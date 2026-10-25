@@ -84,3 +84,42 @@ Full-size frames from the masked recordings of rounds A (Arabic UI) and E (Engli
 
 Owner email on camera (to be masked at source before any clip is committed or cut): quote review «رُفع بواسطة» /
 "Uploaded by" and "Reviewed by", request approval "Assigned to", phone approvals list and detail.
+
+# All-English rounds — Rawaq Restaurant Group (PPS-64) and Liffey Kitchen Group (PPS-65), 2026-10-25
+
+Two more hosted workspaces, with English names, products, suppliers, quotes and UI: Rawaq Restaurant Group (Saudi
+Arabia, SAR, `PP_PROFILE=sa-en`) and Liffey Kitchen Group (Dublin and Cork, EUR, `PP_PROFILE=ie`). Each had a dry
+round and one recorded round, run the same way as the Saudi rounds above. The workspace and data come from
+[`../setup/profiles.cjs`](../setup/profiles.cjs) and the quotes from
+[`../setup/quotes/gen_quotes_en.py`](../setup/quotes/gen_quotes_en.py) (folders `sa-en-round-{D,E}` and
+`ie-round-{D,E}`). The recorder ran with `PP_TENANT=sa-en` / `ie`, and the phone used the English web build. Raw
+clips are in `~/Videos/pp-recording/{sa-en,ie}/en/` on the recording machine.
+
+Every round has the same three lines (oil ×10, basmati ×30, tomatoes ×20). The first supplier is the cheapest and
+sends a WhatsApp photo; the other two send PDFs. Saudi prices include 15% VAT. Irish prices exclude VAT, with a
+zero-rated VAT line and a Subtotal row; #286 stopped that row being counted as an item.
+
+| Workspace | Round | Quotes | PO | Saving recorded |
+|---|---|---|---|---|
+| Rawaq | D, dry | Golden Crescent `GC-26-0412` SAR 5,100 · Red Sea `RS-2026-0318` 4,440 · Qassim `QF-7731` 780 | PO-000001, SAR 5,100 | baseline only |
+| Rawaq | E, recorded | Golden Crescent `GC-26-0437` SAR 4,790 · Red Sea `RS-2026-0342` 4,190 · Qassim `QF-7756` 720 | PO-000002, SAR 4,790 | **SAR 310**; ledger SAR 310.00 |
+| Liffey | D, dry | Brennan & Walsh `BW-26-1184` €1,343 · Atlantic `AFF-2026-0712` €1,111 · Kerrigan `KFP-5521` €272 | PO-000001, €1,343 | ledger €40.00 before round E |
+| Liffey | E, recorded | Brennan & Walsh `BW-26-1219` €1,289.50 · Atlantic `AFF-2026-0748` €1,070 · Kerrigan `KFP-5557` €259 | PO-000002, €1,289.50 | **€53.50**; ledger €93.50 |
+
+Cuts: `docs/gtm/video/cuts/gcc-sa-en-v1/` and `docs/gtm/video/cuts/eu-en-v1/`, built by
+[`../../video/source/edit-sa-en/`](../../video/source/edit-sa-en/) and
+[`../../video/source/edit-ie/`](../../video/source/edit-ie/). Both are forks of `edit-sa` with English only and
+spans retimed to these recordings.
+
+## Screens (English rounds)
+
+These are the same 20 steps as the table above, taken from the masked recordings:
+[`screens/sa-en/`](screens/sa-en/) (Rawaq) and [`screens/ie/`](screens/ie/) (Liffey). The file names match the
+step numbers above.
+
+## Findings (English rounds)
+
+| # | What | Where |
+|---|---|---|
+| b | After an RFQ is sent, the RFQ list can still say "Loading RFQs…" more than a second later (Liffey). So the cut holds on the "RFQ sent. Suppliers emailed: 3" toast. | `/rfq`, Liffey round E |
+| c | Euro amounts drop a trailing zero ("EUR 1,289.5"), and a zero saving shows as red "-SAR 0.00" (PPS-66). | purchase request, `/savings` |

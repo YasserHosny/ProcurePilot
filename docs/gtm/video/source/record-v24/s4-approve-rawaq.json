@@ -1,0 +1,3 @@
+[{"a":"goto","url":"http://localhost:4310/#/home","ms":8000},{"a":"rec"},{"a":"wait","ms":1500},
+{"a":"tap","x":195,"y":256,"pause":2800},{"a":"tap","x":195,"y":95,"pause":4500},
+{"a":"tap","x":287,"y":722,"pause":6000}]
