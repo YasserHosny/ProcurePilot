@@ -17,19 +17,26 @@ _SAR_MARKER = re.compile(
     r"(?-i:SR)(?=[ \t]*\d)|(?<=\d)[ \t]*(?-i:SR))(?![^\W\d_])",
     re.IGNORECASE,
 )
+_EUR_MARKER = re.compile(
+    # "euro"/"euros" must appear right after an amount with a decimal part;
+    # non-currency text like "10 Euro pallets" or "Euro 5" must not count.
+    r"(?<![^\W\d_])(?:EUR|€)(?![^\W\d_])|"
+    r"(?<=\d[.,٫]\d\d)[ \t]*euros?(?![^\W\d_])",
+    re.IGNORECASE,
+)
 _OTHER_MARKER = re.compile(
     r"(?<![^\W\d_])(?:ريال\s+قطري|ريال\s+عُ?ماني|"
-    r"USD|GBP|EUR|AED|QAR|KWD|BHD|OMR|JPY|CAD|AUD|\$|£|€)(?![^\W\d_])",
+    r"USD|GBP|AED|QAR|KWD|BHD|OMR|JPY|CAD|AUD|\$|£)(?![^\W\d_])",
     re.IGNORECASE,
 )
 _ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
 
 
 def detect_currency(text: str) -> str | None:
-    """Return EGP or SAR only with amount-adjacent evidence; conflicts are unknown."""
+    """Return EGP, SAR or EUR only with amount-adjacent evidence; conflicts are unknown."""
     currencies = {
         code
-        for code, pattern in (("EGP", _EGP_MARKER), ("SAR", _SAR_MARKER))
+        for code, pattern in (("EGP", _EGP_MARKER), ("SAR", _SAR_MARKER), ("EUR", _EUR_MARKER))
         if any(_adjacent_to_number(text, *match.span()) for match in pattern.finditer(text))
     }
     if len(currencies) != 1:
@@ -45,7 +52,7 @@ def parse_localised_decimal(value: str | int | Decimal) -> Decimal:
         return value
     text = str(value).translate(_ARABIC_DIGITS).replace("٫", ".").replace("٬", "")
     text = text.replace("−", "-").replace("﹣", "-").strip()
-    text = _SAR_MARKER.sub("", _EGP_MARKER.sub("", text)).strip()
+    text = _EUR_MARKER.sub("", _SAR_MARKER.sub("", _EGP_MARKER.sub("", text))).strip()
     # Leave ASCII separators intact so the established import parser can reject
     # ambiguous comma-only values (for example, "1,234") consistently.
     return decimal_from_extracted(text)
