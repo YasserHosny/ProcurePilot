@@ -44,6 +44,11 @@ _TOTAL_ROW_RE = re.compile(
     r"(?!\s*(?:ال)?فرعي(?![^\W\d_]))",
     re.IGNORECASE,
 )
+_BEFORE_TAX_SUBTOTAL_RE = re.compile(
+    r"^[\s:：\-–]*(?:(?:[\d.,:：()（）/\\\-_%٪\u066a]+|ر\.?\s*س\.?|SAR|SR|ج\.م|LE|EGP|\$|£|€)\s*)*"
+    r"sub[\s\-]*total(?![^\W\d_])",
+    re.IGNORECASE,
+)
 
 
 class AzureDocumentIntelligenceProvider:
@@ -345,6 +350,8 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                     else:
                         stated_total = candidate
                 continue
+            if qty is None and (_is_subtotal_row(label) or _is_subtotal_row(desc)):
+                continue
             if qty is None and _is_tax_row(label):
                 continue
             if qty is None and _is_charge_row(label):
@@ -488,6 +495,11 @@ def _is_total_row(desc: str) -> bool:
 def _is_before_tax_row(desc: str) -> bool:
     n = _normalise_header(desc)
     return "قبل الضريبه" in n or "before tax" in n
+
+
+def _is_subtotal_row(desc: str) -> bool:
+    n = _normalise_header(desc).strip()
+    return _BEFORE_TAX_SUBTOTAL_RE.search(n) is not None
 
 
 def _is_tax_row(desc: str) -> bool:
