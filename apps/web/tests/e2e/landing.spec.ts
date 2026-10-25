@@ -47,52 +47,98 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
     await expect(ironSysLinks.first()).toHaveAttribute('target', '_blank');
   });
 
-  test('next button scrolls the rail so card 2 becomes active', async ({ page }) => {
+  test('five tabs render and clicking step 2 selects it and changes the image src to 02-smart-compare.jpg', async ({ page }) => {
+    await page.goto('/');
+
+    const tabs = page.locator('.gallery-step-btn');
+    await expect(tabs).toHaveCount(5);
+
+    const step1 = tabs.nth(0);
+    const step2 = tabs.nth(1);
+    await expect(step1).toHaveAttribute('aria-selected', 'true');
+    await expect(step2).toHaveAttribute('aria-selected', 'false');
+
+    const initialImg = page.locator('.gallery-card-image.active');
+    await expect(initialImg).toHaveAttribute('src', /\/01-quotation-review\.jpg/);
+
+    await step2.click();
+
+    await expect(step2).toHaveAttribute('aria-selected', 'true');
+    await expect(step1).toHaveAttribute('aria-selected', 'false');
+
+    const activeImg = page.locator('.gallery-card-image.active');
+    await expect(activeImg).toHaveAttribute('src', /\/02-smart-compare\.jpg/);
+  });
+
+  test('Next and Previous buttons navigate between steps and are disabled at the ends', async ({ page }) => {
+    await page.goto('/');
+
+    const prevBtn = page.locator('.gallery-nav-btn.prev-btn');
+    const nextBtn = page.locator('.gallery-nav-btn.next-btn');
+    const tabs = page.locator('.gallery-step-btn');
+
+    await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
+    await expect(prevBtn).toBeDisabled();
+    await expect(nextBtn).toBeEnabled();
+
+    await nextBtn.click();
+    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+    await expect(prevBtn).toBeEnabled();
+
+    // Advance to the last step
+    await nextBtn.click();
+    await nextBtn.click();
+    await nextBtn.click();
+    await expect(tabs.nth(4)).toHaveAttribute('aria-selected', 'true');
+    await expect(nextBtn).toBeDisabled();
+    await expect(prevBtn).toBeEnabled();
+
+    await prevBtn.click();
+    await expect(tabs.nth(3)).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('keyboard navigation: ArrowDown, Home, End move selection and focus follows', async ({ page }) => {
     await page.goto('/');
 
     const step1 = page.locator('.gallery-step-btn').nth(0);
     const step2 = page.locator('.gallery-step-btn').nth(1);
-    await expect(step1).toHaveClass(/active/);
+    const step5 = page.locator('.gallery-step-btn').nth(4);
 
-    const rail = page.locator('.gallery-rail');
-    const initialScrollLeft = await rail.evaluate((el) => el.scrollLeft);
-    const nextBtn = page.locator('.gallery-nav-btn.next-btn');
-    await nextBtn.click();
+    await step1.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(step2).toHaveAttribute('aria-selected', 'true');
+    await expect(step2).toBeFocused();
 
-    await expect(step2).toHaveClass(/active/);
-    const card2 = page.locator('.gallery-card').nth(1);
-    await expect(card2).toHaveClass(/active/);
-    await expect.poll(() => rail.evaluate((el) => el.scrollLeft)).toBeGreaterThan(initialScrollLeft);
+    await page.keyboard.press('End');
+    await expect(step5).toHaveAttribute('aria-selected', 'true');
+    await expect(step5).toBeFocused();
+
+    await page.keyboard.press('Home');
+    await expect(step1).toHaveAttribute('aria-selected', 'true');
+    await expect(step1).toBeFocused();
   });
 
-  test('keyboard ArrowRight on the rail scrolls so card 2 becomes active', async ({ page }) => {
-    await page.goto('/');
-
-    const rail = page.locator('.gallery-rail');
-    await rail.focus();
-    await page.keyboard.press('ArrowRight');
-
-    const step2 = page.locator('.gallery-step-btn').nth(1);
-    await expect(step2).toHaveClass(/active/);
-  });
-
-  test('in Arabic the rail starts at the right and next moves leftwards', async ({ page }) => {
+  test('in RTL / Arabic, ArrowLeft moves forward and Arabic labels render', async ({ page }) => {
     await page.goto('/');
     await page.evaluate(() => {
       localStorage.setItem('pp.locale', 'ar');
     });
     await page.reload();
 
-    const rail = page.locator('.gallery-rail');
-    const initialScrollLeft = await rail.evaluate((el) => el.scrollLeft);
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
 
-    const nextBtn = page.locator('.gallery-nav-btn.next-btn');
-    await nextBtn.click();
+    const tabs = page.locator('.gallery-step-btn');
+    await expect(tabs.nth(0)).toContainText('مراجعة عرض السعر');
+    await expect(tabs.nth(1)).toContainText('المقارنة الذكية');
 
-    const step2 = page.locator('.gallery-step-btn').nth(1);
-    await expect(step2).toHaveClass(/active/);
+    await tabs.nth(0).focus();
+    // In RTL, ArrowLeft moves forward to next step
+    await page.keyboard.press('ArrowLeft');
 
-    await expect.poll(() => rail.evaluate((el) => el.scrollLeft)).toBeLessThan(initialScrollLeft);
+    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+    await expect(tabs.nth(1)).toBeFocused();
+    const activeImg = page.locator('.gallery-card-image.active');
+    await expect(activeImg).toHaveAttribute('src', /\/landing\/ar\/02-smart-compare\.jpg/);
   });
 
   for (const locale of ['en', 'ar'] as const) {
@@ -106,10 +152,10 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
       await expect(page.locator('html')).toHaveAttribute('lang', locale);
       await expect(page.locator('html')).toHaveAttribute('dir', locale === 'ar' ? 'rtl' : 'ltr');
       await expect(page.locator('.hero-headline')).toBeVisible();
-      await expect(page.locator('.gallery-card')).toHaveCount(5);
-      await expect(page.locator('.gallery-card').first()).toHaveAttribute(
-        'aria-roledescription', locale === 'ar' ? 'شريحة' : 'slide'
-      );
+      await expect(page.locator('.gallery-steps')).toHaveAttribute('role', 'tablist');
+      await expect(page.locator('.gallery-step-btn')).toHaveCount(5);
+      await expect(page.locator('.gallery-step-btn').first()).toHaveAttribute('role', 'tab');
+      await expect(page.locator('#gallery-tabpanel')).toHaveAttribute('role', 'tabpanel');
 
       const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
@@ -125,7 +171,7 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
       await page.goto('/');
 
       const html = page.locator('html');
-      const firstImage = page.locator('.gallery-card-image').first();
+      const firstImage = page.locator('.gallery-card-image.active');
       await expect(html).toHaveAttribute('lang', locale);
       await expect(firstImage).toHaveAttribute('src', `/landing/${locale}/01-quotation-review.jpg`);
       await expect.poll(() => page.evaluate(() => Math.abs(window.scrollY))).toBeLessThanOrEqual(1);
@@ -137,6 +183,40 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
       await expect(html).toHaveAttribute('dir', nextLocale === 'ar' ? 'rtl' : 'ltr');
       await expect(firstImage).toHaveAttribute('src', `/landing/${nextLocale}/01-quotation-review.jpg`);
       await expect.poll(() => page.evaluate(() => Math.abs(window.scrollY))).toBeLessThanOrEqual(1);
+    });
+
+    test(`at 375x812 in ${locale}, pressing Next four times keeps active chip inside row bounding box and window.scrollX at 0`, async ({ page }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await page.addInitScript((initialLocale) => {
+        localStorage.setItem('pp.locale', initialLocale);
+      }, locale);
+      await page.goto('/');
+
+      const stepsRow = page.locator('.gallery-steps');
+      await expect(stepsRow).toBeVisible();
+
+      const nextBtn = page.locator('.gallery-nav-btn.next-btn');
+      await expect(nextBtn).toBeVisible();
+
+      for (let i = 1; i <= 4; i++) {
+        await nextBtn.click();
+        const activeChip = page.locator('.gallery-step.active');
+        await expect(activeChip).toBeVisible();
+
+        await expect.poll(async () => {
+          const rowBox = await stepsRow.boundingBox();
+          const chipBox = await activeChip.boundingBox();
+          if (!rowBox || !chipBox) return false;
+
+          return (
+            chipBox.x >= rowBox.x - 1 &&
+            chipBox.x + chipBox.width <= rowBox.x + rowBox.width + 1
+          );
+        }).toBe(true);
+
+        const scrollX = await page.evaluate(() => window.scrollX);
+        expect(scrollX).toBe(0);
+      }
     });
   }
 
@@ -153,7 +233,7 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
   test('Enlarge opens a dialog named by caption, runs axe scan, and Escape closes it returning focus', async ({ page }) => {
     await page.goto('/');
 
-    const enlargeBtn = page.locator('.gallery-card.active .gallery-enlarge-btn');
+    const enlargeBtn = page.locator('.gallery-enlarge-btn');
     await expect(enlargeBtn).toBeVisible();
     await enlargeBtn.focus();
     await enlargeBtn.click();

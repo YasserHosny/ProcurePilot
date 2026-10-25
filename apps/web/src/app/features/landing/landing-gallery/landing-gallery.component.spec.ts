@@ -55,6 +55,7 @@ describe('LandingGalleryComponent', () => {
     it(`does not scroll on first mobile render with initial index ${initialIndex}`, async () => {
       fixture.destroy();
       spyOn(window, 'matchMedia').and.returnValue({ matches: true } as MediaQueryList);
+      const navScrollBy = spyOn(Element.prototype, 'scrollBy');
       const navScrollTo = spyOn(Element.prototype, 'scrollTo');
       const windowScrollTo = spyOn(window, 'scrollTo');
       const scrollIntoView = spyOn(Element.prototype, 'scrollIntoView');
@@ -64,6 +65,7 @@ describe('LandingGalleryComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
 
+      expect(navScrollBy).not.toHaveBeenCalled();
       expect(navScrollTo).not.toHaveBeenCalled();
       expect(windowScrollTo).not.toHaveBeenCalled();
       expect(scrollIntoView).not.toHaveBeenCalled();
@@ -73,32 +75,32 @@ describe('LandingGalleryComponent', () => {
   it('does not scroll the nav or window when locale changes on mobile', async () => {
     spyOn(window, 'matchMedia').and.returnValue({ matches: true } as MediaQueryList);
     const nav: HTMLElement = fixture.nativeElement.querySelector('.gallery-step-index');
-    const navScrollTo = spyOn(nav, 'scrollTo');
+    const navScrollBy = spyOn(nav, 'scrollBy');
     const windowScrollTo = spyOn(window, 'scrollTo');
     const scrollIntoView = spyOn(Element.prototype, 'scrollIntoView');
 
     i18nService.setLocale('ar');
     fixture.detectChanges();
     await fixture.whenStable();
-    expect(navScrollTo).not.toHaveBeenCalled();
+    expect(navScrollBy).not.toHaveBeenCalled();
 
     // An actual index change scrolls only the nav, then a locale change must leave it alone.
     component.activeCardIndex.set(1);
     fixture.detectChanges();
     await fixture.whenStable();
-    expect(navScrollTo).toHaveBeenCalledTimes(1);
-    navScrollTo.calls.reset();
+    expect(navScrollBy).toHaveBeenCalledTimes(1);
+    navScrollBy.calls.reset();
 
     i18nService.setLocale('en');
     fixture.detectChanges();
     await fixture.whenStable();
-    expect(navScrollTo).not.toHaveBeenCalled();
+    expect(navScrollBy).not.toHaveBeenCalled();
     expect(windowScrollTo).not.toHaveBeenCalled();
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
   for (const locale of ['en', 'ar'] as const) {
-    it(`scrolls only the mobile step nav using ${locale} offsets when the index changes`, async () => {
+    it(`scrolls only the mobile step nav using ${locale} layout bounds when the index changes`, async () => {
       spyOn(window, 'matchMedia').and.returnValue({ matches: true } as MediaQueryList);
       i18nService.setLocale(locale);
       fixture.detectChanges();
@@ -106,69 +108,99 @@ describe('LandingGalleryComponent', () => {
 
       const nav: HTMLElement = fixture.nativeElement.querySelector('.gallery-step-index');
       const step: HTMLElement = fixture.nativeElement.querySelectorAll('.gallery-step-btn')[1];
-      spyOnProperty(nav, 'clientWidth', 'get').and.returnValue(320);
-      spyOnProperty(step, 'offsetLeft', 'get').and.returnValue(locale === 'ar' ? -100 : 240);
-      spyOnProperty(step, 'offsetWidth', 'get').and.returnValue(80);
-      const navScrollTo: jasmine.Spy<(options: ScrollToOptions) => void> = spyOn(nav, 'scrollTo');
+      spyOn(nav, 'getBoundingClientRect').and.returnValue({
+        left: 20,
+        right: 340,
+        top: 0,
+        bottom: 40,
+        width: 320,
+        height: 40,
+        x: 20,
+        y: 0,
+      } as unknown as DOMRect);
+      spyOn(step, 'getBoundingClientRect').and.returnValue({
+        left: locale === 'ar' ? -60 : 260,
+        right: locale === 'ar' ? 20 : 340,
+        top: 0,
+        bottom: 40,
+        width: 80,
+        height: 40,
+        x: locale === 'ar' ? -60 : 260,
+        y: 0,
+      } as unknown as DOMRect);
+      const navScrollBy: jasmine.Spy<(options: ScrollToOptions) => void> = spyOn(nav, 'scrollBy');
       const windowScrollTo = spyOn(window, 'scrollTo');
       const scrollIntoView = spyOn(Element.prototype, 'scrollIntoView');
 
       component.activeCardIndex.set(1);
       fixture.detectChanges();
       await fixture.whenStable();
-      expect(navScrollTo).toHaveBeenCalledOnceWith({
-        left: locale === 'ar' ? -340 : 240,
+      expect(navScrollBy).toHaveBeenCalledOnceWith({
+        left: locale === 'ar' ? -320 : 240,
         behavior: 'instant',
       });
 
       component.activeCardIndex.set(1);
       fixture.detectChanges();
       await fixture.whenStable();
-      expect(navScrollTo).toHaveBeenCalledTimes(1);
+      expect(navScrollBy).toHaveBeenCalledTimes(1);
       expect(windowScrollTo).not.toHaveBeenCalled();
       expect(scrollIntoView).not.toHaveBeenCalled();
     });
   }
 
-  it('rail renders 5 cards with numbered labels and captions', () => {
-    const cards = fixture.debugElement.queryAll(By.css('.gallery-card'));
-    expect(cards.length).toBe(5);
-    for (let i = 0; i < cards.length; i++) {
-      const card = cards[i];
-      const numLabel = card.query(By.css('.gallery-card-numbered-label'));
-      expect(numLabel).toBeTruthy();
-      expect(numLabel.nativeElement.textContent).toContain(component.galleryCards[i].num);
+  it('renders 5 steps with numbered badges, labels, and captions', () => {
+    const steps = fixture.debugElement.queryAll(By.css('.gallery-step'));
+    expect(steps.length).toBe(5);
 
-      const caption = card.query(By.css('.gallery-caption-sentence'));
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const badge = step.query(By.css('.gallery-step-badge'));
+      expect(badge).toBeTruthy();
+      expect(badge.nativeElement.textContent.trim()).toBe(translate.instant(component.galleryCards[i].numKey));
+
+      const label = step.query(By.css('.gallery-step-label'));
+      expect(label).toBeTruthy();
+      expect(label.nativeElement.textContent.trim()).toBe(translate.instant(component.galleryCards[i].labelKey));
+
+      const caption = step.query(By.css('.gallery-step-caption'));
       expect(caption).toBeTruthy();
-      expect(caption.nativeElement.textContent.trim().length).toBeGreaterThan(0);
+      expect(caption.nativeElement.textContent.trim()).toBe(translate.instant(component.galleryCards[i].captionKey));
     }
   });
 
   for (const locale of ['en', 'ar'] as const) {
-    it(`renders a named carousel with five localized slides in ${locale}`, () => {
+    it(`renders a tablist with five localized tabs in ${locale}`, () => {
       i18nService.setLocale(locale);
       translate.use(locale);
       fixture.detectChanges();
 
-      const rail: HTMLElement = fixture.nativeElement.querySelector('div.gallery-rail');
-      expect(rail).not.toBeNull();
-      expect(rail.getAttribute('role')).toBe('group');
-      expect(rail.getAttribute('tabindex')).toBe('0');
-      expect(rail.getAttribute('aria-roledescription')).toBe('carousel');
-      expect(rail.getAttribute('aria-label')).toBe(translate.instant('landing.gallery.railLabel'));
+      const tablist: HTMLElement = fixture.nativeElement.querySelector('ol.gallery-steps');
+      expect(tablist).not.toBeNull();
+      expect(tablist.getAttribute('role')).toBe('tablist');
+      expect(tablist.getAttribute('aria-orientation')).toBe(component.ariaOrientation());
 
-      const cards = rail.querySelectorAll('div.gallery-card');
-      expect(cards.length).toBe(5);
-      cards.forEach((card, index) => {
-        expect(card.getAttribute('role')).toBe('group');
-        expect(card.getAttribute('aria-roledescription')).toBe(locale === 'ar' ? 'شريحة' : 'slide');
-        const label = translate.instant(component.galleryCards[index].labelKey);
-        expect(card.getAttribute('aria-label')).toBe(
-          locale === 'ar' ? `${index + 1} من ٥: ${label}` : `${index + 1} of 5: ${label}`
-        );
+      const tabs = tablist.querySelectorAll('button.gallery-step-btn');
+      expect(tabs.length).toBe(5);
+      tabs.forEach((tab, index) => {
+        expect(tab.getAttribute('role')).toBe('tab');
+        expect(tab.getAttribute('id')).toBe(`gallery-tab-${index}`);
+        expect(tab.getAttribute('aria-controls')).toBe('gallery-tabpanel');
+        expect(tab.getAttribute('aria-selected')).toBe(index === 0 ? 'true' : 'false');
+        expect(tab.getAttribute('tabindex')).toBe(index === 0 ? '0' : '-1');
       });
-      expect(rail.querySelector('[role="list"], li')).toBeNull();
+
+      const tabpanel: HTMLElement = fixture.nativeElement.querySelector('#gallery-tabpanel');
+      expect(tabpanel).not.toBeNull();
+      expect(tabpanel.getAttribute('role')).toBe('tabpanel');
+      expect(tabpanel.getAttribute('aria-labelledby')).toBe('gallery-tab-0');
+
+      const counter: HTMLElement = fixture.nativeElement.querySelector('.gallery-counter');
+      expect(counter.textContent?.trim()).toBe(
+        translate.instant('landing.gallery.counter', {
+          n: translate.instant(component.galleryCards[0].numKey),
+        })
+      );
     });
   }
 
@@ -191,33 +223,58 @@ describe('LandingGalleryComponent', () => {
     const stepBtns = fixture.debugElement.queryAll(By.css('.gallery-step-btn'));
     expect(stepBtns.length).toBe(5);
 
-    expect(stepBtns[0].nativeElement.classList).toContain('active');
-    expect(stepBtns[0].nativeElement.getAttribute('aria-current')).toBe('true');
-    expect(stepBtns[1].nativeElement.classList).not.toContain('active');
+    const stepItems = fixture.debugElement.queryAll(By.css('.gallery-step'));
+    expect(stepItems[0].nativeElement.classList).toContain('active');
+    expect(stepBtns[0].nativeElement.getAttribute('aria-selected')).toBe('true');
+    expect(stepBtns[1].nativeElement.getAttribute('aria-selected')).toBe('false');
 
     stepBtns[1].nativeElement.click();
     fixture.detectChanges();
 
     expect(component.activeCardIndex()).toBe(1);
-    expect(stepBtns[1].nativeElement.classList).toContain('active');
-    expect(stepBtns[1].nativeElement.getAttribute('aria-current')).toBe('true');
-    expect(stepBtns[0].nativeElement.classList).not.toContain('active');
+    expect(stepItems[1].nativeElement.classList).toContain('active');
+    expect(stepItems[0].nativeElement.classList).toContain('done');
+    expect(stepBtns[1].nativeElement.getAttribute('aria-selected')).toBe('true');
+    expect(stepBtns[0].nativeElement.getAttribute('aria-selected')).toBe('false');
   });
 
-  it('moves active card with ArrowRight/Left (mirrored when dir=rtl)', () => {
-    const rail = fixture.debugElement.query(By.css('.gallery-rail'));
+  it('moves active card with ArrowDown/Up and ArrowRight/Left (mirrored when dir=rtl)', () => {
+    const getActiveBtn = () => fixture.debugElement.query(By.css('.gallery-step-btn[aria-selected="true"]'));
 
     expect(component.isRtl()).toBeFalse();
     expect(component.activeCardIndex()).toBe(0);
 
-    rail.triggerEventHandler('keydown', { key: 'ArrowRight', preventDefault: jasmine.createSpy() });
+    // ArrowDown moves next
+    getActiveBtn().triggerEventHandler('keydown', { key: 'ArrowDown', preventDefault: jasmine.createSpy() });
     fixture.detectChanges();
     expect(component.activeCardIndex()).toBe(1);
 
-    rail.triggerEventHandler('keydown', { key: 'ArrowLeft', preventDefault: jasmine.createSpy() });
+    // ArrowUp moves prev
+    getActiveBtn().triggerEventHandler('keydown', { key: 'ArrowUp', preventDefault: jasmine.createSpy() });
     fixture.detectChanges();
     expect(component.activeCardIndex()).toBe(0);
 
+    // ArrowRight moves next in LTR
+    getActiveBtn().triggerEventHandler('keydown', { key: 'ArrowRight', preventDefault: jasmine.createSpy() });
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(1);
+
+    // ArrowLeft moves prev in LTR
+    getActiveBtn().triggerEventHandler('keydown', { key: 'ArrowLeft', preventDefault: jasmine.createSpy() });
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(0);
+
+    // End jumps to last
+    getActiveBtn().triggerEventHandler('keydown', { key: 'End', preventDefault: jasmine.createSpy() });
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(4);
+
+    // Home jumps to first
+    getActiveBtn().triggerEventHandler('keydown', { key: 'Home', preventDefault: jasmine.createSpy() });
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(0);
+
+    // RTL switch
     i18nService.setLocale('ar');
     translate.use('ar');
     fixture.detectChanges();
@@ -228,21 +285,24 @@ describe('LandingGalleryComponent', () => {
     expect(component.activeCardIndex()).toBe(1);
 
     // In RTL: ArrowRight moves prev (1 -> 0)
-    rail.triggerEventHandler('keydown', { key: 'ArrowRight', preventDefault: jasmine.createSpy() });
+    getActiveBtn().triggerEventHandler('keydown', { key: 'ArrowRight', preventDefault: jasmine.createSpy() });
     fixture.detectChanges();
     expect(component.activeCardIndex()).toBe(0);
 
     // In RTL: ArrowLeft moves next (0 -> 1)
-    rail.triggerEventHandler('keydown', { key: 'ArrowLeft', preventDefault: jasmine.createSpy() });
+    getActiveBtn().triggerEventHandler('keydown', { key: 'ArrowLeft', preventDefault: jasmine.createSpy() });
     fixture.detectChanges();
     expect(component.activeCardIndex()).toBe(1);
   });
 
-  it('enlarge opens the dialog at the right index and dialog prev/next change the image', () => {
-    const cardEnlargeBtns = fixture.debugElement.queryAll(By.css('.gallery-enlarge-btn'));
-    expect(cardEnlargeBtns.length).toBe(5);
+  it('enlarge opens the dialog at the right index', () => {
+    const enlargeBtn = fixture.debugElement.query(By.css('.gallery-enlarge-btn'));
+    expect(enlargeBtn).toBeTruthy();
 
-    cardEnlargeBtns[1].triggerEventHandler('click', null);
+    component.scrollToCard(1);
+    fixture.detectChanges();
+
+    enlargeBtn.triggerEventHandler('click', { stopPropagation: jasmine.createSpy() });
 
     expect(dialogSpy.open).toHaveBeenCalledWith(
       ScreenshotDialogComponent,
@@ -253,5 +313,74 @@ describe('LandingGalleryComponent', () => {
         restoreFocus: true,
       })
     );
+  });
+
+  it('focusing the enlarge button and pressing Enter opens MatDialog exactly once', () => {
+    const enlargeBtn = fixture.debugElement.query(By.css('.gallery-enlarge-btn'));
+    expect(enlargeBtn).toBeTruthy();
+
+    enlargeBtn.nativeElement.focus();
+
+    // Pressing Enter on a focused button dispatches keydown (which bubbles to panel) and triggers click
+    enlargeBtn.nativeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    enlargeBtn.nativeElement.click();
+    fixture.detectChanges();
+
+    expect(dialogSpy.open).toHaveBeenCalledTimes(1);
+    expect(dialogSpy.open).toHaveBeenCalledWith(
+      ScreenshotDialogComponent,
+      jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          initialIndex: 0,
+        }),
+        restoreFocus: true,
+      })
+    );
+  });
+
+  it('marks all list items with role="presentation" for tablist a11y', () => {
+    const listItems = fixture.nativeElement.querySelectorAll('li.gallery-step');
+    expect(listItems.length).toBe(5);
+    listItems.forEach((li: HTMLElement) => {
+      expect(li.getAttribute('role')).toBe('presentation');
+    });
+  });
+
+  it('reflects layout orientation in aria-orientation attribute ("vertical" on desktop, "horizontal" on phone)', () => {
+    const tablist: HTMLElement = fixture.nativeElement.querySelector('ol[role="tablist"]');
+
+    component.isPhone.set(false);
+    fixture.detectChanges();
+    expect(tablist.getAttribute('aria-orientation')).toBe('vertical');
+
+    component.isPhone.set(true);
+    fixture.detectChanges();
+    expect(tablist.getAttribute('aria-orientation')).toBe('horizontal');
+  });
+
+  it('updates aria-orientation via media query change listener and cleans up on destroy', () => {
+    let changeHandler: ((e: MediaQueryListEvent) => void) | undefined;
+    const mockMql = {
+      matches: false,
+      addEventListener: jasmine.createSpy('addEventListener').and.callFake((event: string, handler: (e: MediaQueryListEvent) => void) => {
+        if (event === 'change') changeHandler = handler;
+      }),
+      removeEventListener: jasmine.createSpy('removeEventListener'),
+    } as unknown as MediaQueryList;
+
+    spyOn(window, 'matchMedia').and.returnValue(mockMql);
+
+    const testFixture = TestBed.createComponent(LandingGalleryComponent);
+    testFixture.detectChanges();
+    const tablist: HTMLElement = testFixture.nativeElement.querySelector('ol[role="tablist"]');
+    expect(tablist.getAttribute('aria-orientation')).toBe('vertical');
+    expect(mockMql.addEventListener).toHaveBeenCalledWith('change', jasmine.any(Function));
+
+    changeHandler?.({ matches: true } as MediaQueryListEvent);
+    testFixture.detectChanges();
+    expect(tablist.getAttribute('aria-orientation')).toBe('horizontal');
+
+    testFixture.destroy();
+    expect(mockMql.removeEventListener).toHaveBeenCalledWith('change', jasmine.any(Function));
   });
 });

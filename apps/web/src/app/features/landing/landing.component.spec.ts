@@ -77,16 +77,20 @@ describe('LandingComponent', () => {
     }
   });
 
-  it('rail renders 5 cards with numbered labels and captions', () => {
-    const cards = fixture.debugElement.queryAll(By.css('.gallery-card'));
-    expect(cards.length).toBe(5);
-    for (let i = 0; i < cards.length; i++) {
-      const card = cards[i];
-      const numLabel = card.query(By.css('.gallery-card-numbered-label'));
-      expect(numLabel).toBeTruthy();
-      expect(numLabel.nativeElement.textContent).toContain(component.galleryCards[i].num);
+  it('gallery renders 5 steps with numbered labels and captions', () => {
+    const steps = fixture.debugElement.queryAll(By.css('.gallery-step'));
+    expect(steps.length).toBe(5);
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const badge = step.query(By.css('.gallery-step-badge'));
+      expect(badge).toBeTruthy();
+      expect(badge.nativeElement.textContent).toContain(component.galleryCards[i].num);
 
-      const caption = card.query(By.css('.gallery-caption-sentence'));
+      const label = step.query(By.css('.gallery-step-label'));
+      expect(label).toBeTruthy();
+      expect(label.nativeElement.textContent.trim().length).toBeGreaterThan(0);
+
+      const caption = step.query(By.css('.gallery-step-caption'));
       expect(caption).toBeTruthy();
       expect(caption.nativeElement.textContent.trim().length).toBeGreaterThan(0);
     }
@@ -111,33 +115,58 @@ describe('LandingComponent', () => {
     const stepBtns = fixture.debugElement.queryAll(By.css('.gallery-step-btn'));
     expect(stepBtns.length).toBe(5);
 
-    expect(stepBtns[0].nativeElement.classList).toContain('active');
-    expect(stepBtns[0].nativeElement.getAttribute('aria-current')).toBe('true');
-    expect(stepBtns[1].nativeElement.classList).not.toContain('active');
+    const stepItems = fixture.debugElement.queryAll(By.css('.gallery-step'));
+    expect(stepItems[0].nativeElement.classList).toContain('active');
+    expect(stepBtns[0].nativeElement.getAttribute('aria-selected')).toBe('true');
+    expect(stepBtns[1].nativeElement.getAttribute('aria-selected')).toBe('false');
 
     stepBtns[1].nativeElement.click();
     fixture.detectChanges();
 
     expect(component.activeCardIndex()).toBe(1);
-    expect(stepBtns[1].nativeElement.classList).toContain('active');
-    expect(stepBtns[1].nativeElement.getAttribute('aria-current')).toBe('true');
-    expect(stepBtns[0].nativeElement.classList).not.toContain('active');
+    expect(stepItems[1].nativeElement.classList).toContain('active');
+    expect(stepItems[0].nativeElement.classList).toContain('done');
+    expect(stepBtns[1].nativeElement.getAttribute('aria-selected')).toBe('true');
+    expect(stepBtns[0].nativeElement.getAttribute('aria-selected')).toBe('false');
   });
 
-  it('moves active card with ArrowRight/Left (mirrored when dir=rtl)', () => {
-    const rail = fixture.debugElement.query(By.css('.gallery-rail'));
+  it('moves active card with ArrowDown/Up and ArrowRight/Left (mirrored when dir=rtl)', () => {
+    const getActiveBtn = () => fixture.debugElement.query(By.css('.gallery-step-btn[aria-selected="true"]'));
 
     expect(component.isRtl()).toBeFalse();
     expect(component.activeCardIndex()).toBe(0);
 
-    rail.triggerEventHandler('keydown', { key: 'ArrowRight', preventDefault: jasmine.createSpy() });
+    // ArrowDown moves next
+    getActiveBtn().triggerEventHandler('keydown', { key: 'ArrowDown', preventDefault: jasmine.createSpy() });
     fixture.detectChanges();
     expect(component.activeCardIndex()).toBe(1);
 
-    rail.triggerEventHandler('keydown', { key: 'ArrowLeft', preventDefault: jasmine.createSpy() });
+    // ArrowUp moves prev
+    getActiveBtn().triggerEventHandler('keydown', { key: 'ArrowUp', preventDefault: jasmine.createSpy() });
     fixture.detectChanges();
     expect(component.activeCardIndex()).toBe(0);
 
+    // ArrowRight moves next in LTR
+    getActiveBtn().triggerEventHandler('keydown', { key: 'ArrowRight', preventDefault: jasmine.createSpy() });
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(1);
+
+    // ArrowLeft moves prev in LTR
+    getActiveBtn().triggerEventHandler('keydown', { key: 'ArrowLeft', preventDefault: jasmine.createSpy() });
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(0);
+
+    // End jumps to last
+    getActiveBtn().triggerEventHandler('keydown', { key: 'End', preventDefault: jasmine.createSpy() });
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(4);
+
+    // Home jumps to first
+    getActiveBtn().triggerEventHandler('keydown', { key: 'Home', preventDefault: jasmine.createSpy() });
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(0);
+
+    // RTL switch
     i18nService.setLocale('ar');
     translate.use('ar');
     fixture.detectChanges();
@@ -148,12 +177,12 @@ describe('LandingComponent', () => {
     expect(component.activeCardIndex()).toBe(1);
 
     // In RTL: ArrowRight moves prev (1 -> 0)
-    rail.triggerEventHandler('keydown', { key: 'ArrowRight', preventDefault: jasmine.createSpy() });
+    getActiveBtn().triggerEventHandler('keydown', { key: 'ArrowRight', preventDefault: jasmine.createSpy() });
     fixture.detectChanges();
     expect(component.activeCardIndex()).toBe(0);
 
     // In RTL: ArrowLeft moves next (0 -> 1)
-    rail.triggerEventHandler('keydown', { key: 'ArrowLeft', preventDefault: jasmine.createSpy() });
+    getActiveBtn().triggerEventHandler('keydown', { key: 'ArrowLeft', preventDefault: jasmine.createSpy() });
     fixture.detectChanges();
     expect(component.activeCardIndex()).toBe(1);
   });
@@ -173,10 +202,13 @@ describe('LandingComponent', () => {
   });
 
   it('enlarge opens the dialog at the right index and dialog prev/next change the image', () => {
-    const cardEnlargeBtns = fixture.debugElement.queryAll(By.css('.gallery-enlarge-btn'));
-    expect(cardEnlargeBtns.length).toBe(5);
+    component.scrollToCard(1);
+    fixture.detectChanges();
 
-    cardEnlargeBtns[1].triggerEventHandler('click', null);
+    const enlargeBtn = fixture.debugElement.query(By.css('.gallery-enlarge-btn'));
+    expect(enlargeBtn).toBeTruthy();
+
+    enlargeBtn.triggerEventHandler('click', { stopPropagation: jasmine.createSpy() });
 
     expect(dialogSpy.open).toHaveBeenCalledWith(
       ScreenshotDialogComponent,

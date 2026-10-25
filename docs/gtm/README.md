@@ -14,6 +14,7 @@ Jira keys, and the handoff log.
 | [`demo-tenant/`](demo-tenant/) | Demo tenants (PP-5 / G-1): plan, restaurant dataset «مطاعم سند» on hosted, findings from building it live, lookups review |
 | [`demo-tenant/round-1/`](demo-tenant/round-1/) | Round 1 walkthrough with live screenshots: RFQ → supplier quotes → compare → request → approval → PO-000001 on the demo tenant |
 | [`demo-tenant/pps50-quote-expiry/`](demo-tenant/pps50-quote-expiry/) | PPS-50 hosted check with screenshots: the round-7 الأمانة photo quote, expiry confirmed as-is → Smart Compare shows «صالح حتى 2026/11/03» (EN + AR); UTC-timezone date-shift finding |
+| [`demo-tenant/pps62-landing-gallery/`](demo-tenant/pps62-landing-gallery/) | PPS-62 landing gallery before/after: snap rail → guided steps, EN + AR, desktop and 375px |
 | [`video/production-tracker.md`](video/production-tracker.md) | Demo video production tracker: what is left before recording (product flow, demo data, production), owners, status, user inputs |
 | [`video/`](video/) | Demo video spec and decisions (PP-6): style, storyboard with music map, beat-locked logo sting, end card, audio sources and licences, beat data, render scripts |
 | [`company-formation/us-company-fb-research.md`](company-formation/us-company-fb-research.md) | Research (Arabic): 13 posts + all comments from the Lean Startup Circle Egypt Facebook group on forming a US company from Egypt — per-post analysis, option comparison, consensus vs. disputed claims, providers |
