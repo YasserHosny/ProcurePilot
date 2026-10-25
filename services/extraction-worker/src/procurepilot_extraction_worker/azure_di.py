@@ -44,6 +44,11 @@ _TOTAL_ROW_RE = re.compile(
     r"(?!\s*(?:ال)?فرعي(?![^\W\d_]))",
     re.IGNORECASE,
 )
+_BEFORE_TAX_SUBTOTAL_RE = re.compile(
+    r"^[\s:：\-–]*(?:(?:[\d.,:：()（）/\\\-_%٪\u066a]+|ر\.?\s*س\.?|SAR|SR|ج\.م|LE|EGP|\$|£|€)\s*)*"
+    r"sub[\s\-]*total(?![^\W\d_])",
+    re.IGNORECASE,
+)
 
 
 class AzureDocumentIntelligenceProvider:
@@ -289,10 +294,11 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                 if amt is not None:
                     numeric_amounts.append(amt)
             fallback_amount = total or (numeric_amounts[-1] if numeric_amounts else None)
+            is_before_tax = _is_before_tax_row(label) or _is_before_tax_row(desc)
             is_total = (
                 qty is None
                 and not (price and total)
-                and (_is_total_row(label) or _is_total_row(desc))
+                and (_is_total_row(label) or _is_total_row(desc) or is_before_tax)
             )
             if is_total and fallback_amount is None:
                 sorted_cols = sorted(expanded.keys(), reverse=True)
@@ -306,7 +312,11 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
 
                 for col in sorted_cols:
                     val = expanded[col]
-                    if _is_total_row(val) or (bool(desc) and val == desc):
+                    if (
+                        _is_total_row(val)
+                        or _is_before_tax_row(val)
+                        or (bool(desc) and val == desc)
+                    ):
                         continue
                     if (
                         _SAR_MARKER.search(val)
@@ -322,7 +332,11 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                 if fallback_amount is None:
                     for col in sorted_cols:
                         val = expanded[col]
-                        if _is_total_row(val) or (bool(desc) and val == desc):
+                        if (
+                            _is_total_row(val)
+                            or _is_before_tax_row(val)
+                            or (bool(desc) and val == desc)
+                        ):
                             continue
                         amt = _cell_amount(val)
                         if amt:
@@ -340,7 +354,7 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                 amount = fallback_amount or price
                 if amount:
                     candidate = _money_field("stated_total", amount, currency, 0.9)
-                    if _is_before_tax_row(label) or _is_before_tax_row(desc):
+                    if is_before_tax:
                         before_tax_total = candidate
                     else:
                         stated_total = candidate
@@ -486,8 +500,8 @@ def _is_total_row(desc: str) -> bool:
 
 
 def _is_before_tax_row(desc: str) -> bool:
-    n = _normalise_header(desc)
-    return "قبل الضريبه" in n or "before tax" in n
+    n = _normalise_header(desc).strip()
+    return "قبل الضريبه" in n or "before tax" in n or _BEFORE_TAX_SUBTOTAL_RE.search(n) is not None
 
 
 def _is_tax_row(desc: str) -> bool:
@@ -571,7 +585,7 @@ def _find_grand_total(text: str, currency: str | None) -> ExtractedField | None:
     before_tax: ExtractedField | None = None
     grand_total: ExtractedField | None = None
     for line in text.splitlines():
-        if _is_total_row(line):
+        if _is_total_row(line) or _is_before_tax_row(line):
             clean_line = _PERCENTAGE_PATTERN.sub("", line)
             amounts = re.findall(r"[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*", clean_line)
             if amounts:
@@ -600,7 +614,10 @@ def _find_grand_total(text: str, currency: str | None) -> ExtractedField | None:
 
 
 def _has_before_tax_total(text: str) -> bool:
-    return any(_is_total_row(line) and _is_before_tax_row(line) for line in text.splitlines())
+    return any(
+        (_is_total_row(line) or _is_before_tax_row(line)) and _is_before_tax_row(line)
+        for line in text.splitlines()
+    )
 
 
 def _has_currency_conflict(text: str) -> bool:

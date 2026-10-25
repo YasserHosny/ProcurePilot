@@ -5,11 +5,13 @@ import pytest
 from procurepilot_extraction_worker.azure_di import (
     _clean_number,
     _find_grand_total,
+    _is_before_tax_row,
     _is_total_row,
     _numeric_cell_amount,
     _parse_invoice_result,
 )
 from procurepilot_extraction_worker.validation import validate_arithmetic
+from procurepilot_extraction_worker.worker import SupplierMatch, _review_reason
 
 
 def _make_table_payload(item_rows: list[list[str]], total_label: str, total_amount: str) -> dict:
@@ -355,3 +357,181 @@ def test_items_without_quantity_not_swallowed_as_total_row() -> None:
     assert result_en.expected_line_count == 1
     assert result_en.stated_total is not None
     assert result_en.stated_total.value == {"amount": "50.00", "currency": "SAR"}
+
+
+def _make_irish_demo_payload(
+    item_rows: list[list[str]],
+    subtotal: str = "€1,111.00",
+    vat: str = "€0.00",
+    total: str = "€1,111.00",
+    subtotal_label: str = "Subtotal",
+) -> dict:
+    headers = ["#", "Item", "Pack", "Qty", "Price per pack (excl. VAT)", "Amount"]
+    cells: list[dict] = []
+    for col, h in enumerate(headers):
+        cells.append({"rowIndex": 0, "columnIndex": col, "columnSpan": 1, "content": h})
+
+    current_row = 1
+    for row_data in item_rows:
+        for col, val in enumerate(row_data):
+            cells.append(
+                {"rowIndex": current_row, "columnIndex": col, "columnSpan": 1, "content": val}
+            )
+        current_row += 1
+
+    cells.append(
+        {"rowIndex": current_row, "columnIndex": 0, "columnSpan": 5, "content": subtotal_label}
+    )
+    cells.append({"rowIndex": current_row, "columnIndex": 5, "columnSpan": 1, "content": subtotal})
+    current_row += 1
+
+    cells.append(
+        {
+            "rowIndex": current_row,
+            "columnIndex": 0,
+            "columnSpan": 5,
+            "content": "VAT 0% (zero-rated food)",
+        }
+    )
+    cells.append({"rowIndex": current_row, "columnIndex": 5, "columnSpan": 1, "content": vat})
+    current_row += 1
+
+    cells.append({"rowIndex": current_row, "columnIndex": 0, "columnSpan": 5, "content": "Total"})
+    cells.append({"rowIndex": current_row, "columnIndex": 5, "columnSpan": 1, "content": total})
+
+    return {
+        "content": f"{subtotal_label} {subtotal} VAT 0% {vat} Total {total}",
+        "tables": [{"columnCount": 6, "rowCount": current_row + 1, "cells": cells}],
+    }
+
+
+def test_irish_demo_layout_subtotal_reconciles_and_avoids_line_count_mismatch() -> None:
+    payload = _make_irish_demo_payload(
+        [
+            ["1", "Sunflower Oil", "20 L drum", "10", "€43.90", "€439.00"],
+            ["2", "Basmati Rice", "10 kg bag", "30", "€22.40", "€672.00"],
+        ],
+        subtotal="€1,111.00",
+        vat="€0.00",
+        total="€1,111.00",
+    )
+    result = _parse_invoice_result(payload, "layout:test")
+
+    assert len(result.lines) == 2
+    assert result.expected_line_count == 2 == len(result.lines)
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "1111.00", "currency": "EUR"}
+
+    validation = validate_arithmetic(result)
+    assert validation.status == "reconciled"
+
+    no_match = SupplierMatch(supplier_id=None, confidence=None, had_candidates=False)
+    review_reason = _review_reason(result, validation.status, 0.85, no_match)
+    assert review_reason != "line_count_mismatch"
+    assert review_reason is None
+
+
+def test_irish_demo_layout_one_line_variant_tomatoes() -> None:
+    payload = _make_irish_demo_payload(
+        [
+            ["1", "Tomatoes", "6 kg box", "20", "€13.60", "€272.00"],
+        ],
+        subtotal="€272.00",
+        vat="€0.00",
+        total="€272.00",
+    )
+    result = _parse_invoice_result(payload, "layout:test")
+
+    assert len(result.lines) == 1
+    assert result.expected_line_count == 1 == len(result.lines)
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "272.00", "currency": "EUR"}
+
+    validation = validate_arithmetic(result)
+    assert validation.status == "reconciled"
+
+    no_match = SupplierMatch(supplier_id=None, confidence=None, had_candidates=False)
+    review_reason = _review_reason(result, validation.status, 0.85, no_match)
+    assert review_reason != "line_count_mismatch"
+    assert review_reason is None
+
+
+@pytest.mark.parametrize(
+    "label",
+    ["subtotal", "sub-total", "sub total", "Sub-total", "Sub total", "SUBTOTAL"],
+)
+def test_subtotal_variants_recognized_as_before_tax(label: str) -> None:
+    assert _is_before_tax_row(label) is True
+    payload = _make_irish_demo_payload(
+        [
+            ["1", "Tomatoes", "6 kg box", "20", "€13.60", "€272.00"],
+        ],
+        subtotal="€272.00",
+        vat="€0.00",
+        total="€272.00",
+        subtotal_label=label,
+    )
+    result = _parse_invoice_result(payload, "layout:test")
+    assert result.expected_line_count == 1 == len(result.lines)
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "272.00", "currency": "EUR"}
+
+
+def test_negative_total_weight_and_item_total_weight_handled_as_before() -> None:
+    # "Total weight 25 kg" starts with Total so it matches _is_total_row,
+    # but it is NOT a before-tax row.
+    assert _is_total_row("Total weight 25 kg") is True
+    assert _is_before_tax_row("Total weight 25 kg") is False
+
+    # "Item total weight" has total inside, not at the start, so it is neither
+    # a total row nor a before-tax row.
+    assert _is_total_row("Item total weight") is False
+    assert _is_before_tax_row("Item total weight") is False
+
+    # An item row named "Total weight 25 kg" with price and total stays a line
+    payload_line = _make_table_payload(
+        [["Total weight 25 kg", "1", "50.00", "50.00"]],
+        "Total",
+        "50.00 EUR",
+    )
+    result_line = _parse_invoice_result(payload_line, "layout:test")
+    assert len(result_line.lines) == 1
+    assert result_line.lines[0].original_text == "Total weight 25 kg"
+    assert result_line.expected_line_count == 1
+
+    # An item row named "Total weight 25 kg" with price/total but missing quantity
+    # is not swallowed as a total row; it increments expected without adding a line
+    payload_no_qty = _make_table_payload(
+        [["Total weight 25 kg", "", "50.00", "50.00"]],
+        "Total",
+        "50.00 EUR",
+    )
+    result_no_qty = _parse_invoice_result(payload_no_qty, "layout:test")
+    assert len(result_no_qty.lines) == 0
+    assert result_no_qty.expected_line_count == 1
+
+    # Summary row with "Total weight 25 kg" with no price and no total in a table
+    # behaves as before (recognized as total row, not before-tax, and overridden by Grand Total)
+    cells = [
+        {"rowIndex": 0, "columnIndex": 0, "columnSpan": 1, "content": "Item"},
+        {"rowIndex": 0, "columnIndex": 1, "columnSpan": 1, "content": "Qty"},
+        {"rowIndex": 0, "columnIndex": 2, "columnSpan": 1, "content": "Price"},
+        {"rowIndex": 0, "columnIndex": 3, "columnSpan": 1, "content": "Amount"},
+        {"rowIndex": 1, "columnIndex": 0, "columnSpan": 1, "content": "Oil"},
+        {"rowIndex": 1, "columnIndex": 1, "columnSpan": 1, "content": "10"},
+        {"rowIndex": 1, "columnIndex": 2, "columnSpan": 1, "content": "€43.90"},
+        {"rowIndex": 1, "columnIndex": 3, "columnSpan": 1, "content": "€439.00"},
+        {"rowIndex": 2, "columnIndex": 0, "columnSpan": 3, "content": "Total weight 25 kg"},
+        {"rowIndex": 2, "columnIndex": 3, "columnSpan": 1, "content": ""},
+        {"rowIndex": 3, "columnIndex": 0, "columnSpan": 3, "content": "Total"},
+        {"rowIndex": 3, "columnIndex": 3, "columnSpan": 1, "content": "€439.00"},
+    ]
+    payload_summary = {
+        "content": "Oil 10 €43.90 €439.00 Total weight 25 kg Total €439.00",
+        "tables": [{"columnCount": 4, "rowCount": 4, "cells": cells}],
+    }
+    result_summary = _parse_invoice_result(payload_summary, "layout:test")
+    assert len(result_summary.lines) == 1
+    assert result_summary.expected_line_count == 1
+    assert result_summary.stated_total is not None
+    assert result_summary.stated_total.value == {"amount": "439.00", "currency": "EUR"}
