@@ -42,3 +42,13 @@ phone photo).
 
 Owner email on camera (to be masked at source before any clip is committed or cut): quote review
 «رُفع بواسطة», phone approvals list and detail «مقدم الطلب».
+
+## Re-shoot after the «توفير» wording (2026-10-25, PPS-63)
+
+Three Arabic shots still showed «وفورات» / «الوفر» (recorded before #263). They were re-shot on hosted with nothing saved and used in the v2.4.2 cuts ([`../../video/cuts/v2.4.2-ledger/`](../../video/cuts/v2.4.2-ledger/)):
+
+| Shot | Frame |
+|---|---|
+| Record-outcome form for PO-000008 (outcomes already recorded, not saved again) | [01](screens-pps63/01-outcome-form-po-000008.jpg) |
+| Ledger as hosted shows it now, cursor on round 6's rows (+١٦٠ / +١٢٠ / +٢٠ = ٣٠٠ ج.م) | [02](screens-pps63/02-ledger-round6-rows.jpg) |
+| Verified ledger with the sidebar: ١٬٧٦٠ ج.م, 15 verified outcomes (rounds 3–7) | [03](screens-pps63/03-ledger-verified.jpg) |
