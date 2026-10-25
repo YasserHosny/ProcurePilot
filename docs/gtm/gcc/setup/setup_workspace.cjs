@@ -46,7 +46,7 @@ const { tenant: TENANT, branches: BRANCHES, costCentres: COST_CENTRES, suppliers
   console.log('products', n);
   // /rfq/guardrails ignores Idempotency-Key, and two enabled guardrails stop auto-preparation (the orchestrator needs
   // exactly one to fire): update the existing demo guardrail instead of adding another on a re-run.
-  const rule = { max_order_value_amount: P.guardrailLimit, max_order_value_currency: P.currency, supplier_allowlist: Object.values(ids.supplier), min_response_count: 1, max_price_variance_pct: '0.20', default_branch_id: ids.branch.olaya, default_cost_centre_id: ids.cc.olaya, enabled: true };
+  const rule = { max_order_value_amount: P.guardrailLimit, max_order_value_currency: P.currency, supplier_allowlist: Object.values(ids.supplier), min_response_count: 1, max_price_variance_pct: '0.20', default_branch_id: ids.branch[BRANCHES[0].key], default_cost_centre_id: ids.cc[COST_CENTRES[0].key], enabled: true };
   const existing = ok(await call('GET', '/rfq/guardrails'), 'list guardrails');
   if (existing.length > 1) throw new Error(`${existing.length} guardrails exist; keep one before re-running`);
   const g = existing.length ? await call('PATCH', `/rfq/guardrails/${existing[0].id}`, rule) : await call('POST', '/rfq/guardrails', rule);
