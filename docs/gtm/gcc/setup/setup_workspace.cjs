@@ -79,7 +79,12 @@ const PRODUCTS = [
   let n = 0;
   for (const [name, unit, count, size] of PRODUCTS) { ok(await call('POST', '/products', { tenant_name: name, base_unit: unit, pack: { pack_count: count, unit_size: size } }, `sa-product-${n}`), name); n++; }
   console.log('products', n);
-  const g = await call('POST', '/rfq/guardrails', { max_order_value_amount: '10000', max_order_value_currency: 'SAR', supplier_allowlist: Object.values(ids.supplier), min_response_count: 1, max_price_variance_pct: '0.20', default_branch_id: ids.branch.olaya, default_cost_centre_id: ids.cc.olaya, enabled: true }, 'sa-guardrail-1');
-  console.log('guardrail', g.status, g.status < 300 ? g.body.id : JSON.stringify(g.body).slice(0, 200));
+  // /rfq/guardrails ignores Idempotency-Key, and two enabled guardrails stop auto-preparation (the orchestrator needs
+  // exactly one to fire): update the existing demo guardrail instead of adding another on a re-run.
+  const rule = { max_order_value_amount: '10000', max_order_value_currency: 'SAR', supplier_allowlist: Object.values(ids.supplier), min_response_count: 1, max_price_variance_pct: '0.20', default_branch_id: ids.branch.olaya, default_cost_centre_id: ids.cc.olaya, enabled: true };
+  const existing = ok(await call('GET', '/rfq/guardrails'), 'list guardrails');
+  if (existing.length > 1) throw new Error(`${existing.length} guardrails exist; keep one before re-running`);
+  const g = existing.length ? await call('PATCH', `/rfq/guardrails/${existing[0].id}`, rule) : await call('POST', '/rfq/guardrails', rule);
+  console.log(existing.length ? 'guardrail updated' : 'guardrail created', g.status, g.status < 300 ? g.body.id : JSON.stringify(g.body).slice(0, 200));
   process.exit(0);
 })().catch((e) => { console.error('FAIL', e.message); process.exit(1); });
