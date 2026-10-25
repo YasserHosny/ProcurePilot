@@ -1,0 +1,2023 @@
+{
+  "h": {
+    "body": 103.0,
+    "outro": 9.75,
+    "scenes": [
+      {
+        "beat": 0,
+        "start": 0,
+        "duration": 4,
+        "spans": [
+          [
+            "opening-h",
+            0,
+            4,
+            4
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "٣ موردين… ٣ صيغ… أسعار بضريبة وبدون، وكلها تكتبها بيدك.",
+          "en": "Three suppliers. Three formats. Drums, bags and boxes, all retyped by hand."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "opening-h",
+              0,
+              4,
+              4
+            ]
+          ],
+          "en": [
+            [
+              "opening-h",
+              0,
+              4,
+              4
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "٣ موردين… ٣ صيغ… أسعار بضريبة وبدون، وكلها تكتبها بيدك.",
+              "offset": 0,
+              "duration": 4,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Three suppliers. Three formats. Drums, bags and boxes, all retyped by hand.",
+              "offset": 0,
+              "duration": 4,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 1,
+        "start": 4,
+        "duration": 8,
+        "spans": [
+          [
+            "s5-po-savings",
+            27,
+            29,
+            4
+          ],
+          [
+            "s5-po-savings",
+            43,
+            43,
+            4
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "ProcurePilot لمشتريات المطاعم / من بلاغ نقص لأمر شراء منرسل… والتوفير مسجّل.",
+          "en": "ProcurePilot, for restaurant purchasing / From a low-stock report to a sent PO, with the saving logged."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s5-po-savings",
+              27,
+              29,
+              4
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              4
+            ]
+          ],
+          "en": [
+            [
+              "s5-po-savings",
+              27,
+              29,
+              4
+            ],
+            [
+              "s5-po-savings",
+              44,
+              44,
+              4
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "ProcurePilot لمشتريات المطاعم",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "bridge"
+            },
+            {
+              "text": "من بلاغ نقص لأمر شراء منرسل… والتوفير مسجّل.",
+              "offset": 2.5,
+              "duration": 5.5,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "ProcurePilot, for restaurant purchasing",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "bridge"
+            },
+            {
+              "text": "From a low-stock report to a sent PO, with the saving logged.",
+              "offset": 2.5,
+              "duration": 5.5,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 2,
+        "start": 12,
+        "duration": 7,
+        "spans": [
+          [
+            "s0-phone-lowstock",
+            1.5,
+            3.5,
+            1
+          ],
+          [
+            "s0-phone-lowstock",
+            9.5,
+            21,
+            4
+          ],
+          [
+            "s0-phone-lowstock",
+            22.0,
+            22.2,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "الفرع يبلّغ من الجوال: الزيت قرب يخلص.",
+          "en": "The branch reports it from the phone: oil is running low."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s0-phone-lowstock",
+              1.5,
+              3.5,
+              1
+            ],
+            [
+              "s0-phone-lowstock",
+              9.5,
+              21,
+              4
+            ],
+            [
+              "s0-phone-lowstock",
+              22.0,
+              22.2,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s0-phone-lowstock",
+              1.5,
+              3.5,
+              1
+            ],
+            [
+              "s0-phone-lowstock",
+              11,
+              21,
+              4
+            ],
+            [
+              "s0-phone-lowstock",
+              22.5,
+              22.8,
+              2
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "الفرع يبلّغ من الجوال: الزيت قرب يخلص.",
+              "offset": 0,
+              "duration": 7,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "The branch reports it from the phone: oil is running low.",
+              "offset": 0,
+              "duration": 7,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 3,
+        "start": 19,
+        "duration": 11,
+        "spans": [
+          [
+            "s1-rfq",
+            8,
+            24,
+            3
+          ],
+          [
+            "s1-rfq",
+            26,
+            35,
+            3.5
+          ],
+          [
+            "s1-rfq",
+            48,
+            51,
+            3
+          ],
+          [
+            "s1-rfq",
+            52.3,
+            52.3,
+            1.5
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "ترسل نفس الطلب لكل مورد لحاله؟ / طلب عرض سعر واحد لـ٣ موردين، والكميات بالكرتون.",
+          "en": "Sending the same request to every supplier? / One RFQ to three suppliers, quantities in packs."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s1-rfq",
+              8,
+              24,
+              3
+            ],
+            [
+              "s1-rfq",
+              26,
+              35,
+              3.5
+            ],
+            [
+              "s1-rfq",
+              48,
+              51,
+              3
+            ],
+            [
+              "s1-rfq",
+              52.3,
+              52.3,
+              1.5
+            ]
+          ],
+          "en": [
+            [
+              "s1-rfq",
+              8,
+              24,
+              3
+            ],
+            [
+              "s1-rfq",
+              25,
+              35,
+              3.5
+            ],
+            [
+              "s1-rfq",
+              41.5,
+              46.5,
+              3
+            ],
+            [
+              "s1-rfq",
+              47.1,
+              47.1,
+              1.5
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "ترسل نفس الطلب لكل مورد لحاله؟",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "pain"
+            },
+            {
+              "text": "طلب عرض سعر واحد لـ٣ موردين، والكميات بالكرتون.",
+              "offset": 2.5,
+              "duration": 8.5,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Sending the same request to every supplier?",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "pain"
+            },
+            {
+              "text": "One RFQ to three suppliers, quantities in packs.",
+              "offset": 2.5,
+              "duration": 8.5,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 5,
+        "start": 30,
+        "duration": 5,
+        "spans": [
+          [
+            "s2-quote-photo",
+            0.3,
+            4.8,
+            5
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "تنقل الأسعار بيدك؟ / ٣ ردود: ملفين PDF وصورة واتساب.",
+          "en": "Retyping prices by hand? / Three replies: two PDFs and a WhatsApp photo."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              5
+            ]
+          ],
+          "en": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              5
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "تنقل الأسعار بيدك؟",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "pain"
+            },
+            {
+              "text": "٣ ردود: ملفين PDF وصورة واتساب.",
+              "offset": 2.5,
+              "duration": 2.5,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Retyping prices by hand?",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "pain"
+            },
+            {
+              "text": "Three replies: two PDFs and a WhatsApp photo.",
+              "offset": 2.5,
+              "duration": 2.5,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 6,
+        "start": 35,
+        "duration": 12,
+        "spans": [
+          [
+            "s2-quote-photo",
+            8,
+            11,
+            3
+          ],
+          [
+            "s2-quote-photo",
+            21.2,
+            22.7,
+            3
+          ],
+          [
+            "s2-quote-photo",
+            24.5,
+            25.3,
+            4
+          ],
+          [
+            "s2-quote-photo",
+            8.5,
+            8.5,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "البنود والأسعار بالريال والضريبة والصلاحية انقرت لحالها… والإجمالي مطابق.",
+          "en": "Items, euro prices, VAT and validity, read automatically. The total checks out."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              21.2,
+              22.7,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              24.5,
+              25.3,
+              4
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              21.2,
+              22.7,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              24.5,
+              25.3,
+              4
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "البنود والأسعار بالريال والضريبة والصلاحية انقرت لحالها… والإجمالي مطابق.",
+              "offset": 0,
+              "duration": 12,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Items, euro prices, VAT and validity, read automatically. The total checks out.",
+              "offset": 0,
+              "duration": 12,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 7,
+        "start": 47,
+        "duration": 5,
+        "spans": [
+          [
+            "s2-quote-photo",
+            25.5,
+            27.5,
+            3.2
+          ],
+          [
+            "s2r-authorised",
+            0.5,
+            2.3,
+            1.8
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "بدون ما تكتب شي… بس الاعتماد قرارك أنت.",
+          "en": "Nothing retyped. But you sign it off."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s2-quote-photo",
+              25.5,
+              27.5,
+              3.2
+            ],
+            [
+              "s2r-authorised",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "en": [
+            [
+              "s2-quote-photo",
+              25.5,
+              27.5,
+              3.2
+            ],
+            [
+              "s2r-authorised",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "بدون ما تكتب شي… بس الاعتماد قرارك أنت.",
+              "offset": 0,
+              "duration": 5,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Nothing retyped. But you sign it off.",
+              "offset": 0,
+              "duration": 5,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 8,
+        "start": 52,
+        "duration": 11,
+        "spans": [
+          [
+            "s3c-smart-compare",
+            10.5,
+            14,
+            3
+          ],
+          [
+            "s3c-smart-compare",
+            18,
+            25,
+            5.5
+          ],
+          [
+            "s3c-smart-compare",
+            29,
+            29,
+            2.5
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "كراتين بأحجام مختلفة؟ / بالكرتون وشامل الضريبة والتوصيل: - أرخص بـ- ر.س في -.",
+          "en": "Different pack sizes? / Per pack, VAT and delivery included: Brennan & Walsh is €13 cheaper on oil."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s3c-smart-compare",
+              10.5,
+              14,
+              3
+            ],
+            [
+              "s3c-smart-compare",
+              18,
+              25,
+              5.5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2.5
+            ]
+          ],
+          "en": [
+            [
+              "s3c-smart-compare",
+              10.5,
+              14,
+              3
+            ],
+            [
+              "s3c-smart-compare",
+              18,
+              25,
+              5.5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2.5
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "كراتين بأحجام مختلفة؟",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "pain"
+            },
+            {
+              "text": "بالكرتون وشامل الضريبة والتوصيل: - أرخص بـ- ر.س في -.",
+              "offset": 2.5,
+              "duration": 8.5,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Different pack sizes?",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "pain"
+            },
+            {
+              "text": "Per pack, VAT and delivery included: Brennan & Walsh is €13 cheaper on oil.",
+              "offset": 2.5,
+              "duration": 8.5,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 10,
+        "start": 63,
+        "duration": 10,
+        "spans": [
+          [
+            "s3-guardrail-draft",
+            6,
+            10,
+            4
+          ],
+          [
+            "s3-guardrail-draft",
+            16,
+            22,
+            4
+          ],
+          [
+            "s3-guardrail-draft",
+            22.6,
+            25.2,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "الطلب واقف ينتظر اعتماد؟ / الضوابط اللي حطيتها جهّزت الطلب… مسودة، مو شراء.",
+          "en": "Requests stuck waiting for approval? / Your guardrails drafted the request. A draft, not a purchase."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s3-guardrail-draft",
+              6,
+              10,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              16,
+              22,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              22.6,
+              25.2,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s3-guardrail-draft",
+              6,
+              10,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              16,
+              22,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              22.6,
+              26,
+              2
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "الطلب واقف ينتظر اعتماد؟",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "pain"
+            },
+            {
+              "text": "الضوابط اللي حطيتها جهّزت الطلب… مسودة، مو شراء.",
+              "offset": 2.5,
+              "duration": 7.5,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Requests stuck waiting for approval?",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "pain"
+            },
+            {
+              "text": "Your guardrails drafted the request. A draft, not a purchase.",
+              "offset": 2.5,
+              "duration": 7.5,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 11,
+        "start": 73,
+        "duration": 8,
+        "spans": [
+          [
+            "s4-phone-approve",
+            5,
+            5.5,
+            1
+          ],
+          [
+            "s4-phone-approve",
+            7,
+            8,
+            2
+          ],
+          [
+            "s4-phone-approve",
+            12.4,
+            15.6,
+            3.2
+          ],
+          [
+            "s4r-approved",
+            0.5,
+            2.3,
+            1.8
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "والمدير يعتمد من جواله، من أي مكان.",
+          "en": "The manager approves from their phone, wherever they are."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s4-phone-approve",
+              5,
+              5.5,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              2
+            ],
+            [
+              "s4-phone-approve",
+              12.4,
+              15.6,
+              3.2
+            ],
+            [
+              "s4r-approved",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "en": [
+            [
+              "s4-phone-approve",
+              5,
+              5.5,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              2
+            ],
+            [
+              "s4-phone-approve",
+              12.4,
+              15.6,
+              3.2
+            ],
+            [
+              "s4r-approved",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "والمدير يعتمد من جواله، من أي مكان.",
+              "offset": 0,
+              "duration": 8,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "The manager approves from their phone, wherever they are.",
+              "offset": 0,
+              "duration": 8,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 12,
+        "start": 81,
+        "duration": 9,
+        "spans": [
+          [
+            "s5-po-savings",
+            3,
+            9,
+            2.5
+          ],
+          [
+            "s5-po-savings",
+            13,
+            20,
+            2.5
+          ],
+          [
+            "s5-po-savings",
+            22,
+            23.2,
+            2
+          ],
+          [
+            "s5-po-savings",
+            27,
+            27,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "من الطلب المعتمد تطلّع أمر الشراء وترسله.",
+          "en": "From the approved request, you create the PO and send it."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s5-po-savings",
+              3,
+              9,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              13,
+              20,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              2
+            ],
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s5-po-savings",
+              3,
+              9,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              13,
+              20,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              2
+            ],
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "من الطلب المعتمد تطلّع أمر الشراء وترسله.",
+              "offset": 0,
+              "duration": 9,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "From the approved request, you create the PO and send it.",
+              "offset": 0,
+              "duration": 9,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 13,
+        "start": 90,
+        "duration": 7,
+        "spans": [
+          [
+            "s5-po-savings",
+            32,
+            35,
+            2
+          ],
+          [
+            "s5-po-savings",
+            36,
+            39,
+            3
+          ],
+          [
+            "s5-po-savings",
+            43,
+            43,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "المالك يسأل: كم وفّرنا؟ / توفير - ر.س على هالطلب، مقابل آخر سعر شراء.",
+          "en": "The owner asks: what did we save? / €53.50 saved on this order, against the last purchase price."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s5-po-savings",
+              32,
+              35,
+              2
+            ],
+            [
+              "s5-po-savings",
+              36,
+              39,
+              3
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s5-po-savings",
+              32,
+              35,
+              2
+            ],
+            [
+              "s5-po-savings",
+              37,
+              40,
+              3
+            ],
+            [
+              "s5-po-savings",
+              44,
+              44,
+              2
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "المالك يسأل: كم وفّرنا؟",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "pain"
+            },
+            {
+              "text": "توفير - ر.س على هالطلب، مقابل آخر سعر شراء.",
+              "offset": 2.5,
+              "duration": 4.5,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "The owner asks: what did we save?",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "pain"
+            },
+            {
+              "text": "€53.50 saved on this order, against the last purchase price.",
+              "offset": 2.5,
+              "duration": 4.5,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 14,
+        "start": 97,
+        "duration": 6,
+        "spans": [
+          [
+            "s6-savings-close",
+            4,
+            8,
+            6
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "وكل توفير مسجّل ومراجَع… جاهز للمالك.",
+          "en": "Every saving logged and verified, ready for the owner."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s6-savings-close",
+              4,
+              8,
+              6
+            ]
+          ],
+          "en": [
+            [
+              "s6-savings-close",
+              4,
+              8,
+              6
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "وكل توفير مسجّل ومراجَع… جاهز للمالك.",
+              "offset": 0,
+              "duration": 6,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Every saving logged and verified, ready for the owner.",
+              "offset": 0,
+              "duration": 6,
+              "role": "fix"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "v": {
+    "body": 50.96666666666667,
+    "outro": 8.5,
+    "scenes": [
+      {
+        "beat": 0,
+        "start": 0,
+        "duration": 3,
+        "spans": [
+          [
+            "opening-v",
+            0,
+            3,
+            3
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "٣ موردين… ٣ صيغ… أسعار بضريبة وبدون، وكلها تكتبها بيدك.",
+          "en": "Three suppliers. Three formats. Drums, bags and boxes, all retyped by hand."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "opening-v",
+              0,
+              3,
+              3
+            ]
+          ],
+          "en": [
+            [
+              "opening-v",
+              0,
+              3,
+              3
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "٣ موردين… ٣ صيغ… أسعار بضريبة وبدون، وكلها تكتبها بيدك.",
+              "offset": 0,
+              "duration": 3,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Three suppliers. Three formats. Drums, bags and boxes, all retyped by hand.",
+              "offset": 0,
+              "duration": 3,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 1,
+        "start": 3,
+        "duration": 4,
+        "spans": [
+          [
+            "s5-po-savings",
+            27,
+            27,
+            2.5
+          ],
+          [
+            "s5-po-savings",
+            43,
+            43,
+            1.5
+          ]
+        ],
+        "crop": [
+          300,
+          100,
+          1320,
+          900
+        ],
+        "copy": {
+          "ar": "ProcurePilot لمشتريات المطاعم / من بلاغ نقص لأمر شراء منرسل… والتوفير مسجّل.",
+          "en": "ProcurePilot, for restaurant purchasing / From a low-stock report to a sent PO, with the saving logged."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              1.5
+            ]
+          ],
+          "en": [
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              44,
+              44,
+              1.5
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "ProcurePilot لمشتريات المطاعم",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "bridge"
+            },
+            {
+              "text": "من بلاغ نقص لأمر شراء منرسل… والتوفير مسجّل.",
+              "offset": 2.5,
+              "duration": 1.5,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "ProcurePilot, for restaurant purchasing",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "bridge"
+            },
+            {
+              "text": "From a low-stock report to a sent PO, with the saving logged.",
+              "offset": 2.5,
+              "duration": 1.5,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 3,
+        "start": 7,
+        "duration": 5.733333333333333,
+        "spans": [
+          [
+            "s1-rfq",
+            26,
+            31,
+            2.7333333333333334
+          ],
+          [
+            "s1-rfq",
+            48,
+            51,
+            1.5
+          ],
+          [
+            "s1-rfq",
+            52.3,
+            52.3,
+            1.5
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "ترسل نفس الطلب لكل مورد لحاله؟ / طلب عرض سعر واحد لـ٣ موردين، والكميات بالكرتون.",
+          "en": "Sending the same request to every supplier? / One RFQ to three suppliers, quantities in packs."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s1-rfq",
+              26,
+              31,
+              2.7333333333333334
+            ],
+            [
+              "s1-rfq",
+              48,
+              51,
+              1.5
+            ],
+            [
+              "s1-rfq",
+              52.3,
+              52.3,
+              1.5
+            ]
+          ],
+          "en": [
+            [
+              "s1-rfq",
+              25,
+              31,
+              2.7333333333333334
+            ],
+            [
+              "s1-rfq",
+              41.5,
+              46.5,
+              1.5
+            ],
+            [
+              "s1-rfq",
+              47.1,
+              47.1,
+              1.5
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "طلب عرض سعر واحد لـ٣ موردين، والكميات بالكرتون.",
+              "offset": 0,
+              "duration": 5.733333333333333,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "One RFQ to three suppliers, quantities in packs.",
+              "offset": 0,
+              "duration": 5.733333333333333,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 5,
+        "start": 12.733333333333334,
+        "duration": 3,
+        "spans": [
+          [
+            "s2-quote-photo",
+            0.3,
+            4.8,
+            3
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "تنقل الأسعار بيدك؟ / ٣ ردود: ملفين PDF وصورة واتساب.",
+          "en": "Retyping prices by hand? / Three replies: two PDFs and a WhatsApp photo."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              3
+            ]
+          ],
+          "en": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              3
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "٣ ردود: ملفين PDF وصورة واتساب.",
+              "offset": 0,
+              "duration": 3,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Three replies: two PDFs and a WhatsApp photo.",
+              "offset": 0,
+              "duration": 3,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 6,
+        "start": 15.733333333333334,
+        "duration": 7,
+        "spans": [
+          [
+            "s2-quote-photo",
+            8,
+            11,
+            2
+          ],
+          [
+            "s2-quote-photo",
+            24.5,
+            25.3,
+            3
+          ],
+          [
+            "s2-quote-photo",
+            8.5,
+            8.5,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "البنود والأسعار بالريال والضريبة والصلاحية انقرت لحالها… والإجمالي مطابق.",
+          "en": "Items, euro prices, VAT and validity, read automatically. The total checks out."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              2
+            ],
+            [
+              "s2-quote-photo",
+              24.5,
+              25.3,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              2
+            ],
+            [
+              "s2-quote-photo",
+              24.5,
+              25.3,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "البنود والأسعار بالريال والضريبة والصلاحية انقرت لحالها… والإجمالي مطابق.",
+              "offset": 0,
+              "duration": 7,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Items, euro prices, VAT and validity, read automatically. The total checks out.",
+              "offset": 0,
+              "duration": 7,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 7,
+        "start": 22.733333333333334,
+        "duration": 3,
+        "spans": [
+          [
+            "s2-quote-photo",
+            25.5,
+            27.5,
+            1.2
+          ],
+          [
+            "s2r-authorised",
+            0.5,
+            2.3,
+            1.8
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "بدون ما تكتب شي… بس الاعتماد قرارك أنت.",
+          "en": "Nothing retyped. But you sign it off."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s2-quote-photo",
+              25.5,
+              27.5,
+              1.2
+            ],
+            [
+              "s2r-authorised",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "en": [
+            [
+              "s2-quote-photo",
+              25.5,
+              27.5,
+              1.2
+            ],
+            [
+              "s2r-authorised",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "بدون ما تكتب شي… بس الاعتماد قرارك أنت.",
+              "offset": 0,
+              "duration": 3,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Nothing retyped. But you sign it off.",
+              "offset": 0,
+              "duration": 3,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 8,
+        "start": 25.733333333333334,
+        "duration": 7,
+        "spans": [
+          [
+            "s3c-smart-compare",
+            18,
+            25,
+            5
+          ],
+          [
+            "s3c-smart-compare",
+            29,
+            29,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "كراتين بأحجام مختلفة؟ / بالكرتون وشامل الضريبة والتوصيل: - أرخص بـ- ر.س في -.",
+          "en": "Different pack sizes? / Per pack, VAT and delivery included: Brennan & Walsh is €13 cheaper on oil."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s3c-smart-compare",
+              18,
+              25,
+              5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s3c-smart-compare",
+              18,
+              25,
+              5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "بالكرتون وشامل الضريبة والتوصيل: - أرخص بـ- ر.س في -.",
+              "offset": 0,
+              "duration": 7,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Per pack, VAT and delivery included: Brennan & Walsh is €13 cheaper on oil.",
+              "offset": 0,
+              "duration": 7,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 10,
+        "start": 32.733333333333334,
+        "duration": 5,
+        "spans": [
+          [
+            "s3-guardrail-draft",
+            6,
+            10,
+            3
+          ],
+          [
+            "s3-guardrail-draft",
+            20.5,
+            23.5,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "الطلب واقف ينتظر اعتماد؟ / الضوابط اللي حطيتها جهّزت الطلب… مسودة، مو شراء.",
+          "en": "Requests stuck waiting for approval? / Your guardrails drafted the request. A draft, not a purchase."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s3-guardrail-draft",
+              6,
+              10,
+              3
+            ],
+            [
+              "s3-guardrail-draft",
+              20.5,
+              23.5,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s3-guardrail-draft",
+              6,
+              10,
+              3
+            ],
+            [
+              "s3-guardrail-draft",
+              20.5,
+              23.5,
+              2
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "الضوابط اللي حطيتها جهّزت الطلب… مسودة، مو شراء.",
+              "offset": 0,
+              "duration": 5,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "Your guardrails drafted the request. A draft, not a purchase.",
+              "offset": 0,
+              "duration": 5,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 11,
+        "start": 37.733333333333334,
+        "duration": 5,
+        "spans": [
+          [
+            "s4-phone-approve",
+            7,
+            8,
+            1
+          ],
+          [
+            "s4-phone-approve",
+            12.4,
+            15.6,
+            2.2
+          ],
+          [
+            "s4r-approved",
+            0.5,
+            2.3,
+            1.8
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "والمدير يعتمد من جواله، من أي مكان.",
+          "en": "The manager approves from their phone, wherever they are."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              12.4,
+              15.6,
+              2.2
+            ],
+            [
+              "s4r-approved",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "en": [
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              12.4,
+              15.6,
+              2.2
+            ],
+            [
+              "s4r-approved",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "والمدير يعتمد من جواله، من أي مكان.",
+              "offset": 0,
+              "duration": 5,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "The manager approves from their phone, wherever they are.",
+              "offset": 0,
+              "duration": 5,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 12,
+        "start": 42.733333333333334,
+        "duration": 3.7333333333333334,
+        "spans": [
+          [
+            "s5-po-savings",
+            22,
+            23.2,
+            1.7333333333333334
+          ],
+          [
+            "s5-po-savings",
+            27,
+            27,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "من الطلب المعتمد تطلّع أمر الشراء وترسله.",
+          "en": "From the approved request, you create the PO and send it."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              1.7333333333333334
+            ],
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              1.7333333333333334
+            ],
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "من الطلب المعتمد تطلّع أمر الشراء وترسله.",
+              "offset": 0,
+              "duration": 3.7333333333333334,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "From the approved request, you create the PO and send it.",
+              "offset": 0,
+              "duration": 3.7333333333333334,
+              "role": "fix"
+            }
+          ]
+        }
+      },
+      {
+        "beat": 13,
+        "start": 46.46666666666667,
+        "duration": 4.5,
+        "spans": [
+          [
+            "s5-po-savings",
+            36,
+            39,
+            2.5
+          ],
+          [
+            "s5-po-savings",
+            43,
+            43,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "المالك يسأل: كم وفّرنا؟ / توفير - ر.س على هالطلب، مقابل آخر سعر شراء.",
+          "en": "The owner asks: what did we save? / €53.50 saved on this order, against the last purchase price."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s5-po-savings",
+              36,
+              39,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s5-po-savings",
+              37,
+              40,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              44,
+              44,
+              2
+            ]
+          ]
+        },
+        "cards_by_language": {
+          "ar": [
+            {
+              "text": "المالك يسأل: كم وفّرنا؟",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "pain"
+            },
+            {
+              "text": "توفير - ر.س على هالطلب، مقابل آخر سعر شراء.",
+              "offset": 2.5,
+              "duration": 2.0,
+              "role": "fix"
+            }
+          ],
+          "en": [
+            {
+              "text": "The owner asks: what did we save?",
+              "offset": 0,
+              "duration": 2.5,
+              "role": "pain"
+            },
+            {
+              "text": "€53.50 saved on this order, against the last purchase price.",
+              "offset": 2.5,
+              "duration": 2.0,
+              "role": "fix"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+FFPROBE_UNAVAILABLE: install-free render host must supply ffprobe for requested proof
+procurepilot-demo-ie-en-16x9.mp4 Summary:
+
+  Integrated loudness:
+    I:         -14.8 LUFS
+    Threshold: -24.9 LUFS
+
+  Loudness range:
+    LRA:         7.3 LU
+    Threshold: -34.8 LUFS
+    LRA low:   -19.1 LUFS
+    LRA high:  -11.8 LUFS
+
+  True peak:
+    Peak:       -2.4 dBFS
+FFPROBE_UNAVAILABLE: install-free render host must supply ffprobe for requested proof
+procurepilot-demo-ie-en-9x16-60s.mp4 Summary:
+
+  Integrated loudness:
+    I:         -13.8 LUFS
+    Threshold: -23.8 LUFS
+
+  Loudness range:
+    LRA:         5.9 LU
+    Threshold: -33.7 LUFS
+    LRA low:   -17.3 LUFS
+    LRA high:  -11.5 LUFS
+
+  True peak:
+    Peak:       -3.0 dBFS
