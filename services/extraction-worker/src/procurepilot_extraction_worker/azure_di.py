@@ -12,6 +12,7 @@ from azure.core.credentials import AzureKeyCredential
 
 from procurepilot_extraction_worker.currency import (
     _EGP_MARKER,
+    _EUR_MARKER,
     _OTHER_MARKER,
     _SAR_MARKER,
     _adjacent_to_number,
@@ -309,6 +310,7 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                         continue
                     if (
                         _SAR_MARKER.search(val)
+                        or _EUR_MARKER.search(val)
                         or _EGP_MARKER.search(val)
                         or _OTHER_MARKER.search(val)
                     ):
@@ -583,7 +585,7 @@ def _find_grand_total(text: str, currency: str | None) -> ExtractedField | None:
                     after = clean_line[end:].lstrip()
                     if any(
                         m.search(before[-10:]) or m.search(after[:10])
-                        for m in (_SAR_MARKER, _EGP_MARKER, _OTHER_MARKER)
+                        for m in (_SAR_MARKER, _EUR_MARKER, _EGP_MARKER, _OTHER_MARKER)
                     ):
                         amount = candidate_amt
                 if not amount:
@@ -604,7 +606,7 @@ def _has_before_tax_total(text: str) -> bool:
 def _has_currency_conflict(text: str) -> bool:
     codes = {
         code
-        for code, pattern in (("EGP", _EGP_MARKER), ("SAR", _SAR_MARKER))
+        for code, pattern in (("EGP", _EGP_MARKER), ("SAR", _SAR_MARKER), ("EUR", _EUR_MARKER))
         if any(_adjacent_to_number(text, *match.span()) for match in pattern.finditer(text))
     }
     other = any(_adjacent_to_number(text, *match.span()) for match in _OTHER_MARKER.finditer(text))
@@ -731,6 +733,7 @@ def _make_field(
 def _clean_number(s: str) -> str | None:
     s = _PERCENTAGE_PATTERN.sub("", s)
     s = _SAR_MARKER.sub("", s)
+    s = _EUR_MARKER.sub("", s)
     s = re.sub(
         r"ج\s*\.\s*م\.?|جنيه(?:\s+مصري)?|(?<![A-Z])L\.?\s*E\.?(?![A-Z])|\b(?:EGP|USD|GBP|EUR)\b",
         "",
@@ -761,6 +764,7 @@ def _clean_number(s: str) -> str | None:
 def _numeric_cell_amount(text: str) -> str | None:
     text = _PERCENTAGE_PATTERN.sub("", text)
     text = _SAR_MARKER.sub("", text)
+    text = _EUR_MARKER.sub("", text)
     cleaned = re.sub(
         r"ج\s*\.\s*م\.?|جنيه(?:\s+مصري)?|(?<![A-Z])L\.?\s*E\.?(?![A-Z])|\b(?:EGP|USD|GBP|EUR)\b|[$£€]",
         "",
