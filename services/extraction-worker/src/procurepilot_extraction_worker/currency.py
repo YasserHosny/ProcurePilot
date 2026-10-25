@@ -18,7 +18,10 @@ _SAR_MARKER = re.compile(
     re.IGNORECASE,
 )
 _EUR_MARKER = re.compile(
-    r"(?<![^\W\d_])(?:EUR|euros?|€)(?![^\W\d_])",
+    # "euro"/"euros" must appear right after an amount with a decimal part;
+    # non-currency text like "10 Euro pallets" or "Euro 5" must not count.
+    r"(?<![^\W\d_])(?:EUR|€)(?![^\W\d_])|"
+    r"(?<=\d[.,٫]\d\d)[ \t]*euros?(?![^\W\d_])",
     re.IGNORECASE,
 )
 _OTHER_MARKER = re.compile(

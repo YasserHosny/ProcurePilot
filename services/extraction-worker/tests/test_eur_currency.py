@@ -19,19 +19,15 @@ from procurepilot_extraction_worker.validation import validate_arithmetic
         "€100",
         "100 €",
         "€ 100",
-        "100 €",
         "EUR 100",
         "100 EUR",
-        "100 euro",
-        "100 euros",
-        "euro 100",
-        "euros 100",
-        "100 Euro",
-        "100 EUROS",
+        "12.60 euro",
         "€1,234.56",
         "1,234.56 €",
         "EUR 4,410.00",
         "4,410.00 EUR",
+        "Total 1,289.50 euros",
+        "Total €1,289.50",
     ],
 )
 def test_eur_markers_touching_amount(text: str) -> None:
@@ -74,10 +70,32 @@ def test_eur_numeric_cells(text: str, expected: Decimal) -> None:
         "europe 100",
         "100 europe",
         "neuro 100",
+        "euro 100",
+        "euros 100",
+        "Euro 1,289.50",
+        "100 euro",
+        "100 euros",
+        "100 Euro",
+        "100 EUROS",
+        "10 Euro pallets",
+        "10 Euro crates",
+        "Euro 5 engine oil",
     ],
 )
 def test_eur_requires_amount_adjacency_and_token_boundaries(text: str) -> None:
     assert detect_currency(text) is None
+
+
+def test_euro_word_before_amount_is_not_evidence() -> None:
+    assert detect_currency("10 Euro pallets") is None
+    assert detect_currency("10 Euro crates") is None
+    assert detect_currency("Euro 5 engine oil") is None
+    assert detect_currency("Euro 1,289.50") is None
+    assert detect_currency("100 euros") is None
+    assert detect_currency("100 euro") is None
+    assert detect_currency("12.60 euro") == "EUR"
+    assert detect_currency("Total 1,289.50 euros") == "EUR"
+    assert detect_currency("Total €1,289.50") == "EUR"
 
 
 @pytest.mark.parametrize(
@@ -88,7 +106,7 @@ def test_eur_requires_amount_adjacency_and_token_boundaries(text: str) -> None:
         "EUR 100, 200 £",
         "€100, £200",
         "100 EUR, 200 USD",
-        "100 euro, 200 EGP",
+        "12.60 euro, 200 EGP",
         "100 EUR, 200 EGP",
     ],
 )
