@@ -40,6 +40,33 @@ replies.
 | `s5-po-savings` | PO from the approved request, submitted, outcome recorded against the last PO price |
 | `s6-savings-close` | the verified ledger |
 
+## Screens
+
+Full-size frames from the masked recordings of rounds A (Arabic UI) and E (English UI), one per step (`screens/{ar,en}/`). The owner's email is masked; the frames are the same footage the video uses.
+
+| # | Step | Arabic UI | English UI |
+|---|---|---|---|
+| 01 | Phone home (owner) | [AR](screens/ar/01-phone-home.jpg) | [EN](screens/en/01-phone-home.jpg) |
+| 02 | Low-stock report: oil, Olaya branch, 1 left | [AR](screens/ar/02-phone-lowstock-filled.jpg) | [EN](screens/en/02-phone-lowstock-filled.jpg) |
+| 03 | Report sent | [AR](screens/ar/03-phone-lowstock-sent.jpg) | [EN](screens/en/03-phone-lowstock-sent.jpg) |
+| 04 | RFQ: three lines in packs | [AR](screens/ar/04-rfq-lines.jpg) | [EN](screens/en/04-rfq-lines.jpg) |
+| 05 | RFQ: three suppliers and needed-by date | [AR](screens/ar/05-rfq-suppliers.jpg) | [EN](screens/en/05-rfq-suppliers.jpg) |
+| 06 | RFQ sent to 3 suppliers | [AR](screens/ar/06-rfq-sent.jpg) | [EN](screens/en/06-rfq-sent.jpg) |
+| 07 | Quotation inbox: two PDFs and a WhatsApp photo | [AR](screens/ar/07-quote-inbox.jpg) | [EN](screens/en/07-quote-inbox.jpg) |
+| 08 | الذهبي photo quote read: SAR, VAT-inclusive total reconciled, flagged fields | [AR](screens/ar/08-quote-review.jpg) | [EN](screens/en/08-quote-review.jpg) |
+| 09 | Extracted lines beside the photo | [AR](screens/ar/09-quote-lines-photo.jpg) | [EN](screens/en/09-quote-lines-photo.jpg) |
+| 10 | Quote reviewed and authorised | [AR](screens/ar/10-quote-authorised.jpg) | [EN](screens/en/10-quote-authorised.jpg) |
+| 11 | Smart Compare, oil ×10: الذهبي recommended | [AR](screens/ar/11-smart-compare.jpg) | [EN](screens/en/11-smart-compare.jpg) |
+| 12 | Guardrail draft request from الذهبي quote, within the SAR limit | [AR](screens/ar/12-guardrail-draft.jpg) | [EN](screens/en/12-guardrail-draft.jpg) |
+| 13 | Phone: approval detail | [AR](screens/ar/13-phone-approval-detail.jpg) | [EN](screens/en/13-phone-approval-detail.jpg) |
+| 14 | Phone: «Request approved» | [AR](screens/ar/14-phone-approved.jpg) | [EN](screens/en/14-phone-approved.jpg) |
+| 15 | Request approved and ordered (web) | [AR](screens/ar/15-request-approved.jpg) | [EN](screens/en/15-request-approved.jpg) |
+| 16 | PO prefilled from the approved request | [AR](screens/ar/16-po-from-request.jpg) | [EN](screens/en/16-po-from-request.jpg) |
+| 17 | PO submitted | [AR](screens/ar/17-po-submitted.jpg) | [EN](screens/en/17-po-submitted.jpg) |
+| 18 | Record outcome from the PO | [AR](screens/ar/18-outcome-form.jpg) | [EN](screens/en/18-outcome-form.jpg) |
+| 19 | Ledger: this order's savings, pending verification | [AR](screens/ar/19-ledger-after-outcome.jpg) | [EN](screens/en/19-ledger-after-outcome.jpg) |
+| 20 | Ledger after verification | [AR](screens/ar/20-ledger-verified.jpg) | [EN](screens/en/20-ledger-verified.jpg) |
+
 ## Notes
 
 - A new workspace has no price history, so the guardrail stays silent (`no_price_history_baseline`) until a
