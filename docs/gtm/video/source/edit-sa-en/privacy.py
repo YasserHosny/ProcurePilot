@@ -92,9 +92,9 @@ def mask(src,result):
     # Restricted to quote review, not the inbox. Also cover partial glyphs at scene transitions.
     extra=[]
     if src.stem=='s2-quote-photo':
-        # Saudi rounds: the information panel scrolls off the top at 24.6–26.4 s in both languages.
-        x=790 if lang=='ar' else 976
-        extra=[(24.6,26.4,(x,58,156,960),'white')]
+        # English rounds: the information panel scrolls off the top at about 23.3 s; the cut skips 22.7–24.5 s.
+        x=976
+        extra=[(23.0,24.2,(x,58,156,960),'white')]
     if src.stem=='s4-phone-approve':
         list_end=max((int(f)/30 for f,hh in result['detections'].items() if any(h[0].startswith('phone-list') for h in hh)),default=6.5)+.5
         extra=[(1.5,max(7.0,list_end),(0,58,390,43),'0xf3f4f9'),
