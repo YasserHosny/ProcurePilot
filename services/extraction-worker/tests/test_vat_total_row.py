@@ -597,3 +597,69 @@ def test_negative_total_weight_and_item_total_weight_handled_as_before() -> None
     assert result_summary.expected_line_count == 1
     assert result_summary.stated_total is not None
     assert result_summary.stated_total.value == {"amount": "439.00", "currency": "EUR"}
+
+
+def test_in_table_subtotal_with_delivery_charge_reconciles_at_total() -> None:
+    # Subtotal 1,000.00 / Delivery 50.00 / Total 1,050.00 with items summing to 1,000.00:
+    # Subtotal is cleared by Delivery charge, stated_total 1050.00, delivery_fee 50.00, reconciled.
+    cells = [
+        {"rowIndex": 0, "columnIndex": 0, "columnSpan": 1, "content": "Item"},
+        {"rowIndex": 0, "columnIndex": 1, "columnSpan": 1, "content": "Qty"},
+        {"rowIndex": 0, "columnIndex": 2, "columnSpan": 1, "content": "Price"},
+        {"rowIndex": 0, "columnIndex": 3, "columnSpan": 1, "content": "Amount"},
+        {"rowIndex": 1, "columnIndex": 0, "columnSpan": 1, "content": "Item 1"},
+        {"rowIndex": 1, "columnIndex": 1, "columnSpan": 1, "content": "1"},
+        {"rowIndex": 1, "columnIndex": 2, "columnSpan": 1, "content": "€1,000.00"},
+        {"rowIndex": 1, "columnIndex": 3, "columnSpan": 1, "content": "€1,000.00"},
+        {"rowIndex": 2, "columnIndex": 0, "columnSpan": 3, "content": "Subtotal"},
+        {"rowIndex": 2, "columnIndex": 3, "columnSpan": 1, "content": "€1,000.00"},
+        {"rowIndex": 3, "columnIndex": 0, "columnSpan": 3, "content": "Delivery"},
+        {"rowIndex": 3, "columnIndex": 3, "columnSpan": 1, "content": "€50.00"},
+        {"rowIndex": 4, "columnIndex": 0, "columnSpan": 3, "content": "Total"},
+        {"rowIndex": 4, "columnIndex": 3, "columnSpan": 1, "content": "€1,050.00"},
+    ]
+    payload = {
+        "content": "quote text",
+        "tables": [{"columnCount": 4, "rowCount": 5, "cells": cells}],
+    }
+    result = _parse_invoice_result(payload, "layout:test")
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "1050.00", "currency": "EUR"}
+    assert result.lines[-1].fields.get("delivery_fee") is not None
+    assert result.lines[-1].fields["delivery_fee"].value == {"amount": "50.00", "currency": "EUR"}
+    validation = validate_arithmetic(result)
+    assert validation.status == "reconciled"
+
+
+def test_split_table_items_following_subtotal_clears_subtotal_candidate() -> None:
+    # Split table: items 600 + Subtotal 600.00, then items 900 more, then Total 1,500.00:
+    # stated_total 1500.00, reconciled.
+    cells = [
+        {"rowIndex": 0, "columnIndex": 0, "columnSpan": 1, "content": "Item"},
+        {"rowIndex": 0, "columnIndex": 1, "columnSpan": 1, "content": "Qty"},
+        {"rowIndex": 0, "columnIndex": 2, "columnSpan": 1, "content": "Price"},
+        {"rowIndex": 0, "columnIndex": 3, "columnSpan": 1, "content": "Amount"},
+        {"rowIndex": 1, "columnIndex": 0, "columnSpan": 1, "content": "Item 1"},
+        {"rowIndex": 1, "columnIndex": 1, "columnSpan": 1, "content": "1"},
+        {"rowIndex": 1, "columnIndex": 2, "columnSpan": 1, "content": "€600.00"},
+        {"rowIndex": 1, "columnIndex": 3, "columnSpan": 1, "content": "€600.00"},
+        {"rowIndex": 2, "columnIndex": 0, "columnSpan": 3, "content": "Subtotal"},
+        {"rowIndex": 2, "columnIndex": 3, "columnSpan": 1, "content": "€600.00"},
+        {"rowIndex": 3, "columnIndex": 0, "columnSpan": 1, "content": "Item 2"},
+        {"rowIndex": 3, "columnIndex": 1, "columnSpan": 1, "content": "1"},
+        {"rowIndex": 3, "columnIndex": 2, "columnSpan": 1, "content": "€900.00"},
+        {"rowIndex": 3, "columnIndex": 3, "columnSpan": 1, "content": "€900.00"},
+        {"rowIndex": 4, "columnIndex": 0, "columnSpan": 3, "content": "Total"},
+        {"rowIndex": 4, "columnIndex": 3, "columnSpan": 1, "content": "€1,500.00"},
+    ]
+    payload = {
+        "content": "quote text",
+        "tables": [{"columnCount": 4, "rowCount": 5, "cells": cells}],
+    }
+    result = _parse_invoice_result(payload, "layout:test")
+    assert len(result.lines) == 2
+    assert result.expected_line_count == 2
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "1500.00", "currency": "EUR"}
+    validation = validate_arithmetic(result)
+    assert validation.status == "reconciled"
