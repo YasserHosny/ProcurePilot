@@ -121,7 +121,7 @@ the result source window 0.5–2.3 s is inside every clip.
             text+=f'| 15 | {tl[fmt]["body"]} s | {tl[fmt]["outro"]} s nominal | `../../renders/{outro}` | Full approved file, unchanged |\n\n'
     text+='''The shot clocks skip navigation/dead time; explicit static subslots hold decision results for at least 1.5 s. Beat 13
 uses a kinetic counter (AR 300 EGP; EN 200 EGP), with the recorded per-line values in the plate. Quote
-figures are AR 24,640 / EN 24,440; compare gap EGP 200; ledger AR 1,560 / EN 1,760.
+figures are AR 24,640 / EN 24,440; compare gap EGP 200; ledger AR 1,560 / EN 1,760 (v2.4.2: AR ledger shots re-shot at ١٬٧٦٠, PPS-63).
 The disclosure pill uses the approved copy from beat 1 until the outro. Vertical captions sit below
 250 px and above the bottom 350 px platform-safe boundaries; the pill is at y=1500. Final visual QA
 must confirm crop focus, reading size and transitions after Chrome rendering; static syntax checks

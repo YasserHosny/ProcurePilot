@@ -63,6 +63,8 @@ function buildTimeline(fmt,lang){
         if(scene.beat===12){useCrop=[rtl?600:340,60,980,900];centerY=1110;}
         if(scene.beat===13)useCrop=[240,60,1440,980];
       }
+      // PPS-63: the re-shot Arabic outcome form (s5 34–42 s) sits further right, nav hidden; keep its title in frame.
+      if(rtl&&scene.beat===13&&name==='s5-po-savings'&&a>=34&&a<42)useCrop=vertical?[460,60,1440,980]:[420,60,1480,980];
       if(scene.beat===8){useCrop=compareCrops(vertical,rtl).main;centerY=vertical?1040:360;}
       // Real end-state inserts: source coordinates never include quotation identity fields.
       if(name==='s2r-authorised'){
@@ -110,7 +112,7 @@ function buildTimeline(fmt,lang){
       cursor+=slot;
     }
     if([1,6,8,13,14].includes(scene.beat)){
-      const money=lang==='ar'?{1:'٣٠٠ ج.م',6:'٢٤٬٦٤٠ ج.م',8:'٢٠٠ ج.م',13:'٣٠٠ ج.م',14:'١٬٥٦٠ ج.م'}:
+      const money=lang==='ar'?{1:'٣٠٠ ج.م',6:'٢٤٬٦٤٠ ج.م',8:'٢٠٠ ج.م',13:'٣٠٠ ج.م',14:'١٬٧٦٠ ج.م'}:
         {1:'EGP 200',6:'EGP 24,440',8:'EGP 200',13:'EGP 200',14:'EGP 1,760'};
       const cards=scene.cards_by_language[lang];
       const reveal=scene.beat===1?st+scene.spans_by_language[lang][0][3]:st+cards.at(-1).offset;
