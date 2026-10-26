@@ -112,7 +112,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-27 | PPS-55 | P-28 | PPS-56 | P-29 | PPS-58 |
 | P-30 | PPS-59 | P-31 | PPS-61 | P-32 | PPS-62 |
 | P-33 | PPS-63 | P-34 | PPS-64 | P-35 | PPS-65 |
-| P-36 | PPS-66 | P-37 | PPS-67 | | |
+| P-36 | PPS-66 | P-37 | PPS-67 | P-38 | PPS-68 |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -241,6 +241,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-35 | — | The same English demo for a eurozone market, Ireland (owner, 2026-10-25): workspace Liffey Kitchen Group, EUR, Irish VAT (IE region and euro extraction #285, Subtotal row #286/#287), €53.50 saved in the recorded round. Cut built by `video/source/edit-ie/` with three owner-approved Irish captions (beat 8 drops VAT: Irish quotes are ex-VAT) | Orch | P-34 | cuts in `docs/gtm/video/cuts/eu-en-v1/`, privacy audit clean, round record in `gcc/rounds/README.md` (PPS-65) |
 | [ ] P-36 | — | Found by the English rounds: euro amounts drop a trailing zero ("EUR 1,289.5") on the purchase request, and a zero saving shows as red "-SAR 0.00" on the ledger | Orch | — | both display as "EUR 1,289.50" and "SAR 0.00", with tests (PPS-66) |
 | [x] P-37 | — | Owner asked for the `find-skills` agent skill (vercel-labs/skills). Added unchanged at `.claude/skills/find-skills/SKILL.md`, so every Claude Code session on the repo has it (cloud containers are wiped when a session ends) | Orch | — | **done 2026-10-25: #288 (b80157a); PPS-67 Done** |
+| [ ] P-38 | — | Docs screenshot drift failed #291 on 28-email-ingestion-log alone (2.23%): the seeded email rows were dated `now()`, so the Received At column showed the capture day and the image changed daily. The spec now anchors them at noon UTC today, so the dashboard's today/week/month counts stay 5 at any hour, then moves them to a fixed day (2026-10-26, the day #292's committed image shows) before capturing 28 | Orch | — | PR merged; two consecutive docs-screenshot runs pass the diff (PPS-68) |
 
 ### E — Pilot environment
 
