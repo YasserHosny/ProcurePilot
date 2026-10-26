@@ -117,7 +117,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-42 | PPS-72 | P-43 | PPS-73 | P-44 | PPS-74 |
 | P-45 | PPS-75 | P-46 | PPS-76 | | |
 | P-49 | PPS-79 | | | | |
-| P-52 | PPS-82 | | | | |
+| P-52 | PPS-82 | P-53 | PPS-83 | P-54 | PPS-84 |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -257,6 +257,8 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-46 | — | "Sent with ProcurePilot by Iron Systems · www.iron-sys.com" footer on invitation, auto-prepared request and digest emails; RFQ emails to suppliers unchanged | Orch → Codex | — | merged (PPS-76) |
 | [ ] P-49 | — | Web unit test `DirectionService (T064)` "switch to rtl" failed once on #299 (no web code). CDK's root `Directionality` reads `dir` from `<body>`/`<html>` when it is constructed; a spec that ran earlier left the page RTL, so `setDirection('rtl')` changed nothing and emitted nothing. The spec now clears `dir`/`lang` before and after each test | Orch | — | PR merged; full web suite green 3 runs in a row (PPS-79) |
 | [ ] P-52 | — | Docs screenshots check (`docs-screenshots.yml`) failed on every frontend PR since #297: its Terms/Privacy notice under the sign-up button made 01c 7px taller (1440×900 → 1440×907). 01c re-committed from CI; user docs mention the notice on Create workspace and Accept invitation | Orch | — | docs-screenshots run green on the PR (PPS-82) |
+| [ ] P-53 | — | Demo video v2.5 in every version (owner-approved 2026-10-27): 10-s problem chapter with each market's own quotes, a logo-build brand turn, beat 1 on the fix caption, full-page saving, pain-to-fix recap, no disclosure pill, music crossfade into the outro. 12 cuts (Egypt ar/en, Saudi ar/en, Rawaq English, Liffey × 16:9/9:16); one build for every market (`docs/gtm/video/source/edit-v2.5/`) | Orch | P-41 | PR open (PPS-83) |
+| [ ] P-54 | — | Arabic UI showed money as «EGP ٣٠٠» (owner, 2026-10-27): Arabic now reads «٣٠٠ ج.م» / «ر.س» (Intl symbol, English unchanged); then re-record the Arabic rounds and rebuild the Arabic v2.5 cuts | Orch → Agy | P-53 | in progress (PPS-84) |
 
 ### E — Pilot environment
 
