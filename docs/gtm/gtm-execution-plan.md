@@ -116,6 +116,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-39 | PPS-69 | P-40 | PPS-70 | P-41 | PPS-71 |
 | P-42 | PPS-72 | P-43 | PPS-73 | P-44 | PPS-74 |
 | P-45 | PPS-75 | P-46 | PPS-76 | | |
+| P-49 | PPS-79 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -253,6 +254,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-44 | — | Mobile had no company or support info: Help & about screen (support@, privacy, terms, by Iron Systems, version); new deps url_launcher, package_info_plus | Orch → Agy | P-43 | merged (PPS-74) |
 | [ ] P-45 | — | Web account menu: Privacy, Terms and "ProcurePilot by Iron Systems" as keyboard-reachable menu items | Orch → Agy | P-43 | merged (PPS-75) |
 | [ ] P-46 | — | "Sent with ProcurePilot by Iron Systems · www.iron-sys.com" footer on invitation, auto-prepared request and digest emails; RFQ emails to suppliers unchanged | Orch → Codex | — | merged (PPS-76) |
+| [ ] P-49 | — | Web unit test `DirectionService (T064)` "switch to rtl" failed once on #299 (no web code). CDK's root `Directionality` reads `dir` from `<body>`/`<html>` when it is constructed; a spec that ran earlier left the page RTL, so `setDirection('rtl')` changed nothing and emitted nothing. The spec now clears `dir`/`lang` before and after each test | Orch | — | PR merged; full web suite green 3 runs in a row (PPS-79) |
 
 ### E — Pilot environment
 
