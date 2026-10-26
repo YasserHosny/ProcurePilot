@@ -31,8 +31,12 @@ RUN if [ -d "apps/web/dist/web/browser" ]; then \
 # Stage 2: Serve with Nginx
 FROM nginx:1.27-alpine
 
+ARG BUILD_SHA=dev
+
 COPY --from=build /app/build-output /usr/share/nginx/html
 COPY infra/nginx/nginx.conf /etc/nginx/templates/default.conf.template
+
+RUN printf '%s\n' "$BUILD_SHA" > /usr/share/nginx/html/version.txt
 
 ENV BACKEND_HOST=api
 

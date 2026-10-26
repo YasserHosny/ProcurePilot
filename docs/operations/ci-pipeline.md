@@ -56,6 +56,16 @@ and the orphaned blobs filled 10.4 GB of the repository's 10 GB Actions cache. T
 relies on. The four single-stage images now use `mode=min`, which stores the same layers for a single-stage build;
 `web.Dockerfile` is two-stage, so it keeps `mode=max` to cache its build stage.
 
+## Frontend deployment and CDN purge
+
+The frontend image embeds its commit SHA in `/version.txt`, served by nginx with `no-store`.
+After updating the Magic Containers image, `deploy-frontend.yml` polls that endpoint with a
+cache-busting query every 15 seconds for approximately 10 minutes. Only once the deployed SHA
+matches does it synchronously purge the site's wildcard URL from bunny CDN, then print the
+landing image's `cdn-cache` header for information. A timeout fails the job and skips the purge.
+This prevents old containers from refilling the cache during rollout: unhashed public assets
+such as landing images were cached for 30 days and otherwise survived new deployments.
+
 ## Concurrency
 
 Pushes to `main` get a per-commit concurrency group (`ci-<sha>`), so several merges landing close together validate
