@@ -20,6 +20,9 @@ permissions:
   contents: read
   packages: write
 
+env:
+  SITE_ORIGIN: https://procurepilot.iron-sys.com
+
 jobs:
   deploy:
     name: Build, Push, and Deploy Web SPA
@@ -54,6 +57,7 @@ jobs:
           file: infra/docker/web.Dockerfile
           push: true
           platforms: linux/amd64
+          build-args: BUILD_SHA=${{ github.sha }}
           tags: |
             ${{ steps.meta.outputs.tag_latest }}
             ${{ steps.meta.outputs.tag_sha }}
@@ -67,3 +71,38 @@ jobs:
           app_id: ${{ secrets.BUNNY_FRONTEND_APP_ID }}
           container: procurepilot-frontend
           image_tag: ${{ github.sha }}
+
+      - name: Wait for the new build to serve
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            if version=$(curl -fsS --connect-timeout 5 --max-time 10 "${SITE_ORIGIN}/version.txt?ts=$(date +%s)"); then
+              version=$(printf '%s' "$version" | tr -d '[:space:]')
+              if [[ "$version" == "$EXPECTED_SHA" ]]; then
+                echo "New build is serving: $EXPECTED_SHA"
+                exit 0
+              fi
+            fi
+            echo "Waiting for build $EXPECTED_SHA to serve..."
+            sleep 15
+          done
+          echo "::error::Timed out after approximately 10 minutes waiting for ${SITE_ORIGIN}/version.txt to serve build $EXPECTED_SHA. CDN purge skipped."
+          exit 1
+
+      - name: Purge bunny CDN
+        shell: bash
+        env:
+          BUNNY_API_KEY: ${{ secrets.BUNNY_API_KEY }}
+        run: |
+          purge_url=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["SITE_ORIGIN"] + "/*", safe="*"))')
+          curl -fsS -X POST "https://api.bunny.net/purge?url=${purge_url}&async=false" \
+            -H "AccessKey: ${BUNNY_API_KEY}"
+          echo
+          if headers=$(curl -fsS --connect-timeout 5 --max-time 30 -D - -o /dev/null "${SITE_ORIGIN}/landing/en/hero-recommendation.jpg"); then
+            printf '%s\n' "$headers" | awk 'tolower($0) ~ /^cdn-cache:/ { print; found = 1 } END { if (!found) print "cdn-cache header absent (informational)" }'
+          else
+            echo "::warning::Could not fetch the image CDN header after purge (informational only)."
+          fi
