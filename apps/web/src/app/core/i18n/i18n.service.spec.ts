@@ -8,7 +8,12 @@ import { ApiService } from '../api/api.service';
 import type { Locale, Me, Tenant } from '../api/models';
 import { SessionService } from '../auth/session.service';
 import { DirectionService } from './direction.service';
-import { I18nService, I18N_LOCATION_SEARCH } from './i18n.service';
+import {
+  I18nService,
+  I18N_LOCATION_PATHNAME,
+  I18N_LOCATION_SEARCH,
+  LOCALE_CHOSEN_STORAGE_KEY,
+} from './i18n.service';
 
 class FakeSessionService {
   readonly member: WritableSignal<Me | null> = signal<Me | null>(null);
@@ -43,6 +48,7 @@ describe('I18nService', () => {
   let fakeSession: FakeSessionService;
   let apiSpy: jasmine.SpyObj<ApiService>;
   let currentSearch: string;
+  let currentPathname: string;
 
   beforeEach(() => {
     localStorage.clear();
@@ -50,6 +56,7 @@ describe('I18nService', () => {
     apiSpy = jasmine.createSpyObj<ApiService>('ApiService', ['updateMe']);
     apiSpy.updateMe.and.returnValue(of(mockMember));
     currentSearch = '';
+    currentPathname = '/auth/sign-in';
 
     TestBed.configureTestingModule({
       providers: [
@@ -60,6 +67,7 @@ describe('I18nService', () => {
         { provide: SessionService, useValue: fakeSession },
         { provide: ApiService, useValue: apiSpy },
         { provide: I18N_LOCATION_SEARCH, useValue: () => currentSearch },
+        { provide: I18N_LOCATION_PATHNAME, useValue: () => currentPathname },
       ],
     });
   });
@@ -82,6 +90,7 @@ describe('I18nService', () => {
 
   it('adopts preferred locale when a guest signs in', () => {
     localStorage.setItem('pp.locale', 'en');
+    localStorage.setItem(LOCALE_CHOSEN_STORAGE_KEY, 'en');
     const service = TestBed.inject(I18nService);
 
     TestBed.flushEffects();
@@ -159,5 +168,153 @@ describe('I18nService', () => {
     expect(service.isRtl()).toBeFalse();
     expect(dirService.currentDirection()).toBe('ltr');
     expect(apiSpy.updateMe).not.toHaveBeenCalled();
+  });
+
+  it('defaults to Arabic with rtl direction for a guest on / with nothing stored', () => {
+    currentPathname = '/';
+    const service = TestBed.inject(I18nService);
+    const dirService = TestBed.inject(DirectionService);
+
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('ar');
+    expect(service.isRtl()).toBeTrue();
+    expect(dirService.currentDirection()).toBe('rtl');
+    expect(localStorage.getItem('pp.locale')).toBe('ar');
+    expect(localStorage.getItem(LOCALE_CHOSEN_STORAGE_KEY)).toBeNull();
+  });
+
+  it('defaults to Arabic for a guest on / when a stale pp.locale=en exists without explicit choice', () => {
+    localStorage.setItem('pp.locale', 'en');
+    currentPathname = '/';
+    const service = TestBed.inject(I18nService);
+    const dirService = TestBed.inject(DirectionService);
+
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('ar');
+    expect(service.isRtl()).toBeTrue();
+    expect(dirService.currentDirection()).toBe('rtl');
+    expect(localStorage.getItem('pp.locale')).toBe('ar');
+    expect(localStorage.getItem(LOCALE_CHOSEN_STORAGE_KEY)).toBeNull();
+  });
+
+  it('yields English on reload for a guest on / after explicit setLocale(en)', () => {
+    currentPathname = '/';
+    const service = TestBed.inject(I18nService);
+    service.setLocale('en');
+
+    expect(localStorage.getItem(LOCALE_CHOSEN_STORAGE_KEY)).toBe('en');
+    expect(localStorage.getItem('pp.locale')).toBe('en');
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideTranslateService(),
+        Directionality,
+        DirectionService,
+        I18nService,
+        { provide: SessionService, useValue: fakeSession },
+        { provide: ApiService, useValue: apiSpy },
+        { provide: I18N_LOCATION_SEARCH, useValue: () => currentSearch },
+        { provide: I18N_LOCATION_PATHNAME, useValue: () => currentPathname },
+      ],
+    });
+
+    const reloadedService = TestBed.inject(I18nService);
+    const dirService = TestBed.inject(DirectionService);
+    TestBed.flushEffects();
+
+    expect(reloadedService.currentLocale()).toBe('en');
+    expect(reloadedService.isRtl()).toBeFalse();
+    expect(dirService.currentDirection()).toBe('ltr');
+  });
+
+  it('applies English and records explicit choice when guest opens /?lang=en', () => {
+    currentPathname = '/';
+    currentSearch = '?lang=en';
+    const service = TestBed.inject(I18nService);
+    const dirService = TestBed.inject(DirectionService);
+
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('en');
+    expect(service.isRtl()).toBeFalse();
+    expect(dirService.currentDirection()).toBe('ltr');
+    expect(localStorage.getItem('pp.locale')).toBe('en');
+    expect(localStorage.getItem(LOCALE_CHOSEN_STORAGE_KEY)).toBe('en');
+  });
+
+  it('defaults to Arabic with rtl direction for a guest on /auth/sign-in with nothing stored', () => {
+    currentPathname = '/auth/sign-in';
+    const service = TestBed.inject(I18nService);
+    const dirService = TestBed.inject(DirectionService);
+
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('ar');
+    expect(service.isRtl()).toBeTrue();
+    expect(dirService.currentDirection()).toBe('rtl');
+    expect(localStorage.getItem('pp.locale')).toBe('ar');
+    expect(localStorage.getItem(LOCALE_CHOSEN_STORAGE_KEY)).toBeNull();
+  });
+
+  it('defaults to Arabic for a guest on /auth/sign-in when a stale pp.locale=en exists without explicit choice', () => {
+    localStorage.setItem('pp.locale', 'en');
+    currentPathname = '/auth/sign-in';
+    const service = TestBed.inject(I18nService);
+    const dirService = TestBed.inject(DirectionService);
+
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('ar');
+    expect(service.isRtl()).toBeTrue();
+    expect(dirService.currentDirection()).toBe('rtl');
+    expect(localStorage.getItem('pp.locale')).toBe('ar');
+    expect(localStorage.getItem(LOCALE_CHOSEN_STORAGE_KEY)).toBeNull();
+  });
+
+  it('yields English for a guest on /auth/sign-in when pp.locale.chosen=en exists', () => {
+    localStorage.setItem(LOCALE_CHOSEN_STORAGE_KEY, 'en');
+    localStorage.setItem('pp.locale', 'en');
+    currentPathname = '/auth/sign-in';
+    const service = TestBed.inject(I18nService);
+    const dirService = TestBed.inject(DirectionService);
+
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('en');
+    expect(service.isRtl()).toBeFalse();
+    expect(dirService.currentDirection()).toBe('ltr');
+    expect(localStorage.getItem('pp.locale')).toBe('en');
+    expect(localStorage.getItem(LOCALE_CHOSEN_STORAGE_KEY)).toBe('en');
+  });
+
+  it('applies English and records explicit choice when guest opens /auth/sign-in?lang=en', () => {
+    currentPathname = '/auth/sign-in';
+    currentSearch = '?lang=en';
+    const service = TestBed.inject(I18nService);
+    const dirService = TestBed.inject(DirectionService);
+
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('en');
+    expect(service.isRtl()).toBeFalse();
+    expect(dirService.currentDirection()).toBe('ltr');
+    expect(localStorage.getItem('pp.locale')).toBe('en');
+    expect(localStorage.getItem(LOCALE_CHOSEN_STORAGE_KEY)).toBe('en');
+  });
+
+  it('defaults to English with ltr direction for a guest on other routes (e.g. /onboarding/signup) with nothing stored', () => {
+    currentPathname = '/onboarding/signup';
+    const service = TestBed.inject(I18nService);
+    const dirService = TestBed.inject(DirectionService);
+
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('en');
+    expect(service.isRtl()).toBeFalse();
+    expect(dirService.currentDirection()).toBe('ltr');
+    expect(localStorage.getItem('pp.locale')).toBe('en');
   });
 });

@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+import { baseStorageStateFile, createBaseStorageState } from '../../playwright.config';
 
 /**
  * Creates the workspace and owner the E2E specs sign in as.
@@ -87,6 +89,10 @@ async function globalSetup(): Promise<void> {
   }
 
   writeFileSync(join(__dirname, '.credentials.json'), JSON.stringify(credentials, null, 2));
+
+  const baseURL = process.env['E2E_BASE_URL'] ?? 'http://localhost:4200';
+  mkdirSync(dirname(baseStorageStateFile), { recursive: true });
+  writeFileSync(baseStorageStateFile, JSON.stringify(createBaseStorageState(baseURL), null, 2));
 }
 
 export default globalSetup;
