@@ -15,9 +15,10 @@ name: Docs screenshots drift
 #
 # Deliberately does NOT auto-commit regenerated screenshots back into the PR -- a bot silently
 # rewriting binary files in someone else's branch is more surprising than useful. On drift, this
-# job fails (images beyond a 1% pixel-change threshold, resized, added or removed) and uploads the
-# regenerated screenshots as an artifact so a reviewer can see exactly what changed; the fix is to
-# commit the artifact's images (CI-rendered, so they match the runner's fonts) or regenerate locally.
+# job fails (images beyond a 1% pixel-change threshold, resized, added or removed). Every complete
+# capture uploads the regenerated screenshots as an artifact so a reviewer can see exactly what
+# changed; the fix is to commit the artifact's images (CI-rendered, so they match the runner's
+# fonts) or regenerate locally.
 
 on:
   pull_request:
@@ -25,6 +26,7 @@ on:
       - 'apps/web/src/app/**'
       - 'apps/web/tests/e2e/user-documentation-screenshots.spec.ts'
       - 'apps/web/tests/e2e/support/canonical-flow.ts'
+      - 'apps/web/tests/e2e/global-setup.ts'
       - 'apps/web/playwright.docs.config.ts'
       - 'scripts/docs_screenshots_diff.py'
       - 'packages/i18n/**'
@@ -175,8 +177,10 @@ jobs:
 
       # Only a capture that ran to the end gives images worth committing; a failed capture leaves
       # a mix of new and committed screenshots (PPS-46). Its own Playwright output says why.
-      - name: Upload regenerated screenshots on drift
-        if: failure() && steps.capture.outcome == 'success'
+      # Uploaded on a pass too, so two runs can be compared to find what varies under the limit
+      # (PPS-69).
+      - name: Upload regenerated screenshots
+        if: always() && steps.capture.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: regenerated-doc-screenshots

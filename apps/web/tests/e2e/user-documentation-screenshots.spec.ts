@@ -396,7 +396,8 @@ async function buildCommercialFixtures(page: Page): Promise<ScreenshotFixtures> 
   });
   await apiAsUser(ownerToken, 'POST', `/requests/${request.id}/submit`);
 
-  await createMember('buyer', ownerToken);
+  // 18-team-management shows this address; under CI it is fixed like the sample names above.
+  await createMember('buyer', ownerToken, process.env['CI'] ? 'e2e.member@example.test' : undefined);
 
   return {
     ownerToken,
