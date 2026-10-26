@@ -245,7 +245,7 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
     // Verify dialog is named by caption
     const dialogTitle = dialog.locator('[mat-dialog-title]');
     await expect(dialogTitle).toBeVisible();
-    await expect(dialogTitle).toHaveText(/The supplier's PDF/i);
+    await expect(dialogTitle).toHaveText(/The supplier's photographed quote/i);
 
     // Run axe scan while dialog is open
     const results = await new AxeBuilder({ page })
