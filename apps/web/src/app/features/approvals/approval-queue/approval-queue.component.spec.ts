@@ -301,7 +301,7 @@ describe('ApprovalQueueComponent', () => {
     expect(compiled.querySelector('.budget-near-badge')?.textContent?.trim()).toBe(
       'Near budget limit',
     );
-    expect(compiled.textContent).toContain('Remaining: EGP 1,250.5');
+    expect(compiled.textContent).toContain('Remaining: EGP 1,250.50');
     expect(compiled.querySelector('.budget-no-budget-badge')?.textContent?.trim()).toBe(
       'No budget configured',
     );
