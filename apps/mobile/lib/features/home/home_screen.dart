@@ -125,6 +125,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
+            key: const Key('homeAboutButton'),
+            icon: const Icon(Icons.info_outline),
+            tooltip: i18n.t('about.title'),
+            onPressed: () => Navigator.of(context).pushNamed('/about'),
+          ),
+          IconButton(
             key: const Key('signOutButton'),
             icon: const Icon(Icons.logout),
             tooltip: i18n.t('mobileHome.signOut'),

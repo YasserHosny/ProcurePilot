@@ -17,6 +17,7 @@ from procurepilot_api.modules.ingestion.orchestrator import (
 from procurepilot_api.modules.requests.service import RequestsService
 from procurepilot_api.modules.rfq.auto_prepared_email import render_auto_prepared_email
 from procurepilot_api.modules.rfq.guardrails import AutoPreparationGuardrail
+from procurepilot_api.shared.i18n import t
 from procurepilot_api.shared.mailer import FakeMailer
 
 
@@ -225,3 +226,19 @@ def test_owner_email_failure_is_reported_not_raised(monkeypatch: pytest.MonkeyPa
         purchase_request_id=uuid4(),
     )
     assert outcome == "failed"
+
+
+@pytest.mark.parametrize("locale", ["en", "ar"])
+def test_owner_email_has_brand_footer(locale: str) -> None:
+    result = render_auto_prepared_email(
+        workspace_name="Workspace",
+        supplier_name="Supplier",
+        request_url="https://app.example.test/requests/1",
+        locale=locale,
+    )
+    sent_with = t("emails.footer.sentWith", locale)
+    website = t("emails.footer.website", locale)
+    assert result.text.endswith(f"{sent_with} · {website}")
+    assert sent_with in result.html
+    assert 'href="https://www.iron-sys.com/" dir="ltr"' in result.html
+    assert f">{website}</a>" in result.html

@@ -51,7 +51,7 @@ describe('LandingPilotComponent', () => {
     copyBtn.triggerEventHandler('click', null);
     fixture.detectChanges();
 
-    expect(copySpy).toHaveBeenCalledWith(environment.supportEmail);
+    expect(copySpy).toHaveBeenCalledWith(environment.salesEmail);
     expect(component.emailCopied()).toBeTrue();
 
     const liveRegion = fixture.debugElement.query(By.css('[aria-live="polite"]'));
@@ -77,7 +77,7 @@ describe('LandingPilotComponent', () => {
 
   it('constructs mailto link with encoded subject and body', () => {
     const mailto = component.mailtoLink();
-    expect(mailto).toContain(`mailto:${environment.supportEmail}`);
+    expect(mailto).toContain(`mailto:${environment.salesEmail}`);
     expect(mailto).toContain('subject=ProcurePilot%20pilot%20access%20request');
   });
 });

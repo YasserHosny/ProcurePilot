@@ -6,6 +6,7 @@ import html
 
 from pydantic import BaseModel
 
+from procurepilot_api.shared.brand_footer import brand_footer
 from procurepilot_api.shared.i18n import t
 
 
@@ -40,16 +41,18 @@ def render_auto_prepared_email(
         supplier=html.escape(supplier_name),
     )
     url = html.escape(request_url, quote=True)
+    footer_text, footer_html = brand_footer(lang)
     body = (
         f'<!doctype html><html lang="{lang}" dir="{direction}"><head><meta charset="utf-8">'
         f"<title>{html.escape(subject)}</title></head><body>"
         f"<p>{html.escape(greeting)}</p><p>{intro_html}</p><p>{html.escape(review)}</p>"
         f'<p><a href="{url}">{html.escape(label)}</a></p>'
-        f'<p><span dir="ltr">{url}</span></p><p>{html.escape(why)}</p></body></html>'
+        f'<p><span dir="ltr">{url}</span></p><p>{html.escape(why)}</p>'
+        f"{footer_html}</body></html>"
     )
     return RenderedAutoPreparedEmail(
         subject=subject,
-        text="\n\n".join([greeting, intro, review, label, request_url, why]),
+        text="\n\n".join([greeting, intro, review, label, request_url, why, footer_text]),
         html=body,
         from_name=t(f"{prefix}.fromName", lang, workspace=workspace_name),
         locale=lang,

@@ -40,7 +40,7 @@ export class LandingPilotComponent implements OnDestroy {
   private readonly clipboard = inject(Clipboard);
   readonly i18n = inject(I18nService);
 
-  readonly supportEmail = environment.supportEmail;
+  readonly salesEmail = environment.salesEmail;
   readonly faqItems = FAQ_ITEMS;
   readonly emailCopied = model<boolean>(false);
   private copyTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -57,11 +57,11 @@ export class LandingPilotComponent implements OnDestroy {
       queryParts.push(`body=${encodeURIComponent(body)}`);
     }
     const query = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
-    return `mailto:${this.supportEmail}${query}`;
+    return `mailto:${this.salesEmail}${query}`;
   });
 
   copyEmail(): void {
-    this.clipboard.copy(this.supportEmail);
+    this.clipboard.copy(this.salesEmail);
     this.emailCopied.set(true);
     if (this.copyTimeoutId) {
       clearTimeout(this.copyTimeoutId);

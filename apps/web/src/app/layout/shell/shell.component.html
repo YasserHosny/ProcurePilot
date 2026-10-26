@@ -109,6 +109,26 @@
         <mat-icon aria-hidden="true">logout</mat-icon>
         <span>{{ 'shell.signOut' | translate }}</span>
       </button>
+
+      <mat-divider></mat-divider>
+
+      <div class="menu-footer">
+        <a mat-menu-item routerLink="/privacy" class="menu-footer-item">
+          <span>{{ 'about.privacy' | translate }}</span>
+        </a>
+        <a mat-menu-item routerLink="/terms" class="menu-footer-item">
+          <span>{{ 'about.terms' | translate }}</span>
+        </a>
+        <a
+          mat-menu-item
+          href="https://www.iron-sys.com/"
+          target="_blank"
+          rel="noopener"
+          class="menu-footer-item menu-footer-company"
+        >
+          <span>{{ 'about.productByPrefix' | translate }} <bdi dir="ltr">{{ 'about.companyName' | translate }}</bdi></span>
+        </a>
+      </div>
     </mat-menu>
   </mat-toolbar>
 

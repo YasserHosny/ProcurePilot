@@ -59,7 +59,7 @@ describe('LandingComponent', () => {
     expect(primaryBtn.nativeElement.textContent.trim()).toBe('Request pilot access');
 
     const href = primaryBtn.nativeElement.getAttribute('href');
-    expect(href).toContain(`mailto:${environment.supportEmail}`);
+    expect(href).toContain(`mailto:${environment.salesEmail}`);
     expect(href).toContain('subject=ProcurePilot%20pilot%20access%20request');
 
     const secondaryBtn = fixture.debugElement.query(By.css('.hero-secondary-btn'));
@@ -231,7 +231,7 @@ describe('LandingComponent', () => {
     copyBtn.triggerEventHandler('click', null);
     fixture.detectChanges();
 
-    expect(copySpy).toHaveBeenCalledWith(environment.supportEmail);
+    expect(copySpy).toHaveBeenCalledWith(environment.salesEmail);
     expect(component.emailCopied()).toBeTrue();
 
     const liveRegion = fixture.debugElement.query(By.css('[aria-live="polite"]'));
@@ -284,11 +284,18 @@ describe('LandingComponent', () => {
     ).toMatch(/\/auth\/sign-in/);
   });
 
-  it('renders the footer with support mailto, maker link, and copyright line', () => {
-    const supportLink = fixture.debugElement.query(By.css('.footer-support-link'));
-    expect(supportLink).toBeTruthy();
-    expect(supportLink.nativeElement.getAttribute('href')).toBe(`mailto:${environment.supportEmail}`);
-    expect(supportLink.nativeElement.textContent).toContain(environment.supportEmail);
+  it('renders the footer with sales mailto, legal links, maker link, and copyright line', () => {
+    const contactLink = fixture.debugElement.query(By.css('.footer-support-link'));
+    expect(contactLink).toBeTruthy();
+    expect(contactLink.nativeElement.getAttribute('href')).toBe(`mailto:${environment.salesEmail}`);
+    expect(contactLink.nativeElement.textContent).toContain(environment.salesEmail);
+
+    const legalLinks = fixture.debugElement.queryAll(By.css('.footer-legal-link'));
+    expect(legalLinks.length).toBe(2);
+    expect(legalLinks[0].nativeElement.getAttribute('routerLink') ?? legalLinks[0].nativeElement.getAttribute('href')).toMatch(/\/privacy/);
+    expect(legalLinks[0].nativeElement.textContent.trim()).toBe('Privacy');
+    expect(legalLinks[1].nativeElement.getAttribute('routerLink') ?? legalLinks[1].nativeElement.getAttribute('href')).toMatch(/\/terms/);
+    expect(legalLinks[1].nativeElement.textContent.trim()).toBe('Terms');
 
     const copyright = fixture.debugElement.query(By.css('.footer-copyright'));
     expect(copyright).toBeTruthy();

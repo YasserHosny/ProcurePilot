@@ -76,6 +76,40 @@ describe('ShellComponent account menu', () => {
     expect(link!.textContent).toContain(enCatalog.shell.contactSupport);
   });
 
+  it('renders a quiet footer block with MatMenuItem legal links and company byline for keyboard access', async () => {
+    const trigger = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      '.account-btn',
+    );
+    trigger!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const privacyItem = document.querySelector<HTMLAnchorElement>(
+      '.menu-footer a[mat-menu-item][routerLink="/privacy"], .menu-footer a[mat-menu-item][href="/privacy"]'
+    );
+    const termsItem = document.querySelector<HTMLAnchorElement>(
+      '.menu-footer a[mat-menu-item][routerLink="/terms"], .menu-footer a[mat-menu-item][href="/terms"]'
+    );
+    const companyItem = document.querySelector<HTMLAnchorElement>(
+      '.menu-footer a[mat-menu-item][href="https://www.iron-sys.com/"]'
+    );
+
+    expect(privacyItem).not.toBeNull();
+    expect(privacyItem!.getAttribute('role')).toBe('menuitem');
+    expect(privacyItem!.textContent).toContain(enCatalog.about.privacy);
+
+    expect(termsItem).not.toBeNull();
+    expect(termsItem!.getAttribute('role')).toBe('menuitem');
+    expect(termsItem!.textContent).toContain(enCatalog.about.terms);
+
+    expect(companyItem).not.toBeNull();
+    expect(companyItem!.getAttribute('role')).toBe('menuitem');
+    expect(companyItem!.getAttribute('target')).toBe('_blank');
+    expect(companyItem!.getAttribute('rel')).toContain('noopener');
+    expect(companyItem!.textContent).toContain(enCatalog.about.companyName);
+    expect(companyItem!.textContent).toContain(enCatalog.about.productByPrefix);
+  });
+
   // WCAG 2.5.3 Label in Name: a speech-input user activates a control by saying what it shows,
   // so the accessible name must contain the visible text (axe: label-content-name-mismatch).
   describe('accessible names contain the visible text', () => {

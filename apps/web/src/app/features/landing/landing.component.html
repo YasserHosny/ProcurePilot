@@ -123,9 +123,17 @@
         </a>
       </div>
       <div class="footer-links">
-        <a [href]="supportMailto" class="footer-support-link">
+        <a routerLink="/privacy" class="footer-legal-link">
+          {{ 'legal.links.privacy' | translate }}
+        </a>
+        <span class="footer-separator" aria-hidden="true">·</span>
+        <a routerLink="/terms" class="footer-legal-link">
+          {{ 'legal.links.terms' | translate }}
+        </a>
+        <span class="footer-separator" aria-hidden="true">·</span>
+        <a [href]="salesMailto" class="footer-support-link">
           <mat-icon aria-hidden="true" class="footer-icon">support_agent</mat-icon>
-          <span>{{ 'landing.footer.contactSupportPrefix' | translate }}<bdi class="email-bdi">{{ supportEmail }}</bdi></span>
+          <span>{{ 'landing.footer.contactSupportPrefix' | translate }}<bdi class="email-bdi">{{ salesEmail }}</bdi></span>
         </a>
         <span class="footer-separator" aria-hidden="true">·</span>
         <a routerLink="/auth/sign-in" class="footer-signin-link">

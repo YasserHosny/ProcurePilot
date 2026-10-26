@@ -31,3 +31,21 @@ def test_invitation_email_is_localized_and_escapes_values(
     assert t("common.roles.buyer", lang) in result.text
     assert result.subject == t("team.invitationEmail.subject", lang, workspace=workspace)
     assert ("٢٥" if lang == "ar" else "25") in result.text
+
+
+@pytest.mark.parametrize("locale", ["en", "ar"])
+def test_invitation_email_has_brand_footer(locale: str) -> None:
+    result = render_invitation_email(
+        workspace_name="Workspace",
+        inviter_email="owner@example.test",
+        role="buyer",
+        expires_at=datetime(2026, 10, 25, tzinfo=UTC),
+        accept_url="https://app.example.test/invite",
+        locale=locale,
+    )
+    sent_with = t("emails.footer.sentWith", locale)
+    website = t("emails.footer.website", locale)
+    assert result.text.endswith(f"{sent_with} · {website}")
+    assert sent_with in result.html
+    assert 'href="https://www.iron-sys.com/" dir="ltr"' in result.html
+    assert f">{website}</a>" in result.html

@@ -57,8 +57,8 @@ export class LandingComponent {
   @ViewChild(LandingGalleryComponent) galleryComponent?: LandingGalleryComponent;
   @ViewChild(LandingPilotComponent) pilotComponent?: LandingPilotComponent;
 
-  readonly supportEmail = environment.supportEmail;
-  readonly supportMailto = `mailto:${environment.supportEmail}`;
+  readonly salesEmail = environment.salesEmail;
+  readonly salesMailto = `mailto:${environment.salesEmail}`;
   readonly currentLocale = this.i18n.currentLocale;
   readonly isRtl = this.i18n.isRtl;
 
@@ -86,7 +86,7 @@ export class LandingComponent {
       queryParts.push(`body=${encodeURIComponent(body)}`);
     }
     const query = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
-    return `mailto:${this.supportEmail}${query}`;
+    return `mailto:${this.salesEmail}${query}`;
   });
 
   readonly heroImageSrc = computed(

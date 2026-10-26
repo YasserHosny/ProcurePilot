@@ -17,7 +17,10 @@ import 'core/camera/camera_capture.dart';
 import 'core/i18n/i18n_loader.dart';
 import 'core/offline_queue/offline_queue_replay.dart';
 import 'core/offline_queue/offline_queue_service.dart';
+import 'core/platform/link_opener.dart';
+import 'core/platform/version_provider.dart';
 import 'core/theme/app_theme.dart';
+import 'features/about/about_screen.dart';
 import 'features/approvals/approval_decision_screen.dart';
 import 'features/approvals/approval_queue_screen.dart';
 import 'features/auth/biometric_offer_screen.dart';
@@ -52,6 +55,7 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/requests/new': (context) => const RequestFormScreen(),
   '/requests/detail': (context) => const RequestDetailScreen(),
   '/lowStock': (context) => const LowStockReportScreen(),
+  '/about': (context) => const AboutScreen(),
 };
 
 void main() async {
@@ -64,6 +68,10 @@ void main() async {
     defaultValue: '',
   );
   const apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: '');
+  const webOrigin = String.fromEnvironment(
+    'WEB_ORIGIN',
+    defaultValue: 'https://procurepilot.iron-sys.com',
+  );
 
   final i18n = I18nLoader();
   await i18n.load(
@@ -118,6 +126,7 @@ void main() async {
       cameraCapture: const ImagePickerCameraCapture(),
       offlineQueueService: offlineQueueService,
       notificationPermission: StandInNotificationPermission(),
+      webOrigin: webOrigin,
     ),
   );
 }
@@ -134,6 +143,12 @@ class ProcurePilotApp extends StatefulWidget {
     this.cameraCapture = const ImagePickerCameraCapture(),
     this.offlineQueueService,
     this.notificationPermission,
+    this.webOrigin = const String.fromEnvironment(
+      'WEB_ORIGIN',
+      defaultValue: 'https://procurepilot.iron-sys.com',
+    ),
+    this.linkOpener = const UrlLauncherLinkOpener(),
+    this.versionProvider = const PackageInfoVersionProvider(),
   });
 
   final I18nLoader i18n;
@@ -145,6 +160,9 @@ class ProcurePilotApp extends StatefulWidget {
   final CameraCapture cameraCapture;
   final OfflineQueue? offlineQueueService;
   final NotificationPermission? notificationPermission;
+  final String webOrigin;
+  final LinkOpener linkOpener;
+  final AppVersionProvider versionProvider;
 
   @override
   State<ProcurePilotApp> createState() => _ProcurePilotAppState();
@@ -284,6 +302,9 @@ class _ProcurePilotAppState extends State<ProcurePilotApp> {
           requestsApiClient: widget.requestsApiClient,
           cameraCapture: widget.cameraCapture,
           offlineQueueService: widget.offlineQueueService,
+          webOrigin: widget.webOrigin,
+          linkOpener: widget.linkOpener,
+          versionProvider: widget.versionProvider,
           i18n: widget.i18n,
           child: MaterialApp(
             navigatorKey: _navigatorKey,

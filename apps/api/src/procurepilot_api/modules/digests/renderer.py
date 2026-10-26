@@ -4,6 +4,7 @@ import html
 from urllib.parse import urljoin
 
 from procurepilot_api.modules.digests.schemas import DigestView
+from procurepilot_api.shared.brand_footer import brand_footer
 from procurepilot_api.shared.i18n import t
 
 
@@ -65,6 +66,8 @@ def render_digest(
 
     footer_text = t("digests.email.footer", locale)
     text_lines.append(f"{footer_text} {settings_url}")
+    brand_text, brand_html = brand_footer(locale)
+    text_lines.extend(["", brand_text])
     plain_text = "\n".join(text_lines)
 
     # Build HTML
@@ -201,6 +204,7 @@ def render_digest(
         <a href="{html.escape(settings_url)}">{manage_settings_label}</a> &bull;
         <a href="{html.escape(settings_url)}">{unsubscribe_label}</a>
       </p>
+      {brand_html}
     </div>
   </div>
 </body>

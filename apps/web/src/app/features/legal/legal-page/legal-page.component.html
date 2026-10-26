@@ -1,0 +1,82 @@
+<div class="legal-page">
+  <header class="legal-header">
+    <div class="header-container">
+      <div class="header-brand-group">
+        <a routerLink="/" class="brand-link" [attr.aria-label]="'common.brandName' | translate">
+          <app-brand-logo [height]="36" />
+        </a>
+        <a href="https://www.iron-sys.com/" target="_blank" rel="noopener" class="header-maker-link">
+          {{ 'landing.header.byIronSystemsPrefix' | translate }} <span class="maker-brand" dir="ltr">{{ 'landing.ironSystems.brandName' | translate }}</span> {{ 'landing.header.byIronSystemsSuffix' | translate }}
+        </a>
+      </div>
+      <div class="header-actions">
+        <app-language-toggle />
+      </div>
+    </div>
+  </header>
+
+  <main class="legal-main" id="main-content">
+    <div class="legal-container">
+      <nav class="legal-breadcrumb" [attr.aria-label]="'legal.breadcrumbLabel' | translate">
+        <a routerLink="/" class="back-link">
+          <mat-icon aria-hidden="true" class="back-icon" [class.rtl-flip]="isRtl()">arrow_back</mat-icon>
+          <span>{{ 'legal.backHome' | translate }}</span>
+        </a>
+      </nav>
+
+      <article class="legal-article">
+        <header class="article-header">
+          <h1 class="legal-title">{{ doc().title }}</h1>
+          <p class="legal-updated">{{ 'legal.updated' | translate }}</p>
+          <p class="legal-intro">{{ doc().intro }}</p>
+        </header>
+
+        <div class="legal-sections">
+          @for (section of doc().sections; track section.id) {
+            <section class="legal-section" [attr.aria-labelledby]="section.id + '-heading'">
+              <h2 [id]="section.id + '-heading'" class="section-heading">{{ section.heading }}</h2>
+              <div class="section-paragraphs">
+                @for (p of section.paragraphs; track $index) {
+                  <p class="section-paragraph">{{ p }}</p>
+                }
+              </div>
+            </section>
+          }
+        </div>
+
+        <div class="article-footer-nav">
+          <a routerLink="/" class="back-link">
+            <mat-icon aria-hidden="true" class="back-icon" [class.rtl-flip]="isRtl()">arrow_back</mat-icon>
+            <span>{{ 'legal.backHome' | translate }}</span>
+          </a>
+        </div>
+      </article>
+    </div>
+  </main>
+
+  <footer class="legal-footer">
+    <div class="footer-container">
+      <div class="footer-identity">
+        <span class="footer-product-name">{{ 'common.brandName' | translate }}</span>
+        <span class="footer-separator" aria-hidden="true">·</span>
+        <a href="https://www.iron-sys.com/" target="_blank" rel="noopener" class="footer-maker-link">
+          {{ 'landing.footer.builtByPrefix' | translate }} <span class="maker-brand" dir="ltr">{{ 'landing.ironSystems.brandName' | translate }}</span>
+        </a>
+      </div>
+      <div class="footer-links">
+        <a routerLink="/privacy" class="footer-legal-link">
+          {{ 'legal.links.privacy' | translate }}
+        </a>
+        <span class="footer-separator" aria-hidden="true">·</span>
+        <a routerLink="/terms" class="footer-legal-link">
+          {{ 'legal.links.terms' | translate }}
+        </a>
+        <span class="footer-separator" aria-hidden="true">·</span>
+        <a routerLink="/auth/sign-in" class="footer-signin-link">
+          {{ 'landing.footer.signIn' | translate }}
+        </a>
+      </div>
+      <p class="footer-copyright">{{ 'landing.footer.copyright' | translate }}</p>
+    </div>
+  </footer>
+</div>

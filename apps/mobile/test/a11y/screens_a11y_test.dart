@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:procurepilot_mobile/core/api/models.dart';
+import 'package:procurepilot_mobile/features/about/about_screen.dart';
 import 'package:procurepilot_mobile/features/approvals/approval_decision_screen.dart';
 import 'package:procurepilot_mobile/features/approvals/approval_queue_screen.dart';
 import 'package:procurepilot_mobile/features/auth/sign_in_screen.dart';
@@ -243,6 +244,24 @@ void main() {
       await _checkGuidelines(tester);
 
       expect(find.byKey(const Key('qualityIssueSubmitButton')), findsOneWidget);
+    });
+  });
+
+  group('About screen accessibility', () {
+    testWidgets('meets tap-target, contrast, and label guidelines', (
+      tester,
+    ) async {
+      await pumpWithServices(
+        tester,
+        child: const AboutScreen(),
+        versionProvider: FakeAppVersionProvider('0.1.0 (1)'),
+      );
+      await tester.pumpAndSettle();
+
+      await _checkGuidelines(tester);
+
+      expect(find.byKey(const Key('aboutContactSupportTile')), findsOneWidget);
+      expect(find.byKey(const Key('aboutCompanyLink')), findsOneWidget);
     });
   });
 }

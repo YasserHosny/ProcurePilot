@@ -14,4 +14,16 @@ describe('application routes', () => {
     expect(landingRoute).toBeDefined();
     expect(landingRoute?.canActivate).toEqual([guestGuard]);
   });
+
+  it('exposes public unauthenticated legal routes for privacy and terms without guards', () => {
+    const privacyRoute = routes.find((route) => route.path === 'privacy');
+    expect(privacyRoute).toBeDefined();
+    expect(privacyRoute?.canActivate).toBeUndefined();
+    expect(privacyRoute?.loadComponent).toBeDefined();
+
+    const termsRoute = routes.find((route) => route.path === 'terms');
+    expect(termsRoute).toBeDefined();
+    expect(termsRoute?.canActivate).toBeUndefined();
+    expect(termsRoute?.loadComponent).toBeDefined();
+  });
 });
