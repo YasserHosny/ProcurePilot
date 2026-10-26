@@ -3,7 +3,10 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
+
 from procurepilot_api.modules.rfq.email import RfqEmailLine, render_rfq_email
+from procurepilot_api.shared.i18n import t
 
 
 def _line(name: str = "عدس بجبة") -> RfqEmailLine:
@@ -164,3 +167,19 @@ def test_single_pack_and_unknown_pack_size() -> None:
     unknown = _RICE.model_copy(update={"pack_count": None, "unit_size": None})
     assert ": 12 packs\n" in _render("en", [unknown])
     assert ": ١٢ عبوة\n" in _render("ar", [unknown])
+
+
+@pytest.mark.parametrize("locale", ["en", "ar"])
+def test_supplier_email_has_no_brand_footer(locale: str) -> None:
+    result = render_rfq_email(
+        tenant_name="Workspace",
+        locale=locale,
+        needed_by=date(2026, 10, 20),
+        lines=[_line()],
+        tenant_terms=None,
+        reply_to=None,
+    )
+    for part in (result.text, result.html):
+        assert t("emails.footer.sentWith", locale) not in part
+        assert t("emails.footer.website", locale) not in part
+        assert "https://www.iron-sys.com/" not in part

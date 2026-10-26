@@ -5,6 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from procurepilot_api.shared.brand_footer import brand_footer
 from procurepilot_api.shared.i18n import t
 
 
@@ -49,17 +50,21 @@ def render_invitation_email(
         inviter=f'<span dir="ltr">{html.escape(inviter_email)}</span>',
     )
     url = html.escape(accept_url, quote=True)
+    footer_text, footer_html = brand_footer(lang)
     body = (
         f'<!doctype html><html lang="{lang}" dir="{direction}"><head><meta charset="utf-8">'
         f"<title>{html.escape(subject)}</title></head><body>"
         f"<p>{html.escape(greeting)}</p><p>{intro_html}</p>"
         f"<p>{html.escape(role_line)}</p><p>{html.escape(expiry)}</p>"
         f'<p><a href="{url}">{html.escape(label)}</a></p>'
-        f'<p><span dir="ltr">{url}</span></p><p>{html.escape(ignore)}</p></body></html>'
+        f'<p><span dir="ltr">{url}</span></p><p>{html.escape(ignore)}</p>'
+        f"{footer_html}</body></html>"
     )
     return RenderedInvitationEmail(
         subject=subject,
-        text="\n\n".join([greeting, intro, role_line, expiry, label, accept_url, ignore]),
+        text="\n\n".join(
+            [greeting, intro, role_line, expiry, label, accept_url, ignore, footer_text]
+        ),
         html=body,
         from_name=t(f"{prefix}.fromName", lang, workspace=workspace_name),
         locale=lang,
