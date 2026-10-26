@@ -39,6 +39,10 @@
 	<string>ProcurePilot uses the camera to attach photos to quality issue reports.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>ProcurePilot uses the photo library to access photos attached to quality issue reports.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>mailto</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

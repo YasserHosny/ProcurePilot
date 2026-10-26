@@ -15,7 +15,10 @@ import 'package:procurepilot_mobile/core/auth/biometric_gate.dart';
 import 'package:procurepilot_mobile/core/camera/camera_capture.dart';
 import 'package:procurepilot_mobile/core/i18n/i18n_loader.dart';
 import 'package:procurepilot_mobile/core/offline_queue/offline_queue_service.dart';
+import 'package:procurepilot_mobile/core/platform/link_opener.dart';
+import 'package:procurepilot_mobile/core/platform/version_provider.dart';
 import 'package:procurepilot_mobile/core/theme/app_theme.dart';
+import 'package:procurepilot_mobile/features/about/about_screen.dart';
 import 'package:procurepilot_mobile/features/approvals/approval_decision_screen.dart';
 import 'package:procurepilot_mobile/features/approvals/approval_queue_screen.dart';
 import 'package:procurepilot_mobile/features/auth/biometric_offer_screen.dart';
@@ -273,6 +276,17 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'queuedMessage':
             'Low stock report queued — will send when back online.',
       },
+      'about': {
+        'title': 'Help & about',
+        'productByPrefix': 'ProcurePilot by',
+        'companyName': 'Iron Systems',
+        'companyLink': 'www.iron-sys.com',
+        'support': 'Contact support',
+        'supportHint': 'Questions or problems with ProcurePilot',
+        'privacy': 'Privacy Policy',
+        'terms': 'Terms of Service',
+        'version': 'Version {{version}}',
+      },
     }),
     'assets/i18n/ar.json': jsonEncode({
       'common': {
@@ -364,6 +378,17 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'queuedMessage':
             'بلاغ انخفاض المخزون في قائمة الانتظار — سيتم الإرسال عند عودة الاتصال.',
       },
+      'about': {
+        'title': 'المساعدة وحول التطبيق',
+        'productByPrefix': 'ProcurePilot من',
+        'companyName': 'Iron Systems',
+        'companyLink': 'www.iron-sys.com',
+        'support': 'تواصل مع الدعم',
+        'supportHint': 'أسئلة أو مشكلات في استخدام ProcurePilot',
+        'privacy': 'سياسة الخصوصية',
+        'terms': 'شروط الخدمة',
+        'version': 'الإصدار {{version}}',
+      },
     }),
   });
   final i18n = I18nLoader(bundle: bundle);
@@ -430,6 +455,40 @@ class FakeCameraCapture implements CameraCapture {
 
   @override
   Future<CapturedPhoto?> recoverLostCapture() async => null;
+}
+
+/// Fake link opener for widget tests.
+class FakeLinkOpener implements LinkOpener {
+  final List<String> calls = [];
+  final List<String> openedUrls = [];
+  final List<Uri> openedUris = [];
+
+  @override
+  Future<bool> open(Uri uri) async {
+    calls.add(uri.toString());
+    openedUrls.add(uri.toString());
+    openedUris.add(uri);
+    return true;
+  }
+
+  @override
+  Future<bool> openUrl(Uri uri) => open(uri);
+
+  @override
+  Future<bool> openString(String url) => open(Uri.parse(url));
+}
+
+/// Fake app version provider for widget tests.
+class FakeAppVersionProvider implements AppVersionProvider {
+  FakeAppVersionProvider([this.versionString = '0.1.0 (1)']);
+
+  String versionString;
+
+  @override
+  Future<String> getVersionString() async => versionString;
+
+  @override
+  Future<String> getVersion() => getVersionString();
 }
 
 /// In-memory test double for [OfflineQueue].
@@ -932,6 +991,9 @@ class TestServiceProvider extends StatelessWidget {
     required this.cameraCapture,
     required this.i18n,
     this.offlineQueueService,
+    this.linkOpener,
+    this.versionProvider,
+    this.webOrigin = 'https://procurepilot.iron-sys.com',
     required this.child,
   });
 
@@ -943,6 +1005,9 @@ class TestServiceProvider extends StatelessWidget {
   final CameraCapture cameraCapture;
   final I18nLoader i18n;
   final OfflineQueue? offlineQueueService;
+  final LinkOpener? linkOpener;
+  final AppVersionProvider? versionProvider;
+  final String webOrigin;
   final Widget child;
 
   @override
@@ -959,6 +1024,9 @@ class TestServiceProvider extends StatelessWidget {
       cameraCapture: cameraCapture,
       i18n: i18n,
       offlineQueueService: offlineQueueService,
+      webOrigin: webOrigin,
+      linkOpener: linkOpener ?? const UrlLauncherLinkOpener(),
+      versionProvider: versionProvider ?? const PackageInfoVersionProvider(),
       child: MaterialApp(
         theme: AppTheme.lightTheme,
         locale: Locale(i18n.locale),
@@ -978,6 +1046,7 @@ class TestServiceProvider extends StatelessWidget {
           '/requests/new': (_) => const RequestFormScreen(),
           '/requests/detail': (_) => const RequestDetailScreen(),
           '/lowStock': (_) => const LowStockReportScreen(),
+          '/about': (_) => const AboutScreen(),
         },
         home: child,
       ),
@@ -996,6 +1065,9 @@ Future<TestServiceProvider> pumpWithServices(
   RequestsApiClient? requestsApiClient,
   CameraCapture? cameraCapture,
   OfflineQueue? offlineQueueService,
+  LinkOpener? linkOpener,
+  AppVersionProvider? versionProvider,
+  String? webOrigin,
   I18nLoader? i18n,
   String locale = 'en',
 }) async {
@@ -1018,6 +1090,9 @@ Future<TestServiceProvider> pumpWithServices(
     cameraCapture: cameraCapture ?? FakeCameraCapture(),
     i18n: i18nValue,
     offlineQueueService: offlineQueueService,
+    linkOpener: linkOpener,
+    versionProvider: versionProvider,
+    webOrigin: webOrigin ?? 'https://procurepilot.iron-sys.com',
     child: child,
   );
   await tester.pumpWidget(widget);

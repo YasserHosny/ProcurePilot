@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:procurepilot_mobile/core/api/models.dart';
+import 'package:procurepilot_mobile/features/about/about_screen.dart';
 import 'package:procurepilot_mobile/features/home/home_screen.dart';
 import 'package:procurepilot_mobile/features/low_stock/low_stock_report_screen.dart';
 
@@ -311,5 +312,39 @@ void main() {
         }
       },
     );
+
+    testWidgets('shows about action and navigates to AboutScreen', (
+      tester,
+    ) async {
+      final auth =
+          FakeAuthService(
+              storage: FakeStorage(),
+              httpClient: defaultTestHttpClient(),
+              supabaseUrl: 'https://test.supabase.co',
+              supabaseAnonKey: 'test-anon-key',
+            )
+            ..accessToken = makeAccessToken('branch_manager')
+            ..refreshToken = 'refresh-token'
+            ..tokenRole = 'branch_manager';
+
+      await pumpWithServices(
+        tester,
+        child: const HomeScreen(),
+        authService: auth,
+      );
+      await tester.pumpAndSettle();
+
+      final aboutButton = find.byKey(const Key('homeAboutButton'));
+      expect(aboutButton, findsOneWidget);
+      expect(
+        tester.widget<IconButton>(aboutButton).tooltip,
+        'Help & about',
+      );
+
+      await tester.tap(aboutButton);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AboutScreen), findsOneWidget);
+    });
   });
 }
