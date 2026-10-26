@@ -4103,6 +4103,13 @@
   "legal": {
     "updated": "آخر تحديث: 26 أكتوبر 2026",
     "backHome": "العودة إلى ProcurePilot",
+    "signupNotice": {
+      "prefix": "بإنشاء حساب، فإنك توافق على ",
+      "terms": "شروط الخدمة",
+      "middle": " وتقرّ بـ",
+      "privacy": "سياسة الخصوصية",
+      "suffix": "."
+    },
     "links": {
       "privacy": "الخصوصية",
       "terms": "الشروط"

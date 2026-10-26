@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
@@ -55,6 +56,19 @@ describe('AcceptInvitationComponent (T059)', () => {
 
   it('should initialize token from route query params', () => {
     expect(component.form.controls.token.value).toBe('token_abc12345678901234567890');
+  });
+
+  it('renders legal signup notice with links to terms and privacy when accountMode is new', () => {
+    component.onAccountModeChange('new');
+    fixture.detectChanges();
+    const notice = fixture.debugElement.query(By.css('.accept-legal-notice'));
+    expect(notice).toBeTruthy();
+    const termsLink = notice.query(By.css('a[routerLink="/terms"]'));
+    expect(termsLink).toBeTruthy();
+    expect(termsLink.nativeElement.textContent.trim()).toBe('Terms of Service');
+    const privacyLink = notice.query(By.css('a[routerLink="/privacy"]'));
+    expect(privacyLink).toBeTruthy();
+    expect(privacyLink.nativeElement.textContent.trim()).toBe('Privacy Policy');
   });
 
   it('should require password in new account mode and omit in existing account mode', () => {

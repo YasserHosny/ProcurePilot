@@ -20,6 +20,16 @@ export const routes: Routes = [
       import('./features/landing/landing.component').then((m) => m.LandingComponent),
   },
   {
+    path: 'privacy',
+    loadComponent: () =>
+      import('./features/legal/privacy/privacy.component').then((m) => m.PrivacyComponent),
+  },
+  {
+    path: 'terms',
+    loadComponent: () =>
+      import('./features/legal/terms/terms.component').then((m) => m.TermsComponent),
+  },
+  {
     path: 'auth',
     children: [
       {

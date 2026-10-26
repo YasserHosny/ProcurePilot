@@ -76,6 +76,33 @@ describe('ShellComponent account menu', () => {
     expect(link!.textContent).toContain(enCatalog.shell.contactSupport);
   });
 
+  it('renders a quiet footer block with legal links and company byline', async () => {
+    const trigger = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      '.account-btn',
+    );
+    trigger!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const privacyLink = document.querySelector<HTMLAnchorElement>('.menu-footer a[routerLink="/privacy"], .menu-footer a[href="/privacy"]');
+    const termsLink = document.querySelector<HTMLAnchorElement>('.menu-footer a[routerLink="/terms"], .menu-footer a[href="/terms"]');
+    expect(privacyLink).not.toBeNull();
+    expect(privacyLink!.textContent).toContain(enCatalog.about.privacy);
+    expect(termsLink).not.toBeNull();
+    expect(termsLink!.textContent).toContain(enCatalog.about.terms);
+
+    const makerLink = document.querySelector<HTMLAnchorElement>('.menu-maker-link');
+    expect(makerLink).not.toBeNull();
+    expect(makerLink!.getAttribute('href')).toBe('https://www.iron-sys.com/');
+    expect(makerLink!.getAttribute('target')).toBe('_blank');
+    expect(makerLink!.getAttribute('rel')).toContain('noopener');
+    expect(makerLink!.textContent).toContain(enCatalog.about.companyName);
+
+    const footerBlock = document.querySelector<HTMLElement>('.menu-footer');
+    expect(footerBlock).not.toBeNull();
+    expect(footerBlock!.textContent).toContain(enCatalog.about.productByPrefix);
+  });
+
   // WCAG 2.5.3 Label in Name: a speech-input user activates a control by saying what it shows,
   // so the accessible name must contain the visible text (axe: label-content-name-mismatch).
   describe('accessible names contain the visible text', () => {

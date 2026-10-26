@@ -98,6 +98,12 @@
           <span>{{ 'onboarding.acceptInvitation.submitButton' | translate }}</span>
         }
       </button>
+
+      @if (accountMode() === 'new') {
+        <p class="accept-legal-notice">
+          {{ 'legal.signupNotice.prefix' | translate }}<a routerLink="/terms" target="_blank" rel="noopener">{{ 'legal.signupNotice.terms' | translate }}</a>{{ 'legal.signupNotice.middle' | translate }}<a routerLink="/privacy" target="_blank" rel="noopener">{{ 'legal.signupNotice.privacy' | translate }}</a>{{ 'legal.signupNotice.suffix' | translate }}
+        </p>
+      }
     </form>
 
     <div class="card-footer">

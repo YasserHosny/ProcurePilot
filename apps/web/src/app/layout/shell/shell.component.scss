@@ -322,6 +322,56 @@
   color: t.$brand-primary;
 }
 
+.menu-footer {
+  padding-inline: 1rem;
+  padding-block: 0.625rem 0.5rem;
+  font-size: var(--pp-text-12, 0.75rem);
+  line-height: var(--pp-leading, 1.5);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.menu-footer-links {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.menu-footer-link {
+  color: var(--pp-text-muted);
+  text-decoration: none;
+  font-weight: 500;
+
+  &:hover {
+    color: var(--pp-primary);
+    text-decoration: underline;
+  }
+}
+
+.menu-footer-sep {
+  color: var(--pp-text-muted);
+}
+
+.menu-footer-byline {
+  color: var(--pp-text-muted);
+  font-size: 0.6875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.menu-maker-link {
+  color: var(--pp-text-muted);
+  text-decoration: none;
+  font-weight: 500;
+
+  &:hover {
+    color: var(--pp-primary);
+    text-decoration: underline;
+  }
+}
+
 @include bp.tablet-down {
   .workspace-badge { display: none; }
   .workspace-name { max-inline-size: 100px; }

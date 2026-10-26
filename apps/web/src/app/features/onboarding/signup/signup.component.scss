@@ -139,6 +139,23 @@
   display: inline-block;
 }
 
+.signup-legal-notice {
+  margin: 0;
+  text-align: center;
+  font-size: var(--pp-text-12, 0.75rem);
+  color: var(--pp-text-muted);
+  line-height: var(--pp-leading, 1.5);
+
+  a {
+    color: var(--pp-primary);
+    text-decoration: underline;
+
+    &:hover {
+      color: var(--pp-primary-hover, var(--pp-navy-900));
+    }
+  }
+}
+
 .signin-prompt {
   text-align: center;
   font-size: 0.875rem;
