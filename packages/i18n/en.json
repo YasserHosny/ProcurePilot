@@ -4011,7 +4011,7 @@
       "exploreScreens": "See the product screens",
       "note": "Invitation-only pilot. Free for the agreed pilot period.",
       "visualLabel": "Smart Compare · Demonstration data",
-      "visualAlt": "Demonstration screen: the recommended offer, Cumin Grove Foods, at a total landed cost of EGP 2,040 for 50 kg of rice."
+      "visualAlt": "Demonstration screen: the recommended offer, Golden Crescent Foodstuff, at a total landed cost of SAR 1,480 for 10 tins of sunflower oil."
     },
     "workflow": {
       "title": "From a supplier's quote to a verified saving",
@@ -4027,7 +4027,7 @@
     },
     "gallery": {
       "title": "Five screens from the working product",
-      "subtitle": "Real screens with synthetic data: the restaurant group, suppliers and prices are made up for this demonstration.",
+      "subtitle": "Real screens with synthetic data: the restaurant groups, suppliers and prices are made up for this demonstration.",
       "previous": "Previous screen",
       "next": "Next screen",
       "counter": "Step {{n}} of 5",
@@ -4039,23 +4039,23 @@
       "screen1Num": "01",
       "screen1Label": "Quotation review",
       "screen1Numbered": "01 Quotation review",
-      "screen1Caption": "The supplier's PDF sits beside the extracted lines, each with its confidence score.",
+      "screen1Caption": "The supplier's photographed quote sits beside the extracted lines, each with its confidence score.",
       "screen2Num": "02",
       "screen2Label": "Smart Compare",
       "screen2Numbered": "02 Smart Compare",
-      "screen2Caption": "Three offers for 50 kg of rice, ranked on landed cost, with the scoring shown.",
+      "screen2Caption": "Two offers for 10 tins of sunflower oil, ranked on landed cost, with the scoring shown.",
       "screen3Num": "03",
       "screen3Label": "Basket split",
       "screen3Numbered": "03 Basket split",
       "screen3Caption": "One order split between two suppliers to lower the total, with each delivery fee counted.",
       "screen4Num": "04",
-      "screen4Label": "Approval queue",
-      "screen4Numbered": "04 Approval queue",
-      "screen4Caption": "A priced branch request waits for a decision, checked against its cost centre's budget.",
+      "screen4Label": "Request approval",
+      "screen4Numbered": "04 Request approval",
+      "screen4Caption": "A branch request prepared from the best quote, approved within its remaining budget and ready to order.",
       "screen5Num": "05",
       "screen5Label": "Savings ledger",
       "screen5Numbered": "05 Savings ledger",
-      "screen5Caption": "One saving verified with its evidence, one still pending, kept apart."
+      "screen5Caption": "Each saving checked against the last PO or quoted price and verified, with its evidence one click away."
     },
     "evidence": {
       "title": "Calculated saving is not yet verified saving.",
