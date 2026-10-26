@@ -48,11 +48,17 @@ function mintInvitation(
 }
 
 async function globalSetup(): Promise<void> {
-  const stamp = Date.now();
+  // A docs capture under CI signs up once into a fresh database (playwright.docs.config.ts never
+  // retries), so it needs no timestamp. The owner email and workspace name appear in screenshots
+  // 02, 17 and 18, and a new timestamp each run kept 17 at ~0.93% drift, just under the 1% limit
+  // (PPS-69). Every other run reuses its database, so the timestamp keeps the sign-up unique.
+  const docsCapture =
+    !!process.env['CI'] && process.env['CAPTURE_USER_DOC_SCREENSHOTS'] === '1';
+  const suffix = docsCapture ? '' : `.${Date.now()}`;
   const credentials: E2ECredentials = {
-    ownerEmail: `e2e.owner.${stamp}@example.test`,
+    ownerEmail: `e2e.owner${suffix}@example.test`,
     ownerPassword: 'E2ePassword123!',
-    businessName: `E2E Test Co ${stamp}`,
+    businessName: `E2E Test Co${suffix.replace('.', ' ')}`,
   };
 
   const invitation = mintInvitation(credentials.ownerEmail);

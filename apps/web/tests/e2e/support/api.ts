@@ -166,10 +166,14 @@ export interface CreatedMember {
  *
  * The address is unique per call: the server allows only one pending invitation per address per
  * workspace, so reusing a fixed address makes a suite that passes once and 409s ever after.
+ * Pass `email` only for a workspace that is used once, such as the docs capture under CI.
  */
-export async function createMember(role = 'buyer', ownerTokenOverride?: string): Promise<CreatedMember> {
+export async function createMember(
+  role = 'buyer',
+  ownerTokenOverride?: string,
+  email = `e2e.member.${Date.now()}.${Math.floor(Math.random() * 10000)}@example.test`,
+): Promise<CreatedMember> {
   const ownerToken = ownerTokenOverride ?? (await signInOwner());
-  const email = `e2e.member.${Date.now()}.${Math.floor(Math.random() * 10000)}@example.test`;
   const password = 'E2eMemberPassword123!';
 
   const invitation = await call<{ token?: string }>('/invitations', {
