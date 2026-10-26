@@ -485,8 +485,8 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
       v.supplier_id,
       v.match_method,
       v.quotation_id,
-      v.received_at,
-      v.processed_at
+      anchor.at - v.received_before_anchor,
+      anchor.at - v.processed_before_anchor
     from owner, (select date_trunc('day', now(), 'UTC') + interval '12 hours' as at) anchor, (values
       (
         '<quote-2026-0819@acmefoods.co.uk>',
@@ -499,8 +499,8 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
         '${workflowSupplier.id}'::uuid,
         'domain',
         ${quoteSql},
-        anchor.at - interval '45 minutes',
-        anchor.at - interval '44 minutes'
+        interval '45 minutes',
+        interval '44 minutes'
       ),
       (
         '<quotes-sep2026@freshdirect.example.com>',
@@ -513,8 +513,8 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
         '${supplier.id}'::uuid,
         'domain',
         null::uuid,
-        anchor.at - interval '2 hours',
-        anchor.at - interval '1 hour 58 minutes'
+        interval '2 hours',
+        interval '1 hour 58 minutes'
       ),
       (
         '<promo-autumn@unapproved-vendor.com>',
@@ -527,8 +527,8 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
         null::uuid,
         null,
         null::uuid,
-        anchor.at - interval '3 hours',
-        anchor.at - interval '3 hours'
+        interval '3 hours',
+        interval '3 hours'
       ),
       (
         '<err-98124@brightwell-electronics.co.uk>',
@@ -541,8 +541,8 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
         null::uuid,
         null,
         null::uuid,
-        anchor.at - interval '4 hours',
-        anchor.at - interval '3 hours 58 minutes'
+        interval '4 hours',
+        interval '3 hours 58 minutes'
       ),
       (
         '<logistics-2026@highland-transport.test>',
@@ -555,10 +555,10 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
         null::uuid,
         null,
         null::uuid,
-        anchor.at - interval '5 hours',
-        null::timestamptz
+        interval '5 hours',
+        null::interval
       )
-    ) as v(message_id, from_address, from_domain, subject, status, error_message, attachment_count, supplier_id, match_method, quotation_id, received_at, processed_at)
+    ) as v(message_id, from_address, from_domain, subject, status, error_message, attachment_count, supplier_id, match_method, quotation_id, received_before_anchor, processed_before_anchor)
     on conflict do nothing;
   `;
 
