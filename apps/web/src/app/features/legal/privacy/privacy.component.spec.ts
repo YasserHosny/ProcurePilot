@@ -53,6 +53,10 @@ describe('PrivacyComponent', () => {
 
     const langToggle = fixture.debugElement.query(By.css('app-language-toggle'));
     expect(langToggle).toBeTruthy();
+
+    const breadcrumb = fixture.debugElement.query(By.css('.legal-breadcrumb'));
+    expect(breadcrumb).toBeTruthy();
+    expect(breadcrumb.nativeElement.getAttribute('aria-label')).toBe('Breadcrumb');
   });
 
   it('renders title, updated date, intro, and all 10 sections in English', () => {

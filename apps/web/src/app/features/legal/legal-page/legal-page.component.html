@@ -17,7 +17,7 @@
 
   <main class="legal-main" id="main-content">
     <div class="legal-container">
-      <nav class="legal-breadcrumb" aria-label="Breadcrumb">
+      <nav class="legal-breadcrumb" [attr.aria-label]="'legal.breadcrumbLabel' | translate">
         <a routerLink="/" class="back-link">
           <mat-icon aria-hidden="true" class="back-icon" [class.rtl-flip]="isRtl()">arrow_back</mat-icon>
           <span>{{ 'legal.backHome' | translate }}</span>

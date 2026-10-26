@@ -113,17 +113,21 @@
       <mat-divider></mat-divider>
 
       <div class="menu-footer">
-        <div class="menu-footer-links">
-          <a routerLink="/privacy" class="menu-footer-link">{{ 'about.privacy' | translate }}</a>
-          <span class="menu-footer-sep" aria-hidden="true">·</span>
-          <a routerLink="/terms" class="menu-footer-link">{{ 'about.terms' | translate }}</a>
-        </div>
-        <div class="menu-footer-byline">
-          <span>{{ 'about.productByPrefix' | translate }}</span>
-          <a href="https://www.iron-sys.com/" target="_blank" rel="noopener" class="menu-maker-link" dir="ltr">
-            {{ 'about.companyName' | translate }}
-          </a>
-        </div>
+        <a mat-menu-item routerLink="/privacy" class="menu-footer-item">
+          <span>{{ 'about.privacy' | translate }}</span>
+        </a>
+        <a mat-menu-item routerLink="/terms" class="menu-footer-item">
+          <span>{{ 'about.terms' | translate }}</span>
+        </a>
+        <a
+          mat-menu-item
+          href="https://www.iron-sys.com/"
+          target="_blank"
+          rel="noopener"
+          class="menu-footer-item menu-footer-company"
+        >
+          <span>{{ 'about.productByPrefix' | translate }} <bdi dir="ltr">{{ 'about.companyName' | translate }}</bdi></span>
+        </a>
       </div>
     </mat-menu>
   </mat-toolbar>

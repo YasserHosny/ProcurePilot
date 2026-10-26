@@ -4103,6 +4103,7 @@
   "legal": {
     "updated": "Last updated: 26 October 2026",
     "backHome": "Back to ProcurePilot",
+    "breadcrumbLabel": "Breadcrumb",
     "signupNotice": {
       "prefix": "By creating an account you agree to the ",
       "terms": "Terms of Service",

@@ -4103,6 +4103,7 @@
   "legal": {
     "updated": "آخر تحديث: 26 أكتوبر 2026",
     "backHome": "العودة إلى ProcurePilot",
+    "breadcrumbLabel": "مسار التنقل",
     "signupNotice": {
       "prefix": "بإنشاء حساب، فإنك توافق على ",
       "terms": "شروط الخدمة",
