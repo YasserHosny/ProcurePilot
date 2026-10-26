@@ -339,10 +339,8 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
   });
 
   test('toggles language between EN and Arabic on public pages', async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem('pp.locale', 'en');
-      localStorage.setItem('pp.locale.chosen', 'en');
-    });
+    // English comes from the project's base storageState, which seeds localStorage once per
+    // context. An addInitScript would re-run on page.reload() and overwrite the toggle's choice.
     await page.goto('/');
 
     const html = page.locator('html');
