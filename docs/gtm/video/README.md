@@ -81,7 +81,7 @@ www.iron-sys.com), **www.iron-sys.com** and **hello@iron-sys.com** (the site's a
 as a darker footer strip in 16:9 and a panel inside the safe area in 9:16. Everything above it, the timing and
 the audio are unchanged. Source and rebuild: [`source/endcard-v2/`](source/endcard-v2/) (`make_boards.py` →
 `render_frames.cjs` → `build.py`). `renders/outro-*` and `renders/end-card-*` now carry v2; the latest cuts
-(v2.4.2, gcc-sa-v1 Arabic, gcc-sa-en-v1, eu-en-v1) had their outro swapped with the body and audio
+(v2.4.2, gcc-sa-v1 Arabic and English, gcc-sa-en-v1, eu-en-v1) had their outro swapped with the body and audio
 byte-identical. Older cuts keep the v1 card.
 
 ## English versions (for LinkedIn / non-Arabic viewers)
