@@ -67,7 +67,7 @@
               {{ 'organisation.budgets.columns.currency' | translate }}
             </th>
             <td mat-cell *matCellDef="let budget">
-              {{ budget.amount.currency }}
+              {{ budget.amount.currency | currencySymbol }}
             </td>
           </ng-container>
 

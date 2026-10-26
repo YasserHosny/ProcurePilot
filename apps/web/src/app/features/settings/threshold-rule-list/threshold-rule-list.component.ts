@@ -50,7 +50,7 @@ import type {
 } from '../../../core/api/models';
 import { RoleDirective } from '../../../core/auth/role.directive';
 import { SessionService } from '../../../core/auth/session.service';
-import { FormatMoneyPipe } from '../../../core/format';
+import { CurrencySymbolPipe, FormatMoneyPipe } from '../../../core/format';
 import { ApprovalsApiService } from '../../approvals/approvals-api';
 import { OrganisationApiService } from '../organisation-api';
 
@@ -90,6 +90,7 @@ function amountRangeValidator(group: AbstractControl): ValidationErrors | null {
     TranslatePipe,
     RoleDirective,
     FormatMoneyPipe,
+    CurrencySymbolPipe,
   ],
   templateUrl: './threshold-rule-list.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,

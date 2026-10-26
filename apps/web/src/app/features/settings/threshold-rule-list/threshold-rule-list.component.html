@@ -90,7 +90,7 @@
               {{ 'approvals.thresholdRules.columns.currency' | translate }}
             </th>
             <td mat-cell *matCellDef="let rule">
-              <span class="currency-badge">{{ rule.currency }}</span>
+              <span class="currency-badge">{{ rule.currency | currencySymbol }}</span>
             </td>
           </ng-container>
 

@@ -65,7 +65,7 @@
         </div>
         <div class="breakdown-item diff-item">
           <span class="breakdown-label">{{ 'quotations.review.arithmetic.difference' | translate }}</span>
-          <span class="breakdown-val diff-val">{{ arithmeticDifference }} {{ q.currency || 'USD' }}</span>
+          <span class="breakdown-val diff-val">{{ { amount: arithmeticDifference ?? '0.00', currency: q.currency || 'USD' } | formatMoney }}</span>
         </div>
       </div>
 

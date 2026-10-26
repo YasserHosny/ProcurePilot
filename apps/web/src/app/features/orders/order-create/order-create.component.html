@@ -183,7 +183,7 @@
       <mat-card class="totals-card">
         <div>
           <span>{{ 'orders.create.linesTotalLabel' | translate }}:</span>
-          <span class="pp-figures">{{ form.value.currency || 'USD' }} {{ computedTotals().linesTotal | number:'1.2-2' }}</span>
+          <span class="pp-figures">{{ { amount: computedTotals().linesTotal, currency: form.value.currency || 'USD' } | formatMoney }}</span>
         </div>
         <div class="tax-row">
           <span>{{ 'orders.create.orderTax' | translate }}:</span>
@@ -199,7 +199,7 @@
         </div>
         <div class="grand-total">
           <span>{{ 'orders.create.orderTotal' | translate }}:</span>
-          <span class="pp-figures">{{ form.value.currency || 'USD' }} {{ computedTotals().orderTotal | number:'1.2-2' }}</span>
+          <span class="pp-figures">{{ { amount: computedTotals().orderTotal, currency: form.value.currency || 'USD' } | formatMoney }}</span>
         </div>
       </mat-card>
 

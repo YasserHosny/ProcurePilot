@@ -20,7 +20,7 @@ import type {
   CostCentre,
   CostCentreList,
 } from "../../../core/api/models";
-import { FormatMoneyPipe } from "../../../core/format";
+import { CurrencySymbolPipe, FormatMoneyPipe } from "../../../core/format";
 import { RoleDirective } from "../../../core/auth/role.directive";
 import { OrganisationApiService } from "../organisation-api";
 import { BudgetFormDialogComponent } from "./budget-form-dialog/budget-form-dialog.component";
@@ -41,6 +41,7 @@ const BUDGETS_I18N = "organisation.budgets";
     TranslatePipe,
     RoleDirective,
     FormatMoneyPipe,
+    CurrencySymbolPipe,
   ],
   templateUrl: "./budget-list.component.html",
   changeDetection: ChangeDetectionStrategy.Eager,

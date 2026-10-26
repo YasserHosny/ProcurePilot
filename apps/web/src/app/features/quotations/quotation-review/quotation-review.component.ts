@@ -36,6 +36,7 @@ import type {
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { CurrencySymbolPipe } from '../../../core/format/currency-symbol.pipe';
 import { FormatExtractionPipe } from '../../../core/format/extraction-value.pipe';
 import { QuotationReviewBannersComponent } from './quotation-review-banners.component';
 import { QuotationDocPreviewComponent } from './quotation-doc-preview.component';
@@ -106,6 +107,7 @@ type QuotationTimestampFields = QuotationDetail & {
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
+    CurrencySymbolPipe,
     FormatExtractionPipe,
     QuotationReviewBannersComponent,
     QuotationDocPreviewComponent,

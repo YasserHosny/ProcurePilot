@@ -17,6 +17,7 @@ import { concatMap, from, toArray } from 'rxjs';
 import type { ApiError } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { CurrencySymbolPipe } from '../../../core/format/currency-symbol.pipe';
 import { toLocalMidnightIsoOrNull } from '../../../core/format/iso-date';
 import { lineDescription, packLabel } from '../../orders/pack-label';
 import {
@@ -59,6 +60,7 @@ export interface EditableOutcomeLine {
     MatSnackBarModule,
     TranslatePipe,
     FormatMoneyPipe,
+    CurrencySymbolPipe,
   ],
   templateUrl: './outcome-from-order.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,

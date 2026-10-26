@@ -1,5 +1,16 @@
 import 'package:intl/intl.dart';
 
+const _arabicCurrencySymbols = {
+  'EGP': 'ج.م',
+  'SAR': 'ر.س',
+  'AED': 'د.إ',
+  'KWD': 'د.ك',
+  'QAR': 'ر.ق',
+  'BHD': 'د.ب',
+  'OMR': 'ر.ع',
+  'JOD': 'د.أ',
+};
+
 /// Formats a decimal amount for display without converting its full precision
 /// through a binary floating point value.
 String formatMoney(String amount, String currency, {required String locale}) {
@@ -12,7 +23,11 @@ String formatMoney(String amount, String currency, {required String locale}) {
   try {
     final value = amount.trim();
     final match = RegExp(r'^([+-]?)(\d+)(?:\.(\d*))?$').firstMatch(value);
-    if (match == null) return '$code $amount';
+    if (match == null) {
+      final symbol = locale == 'ar' ? (_arabicCurrencySymbols[code] ?? code) : code;
+      final formatted = locale == 'ar' ? '$amount $symbol' : '$code $amount';
+      return locale == 'ar' ? '\u2068$formatted\u2069' : formatted;
+    }
     final negative = match.group(1) == '-';
     final whole = BigInt.parse(match.group(2)!);
     final fraction = match.group(3) ?? '';
@@ -53,9 +68,13 @@ String formatMoney(String amount, String currency, {required String locale}) {
             (match) => String.fromCharCode(0x0660 + int.parse(match[0]!)),
           );
     }
-    final formatted = '$code $number';
+    final formatted = locale == 'ar'
+        ? '$number ${_arabicCurrencySymbols[code] ?? code}'
+        : '$code $number';
     return locale == 'ar' ? '\u2068$formatted\u2069' : formatted;
   } on Object {
-    return '$code $amount';
+    final symbol = locale == 'ar' ? (_arabicCurrencySymbols[code] ?? code) : code;
+    final formatted = locale == 'ar' ? '$amount $symbol' : '$code $amount';
+    return locale == 'ar' ? '\u2068$formatted\u2069' : formatted;
   }
 }

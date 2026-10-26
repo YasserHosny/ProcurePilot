@@ -25,6 +25,7 @@ import type {
   Quotation,
 } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
+import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 
 export type UploadState =
   | 'idle'
@@ -76,6 +77,7 @@ const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
     DatePipe,
     SlicePipe,
     TranslatePipe,
+    FormatMoneyPipe,
   ],
   templateUrl: './quotation-upload.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,

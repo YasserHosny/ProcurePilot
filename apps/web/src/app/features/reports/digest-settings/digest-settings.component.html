@@ -151,7 +151,7 @@
                         <span class="item-label">{{ item.label }}</span>
                         @if (item.money) {
                           <span class="money-badge" [ngClass]="{ hero: sec.kind === 'verified_savings' }">
-                            {{ item.money.amount | number: '1.2-2' }} {{ item.money.currency }}
+                            {{ item.money | formatMoney }}
                           </span>
                         }
                       </div>

@@ -140,7 +140,7 @@
             @for (row of review.normalized_rows.slice(0, 5); track row.provider_record_id || row.product_name) {
               <div class="refresh-preview-row" role="row">
                 <span role="cell">{{ row.product_name }}</span>
-                <span role="cell">{{ row.unit_price_amount }} {{ row.unit_price_currency }}</span>
+                <span role="cell">{{ { amount: row.unit_price_amount, currency: row.unit_price_currency } | formatMoney }}</span>
                 <span role="cell">{{ row.base_unit | unitLabel }}</span>
               </div>
             }

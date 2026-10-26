@@ -1,6 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { toIsoDate } from '../../../core/format/iso-date';
 import { FormatService } from '../../../core/format/format.service';
+import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -55,6 +56,7 @@ interface OrderLineForm {
     RouterLink,
     TranslatePipe,
     DecimalPipe,
+    FormatMoneyPipe,
   ],
   providers: [provideAppDateAdapter()],
   templateUrl: './order-create.component.html',

@@ -78,7 +78,7 @@
               </mat-panel-title>
               <mat-panel-description class="line-panel-desc">
                 @if (computeLineTotal(line); as total) {
-                  <span class="line-summary-total">{{ total }} {{ line.unit_price?.currency || effectiveCurrency }}</span>
+                  <span class="line-summary-total">{{ { amount: total, currency: line.unit_price?.currency || effectiveCurrency } | formatMoney }}</span>
                 }
                 @if (isWriter && quotation.status !== 'reviewed' && !pendingRemoveLineIds.has(line.id)) {
                   <button
@@ -178,7 +178,7 @@
                     (blur)="fieldReviewed.emit({ entityType: 'quotation_line', entityId: line.id, fieldName: 'unit_price', reviewedValue: { amount: $any($event.target).value, currency: line.unit_price?.currency || effectiveCurrency } })"
                     [readonly]="!isWriter || quotation.status === 'reviewed'"
                   />
-                  <span matTextSuffix class="currency-suffix">{{ line.unit_price?.currency || effectiveCurrency }}</span>
+                  <span matTextSuffix class="currency-suffix">{{ (line.unit_price?.currency || effectiveCurrency) | currencySymbol }}</span>
                 </mat-form-field>
                 @if (isFieldCorrected('quotation_line', line.id, 'unit_price')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
@@ -206,7 +206,7 @@
                     readonly
                   />
                   @if (line.delivery_fee; as df) {
-                    <span matTextSuffix class="currency-suffix">{{ df.currency }}</span>
+                    <span matTextSuffix class="currency-suffix">{{ df.currency | currencySymbol }}</span>
                   }
                 </mat-form-field>
               </div>
@@ -221,7 +221,7 @@
                     readonly
                   />
                   @if (line.discount; as disc) {
-                    <span matTextSuffix class="currency-suffix">{{ disc.currency }}</span>
+                    <span matTextSuffix class="currency-suffix">{{ disc.currency | currencySymbol }}</span>
                   }
                 </mat-form-field>
               </div>
@@ -248,7 +248,7 @@
                     readonly
                   />
                   @if (line.unit_price; as up) {
-                    <span matTextSuffix class="currency-suffix">{{ up.currency }}</span>
+                    <span matTextSuffix class="currency-suffix">{{ up.currency | currencySymbol }}</span>
                   }
                 </mat-form-field>
               </div>
@@ -264,8 +264,8 @@
           @if (newLine.quantity) {
             <span class="new-line-detail">&times; {{ newLine.quantity }}</span>
           }
-          @if (newLine.unit_price_amount) {
-            <span class="new-line-detail">&#64; {{ newLine.unit_price_amount }} {{ newLine.unit_price_currency }}</span>
+          @if (newLine.unit_price_amount && newLine.unit_price_currency) {
+            <span class="new-line-detail">&#64; {{ { amount: newLine.unit_price_amount, currency: newLine.unit_price_currency } | formatMoney }}</span>
           }
           <span class="new-line-badge">{{ 'quotations.review.lines.pendingAdd' | translate }}</span>
         </div>

@@ -198,7 +198,7 @@
                   @if (dup.stated_total_amount && dup.stated_total_currency) {
                     <span>
                       {{ 'quotations.upload.duplicateWarning.total' | translate }}
-                      {{ dup.stated_total_amount }} {{ dup.stated_total_currency }}
+                      {{ { amount: dup.stated_total_amount, currency: dup.stated_total_currency } | formatMoney }}
                     </span>
                   }
                 </li>
