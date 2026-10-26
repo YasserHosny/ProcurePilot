@@ -35,6 +35,8 @@ const SCREENSHOT_DIR = process.env['DOCS_SCREENSHOT_DIR']
     : join(REPO_ROOT, process.env['DOCS_SCREENSHOT_DIR']))
   : join(REPO_ROOT, 'docs', 'user', 'screenshots');
 const VIEWPORT = { width: 1440, height: 900 };
+// The day 28-email-ingestion-log.jpg shows its emails as received (see fixEmailLogDates).
+const EMAIL_LOG_DAY = '2026-10-26';
 type ScreenshotTarget = 'auto' | 'dialog' | 'sidebar';
 
 interface ScreenshotFixtures {
@@ -297,6 +299,7 @@ test.describe('User documentation screenshots', () => {
     });
     await page.setViewportSize(VIEWPORT);
 
+    fixEmailLogDates(fixtures);
     await captureRoute(page, '/ingestion/email-log', '28-email-ingestion-log.jpg', async () => {
       await expect(page.locator('.page-title')).toContainText('Email Inbound Log');
       await waitForNoVisibleLoading(page);
@@ -453,7 +456,10 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
     console.warn('Catalogue import failed:', e);
   }
 
-  // Direct SQL seed for realistic email log entries
+  // Direct SQL seed for realistic email log entries. They are anchored at noon UTC today (the
+  // tenant's default reporting timezone), not at now(): the dashboard's "today · this week · this
+  // month" counts then read 5 at any hour, including the 03:17 UTC weekly run.
+  // fixEmailLogDates() moves them to a fixed day before the email log is captured.
   const quoteSql = quotationId ? `'${quotationId}'::uuid` : 'null::uuid';
   const sql = `
     with owner as (
@@ -479,9 +485,9 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
       v.supplier_id,
       v.match_method,
       v.quotation_id,
-      v.received_at,
-      v.processed_at
-    from owner, (values
+      anchor.at - v.received_before_anchor,
+      anchor.at - v.processed_before_anchor
+    from owner, (select date_trunc('day', now(), 'UTC') + interval '12 hours' as at) anchor, (values
       (
         '<quote-2026-0819@acmefoods.co.uk>',
         'orders@acmefoods.co.uk',
@@ -493,8 +499,8 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
         '${workflowSupplier.id}'::uuid,
         'domain',
         ${quoteSql},
-        now() - interval '45 minutes',
-        now() - interval '44 minutes'
+        interval '45 minutes',
+        interval '44 minutes'
       ),
       (
         '<quotes-sep2026@freshdirect.example.com>',
@@ -507,8 +513,8 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
         '${supplier.id}'::uuid,
         'domain',
         null::uuid,
-        now() - interval '2 hours',
-        now() - interval '1 hour 58 minutes'
+        interval '2 hours',
+        interval '1 hour 58 minutes'
       ),
       (
         '<promo-autumn@unapproved-vendor.com>',
@@ -521,8 +527,8 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
         null::uuid,
         null,
         null::uuid,
-        now() - interval '3 hours',
-        now() - interval '3 hours'
+        interval '3 hours',
+        interval '3 hours'
       ),
       (
         '<err-98124@brightwell-electronics.co.uk>',
@@ -535,8 +541,8 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
         null::uuid,
         null,
         null::uuid,
-        now() - interval '4 hours',
-        now() - interval '3 hours 58 minutes'
+        interval '4 hours',
+        interval '3 hours 58 minutes'
       ),
       (
         '<logistics-2026@highland-transport.test>',
@@ -549,13 +555,38 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
         null::uuid,
         null,
         null::uuid,
-        now() - interval '5 hours',
-        null::timestamptz
+        interval '5 hours',
+        null::interval
       )
-    ) as v(message_id, from_address, from_domain, subject, status, error_message, attachment_count, supplier_id, match_method, quotation_id, received_at, processed_at)
+    ) as v(message_id, from_address, from_domain, subject, status, error_message, attachment_count, supplier_id, match_method, quotation_id, received_before_anchor, processed_before_anchor)
     on conflict do nothing;
   `;
 
+  runSql(sql);
+}
+
+// The email log shows each row's received date, so rows dated by the capture day changed
+// 28-email-ingestion-log.jpg every day and failed the drift check on any later PR. Keep each
+// row's time of day and move it to a fixed day.
+function fixEmailLogDates(fixtures: ScreenshotFixtures): void {
+  runSql(`
+    update ingestion_email_log l
+    set received_at = l.received_at + (
+          timestamptz '${EMAIL_LOG_DAY} 00:00:00+00' - date_trunc('day', l.received_at, 'UTC')
+        ),
+        processed_at = l.processed_at + (
+          timestamptz '${EMAIL_LOG_DAY} 00:00:00+00' - date_trunc('day', l.received_at, 'UTC')
+        )
+    where l.tenant_id = (
+      select m.tenant_id
+      from membership m
+      where lower(m.email) = lower('${fixtures.ownerCreds.ownerEmail}') and m.status = 'active'
+      limit 1
+    );
+  `);
+}
+
+function runSql(sql: string): void {
   execFileSync(
     'docker',
     ['exec', 'supabase_db_ProcurePilot', 'psql', '-U', 'postgres', '-t', '-A', '-c', sql],
