@@ -26,6 +26,7 @@ LATEST = {
     'v2.4.2-ledger/procurepilot-demo-ar-16x9.mp4': '', 'v2.4.2-ledger/procurepilot-demo-ar-9x16-60s.mp4': '',
     'v2.4.2-ledger/procurepilot-demo-en-16x9.mp4': '-en', 'v2.4.2-ledger/procurepilot-demo-en-9x16-60s.mp4': '-en',
     'gcc-sa-v1/procurepilot-demo-sa-ar-16x9.mp4': '', 'gcc-sa-v1/procurepilot-demo-sa-ar-9x16-60s.mp4': '',
+    'gcc-sa-v1/procurepilot-demo-sa-en-16x9.mp4': '-en', 'gcc-sa-v1/procurepilot-demo-sa-en-9x16-60s.mp4': '-en',
     'gcc-sa-en-v1/procurepilot-demo-sa-en-16x9.mp4': '-en', 'gcc-sa-en-v1/procurepilot-demo-sa-en-9x16-60s.mp4': '-en',
     'eu-en-v1/procurepilot-demo-ie-en-16x9.mp4': '-en', 'eu-en-v1/procurepilot-demo-ie-en-9x16-60s.mp4': '-en',
 }
