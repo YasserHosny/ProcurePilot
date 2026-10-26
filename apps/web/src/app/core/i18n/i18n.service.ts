@@ -1,4 +1,4 @@
-import { Injectable, effect, inject, signal, untracked } from '@angular/core';
+import { Injectable, InjectionToken, effect, inject, signal, untracked } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
 import { Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
@@ -10,12 +10,36 @@ import { DirectionService } from './direction.service';
 
 const LOCALE_STORAGE_KEY = 'pp.locale';
 
+export const I18N_LOCATION_SEARCH = new InjectionToken<() => string>(
+  'I18N_LOCATION_SEARCH',
+  {
+    providedIn: 'root',
+    factory: () => () => (typeof window !== 'undefined' ? window.location.search : ''),
+  },
+);
+
+function parseQueryLocale(search: string): Locale | null {
+  try {
+    const params = new URLSearchParams(search);
+    const lang = params.get('lang')?.toLowerCase();
+    if (lang === 'en' || lang === 'ar') {
+      return lang;
+    }
+  } catch {
+    // Ignore invalid search strings
+  }
+  return null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class I18nService {
   private readonly translate = inject(TranslateService);
   private readonly direction = inject(DirectionService);
   private readonly session = inject(SessionService);
   private readonly api = inject(ApiService);
+  private readonly getLocationSearch =
+    inject(I18N_LOCATION_SEARCH, { optional: true }) ??
+    (() => (typeof window !== 'undefined' ? window.location.search : ''));
 
   private readonly localeSignal = signal<Locale>('en');
 
@@ -29,15 +53,17 @@ export class I18nService {
     this.translate.addLangs(['en', 'ar']);
     this.translate.setFallbackLang('en');
 
-    // Restore guest preference or default
+    const queryLocale = parseQueryLocale(this.getLocationSearch());
     const storedLocale = (localStorage.getItem(LOCALE_STORAGE_KEY) as Locale | null) ?? 'en';
-    const initialLocale = this.session.isAuthenticated()
-      ? this.session.activeLocale()
-      : storedLocale;
+    const initialLocale =
+      queryLocale ??
+      (this.session.isAuthenticated() ? this.session.activeLocale() : storedLocale);
 
     this.applyLocale(initialLocale);
 
-    this.lastSessionLocale = initialLocale;
+    this.lastSessionLocale = this.session.isAuthenticated()
+      ? this.session.activeLocale()
+      : initialLocale;
 
     // Adopt the session's locale when the SESSION changes — sign-in, session restore, workspace
     // switch — and never merely because the local choice differs from it.
