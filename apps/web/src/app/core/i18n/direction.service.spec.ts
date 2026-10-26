@@ -10,7 +10,17 @@ describe('DirectionService (T064)', () => {
   let doc: Document;
   let cdkDir: Directionality;
 
+  // CDK's root Directionality reads `dir` from <body>/<html> when it is constructed, and other
+  // specs leave the page in Arabic. Start from a clean ltr page so `setDirection` really changes it.
+  function resetPageDirection(): void {
+    for (const el of [document.documentElement, document.body]) {
+      el.removeAttribute('dir');
+      el.removeAttribute('lang');
+    }
+  }
+
   beforeEach(() => {
+    resetPageDirection();
     TestBed.configureTestingModule({
       providers: [DirectionService, Directionality],
     });
@@ -18,6 +28,8 @@ describe('DirectionService (T064)', () => {
     doc = TestBed.inject(DOCUMENT);
     cdkDir = TestBed.inject(Directionality);
   });
+
+  afterEach(resetPageDirection);
 
   it('should default to ltr', () => {
     expect(service.currentDirection()).toBe('ltr');
