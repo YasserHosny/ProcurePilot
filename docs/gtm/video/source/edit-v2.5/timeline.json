@@ -1,0 +1,7498 @@
+{
+  "eg": {
+    "h": {
+      "body": 119.5,
+      "outro": 9.75,
+      "scenes": [
+        {
+          "beat": "p1",
+          "duration": 2.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 0
+        },
+        {
+          "beat": 0,
+          "duration": 5,
+          "spans": [
+            [
+              "opening-h",
+              0,
+              5,
+              5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "opening-h",
+                0,
+                5,
+                5
+              ]
+            ],
+            "en": [
+              [
+                "opening-h",
+                0,
+                5,
+                5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "…وكل سعر بتكتبه بإيدك في الإكسيل.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "…and every price retyped into Excel.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 2.5
+        },
+        {
+          "beat": "p3",
+          "duration": 3.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 7.5
+        },
+        {
+          "beat": "turn",
+          "duration": 3.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 11.0
+        },
+        {
+          "beat": 1,
+          "duration": 8,
+          "spans": [
+            [
+              "s5-po-savings",
+              26,
+              28,
+              4
+            ],
+            [
+              "s5-po-savings",
+              42,
+              42,
+              4
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s5-po-savings",
+                26,
+                28,
+                4
+              ],
+              [
+                "s5-po-savings",
+                52.5,
+                52.5,
+                4
+              ]
+            ],
+            "en": [
+              [
+                "s5-po-savings",
+                26,
+                28,
+                4
+              ],
+              [
+                "s5-po-savings",
+                44.5,
+                44.5,
+                4
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "من بلاغ نقص لأمر شراء تبعته للموردين… والتوفير متسجّل.",
+                "offset": 0,
+                "duration": 8,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "From a low-stock report to a sent PO, with the saving logged.",
+                "offset": 0,
+                "duration": 8,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 14.5
+        },
+        {
+          "beat": 2,
+          "duration": 7,
+          "spans": [
+            [
+              "s0-phone-lowstock",
+              1.5,
+              3.5,
+              1
+            ],
+            [
+              "s0-phone-lowstock",
+              11,
+              20.5,
+              4
+            ],
+            [
+              "s0-phone-lowstock",
+              21.8,
+              22.1,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s0-phone-lowstock",
+                1.5,
+                3.5,
+                1
+              ],
+              [
+                "s0-phone-lowstock",
+                11,
+                20.5,
+                4
+              ],
+              [
+                "s0-phone-lowstock",
+                21.8,
+                22.1,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s0-phone-lowstock",
+                1.5,
+                3.5,
+                1
+              ],
+              [
+                "s0-phone-lowstock",
+                11,
+                20.5,
+                4
+              ],
+              [
+                "s0-phone-lowstock",
+                21.8,
+                22.1,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "الفرع بيبلّغ من الموبايل: الزيت قرب يخلص.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "The branch reports it from the phone: oil is running low.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 22.5
+        },
+        {
+          "beat": 3,
+          "duration": 11,
+          "spans": [
+            [
+              "s1-rfq",
+              4,
+              18,
+              3
+            ],
+            [
+              "s1-rfq",
+              24,
+              34,
+              3.5
+            ],
+            [
+              "s1-rfq",
+              40.5,
+              43.3,
+              3
+            ],
+            [
+              "s1-rfq",
+              44.2,
+              44.2,
+              1.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s1-rfq",
+                4,
+                18,
+                3
+              ],
+              [
+                "s1-rfq",
+                24,
+                34,
+                3.5
+              ],
+              [
+                "s1-rfq",
+                40.5,
+                43.3,
+                3
+              ],
+              [
+                "s1-rfq",
+                44.2,
+                44.2,
+                1.5
+              ]
+            ],
+            "en": [
+              [
+                "s1-rfq",
+                4,
+                18,
+                3
+              ],
+              [
+                "s1-rfq",
+                24,
+                34,
+                3.5
+              ],
+              [
+                "s1-rfq",
+                40.5,
+                43.3,
+                3
+              ],
+              [
+                "s1-rfq",
+                44.2,
+                44.2,
+                1.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "بتبعت نفس الطلب لكل مورد لوحده؟",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "طلب عرض سعر واحد لـ٣ موردين، والكميات بالعبوة.",
+                "offset": 2.5,
+                "duration": 8.5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Sending the same request to every supplier?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "One RFQ to three suppliers, quantities in packs.",
+                "offset": 2.5,
+                "duration": 8.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 29.5
+        },
+        {
+          "beat": 5,
+          "duration": 5,
+          "spans": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s2-quote-photo",
+                0.3,
+                4.8,
+                5
+              ]
+            ],
+            "en": [
+              [
+                "s2-quote-photo",
+                0.3,
+                4.8,
+                5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "بتنقل الأسعار بإيدك؟",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "٣ ردود: ملفين PDF وصورة واتساب.",
+                "offset": 2.5,
+                "duration": 2.5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Retyping prices by hand?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "Three replies: two PDFs and a WhatsApp photo.",
+                "offset": 2.5,
+                "duration": 2.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 40.5
+        },
+        {
+          "beat": 6,
+          "duration": 12,
+          "spans": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              22,
+              23,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              24,
+              25,
+              4
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s2-quote-photo",
+                8,
+                11,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                22,
+                23,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                24,
+                25,
+                4
+              ],
+              [
+                "s2-quote-photo",
+                8.5,
+                8.5,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s2-quote-photo",
+                8,
+                11,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                22,
+                23,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                24,
+                25,
+                4
+              ],
+              [
+                "s2-quote-photo",
+                8.5,
+                8.5,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "البنود والأسعار بالجنيه وتاريخ الصلاحية اتقروا لوحدهم… والإجمالي مطابق.",
+                "offset": 0,
+                "duration": 12,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Items, EGP prices and validity, read automatically. The total checks out.",
+                "offset": 0,
+                "duration": 12,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 45.5
+        },
+        {
+          "beat": 7,
+          "duration": 5,
+          "spans": [
+            [
+              "s2-quote-photo",
+              24.5,
+              26.3,
+              3.2
+            ],
+            [
+              "s2r-authorised",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s2-quote-photo",
+                24.5,
+                26.3,
+                3.2
+              ],
+              [
+                "s2r-authorised",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ],
+            "en": [
+              [
+                "s2-quote-photo",
+                24.5,
+                26.3,
+                3.2
+              ],
+              [
+                "s2r-authorised",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "من غير ما تكتب حاجة… بس الاعتماد قرارك إنت.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Nothing retyped. But you sign it off.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 57.5
+        },
+        {
+          "beat": 8,
+          "duration": 11,
+          "spans": [
+            [
+              "s3c-smart-compare",
+              10.5,
+              14,
+              3
+            ],
+            [
+              "s3c-smart-compare",
+              20,
+              27,
+              5.5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s3c-smart-compare",
+                10.5,
+                14,
+                3
+              ],
+              [
+                "s3c-smart-compare",
+                20,
+                27,
+                5.5
+              ],
+              [
+                "s3c-smart-compare",
+                29,
+                29,
+                2.5
+              ]
+            ],
+            "en": [
+              [
+                "s3c-smart-compare",
+                10.5,
+                14,
+                3
+              ],
+              [
+                "s3c-smart-compare",
+                20,
+                27,
+                5.5
+              ],
+              [
+                "s3c-smart-compare",
+                29,
+                29,
+                2.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "عبوات مختلفة؟",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "بالعبوة وشامل الضريبة والتوصيل: الأمانة أرخص بـ٢٠٠ ج.م في الزيت.",
+                "offset": 2.5,
+                "duration": 8.5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Different pack sizes?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "Per pack, VAT and delivery included: Al-Amana is EGP 200 cheaper on oil.",
+                "offset": 2.5,
+                "duration": 8.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 62.5
+        },
+        {
+          "beat": 10,
+          "duration": 10,
+          "spans": [
+            [
+              "s3-guardrail-draft",
+              5,
+              10,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              16,
+              22,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              22.5,
+              24.1,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s3-guardrail-draft",
+                5,
+                10,
+                4
+              ],
+              [
+                "s3-guardrail-draft",
+                16,
+                22,
+                4
+              ],
+              [
+                "s3-guardrail-draft",
+                22.5,
+                24.1,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s3-guardrail-draft",
+                5,
+                10,
+                4
+              ],
+              [
+                "s3-guardrail-draft",
+                16,
+                22,
+                4
+              ],
+              [
+                "s3-guardrail-draft",
+                22.5,
+                24.1,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "الطلب واقف مستني اعتماد؟",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "الضوابط اللي حطّيتها جهّزت الطلب… مسودة، مش شراء.",
+                "offset": 2.5,
+                "duration": 7.5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Requests stuck waiting for approval?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "Your guardrails drafted the request. A draft, not a purchase.",
+                "offset": 2.5,
+                "duration": 7.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 73.5
+        },
+        {
+          "beat": 11,
+          "duration": 8,
+          "spans": [
+            [
+              "s4-phone-approve",
+              5,
+              5.5,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              2
+            ],
+            [
+              "s4-phone-approve",
+              13.5,
+              15.15,
+              3.2
+            ],
+            [
+              "s4r-approved",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s4-phone-approve",
+                5,
+                5.5,
+                1
+              ],
+              [
+                "s4-phone-approve",
+                7,
+                8,
+                2
+              ],
+              [
+                "s4-phone-approve",
+                13.5,
+                15.15,
+                3.2
+              ],
+              [
+                "s4r-approved",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ],
+            "en": [
+              [
+                "s4-phone-approve",
+                5,
+                5.5,
+                1
+              ],
+              [
+                "s4-phone-approve",
+                7,
+                8,
+                2
+              ],
+              [
+                "s4-phone-approve",
+                13.5,
+                15.15,
+                3.2
+              ],
+              [
+                "s4r-approved",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "والمدير يعتمد من موبايله، من أي مكان.",
+                "offset": 0,
+                "duration": 8,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "The manager approves from their phone, wherever they are.",
+                "offset": 0,
+                "duration": 8,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 83.5
+        },
+        {
+          "beat": 12,
+          "duration": 9,
+          "spans": [
+            [
+              "s5-po-savings",
+              3,
+              9,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              13,
+              20,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              2
+            ],
+            [
+              "s5-po-savings",
+              26,
+              26,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s5-po-savings",
+                3,
+                9,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                13,
+                20,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                22,
+                23.2,
+                2
+              ],
+              [
+                "s5-po-savings",
+                26,
+                26,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s5-po-savings",
+                3,
+                9,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                13,
+                20,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                22,
+                23.2,
+                2
+              ],
+              [
+                "s5-po-savings",
+                26,
+                26,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "من الطلب المعتمد بتطلّع أمر الشراء وتبعته.",
+                "offset": 0,
+                "duration": 9,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "From the approved request, you create the PO and send it.",
+                "offset": 0,
+                "duration": 9,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 91.5
+        },
+        {
+          "beat": 13,
+          "duration": 7,
+          "spans": [
+            [
+              "s5-po-savings",
+              32,
+              35,
+              2
+            ],
+            [
+              "s5-po-savings",
+              36,
+              38.5,
+              3
+            ],
+            [
+              "s5-po-savings",
+              42,
+              42,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s5-po-savings",
+                35,
+                38,
+                2
+              ],
+              [
+                "s5-po-savings",
+                39,
+                41.5,
+                3
+              ],
+              [
+                "s5-po-savings",
+                52.5,
+                52.5,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s5-po-savings",
+                32,
+                35,
+                2
+              ],
+              [
+                "s5-po-savings",
+                38,
+                40.3,
+                3
+              ],
+              [
+                "s5-po-savings",
+                44.5,
+                44.5,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "المالك بيسأل: وفّرنا كام؟",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "توفير ٣٠٠ ج.م على الطلب ده، مقابل آخر سعر شراء.",
+                "offset": 2.5,
+                "duration": 4.5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "The owner asks: what did we save?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "EGP 200 saved on this order, against the last purchase price.",
+                "offset": 2.5,
+                "duration": 4.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 100.5
+        },
+        {
+          "beat": 14,
+          "duration": 6,
+          "spans": [
+            [
+              "s6-savings-close",
+              4,
+              8,
+              6
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s6-savings-close",
+                4,
+                8,
+                6
+              ]
+            ],
+            "en": [
+              [
+                "s6-savings-close",
+                4,
+                8,
+                6
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "وكل توفير متسجّل ومعتمد… جاهز للمالك.",
+                "offset": 0,
+                "duration": 6,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Every saving logged and verified, ready for the owner.",
+                "offset": 0,
+                "duration": 6,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 107.5
+        },
+        {
+          "beat": "recap",
+          "duration": 6,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 113.5
+        }
+      ],
+      "langs": [
+        "ar",
+        "en"
+      ],
+      "v25": {
+        "ar": {
+          "p1": "عروض في كل صيغة…",
+          "0": "…وكل سعر بتكتبه بإيدك في الإكسيل.",
+          "p3": [
+            "بتلف على كل مورد لوحده",
+            "بتقارن عبوات مش زي بعض",
+            "ومش عارف وفّرت كام"
+          ],
+          "turn": [
+            "لمشتريات المطاعم",
+            "بيحلّها كلها."
+          ],
+          "saving": [
+            "توفير على الطلب ده",
+            "مقابل آخر سعر شراء"
+          ],
+          "recap": {
+            "title": "كل مشكلة وعندنا حلها",
+            "rows": [
+              [
+                "نسخ الأسعار بإيدك",
+                "بيقرا الـPDF والصور لوحده"
+              ],
+              [
+                "مورد مورد",
+                "طلب عرض سعر واحد لكل الموردين"
+              ],
+              [
+                "عبوات مختلفة",
+                "مقارنة بالعبوة شامل الضريبة والتوصيل"
+              ],
+              [
+                "اعتماد متأخر",
+                "اعتماد من الموبايل"
+              ],
+              [
+                "وفّرنا كام؟",
+                "سجل توفير معتمد"
+              ]
+            ]
+          }
+        },
+        "en": {
+          "p1": "Quotes in every format…",
+          "0": "…and every price retyped into Excel.",
+          "p3": [
+            "Chasing each supplier one by one",
+            "Comparing packs that don't match",
+            "And no idea what you saved"
+          ],
+          "turn": [
+            "for restaurant purchasing",
+            "handles all of it."
+          ],
+          "saving": [
+            "Saved on this order",
+            "against the last purchase price"
+          ],
+          "recap": {
+            "title": "Every pain, solved",
+            "rows": [
+              [
+                "Retyping prices",
+                "PDFs and photos read automatically"
+              ],
+              [
+                "One supplier at a time",
+                "One RFQ to every supplier"
+              ],
+              [
+                "Different pack sizes",
+                "Per pack, VAT and delivery included"
+              ],
+              [
+                "Slow approvals",
+                "Approval from the phone"
+              ],
+              [
+                "What did we save?",
+                "A verified savings ledger"
+              ]
+            ]
+          }
+        }
+      },
+      "money": {
+        "ar": {
+          "cards": {
+            "1": "٣٠٠ ج.م",
+            "6": "٢٤٬٦٤٠ ج.م",
+            "8": "٢٠٠ ج.م",
+            "13": "٣٠٠ ج.م",
+            "14": "١٬٧٦٠ ج.م"
+          },
+          "saving": 300,
+          "decimals": 0,
+          "prefix": "",
+          "suffix": " ج.م",
+          "label": "ج.م"
+        },
+        "en": {
+          "cards": {
+            "1": "EGP 200",
+            "6": "EGP 24,440",
+            "8": "EGP 200",
+            "13": "EGP 200",
+            "14": "EGP 1,760"
+          },
+          "saving": 200,
+          "decimals": 0,
+          "prefix": "EGP ",
+          "suffix": "",
+          "label": "EGP"
+        }
+      },
+      "saving_at": [
+        2.5,
+        2.8
+      ]
+    },
+    "v": {
+      "body": 65.96666666666667,
+      "outro": 8.5,
+      "scenes": [
+        {
+          "beat": "p1",
+          "duration": 2.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 0
+        },
+        {
+          "beat": 0,
+          "duration": 3,
+          "spans": [
+            [
+              "opening-v",
+              0,
+              3,
+              3
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "opening-v",
+                0,
+                3,
+                3
+              ]
+            ],
+            "en": [
+              [
+                "opening-v",
+                0,
+                3,
+                3
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "…وكل سعر بتكتبه بإيدك في الإكسيل.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "…and every price retyped into Excel.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 2.5
+        },
+        {
+          "beat": "p3",
+          "duration": 3,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 5.5
+        },
+        {
+          "beat": "turn",
+          "duration": 3,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 8.5
+        },
+        {
+          "beat": 1,
+          "duration": 4,
+          "spans": [
+            [
+              "s5-po-savings",
+              26,
+              26,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              42,
+              42,
+              1.5
+            ]
+          ],
+          "crop": [
+            300,
+            100,
+            1320,
+            900
+          ],
+          "spans_by_language": {
+            "ar": [
+              [
+                "s5-po-savings",
+                26,
+                26,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                52.5,
+                52.5,
+                1.5
+              ]
+            ],
+            "en": [
+              [
+                "s5-po-savings",
+                26,
+                26,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                44.5,
+                44.5,
+                1.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "من بلاغ نقص لأمر شراء تبعته للموردين… والتوفير متسجّل.",
+                "offset": 0,
+                "duration": 4,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "From a low-stock report to a sent PO, with the saving logged.",
+                "offset": 0,
+                "duration": 4,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 11.5
+        },
+        {
+          "beat": 3,
+          "duration": 5.733333333333333,
+          "spans": [
+            [
+              "s1-rfq",
+              24,
+              28,
+              2.7333333333333334
+            ],
+            [
+              "s1-rfq",
+              40.5,
+              43.3,
+              1.5
+            ],
+            [
+              "s1-rfq",
+              44.2,
+              44.2,
+              1.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s1-rfq",
+                24,
+                28,
+                2.7333333333333334
+              ],
+              [
+                "s1-rfq",
+                40.5,
+                43.3,
+                1.5
+              ],
+              [
+                "s1-rfq",
+                44.2,
+                44.2,
+                1.5
+              ]
+            ],
+            "en": [
+              [
+                "s1-rfq",
+                24,
+                28,
+                2.7333333333333334
+              ],
+              [
+                "s1-rfq",
+                40.5,
+                43.3,
+                1.5
+              ],
+              [
+                "s1-rfq",
+                44.2,
+                44.2,
+                1.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "طلب عرض سعر واحد لـ٣ موردين، والكميات بالعبوة.",
+                "offset": 0,
+                "duration": 5.733333333333333,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "One RFQ to three suppliers, quantities in packs.",
+                "offset": 0,
+                "duration": 5.733333333333333,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 15.5
+        },
+        {
+          "beat": 5,
+          "duration": 3,
+          "spans": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              3
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s2-quote-photo",
+                0.3,
+                4.8,
+                3
+              ]
+            ],
+            "en": [
+              [
+                "s2-quote-photo",
+                0.3,
+                4.8,
+                3
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "٣ ردود: ملفين PDF وصورة واتساب.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Three replies: two PDFs and a WhatsApp photo.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 21.233333333333334
+        },
+        {
+          "beat": 6,
+          "duration": 7,
+          "spans": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              2
+            ],
+            [
+              "s2-quote-photo",
+              24,
+              25,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s2-quote-photo",
+                8,
+                11,
+                2
+              ],
+              [
+                "s2-quote-photo",
+                24,
+                25,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                8.5,
+                8.5,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s2-quote-photo",
+                8,
+                11,
+                2
+              ],
+              [
+                "s2-quote-photo",
+                24,
+                25,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                8.5,
+                8.5,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "البنود والأسعار بالجنيه وتاريخ الصلاحية اتقروا لوحدهم… والإجمالي مطابق.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Items, EGP prices and validity, read automatically. The total checks out.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 24.233333333333334
+        },
+        {
+          "beat": 7,
+          "duration": 3,
+          "spans": [
+            [
+              "s2-quote-photo",
+              24.5,
+              26.3,
+              1.2
+            ],
+            [
+              "s2r-authorised",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s2-quote-photo",
+                24.5,
+                26.3,
+                1.2
+              ],
+              [
+                "s2r-authorised",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ],
+            "en": [
+              [
+                "s2-quote-photo",
+                24.5,
+                26.3,
+                1.2
+              ],
+              [
+                "s2r-authorised",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "من غير ما تكتب حاجة… بس الاعتماد قرارك إنت.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Nothing retyped. But you sign it off.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 31.233333333333334
+        },
+        {
+          "beat": 8,
+          "duration": 7,
+          "spans": [
+            [
+              "s3c-smart-compare",
+              20,
+              27,
+              5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s3c-smart-compare",
+                20,
+                27,
+                5
+              ],
+              [
+                "s3c-smart-compare",
+                29,
+                29,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s3c-smart-compare",
+                20,
+                27,
+                5
+              ],
+              [
+                "s3c-smart-compare",
+                29,
+                29,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "بالعبوة وشامل الضريبة والتوصيل: الأمانة أرخص بـ٢٠٠ ج.م في الزيت.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Per pack, VAT and delivery included: Al-Amana is EGP 200 cheaper on oil.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 34.233333333333334
+        },
+        {
+          "beat": 10,
+          "duration": 5,
+          "spans": [
+            [
+              "s3-guardrail-draft",
+              5,
+              10,
+              3
+            ],
+            [
+              "s3-guardrail-draft",
+              20,
+              23,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s3-guardrail-draft",
+                5,
+                10,
+                3
+              ],
+              [
+                "s3-guardrail-draft",
+                20,
+                23,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s3-guardrail-draft",
+                5,
+                10,
+                3
+              ],
+              [
+                "s3-guardrail-draft",
+                20,
+                23,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "الضوابط اللي حطّيتها جهّزت الطلب… مسودة، مش شراء.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Your guardrails drafted the request. A draft, not a purchase.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 41.233333333333334
+        },
+        {
+          "beat": 11,
+          "duration": 5,
+          "spans": [
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              13.5,
+              15.15,
+              2.2
+            ],
+            [
+              "s4r-approved",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s4-phone-approve",
+                7,
+                8,
+                1
+              ],
+              [
+                "s4-phone-approve",
+                13.5,
+                15.15,
+                2.2
+              ],
+              [
+                "s4r-approved",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ],
+            "en": [
+              [
+                "s4-phone-approve",
+                7,
+                8,
+                1
+              ],
+              [
+                "s4-phone-approve",
+                13.5,
+                15.15,
+                2.2
+              ],
+              [
+                "s4r-approved",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "والمدير يعتمد من موبايله، من أي مكان.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "The manager approves from their phone, wherever they are.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 46.233333333333334
+        },
+        {
+          "beat": 12,
+          "duration": 3.7333333333333334,
+          "spans": [
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              1.7333333333333334
+            ],
+            [
+              "s5-po-savings",
+              26,
+              26,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s5-po-savings",
+                22,
+                23.2,
+                1.7333333333333334
+              ],
+              [
+                "s5-po-savings",
+                26,
+                26,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s5-po-savings",
+                22,
+                23.2,
+                1.7333333333333334
+              ],
+              [
+                "s5-po-savings",
+                26,
+                26,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "من الطلب المعتمد بتطلّع أمر الشراء وتبعته.",
+                "offset": 0,
+                "duration": 3.7333333333333334,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "From the approved request, you create the PO and send it.",
+                "offset": 0,
+                "duration": 3.7333333333333334,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 51.233333333333334
+        },
+        {
+          "beat": 13,
+          "duration": 6.0,
+          "spans": [
+            [
+              "s5-po-savings",
+              39,
+              41.5,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              52.5,
+              52.5,
+              3.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s5-po-savings",
+                39,
+                41.5,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                52.5,
+                52.5,
+                3.5
+              ]
+            ],
+            "en": [
+              [
+                "s5-po-savings",
+                38,
+                40.3,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                44.5,
+                44.5,
+                3.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "المالك بيسأل: وفّرنا كام؟",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "توفير ٣٠٠ ج.م على الطلب ده، مقابل آخر سعر شراء.",
+                "offset": 2.5,
+                "duration": 2.0,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "The owner asks: what did we save?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "EGP 200 saved on this order, against the last purchase price.",
+                "offset": 2.5,
+                "duration": 2.0,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 54.96666666666667
+        },
+        {
+          "beat": "recap",
+          "duration": 5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 60.96666666666667
+        }
+      ],
+      "langs": [
+        "ar",
+        "en"
+      ],
+      "v25": {
+        "ar": {
+          "p1": "عروض في كل صيغة…",
+          "0": "…وكل سعر بتكتبه بإيدك في الإكسيل.",
+          "p3": [
+            "بتلف على كل مورد لوحده",
+            "بتقارن عبوات مش زي بعض",
+            "ومش عارف وفّرت كام"
+          ],
+          "turn": [
+            "لمشتريات المطاعم",
+            "بيحلّها كلها."
+          ],
+          "saving": [
+            "توفير على الطلب ده",
+            "مقابل آخر سعر شراء"
+          ],
+          "recap": {
+            "title": "كل مشكلة وعندنا حلها",
+            "rows": [
+              [
+                "نسخ الأسعار بإيدك",
+                "بيقرا الـPDF والصور لوحده"
+              ],
+              [
+                "مورد مورد",
+                "طلب عرض سعر واحد لكل الموردين"
+              ],
+              [
+                "عبوات مختلفة",
+                "مقارنة بالعبوة شامل الضريبة والتوصيل"
+              ],
+              [
+                "اعتماد متأخر",
+                "اعتماد من الموبايل"
+              ],
+              [
+                "وفّرنا كام؟",
+                "سجل توفير معتمد"
+              ]
+            ]
+          }
+        },
+        "en": {
+          "p1": "Quotes in every format…",
+          "0": "…and every price retyped into Excel.",
+          "p3": [
+            "Chasing each supplier one by one",
+            "Comparing packs that don't match",
+            "And no idea what you saved"
+          ],
+          "turn": [
+            "for restaurant purchasing",
+            "handles all of it."
+          ],
+          "saving": [
+            "Saved on this order",
+            "against the last purchase price"
+          ],
+          "recap": {
+            "title": "Every pain, solved",
+            "rows": [
+              [
+                "Retyping prices",
+                "PDFs and photos read automatically"
+              ],
+              [
+                "One supplier at a time",
+                "One RFQ to every supplier"
+              ],
+              [
+                "Different pack sizes",
+                "Per pack, VAT and delivery included"
+              ],
+              [
+                "Slow approvals",
+                "Approval from the phone"
+              ],
+              [
+                "What did we save?",
+                "A verified savings ledger"
+              ]
+            ]
+          }
+        }
+      },
+      "money": {
+        "ar": {
+          "cards": {
+            "1": "٣٠٠ ج.م",
+            "6": "٢٤٬٦٤٠ ج.م",
+            "8": "٢٠٠ ج.م",
+            "13": "٣٠٠ ج.م",
+            "14": "١٬٧٦٠ ج.م"
+          },
+          "saving": 300,
+          "decimals": 0,
+          "prefix": "",
+          "suffix": " ج.م",
+          "label": "ج.م"
+        },
+        "en": {
+          "cards": {
+            "1": "EGP 200",
+            "6": "EGP 24,440",
+            "8": "EGP 200",
+            "13": "EGP 200",
+            "14": "EGP 1,760"
+          },
+          "saving": 200,
+          "decimals": 0,
+          "prefix": "EGP ",
+          "suffix": "",
+          "label": "EGP"
+        }
+      },
+      "saving_at": [
+        2.5,
+        2.3
+      ]
+    }
+  },
+  "sa": {
+    "h": {
+      "body": 119.5,
+      "outro": 9.75,
+      "scenes": [
+        {
+          "beat": "p1",
+          "duration": 2.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 0
+        },
+        {
+          "beat": 0,
+          "duration": 5,
+          "spans": [
+            [
+              "opening-h",
+              0,
+              5,
+              5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "opening-h",
+                0,
+                5,
+                5
+              ]
+            ],
+            "en": [
+              [
+                "opening-h",
+                0,
+                5,
+                5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "…وكل سعر تكتبه بيدك في الإكسل.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "…and every price retyped into Excel.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 2.5
+        },
+        {
+          "beat": "p3",
+          "duration": 3.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 7.5
+        },
+        {
+          "beat": "turn",
+          "duration": 3.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 11.0
+        },
+        {
+          "beat": 1,
+          "duration": 8,
+          "spans": [
+            [
+              "s5-po-savings",
+              27,
+              29,
+              4
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              4
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s5-po-savings",
+                27,
+                29,
+                4
+              ],
+              [
+                "s5-po-savings",
+                43,
+                43,
+                4
+              ]
+            ],
+            "en": [
+              [
+                "s5-po-savings",
+                27,
+                29,
+                4
+              ],
+              [
+                "s5-po-savings",
+                44,
+                44,
+                4
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "من بلاغ نقص لأمر شراء ترسله للموردين… والتوفير مسجّل.",
+                "offset": 0,
+                "duration": 8,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "From a low-stock report to a sent PO, with the saving logged.",
+                "offset": 0,
+                "duration": 8,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 14.5
+        },
+        {
+          "beat": 2,
+          "duration": 7,
+          "spans": [
+            [
+              "s0-phone-lowstock",
+              1.5,
+              3.5,
+              1
+            ],
+            [
+              "s0-phone-lowstock",
+              9.5,
+              21,
+              4
+            ],
+            [
+              "s0-phone-lowstock",
+              22.0,
+              22.2,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s0-phone-lowstock",
+                1.5,
+                3.5,
+                1
+              ],
+              [
+                "s0-phone-lowstock",
+                9.5,
+                21,
+                4
+              ],
+              [
+                "s0-phone-lowstock",
+                22.0,
+                22.2,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s0-phone-lowstock",
+                1.5,
+                3.5,
+                1
+              ],
+              [
+                "s0-phone-lowstock",
+                11,
+                21,
+                4
+              ],
+              [
+                "s0-phone-lowstock",
+                22.5,
+                22.8,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "الفرع يبلّغ من الجوال: الزيت قرب يخلص.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "The branch reports it from the phone: oil is running low.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 22.5
+        },
+        {
+          "beat": 3,
+          "duration": 11,
+          "spans": [
+            [
+              "s1-rfq",
+              8,
+              24,
+              3
+            ],
+            [
+              "s1-rfq",
+              26,
+              35,
+              3.5
+            ],
+            [
+              "s1-rfq",
+              48,
+              51,
+              3
+            ],
+            [
+              "s1-rfq",
+              52.3,
+              52.3,
+              1.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s1-rfq",
+                8,
+                24,
+                3
+              ],
+              [
+                "s1-rfq",
+                26,
+                35,
+                3.5
+              ],
+              [
+                "s1-rfq",
+                48,
+                51,
+                3
+              ],
+              [
+                "s1-rfq",
+                52.3,
+                52.3,
+                1.5
+              ]
+            ],
+            "en": [
+              [
+                "s1-rfq",
+                8,
+                24,
+                3
+              ],
+              [
+                "s1-rfq",
+                25,
+                35,
+                3.5
+              ],
+              [
+                "s1-rfq",
+                53,
+                56.5,
+                3
+              ],
+              [
+                "s1-rfq",
+                57.4,
+                57.4,
+                1.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "ترسل نفس الطلب لكل مورد لحاله؟",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "طلب عرض سعر واحد لـ٣ موردين، والكميات بالكرتون.",
+                "offset": 2.5,
+                "duration": 8.5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Sending the same request to every supplier?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "One RFQ to three suppliers, quantities in packs.",
+                "offset": 2.5,
+                "duration": 8.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 29.5
+        },
+        {
+          "beat": 5,
+          "duration": 5,
+          "spans": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s2-quote-photo",
+                0.3,
+                4.8,
+                5
+              ]
+            ],
+            "en": [
+              [
+                "s2-quote-photo",
+                0.3,
+                4.8,
+                5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "تنقل الأسعار بيدك؟",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "٣ ردود: ملفين PDF وصورة واتساب.",
+                "offset": 2.5,
+                "duration": 2.5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Retyping prices by hand?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "Three replies: two PDFs and a WhatsApp photo.",
+                "offset": 2.5,
+                "duration": 2.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 40.5
+        },
+        {
+          "beat": 6,
+          "duration": 12,
+          "spans": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              22,
+              23.5,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              26.5,
+              27.3,
+              4
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s2-quote-photo",
+                8,
+                11,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                22,
+                23.5,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                26.5,
+                27.3,
+                4
+              ],
+              [
+                "s2-quote-photo",
+                8.5,
+                8.5,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s2-quote-photo",
+                8,
+                11,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                22,
+                23.5,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                26.5,
+                27.3,
+                4
+              ],
+              [
+                "s2-quote-photo",
+                8.5,
+                8.5,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "البنود والأسعار بالريال والضريبة والصلاحية انقرت لحالها… والإجمالي مطابق.",
+                "offset": 0,
+                "duration": 12,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Items, SAR prices, VAT and validity, read automatically. The total checks out.",
+                "offset": 0,
+                "duration": 12,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 45.5
+        },
+        {
+          "beat": 7,
+          "duration": 5,
+          "spans": [
+            [
+              "s2-quote-photo",
+              27.5,
+              29.5,
+              3.2
+            ],
+            [
+              "s2r-authorised",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s2-quote-photo",
+                27.5,
+                29.5,
+                3.2
+              ],
+              [
+                "s2r-authorised",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ],
+            "en": [
+              [
+                "s2-quote-photo",
+                27.5,
+                29.5,
+                3.2
+              ],
+              [
+                "s2r-authorised",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "بدون ما تكتب شي… بس الاعتماد قرارك أنت.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Nothing retyped. But you sign it off.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 57.5
+        },
+        {
+          "beat": 8,
+          "duration": 11,
+          "spans": [
+            [
+              "s3c-smart-compare",
+              10.5,
+              14,
+              3
+            ],
+            [
+              "s3c-smart-compare",
+              18,
+              25,
+              5.5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s3c-smart-compare",
+                10.5,
+                14,
+                3
+              ],
+              [
+                "s3c-smart-compare",
+                18,
+                25,
+                5.5
+              ],
+              [
+                "s3c-smart-compare",
+                29,
+                29,
+                2.5
+              ]
+            ],
+            "en": [
+              [
+                "s3c-smart-compare",
+                10.5,
+                14,
+                3
+              ],
+              [
+                "s3c-smart-compare",
+                18,
+                25,
+                5.5
+              ],
+              [
+                "s3c-smart-compare",
+                29,
+                29,
+                2.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "كراتين بأحجام مختلفة؟",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "بالكرتون وشامل الضريبة والتوصيل: الذهبي أرخص بـ٤٠ ر.س في الزيت.",
+                "offset": 2.5,
+                "duration": 8.5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Different pack sizes?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "Per pack, VAT and delivery included: Al-Dhahabi is SAR 40 cheaper on oil.",
+                "offset": 2.5,
+                "duration": 8.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 62.5
+        },
+        {
+          "beat": 10,
+          "duration": 10,
+          "spans": [
+            [
+              "s3-guardrail-draft",
+              6,
+              10,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              16,
+              22,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              22.6,
+              25.2,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s3-guardrail-draft",
+                6,
+                10,
+                4
+              ],
+              [
+                "s3-guardrail-draft",
+                16,
+                22,
+                4
+              ],
+              [
+                "s3-guardrail-draft",
+                22.6,
+                25.2,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s3-guardrail-draft",
+                6,
+                10,
+                4
+              ],
+              [
+                "s3-guardrail-draft",
+                16,
+                22,
+                4
+              ],
+              [
+                "s3-guardrail-draft",
+                22.6,
+                26,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "الطلب واقف ينتظر اعتماد؟",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "الضوابط اللي حطيتها جهّزت الطلب… مسودة، مو شراء.",
+                "offset": 2.5,
+                "duration": 7.5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Requests stuck waiting for approval?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "Your guardrails drafted the request. A draft, not a purchase.",
+                "offset": 2.5,
+                "duration": 7.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 73.5
+        },
+        {
+          "beat": 11,
+          "duration": 8,
+          "spans": [
+            [
+              "s4-phone-approve",
+              5,
+              5.5,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              2
+            ],
+            [
+              "s4-phone-approve",
+              13.3,
+              15.2,
+              3.2
+            ],
+            [
+              "s4r-approved",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s4-phone-approve",
+                5,
+                5.5,
+                1
+              ],
+              [
+                "s4-phone-approve",
+                7,
+                8,
+                2
+              ],
+              [
+                "s4-phone-approve",
+                13.3,
+                15.2,
+                3.2
+              ],
+              [
+                "s4r-approved",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ],
+            "en": [
+              [
+                "s4-phone-approve",
+                5,
+                5.5,
+                1
+              ],
+              [
+                "s4-phone-approve",
+                7,
+                8,
+                2
+              ],
+              [
+                "s4-phone-approve",
+                13.3,
+                15.2,
+                3.2
+              ],
+              [
+                "s4r-approved",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "والمدير يعتمد من جواله، من أي مكان.",
+                "offset": 0,
+                "duration": 8,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "The manager approves from their phone, wherever they are.",
+                "offset": 0,
+                "duration": 8,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 83.5
+        },
+        {
+          "beat": 12,
+          "duration": 9,
+          "spans": [
+            [
+              "s5-po-savings",
+              3,
+              9,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              13,
+              20,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              2
+            ],
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s5-po-savings",
+                3,
+                9,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                13,
+                20,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                22,
+                23.2,
+                2
+              ],
+              [
+                "s5-po-savings",
+                27,
+                27,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s5-po-savings",
+                3,
+                9,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                13,
+                20,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                22,
+                23.2,
+                2
+              ],
+              [
+                "s5-po-savings",
+                27,
+                27,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "من الطلب المعتمد تطلّع أمر الشراء وترسله.",
+                "offset": 0,
+                "duration": 9,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "From the approved request, you create the PO and send it.",
+                "offset": 0,
+                "duration": 9,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 91.5
+        },
+        {
+          "beat": 13,
+          "duration": 7,
+          "spans": [
+            [
+              "s5-po-savings",
+              32,
+              35,
+              2
+            ],
+            [
+              "s5-po-savings",
+              36,
+              39,
+              3
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s5-po-savings",
+                32,
+                35,
+                2
+              ],
+              [
+                "s5-po-savings",
+                36,
+                39,
+                3
+              ],
+              [
+                "s5-po-savings",
+                43,
+                43,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s5-po-savings",
+                32,
+                35,
+                2
+              ],
+              [
+                "s5-po-savings",
+                37,
+                40,
+                3
+              ],
+              [
+                "s5-po-savings",
+                44,
+                44,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "المالك يسأل: كم وفّرنا؟",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "توفير ١٩٠ ر.س على هالطلب، مقابل آخر سعر شراء.",
+                "offset": 2.5,
+                "duration": 4.5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "The owner asks: what did we save?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "SAR 120 saved on this order, against the last purchase price.",
+                "offset": 2.5,
+                "duration": 4.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 100.5
+        },
+        {
+          "beat": 14,
+          "duration": 6,
+          "spans": [
+            [
+              "s6-savings-close",
+              4,
+              8,
+              6
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s6-savings-close",
+                4,
+                8,
+                6
+              ]
+            ],
+            "en": [
+              [
+                "s6-savings-close",
+                4,
+                8,
+                6
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "وكل توفير مسجّل ومراجَع… جاهز للمالك.",
+                "offset": 0,
+                "duration": 6,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Every saving logged and verified, ready for the owner.",
+                "offset": 0,
+                "duration": 6,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 107.5
+        },
+        {
+          "beat": "recap",
+          "duration": 6,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 113.5
+        }
+      ],
+      "langs": [
+        "ar",
+        "en"
+      ],
+      "v25": {
+        "ar": {
+          "p1": "عروض في كل صيغة…",
+          "0": "…وكل سعر تكتبه بيدك في الإكسل.",
+          "p3": [
+            "تدوّر على كل مورد لحاله",
+            "تقارن عبوات مو زي بعض",
+            "وما تدري كم وفّرت"
+          ],
+          "turn": [
+            "لمشتريات المطاعم",
+            "يحلّها كلها."
+          ],
+          "saving": [
+            "توفير على هذا الطلب",
+            "مقابل آخر سعر شراء"
+          ],
+          "recap": {
+            "title": "كل مشكلة ولها حل",
+            "rows": [
+              [
+                "نسخ الأسعار بيدك",
+                "يقرأ الـPDF والصور بنفسه"
+              ],
+              [
+                "مورد مورد",
+                "طلب عرض سعر واحد لكل الموردين"
+              ],
+              [
+                "عبوات مختلفة",
+                "مقارنة بالعبوة شامل الضريبة والتوصيل"
+              ],
+              [
+                "اعتماد متأخر",
+                "اعتماد من الجوال"
+              ],
+              [
+                "كم وفّرنا؟",
+                "سجل توفير معتمد"
+              ]
+            ]
+          }
+        },
+        "en": {
+          "p1": "Quotes in every format…",
+          "0": "…and every price retyped into Excel.",
+          "p3": [
+            "Chasing each supplier one by one",
+            "Comparing packs that don't match",
+            "And no idea what you saved"
+          ],
+          "turn": [
+            "for restaurant purchasing",
+            "handles all of it."
+          ],
+          "saving": [
+            "Saved on this order",
+            "against the last purchase price"
+          ],
+          "recap": {
+            "title": "Every pain, solved",
+            "rows": [
+              [
+                "Retyping prices",
+                "PDFs and photos read automatically"
+              ],
+              [
+                "One supplier at a time",
+                "One RFQ to every supplier"
+              ],
+              [
+                "Different pack sizes",
+                "Per pack, VAT and delivery included"
+              ],
+              [
+                "Slow approvals",
+                "Approval from the phone"
+              ],
+              [
+                "What did we save?",
+                "A verified savings ledger"
+              ]
+            ]
+          }
+        }
+      },
+      "money": {
+        "ar": {
+          "cards": {
+            "1": "١٩٠ ر.س",
+            "6": "٤٬٩١٠ ر.س",
+            "8": "٤٠ ر.س",
+            "13": "١٩٠ ر.س",
+            "14": "١٩٠ ر.س"
+          },
+          "saving": 190,
+          "decimals": 0,
+          "prefix": "",
+          "suffix": " ر.س",
+          "label": "ر.س"
+        },
+        "en": {
+          "cards": {
+            "1": "SAR 120",
+            "6": "SAR 4,790",
+            "8": "SAR 40",
+            "13": "SAR 120",
+            "14": "SAR 310"
+          },
+          "saving": 120,
+          "decimals": 0,
+          "prefix": "SAR ",
+          "suffix": "",
+          "label": "SAR"
+        }
+      },
+      "saving_at": [
+        2.5,
+        2.8
+      ]
+    },
+    "v": {
+      "body": 65.96666666666667,
+      "outro": 8.5,
+      "scenes": [
+        {
+          "beat": "p1",
+          "duration": 2.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 0
+        },
+        {
+          "beat": 0,
+          "duration": 3,
+          "spans": [
+            [
+              "opening-v",
+              0,
+              3,
+              3
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "opening-v",
+                0,
+                3,
+                3
+              ]
+            ],
+            "en": [
+              [
+                "opening-v",
+                0,
+                3,
+                3
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "…وكل سعر تكتبه بيدك في الإكسل.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "…and every price retyped into Excel.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 2.5
+        },
+        {
+          "beat": "p3",
+          "duration": 3,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 5.5
+        },
+        {
+          "beat": "turn",
+          "duration": 3,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 8.5
+        },
+        {
+          "beat": 1,
+          "duration": 4,
+          "spans": [
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              1.5
+            ]
+          ],
+          "crop": [
+            300,
+            100,
+            1320,
+            900
+          ],
+          "spans_by_language": {
+            "ar": [
+              [
+                "s5-po-savings",
+                27,
+                27,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                43,
+                43,
+                1.5
+              ]
+            ],
+            "en": [
+              [
+                "s5-po-savings",
+                27,
+                27,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                44,
+                44,
+                1.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "من بلاغ نقص لأمر شراء ترسله للموردين… والتوفير مسجّل.",
+                "offset": 0,
+                "duration": 4,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "From a low-stock report to a sent PO, with the saving logged.",
+                "offset": 0,
+                "duration": 4,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 11.5
+        },
+        {
+          "beat": 3,
+          "duration": 5.733333333333333,
+          "spans": [
+            [
+              "s1-rfq",
+              26,
+              31,
+              2.7333333333333334
+            ],
+            [
+              "s1-rfq",
+              48,
+              51,
+              1.5
+            ],
+            [
+              "s1-rfq",
+              52.3,
+              52.3,
+              1.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s1-rfq",
+                26,
+                31,
+                2.7333333333333334
+              ],
+              [
+                "s1-rfq",
+                48,
+                51,
+                1.5
+              ],
+              [
+                "s1-rfq",
+                52.3,
+                52.3,
+                1.5
+              ]
+            ],
+            "en": [
+              [
+                "s1-rfq",
+                25,
+                31,
+                2.7333333333333334
+              ],
+              [
+                "s1-rfq",
+                53,
+                56.5,
+                1.5
+              ],
+              [
+                "s1-rfq",
+                57.4,
+                57.4,
+                1.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "طلب عرض سعر واحد لـ٣ موردين، والكميات بالكرتون.",
+                "offset": 0,
+                "duration": 5.733333333333333,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "One RFQ to three suppliers, quantities in packs.",
+                "offset": 0,
+                "duration": 5.733333333333333,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 15.5
+        },
+        {
+          "beat": 5,
+          "duration": 3,
+          "spans": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              3
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s2-quote-photo",
+                0.3,
+                4.8,
+                3
+              ]
+            ],
+            "en": [
+              [
+                "s2-quote-photo",
+                0.3,
+                4.8,
+                3
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "٣ ردود: ملفين PDF وصورة واتساب.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Three replies: two PDFs and a WhatsApp photo.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 21.233333333333334
+        },
+        {
+          "beat": 6,
+          "duration": 7,
+          "spans": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              2
+            ],
+            [
+              "s2-quote-photo",
+              26.5,
+              27.3,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s2-quote-photo",
+                8,
+                11,
+                2
+              ],
+              [
+                "s2-quote-photo",
+                26.5,
+                27.3,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                8.5,
+                8.5,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s2-quote-photo",
+                8,
+                11,
+                2
+              ],
+              [
+                "s2-quote-photo",
+                26.5,
+                27.3,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                8.5,
+                8.5,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "البنود والأسعار بالريال والضريبة والصلاحية انقرت لحالها… والإجمالي مطابق.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Items, SAR prices, VAT and validity, read automatically. The total checks out.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 24.233333333333334
+        },
+        {
+          "beat": 7,
+          "duration": 3,
+          "spans": [
+            [
+              "s2-quote-photo",
+              27.5,
+              29.5,
+              1.2
+            ],
+            [
+              "s2r-authorised",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s2-quote-photo",
+                27.5,
+                29.5,
+                1.2
+              ],
+              [
+                "s2r-authorised",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ],
+            "en": [
+              [
+                "s2-quote-photo",
+                27.5,
+                29.5,
+                1.2
+              ],
+              [
+                "s2r-authorised",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "بدون ما تكتب شي… بس الاعتماد قرارك أنت.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Nothing retyped. But you sign it off.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 31.233333333333334
+        },
+        {
+          "beat": 8,
+          "duration": 7,
+          "spans": [
+            [
+              "s3c-smart-compare",
+              18,
+              25,
+              5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s3c-smart-compare",
+                18,
+                25,
+                5
+              ],
+              [
+                "s3c-smart-compare",
+                29,
+                29,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s3c-smart-compare",
+                18,
+                25,
+                5
+              ],
+              [
+                "s3c-smart-compare",
+                29,
+                29,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "بالكرتون وشامل الضريبة والتوصيل: الذهبي أرخص بـ٤٠ ر.س في الزيت.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Per pack, VAT and delivery included: Al-Dhahabi is SAR 40 cheaper on oil.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 34.233333333333334
+        },
+        {
+          "beat": 10,
+          "duration": 5,
+          "spans": [
+            [
+              "s3-guardrail-draft",
+              6,
+              10,
+              3
+            ],
+            [
+              "s3-guardrail-draft",
+              20.5,
+              23.5,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s3-guardrail-draft",
+                6,
+                10,
+                3
+              ],
+              [
+                "s3-guardrail-draft",
+                20.5,
+                23.5,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s3-guardrail-draft",
+                6,
+                10,
+                3
+              ],
+              [
+                "s3-guardrail-draft",
+                20.5,
+                23.5,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "الضوابط اللي حطيتها جهّزت الطلب… مسودة، مو شراء.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "Your guardrails drafted the request. A draft, not a purchase.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 41.233333333333334
+        },
+        {
+          "beat": 11,
+          "duration": 5,
+          "spans": [
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              13.3,
+              15.2,
+              2.2
+            ],
+            [
+              "s4r-approved",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s4-phone-approve",
+                7,
+                8,
+                1
+              ],
+              [
+                "s4-phone-approve",
+                13.3,
+                15.2,
+                2.2
+              ],
+              [
+                "s4r-approved",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ],
+            "en": [
+              [
+                "s4-phone-approve",
+                7,
+                8,
+                1
+              ],
+              [
+                "s4-phone-approve",
+                13.3,
+                15.2,
+                2.2
+              ],
+              [
+                "s4r-approved",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "والمدير يعتمد من جواله، من أي مكان.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "The manager approves from their phone, wherever they are.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 46.233333333333334
+        },
+        {
+          "beat": 12,
+          "duration": 3.7333333333333334,
+          "spans": [
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              1.7333333333333334
+            ],
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s5-po-savings",
+                22,
+                23.2,
+                1.7333333333333334
+              ],
+              [
+                "s5-po-savings",
+                27,
+                27,
+                2
+              ]
+            ],
+            "en": [
+              [
+                "s5-po-savings",
+                22,
+                23.2,
+                1.7333333333333334
+              ],
+              [
+                "s5-po-savings",
+                27,
+                27,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "من الطلب المعتمد تطلّع أمر الشراء وترسله.",
+                "offset": 0,
+                "duration": 3.7333333333333334,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "From the approved request, you create the PO and send it.",
+                "offset": 0,
+                "duration": 3.7333333333333334,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 51.233333333333334
+        },
+        {
+          "beat": 13,
+          "duration": 6.0,
+          "spans": [
+            [
+              "s5-po-savings",
+              36,
+              39,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              3.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [
+              [
+                "s5-po-savings",
+                36,
+                39,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                43,
+                43,
+                3.5
+              ]
+            ],
+            "en": [
+              [
+                "s5-po-savings",
+                37,
+                40,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                44,
+                44,
+                3.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "ar": [
+              {
+                "text": "المالك يسأل: كم وفّرنا؟",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "توفير ١٩٠ ر.س على هالطلب، مقابل آخر سعر شراء.",
+                "offset": 2.5,
+                "duration": 2.0,
+                "role": "fix"
+              }
+            ],
+            "en": [
+              {
+                "text": "The owner asks: what did we save?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "SAR 120 saved on this order, against the last purchase price.",
+                "offset": 2.5,
+                "duration": 2.0,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 54.96666666666667
+        },
+        {
+          "beat": "recap",
+          "duration": 5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "ar": [],
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 60.96666666666667
+        }
+      ],
+      "langs": [
+        "ar",
+        "en"
+      ],
+      "v25": {
+        "ar": {
+          "p1": "عروض في كل صيغة…",
+          "0": "…وكل سعر تكتبه بيدك في الإكسل.",
+          "p3": [
+            "تدوّر على كل مورد لحاله",
+            "تقارن عبوات مو زي بعض",
+            "وما تدري كم وفّرت"
+          ],
+          "turn": [
+            "لمشتريات المطاعم",
+            "يحلّها كلها."
+          ],
+          "saving": [
+            "توفير على هذا الطلب",
+            "مقابل آخر سعر شراء"
+          ],
+          "recap": {
+            "title": "كل مشكلة ولها حل",
+            "rows": [
+              [
+                "نسخ الأسعار بيدك",
+                "يقرأ الـPDF والصور بنفسه"
+              ],
+              [
+                "مورد مورد",
+                "طلب عرض سعر واحد لكل الموردين"
+              ],
+              [
+                "عبوات مختلفة",
+                "مقارنة بالعبوة شامل الضريبة والتوصيل"
+              ],
+              [
+                "اعتماد متأخر",
+                "اعتماد من الجوال"
+              ],
+              [
+                "كم وفّرنا؟",
+                "سجل توفير معتمد"
+              ]
+            ]
+          }
+        },
+        "en": {
+          "p1": "Quotes in every format…",
+          "0": "…and every price retyped into Excel.",
+          "p3": [
+            "Chasing each supplier one by one",
+            "Comparing packs that don't match",
+            "And no idea what you saved"
+          ],
+          "turn": [
+            "for restaurant purchasing",
+            "handles all of it."
+          ],
+          "saving": [
+            "Saved on this order",
+            "against the last purchase price"
+          ],
+          "recap": {
+            "title": "Every pain, solved",
+            "rows": [
+              [
+                "Retyping prices",
+                "PDFs and photos read automatically"
+              ],
+              [
+                "One supplier at a time",
+                "One RFQ to every supplier"
+              ],
+              [
+                "Different pack sizes",
+                "Per pack, VAT and delivery included"
+              ],
+              [
+                "Slow approvals",
+                "Approval from the phone"
+              ],
+              [
+                "What did we save?",
+                "A verified savings ledger"
+              ]
+            ]
+          }
+        }
+      },
+      "money": {
+        "ar": {
+          "cards": {
+            "1": "١٩٠ ر.س",
+            "6": "٤٬٩١٠ ر.س",
+            "8": "٤٠ ر.س",
+            "13": "١٩٠ ر.س",
+            "14": "١٩٠ ر.س"
+          },
+          "saving": 190,
+          "decimals": 0,
+          "prefix": "",
+          "suffix": " ر.س",
+          "label": "ر.س"
+        },
+        "en": {
+          "cards": {
+            "1": "SAR 120",
+            "6": "SAR 4,790",
+            "8": "SAR 40",
+            "13": "SAR 120",
+            "14": "SAR 310"
+          },
+          "saving": 120,
+          "decimals": 0,
+          "prefix": "SAR ",
+          "suffix": "",
+          "label": "SAR"
+        }
+      },
+      "saving_at": [
+        2.5,
+        2.3
+      ]
+    }
+  },
+  "sa-en": {
+    "h": {
+      "body": 119.5,
+      "outro": 9.75,
+      "scenes": [
+        {
+          "beat": "p1",
+          "duration": 2.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 0
+        },
+        {
+          "beat": 0,
+          "duration": 5,
+          "spans": [
+            [
+              "opening-h",
+              0,
+              5,
+              5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "opening-h",
+                0,
+                5,
+                5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "…and every price retyped into Excel.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 2.5
+        },
+        {
+          "beat": "p3",
+          "duration": 3.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 7.5
+        },
+        {
+          "beat": "turn",
+          "duration": 3.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 11.0
+        },
+        {
+          "beat": 1,
+          "duration": 8,
+          "spans": [
+            [
+              "s5-po-savings",
+              27,
+              29,
+              4
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              4
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s5-po-savings",
+                27,
+                29,
+                4
+              ],
+              [
+                "s5-po-savings",
+                44,
+                44,
+                4
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "From a low-stock report to a sent PO, with the saving logged.",
+                "offset": 0,
+                "duration": 8,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 14.5
+        },
+        {
+          "beat": 2,
+          "duration": 7,
+          "spans": [
+            [
+              "s0-phone-lowstock",
+              1.5,
+              3.5,
+              1
+            ],
+            [
+              "s0-phone-lowstock",
+              9.5,
+              21,
+              4
+            ],
+            [
+              "s0-phone-lowstock",
+              22.0,
+              22.2,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s0-phone-lowstock",
+                1.5,
+                3.5,
+                1
+              ],
+              [
+                "s0-phone-lowstock",
+                11,
+                21,
+                4
+              ],
+              [
+                "s0-phone-lowstock",
+                22.75,
+                23.0,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "The branch reports it from the phone: oil is running low.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 22.5
+        },
+        {
+          "beat": 3,
+          "duration": 11,
+          "spans": [
+            [
+              "s1-rfq",
+              8,
+              24,
+              3
+            ],
+            [
+              "s1-rfq",
+              26,
+              35,
+              3.5
+            ],
+            [
+              "s1-rfq",
+              48,
+              51,
+              3
+            ],
+            [
+              "s1-rfq",
+              52.3,
+              52.3,
+              1.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s1-rfq",
+                8,
+                24,
+                3
+              ],
+              [
+                "s1-rfq",
+                25,
+                35,
+                3.5
+              ],
+              [
+                "s1-rfq",
+                40,
+                45,
+                3
+              ],
+              [
+                "s1-rfq",
+                45.9,
+                45.9,
+                1.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Sending the same request to every supplier?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "One RFQ to three suppliers, quantities in packs.",
+                "offset": 2.5,
+                "duration": 8.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 29.5
+        },
+        {
+          "beat": 5,
+          "duration": 5,
+          "spans": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s2-quote-photo",
+                0.3,
+                4.8,
+                5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Retyping prices by hand?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "Three replies: two PDFs and a WhatsApp photo.",
+                "offset": 2.5,
+                "duration": 2.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 40.5
+        },
+        {
+          "beat": 6,
+          "duration": 12,
+          "spans": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              21.2,
+              22.7,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              24.5,
+              25.3,
+              4
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s2-quote-photo",
+                8,
+                11,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                21.2,
+                22.7,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                24.5,
+                25.3,
+                4
+              ],
+              [
+                "s2-quote-photo",
+                8.5,
+                8.5,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Items, SAR prices, VAT and validity, read automatically. The total checks out.",
+                "offset": 0,
+                "duration": 12,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 45.5
+        },
+        {
+          "beat": 7,
+          "duration": 5,
+          "spans": [
+            [
+              "s2-quote-photo",
+              25.5,
+              27.5,
+              3.2
+            ],
+            [
+              "s2r-authorised",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s2-quote-photo",
+                25.5,
+                27.5,
+                3.2
+              ],
+              [
+                "s2r-authorised",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Nothing retyped. But you sign it off.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 57.5
+        },
+        {
+          "beat": 8,
+          "duration": 11,
+          "spans": [
+            [
+              "s3c-smart-compare",
+              10.5,
+              14,
+              3
+            ],
+            [
+              "s3c-smart-compare",
+              18,
+              25,
+              5.5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s3c-smart-compare",
+                10.5,
+                14,
+                3
+              ],
+              [
+                "s3c-smart-compare",
+                18,
+                25,
+                5.5
+              ],
+              [
+                "s3c-smart-compare",
+                29,
+                29,
+                2.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Different pack sizes?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "Per pack, VAT and delivery included: Golden Crescent is SAR 40 cheaper on oil.",
+                "offset": 2.5,
+                "duration": 8.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 62.5
+        },
+        {
+          "beat": 10,
+          "duration": 10,
+          "spans": [
+            [
+              "s3-guardrail-draft",
+              6,
+              10,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              16,
+              22,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              22.6,
+              25.2,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s3-guardrail-draft",
+                6,
+                10,
+                4
+              ],
+              [
+                "s3-guardrail-draft",
+                16,
+                22,
+                4
+              ],
+              [
+                "s3-guardrail-draft",
+                22.6,
+                25.8,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Requests stuck waiting for approval?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "Your guardrails drafted the request. A draft, not a purchase.",
+                "offset": 2.5,
+                "duration": 7.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 73.5
+        },
+        {
+          "beat": 11,
+          "duration": 8,
+          "spans": [
+            [
+              "s4-phone-approve",
+              5,
+              5.5,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              2
+            ],
+            [
+              "s4-phone-approve",
+              12.4,
+              17.3,
+              3.2
+            ],
+            [
+              "s4r-approved",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s4-phone-approve",
+                5,
+                5.5,
+                1
+              ],
+              [
+                "s4-phone-approve",
+                7,
+                8,
+                2
+              ],
+              [
+                "s4-phone-approve",
+                12.4,
+                17.3,
+                3.2
+              ],
+              [
+                "s4r-approved",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "The manager approves from their phone, wherever they are.",
+                "offset": 0,
+                "duration": 8,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 83.5
+        },
+        {
+          "beat": 12,
+          "duration": 9,
+          "spans": [
+            [
+              "s5-po-savings",
+              3,
+              9,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              13,
+              20,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              2
+            ],
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s5-po-savings",
+                3,
+                9,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                13,
+                20,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                22,
+                23.2,
+                2
+              ],
+              [
+                "s5-po-savings",
+                27,
+                27,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "From the approved request, you create the PO and send it.",
+                "offset": 0,
+                "duration": 9,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 91.5
+        },
+        {
+          "beat": 13,
+          "duration": 7,
+          "spans": [
+            [
+              "s5-po-savings",
+              32,
+              35,
+              2
+            ],
+            [
+              "s5-po-savings",
+              36,
+              39,
+              3
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s5-po-savings",
+                32,
+                35,
+                2
+              ],
+              [
+                "s5-po-savings",
+                37,
+                40,
+                3
+              ],
+              [
+                "s5-po-savings",
+                44,
+                44,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "The owner asks: what did we save?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "SAR 310 saved on this order, against the last purchase price.",
+                "offset": 2.5,
+                "duration": 4.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 100.5
+        },
+        {
+          "beat": 14,
+          "duration": 6,
+          "spans": [
+            [
+              "s6-savings-close",
+              4,
+              8,
+              6
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s6-savings-close",
+                4,
+                8,
+                6
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Every saving logged and verified, ready for the owner.",
+                "offset": 0,
+                "duration": 6,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 107.5
+        },
+        {
+          "beat": "recap",
+          "duration": 6,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 113.5
+        }
+      ],
+      "langs": [
+        "en"
+      ],
+      "v25": {
+        "en": {
+          "p1": "Quotes in every format…",
+          "0": "…and every price retyped into Excel.",
+          "p3": [
+            "Chasing each supplier one by one",
+            "Comparing packs that don't match",
+            "And no idea what you saved"
+          ],
+          "turn": [
+            "for restaurant purchasing",
+            "handles all of it."
+          ],
+          "saving": [
+            "Saved on this order",
+            "against the last purchase price"
+          ],
+          "recap": {
+            "title": "Every pain, solved",
+            "rows": [
+              [
+                "Retyping prices",
+                "PDFs and photos read automatically"
+              ],
+              [
+                "One supplier at a time",
+                "One RFQ to every supplier"
+              ],
+              [
+                "Different pack sizes",
+                "Per pack, VAT and delivery included"
+              ],
+              [
+                "Slow approvals",
+                "Approval from the phone"
+              ],
+              [
+                "What did we save?",
+                "A verified savings ledger"
+              ]
+            ]
+          }
+        }
+      },
+      "money": {
+        "en": {
+          "cards": {
+            "1": "SAR 310",
+            "6": "SAR 4,790",
+            "8": "SAR 40",
+            "13": "SAR 310",
+            "14": "SAR 310"
+          },
+          "saving": 310,
+          "decimals": 0,
+          "prefix": "SAR ",
+          "suffix": "",
+          "label": "SAR"
+        }
+      },
+      "saving_at": [
+        2.5,
+        2.8
+      ]
+    },
+    "v": {
+      "body": 65.96666666666667,
+      "outro": 8.5,
+      "scenes": [
+        {
+          "beat": "p1",
+          "duration": 2.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 0
+        },
+        {
+          "beat": 0,
+          "duration": 3,
+          "spans": [
+            [
+              "opening-v",
+              0,
+              3,
+              3
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "opening-v",
+                0,
+                3,
+                3
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "…and every price retyped into Excel.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 2.5
+        },
+        {
+          "beat": "p3",
+          "duration": 3,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 5.5
+        },
+        {
+          "beat": "turn",
+          "duration": 3,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 8.5
+        },
+        {
+          "beat": 1,
+          "duration": 4,
+          "spans": [
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              1.5
+            ]
+          ],
+          "crop": [
+            300,
+            100,
+            1320,
+            900
+          ],
+          "spans_by_language": {
+            "en": [
+              [
+                "s5-po-savings",
+                27,
+                27,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                44,
+                44,
+                1.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "From a low-stock report to a sent PO, with the saving logged.",
+                "offset": 0,
+                "duration": 4,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 11.5
+        },
+        {
+          "beat": 3,
+          "duration": 5.733333333333333,
+          "spans": [
+            [
+              "s1-rfq",
+              26,
+              31,
+              2.7333333333333334
+            ],
+            [
+              "s1-rfq",
+              48,
+              51,
+              1.5
+            ],
+            [
+              "s1-rfq",
+              52.3,
+              52.3,
+              1.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s1-rfq",
+                25,
+                31,
+                2.7333333333333334
+              ],
+              [
+                "s1-rfq",
+                40,
+                45,
+                1.5
+              ],
+              [
+                "s1-rfq",
+                45.9,
+                45.9,
+                1.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "One RFQ to three suppliers, quantities in packs.",
+                "offset": 0,
+                "duration": 5.733333333333333,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 15.5
+        },
+        {
+          "beat": 5,
+          "duration": 3,
+          "spans": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              3
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s2-quote-photo",
+                0.3,
+                4.8,
+                3
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Three replies: two PDFs and a WhatsApp photo.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 21.233333333333334
+        },
+        {
+          "beat": 6,
+          "duration": 7,
+          "spans": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              2
+            ],
+            [
+              "s2-quote-photo",
+              24.5,
+              25.3,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s2-quote-photo",
+                8,
+                11,
+                2
+              ],
+              [
+                "s2-quote-photo",
+                24.5,
+                25.3,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                8.5,
+                8.5,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Items, SAR prices, VAT and validity, read automatically. The total checks out.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 24.233333333333334
+        },
+        {
+          "beat": 7,
+          "duration": 3,
+          "spans": [
+            [
+              "s2-quote-photo",
+              25.5,
+              27.5,
+              1.2
+            ],
+            [
+              "s2r-authorised",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s2-quote-photo",
+                25.5,
+                27.5,
+                1.2
+              ],
+              [
+                "s2r-authorised",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Nothing retyped. But you sign it off.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 31.233333333333334
+        },
+        {
+          "beat": 8,
+          "duration": 7,
+          "spans": [
+            [
+              "s3c-smart-compare",
+              18,
+              25,
+              5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s3c-smart-compare",
+                18,
+                25,
+                5
+              ],
+              [
+                "s3c-smart-compare",
+                29,
+                29,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Per pack, VAT and delivery included: Golden Crescent is SAR 40 cheaper on oil.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 34.233333333333334
+        },
+        {
+          "beat": 10,
+          "duration": 5,
+          "spans": [
+            [
+              "s3-guardrail-draft",
+              6,
+              10,
+              3
+            ],
+            [
+              "s3-guardrail-draft",
+              20.5,
+              23.5,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s3-guardrail-draft",
+                6,
+                10,
+                3
+              ],
+              [
+                "s3-guardrail-draft",
+                20.5,
+                23.5,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Your guardrails drafted the request. A draft, not a purchase.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 41.233333333333334
+        },
+        {
+          "beat": 11,
+          "duration": 5,
+          "spans": [
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              12.4,
+              17.3,
+              2.2
+            ],
+            [
+              "s4r-approved",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s4-phone-approve",
+                7,
+                8,
+                1
+              ],
+              [
+                "s4-phone-approve",
+                12.4,
+                17.3,
+                2.2
+              ],
+              [
+                "s4r-approved",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "The manager approves from their phone, wherever they are.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 46.233333333333334
+        },
+        {
+          "beat": 12,
+          "duration": 3.7333333333333334,
+          "spans": [
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              1.7333333333333334
+            ],
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s5-po-savings",
+                22,
+                23.2,
+                1.7333333333333334
+              ],
+              [
+                "s5-po-savings",
+                27,
+                27,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "From the approved request, you create the PO and send it.",
+                "offset": 0,
+                "duration": 3.7333333333333334,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 51.233333333333334
+        },
+        {
+          "beat": 13,
+          "duration": 6.0,
+          "spans": [
+            [
+              "s5-po-savings",
+              37,
+              40,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              44,
+              44,
+              3.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s5-po-savings",
+                37,
+                40,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                44,
+                44,
+                3.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "The owner asks: what did we save?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "SAR 310 saved on this order, against the last purchase price.",
+                "offset": 2.5,
+                "duration": 2.0,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 54.96666666666667
+        },
+        {
+          "beat": "recap",
+          "duration": 5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 60.96666666666667
+        }
+      ],
+      "langs": [
+        "en"
+      ],
+      "v25": {
+        "en": {
+          "p1": "Quotes in every format…",
+          "0": "…and every price retyped into Excel.",
+          "p3": [
+            "Chasing each supplier one by one",
+            "Comparing packs that don't match",
+            "And no idea what you saved"
+          ],
+          "turn": [
+            "for restaurant purchasing",
+            "handles all of it."
+          ],
+          "saving": [
+            "Saved on this order",
+            "against the last purchase price"
+          ],
+          "recap": {
+            "title": "Every pain, solved",
+            "rows": [
+              [
+                "Retyping prices",
+                "PDFs and photos read automatically"
+              ],
+              [
+                "One supplier at a time",
+                "One RFQ to every supplier"
+              ],
+              [
+                "Different pack sizes",
+                "Per pack, VAT and delivery included"
+              ],
+              [
+                "Slow approvals",
+                "Approval from the phone"
+              ],
+              [
+                "What did we save?",
+                "A verified savings ledger"
+              ]
+            ]
+          }
+        }
+      },
+      "money": {
+        "en": {
+          "cards": {
+            "1": "SAR 310",
+            "6": "SAR 4,790",
+            "8": "SAR 40",
+            "13": "SAR 310",
+            "14": "SAR 310"
+          },
+          "saving": 310,
+          "decimals": 0,
+          "prefix": "SAR ",
+          "suffix": "",
+          "label": "SAR"
+        }
+      },
+      "saving_at": [
+        2.5,
+        2.3
+      ]
+    }
+  },
+  "ie": {
+    "h": {
+      "body": 119.5,
+      "outro": 9.75,
+      "scenes": [
+        {
+          "beat": "p1",
+          "duration": 2.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 0
+        },
+        {
+          "beat": 0,
+          "duration": 5,
+          "spans": [
+            [
+              "opening-h",
+              0,
+              5,
+              5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "opening-h",
+                0,
+                5,
+                5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "…and every price retyped into Excel.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 2.5
+        },
+        {
+          "beat": "p3",
+          "duration": 3.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 7.5
+        },
+        {
+          "beat": "turn",
+          "duration": 3.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 11.0
+        },
+        {
+          "beat": 1,
+          "duration": 8,
+          "spans": [
+            [
+              "s5-po-savings",
+              27,
+              29,
+              4
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              4
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s5-po-savings",
+                27,
+                29,
+                4
+              ],
+              [
+                "s5-po-savings",
+                44,
+                44,
+                4
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "From a low-stock report to a sent PO, with the saving logged.",
+                "offset": 0,
+                "duration": 8,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 14.5
+        },
+        {
+          "beat": 2,
+          "duration": 7,
+          "spans": [
+            [
+              "s0-phone-lowstock",
+              1.5,
+              3.5,
+              1
+            ],
+            [
+              "s0-phone-lowstock",
+              9.5,
+              21,
+              4
+            ],
+            [
+              "s0-phone-lowstock",
+              22.0,
+              22.2,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s0-phone-lowstock",
+                1.5,
+                3.5,
+                1
+              ],
+              [
+                "s0-phone-lowstock",
+                11,
+                21,
+                4
+              ],
+              [
+                "s0-phone-lowstock",
+                22.5,
+                22.8,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "The branch reports it from the phone: oil is running low.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 22.5
+        },
+        {
+          "beat": 3,
+          "duration": 11,
+          "spans": [
+            [
+              "s1-rfq",
+              8,
+              24,
+              3
+            ],
+            [
+              "s1-rfq",
+              26,
+              35,
+              3.5
+            ],
+            [
+              "s1-rfq",
+              48,
+              51,
+              3
+            ],
+            [
+              "s1-rfq",
+              52.3,
+              52.3,
+              1.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s1-rfq",
+                8,
+                24,
+                3
+              ],
+              [
+                "s1-rfq",
+                25,
+                35,
+                3.5
+              ],
+              [
+                "s1-rfq",
+                41.5,
+                46.5,
+                3
+              ],
+              [
+                "s1-rfq",
+                47.1,
+                47.1,
+                1.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Sending the same request to every supplier?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "One RFQ to three suppliers, quantities in packs.",
+                "offset": 2.5,
+                "duration": 8.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 29.5
+        },
+        {
+          "beat": 5,
+          "duration": 5,
+          "spans": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s2-quote-photo",
+                0.3,
+                4.8,
+                5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Retyping prices by hand?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "Three replies: two PDFs and a WhatsApp photo.",
+                "offset": 2.5,
+                "duration": 2.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 40.5
+        },
+        {
+          "beat": 6,
+          "duration": 12,
+          "spans": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              21.2,
+              22.7,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              24.5,
+              25.3,
+              4
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s2-quote-photo",
+                8,
+                11,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                21.2,
+                22.7,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                24.5,
+                25.3,
+                4
+              ],
+              [
+                "s2-quote-photo",
+                8.5,
+                8.5,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Items, euro prices, VAT and validity, read automatically. The total checks out.",
+                "offset": 0,
+                "duration": 12,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 45.5
+        },
+        {
+          "beat": 7,
+          "duration": 5,
+          "spans": [
+            [
+              "s2-quote-photo",
+              25.5,
+              27.5,
+              3.2
+            ],
+            [
+              "s2r-authorised",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s2-quote-photo",
+                25.5,
+                27.5,
+                3.2
+              ],
+              [
+                "s2r-authorised",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Nothing retyped. But you sign it off.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 57.5
+        },
+        {
+          "beat": 8,
+          "duration": 11,
+          "spans": [
+            [
+              "s3c-smart-compare",
+              10.5,
+              14,
+              3
+            ],
+            [
+              "s3c-smart-compare",
+              18,
+              25,
+              5.5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s3c-smart-compare",
+                10.5,
+                14,
+                3
+              ],
+              [
+                "s3c-smart-compare",
+                18,
+                25,
+                5.5
+              ],
+              [
+                "s3c-smart-compare",
+                29,
+                29,
+                2.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Different pack sizes?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "Per pack, delivery included: Brennan & Walsh is €13 cheaper on oil.",
+                "offset": 2.5,
+                "duration": 8.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 62.5
+        },
+        {
+          "beat": 10,
+          "duration": 10,
+          "spans": [
+            [
+              "s3-guardrail-draft",
+              6,
+              10,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              16,
+              22,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              22.6,
+              25.2,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s3-guardrail-draft",
+                6,
+                10,
+                4
+              ],
+              [
+                "s3-guardrail-draft",
+                16,
+                22,
+                4
+              ],
+              [
+                "s3-guardrail-draft",
+                22.6,
+                26,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Requests stuck waiting for approval?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "Your guardrails drafted the request. A draft, not a purchase.",
+                "offset": 2.5,
+                "duration": 7.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 73.5
+        },
+        {
+          "beat": 11,
+          "duration": 8,
+          "spans": [
+            [
+              "s4-phone-approve",
+              5,
+              5.5,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              2
+            ],
+            [
+              "s4-phone-approve",
+              12.4,
+              15.6,
+              3.2
+            ],
+            [
+              "s4r-approved",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s4-phone-approve",
+                5,
+                5.5,
+                1
+              ],
+              [
+                "s4-phone-approve",
+                7,
+                8,
+                2
+              ],
+              [
+                "s4-phone-approve",
+                12.4,
+                15.6,
+                3.2
+              ],
+              [
+                "s4r-approved",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "The manager approves from their phone, wherever they are.",
+                "offset": 0,
+                "duration": 8,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 83.5
+        },
+        {
+          "beat": 12,
+          "duration": 9,
+          "spans": [
+            [
+              "s5-po-savings",
+              3,
+              9,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              13,
+              20,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              2
+            ],
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s5-po-savings",
+                3,
+                9,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                13,
+                20,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                22,
+                23.2,
+                2
+              ],
+              [
+                "s5-po-savings",
+                27,
+                27,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "From the approved request, you create the PO and send it.",
+                "offset": 0,
+                "duration": 9,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 91.5
+        },
+        {
+          "beat": 13,
+          "duration": 7,
+          "spans": [
+            [
+              "s5-po-savings",
+              32,
+              35,
+              2
+            ],
+            [
+              "s5-po-savings",
+              36,
+              39,
+              3
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s5-po-savings",
+                32,
+                35,
+                2
+              ],
+              [
+                "s5-po-savings",
+                37,
+                40,
+                3
+              ],
+              [
+                "s5-po-savings",
+                44,
+                44,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "The owner asks: what did we save?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "€53.50 saved on this order, against the last purchase price.",
+                "offset": 2.5,
+                "duration": 4.5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 100.5
+        },
+        {
+          "beat": 14,
+          "duration": 6,
+          "spans": [
+            [
+              "s6-savings-close",
+              4,
+              8,
+              6
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s6-savings-close",
+                4,
+                8,
+                6
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Every saving logged and verified, ready for the owner.",
+                "offset": 0,
+                "duration": 6,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 107.5
+        },
+        {
+          "beat": "recap",
+          "duration": 6,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 113.5
+        }
+      ],
+      "langs": [
+        "en"
+      ],
+      "v25": {
+        "en": {
+          "p1": "Quotes in every format…",
+          "0": "…and every price retyped into Excel.",
+          "p3": [
+            "Chasing each supplier one by one",
+            "Comparing packs that don't match",
+            "And no idea what you saved"
+          ],
+          "turn": [
+            "for restaurant purchasing",
+            "handles all of it."
+          ],
+          "saving": [
+            "Saved on this order",
+            "against the last purchase price"
+          ],
+          "recap": {
+            "title": "Every pain, solved",
+            "rows": [
+              [
+                "Retyping prices",
+                "PDFs and photos read automatically"
+              ],
+              [
+                "One supplier at a time",
+                "One RFQ to every supplier"
+              ],
+              [
+                "Different pack sizes",
+                "Per pack, delivery included"
+              ],
+              [
+                "Slow approvals",
+                "Approval from the phone"
+              ],
+              [
+                "What did we save?",
+                "A verified savings ledger"
+              ]
+            ]
+          }
+        }
+      },
+      "money": {
+        "en": {
+          "cards": {
+            "1": "€53.50",
+            "6": "€1,289.50",
+            "8": "€13",
+            "13": "€53.50",
+            "14": "€93.50"
+          },
+          "saving": 53.5,
+          "decimals": 2,
+          "prefix": "€",
+          "suffix": "",
+          "label": ""
+        }
+      },
+      "saving_at": [
+        2.5,
+        2.8
+      ]
+    },
+    "v": {
+      "body": 65.96666666666667,
+      "outro": 8.5,
+      "scenes": [
+        {
+          "beat": "p1",
+          "duration": 2.5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 0
+        },
+        {
+          "beat": 0,
+          "duration": 3,
+          "spans": [
+            [
+              "opening-v",
+              0,
+              3,
+              3
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "opening-v",
+                0,
+                3,
+                3
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "…and every price retyped into Excel.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 2.5
+        },
+        {
+          "beat": "p3",
+          "duration": 3,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 5.5
+        },
+        {
+          "beat": "turn",
+          "duration": 3,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 8.5
+        },
+        {
+          "beat": 1,
+          "duration": 4,
+          "spans": [
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              43,
+              43,
+              1.5
+            ]
+          ],
+          "crop": [
+            300,
+            100,
+            1320,
+            900
+          ],
+          "spans_by_language": {
+            "en": [
+              [
+                "s5-po-savings",
+                27,
+                27,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                44,
+                44,
+                1.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "From a low-stock report to a sent PO, with the saving logged.",
+                "offset": 0,
+                "duration": 4,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 11.5
+        },
+        {
+          "beat": 3,
+          "duration": 5.733333333333333,
+          "spans": [
+            [
+              "s1-rfq",
+              26,
+              31,
+              2.7333333333333334
+            ],
+            [
+              "s1-rfq",
+              48,
+              51,
+              1.5
+            ],
+            [
+              "s1-rfq",
+              52.3,
+              52.3,
+              1.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s1-rfq",
+                25,
+                31,
+                2.7333333333333334
+              ],
+              [
+                "s1-rfq",
+                41.5,
+                46.5,
+                1.5
+              ],
+              [
+                "s1-rfq",
+                47.1,
+                47.1,
+                1.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "One RFQ to three suppliers, quantities in packs.",
+                "offset": 0,
+                "duration": 5.733333333333333,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 15.5
+        },
+        {
+          "beat": 5,
+          "duration": 3,
+          "spans": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              3
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s2-quote-photo",
+                0.3,
+                4.8,
+                3
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Three replies: two PDFs and a WhatsApp photo.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 21.233333333333334
+        },
+        {
+          "beat": 6,
+          "duration": 7,
+          "spans": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              2
+            ],
+            [
+              "s2-quote-photo",
+              24.5,
+              25.3,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s2-quote-photo",
+                8,
+                11,
+                2
+              ],
+              [
+                "s2-quote-photo",
+                24.5,
+                25.3,
+                3
+              ],
+              [
+                "s2-quote-photo",
+                8.5,
+                8.5,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Items, euro prices, VAT and validity, read automatically. The total checks out.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 24.233333333333334
+        },
+        {
+          "beat": 7,
+          "duration": 3,
+          "spans": [
+            [
+              "s2-quote-photo",
+              25.5,
+              27.5,
+              1.2
+            ],
+            [
+              "s2r-authorised",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s2-quote-photo",
+                25.5,
+                27.5,
+                1.2
+              ],
+              [
+                "s2r-authorised",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Nothing retyped. But you sign it off.",
+                "offset": 0,
+                "duration": 3,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 31.233333333333334
+        },
+        {
+          "beat": 8,
+          "duration": 7,
+          "spans": [
+            [
+              "s3c-smart-compare",
+              18,
+              25,
+              5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s3c-smart-compare",
+                18,
+                25,
+                5
+              ],
+              [
+                "s3c-smart-compare",
+                29,
+                29,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Per pack, delivery included: Brennan & Walsh is €13 cheaper on oil.",
+                "offset": 0,
+                "duration": 7,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 34.233333333333334
+        },
+        {
+          "beat": 10,
+          "duration": 5,
+          "spans": [
+            [
+              "s3-guardrail-draft",
+              6,
+              10,
+              3
+            ],
+            [
+              "s3-guardrail-draft",
+              20.5,
+              23.5,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s3-guardrail-draft",
+                6,
+                10,
+                3
+              ],
+              [
+                "s3-guardrail-draft",
+                20.5,
+                23.5,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "Your guardrails drafted the request. A draft, not a purchase.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 41.233333333333334
+        },
+        {
+          "beat": 11,
+          "duration": 5,
+          "spans": [
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              12.4,
+              15.6,
+              2.2
+            ],
+            [
+              "s4r-approved",
+              0.5,
+              2.3,
+              1.8
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s4-phone-approve",
+                7,
+                8,
+                1
+              ],
+              [
+                "s4-phone-approve",
+                12.4,
+                15.6,
+                2.2
+              ],
+              [
+                "s4r-approved",
+                0.5,
+                2.3,
+                1.8
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "The manager approves from their phone, wherever they are.",
+                "offset": 0,
+                "duration": 5,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 46.233333333333334
+        },
+        {
+          "beat": 12,
+          "duration": 3.7333333333333334,
+          "spans": [
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              1.7333333333333334
+            ],
+            [
+              "s5-po-savings",
+              27,
+              27,
+              2
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s5-po-savings",
+                22,
+                23.2,
+                1.7333333333333334
+              ],
+              [
+                "s5-po-savings",
+                27,
+                27,
+                2
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "From the approved request, you create the PO and send it.",
+                "offset": 0,
+                "duration": 3.7333333333333334,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 51.233333333333334
+        },
+        {
+          "beat": 13,
+          "duration": 6.0,
+          "spans": [
+            [
+              "s5-po-savings",
+              37,
+              40,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              44,
+              44,
+              3.5
+            ]
+          ],
+          "crop": null,
+          "spans_by_language": {
+            "en": [
+              [
+                "s5-po-savings",
+                37,
+                40,
+                2.5
+              ],
+              [
+                "s5-po-savings",
+                44,
+                44,
+                3.5
+              ]
+            ]
+          },
+          "cards_by_language": {
+            "en": [
+              {
+                "text": "The owner asks: what did we save?",
+                "offset": 0,
+                "duration": 2.5,
+                "role": "pain"
+              },
+              {
+                "text": "€53.50 saved on this order, against the last purchase price.",
+                "offset": 2.5,
+                "duration": 2.0,
+                "role": "fix"
+              }
+            ]
+          },
+          "start": 54.96666666666667
+        },
+        {
+          "beat": "recap",
+          "duration": 5,
+          "spans": [],
+          "crop": null,
+          "spans_by_language": {
+            "en": []
+          },
+          "cards_by_language": {},
+          "start": 60.96666666666667
+        }
+      ],
+      "langs": [
+        "en"
+      ],
+      "v25": {
+        "en": {
+          "p1": "Quotes in every format…",
+          "0": "…and every price retyped into Excel.",
+          "p3": [
+            "Chasing each supplier one by one",
+            "Comparing packs that don't match",
+            "And no idea what you saved"
+          ],
+          "turn": [
+            "for restaurant purchasing",
+            "handles all of it."
+          ],
+          "saving": [
+            "Saved on this order",
+            "against the last purchase price"
+          ],
+          "recap": {
+            "title": "Every pain, solved",
+            "rows": [
+              [
+                "Retyping prices",
+                "PDFs and photos read automatically"
+              ],
+              [
+                "One supplier at a time",
+                "One RFQ to every supplier"
+              ],
+              [
+                "Different pack sizes",
+                "Per pack, delivery included"
+              ],
+              [
+                "Slow approvals",
+                "Approval from the phone"
+              ],
+              [
+                "What did we save?",
+                "A verified savings ledger"
+              ]
+            ]
+          }
+        }
+      },
+      "money": {
+        "en": {
+          "cards": {
+            "1": "€53.50",
+            "6": "€1,289.50",
+            "8": "€13",
+            "13": "€53.50",
+            "14": "€93.50"
+          },
+          "saving": 53.5,
+          "decimals": 2,
+          "prefix": "€",
+          "suffix": "",
+          "label": ""
+        }
+      },
+      "saving_at": [
+        2.5,
+        2.3
+      ]
+    }
+  }
+}

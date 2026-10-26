@@ -1,0 +1,18 @@
+# Inputs and build outputs; never committed (raw clips show the owner's email until masked).
+raw/
+masked/
+plates/
+tex/
+fonts/
+data.js
+frames-*/
+proof/
+sheets/
+tmp/
+*.wav
+*.mp4
+
+audio/
+__pycache__/
+plates-*
+fonts
