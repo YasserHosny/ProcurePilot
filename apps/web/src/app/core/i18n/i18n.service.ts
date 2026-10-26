@@ -8,13 +8,22 @@ import type { Locale, Me } from '../api/models';
 import { SessionService } from '../auth/session.service';
 import { DirectionService } from './direction.service';
 
-const LOCALE_STORAGE_KEY = 'pp.locale';
+export const LOCALE_STORAGE_KEY = 'pp.locale';
+export const LOCALE_CHOSEN_STORAGE_KEY = 'pp.locale.chosen';
 
 export const I18N_LOCATION_SEARCH = new InjectionToken<() => string>(
   'I18N_LOCATION_SEARCH',
   {
     providedIn: 'root',
     factory: () => () => (typeof window !== 'undefined' ? window.location.search : ''),
+  },
+);
+
+export const I18N_LOCATION_PATHNAME = new InjectionToken<() => string>(
+  'I18N_LOCATION_PATHNAME',
+  {
+    providedIn: 'root',
+    factory: () => () => (typeof window !== 'undefined' ? window.location.pathname : ''),
   },
 );
 
@@ -40,6 +49,9 @@ export class I18nService {
   private readonly getLocationSearch =
     inject(I18N_LOCATION_SEARCH, { optional: true }) ??
     (() => (typeof window !== 'undefined' ? window.location.search : ''));
+  private readonly getLocationPathname =
+    inject(I18N_LOCATION_PATHNAME, { optional: true }) ??
+    (() => (typeof window !== 'undefined' ? window.location.pathname : ''));
 
   private readonly localeSignal = signal<Locale>('en');
 
@@ -54,10 +66,25 @@ export class I18nService {
     this.translate.setFallbackLang('en');
 
     const queryLocale = parseQueryLocale(this.getLocationSearch());
-    const storedLocale = (localStorage.getItem(LOCALE_STORAGE_KEY) as Locale | null) ?? 'en';
-    const initialLocale =
-      queryLocale ??
-      (this.session.isAuthenticated() ? this.session.activeLocale() : storedLocale);
+    let initialLocale: Locale;
+
+    if (queryLocale) {
+      localStorage.setItem(LOCALE_CHOSEN_STORAGE_KEY, queryLocale);
+      initialLocale = queryLocale;
+    } else if (this.session.isAuthenticated()) {
+      initialLocale = this.session.activeLocale();
+    } else {
+      const pathname = this.getLocationPathname();
+      const isDefaultArabicRoute =
+        pathname === '/' || pathname === '' || pathname === '/auth/sign-in';
+      if (isDefaultArabicRoute) {
+        const chosen = localStorage.getItem(LOCALE_CHOSEN_STORAGE_KEY) as Locale | null;
+        initialLocale = chosen === 'en' || chosen === 'ar' ? chosen : 'ar';
+      } else {
+        const stored = localStorage.getItem(LOCALE_STORAGE_KEY) as Locale | null;
+        initialLocale = stored === 'ar' || stored === 'en' ? stored : 'en';
+      }
+    }
 
     this.applyLocale(initialLocale);
 
@@ -97,6 +124,7 @@ export class I18nService {
     // Claim the choice before applying it: the server round-trip below is asynchronous, and
     // without this the session effect would still be holding the old value.
     this.lastSessionLocale = locale;
+    localStorage.setItem(LOCALE_CHOSEN_STORAGE_KEY, locale);
     this.applyLocale(locale);
 
     if (persistToServer && this.session.isAuthenticated()) {

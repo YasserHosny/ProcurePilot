@@ -1,7 +1,39 @@
 import { defineConfig, devices } from '@playwright/test';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 export const authFile = join(__dirname, 'tests', 'e2e', '.auth', 'owner.json');
+export const baseStorageStateFile = join(__dirname, 'tests', 'e2e', '.auth', 'base-locale.json');
+
+const baseURL = process.env['E2E_BASE_URL'] ?? 'http://localhost:4200';
+
+export function createBaseStorageState(originUrl: string = baseURL): {
+  cookies: never[];
+  origins: { origin: string; localStorage: { name: string; value: string }[] }[];
+} {
+  return {
+    cookies: [],
+    origins: [
+      {
+        origin: new URL(originUrl).origin,
+        localStorage: [
+          { name: 'pp.locale', value: 'en' },
+          { name: 'pp.locale.chosen', value: 'en' },
+        ],
+      },
+    ],
+  };
+}
+
+// Ensure the base storage state file exists before Playwright starts workers/projects
+if (!existsSync(baseStorageStateFile)) {
+  try {
+    mkdirSync(dirname(baseStorageStateFile), { recursive: true });
+    writeFileSync(baseStorageStateFile, JSON.stringify(createBaseStorageState(baseURL), null, 2));
+  } catch {
+    // Ignore static analysis write errors
+  }
+}
 
 /**
  * End-to-end configuration.
@@ -43,21 +75,21 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         channel: 'chrome',
+        storageState: baseStorageStateFile,
       },
     },
     {
-      // No storageState here: setting it project-wide would silently hand the shared owner's
-      // session (and its cached locale) to every spec using this project, including the ~20
-      // that were never meant to touch it (found the hard way — rtl.spec.ts's own
-      // "should render in English and LTR by default" test started failing because the
-      // shared owner's leftover Arabic localStorage got preloaded into its supposedly-fresh,
-      // unauthenticated context). Only approval-queue.spec.ts and
-      // purchase-request-submission.spec.ts opt in, via their own `test.use({ storageState })`.
+      // No auth storageState here: setting it project-wide would silently hand the shared owner's
+      // session to every spec using this project.
+      // Only approval-queue.spec.ts and purchase-request-submission.spec.ts opt in, via their own `test.use({ storageState })`.
+      // The baseStorageStateFile supplies 'pp.locale'='en' and 'pp.locale.chosen'='en' so unauthenticated
+      // English E2E flows start in English without inheriting an authenticated session.
       name: 'chrome',
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],
         channel: 'chrome',
+        storageState: baseStorageStateFile,
       },
     },
   ],

@@ -15,6 +15,12 @@ setup('authenticate shared owner once', async ({ page }) => {
   await page.waitForURL('**/home');
   await expect(page).toHaveURL(/\/home$/);
 
+  // Ensure authenticated storage state explicitly carries English locale preference
+  await page.evaluate(() => {
+    localStorage.setItem('pp.locale', 'en');
+    localStorage.setItem('pp.locale.chosen', 'en');
+  });
+
   await mkdir(dirname(authFile), { recursive: true });
   await page.context().storageState({ path: authFile });
 });

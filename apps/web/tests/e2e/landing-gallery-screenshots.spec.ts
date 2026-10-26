@@ -241,12 +241,14 @@ test.describe('PPS-36 landing gallery: synthetic Cairo restaurant procurement', 
         await page.clock.setFixedTime(new Date('2026-10-22T09:00:00Z'));
         // Restore the real API-issued session in memory. No password enters the browser,
         // and captures do not require repeated rate-limited login requests.
-        await page.addInitScript(({ origin, accessToken, refreshToken }) => {
+        await page.addInitScript(({ origin, accessToken, refreshToken, locale }) => {
           if (location.origin === origin) {
             localStorage.setItem('pp.access_token', accessToken);
             localStorage.setItem('pp.refresh_token', refreshToken);
+            localStorage.setItem('pp.locale', locale);
+            localStorage.setItem('pp.locale.chosen', locale);
           }
-        }, { origin: new URL(WEB).origin, accessToken: state.token, refreshToken: state.refreshToken });
+        }, { origin: new URL(WEB).origin, accessToken: state.token, refreshToken: state.refreshToken, locale });
         await page.goto('/home');
         await expect(page.locator('html')).toHaveAttribute('dir', locale === 'ar' ? 'rtl' : 'ltr');
         // Real navigation control: retain the application toolbar and give its tables space.

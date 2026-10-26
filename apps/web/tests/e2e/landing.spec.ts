@@ -18,6 +18,10 @@ import { test, expect } from '@playwright/test';
  */
 test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
   test('unauthenticated "/" displays the landing page without redirecting', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('pp.locale', 'en');
+      localStorage.setItem('pp.locale.chosen', 'en');
+    });
     await page.goto('/');
 
     // Verify URL remains "/" and does not redirect to /auth/sign-in
@@ -45,6 +49,32 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
     const ironSysLinks = page.locator('a[href="https://www.iron-sys.com/"]');
     await expect(ironSysLinks.first()).toHaveAttribute('rel', /noopener/);
     await expect(ironSysLinks.first()).toHaveAttribute('target', '_blank');
+  });
+
+  test.describe('fresh visitor defaults without explicit choice', () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test('unauthenticated "/" defaults to Arabic in RTL without query param', async ({ page }) => {
+      await page.goto('/');
+
+      await expect(page).toHaveURL(/\/$/);
+      const html = page.locator('html');
+      await expect(html).toHaveAttribute('dir', 'rtl');
+      await expect(html).toHaveAttribute('lang', 'ar');
+
+      const headline = page.locator('.hero-headline');
+      await expect(headline).toBeVisible();
+      await expect(headline).toContainText('كل سعر من مورديك، موثَّق بعرض السعر الذي جاء منه.');
+    });
+
+    test('unauthenticated "/auth/sign-in" defaults to Arabic in RTL without query param', async ({ page }) => {
+      await page.goto('/auth/sign-in');
+
+      await expect(page).toHaveURL(/\/auth\/sign-in$/);
+      const html = page.locator('html');
+      await expect(html).toHaveAttribute('dir', 'rtl');
+      await expect(html).toHaveAttribute('lang', 'ar');
+    });
   });
 
   test('five tabs render and clicking step 2 selects it and changes the image src to 02-smart-compare.jpg', async ({ page }) => {
@@ -122,6 +152,7 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
     await page.goto('/');
     await page.evaluate(() => {
       localStorage.setItem('pp.locale', 'ar');
+      localStorage.setItem('pp.locale.chosen', 'ar');
     });
     await page.reload();
 
@@ -145,6 +176,7 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
     test(`the full landing page has no WCAG 2.1 AA violations in ${locale}`, async ({ page }) => {
       await page.addInitScript((initialLocale) => {
         localStorage.setItem('pp.locale', initialLocale);
+        localStorage.setItem('pp.locale.chosen', initialLocale);
       }, locale);
       await page.goto('/');
 
@@ -167,6 +199,7 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
       await page.setViewportSize({ width: 375, height: 812 });
       await page.addInitScript((initialLocale) => {
         localStorage.setItem('pp.locale', initialLocale);
+        localStorage.setItem('pp.locale.chosen', initialLocale);
       }, locale);
       await page.goto('/');
 
@@ -189,6 +222,7 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
       await page.setViewportSize({ width: 375, height: 812 });
       await page.addInitScript((initialLocale) => {
         localStorage.setItem('pp.locale', initialLocale);
+        localStorage.setItem('pp.locale.chosen', initialLocale);
       }, locale);
       await page.goto('/');
 
@@ -231,6 +265,10 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
   });
 
   test('Enlarge opens a dialog named by caption, runs axe scan, and Escape closes it returning focus', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('pp.locale', 'en');
+      localStorage.setItem('pp.locale.chosen', 'en');
+    });
     await page.goto('/');
 
     const enlargeBtn = page.locator('.gallery-enlarge-btn');
@@ -287,6 +325,7 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
     await page.goto('/');
     await page.evaluate(() => {
       localStorage.setItem('pp.locale', 'ar');
+      localStorage.setItem('pp.locale.chosen', 'ar');
     });
     await page.reload();
 
@@ -300,6 +339,10 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
   });
 
   test('toggles language between EN and Arabic on public pages', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('pp.locale', 'en');
+      localStorage.setItem('pp.locale.chosen', 'en');
+    });
     await page.goto('/');
 
     const html = page.locator('html');
