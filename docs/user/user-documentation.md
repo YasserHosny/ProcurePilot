@@ -101,6 +101,8 @@ The email's link opens **Choose a new password** (`/auth/update-password`). Ente
 
 Workspace creation is invitation-gated during the pilot programme. The form captures the platform invitation token, business name, owner email, password, operating region, primary currency, tax model, and default locale; successful completion creates the isolated tenant and first owner account, then takes you to a **Plan Confirmation** screen (`/onboarding/plan`) before entering the workspace.
 
+Under the **Create Workspace & Sign In** button, a notice says that creating an account means agreeing to the **Terms of Service** (`/terms`) and acknowledging the **Privacy Policy** (`/privacy`). Both links open in a new tab and need no sign-in.
+
 ### Accept invitation
 
 **Route:** `/onboarding/accept-invitation?token=...`
@@ -108,6 +110,8 @@ Workspace creation is invitation-gated during the pilot programme. The form capt
 ![Accept Invitation](screenshots/01d-accept-invitation.jpg)
 
 Invited members arrive here from their email link. The token identifies the pending invitation, then the user signs in or creates credentials before being added to the workspace with the role assigned by the owner.
+
+When the invitation is for a new account, the same Terms of Service and Privacy Policy notice appears under the submit button. It is not shown to people who sign in with an existing account.
 
 ### Plan Confirmation
 
