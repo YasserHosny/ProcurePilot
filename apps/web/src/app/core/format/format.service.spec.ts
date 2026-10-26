@@ -50,21 +50,63 @@ describe('FormatService (T069)', () => {
       const result = service.formatMoney({ amount: 'invalid', currency: 'USD' });
       expect(result).toContain('USD');
     });
+
+    it('displays negative zero and sub-cent negative as zero with no minus sign', () => {
+      const zeroExpected = service.formatMoney({ amount: '0', currency: 'SAR' }, 'en');
+      const negZero = service.formatMoney({ amount: '-0.0000', currency: 'SAR' }, 'en');
+      const subCent = service.formatMoney({ amount: '-0.0020', currency: 'SAR' }, 'en');
+      const justUnderHalfCent = service.formatMoney({ amount: '-0.0049', currency: 'SAR' }, 'en');
+      expect(negZero).not.toContain('-');
+      expect(negZero).toBe(zeroExpected);
+      expect(subCent).not.toContain('-');
+      expect(subCent).toBe(zeroExpected);
+      expect(justUnderHalfCent).not.toContain('-');
+      expect(justUnderHalfCent).toBe(zeroExpected);
+
+      const halfCentNegative = service.formatMoney({ amount: '-0.0050', currency: 'SAR' }, 'en');
+      expect(halfCentNegative).toBe(
+        service.formatMoney({ amount: '-0.01', currency: 'SAR' }, 'en'),
+      );
+      expect(halfCentNegative).toContain('-');
+      expect(halfCentNegative).toContain('0.01');
+    });
   });
 
-  describe('formatCurrencyAmount (0–2 fraction digits, locale-aware)', () => {
-    it('formats money with thousands separators and 0–2 fraction digits in en', () => {
+  describe('formatCurrencyAmount (0 or 2 fraction digits, locale-aware)', () => {
+    it('formats money with thousands separators and 0 or 2 fraction digits in en', () => {
       translate.use('en');
       expect(service.formatCurrencyAmount({ amount: '56425.0000', currency: 'EGP' })).toBe(
         'EGP 56,425',
       );
       expect(service.formatCurrencyAmount({ amount: '56425.5000', currency: 'EGP' })).toBe(
-        'EGP 56,425.5',
+        'EGP 56,425.50',
       );
       expect(service.formatCurrencyAmount({ amount: '56425.5500', currency: 'EGP' })).toBe(
         'EGP 56,425.55',
       );
+      expect(formatCurrencyAmount({ amount: '1289.5000', currency: 'EUR' }, 'en')).toBe(
+        'EUR 1,289.50',
+      );
       expect(formatCurrencyAmount({ amount: '500.0000', currency: 'GBP' }, 'en')).toBe('GBP 500');
+    });
+
+    it('formats negative zero and sub-cent negative as zero without minus sign, and half-cent as negative one-cent', () => {
+      expect(service.formatCurrencyAmount({ amount: '-0.0000', currency: 'SAR' }, 'en')).toBe(
+        'SAR 0',
+      );
+      expect(service.formatCurrencyAmount({ amount: '-0.0020', currency: 'SAR' }, 'en')).toBe(
+        'SAR 0',
+      );
+      expect(service.formatCurrencyAmount({ amount: '-0.0049', currency: 'SAR' }, 'en')).toBe(
+        'SAR 0',
+      );
+      expect(service.formatCurrencyAmount({ amount: '-0.0050', currency: 'SAR' }, 'en')).toBe(
+        'SAR -0.01',
+      );
+      expect(formatCurrencyAmount({ amount: '-0.0000', currency: 'SAR' }, 'en')).toBe('SAR 0');
+      expect(formatCurrencyAmount({ amount: '-0.0020', currency: 'SAR' }, 'en')).toBe('SAR 0');
+      expect(formatCurrencyAmount({ amount: '-0.0049', currency: 'SAR' }, 'en')).toBe('SAR 0');
+      expect(formatCurrencyAmount({ amount: '-0.0050', currency: 'SAR' }, 'en')).toBe('SAR -0.01');
     });
 
     it('formats money with Arabic-Indic digits when active ngx-translate language is ar', () => {

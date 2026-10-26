@@ -44,7 +44,7 @@ export function getBaselinePolicyClass(policy: BaselinePolicy): string {
 export function getDeltaClass(delta: Money | null | undefined): 'positive-delta' | 'negative-delta' | 'zero-delta' {
   if (!delta || !delta.amount) return 'zero-delta';
   const val = parseFloat(delta.amount);
-  if (isNaN(val) || Math.abs(val) < 0.0001) return 'zero-delta';
+  if (isNaN(val) || Math.abs(val) < 0.005) return 'zero-delta';
   if (val > 0) return 'positive-delta';
   return 'negative-delta';
 }
@@ -52,11 +52,11 @@ export function getDeltaClass(delta: Money | null | undefined): 'positive-delta'
 export function isPositiveSaving(delta: Money | null | undefined): boolean {
   if (!delta || !delta.amount) return false;
   const val = parseFloat(delta.amount);
-  return !isNaN(val) && val > 0.0001;
+  return !isNaN(val) && val >= 0.005;
 }
 
 export function isNegativeSaving(delta: Money | null | undefined): boolean {
   if (!delta || !delta.amount) return false;
   const val = parseFloat(delta.amount);
-  return !isNaN(val) && val < -0.0001;
+  return !isNaN(val) && val <= -0.005;
 }

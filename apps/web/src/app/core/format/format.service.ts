@@ -98,7 +98,7 @@ export function formatExactQuantity(
 
 /**
  * Pure locale-aware money formatter with explicit currency code, thousands separators,
- * 0-2 fraction digits (e.g. `EGP 56,425`, `EGP 56,425.5`), and Arabic-Indic digits for 'ar'.
+ * 0 or 2 fraction digits (e.g. `EGP 56,425`, `EGP 56,425.50`), and Arabic-Indic digits for 'ar'.
  */
 export function formatCurrencyAmount(
   value: MoneyLike | null | undefined,
@@ -113,9 +113,16 @@ export function formatCurrencyAmount(
     return `— ${value.currency}`;
   }
 
-  const formattedNumber = formatLocaleNumber(numAmount, locale, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+  const isZero = Math.abs(numAmount) < 0.005;
+  const normalizedAmount = isZero ? 0 : numAmount;
+  const rounded = isZero
+    ? 0
+    : (Math.sign(normalizedAmount) * Math.round(Math.abs(normalizedAmount) * 100)) / 100;
+  const fractionDigits = Number.isInteger(rounded) ? 0 : 2;
+
+  const formattedNumber = formatLocaleNumber(normalizedAmount, locale, {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   });
   return `${value.currency} ${formattedNumber}`;
 }
@@ -158,6 +165,9 @@ export class FormatService {
       return `— ${value.currency}`;
     }
 
+    const isZero = Math.abs(numAmount) < 0.005;
+    const normalizedAmount = isZero ? 0 : numAmount;
+
     const locale = this.resolveLocale(localeOverride);
 
     try {
@@ -168,9 +178,9 @@ export class FormatService {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
         ...(isArabicLocale(locale) ? { numberingSystem: 'arab' } : {}),
-      }).format(numAmount);
+      }).format(normalizedAmount);
     } catch {
-      const formattedNumber = numAmount.toLocaleString(locale, {
+      const formattedNumber = normalizedAmount.toLocaleString(locale, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
@@ -180,7 +190,7 @@ export class FormatService {
 
   /**
    * Formats a monetary value with explicit currency code, thousands separators,
-   * 0-2 fraction digits (`EGP 56,425`; `EGP 56,425.5`), and Arabic-Indic digits for `ar`.
+   * 0 or 2 fraction digits (`EGP 56,425`; `EGP 56,425.50`), and Arabic-Indic digits for `ar`.
    */
   formatCurrencyAmount(
     value: MoneyLike | null | undefined,

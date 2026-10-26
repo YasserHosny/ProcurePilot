@@ -449,7 +449,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
   });
 
   it('should display the estimate for a line with price history', () => {
-    expect(component.formatEstimate(mockRequest.lines[0])).toBe('GBP 25.5');
+    expect(component.formatEstimate(mockRequest.lines[0])).toBe('GBP 25.50');
   });
 
   it('should display a fallback for a line without price history', () => {
