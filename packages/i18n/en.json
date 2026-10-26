@@ -4099,5 +4099,133 @@
       "signIn": "Sign in",
       "copyright": "© 2026 ProcurePilot. All rights reserved."
     }
+  },
+  "legal": {
+    "updated": "Last updated: 26 October 2026",
+    "backHome": "Back to ProcurePilot",
+    "links": {
+      "privacy": "Privacy",
+      "terms": "Terms"
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "intro": "ProcurePilot is a purchasing product built and run by Iron Systems (\"we\", \"us\"). This policy explains what information ProcurePilot handles, why, who helps us process it, and the choices you have.",
+      "sections": {
+        "s01": {
+          "heading": "Who is responsible",
+          "p1": "Your organisation decides what purchasing information goes into its ProcurePilot workspace and is responsible for it; we process that information on your organisation's behalf to provide the service. For account details and our own business contacts, Iron Systems is responsible.",
+          "p2": "Questions about privacy: privacy@iron-sys.com."
+        },
+        "s02": {
+          "heading": "What we collect",
+          "p1": "Account details: name, work email, role and the workspace you belong to.",
+          "p2": "Purchasing information your team enters or sends in: suppliers and their contact emails, products, prices, quotations, requests, approvals, purchase orders, deliveries and savings records.",
+          "p3": "Documents: quotations and other files you upload, photos taken in the mobile app, and supplier emails sent to your workspace's inbound address.",
+          "p4": "Technical information: sign-in and security events, an audit trail of changes in your workspace, device registration for the mobile app, and error reports that help us fix faults."
+        },
+        "s03": {
+          "heading": "How we use it",
+          "p1": "To provide ProcurePilot: read quotations, compare offers, prepare requests for human approval, send requests for quotation to the suppliers you choose, and report savings.",
+          "p2": "To keep the service secure and working, to support you when you contact us, and to meet legal obligations. We do not sell your information and we do not use it for advertising."
+        },
+        "s04": {
+          "heading": "Artificial intelligence",
+          "p1": "ProcurePilot uses AI services to read quotation documents, match products and answer questions about your own data. Results are shown for a person to check; ProcurePilot never places an order on its own.",
+          "p2": "We do not use your data to train AI models, and we use these services under terms that do not allow the provider to train on your data."
+        },
+        "s05": {
+          "heading": "Who helps us",
+          "p1": "We use a small number of providers to run ProcurePilot, under agreements that limit them to processing on our instructions: Supabase (database, sign-in and file storage, hosted on Amazon Web Services in Ireland), bunny.net (application hosting), Amazon Web Services Bedrock (AI models, United States), Microsoft Azure AI Document Intelligence (document reading), Mailgun (sending and receiving email) and Sentry (error reports).",
+          "p2": "Some of these providers process information outside your country. Where this happens we rely on their contractual and security commitments."
+        },
+        "s06": {
+          "heading": "How we protect it",
+          "p1": "Every workspace's data is kept separate by rules enforced in the database itself, so one organisation cannot see another's. Connections are encrypted, stored data is encrypted by our providers, access is limited to people who need it, and important changes are recorded in an audit trail that cannot be edited."
+        },
+        "s07": {
+          "heading": "How long we keep it",
+          "p1": "We keep workspace data while your organisation uses ProcurePilot. When the subscription or pilot ends, we return it on request and delete it within 90 days, unless the law requires us to keep part of it longer. Backups are overwritten on a rolling schedule."
+        },
+        "s08": {
+          "heading": "Your rights",
+          "p1": "Depending on where you are, you may ask to access, correct, export or delete your personal information, or object to how it is used. For information in a workspace, your organisation's workspace owner can usually help first; you can also write to privacy@iron-sys.com. You may complain to your data protection authority."
+        },
+        "s09": {
+          "heading": "Cookies and browser storage",
+          "p1": "ProcurePilot stores only what it needs in your browser to keep you signed in and remember your language. We do not use advertising or third-party tracking cookies."
+        },
+        "s10": {
+          "heading": "Changes and contact",
+          "p1": "We will update this page when our practices change and show the date at the top. Contact: privacy@iron-sys.com for privacy, security@iron-sys.com to report a security issue, and support@iron-sys.com for help with the product."
+        }
+      }
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "intro": "These terms apply when your organisation uses ProcurePilot, a purchasing product provided by Iron Systems. Any order form or pilot agreement signed with your organisation takes precedence over these terms where they differ.",
+      "sections": {
+        "s01": {
+          "heading": "The service",
+          "p1": "ProcurePilot helps purchasing teams collect supplier quotations, compare offers, route requests for approval, issue purchase orders and record savings. We may improve and change features over time."
+        },
+        "s02": {
+          "heading": "Pilots and trials",
+          "p1": "Pilot access is by invitation and free for the agreed pilot period. During a pilot the service is provided as it is, and features may change."
+        },
+        "s03": {
+          "heading": "Accounts",
+          "p1": "Your organisation is responsible for who it invites, for the roles it gives them and for keeping sign-in details safe. Tell us promptly at security@iron-sys.com if you suspect unauthorised access."
+        },
+        "s04": {
+          "heading": "Your data",
+          "p1": "Your organisation owns the information it puts into ProcurePilot. You allow us to process it only to provide, secure and support the service, as described in our Privacy Policy. You can export your data while you use the service."
+        },
+        "s05": {
+          "heading": "Human decisions",
+          "p1": "ProcurePilot prepares information and recommendations; people in your organisation make and authorise every purchasing decision. AI-read figures and recommendations should be checked before you rely on them. Requests for quotation are sent to suppliers on your organisation's behalf."
+        },
+        "s06": {
+          "heading": "Acceptable use",
+          "p1": "Do not use ProcurePilot to break the law, to send unsolicited messages, to upload content you have no right to share, or to try to access another organisation's data or disrupt the service."
+        },
+        "s07": {
+          "heading": "Fees",
+          "p1": "Paid plans are charged as set out in your order form. Pilot periods are free unless agreed otherwise in writing."
+        },
+        "s08": {
+          "heading": "Confidentiality and ownership",
+          "p1": "We keep your organisation's information confidential. Iron Systems keeps all rights in ProcurePilot itself, including its software, design and documentation."
+        },
+        "s09": {
+          "heading": "Liability",
+          "p1": "To the extent the law allows, we are not liable for indirect or consequential losses, and our total liability is limited to the fees your organisation paid for ProcurePilot in the 12 months before the claim. Nothing in these terms limits liability that cannot be limited by law."
+        },
+        "s10": {
+          "heading": "Ending use",
+          "p1": "Your organisation may stop using ProcurePilot at any time. We may suspend access that breaks these terms. When use ends, we return your data on request and delete it as described in the Privacy Policy."
+        },
+        "s11": {
+          "heading": "Law and contact",
+          "p1": "These terms are governed by the laws of the Arab Republic of Egypt, and the courts of Cairo have jurisdiction, unless your agreement with us says otherwise. We will update this page when the terms change. Questions: support@iron-sys.com."
+        }
+      }
+    }
+  },
+  "about": {
+    "title": "Help & about",
+    "productByPrefix": "ProcurePilot by",
+    "companyName": "Iron Systems",
+    "companyLink": "www.iron-sys.com",
+    "support": "Contact support",
+    "supportHint": "Questions or problems with ProcurePilot",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "version": "Version {{version}}"
+  },
+  "emails": {
+    "footer": {
+      "sentWith": "Sent with ProcurePilot by Iron Systems",
+      "website": "www.iron-sys.com"
+    }
   }
 }
