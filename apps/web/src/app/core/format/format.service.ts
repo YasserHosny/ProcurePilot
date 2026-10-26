@@ -22,6 +22,33 @@ function buildNumberFormatOptions(
 }
 
 /**
+ * Returns the currency symbol for display in user-facing text.
+ * For Arabic locales, extracts the Intl currency part without trailing dot or directional marks.
+ * For other locales, returns the ISO 4217 currency code.
+ * Falls back to the raw code if Intl does not recognize it.
+ */
+export function currencySymbol(currency: string, locale = 'en'): string {
+  if (!currency) return '';
+  if (!isArabicLocale(locale)) {
+    return currency;
+  }
+  try {
+    const parts = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+    }).formatToParts(1);
+    const currPart = parts.find(p => p.type === 'currency');
+    if (!currPart) return currency;
+    let s = currPart.value;
+    s = s.replace(/[\u200E\u200F\u061C]/g, '');
+    s = s.replace(/\.+$/, '');
+    return s.trim();
+  } catch {
+    return currency;
+  }
+}
+
+/**
  * Pure locale-aware number/quantity formatter: thousands separators, 0-2 fraction digits,
  * and Arabic-Indic digits when locale is 'ar'.
  */
@@ -110,7 +137,8 @@ export function formatCurrencyAmount(
 
   const numAmount = typeof value.amount === 'number' ? value.amount : parseFloat(value.amount);
   if (isNaN(numAmount)) {
-    return `— ${value.currency}`;
+    const symbol = isArabicLocale(locale) ? currencySymbol(value.currency, locale) : value.currency;
+    return `— ${symbol}`;
   }
 
   const isZero = Math.abs(numAmount) < 0.005;
@@ -124,6 +152,12 @@ export function formatCurrencyAmount(
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   });
+
+  if (isArabicLocale(locale)) {
+    const symbol = currencySymbol(value.currency, locale);
+    return `${formattedNumber} ${symbol}`;
+  }
+
   return `${value.currency} ${formattedNumber}`;
 }
 
@@ -144,6 +178,10 @@ export class FormatService {
     }
     const active = this.translate?.getCurrentLang() || this.translate?.getFallbackLang();
     return active || 'en';
+  }
+
+  currencySymbol(currency: string, localeOverride?: string): string {
+    return currencySymbol(currency, this.resolveLocale(localeOverride));
   }
 
   /**

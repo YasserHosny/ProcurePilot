@@ -17,6 +17,8 @@ import type {
   QuotationDetail,
   QuotationLine,
 } from '../../../core/api/models';
+import { CurrencySymbolPipe } from '../../../core/format/currency-symbol.pipe';
+import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 
 @Component({
   selector: 'app-quotation-lines',
@@ -32,6 +34,8 @@ import type {
     MatInputModule,
     MatTooltipModule,
     TranslatePipe,
+    FormatMoneyPipe,
+    CurrencySymbolPipe,
   ],
   templateUrl: './quotation-lines.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,

@@ -5,6 +5,7 @@ import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import {
   FormatService,
+  currencySymbol,
   formatCurrencyAmount,
   formatExactQuantity,
   formatLocaleNumber,
@@ -25,6 +26,25 @@ describe('FormatService (T069)', () => {
     });
     service = TestBed.inject(FormatService);
     translate = TestBed.inject(TranslateService);
+  });
+
+  describe('currencySymbol', () => {
+    it('returns Arabic currency symbols for Arabic locales and ISO code for others (PPS-84)', () => {
+      expect(currencySymbol('EGP', 'ar')).toBe('ج.م');
+      expect(currencySymbol('SAR', 'ar')).toBe('ر.س');
+      expect(currencySymbol('EUR', 'ar')).toBe('€');
+      expect(currencySymbol('USD', 'ar')).toBe('US$');
+      expect(currencySymbol('EGP', 'en')).toBe('EGP');
+      expect(currencySymbol('SAR', 'en')).toBe('SAR');
+      expect(currencySymbol('XYZ', 'ar')).toBe('XYZ');
+    });
+
+    it('resolves active locale through FormatService.currencySymbol', () => {
+      translate.use('ar');
+      expect(service.currencySymbol('EGP')).toBe('ج.م');
+      translate.use('en');
+      expect(service.currencySymbol('EGP')).toBe('EGP');
+    });
   });
 
   describe('formatMoney', () => {
@@ -109,18 +129,27 @@ describe('FormatService (T069)', () => {
       expect(formatCurrencyAmount({ amount: '-0.0050', currency: 'SAR' }, 'en')).toBe('SAR -0.01');
     });
 
-    it('formats money with Arabic-Indic digits when active ngx-translate language is ar', () => {
+    it('formats money with Arabic currency symbol after the number when active ngx-translate language is ar (PPS-84)', () => {
       translate.use('ar');
       const intFormatted = service.formatCurrencyAmount({ amount: '56425.0000', currency: 'EGP' });
-      expect(intFormatted).toContain('EGP');
-      expect(intFormatted).toContain('٥٦');
-      expect(intFormatted).toContain('٤٢٥');
-      expect(intFormatted).not.toContain('56425');
+      expect(intFormatted).toBe('٥٦٬٤٢٥ ج.م');
 
       const decFormatted = service.formatCurrencyAmount({ amount: '56425.5000', currency: 'EGP' });
-      expect(decFormatted).toContain('EGP');
-      expect(decFormatted).toContain('٥');
-      expect(decFormatted).not.toContain('000');
+      expect(decFormatted).toBe('٥٦٬٤٢٥٫٥٠ ج.م');
+    });
+
+    it('formats pure formatCurrencyAmount with Arabic currency symbol after the number (PPS-84)', () => {
+      expect(formatCurrencyAmount({ amount: '56425', currency: 'EGP' }, 'ar')).toBe('٥٦٬٤٢٥ ج.م');
+      expect(formatCurrencyAmount({ amount: '56425.5', currency: 'EGP' }, 'ar')).toBe('٥٦٬٤٢٥٫٥٠ ج.م');
+      expect(formatCurrencyAmount({ amount: '190', currency: 'SAR' }, 'ar')).toBe('١٩٠ ر.س');
+      expect(formatCurrencyAmount({ amount: '13', currency: 'EUR' }, 'ar')).toBe('١٣ €');
+      expect(formatCurrencyAmount({ amount: '0', currency: 'EGP' }, 'ar')).toBe('٠ ج.م');
+      expect(formatCurrencyAmount({ amount: '-0.0000', currency: 'EGP' }, 'ar')).toBe('٠ ج.م');
+      expect(formatCurrencyAmount({ amount: '56425', currency: 'EGP' }, 'en')).toBe('EGP 56,425');
+
+      const unknownCurr = formatCurrencyAmount({ amount: '100', currency: 'XYZ' }, 'ar');
+      expect(unknownCurr).toContain('XYZ');
+      expect(unknownCurr).toContain('١٠٠');
     });
 
     it('returns placeholder for null or missing money values', () => {

@@ -464,7 +464,7 @@
                     (blur)="reviewFieldValue('quotation', q.id, 'stated_total', { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || effectiveQuotationCurrency() })"
                     [readonly]="!isWriter() || q.status === 'reviewed'"
                   />
-                  <span matTextSuffix class="currency-suffix">{{ q.stated_total?.currency || effectiveQuotationCurrency() }}</span>
+                  <span matTextSuffix class="currency-suffix">{{ (q.stated_total?.currency || effectiveQuotationCurrency()) | currencySymbol }}</span>
                 </mat-form-field>
                 @if (isFieldCorrected('quotation', q.id, 'stated_total')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>

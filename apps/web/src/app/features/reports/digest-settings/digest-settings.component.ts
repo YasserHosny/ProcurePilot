@@ -1,4 +1,4 @@
-import { DecimalPipe, NgClass } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -12,6 +12,7 @@ import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import {
   type DigestSubscription,
   type DigestView,
@@ -34,7 +35,7 @@ import {
     MatSnackBarModule,
     TranslatePipe,
     FormatDatePipe,
-    DecimalPipe,
+    FormatMoneyPipe,
   ],
   templateUrl: './digest-settings.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
