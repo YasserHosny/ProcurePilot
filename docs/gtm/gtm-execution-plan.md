@@ -113,7 +113,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-30 | PPS-59 | P-31 | PPS-61 | P-32 | PPS-62 |
 | P-33 | PPS-63 | P-34 | PPS-64 | P-35 | PPS-65 |
 | P-36 | PPS-66 | P-37 | PPS-67 | P-38 | PPS-68 |
-| P-39 | PPS-69 | | | | |
+| P-39 | PPS-69 | P-40 | PPS-70 | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -244,6 +244,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [x] P-37 | — | Owner asked for the `find-skills` agent skill (vercel-labs/skills). Added unchanged at `.claude/skills/find-skills/SKILL.md`, so every Claude Code session on the repo has it (cloud containers are wiped when a session ends) | Orch | — | **done 2026-10-25: #288 (b80157a); PPS-67 Done** |
 | [ ] P-38 | — | Docs screenshot drift failed #291 on 28-email-ingestion-log alone (2.23%): the seeded email rows were dated `now()`, so the Received At column showed the capture day and the image changed daily. The spec now anchors them at noon UTC today, so the dashboard's today/week/month counts stay 5 at any hour, then moves them to a fixed day (2026-10-26, the day #292's committed image shows) before capturing 28 | Orch | — | PR merged; two consecutive docs-screenshot runs pass the diff (PPS-68) |
 | [ ] P-39 | — | Docs screenshot 17-approval-queue sat at 0.92–0.94% drift, just under the 1% limit: its Requester column shows the E2E owner's email, which carried a new `Date.now()` each run (as did the workspace name on 02 and the buyer's email on 18). A docs capture under CI now signs up as `e2e.owner@example.test` / `E2E Test Co` with a fixed buyer address; the docs job uploads its images after every complete capture | Orch | — | PR merged; two consecutive docs-screenshot runs show 17 well under the limit (PPS-69) |
+| [ ] P-40 | — | Found in docs screenshot 17 (P-39): on the web approval queue, Approve/Reject render under the Lines column and the Actions column is empty. Likely `display: flex` on the `.lines-cell` / `.actions-cell` `<td>`s takes them out of table layout | Orch → Agy | — | buttons under Actions in EN and AR, with a test and zero axe violations; 17 re-committed from CI (PPS-70) |
 
 ### E — Pilot environment
 
