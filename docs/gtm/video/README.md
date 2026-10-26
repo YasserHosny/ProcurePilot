@@ -75,6 +75,15 @@ Navy, follows the sting seamlessly; elements fade up 0.27 s apart: logo · «ج�
 «د. ياسر حسني — المؤسس» · yasser.hosny@iron-sys.com · «أحد منتجات Iron Systems». The 9:16 card keeps
 everything inside the WhatsApp/Reels safe area (top ~250 px, bottom ~350 px).
 
+**End card v2 (2026-10-26, owner):** the closing «أحد منتجات Iron Systems» / "A product of Iron Systems" line was
+small and said nothing about the company. It is now a company band: the Iron Systems logo (from
+www.iron-sys.com), **www.iron-sys.com** and **hello@iron-sys.com** (the site's address for new business),
+as a darker footer strip in 16:9 and a panel inside the safe area in 9:16. Everything above it, the timing and
+the audio are unchanged. Source and rebuild: [`source/endcard-v2/`](source/endcard-v2/) (`make_boards.py` →
+`render_frames.cjs` → `build.py`). `renders/outro-*` and `renders/end-card-*` now carry v2; the latest cuts
+(v2.4.2, gcc-sa-v1 Arabic, gcc-sa-en-v1, eu-en-v1) had their outro swapped with the body and audio
+byte-identical. Older cuts keep the v1 card.
+
 ## English versions (for LinkedIn / non-Arabic viewers)
 
 Same keyframes, beats, sound cues and mix as the Arabic outro — only the text changes:
