@@ -22,6 +22,17 @@ class FakeSessionService {
   readonly activeLocale = computed<Locale>(
     () => this.member()?.preferred_locale ?? this.member()?.tenant.default_locale ?? 'en',
   );
+  readonly signedInInteractively: WritableSignal<boolean> = signal(false);
+
+  login(): void {
+    this.signedInInteractively.set(true);
+    this.member.set(mockMember);
+  }
+
+  restore(): void {
+    this.signedInInteractively.set(false);
+    this.member.set(mockMember);
+  }
 }
 
 const mockTenant: Tenant = {
@@ -88,7 +99,39 @@ describe('I18nService', () => {
     expect(localStorage.getItem('pp.locale')).toBe('ar');
   });
 
-  it('adopts preferred locale when a guest signs in', () => {
+  it('adopts account locale ar and does not call updateMe when signing in with no chosen value', () => {
+    currentPathname = '/onboarding/signup';
+    localStorage.setItem('pp.locale', 'en');
+    const service = TestBed.inject(I18nService);
+
+    TestBed.flushEffects();
+    expect(service.currentLocale()).toBe('en');
+
+    fakeSession.login();
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('ar');
+    expect(localStorage.getItem('pp.locale')).toBe('ar');
+    expect(apiSpy.updateMe).not.toHaveBeenCalled();
+  });
+
+  it('adopts account locale ar and does not call updateMe when signing in with chosen equal to account locale', () => {
+    localStorage.setItem('pp.locale', 'ar');
+    localStorage.setItem(LOCALE_CHOSEN_STORAGE_KEY, 'ar');
+    const service = TestBed.inject(I18nService);
+
+    TestBed.flushEffects();
+    expect(service.currentLocale()).toBe('ar');
+
+    fakeSession.login();
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('ar');
+    expect(localStorage.getItem('pp.locale')).toBe('ar');
+    expect(apiSpy.updateMe).not.toHaveBeenCalled();
+  });
+
+  it('preserves guest chosen locale en and calls updateMe once when signing in with account locale ar', () => {
     localStorage.setItem('pp.locale', 'en');
     localStorage.setItem(LOCALE_CHOSEN_STORAGE_KEY, 'en');
     const service = TestBed.inject(I18nService);
@@ -96,11 +139,95 @@ describe('I18nService', () => {
     TestBed.flushEffects();
     expect(service.currentLocale()).toBe('en');
 
+    fakeSession.login();
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('en');
+    expect(localStorage.getItem('pp.locale')).toBe('en');
+    expect(apiSpy.updateMe).toHaveBeenCalledTimes(1);
+    expect(apiSpy.updateMe).toHaveBeenCalledWith({ preferred_locale: 'en' });
+  });
+
+  it('adopts account locale ar and does not call updateMe on session restore at startup even when chosen is en', () => {
+    localStorage.setItem('pp.locale', 'en');
+    localStorage.setItem(LOCALE_CHOSEN_STORAGE_KEY, 'en');
     fakeSession.member.set(mockMember);
+
+    const service = TestBed.inject(I18nService);
     TestBed.flushEffects();
 
     expect(service.currentLocale()).toBe('ar');
     expect(localStorage.getItem('pp.locale')).toBe('ar');
+    expect(apiSpy.updateMe).not.toHaveBeenCalled();
+  });
+
+  it('adopts account locale ar and does not call updateMe when session is restored asynchronously on reload', () => {
+    localStorage.setItem('pp.locale', 'en');
+    localStorage.setItem(LOCALE_CHOSEN_STORAGE_KEY, 'en');
+
+    // At construction on reload, member is null until async restore completes
+    expect(fakeSession.member()).toBeNull();
+    const service = TestBed.inject(I18nService);
+    TestBed.flushEffects();
+
+    // Async restore completes (interactive = false) and sets member with account locale 'ar'
+    fakeSession.restore();
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('ar');
+    expect(localStorage.getItem('pp.locale')).toBe('ar');
+    expect(apiSpy.updateMe).not.toHaveBeenCalled();
+  });
+
+  it('preserves guest chosen locale en and calls updateMe once when login succeeds after restore failed with expired token', () => {
+    localStorage.setItem('pp.access_token', 'expired-token');
+    localStorage.setItem('pp.locale', 'en');
+    localStorage.setItem(LOCALE_CHOSEN_STORAGE_KEY, 'en');
+
+    // Restore fails on reload: member remains null, signedInInteractively remains false
+    expect(fakeSession.member()).toBeNull();
+    expect(fakeSession.signedInInteractively()).toBeFalse();
+    const service = TestBed.inject(I18nService);
+    TestBed.flushEffects();
+    expect(service.currentLocale()).toBe('en');
+
+    // User then signs in interactively via the login form
+    fakeSession.login();
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('en');
+    expect(localStorage.getItem('pp.locale')).toBe('en');
+    expect(apiSpy.updateMe).toHaveBeenCalledTimes(1);
+    expect(apiSpy.updateMe).toHaveBeenCalledWith({ preferred_locale: 'en' });
+  });
+
+  it('applies new session locale when workspace changes for an authenticated user with no new explicit choice', () => {
+    fakeSession.member.set(mockMember);
+    const service = TestBed.inject(I18nService);
+    TestBed.flushEffects();
+    expect(service.currentLocale()).toBe('ar');
+
+    fakeSession.member.set({ ...mockMember, preferred_locale: 'en' });
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('en');
+    expect(localStorage.getItem('pp.locale')).toBe('en');
+    expect(apiSpy.updateMe).not.toHaveBeenCalled();
+  });
+
+  it('retains explicit locale choice when authenticated user switches language and does not revert to stale session locale', () => {
+    fakeSession.member.set({ ...mockMember, preferred_locale: 'en' });
+    const service = TestBed.inject(I18nService);
+    TestBed.flushEffects();
+    expect(service.currentLocale()).toBe('en');
+
+    service.setLocale('ar').subscribe();
+    TestBed.flushEffects();
+
+    expect(service.currentLocale()).toBe('ar');
+    expect(localStorage.getItem('pp.locale')).toBe('ar');
+    expect(localStorage.getItem(LOCALE_CHOSEN_STORAGE_KEY)).toBe('ar');
+    expect(apiSpy.updateMe).toHaveBeenCalledWith({ preferred_locale: 'ar' });
   });
 
   it('does not call updateMe when setLocale is called as a guest', () => {

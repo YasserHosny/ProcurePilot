@@ -77,9 +77,11 @@ export class SessionService {
   }
 
   private readonly member = signal<Me | null>(null);
+  private readonly interactiveSignIn = signal(false);
 
   readonly currentMember = this.member.asReadonly();
   readonly isAuthenticated = computed(() => this.member() !== null);
+  readonly signedInInteractively = this.interactiveSignIn.asReadonly();
   readonly role = computed<Role | null>(() => this.member()?.role ?? null);
   readonly tenant = computed(() => this.member()?.tenant ?? null);
   readonly homeCurrency = computed(() => this.tenant()?.currency ?? undefined);
@@ -97,13 +99,14 @@ export class SessionService {
   }
 
   login(email: string, password: string): Observable<Session> {
-    return this.api.login(email, password).pipe(tap((s) => this.adopt(s)));
+    return this.api.login(email, password).pipe(tap((s) => this.adopt(s, true)));
   }
 
   /** Restores the member on app start when a token survived a reload. */
   restore(): Observable<Me> {
     return this.api.me().pipe(
       tap((me) => {
+        this.interactiveSignIn.set(false);
         this.member.set(me);
         this.scheduleRefresh();
       }),
@@ -217,12 +220,14 @@ export class SessionService {
   logout(): void {
     this.clearRefreshTimer();
     this.inFlightRefresh = null;
+    this.interactiveSignIn.set(false);
     this.member.set(null);
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
   }
 
-  adopt(session: Session): void {
+  adopt(session: Session, interactive = false): void {
+    this.interactiveSignIn.set(interactive);
     localStorage.setItem(ACCESS_TOKEN_KEY, session.access_token);
     localStorage.setItem(REFRESH_TOKEN_KEY, session.refresh_token);
     this.member.set(session.user);

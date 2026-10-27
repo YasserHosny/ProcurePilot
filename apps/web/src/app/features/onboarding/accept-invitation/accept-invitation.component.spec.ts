@@ -113,7 +113,7 @@ describe('AcceptInvitationComponent (T059)', () => {
       'token_abc12345678901234567890',
       'SuperSecretPassword123!',
     );
-    expect(sessionService.adopt).toHaveBeenCalledWith(mockSession);
+    expect(sessionService.adopt).toHaveBeenCalledWith(mockSession, true);
     expect(router.navigate).toHaveBeenCalledWith(['/home']);
   });
 
