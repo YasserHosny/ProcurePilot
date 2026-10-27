@@ -3849,7 +3849,7 @@
       "loadError": "فشل تحميل ردود طلب عروض الأسعار.",
       "guardrailOutcomes": "نتائج الضوابط",
       "guardrail": "الضابط",
-      "guardrailLabel": "حتى {{amount}} {{currency}}",
+      "guardrailLabel": "حتى {{money}}",
       "draftNoticeTitle": "لم يتم إرسال طلب عرض الأسعار هذا بعد",
       "draftNoticeDescription": "راجع مسودتك أو عدّلها، أو أرسلها إلى الموردين لبدء جمع الردود.",
       "editDraft": "تعديل",

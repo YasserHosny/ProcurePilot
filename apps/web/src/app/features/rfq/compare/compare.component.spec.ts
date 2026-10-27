@@ -11,7 +11,7 @@ import {
 } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { ActivatedRoute, Router } from '@angular/router';
-import { provideTranslateService } from '@ngx-translate/core';
+import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -348,7 +348,10 @@ describe('CompareComponent (RFQ)', () => {
   });
 
   it('labels a known guardrail by its limit', () => {
-    expect(component.guardrailLabel('g-1')).toContain('rfq.compare.guardrailLabel');
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.use('en');
+    expect(component.guardrailLabel('g-1')).toBe('Up to GBP 500');
     expect(component.guardrails()[0].max_order_value_amount).toBe('500.00');
   });
 
