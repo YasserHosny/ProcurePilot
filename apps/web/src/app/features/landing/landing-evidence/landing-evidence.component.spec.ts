@@ -49,6 +49,6 @@ describe('LandingEvidenceComponent', () => {
     const verifiedChip = verifiedRow.query(By.css('.excerpt-chip.verified'));
     expect(verifiedChip).toBeTruthy();
     expect(verifiedChip.nativeElement.textContent.trim()).toBe('Verified');
-    expect(verifiedRow.nativeElement.textContent).toContain('560.00');
+    expect(verifiedRow.nativeElement.textContent).toContain('560');
   });
 });

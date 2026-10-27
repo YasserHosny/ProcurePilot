@@ -108,7 +108,7 @@ test.describe('Organisation Branch-Scoped Visibility (chunk 007 US4)', () => {
       branchB.id,
     );
 
-    // Amounts chosen so each renders ('6,100.00' / '9,200.00') as a string that is not a
+    // Amounts chosen so each renders ('6,100' / '9,200') as a string that is not a
     // substring of the other — rows are keyed by formatted amount, matching the budget suite.
     const createBudget = (amount: string, branchId: string): Promise<Fixture> =>
       apiAsUser<Fixture>(ownerToken, 'POST', '/organisation/budgets', {
@@ -119,8 +119,8 @@ test.describe('Organisation Branch-Scoped Visibility (chunk 007 US4)', () => {
         scope: 'branch',
         branch_id: branchId,
       });
-    budgetA = { id: (await createBudget('6100', branchA.id)).id, label: '6,100.00' };
-    budgetB = { id: (await createBudget('9200', branchB.id)).id, label: '9,200.00' };
+    budgetA = { id: (await createBudget('6100', branchA.id)).id, label: '6,100' };
+    budgetB = { id: (await createBudget('9200', branchB.id)).id, label: '9,200' };
 
     // Starting role is deliberate — see the block comment at the top of this file.
     const created = await createMember('approver', ownerToken);

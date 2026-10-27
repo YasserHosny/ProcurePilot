@@ -92,7 +92,7 @@ describe('OrderDetailComponent', () => {
     };
     const label = component.linePriceLabel(line);
     expect(label).toContain('pack of 0.5 L');
-    expect(label).toContain('20.00 / L');
+    expect(label).toContain('20 / L');
     expect(catalogue.product).not.toHaveBeenCalled();
   });
 

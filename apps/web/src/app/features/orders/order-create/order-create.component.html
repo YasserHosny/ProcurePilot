@@ -91,7 +91,7 @@
               @if (line.controls.source_request_line_id.value) {
                 <div class="line-reference-info">
                   @if (line.controls.estimated_price.value !== null) {
-                    <span class="estimate-badge">{{ 'orders.create.estimateReference' | translate }}: {{ line.controls.estimated_price.value | number:'1.2-2' }}</span>
+                    <span class="estimate-badge">{{ 'orders.create.estimateReference' | translate }}: {{ { amount: line.controls.estimated_price.value, currency: form.controls.currency.value } | formatMoney }}</span>
                   }
                   <span class="remaining-badge">{{ 'orders.create.remainingQuantity' | translate }}: {{ line.controls.remaining_quantity.value }}</span>
                 </div>

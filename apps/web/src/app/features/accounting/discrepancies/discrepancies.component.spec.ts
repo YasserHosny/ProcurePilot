@@ -396,9 +396,9 @@ describe('DiscrepanciesComponent (T031)', () => {
     const purchaseAmount = mismatchDetail.query(By.css('[data-testid="purchase-amount"]'));
 
     expect(billVendor.nativeElement.textContent).toContain('Acme Supplies');
-    expect(billAmount.nativeElement.textContent).toContain('1,250.00');
+    expect(billAmount.nativeElement.textContent).toContain('1,250');
     expect(purchaseSupplier.nativeElement.textContent).toContain('Acme Supplies Inc');
-    expect(purchaseAmount.nativeElement.textContent).toContain('1,200.00');
+    expect(purchaseAmount.nativeElement.textContent).toContain('1,200');
   });
 
   it('should render unmatched_bill detail with vendor, amount, and date', () => {
@@ -419,7 +419,7 @@ describe('DiscrepanciesComponent (T031)', () => {
     const date = unmatchedBill.query(By.css('[data-testid="unmatched-bill-date"]'));
 
     expect(vendor.nativeElement.textContent).toContain('Beta Cloud Services');
-    expect(amount.nativeElement.textContent).toContain('450.00');
+    expect(amount.nativeElement.textContent).toContain('450');
     expect(date).toBeTruthy();
   });
 
@@ -441,7 +441,7 @@ describe('DiscrepanciesComponent (T031)', () => {
     const date = unmatchedPurchase.query(By.css('[data-testid="unmatched-purchase-date"]'));
 
     expect(supplier.nativeElement.textContent).toContain('Gamma Hardware');
-    expect(amount.nativeElement.textContent).toContain('980.00');
+    expect(amount.nativeElement.textContent).toContain('980');
     expect(date).toBeTruthy();
   });
 
@@ -459,8 +459,8 @@ describe('DiscrepanciesComponent (T031)', () => {
     expect(detail.nativeElement.textContent).toContain('10');
     expect(detail.nativeElement.textContent).toContain('Not provided');
     expect(detail.nativeElement.textContent).toContain('Pending');
-    expect(detail.nativeElement.textContent).toContain('12.00 GBP');
-    expect(detail.nativeElement.textContent).toContain('13.50 GBP');
+    expect(detail.nativeElement.textContent).toContain('GBP 12');
+    expect(detail.nativeElement.textContent).toContain('GBP 13.50');
   });
 
   it('should remove row and show success snackbar on successful resolve', () => {

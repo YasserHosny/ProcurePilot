@@ -48,27 +48,27 @@ describe('FormatService (T069)', () => {
   });
 
   describe('formatMoney', () => {
-    it('should format money with explicit currency in English locale', () => {
-      const result = service.formatMoney({ amount: '1234.50', currency: 'SAR' }, 'en');
-      expect(result).toContain('SAR');
-      expect(result).toContain('1,234.50');
+    it('formats whole and decimal amounts in Arabic locale (PPS-85)', () => {
+      expect(service.formatMoney({ amount: '300.00', currency: 'EGP' }, 'ar')).toBe('٣٠٠ ج.م');
+      expect(service.formatMoney({ amount: '56425.5', currency: 'EGP' }, 'ar')).toBe('٥٦٬٤٢٥٫٥٠ ج.م');
     });
 
-    it('should format money with explicit currency in Arabic locale', () => {
-      const result = service.formatMoney({ amount: '1234.50', currency: 'SAR' }, 'ar');
-      expect(result.length).toBeGreaterThan(0);
-      const hasCurrency = result.includes('SAR') || result.includes('ر.س') || result.includes('ر.س.');
-      expect(hasCurrency).toBeTrue();
+    it('formats whole and decimal amounts in English locale (PPS-85)', () => {
+      expect(service.formatMoney({ amount: '1234.50', currency: 'SAR' }, 'en')).toBe('SAR 1,234.50');
+      expect(service.formatMoney({ amount: '36.00', currency: 'GBP' }, 'en')).toBe('GBP 36');
     });
 
     it('should return placeholder for null or missing amount', () => {
       expect(service.formatMoney(null)).toBe('—');
       expect(service.formatMoney(undefined)).toBe('—');
+      expect(service.formatMoney({ amount: null as unknown as string, currency: 'EGP' })).toBe('—');
     });
 
     it('should always include currency even if amount is NaN', () => {
-      const result = service.formatMoney({ amount: 'invalid', currency: 'USD' });
-      expect(result).toContain('USD');
+      const resultEn = service.formatMoney({ amount: 'invalid', currency: 'USD' }, 'en');
+      expect(resultEn).toBe('— USD');
+      const resultAr = service.formatMoney({ amount: 'invalid', currency: 'USD' }, 'ar');
+      expect(resultAr).toBe('— US$');
     });
 
     it('displays negative zero and sub-cent negative as zero with no minus sign', () => {

@@ -211,9 +211,9 @@ test.describe('Organisation Budget Management (chunk 007 US3)', () => {
     });
 
     // Column order is fixed by displayedColumns: amount, currency, period, scope, appliesTo.
-    const row = budgetRow(page, '5,000.00');
+    const row = budgetRow(page, '5,000');
     await expect(row).toBeVisible();
-    await expect(row.locator('.budget-amount')).toContainText('5,000.00');
+    await expect(row.locator('.budget-amount')).toContainText('5,000');
     await expect(row.locator('td').nth(1)).toHaveText('GBP');
     await expect(row.locator('td').nth(2)).toHaveText('Monthly');
     await expect(row.locator('td').nth(3)).toHaveText('Whole organisation');
@@ -276,7 +276,7 @@ test.describe('Organisation Budget Management (chunk 007 US3)', () => {
       periodStart: '2026-01-01',
       scope: 'Whole organisation',
     });
-    const annualRow = budgetRow(page, '11,250.00');
+    const annualRow = budgetRow(page, '11,250');
     await expect(annualRow).toBeVisible();
     await expect(banner).toHaveCount(0);
 
@@ -287,7 +287,7 @@ test.describe('Organisation Budget Management (chunk 007 US3)', () => {
       periodStart: '2026-04-01',
       scope: 'Whole organisation',
     });
-    const quarterlyRow = budgetRow(page, '4,200.00');
+    const quarterlyRow = budgetRow(page, '4,200');
     await expect(quarterlyRow).toBeVisible();
     await expect(annualRow).toBeVisible();
     await expect(banner).toBeVisible();
@@ -300,7 +300,7 @@ test.describe('Organisation Budget Management (chunk 007 US3)', () => {
       periodStart: '2028-01-01',
       scope: 'Whole organisation',
     });
-    await expect(budgetRow(page, '850.00')).toBeVisible();
+    await expect(budgetRow(page, '850')).toBeVisible();
     // The flag resets on every successful create, so the stale warning must actually be gone.
     await expect(banner).toHaveCount(0);
   });

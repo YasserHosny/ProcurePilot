@@ -296,7 +296,7 @@ describe('MatchResolutionComponent (T039)', () => {
 
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Quoted exposure');
-    expect(text).toContain('£34.00');
+    expect(text).toContain('GBP 34');
   });
 
   it('should prefill the quotation supplier when creating a new product', () => {

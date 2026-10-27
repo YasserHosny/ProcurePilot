@@ -208,7 +208,7 @@ describe("BudgetListComponent (T030)", () => {
     fixture.detectChanges();
 
     const firstRow = rowCells(0);
-    expect(firstRow[0]).toContain("12,000.00");
+    expect(firstRow[0]).toContain("12,000");
     expect(firstRow[1]).toBe("USD");
     expect(firstRow[2]).toBe("Monthly");
     expect(firstRow[3]).toBe("Whole organisation");
@@ -296,7 +296,7 @@ describe("BudgetListComponent (T030)", () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector(".action-btn")).toBeNull();
-    expect(rowCells(0)[0]).toContain("12,000.00");
+    expect(rowCells(0)[0]).toContain("12,000");
   });
 });
 

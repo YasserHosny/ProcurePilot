@@ -84,12 +84,12 @@ test.describe('Value Proof & Savings Ledger (T023, US1)', () => {
     await expect(page.locator('.pending-banner')).toBeVisible();
     await expect(
       page.locator('.detail-row', { hasText: 'Actual Total Value' }).locator('.detail-val'),
-    ).toContainText('12.00');
+    ).toContainText('12');
     // Baseline comes from the landed-cost price history (last paid £1.20/kg × 10 kg).
     await expect(
       page.locator('.detail-row', { hasText: 'Baseline Total Value' }).locator('.detail-val'),
-    ).toContainText('12.00');
-    await expect(page.locator('.delta-amount')).toContainText('0.00');
+    ).toContainText('12');
+    await expect(page.locator('.delta-amount')).toContainText('0');
   });
 
   it_or_test: test('displays savings ledger with pending vs verified distinction and navigates to evidence', async ({ page }) => {

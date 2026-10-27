@@ -40,11 +40,11 @@ test.describe('Quotation Arithmetic Mismatch (T055, US3)', () => {
     await expect(banner).toBeVisible();
     await expect(page.locator('.mismatch-title')).toContainText('Arithmetic discrepancy detected');
 
-    // Breakdown: stated (88.00 or 77.00, hash-chosen) vs computed (always 75.00).
+    // Breakdown: stated (88 or 77, hash-chosen) vs computed (always 75).
     const statedValue = page.locator('.breakdown-item').first().locator('.breakdown-val');
-    await expect(statedValue).toHaveText(/^\s*£(88|77)\.00\s*$/);
+    await expect(statedValue).toHaveText(/^\s*GBP (88|77)\s*$/);
     const computedValue = page.locator('.breakdown-item').nth(1).locator('.breakdown-val');
-    await expect(computedValue).toHaveText(/^\s*£75\.00\s*$/);
+    await expect(computedValue).toHaveText(/^\s*GBP 75\s*$/);
     await expect(page.locator('.breakdown-item.diff-item')).toBeVisible();
 
     // SC-003: confirmation is genuinely blocked while the mismatch persists.

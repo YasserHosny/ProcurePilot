@@ -137,7 +137,7 @@
                   <p>
                     {{ 'alerts.card.evidence.expiringSoon' | translate: {
                       supplier: getSupplierName(alert.supplier_id),
-                      validTo: ($any(alert.evidence['valid_to']) | formatDate)
+                      validTo: (asDate(alert.evidence['valid_to']) | formatDate)
                     } }}
                   </p>
                 } @else if (alert.kind === 'preferred_supplier_offer_disappeared') {
@@ -149,41 +149,41 @@
                 } @else if (alert.kind === 'price_swing') {
                   <p>
                     {{ 'alerts.card.evidence.priceSwing' | translate: {
-                      currentPrice: ($any(alert.evidence['current_price']) | formatMoney),
+                      currentPrice: (asMoney(alert.evidence['current_price']) | formatMoney),
                       swingPercent: alert.evidence['swing_percent'],
-                      avgPrice: ($any(alert.evidence['average_price']) | formatMoney)
+                      avgPrice: (asMoney(alert.evidence['average_price']) | formatMoney)
                     } }}
                   </p>
                 } @else if (alert.kind === 'price_spike') {
                   <p>
                     {{ 'alerts.card.evidence.priceSpike' | translate: {
-                      currentPrice: ($any(alert.evidence['current_normalised_unit_price'] || alert.evidence['current_price']) | formatMoney),
+                      currentPrice: (asMoney(alert.evidence['current_normalised_unit_price'] || alert.evidence['current_price']) | formatMoney),
                       spikePercent: alert.evidence['spike_percentage'],
-                      avgPrice: ($any(alert.evidence['rolling_average'] || alert.evidence['baseline_price']) | formatMoney)
+                      avgPrice: (asMoney(alert.evidence['rolling_average'] || alert.evidence['baseline_price']) | formatMoney)
                     } }}
                   </p>
                 } @else if (alert.kind === 'likely_duplicate_quotation_line') {
                   <p>
                     {{ 'alerts.card.evidence.duplicateLine' | translate: {
                       supplier: getSupplierName(alert.supplier_id),
-                      unitPrice: ($any(alert.evidence['unit_price']) | formatMoney),
+                      unitPrice: (asMoney(alert.evidence['unit_price']) | formatMoney),
                       quantity: alert.evidence['requested_quantity_1']
                     } }}
                   </p>
                 } @else if (alert.kind === 'decimal_or_quantity_anomaly') {
                   <p>
                     {{ 'alerts.card.evidence.decimalAnomaly' | translate: {
-                      currentPrice: ($any(alert.evidence['current_price']) | formatMoney),
+                      currentPrice: (asMoney(alert.evidence['current_price']) | formatMoney),
                       ratio: alert.evidence['ratio'],
-                      avgPrice: ($any(alert.evidence['baseline_price']) | formatMoney)
+                      avgPrice: (asMoney(alert.evidence['baseline_price']) | formatMoney)
                     } }}
                   </p>
                 } @else if (alert.kind === 'delivery_cost_anomaly') {
                   <p>
                     {{ 'alerts.card.evidence.deliveryCostAnomaly' | translate: {
-                      deliveryFee: alert.evidence['delivery_fee'] + ' ' + (alert.evidence['currency'] || ''),
+                      deliveryFee: evidenceMoney(alert.evidence['delivery_fee'], alert.evidence['currency']),
                       feeRatio: alert.evidence['fee_ratio'],
-                      mov: alert.evidence['minimum_order_value'] + ' ' + (alert.evidence['currency'] || '')
+                      mov: evidenceMoney(alert.evidence['minimum_order_value'], alert.evidence['currency'])
                     } }}
                   </p>
                 } @else if (alert.kind === 'supplier_quality_trend_change') {

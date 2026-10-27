@@ -18,6 +18,7 @@ import { ApiService } from '../../../core/api/api.service';
 import type { Product, Supplier } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { FormatService, type MoneyLike } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { navigateAlertAction } from '../alert-actions';
 import type { Alert, AlertKind } from '../alerts-api';
@@ -52,6 +53,7 @@ export class AlertsInboxComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
+  private readonly formatService = inject(FormatService);
 
   readonly isLoading = signal<boolean>(false);
   readonly alerts = signal<Alert[]>([]);
@@ -144,6 +146,25 @@ export class AlertsInboxComponent implements OnInit {
 
   onActionClick(alert: Alert): void {
     navigateAlertAction(this.router, alert);
+  }
+
+  evidenceMoney(amount: unknown, currency: unknown): string {
+    if (
+      (typeof amount === 'string' || typeof amount === 'number') &&
+      typeof currency === 'string' &&
+      currency.length > 0
+    ) {
+      return this.formatService.formatMoney({ amount, currency });
+    }
+    return String(amount ?? '—');
+  }
+
+  asMoney(value: unknown): MoneyLike | null | undefined {
+    return value as MoneyLike | null | undefined;
+  }
+
+  asDate(value: unknown): string | Date | null | undefined {
+    return value as string | Date | null | undefined;
   }
 
   getProductName(productId: string): string {

@@ -154,11 +154,11 @@ test.describe('Phase 1 Complete Canonical Value Path (T075)', () => {
     await expect(page.locator('.pending-banner')).toBeVisible();
     await expect(
       page.locator('.detail-row', { hasText: 'Actual Total Value' }).locator('.detail-val'),
-    ).toContainText('12.00');
+    ).toContainText('12');
     await expect(
       page.locator('.detail-row', { hasText: 'Baseline Total Value' }).locator('.detail-val'),
-    ).toContainText('12.00');
-    await expect(page.locator('.delta-amount')).toContainText('0.00');
+    ).toContainText('12');
+    await expect(page.locator('.delta-amount')).toContainText('0');
     await expect(page.locator('.competing-offer-row').first()).toBeVisible();
 
     // 9. Verify the saving — it becomes immutable.

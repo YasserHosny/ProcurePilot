@@ -10,6 +10,7 @@ import { TranslatePipe, TranslateService } from "@ngx-translate/core";
 
 import { ApiService } from "../../../core/api/api.service";
 import type { BaseUnit, ImportPreview } from "../../../core/api/models";
+import { formatCurrencyAmount } from "../../../core/format/format.service";
 import { I18nService } from "../../../core/i18n";
 
 @Component({
@@ -70,8 +71,15 @@ export class ImportWizardPreviewComponent implements OnInit {
     if ("pack_count" in obj && "unit_size" in obj) {
       return this.formatPackCell(obj, row);
     }
-    if ("amount" in obj && "currency" in obj) {
-      return `${obj["amount"]} ${obj["currency"]}`;
+    if (
+      "amount" in obj &&
+      "currency" in obj &&
+      typeof obj["currency"] === "string"
+    ) {
+      return formatCurrencyAmount(
+        { amount: obj["amount"] as string | number, currency: obj["currency"] },
+        this.translate.getCurrentLang() || this.translate.getFallbackLang() || "en",
+      );
     }
     return JSON.stringify(value);
   }

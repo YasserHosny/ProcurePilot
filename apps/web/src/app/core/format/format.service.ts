@@ -186,6 +186,7 @@ export class FormatService {
 
   /**
    * Formats a monetary value with explicit currency and locale sensitivity.
+   * Delegates to formatCurrencyAmount with resolved active/overridden locale.
    *
    * @param value Money object containing decimal amount and ISO 4217 currency.
    * @param localeOverride Optional locale override (e.g. 'en' or 'ar').
@@ -194,36 +195,7 @@ export class FormatService {
     value: MoneyLike | null | undefined,
     localeOverride?: string,
   ): string {
-    if (!value || value.amount === null || value.amount === undefined || !value.currency) {
-      return '—';
-    }
-
-    const numAmount = typeof value.amount === 'number' ? value.amount : parseFloat(value.amount);
-    if (isNaN(numAmount)) {
-      return `— ${value.currency}`;
-    }
-
-    const isZero = Math.abs(numAmount) < 0.005;
-    const normalizedAmount = isZero ? 0 : numAmount;
-
-    const locale = this.resolveLocale(localeOverride);
-
-    try {
-      return new Intl.NumberFormat(locale, {
-        style: 'currency',
-        currency: value.currency,
-        currencyDisplay: 'symbol',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-        ...(isArabicLocale(locale) ? { numberingSystem: 'arab' } : {}),
-      }).format(normalizedAmount);
-    } catch {
-      const formattedNumber = normalizedAmount.toLocaleString(locale, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-      return `${formattedNumber} ${value.currency}`;
-    }
+    return formatCurrencyAmount(value, this.resolveLocale(localeOverride));
   }
 
   /**

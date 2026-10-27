@@ -1,23 +1,8 @@
-import type { Money, RecommendationConfidence, StockSignal } from './offers-api';
+import type { RecommendationConfidence, StockSignal } from './offers-api';
 
 /**
  * Helper formatting utilities for Smart Compare & Intelligence.
  */
-
-export function formatMoney(money: Money | null | undefined): string {
-  if (!money || money.amount === undefined || money.amount === null) {
-    return '—';
-  }
-  const num = parseFloat(money.amount);
-  if (isNaN(num)) {
-    return `${money.amount} ${money.currency}`;
-  }
-  const formatted = num.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  });
-  return `${formatted} ${money.currency}`;
-}
 
 export function formatScorePercent(score: string | number | null | undefined): string {
   if (score === null || score === undefined || score === '') return '—';

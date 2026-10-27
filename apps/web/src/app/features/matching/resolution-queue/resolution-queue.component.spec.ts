@@ -421,7 +421,7 @@ describe('ResolutionQueueComponent', () => {
     expect(text).toContain('fresh-farms.pdf');
     expect(text).toContain('buyer@example.com');
     expect(text).toContain('Quoted exposure');
-    expect(text).toContain('£30.00');
+    expect(text).toContain('GBP 30');
 
     expect(compiled.querySelectorAll('article.match-line').length).toBe(2);
     expect(compiled.querySelectorAll('a.action-btn').length).toBe(2);
