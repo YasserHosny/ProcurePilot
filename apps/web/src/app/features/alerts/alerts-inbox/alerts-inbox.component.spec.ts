@@ -274,4 +274,17 @@ describe('AlertsInboxComponent (US4, T061)', () => {
 
     expect(component.filteredAlerts().length).toBe(0);
   });
+
+  describe('evidenceMoney', () => {
+    it('formats valid amount and currency through FormatService.formatMoney', () => {
+      expect(component.evidenceMoney('45.00', 'GBP')).toBe('GBP 45');
+      expect(component.evidenceMoney(150, 'USD')).toBe('USD 150');
+    });
+
+    it('falls back to stringified amount or placeholder when currency is missing or invalid', () => {
+      expect(component.evidenceMoney('45.00', '')).toBe('45.00');
+      expect(component.evidenceMoney('45.00', null)).toBe('45.00');
+      expect(component.evidenceMoney(undefined, undefined)).toBe('—');
+    });
+  });
 });

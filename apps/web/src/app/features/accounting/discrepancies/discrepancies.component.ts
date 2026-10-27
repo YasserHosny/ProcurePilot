@@ -16,6 +16,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { RoleDirective } from '../../../core/auth/role.directive';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import {
   AccountingApiService,
@@ -52,6 +53,7 @@ import {
 })
 export class DiscrepanciesComponent implements OnInit {
   private readonly accountingApi = inject(AccountingApiService);
+  private readonly formatService = inject(FormatService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
 
@@ -253,7 +255,10 @@ export class DiscrepanciesComponent implements OnInit {
     if (amount === null || amount === undefined) {
       return this.formatEvidenceValue(null);
     }
-    return currency ? `${amount} ${currency}` : amount;
+    if (!currency) {
+      return amount;
+    }
+    return this.formatService.formatMoney({ amount, currency });
   }
 
   getEvidenceState(

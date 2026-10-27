@@ -204,7 +204,7 @@ describe('BillsComponent (T026)', () => {
 
       const amountEl = firstRow.query(By.css('[data-testid="bill-amount"]'));
       expect(amountEl.nativeElement.textContent).toContain('1,500.50');
-      expect(amountEl.nativeElement.textContent).toContain('$');
+      expect(amountEl.nativeElement.textContent).toContain('USD');
 
       const dateEl = firstRow.query(By.css('[data-testid="bill-date"]'));
       expect(dateEl.nativeElement.textContent).toContain('2026');

@@ -75,10 +75,3 @@ export function assertSameCurrency(a: Money, b: Money): void {
   }
 }
 
-/** Format for display in a locale. Never used for storage or comparison. */
-export function formatMoney(value: Money, locale: string): string {
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency: value.currency,
-  }).format(Number(value.amount));
-}

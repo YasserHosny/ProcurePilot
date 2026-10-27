@@ -17,6 +17,7 @@ import { TranslatePipe, TranslateService } from "@ngx-translate/core";
 import { ApiService } from "../../../core/api/api.service";
 import type { ApiError, ImportPreview, ImportResult } from "../../../core/api/models";
 import { SessionService } from "../../../core/auth/session.service";
+import { formatCurrencyAmount } from "../../../core/format/format.service";
 import { ImportWizardPreviewComponent } from "./import-wizard-preview.component";
 
 type WizardStep = "upload" | "preview" | "result";
@@ -165,8 +166,15 @@ export class ImportWizardComponent implements OnInit {
     if ("pack_count" in record && "unit_size" in record) {
       return `${record["pack_count"]} × ${record["unit_size"]}`;
     }
-    if ("amount" in record && "currency" in record) {
-      return `${record["amount"]} ${record["currency"]}`;
+    if (
+      "amount" in record &&
+      "currency" in record &&
+      typeof record["currency"] === "string"
+    ) {
+      return formatCurrencyAmount(
+        { amount: record["amount"] as string | number, currency: record["currency"] },
+        this.translate.getCurrentLang() || this.translate.getFallbackLang() || "en",
+      );
     }
     return JSON.stringify(record);
   }

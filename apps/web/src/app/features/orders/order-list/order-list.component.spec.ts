@@ -69,7 +69,7 @@ describe('OrderListComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[data-testid="orders-list"]').textContent).toContain('PO-1001');
     expect(fixture.nativeElement.textContent).toContain('Submitted');
-    expect(fixture.nativeElement.textContent).toContain('120.00');
+    expect(fixture.nativeElement.textContent).toContain('GBP 120');
   });
 
   it('shows create button for owner and hides for viewer', () => {

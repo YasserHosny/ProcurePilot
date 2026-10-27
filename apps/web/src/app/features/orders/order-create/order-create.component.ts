@@ -1,4 +1,3 @@
-import { DecimalPipe } from '@angular/common';
 import { toIsoDate } from '../../../core/format/iso-date';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
@@ -55,7 +54,6 @@ interface OrderLineForm {
     MatOptionModule,
     RouterLink,
     TranslatePipe,
-    DecimalPipe,
     FormatMoneyPipe,
   ],
   providers: [provideAppDateAdapter()],

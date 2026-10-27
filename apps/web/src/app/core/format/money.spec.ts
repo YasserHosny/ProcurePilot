@@ -1,4 +1,4 @@
-import { MoneyError, assertSameCurrency, formatMoney, money } from './money';
+import { MoneyError, assertSameCurrency, money } from './money';
 
 /**
  * Money is the type the product's north-star metric is denominated in, so its guards are tested
@@ -38,9 +38,5 @@ describe('Money', () => {
 
   it('allows combining the same currency', () => {
     expect(() => assertSameCurrency(money('1.00', 'GBP'), money('2.00', 'GBP'))).not.toThrow();
-  });
-
-  it('formats for display without losing the currency', () => {
-    expect(formatMoney(money('1234.50', 'GBP'), 'en-GB')).toContain('£');
   });
 });
