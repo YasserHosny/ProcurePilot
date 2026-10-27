@@ -37,14 +37,21 @@ String formatMoney(String amount, String currency, {required String locale}) {
         : BigInt.parse(padded.substring(0, digits));
     var roundedWhole = whole;
     if (digits < padded.length && padded.codeUnitAt(digits) >= 53) {
-      minor += BigInt.one;
-      final limit = BigInt.from(10).pow(digits);
-      if (digits > 0 && minor >= limit) {
+      if (digits > 0) {
+        minor += BigInt.one;
+        final limit = BigInt.from(10).pow(digits);
+        if (minor >= limit) {
+          roundedWhole += BigInt.one;
+          minor -= limit;
+        }
+      } else {
         roundedWhole += BigInt.one;
-        minor -= limit;
       }
-      if (digits == 0) roundedWhole += BigInt.one;
     }
+    final isZero = roundedWhole == BigInt.zero && minor == BigInt.zero;
+    final isNegative = negative && !isZero;
+    final showFraction = digits > 0 && minor != BigInt.zero;
+
     final symbols = NumberFormat.decimalPattern(locale).symbols;
     final wholeText = roundedWhole.toString();
     final groups = <String>[];
@@ -53,12 +60,10 @@ String formatMoney(String amount, String currency, {required String locale}) {
       groups.insert(0, wholeText.substring(start, end));
     }
     final groupedWhole = groups.join(symbols.GROUP_SEP);
-    final fractionText = digits == 0
-        ? ''
-        : minor.toString().padLeft(digits, '0');
-    var number =
-        '${negative ? '-' : ''}$groupedWhole'
-        '${digits == 0 ? '' : '${symbols.DECIMAL_SEP}$fractionText'}';
+    final fractionText = showFraction
+        ? '${symbols.DECIMAL_SEP}${minor.toString().padLeft(digits, '0')}'
+        : '';
+    var number = '${isNegative ? '-' : ''}$groupedWhole$fractionText';
     if (locale == 'ar') {
       number = number
           .replaceAll(symbols.GROUP_SEP, '٬')

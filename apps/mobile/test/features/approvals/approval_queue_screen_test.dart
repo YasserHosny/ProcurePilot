@@ -50,7 +50,7 @@ void main() {
       expect(find.text('Requester: john@example.com'), findsOneWidget);
       expect(find.textContaining('member-uuid-1111'), findsNothing);
       expect(find.textContaining('member-uuid-2222'), findsNothing);
-      expect(find.text('USD 125.00'), findsNWidgets(2));
+      expect(find.text('USD 125'), findsNWidgets(2));
     });
 
     testWidgets('falls back to localised unknown requester when name and email are missing', (
@@ -94,10 +94,10 @@ void main() {
         ),
       ];
       await pumpQueue(tester);
-      expect(find.text('EGP 12,500.00'), findsOneWidget);
+      expect(find.text('EGP 12,500'), findsOneWidget);
 
       await pumpQueue(tester, locale: 'ar');
-      expect(find.textContaining('١٢٬٥٠٠٫٠٠'), findsOneWidget);
+      expect(find.textContaining('١٢٬٥٠٠'), findsOneWidget);
       expect(find.byType(Directionality), findsWidgets);
     });
 
