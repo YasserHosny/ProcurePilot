@@ -70,7 +70,7 @@ void main() {
 
       await pumpList(tester);
 
-      expect(find.text('EGP 12,500.00'), findsOneWidget);
+      expect(find.text('EGP 12,500'), findsOneWidget);
     });
 
     testWidgets('filters requests by status', (tester) async {
@@ -234,12 +234,12 @@ void main() {
         createdAt: DateTime.now(),
       );
       await pumpDetail(tester, request);
-      expect(find.text('EGP 12,500.00'), findsOneWidget);
+      expect(find.text('EGP 12,500'), findsOneWidget);
       expect(find.text('EGP 1.23'), findsOneWidget);
       expect(find.text('KWD -12.500'), findsOneWidget);
 
       await pumpDetail(tester, request, locale: 'ar');
-      expect(find.textContaining('١٢٬٥٠٠٫٠٠'), findsOneWidget);
+      expect(find.textContaining('١٢٬٥٠٠'), findsOneWidget);
       expect(find.textContaining('١٫٢٣'), findsOneWidget);
       expect(find.textContaining('١٢٫٥٠٠'), findsOneWidget);
     });

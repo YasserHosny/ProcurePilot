@@ -92,9 +92,9 @@ void main() {
         expect(find.textContaining('requester-uuid-1111'), findsNothing);
 
         expect(find.text('Estimated Total: '), findsOneWidget);
-        expect(find.text('USD 125.00'), findsOneWidget);
+        expect(find.text('USD 125'), findsOneWidget);
         expect(find.text('Remaining budget: '), findsOneWidget);
-        expect(find.text('USD 40.00'), findsOneWidget);
+        expect(find.text('USD 40'), findsOneWidget);
         expect(
           find.text(
             'This request would exceed the remaining budget for its scope.',
