@@ -3849,7 +3849,7 @@
       "loadError": "Failed to load RFQ responses.",
       "guardrailOutcomes": "Guardrail outcomes",
       "guardrail": "Guardrail",
-      "guardrailLabel": "Up to {{amount}} {{currency}}",
+      "guardrailLabel": "Up to {{money}}",
       "draftNoticeTitle": "This RFQ hasn't been sent yet",
       "draftNoticeDescription": "Review or edit your draft, or send it to suppliers to start collecting responses.",
       "editDraft": "Edit",

@@ -200,8 +200,10 @@ export class CompareComponent implements OnInit {
       return this.translate.instant('rfq.compare.guardrail');
     }
     return this.translate.instant('rfq.compare.guardrailLabel', {
-      amount: guardrail.max_order_value_amount,
-      currency: guardrail.max_order_value_currency,
+      money: this.formatService.formatMoney({
+        amount: guardrail.max_order_value_amount,
+        currency: guardrail.max_order_value_currency,
+      }),
     });
   }
 
