@@ -58,6 +58,9 @@ export class I18nService {
   /** The last locale the SESSION reported, so a user's own choice is not overwritten by it. */
   private lastSessionLocale: Locale | null = null;
 
+  /** Tracks whether the session was authenticated on the previous effect run (PPS-86). */
+  private wasAuthenticated = this.session.isAuthenticated();
+
   readonly currentLocale = this.localeSignal.asReadonly();
   readonly isRtl = this.direction.isRtl;
 
@@ -100,11 +103,29 @@ export class I18nService {
     // immediately applied 'en' again. The language switcher appeared completely dead — no error,
     // no flicker, nothing — because the revert happened in the same tick. Tracking the last value
     // the session reported means a user's explicit choice is never fought by a stale one.
+    //
+    // PPS-86: On a signed-out → signed-in transition, honour any explicit guest choice
+    // (pp.locale.chosen) only on interactive sign-in (not background/restore session load).
+    // If it differs from the account's activeLocale, persist it to the server.
     effect(() => {
-      if (!this.session.isAuthenticated()) {
+      const isAuth = this.session.isAuthenticated();
+      const wasAuth = this.wasAuthenticated;
+      this.wasAuthenticated = isAuth;
+
+      if (!isAuth) {
         return;
       }
+
       const active = this.session.activeLocale();
+
+      if (!wasAuth && untracked(this.session.signedInInteractively)) {
+        const chosen = localStorage.getItem(LOCALE_CHOSEN_STORAGE_KEY) as Locale | null;
+        if ((chosen === 'en' || chosen === 'ar') && chosen !== active) {
+          this.setLocale(chosen, true).subscribe();
+          return;
+        }
+      }
+
       if (active && active !== this.lastSessionLocale) {
         this.lastSessionLocale = active;
         if (active !== untracked(this.localeSignal)) {

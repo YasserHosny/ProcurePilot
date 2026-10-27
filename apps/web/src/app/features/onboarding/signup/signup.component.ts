@@ -131,7 +131,7 @@ export class SignupComponent implements OnInit {
       .subscribe({
         next: (session) => {
           this.isSubmitting.set(false);
-          this.session.adopt(session);
+          this.session.adopt(session, true);
           void this.router.navigate(['/onboarding/plan']);
         },
         error: (err: unknown) => {

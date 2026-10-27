@@ -101,7 +101,7 @@ export class AcceptInvitationComponent implements OnInit {
     this.api.acceptInvitation(token.trim(), passwordPayload).subscribe({
       next: (session) => {
         this.isSubmitting.set(false);
-        this.session.adopt(session);
+        this.session.adopt(session, true);
         void this.router.navigate(['/home']);
       },
       error: (err: unknown) => {
