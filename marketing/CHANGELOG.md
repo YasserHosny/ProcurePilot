@@ -2,6 +2,7 @@
 
 ## 2.0.0 · 2026-10-29
 
+- Upstream skills are installed without their `evals/` test folders (`scripts/sync-upstream-skills.mjs`): a sample prompt there carries a fake key that the repo's secret scan (gitleaks) flags.
 - **Moved into the ProcurePilot repo** as `marketing/` (owner request; G-14, PPS-111; branch `docs/marketing-os`). Product docs are linked from the repo (`../docs/gtm`, `../docs/brand`, `../packages/i18n`) instead of mirrored; `config/sources.yaml` reads this repo (warns when behind origin) and treats the website and brand folders as optional workspace sources. Brand files needed for production copied to `brand/iron-systems/`. Demo video v2.2 (pre-limiter mix) not copied: the repo holds the corrected cut.
 - LinkedIn About updated on the live page (EN; AR added as a page language), 2026-10-29.
 - LinkedIn images v2 (`scripts/render-linkedin-v2.cjs`): editorial, real material only (v2.5 frames, round-6 WhatsApp quote photo), following `docs/gtm/video/motion-style.md`; A-05 and A-06 now made from real Egypt frames. Text pass removed AI-sounding lines (A-02, CP-01).

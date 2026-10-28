@@ -49,11 +49,15 @@ const commit = git(source, 'rev-parse', 'HEAD');
 let version = null;
 try { version = JSON.parse(fs.readFileSync(path.join(source, '.claude-plugin/plugin.json'), 'utf8')).version; } catch { /* optional */ }
 
+// Skill test material (evals/) is not installed: it is only used to test skills upstream, and its sample prompts
+// contain fake credentials that trip the repo's secret scan (gitleaks), see PR #326.
+const EXCLUDE_DIRS = new Set(['evals']);
 const hashFile = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 function walk(dir, base = dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const p = path.join(dir, e.name);
     if (e.isSymbolicLink()) throw new Error(`Refusing symlink in upstream skill: ${p}`);
+    if (e.isDirectory() && EXCLUDE_DIRS.has(e.name)) return [];
     return e.isDirectory() ? walk(p, base) : [path.relative(base, p).split(path.sep).join('/')];
   });
 }
@@ -70,7 +74,7 @@ for (const name of config.skills) {
   lock.skills[name] = { files };
   if (dryRun) { console.log(`would install ${name} (${Object.keys(files).length} files)`); continue; }
   fs.rmSync(to, { recursive: true, force: true });
-  fs.cpSync(from, to, { recursive: true });
+  fs.cpSync(from, to, { recursive: true, filter: (src) => !EXCLUDE_DIRS.has(path.basename(src)) || !fs.statSync(src).isDirectory() });
   console.log(`installed ${name} (${Object.keys(files).length} files)`);
 }
 

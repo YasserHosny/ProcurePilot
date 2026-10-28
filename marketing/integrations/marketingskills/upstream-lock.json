@@ -7,14 +7,12 @@
   "skills": {
     "product-marketing": {
       "files": {
-        "evals/evals.json": "99ed087b244d4724bb93b6426107c63ec87957196842e5905334efd7ab29acd0",
         "references/brand-voice.md": "595871313bf032be3996a567a053b4531837bc9362f91e76c253f4b95542ac60",
         "SKILL.md": "e6cd52d37b248c38d8020017acb3d2ce2b3106ed8a6ca774338dd6844622e654"
       }
     },
     "customer-research": {
       "files": {
-        "evals/evals.json": "9c17438738d36a6351924d23244b053c80f4d533fd9c3a0210e3688beb779180",
         "references/interviews-and-surveys.md": "6583191c870887feb288eee93248bd82cc997b6b010762076fe16a49b67806f5",
         "references/source-guides.md": "23db7acf05f07da54af9bee47003c8f08a18b4ccef7da3e8e3d128aa06d1ca58",
         "SKILL.md": "fdca4d8bfca510faa4aca7a9c2ba365c9e7cf24f833808381b09b66dda0faa98"
@@ -22,7 +20,6 @@
     },
     "competitor-profiling": {
       "files": {
-        "evals/evals.json": "140f2821d97253ac2704f770890ae58d6c5d6dc0cd4848cff6e9f931957bb1b6",
         "references/templates.md": "146dcb7130d01c6d7d8b25292c5be8dd13934f895b7b4f0eecd51146e5d607fe",
         "references/tool-reference.md": "f90f4a0bfc852e33defcc2f9d15fb2abcb13d8b01cba3408c0d66a0c319a3878",
         "SKILL.md": "4ea0896c2e73b49361f2708f084e33ed21663b9af4c1096b886845e0de9fe834"
@@ -30,7 +27,6 @@
     },
     "competitors": {
       "files": {
-        "evals/evals.json": "3c3f5174db5a519e030b9447a6e501ece54003f3696e58222f5335b72034e2da",
         "references/content-architecture.md": "cf55870fa8a606f0adb16d4a8728ab3b0b6c987c373e6edd6ee18b448831bff2",
         "references/templates.md": "bb4e8fb211f3f639f16a341e77d7f5ea46333aa6e89177011d3f4342a2315754",
         "SKILL.md": "52b0fe4578524139f6ec78cd05d20671846ca276cda09cd571ed3377f07f5695"
@@ -38,7 +34,6 @@
     },
     "marketing-plan": {
       "files": {
-        "evals/evals.json": "9bda278a720b315669ac529ce4dee6c9679bacae6d69a0d61548b6a45ba55885",
         "references/aarrr-framework.md": "ad6d14748ea5515908cbec2f1624ff4c1f500b2fb689de960e86104de5e1fdda",
         "references/budget-planning.md": "e8e2bedff793550fedef907fabf3011f2638650e8aec881bbda9441de58ccda8",
         "references/client-types.md": "ca1313061b1057e6b001bff94833c6711805cdd0ab4910b551fad8fe2e675a9e",
@@ -58,7 +53,6 @@
     },
     "marketing-ideas": {
       "files": {
-        "evals/evals.json": "b7976c4a35eee8d91b6d1406aae4f1fa2d5c262e2c758ec07b6af510c97a37a7",
         "references/guerrilla-marketing.md": "d2bb0df8b06aec856d9dc6a79e49d6d92a26ca66590e4017d5f1ab2bdcf1ceb0",
         "references/ideas-by-category.md": "c0710cde1d82fc96181dcaf1dedab8a501035ac31fe42509c2d19fcf457362c4",
         "SKILL.md": "1b210d02967f0ff627d4f1633f1cf5c77d9730661fa69b31e301835d97f42c06"
@@ -66,13 +60,11 @@
     },
     "marketing-psychology": {
       "files": {
-        "evals/evals.json": "0048b391dc56b7b73b5b3fa42ea05158949cced630d771d5dbb92869465e6260",
         "SKILL.md": "f02e4fe8370d629d914032f5f8a3a988e2825e5bdae08215cf08cfb4ff07de73"
       }
     },
     "content-strategy": {
       "files": {
-        "evals/evals.json": "c1394df7a6148f76855157c08571afc0428d257f3c442dd22ee95f9f2993e82a",
         "references/content-distribution.md": "7c752892cfd6504621872584ca461c5e564aa66ae7fc0756f8344a2bb1972cb4",
         "references/headless-cms.md": "6e79cc642da23d7eb09f61c27a9fedb20accb0971eb0a50626fd60456c31192d",
         "SKILL.md": "cd8c5939b4e26b0fc478bfeb332a2956746b2d69ce47b44a34829c42510a9899"
@@ -80,7 +72,6 @@
     },
     "copywriting": {
       "files": {
-        "evals/evals.json": "cd44f25b0aaff3d6ddf8db1fcbf633a45e49e4f73be05515d50ea7e102546053",
         "references/ai-tells.md": "e440070f751a959d793c08edb461d421983ba3291b2c19b3007daf1fa1613824",
         "references/copy-frameworks.md": "148295b56de4e7864706a92bc9247e9d8637cca7b7d68738157f2c5ee5f49a9e",
         "references/natural-transitions.md": "0e2cdaf06b93e484a01ebd99e86b1864f26d743398b6dceb41279c1380ee2dcb",
@@ -89,7 +80,6 @@
     },
     "copy-editing": {
       "files": {
-        "evals/evals.json": "9a35b8642640b1623c80e040ac7d88aed9b58f80b3623b9c40728fe5c2cde660",
         "references/checklist.md": "3ee21b8b58ab852090f05d669d8c121a46f59f638e8e5cdea278e5fda5ee827e",
         "references/content-refresh.md": "33a3a7dbf4fc4b9425a10378ea05ed177929ab04d3b9f532650b5f01f55b7144",
         "references/plain-english-alternatives.md": "0bde00902bb1ae02d6fda0b87928d5f2caa9eb4bd0367015eae368cb0f7d3c0f",
@@ -98,7 +88,6 @@
     },
     "social": {
       "files": {
-        "evals/evals.json": "e4f28982c71b3ecc35f2dd868b516e0f34530800ff0153826b867a3cbc878fa7",
         "references/carousel-frameworks.md": "88dabd955dda8b6683d5ffe6906549916e8a028cd3cfd0110fd6559c15eb8e90",
         "references/listening-sources-template.md": "7a756c72e1210365fa7182898d3f944a374dcc9aa63e68307d1ee3588e81c117",
         "references/listening.md": "a79924afb89333eab14f198085fddf6e73a73f5ab24c5dc865671f067a6430e5",
@@ -113,7 +102,6 @@
     },
     "video": {
       "files": {
-        "evals/evals.json": "9c08eb28804bf79488a3ccbf1429d5a050a55063db07d2952d468158adef225c",
         "references/ai-video-prompting.md": "cc1c2db4e76c38096a1b252792e0267b9819565ca7c2c077aa4ba2d894334c41",
         "references/edit-anatomy.md": "59e652260e6e7ae64d28c40d15269dc2ebc33fe63bfa7c8ccd7416aeef0e7951",
         "references/product-demo-recording.md": "4f499a6f2bd3ae93bf41a2e2694f3af04bb17aa4d649443cf9120dee382b18e6",
@@ -122,14 +110,12 @@
     },
     "image": {
       "files": {
-        "evals/evals.json": "fcc368aa8d2ecfef081044839e322ce2496e7d32c88b12ae0974fce1e8086759",
         "references/ai-image-prompting.md": "17237cdd22a0ef19b326fe1616346aa88140425d5993126500563c02373bb251",
         "SKILL.md": "58a2f2d29b8c0e2aded87349fcfba89841ff6f3bb90beb9c87883eab8717864d"
       }
     },
     "seo-audit": {
       "files": {
-        "evals/evals.json": "556bc8d66fc8b429b0f17a084433cb212541f183ee39ac70433ed0e34dc0e788",
         "references/ai-writing-detection.md": "847cbc0e9effb41e9fbdc98f05b85e2824ebe266dcbc291689a23ee0ea320f11",
         "references/international-seo.md": "69f6bca80580fe7bcd03a54edd5f99f83317ffc359d5aea50a4a436f1a59a4f7",
         "references/local-seo-pages-and-measurement.md": "d701d6f05343566e4766cbaba2289393972d32b13e1328f537243d9238ed105f",
@@ -142,7 +128,6 @@
     },
     "ai-seo": {
       "files": {
-        "evals/evals.json": "7b36af6609906cdb559a0138b03c25c161f143b85fcc295bb7355663e6f9a157",
         "references/agent-defaults.md": "52dd7927b9d94865617d1eb1491788cd531b080a59e79bb59d5df9483893834b",
         "references/agent-readiness.md": "8bd473df80104ddf3f2e41e9772fadb23eeeed73f690fc0bd6a02b8b596e2e9b",
         "references/ai-attribution.md": "c0a71b165a31650ff7e44ab6db3ef293d4fe0918c06691b88d0d4662edb4b679",
@@ -163,7 +148,6 @@
     },
     "site-architecture": {
       "files": {
-        "evals/evals.json": "279feddd54b49883ec0dbea7564c7aafa109c124ceb3402b87a0c8c93fb3ddd4",
         "references/mermaid-templates.md": "0b080be5dee5c1ee354853994fc6610ab8f03f301f2d63cd05602c237555a23a",
         "references/navigation-patterns.md": "499fd8af66a4701827d85d68b06b8e746a7ecee2f0dc8540796ddf375764fca6",
         "references/platforms-and-migration.md": "5d5e9b36189b5a5a8e8115ab2c2533c553ebc839a3e6e70eb2770286d6cea175",
@@ -173,14 +157,12 @@
     },
     "schema": {
       "files": {
-        "evals/evals.json": "97185063f4656d2f68d47a2f1c68227595a1e13103daa4485ac477d918ebc890",
         "references/schema-examples.md": "741b79db51909479e27e9e48955664394a3981e7083071a555a08b02e9f6b529",
         "SKILL.md": "5606f9b71487823eeac123de47ee7c4745dd73ef25d89da0cac4d8ca31fa8653"
       }
     },
     "link-building": {
       "files": {
-        "evals/evals.json": "5c4781604790521fe2b7f6669089a1343a2f79200715b0e72049aff51e8a5555",
         "references/prospecting-and-outreach.md": "bca9eff40b77891b770fc2e4bd3c2ff3aeaa1eff6c6d8750af7e45501f606949",
         "references/risk-policy.md": "6fdace7097eeacf154cd682763d7a75377c8ebdff436b02cb9bd349eb634be19",
         "references/tactics.md": "f6fc7edf5122625f9131e2c9d58dc553e4bd900c5c3a0e3caf784aa74a28c7c2",
@@ -189,7 +171,6 @@
     },
     "cro": {
       "files": {
-        "evals/evals.json": "31a978defd41b86a0aafa2728499be488de21bfb0f1c7f33a93c1ce876eb38fd",
         "references/experiments.md": "f3103edc47e61e62eb4c733f30aa6bebe31e117beb74d61b3d44b766ae9324a1",
         "references/form.md": "5629d0b9710edd5a40cb7bdce11b560523cd2167578560bc389d2d6c0415d604",
         "SKILL.md": "0cf92820dd627b8a65fdfb6f5ffcd7168dbdad314f564ca0e68fd73d097ed0a8"
@@ -197,7 +178,6 @@
     },
     "analytics": {
       "files": {
-        "evals/evals.json": "8c1cfa3a6ef03edada141b6cbed5bfb768265edfe0ef7d3777db264c4a9790ff",
         "references/event-library.md": "716aa9c1fa771319a1248eda96bdec66ad97e4cf6363a0432db9459f5e880b38",
         "references/ga4-implementation.md": "dcaf5d3c084226012cdbebebe5aa5d0f2fa95154aee64865b5089f35d4fb7455",
         "references/gtm-implementation.md": "65eb4493ab6bc835259cd70456c5ea28c1dfa77bbd2d9b45e60f0c222f65bdd0",
@@ -206,7 +186,6 @@
     },
     "ab-testing": {
       "files": {
-        "evals/evals.json": "5904397cfa460f3156f4abdd0c2b2ea19407b2a0882e7f75298ecf4dfc1268f0",
         "references/sample-size-guide.md": "1ac90d26e4754d9d380d1ee704d6c0b0f058de54991c9d62b912d1df06d8a510",
         "references/test-templates.md": "1ececdef6d9fcbca75d8e871691d5fe68e2bc8ccbf6943166def4fe5d51198e6",
         "SKILL.md": "42b285d19e400bf06707b59569b15b3b7b4cbe88489b2c41772f111d3d1b3627"
@@ -214,7 +193,6 @@
     },
     "launch": {
       "files": {
-        "evals/evals.json": "45bbda415e09019229bbfd1c21d8bd6840d0686798d1636fddfff0d9e2004e58",
         "references/shipped-changes.md": "e7410ed62626e50187bdd38f018f1e2b1114ce7ab481a3abe6d05b067fd39100",
         "references/site-launch-qa.md": "3b0dd3f36ad55266b6f3217bdd3eeabf059e65a43a598b7da6d7740a8edf6e30",
         "SKILL.md": "73b0e3e2eb40cf18935b7b76d047618da56d0a0de187fe87b1689b2083f5b044"
@@ -222,7 +200,6 @@
     },
     "sales-enablement": {
       "files": {
-        "evals/evals.json": "cb27684b4f4a3f319caa42e3367dfa014aa9f31ea300fac72741788e5032b3ee",
         "references/cold-call-scripts.md": "ef2de0344a649c877d70ce4b292b472968724b88be07d16d7fb0e410339f9c7b",
         "references/deck-frameworks.md": "b5a75e2bc15dfae40a2cb38a7694fc707f2ec8159a0afaca58deff4385323ef3",
         "references/demo-scripts.md": "1f2c4f8f9b0581caab53ca89ccad7e440f8c3a49761165fd4c40cf19b803c0ac",
@@ -234,7 +211,6 @@
     },
     "lead-magnets": {
       "files": {
-        "evals/evals.json": "2c237c853f401e77ab10e8b41d9ecb7c8e8e615b3f9a0356b4c4b317fa9786f1",
         "references/benchmarks.md": "dcb59c5f88a09b8410af1e7ca6f30ffbf10ed9d24d30be15f206ce680ee8e8db",
         "references/content-to-skill-corpus-design.md": "99451d8f46c0c3f10c83ff8930e134141be78ed7bcb80da0fdc4efcd061d89b4",
         "references/content-to-skill-release.md": "d0d6610f9769441f749162dc5b3b4bf40c75b693cf7734b56be418ba654e06fd",
@@ -243,5 +219,6 @@
         "SKILL.md": "43b70a1ac3b642f149469fae4230895da9ce516bbd7943b24860ca3c2a42e507"
       }
     }
-  }
+  },
+  "note": "evals/ folders excluded from the install (2026-10-29, PR #326 secret scan)"
 }
