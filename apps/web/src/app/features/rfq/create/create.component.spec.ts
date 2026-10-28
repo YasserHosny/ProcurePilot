@@ -363,6 +363,77 @@ describe('RfqCreateComponent', () => {
     expect(matError?.textContent?.trim()).toBe('Select a product from the catalogue.');
   });
 
+  it('paginates active products across multiple pages: validates page-2 product in edit mode, displays label, and filters by picker', async () => {
+    routeId = 'rfq-edit-page-2';
+    const page1Product: Product = {
+      id: 'prod-p1',
+      tenant_name: 'Product Page 1',
+      variant: null,
+    } as Product;
+    const page2Product: Product = {
+      id: 'prod-p2',
+      tenant_name: 'Product Page 2',
+      variant: 'Special Variant',
+    } as Product;
+
+    apiSpy.products.and.callFake((params?: { cursor?: string; limit?: number; status?: 'active' | 'archived' | 'all'; q?: string }) => {
+      if (params?.cursor === 'c2') {
+        return of({ items: [page2Product], next_cursor: null });
+      }
+      return of({ items: [page1Product], next_cursor: 'c2' });
+    });
+    apiSpy.products.calls.reset();
+
+    const editDetailWithPage2: RfqDetail = {
+      rfq: {
+        id: 'rfq-edit-page-2',
+        tenant_id: 't-1',
+        created_by_membership_id: 'm-1',
+        status: 'draft',
+        needed_by_date: '2026-11-15',
+        tenant_terms: 'Page 2 terms',
+        idempotency_key: 'edit-key-p2',
+        created_at: '2026-10-01T00:00:00Z',
+      },
+      lines: [
+        {
+          id: 'l-edit-page-2',
+          tenant_id: 't-1',
+          rfq_id: 'rfq-edit-page-2',
+          workspace_product_id: 'prod-p2',
+          quantity: '5',
+          created_at: '2026-10-01T00:00:00Z',
+        },
+      ],
+      recipients: [],
+    };
+    rfqApiSpy.getRfq.and.returnValue(of(editDetailWithPage2));
+
+    const editFixture = TestBed.createComponent(RfqCreateComponent);
+    const editComp = editFixture.componentInstance;
+    editFixture.detectChanges();
+    await editFixture.whenStable();
+    editFixture.detectChanges();
+
+    expect(apiSpy.products).toHaveBeenCalledTimes(2);
+    expect(apiSpy.products.calls.argsFor(0)[0]).toEqual({ limit: 100, status: 'active' });
+    expect(apiSpy.products.calls.argsFor(1)[0]).toEqual({ limit: 100, status: 'active', cursor: 'c2' });
+
+    const lineControl = editComp.linesFormArray.at(0).get('workspace_product_id');
+    expect(lineControl?.value).toBe('prod-p2');
+    expect(lineControl?.valid).toBeTrue();
+    expect(lineControl?.hasError('invalidProduct')).toBeFalse();
+
+    const productInput = editFixture.nativeElement.querySelector(
+      'input[formcontrolname="workspace_product_id"]',
+    ) as HTMLInputElement;
+    expect(productInput.value).toBe(editComp.productLabel(page2Product));
+    expect(editComp.displayProduct('prod-p2')).toBe(editComp.productLabel(page2Product));
+
+    const filterResults = editComp.getFilteredProducts('Page 2');
+    expect(filterResults.some((p) => p.id === 'prod-p2')).toBeTrue();
+  });
+
   it('shows non-draft message and hides editable form when RFQ is not a draft', () => {
     routeId = 'rfq-sent-1';
     const sentDetail: RfqDetail = {

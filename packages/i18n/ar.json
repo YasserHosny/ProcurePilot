@@ -26,7 +26,8 @@
     "all": "الكل",
     "cancel": "إلغاء",
     "retry": "إعادة المحاولة",
-    "notAvailable": "غير متوفر"
+    "notAvailable": "غير متوفر",
+    "breadcrumbLabel": "مسار التنقل"
   },
   "auth": {
     "signin": {

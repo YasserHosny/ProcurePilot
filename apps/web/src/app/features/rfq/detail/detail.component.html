@@ -19,7 +19,7 @@
     </div>
   } @else if (rfqDetail(); as detail) {
     <!-- Breadcrumb -->
-    <nav class="breadcrumb" aria-label="breadcrumb">
+    <nav class="breadcrumb" [attr.aria-label]="'common.breadcrumbLabel' | translate">
       <a routerLink="/rfq/history" class="breadcrumb-link">{{ 'rfq.history.title' | translate }}</a>
       <mat-icon class="breadcrumb-sep rtl-flip" aria-hidden="true">chevron_right</mat-icon>
       <span class="breadcrumb-current">{{ breadcrumbText() }}</span>

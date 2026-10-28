@@ -399,6 +399,7 @@ describe('CompareComponent (RFQ)', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const breadcrumb = compiled.querySelector('nav.breadcrumb');
     expect(breadcrumb).not.toBeNull();
+    expect(breadcrumb?.getAttribute('aria-label')).toBe(TestBed.inject(TranslateService).instant('common.breadcrumbLabel'));
     const link = breadcrumb?.querySelector('a.breadcrumb-link');
     expect(link?.getAttribute('routerLink') ?? link?.getAttribute('href')).toBe('/rfq/history');
   });

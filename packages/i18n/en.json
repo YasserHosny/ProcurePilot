@@ -26,7 +26,8 @@
     "all": "All",
     "cancel": "Cancel",
     "retry": "Retry",
-    "notAvailable": "Not available"
+    "notAvailable": "Not available",
+    "breadcrumbLabel": "Breadcrumb"
   },
   "auth": {
     "signin": {

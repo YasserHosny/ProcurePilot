@@ -13,7 +13,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { forkJoin } from 'rxjs';
+import { EMPTY, Observable, expand, forkJoin, reduce } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { Rfq, RfqApi, RfqDetail } from '../rfq-api';
@@ -163,8 +163,8 @@ export class RfqCreateComponent implements OnInit {
       return;
     }
 
-    this.apiService.products({ limit: 100, status: 'active' }).subscribe((res) => {
-      this.products.set(res.items);
+    this.loadAllActiveProducts().subscribe((items) => {
+      this.products.set(items);
       this.revalidateLines();
     });
     this.apiService.suppliers({ limit: 100, status: 'active' }).subscribe((res) => {
@@ -172,17 +172,28 @@ export class RfqCreateComponent implements OnInit {
     });
   }
 
+  private loadAllActiveProducts(): Observable<Product[]> {
+    return this.apiService.products({ limit: 100, status: 'active' }).pipe(
+      expand((res) =>
+        res.next_cursor
+          ? this.apiService.products({ limit: 100, status: 'active', cursor: res.next_cursor })
+          : EMPTY,
+      ),
+      reduce((acc, res) => acc.concat(res.items), [] as Product[]),
+    );
+  }
+
   private loadDuplicateData(fromId: string): void {
     this.isLoadingRfq.set(true);
     this.errorMessage.set(null);
 
     forkJoin({
-      products: this.apiService.products({ limit: 100, status: 'active' }),
+      products: this.loadAllActiveProducts(),
       suppliers: this.apiService.suppliers({ limit: 100, status: 'active' }),
       detail: this.rfqApi.getRfq(fromId),
     }).subscribe({
       next: ({ products, suppliers, detail }) => {
-        this.products.set(products.items);
+        this.products.set(products);
         const validSuppliers = suppliers.items.filter((s) => !!s.contact_email);
         this.suppliers.set(validSuppliers);
         this.applyDuplicateDetail(detail, validSuppliers);
@@ -239,12 +250,12 @@ export class RfqCreateComponent implements OnInit {
     this.errorMessage.set(null);
 
     forkJoin({
-      products: this.apiService.products({ limit: 100, status: 'active' }),
+      products: this.loadAllActiveProducts(),
       suppliers: this.apiService.suppliers({ limit: 100, status: 'active' }),
       detail: this.rfqApi.getRfq(rfqId),
     }).subscribe({
       next: ({ products, suppliers, detail }) => {
-        this.products.set(products.items);
+        this.products.set(products);
         this.suppliers.set(suppliers.items.filter((s) => !!s.contact_email));
         this.applyRfqDetail(detail);
         this.isLoadingRfq.set(false);
