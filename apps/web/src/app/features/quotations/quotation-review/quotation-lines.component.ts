@@ -19,6 +19,7 @@ import type {
 } from '../../../core/api/models';
 import { CurrencySymbolPipe } from '../../../core/format/currency-symbol.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { sameReviewedValue } from './reviewed-value';
 
 @Component({
   selector: 'app-quotation-lines',
@@ -137,7 +138,7 @@ export class QuotationLinesComponent {
       ? this.pendingCorrections.get(fe.id)
       : fe.corrected_value;
     if (effective === null || effective === undefined) return false;
-    return String(effective).trim() !== String(fe.extracted_value ?? '').trim();
+    return !sameReviewedValue(effective, fe.extracted_value);
   }
 
   isFieldConfirmedAsIs(
@@ -154,7 +155,7 @@ export class QuotationLinesComponent {
     const effective = this.pendingCorrections.has(fe.id)
       ? this.pendingCorrections.get(fe.id)
       : fe.corrected_value;
-    return String(effective ?? '').trim() === String(fe.extracted_value ?? '').trim();
+    return sameReviewedValue(effective, fe.extracted_value);
   }
 
   formatUnitPrice(value: string | number | null | undefined): string {

@@ -876,6 +876,50 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(correctedTag.textContent.trim()).toBe('Corrected by Human');
   });
 
+  it('shows the corrected tag on the stated total field after a money correction differs from the extracted value', () => {
+    const statedTotal = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-stated-total',
+      field_name: 'stated_total',
+      extracted_value: { amount: '88.00', currency: 'GBP' },
+      confidence: '0.9500',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [statedTotal] });
+    fixture.detectChanges();
+
+    const input = fixture.nativeElement.querySelector('#field-fe-stated-total input') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    input.value = '75.00';
+    input.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const fieldBox = fixture.nativeElement.querySelector('#field-fe-stated-total') as HTMLElement;
+    expect(fieldBox.querySelector('.corrected-tag')).toBeTruthy();
+    expect(fieldBox.querySelector('.confirmed-tag')).toBeNull();
+  });
+
+  it('shows the confirmed tag on the stated total field when the money correction equals the extracted value', () => {
+    const statedTotal = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-stated-total',
+      field_name: 'stated_total',
+      extracted_value: { amount: '75.00', currency: 'GBP' },
+      confidence: '0.9500',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [statedTotal] });
+    fixture.detectChanges();
+
+    const input = fixture.nativeElement.querySelector('#field-fe-stated-total input') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    input.value = '75';
+    input.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const fieldBox = fixture.nativeElement.querySelector('#field-fe-stated-total') as HTMLElement;
+    expect(fieldBox.querySelector('.confirmed-tag')).toBeTruthy();
+    expect(fieldBox.querySelector('.corrected-tag')).toBeNull();
+  });
+
   it('displays exact stored amount in editable unit price input while read-only display formats with 0 or 2 decimals (e.g. 85.0000 -> 85)', () => {
     // 1. Read-only display of 85.0000 still shows "85"
     component.quotation.set({

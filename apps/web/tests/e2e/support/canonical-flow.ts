@@ -168,9 +168,10 @@ export async function resolveIssueDateFlag(page: Page): Promise<void> {
 
 /** Saves pending corrections and asserts they were persisted with attribution and took effect. */
 export async function saveCorrections(page: Page): Promise<void> {
-  // Wait on the PATCH itself, not only on the page: the Issue Date corrected tag is already
-  // visible before save, so the tag check alone never proved the save happened. When the
-  // mismatch banner survives a save, the status and saved stated total say why (PPS-46).
+  // Wait on the PATCH itself, not only on the page: the Stated Total corrected tag and the
+  // Issue Date confirmed tag are both already visible before save, so the tag checks alone
+  // never prove the save happened. When the mismatch banner survives a save, the status and
+  // saved stated total say why (PPS-46).
   const saved = page.waitForResponse(
     (response) =>
       response.request().method() === 'PATCH' &&
@@ -184,7 +185,12 @@ export async function saveCorrections(page: Page): Promise<void> {
   expect(Number(statedTotal?.amount), `stated total after save: ${JSON.stringify(statedTotal)}`).toBe(
     Number(STUB_COMPUTED_TOTAL),
   );
-  await expect(page.locator('.corrected-tag').first()).toBeVisible();
+  await expect(
+    page.locator('.field-box', { hasText: 'Stated Total Amount' }).locator('.corrected-tag'),
+  ).toBeVisible();
+  await expect(
+    page.locator('.field-box', { hasText: 'Issue Date' }).locator('.confirmed-tag'),
+  ).toBeVisible();
   await expect(page.locator('.arithmetic-mismatch-banner')).toBeHidden();
   await expect(page.locator('button.confirm-btn')).toBeEnabled();
 }

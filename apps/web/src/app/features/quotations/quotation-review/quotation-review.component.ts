@@ -42,6 +42,7 @@ import { QuotationReviewBannersComponent } from './quotation-review-banners.comp
 import { QuotationDocPreviewComponent } from './quotation-doc-preview.component';
 import { QuotationLinesComponent } from './quotation-lines.component';
 import { QuotationAuditTrailComponent } from './quotation-audit-trail.component';
+import { sameReviewedValue } from './reviewed-value';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 interface FlaggedField {
@@ -647,7 +648,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       ? this.pendingCorrections().get(fe.id)
       : fe.corrected_value;
     if (effective === null || effective === undefined) return false;
-    return String(effective).trim() !== String(fe.extracted_value ?? '').trim();
+    return !sameReviewedValue(effective, fe.extracted_value);
   }
 
   isFieldConfirmedAsIs(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): boolean {
@@ -660,7 +661,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const effective = this.pendingCorrections().has(fe.id)
       ? this.pendingCorrections().get(fe.id)
       : fe.corrected_value;
-    return String(effective ?? '').trim() === String(fe.extracted_value ?? '').trim();
+    return sameReviewedValue(effective, fe.extracted_value);
   }
 
   getFieldConfidence(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): number {
