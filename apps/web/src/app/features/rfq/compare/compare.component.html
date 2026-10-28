@@ -1,10 +1,18 @@
-<div class="page-container">
-  <div class="page-header">
-    <div class="header-content">
-      <h1 class="page-title">{{ 'rfq.compare.title' | translate }}</h1>
-      <p class="page-subtitle">{{ 'rfq.compare.subtitle' | translate }}</p>
+<div class="page-container" [class.embedded]="embedded()">
+  @if (!embedded()) {
+    <nav class="breadcrumb" aria-label="breadcrumb">
+      <a routerLink="/rfq/history" class="breadcrumb-link">{{ 'rfq.history.title' | translate }}</a>
+      <mat-icon class="breadcrumb-sep rtl-flip" aria-hidden="true">chevron_right</mat-icon>
+      <span class="breadcrumb-current">{{ 'rfq.compare.title' | translate }}</span>
+    </nav>
+
+    <div class="page-header">
+      <div class="header-content">
+        <h1 class="page-title">{{ 'rfq.compare.title' | translate }}</h1>
+        <p class="page-subtitle">{{ 'rfq.compare.subtitle' | translate }}</p>
+      </div>
     </div>
-  </div>
+  }
 
   @if (rfqDetail()?.rfq?.status === 'draft') {
     <mat-card class="draft-notice-card" data-testid="rfq-compare-draft-notice">

@@ -394,6 +394,32 @@ describe('CompareComponent (RFQ)', () => {
     expect(component.formatQuantity('1.234567')).toBe('1.234567');
     expect(component.formatQuantity('50.000000')).toBe('50');
   });
+
+  it('renders breadcrumb on standalone compare page', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const breadcrumb = compiled.querySelector('nav.breadcrumb');
+    expect(breadcrumb).not.toBeNull();
+    const link = breadcrumb?.querySelector('a.breadcrumb-link');
+    expect(link?.getAttribute('routerLink') ?? link?.getAttribute('href')).toBe('/rfq/history');
+  });
+
+  it('supports embedded input mode: loads data from rfqId input and hides header/breadcrumb', async () => {
+    mockRfqApi.getRfq.calls.reset();
+    mockRfqApi.listResponses.calls.reset();
+
+    fixture.componentRef.setInput('embedded', true);
+    fixture.componentRef.setInput('rfqId', 'rfq-embedded-1');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(mockRfqApi.getRfq).toHaveBeenCalledWith('rfq-embedded-1');
+    expect(mockRfqApi.listResponses).toHaveBeenCalledWith('rfq-embedded-1');
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('nav.breadcrumb')).toBeNull();
+    expect(compiled.querySelector('.page-header')).toBeNull();
+  });
 });
 
 describe('RFQ quantity display', () => {

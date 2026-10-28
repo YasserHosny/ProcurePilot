@@ -9,15 +9,22 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { RfqApi, RfqSummary } from '../rfq-api';
+import { RfqApi, RfqRecipient, RfqSummary } from '../rfq-api';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { RoleDirective } from '../../../core/auth/role.directive';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
+
+export interface RecipientsCacheEntry {
+  loading: boolean;
+  error: boolean;
+  recipients?: RfqRecipient[];
+}
 
 @Component({
   selector: 'app-rfq-history',
@@ -32,6 +39,7 @@ import { SessionService } from '../../../core/auth/session.service';
     MatChipsModule,
     MatButtonModule,
     MatDialogModule,
+    MatMenuModule,
     TranslatePipe,
     FormatDatePipe,
     RoleDirective,
@@ -53,6 +61,9 @@ export class HistoryComponent implements OnInit {
   readonly loading = signal<boolean>(true);
   readonly rfqs = signal<RfqSummary[]>([]);
   readonly nextCursor = signal<string | null>(null);
+  readonly recipientsCache = signal<Record<string, RecipientsCacheEntry>>({});
+
+  readonly timeFormatOptions: Intl.DateTimeFormatOptions = { timeStyle: 'short' };
 
   readonly displayedColumns = ['status', 'neededBy', 'sentAt', 'recipients', 'responses', 'actions'];
 
@@ -83,6 +94,33 @@ export class HistoryComponent implements OnInit {
     });
   }
 
+  loadRecipients(rfqId: string): void {
+    const existing = this.recipientsCache()[rfqId];
+    if (existing?.loading || existing?.recipients) {
+      return;
+    }
+
+    this.recipientsCache.update((cache) => ({
+      ...cache,
+      [rfqId]: { loading: true, error: false },
+    }));
+
+    this.rfqApi.getRfq(rfqId).subscribe({
+      next: (detail) => {
+        this.recipientsCache.update((cache) => ({
+          ...cache,
+          [rfqId]: { loading: false, error: false, recipients: detail.recipients },
+        }));
+      },
+      error: () => {
+        this.recipientsCache.update((cache) => ({
+          ...cache,
+          [rfqId]: { loading: false, error: true },
+        }));
+      },
+    });
+  }
+
   getStatusClass(status: string): string {
     switch (status) {
       case 'draft': return 'status-draft';
@@ -96,12 +134,12 @@ export class HistoryComponent implements OnInit {
 
   onRowClick(rfq: RfqSummary): void {
     if (rfq.status === 'draft') {
-      this.router.navigate(rfq.created_by_membership_id === this.currentMembershipId()
-        ? ['/rfq', rfq.id, 'edit'] : ['/rfq/compare', rfq.id]);
+      this.router.navigate(this.isCreator(rfq)
+        ? ['/rfq', rfq.id, 'edit'] : ['/rfq', rfq.id]);
     } else if (rfq.status === 'converted' && rfq.converted_purchase_request_id) {
       this.router.navigate(['/requests', rfq.converted_purchase_request_id]);
     } else {
-      this.router.navigate(['/rfq/compare', rfq.id]);
+      this.router.navigate(['/rfq', rfq.id]);
     }
   }
 

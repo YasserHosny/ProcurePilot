@@ -54,7 +54,7 @@
               <th mat-header-cell *matHeaderCellDef>{{ 'rfq.history.sentAt' | translate }}</th>
               <td mat-cell *matCellDef="let rfq" data-testid="rfq-sent-at-cell">
                 @if (rfq.sent_at) {
-                  {{ rfq.sent_at | formatDate }}
+                  {{ rfq.sent_at | formatDate }} · {{ rfq.sent_at | formatDate: timeFormatOptions }}
                 } @else {
                   —
                 }
@@ -64,16 +64,40 @@
             <!-- Recipients Column -->
             <ng-container matColumnDef="recipients">
               <th mat-header-cell *matHeaderCellDef class="number-cell">{{ 'rfq.history.recipients' | translate }}</th>
-              <td mat-cell *matCellDef="let rfq" class="number-cell">
-                {{ rfq.recipient_count }}
+              <td mat-cell *matCellDef="let rfq" class="number-cell" data-testid="rfq-recipients-cell">
+                @if (rfq.recipient_count > 0) {
+                  <button
+                    type="button"
+                    class="recipients-btn"
+                    [matMenuTriggerFor]="recipientsMenu"
+                    [matMenuTriggerData]="{ rfq: rfq }"
+                    (click)="$event.stopPropagation(); loadRecipients(rfq.id)"
+                    data-testid="rfq-recipients-button"
+                  >
+                    {{ rfq.recipient_count }}
+                  </button>
+                } @else {
+                  0
+                }
               </td>
             </ng-container>
 
             <!-- Responses Column -->
             <ng-container matColumnDef="responses">
               <th mat-header-cell *matHeaderCellDef class="number-cell">{{ 'rfq.history.responses' | translate }}</th>
-              <td mat-cell *matCellDef="let rfq" class="number-cell">
-                {{ rfq.response_count }}
+              <td mat-cell *matCellDef="let rfq" class="number-cell" data-testid="rfq-responses-cell">
+                @if (rfq.response_count > 0) {
+                  <a
+                    [routerLink]="['/rfq', rfq.id]"
+                    [queryParams]="{ tab: 'responses' }"
+                    class="table-link"
+                    (click)="$event.stopPropagation()"
+                  >
+                    {{ rfq.response_count }}
+                  </a>
+                } @else {
+                  0
+                }
               </td>
             </ng-container>
 
@@ -81,8 +105,8 @@
             <ng-container matColumnDef="actions">
               <th mat-header-cell *matHeaderCellDef class="actions-header">{{ 'rfq.history.actions' | translate }}</th>
               <td mat-cell *matCellDef="let rfq" class="actions-cell">
-                @if (rfq.status === 'draft' && isCreator(rfq)) {
-                  <div class="draft-actions">
+                <div class="actions-container">
+                  @if (rfq.status === 'draft' && isCreator(rfq)) {
                     <button
                       mat-stroked-button
                       type="button"
@@ -102,10 +126,19 @@
                     >
                       {{ 'rfq.history.send' | translate }}
                     </button>
-                  </div>
-                } @else {
-                  <mat-icon aria-hidden="true">chevron_right</mat-icon>
-                }
+                  }
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [matMenuTriggerFor]="actionsMenu"
+                    [matMenuTriggerData]="{ rfq: rfq }"
+                    (click)="$event.stopPropagation()"
+                    [attr.aria-label]="'rfq.history.actionsMenuLabel' | translate"
+                    data-testid="rfq-actions-button"
+                  >
+                    <mat-icon aria-hidden="true">more_horiz</mat-icon>
+                  </button>
+                </div>
               </td>
             </ng-container>
 
@@ -116,4 +149,67 @@
       }
     }
   </mat-card>
+
+  <mat-menu #actionsMenu="matMenu" xPosition="before">
+    <ng-template matMenuContent let-rfq="rfq">
+      <a mat-menu-item [routerLink]="['/rfq', rfq.id]">
+        <mat-icon aria-hidden="true">visibility</mat-icon>
+        <span>{{ 'rfq.history.viewDetails' | translate }}</span>
+      </a>
+      <a
+        mat-menu-item
+        [routerLink]="['/rfq', rfq.id]"
+        [queryParams]="{ tab: 'responses' }"
+        [disabled]="rfq.response_count === 0"
+      >
+        <mat-icon aria-hidden="true">compare_arrows</mat-icon>
+        <span>{{ 'rfq.history.compareResponses' | translate }}</span>
+      </a>
+      <a mat-menu-item [routerLink]="['/rfq/create']" [queryParams]="{ from: rfq.id }">
+        <mat-icon aria-hidden="true">content_copy</mat-icon>
+        <span>{{ 'rfq.history.duplicate' | translate }}</span>
+      </a>
+    </ng-template>
+  </mat-menu>
+
+  <mat-menu #recipientsMenu="matMenu" class="recipients-popover-menu">
+    <ng-template matMenuContent let-rfq="rfq">
+      <div class="recipients-popover">
+        <div class="popover-header">
+          <strong>{{ 'rfq.history.sentToSuppliers' | translate: { count: rfq.recipient_count } }}</strong>
+        </div>
+        @if (recipientsCache()[rfq.id]?.loading) {
+          <div class="popover-loading">
+            <mat-spinner diameter="24"></mat-spinner>
+          </div>
+        } @else if (recipientsCache()[rfq.id]?.error) {
+          <div class="popover-error">
+            <span>{{ 'rfq.history.recipientsLoadError' | translate }}</span>
+          </div>
+        } @else {
+          <div class="recipients-list">
+            @for (recipient of recipientsCache()[rfq.id]?.recipients; track recipient.id) {
+              <div class="recipient-row">
+                <span class="status-dot" [ngClass]="'dot-' + recipient.status"></span>
+                <span class="recipient-name">{{ recipient.supplier_name || ('rfq.history.unknownSupplier' | translate) }}</span>
+                <span class="recipient-status">{{ 'rfq.history.recipientStatus_' + recipient.status | translate }}</span>
+                @if (recipient.sent_at) {
+                  <span class="recipient-time">{{ recipient.sent_at | formatDate: timeFormatOptions }}</span>
+                }
+              </div>
+            }
+          </div>
+        }
+        <div class="popover-footer">
+          <a
+            [routerLink]="['/rfq', rfq.id]"
+            [queryParams]="{ tab: 'recipients' }"
+            class="view-all-link"
+          >
+            {{ 'rfq.history.viewAllRecipients' | translate }}
+          </a>
+        </div>
+      </div>
+    </ng-template>
+  </mat-menu>
 </div>

@@ -1,7 +1,7 @@
-import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnChanges, inject, signal, input, model, ChangeDetectionStrategy } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -35,6 +35,7 @@ const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
   standalone: true,
   imports: [
     FormsModule,
+    RouterModule,
     MatCardModule,
     MatButtonModule,
     MatDialogModule,
@@ -54,7 +55,10 @@ const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './compare.component.scss',
 })
-export class CompareComponent implements OnInit {
+export class CompareComponent implements OnInit, OnChanges {
+  readonly embedded = input<boolean>(false);
+  readonly rfqId = model<string>('');
+
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
@@ -65,7 +69,6 @@ export class CompareComponent implements OnInit {
   private readonly translate = inject(TranslateService);
   private readonly formatService = inject(FormatService);
 
-  readonly rfqId = signal<string>('');
   readonly rfqDetail = signal<RfqDetail | null>(null);
   readonly isLoading = signal<boolean>(false);
   readonly responses = signal<RfqResponseComparison[]>([]);
@@ -87,15 +90,26 @@ export class CompareComponent implements OnInit {
       const email = this.session.currentMember()?.email;
       this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
     });
-    this.route.paramMap.subscribe((params) => {
-      const id = params.get('id');
-      if (id) {
-        this.rfqId.set(id);
-        this.loadData(id);
-      }
-    });
+    if (this.rfqId()) {
+      this.loadData(this.rfqId());
+    } else {
+      this.route.paramMap.subscribe((params) => {
+        const id = params.get('id');
+        if (id) {
+          this.rfqId.set(id);
+          this.loadData(id);
+        }
+      });
+    }
 
     this.loadBranches();
+  }
+
+  ngOnChanges(): void {
+    const id = this.rfqId();
+    if (id && this.rfqDetail()?.rfq.id !== id) {
+      this.loadData(id);
+    }
   }
 
   loadData(rfqId: string): void {
