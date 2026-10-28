@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import time
+from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -16,6 +19,7 @@ from integration.smart_compare_helpers import (
     settings_for_test_db,
 )
 from procurepilot_api.errors import NotFoundError
+from procurepilot_api.modules.offers import supplier_iq
 from procurepilot_api.modules.offers.supplier_iq import SupplierIqService
 
 psycopg = pytest.importorskip("psycopg")
@@ -78,13 +82,14 @@ def test_supplier_scorecard_metrics_trace_to_seeded_source_records(
         )
         quality_issue_id = _insert_quality_issue(context, supplier_offer_ids[0])
 
+        today = _scorecard_today()
         scorecard = SupplierIqService(settings).get_scorecard(
             member=context.member,
             supplier_id=context.supplier_ids[0],
         )
 
         assert scorecard.supplier_id == context.supplier_ids[0]
-        assert scorecard.window_start <= date.today() <= scorecard.window_end
+        assert scorecard.window_start <= today <= scorecard.window_end
         assert scorecard.metrics["fulfilment_rate"].value == "0.5000"
         assert scorecard.metrics["quality_score"].value == "0.6667"
         assert scorecard.metrics["spend_exposure"].value == "0.6000"
@@ -119,6 +124,42 @@ def test_supplier_scorecard_honours_requested_window_months(
         assert 88 <= (scorecard.window_end - scorecard.window_start).days <= 93
 
 
+# 00:30 in Cairo (EEST, UTC+3) is still the previous day in UTC.
+CAIRO_JUST_AFTER_MIDNIGHT = datetime(2026, 10, 28, 21, 30, tzinfo=UTC)
+
+
+@pytest.fixture
+def cairo_host_clock(monkeypatch: pytest.MonkeyPatch) -> Iterator[datetime]:
+    monkeypatch.setattr(supplier_iq, "_utc_now", lambda: CAIRO_JUST_AFTER_MIDNIGHT)
+    previous_tz = os.environ.get("TZ")
+    os.environ["TZ"] = "Africa/Cairo"
+    time.tzset()
+    try:
+        yield CAIRO_JUST_AFTER_MIDNIGHT
+    finally:
+        if previous_tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = previous_tz
+        time.tzset()
+
+
+def test_supplier_scorecard_window_ends_on_utc_date_on_a_cairo_host_after_midnight(
+    monkeypatch: pytest.MonkeyPatch,
+    cairo_host_clock: datetime,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    assert cairo_host_clock.astimezone().date() == date(2026, 10, 29)
+    with committed_smart_context("supplier-iq-cairo-midnight") as context:
+        scorecard = SupplierIqService(settings).get_scorecard(
+            member=context.member,
+            supplier_id=context.supplier_ids[0],
+        )
+
+        assert scorecard.window_end == date(2026, 10, 28)
+        assert scorecard.window_start <= _scorecard_today() <= scorecard.window_end
+
+
 def test_cross_tenant_supplier_scorecard_reference_returns_not_found(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -130,6 +171,12 @@ def test_cross_tenant_supplier_scorecard_reference_returns_not_found(
                     member=alpha.member,
                     supplier_id=beta.supplier_ids[0],
                 )
+
+
+def _scorecard_today() -> date:
+    # The service's clock, not date.today(): the window ends on the UTC date, so a host east of
+    # UTC is a day ahead of it between local midnight and UTC midnight.
+    return supplier_iq._utc_now().date()
 
 
 def _insert_purchase_record(

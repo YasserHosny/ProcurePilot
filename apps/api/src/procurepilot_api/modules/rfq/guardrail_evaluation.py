@@ -91,7 +91,7 @@ def compute_guardrail_evaluation(
         join rfq_recipient rec on r.rfq_recipient_id = rec.id
         join quotation q on r.quotation_id = q.id and q.tenant_id = r.tenant_id
         left join quotation_line ql on r.quotation_id = ql.quotation_id
-        left join match_decision md on ql.id = md.quotation_line_id
+        left join current_match_decision md on ql.id = md.quotation_line_id
         where r.tenant_id = %s and rec.rfq_id = %s
         """,
         (tenant_id, rfq_id),
@@ -215,7 +215,7 @@ def compute_guardrail_evaluation(
             select md.matched_workspace_product_id,
                    avg(lc.total_amount / lc.normalised_base_quantity) as avg_price
             from landed_cost lc
-            join match_decision md on lc.match_decision_id = md.id
+            join current_match_decision md on lc.match_decision_id = md.id
             where lc.tenant_id = %s and lc.created_at >= now() - interval '90 days'
               and md.matched_workspace_product_id = any(%s)
               and not exists (

@@ -190,7 +190,7 @@ def test_auto_accepted_tasks_use_auto_accepted_status(
     captured: dict[str, object] = {}
     client = FakeClient(
         {
-            "match_decision": [
+            "current_match_decision": [
                 {
                     "id": decision_id,
                     "quotation_line_id": line_id,

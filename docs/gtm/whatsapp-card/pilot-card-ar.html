@@ -5,59 +5,77 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#0B2545}
-.card{width:1080px;height:1350px;background:#0B2545;color:#fff;font-family:'Readex Pro',sans-serif;
-  padding:72px 80px 64px;display:flex;flex-direction:column;position:relative;overflow:hidden}
-.glow{position:absolute;inset-inline-start:-260px;top:-260px;width:760px;height:760px;border-radius:50%;
-  background:radial-gradient(circle,rgba(25,184,164,.22),rgba(25,184,164,0) 65%)}
-.top{display:flex;justify-content:space-between;align-items:center;position:relative}
-.top img{height:76px}
-.tag{font-size:26px;font-weight:500;color:#0B2545;background:#19B8A4;border-radius:999px;padding:10px 28px}
-.kicker{margin-top:52px;font-size:34px;font-weight:500;color:#C9D6E3;position:relative}
-h1{margin:14px 0 0;font-size:70px;line-height:1.25;font-weight:700;letter-spacing:-.5px;position:relative}
+.card{width:1080px;height:1350px;color:#fff;font-family:'Readex Pro',sans-serif;position:relative;overflow:hidden;display:flex;flex-direction:column;background:#0B2545}
+.ltr{direction:ltr;unicode-bidi:isolate}
+.main{position:relative;flex:1;padding:60px 72px 0;display:flex;flex-direction:column}
+.top{display:flex;justify-content:space-between;align-items:center}
+.top img{height:66px}
+.tag{font-size:25px;font-weight:500;color:#0B2545;background:#19B8A4;border-radius:999px;padding:9px 26px}
+.kicker{margin-top:48px;font-size:30px;font-weight:500;color:#C9D6E3}
+h1{margin:12px 0 0;font-size:66px;line-height:1.2;font-weight:700;letter-spacing:-.5px}
 h1 em{font-style:normal;color:#19B8A4}
-.sub{margin-top:22px;font-size:36px;line-height:1.55;font-weight:400;color:#D7E3F0;position:relative}
+.sub{margin-top:16px;font-size:33px;line-height:1.5;color:#D7E3F0}
 .sub b{color:#fff;font-weight:600}
-.compare{margin-top:40px;background:#13345C;border-radius:32px;padding:34px 40px;display:flex;flex-direction:column;gap:20px;position:relative}
-.row{display:flex;align-items:center;gap:22px;font-size:30px}
+.compare{margin-top:28px;background:#13345C;border-radius:28px;padding:24px 34px;display:flex;flex-direction:column;gap:14px}
+.row{display:flex;align-items:center;gap:22px;font-size:28px}
 .row .name{width:150px;color:#C9D6E3;font-weight:500}
-.bar{height:44px;border-radius:12px;background:#C9D6E3;opacity:.55}
-.row.win .bar{background:#19B8A4;opacity:1;position:relative}
+.bar{height:34px;border-radius:10px;background:#C9D6E3;opacity:.55}
+.row.win .bar{background:#19B8A4;opacity:1}
 .row.win .name{color:#fff;font-weight:600}
-.pill{margin-inline-start:auto;font-size:26px;font-weight:600;color:#19B8A4;border:2px solid #19B8A4;border-radius:999px;padding:6px 22px}
-.steps{margin-top:32px;display:flex;gap:18px;position:relative}
-.step{flex:1;background:rgba(255,255,255,.06);border-radius:24px;padding:22px 22px;font-size:27px;line-height:1.45;font-weight:500}
-.step span{display:block;font-size:40px;font-weight:700;color:#19B8A4;margin-bottom:6px}
-.cta{margin-top:auto;margin-block-start:32px;background:#19B8A4;color:#0B2545;border-radius:32px;padding:34px 44px;display:flex;align-items:center;justify-content:space-between;position:relative}
-.cta .t1{font-size:46px;font-weight:700}
-.cta .t2{font-size:30px;font-weight:500;margin-top:6px}
-.cta .arrow{font-size:76px;font-weight:700;line-height:1}
+.pill{margin-inline-start:auto;font-size:24px;font-weight:600;color:#19B8A4;border:2px solid #19B8A4;border-radius:999px;padding:4px 20px}
+.steps{margin-top:22px;display:flex;gap:16px}
+.step{flex:1;background:rgba(255,255,255,.06);border-radius:22px;padding:18px 20px;font-size:25px;line-height:1.4;font-weight:500}
+.step span{display:block;font-size:34px;font-weight:700;color:#19B8A4;margin-bottom:4px}
+.cta{margin-top:auto;background:#19B8A4;color:#0B2545;border-radius:28px;padding:24px 36px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.cta .t1{font-size:42px;font-weight:700}
+.cta .t2{font-size:28px;font-weight:500;margin-top:4px}
+.cta .arrow{font-size:64px;font-weight:700;line-height:1}
+.founder{margin:20px 0 22px;display:flex;justify-content:space-between;align-items:baseline;font-size:27px;color:#D7E3F0}
+.founder .wa{font-weight:600;color:#19B8A4;font-size:32px}
+.founder .wa small{font-size:24px;font-weight:500;color:#AFC3D9;margin-inline-end:10px}
+.band{position:relative;height:100px;background:#071A33;border-top:1px solid #1C3D66;padding:0 72px;display:flex;align-items:center;justify-content:space-between}
+.band .by{display:flex;align-items:center;gap:16px;font-size:24px;color:#AFC3D9}
+.band .by img{height:40px;display:block}
+.band .links{font-size:25px;color:#D7E3F0}
+.band .links b{color:#fff;font-weight:600}
+.band .links i{font-style:normal;color:#5A7699;margin:0 12px}
+.kicker{margin-top:48px}
+.compare{margin-top:34px;padding:30px 36px;gap:18px}
+.row{font-size:30px}
+.bar{height:40px}
+.steps{margin-top:26px}
+.step{padding:22px 22px;font-size:27px}
+.step span{font-size:38px}
 </style></head><body>
 <div class="card">
-  <div class="glow"></div>
-  <div class="top">
-    <img src="../../brand/logo/procurepilot-arabic-horizontal-dark.svg" alt="بروكيور بايلوت">
-    <div class="tag">بايلوت مجاني</div>
+  <div style="position:absolute;inset-inline-start:-260px;top:-260px;width:760px;height:760px;border-radius:50%;background:radial-gradient(circle,rgba(25,184,164,.22),rgba(25,184,164,0) 65%)"></div>
+  <div class="main">
+    <div class="top">
+      <img src="../../brand/logo/procurepilot-arabic-horizontal-dark.svg" alt="بروكيور بايلوت">
+      <div class="tag">بايلوت مجاني</div>
+    </div>
+    <div class="kicker">لمشتريات المطاعم</div>
+    <h1>عروض الموردين متبعترة<br>على الواتساب والإكسل؟</h1>
+    <div class="sub">بروكيور بايلوت بيجمع عروض الأسعار ويقارنها جنب بعض،<br>و<b>يوريك قد إيه وفّرت بالجنيه</b>.</div>
+    <div class="compare">
+      <div class="row"><div class="name">مورد ١</div><div class="bar" style="width:520px"></div></div>
+      <div class="row win"><div class="name">مورد ٢</div><div class="bar" style="width:400px"></div><div class=pill>الأوفر</div></div>
+      <div class="row"><div class="name">مورد ٣</div><div class="bar" style="width:600px"></div></div>
+    </div>
+    <div class="steps">
+      <div class="step"><span>١</span>ابعت طلب عرض سعر واحد لكل الموردين</div>
+      <div class="step"><span>٢</span>قارن بالعبوة، شامل الضريبة والتوصيل</div>
+      <div class="step"><span>٣</span>وافق على الطلب من موبايلك وطلّع أمر الشراء</div>
+    </div>
+    <div class="cta">
+      <div><div class="t1">جرّبه أسبوعين مجانًا</div><div class="t2">وإحنا اللي هنجهّزه معاك.</div></div>
+      <div class="arrow">←</div>
+    </div>
+    <div class="founder"><span>د. ياسر حسني — المؤسس</span><span class="wa"><small>واتساب</small><span class="ltr">+20 102 735 4140</span></span></div>
   </div>
-
-  <div class="kicker">للمطاعم والشركات اللي عندها فروع</div>
-  <h1>عروض الموردين متبعترة<br>على الواتساب والإكسل؟</h1>
-  <div class="sub">بروكيور بايلوت بيجمع عروض الأسعار، يقارنها جنب بعض،<br>و<b>يوريك قد إيه وفّرت بالجنيه</b> — وإنت متابع من موبايلك.</div>
-
-  <div class="compare">
-    <div class="row"><div class="name">مورد ١</div><div class="bar" style="width:520px"></div></div>
-    <div class="row win"><div class="name">مورد ٢</div><div class="bar" style="width:400px"></div><div class="pill">الأوفر</div></div>
-    <div class="row"><div class="name">مورد ٣</div><div class="bar" style="width:600px"></div></div>
-  </div>
-
-  <div class="steps">
-    <div class="step"><span>١</span>ابعت طلب عرض سعر لكل الموردين مرة واحدة</div>
-    <div class="step"><span>٢</span>قارن العروض بنفس الوحدة والسعر الحقيقي</div>
-    <div class="step"><span>٣</span>وافق على الطلب من موبايلك وطلّع أمر الشراء</div>
-  </div>
-
-  <div class="cta">
-    <div><div class="t1">جرّبه مجاناً ١٤ يوم</div><div class="t2">أماكن البايلوت محدودة — ابعتلي رسالة هنا</div></div>
-    <div class="arrow">←</div>
+  <div class="band">
+    <div class="by"><span>أحد منتجات</span><img src="iron-systems-logo-white.svg" alt="Iron Systems"></div>
+    <div class="links ltr"><b>www.iron-sys.com</b><i>·</i>hello@iron-sys.com</div>
   </div>
 </div>
 </body></html>

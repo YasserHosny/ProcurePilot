@@ -86,7 +86,7 @@ class _FakeClient:
                     "vat_rate": None,
                 }
             ],
-            "match_decision": [
+            "current_match_decision": [
                 {
                     "id": str(uuid4()),
                     "quotation_line_id": str(LINE_ID),

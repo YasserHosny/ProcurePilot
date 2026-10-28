@@ -49,6 +49,11 @@ MIN_SAMPLE_COUNT = 3
 FRESHNESS_TARGET_DAYS = Decimal("180")
 
 
+def _utc_now() -> datetime:
+    """The service clock. Evidence windows end on the UTC date, not the host's or tenant's."""
+    return datetime.now(UTC)
+
+
 @dataclass(frozen=True)
 class SupplierIqSourceData:
     purchase_records: list[dict[str, object]]
@@ -78,7 +83,7 @@ class SupplierIqService:
         bearer_token: str | None = None,
         window_months: int = 6,
     ) -> SupplierScorecard:
-        today = datetime.now(UTC).date()
+        today = _utc_now().date()
         bounded_months = max(1, min(24, int(window_months)))
         window_start = today - relativedelta(months=bounded_months)
         with _authenticated_db(self._settings, member) as conn:
@@ -93,7 +98,7 @@ class SupplierIqService:
                 supplier_id=supplier_id,
                 window_start=window_start,
                 window_end=today,
-                computed_at=datetime.now(UTC),
+                computed_at=_utc_now(),
                 source_data=source_data,
             )
             _persist_snapshot(conn, member=member, scorecard=scorecard)
@@ -125,7 +130,7 @@ class SupplierIqService:
             raise UnprocessableEntityError(details={"header": "Idempotency-Key is required"})
         if member.role not in {MemberRole.owner, MemberRole.buyer}:
             raise PermissionDeniedError()
-        window_end = datetime.now(UTC).date()
+        window_end = _utc_now().date()
         window_start = window_end - timedelta(days=DEFAULT_WINDOW_DAYS)
         generated = 0
         with _authenticated_db_with_failure_audit(
@@ -795,7 +800,7 @@ select
   lc.total_currency as currency,
   lc.recorded_at
 from landed_cost lc
-join match_decision md
+join current_match_decision md
   on md.tenant_id = lc.tenant_id
  and md.id = lc.match_decision_id
 join quotation_line ql
@@ -819,7 +824,7 @@ select
   lc.total_currency as currency,
   lc.recorded_at
 from landed_cost lc
-join match_decision md
+join current_match_decision md
   on md.tenant_id = lc.tenant_id
  and md.id = lc.match_decision_id
 join quotation_line ql

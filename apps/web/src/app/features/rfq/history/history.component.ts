@@ -1,4 +1,6 @@
-import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, DestroyRef, ChangeDetectionStrategy } from '@angular/core';
+import { BreakpointObserver } from '@angular/cdk/layout';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
@@ -15,10 +17,22 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { RfqApi, RfqRecipient, RfqSummary } from '../rfq-api';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { FormatService } from '../../../core/format/format.service';
+import { parseIsoDateLocal } from '../../../core/format/iso-date';
 import { RoleDirective } from '../../../core/auth/role.directive';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
+
+export function isDateInPast(date: Date | string | null | undefined): boolean {
+  if (!date) return false;
+  const d = typeof date === 'string' ? parseIsoDateLocal(date) : date;
+  if (!d || isNaN(d.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return target.getTime() < today.getTime();
+}
 
 export interface RecipientsCacheEntry {
   loading: boolean;
@@ -56,7 +70,26 @@ export class HistoryComponent implements OnInit {
   private readonly translate = inject(TranslateService);
   private readonly api = inject(ApiService);
   private readonly session = inject(SessionService);
+  private readonly formatService = inject(FormatService);
+  private readonly breakpoint = inject(BreakpointObserver);
+  private readonly destroyRef = inject(DestroyRef);
+
   readonly currentMembershipId = signal<string | null>(null);
+
+  readonly isBelow1200 = signal(false);
+  readonly isBelow768 = signal(false);
+
+  readonly displayedColumns = computed(() => {
+    if (this.isBelow768()) {
+      return ['status', 'neededBy', 'actions'];
+    }
+    if (this.isBelow1200()) {
+      return ['status', 'neededBy', 'sentAt', 'actions'];
+    }
+    return ['status', 'neededBy', 'sentAt', 'recipients', 'responses', 'actions'];
+  });
+
+  readonly showCountsInMenu = computed(() => this.isBelow1200());
 
   readonly loading = signal<boolean>(true);
   readonly rfqs = signal<RfqSummary[]>([]);
@@ -65,9 +98,21 @@ export class HistoryComponent implements OnInit {
 
   readonly timeFormatOptions: Intl.DateTimeFormatOptions = { timeStyle: 'short' };
 
-  readonly displayedColumns = ['status', 'neededBy', 'sentAt', 'recipients', 'responses', 'actions'];
-
   ngOnInit(): void {
+    this.breakpoint
+      .observe('(max-width: 1199.98px)')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((res) => {
+        this.isBelow1200.set(res.matches);
+      });
+
+    this.breakpoint
+      .observe('(max-width: 767.98px)')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((res) => {
+        this.isBelow768.set(res.matches);
+      });
+
     this.api.members().subscribe(({ items }) => {
       const email = this.session.currentMember()?.email;
       this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
@@ -153,12 +198,35 @@ export class HistoryComponent implements OnInit {
   onSendDraft(rfq: RfqSummary, event?: Event): void {
     event?.stopPropagation();
     if (!this.isCreator(rfq)) return;
+
+    if (isDateInPast(rfq.needed_by_date)) {
+      const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
+        width: '440px',
+        data: {
+          titleKey: 'rfq.history.neededByPassedTitle',
+          messageKey: 'rfq.history.neededByPassedMessage',
+          confirmKey: 'rfq.history.neededByPassedConfirm',
+          cancelKey: 'rfq.history.neededByPassedCancel',
+          isDestructive: false,
+        },
+      });
+
+      dialogRef.afterClosed().subscribe((confirmed: boolean | undefined) => {
+        if (confirmed) {
+          this.router.navigate(['/rfq', rfq.id, 'edit']);
+        }
+      });
+      return;
+    }
+
+    const formattedDate = this.formatService.formatDate(rfq.needed_by_date);
     const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
       width: '440px',
       data: {
         titleKey: 'rfq.history.confirmSendTitle',
         messageKey: 'rfq.history.confirmSendMessage',
-        messageParams: { count: rfq.recipient_count },
+        messageParams: { count: rfq.recipient_count, date: formattedDate },
+        date: formattedDate,
         confirmKey: 'rfq.history.confirmSendButton',
         cancelKey: 'rfq.history.cancelSendButton',
         isDestructive: false,

@@ -1,12 +1,14 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { RfqCreateComponent } from './create.component';
-import { RfqApi, Rfq, RfqDetail } from '../rfq-api';
+import { RfqApi, Rfq, RfqDetail, RfqCreateResponse } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { provideHttpClient, HttpErrorResponse, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { of, throwError } from 'rxjs';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
+import { of, throwError, Subject } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Product, Supplier } from '../../../core/api/models';
@@ -17,17 +19,38 @@ describe('RfqCreateComponent', () => {
   let rfqApiSpy: jasmine.SpyObj<RfqApi>;
   let apiSpy: jasmine.SpyObj<ApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
+  let dialogSpy: jasmine.SpyObj<MatDialog>;
   let router: Router;
   let translate: TranslateService;
   let routeId: string | null;
   let fromId: string | null;
 
   beforeEach(async () => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(2026, 9, 28));
     routeId = null;
     fromId = null;
     rfqApiSpy = jasmine.createSpyObj('RfqApi', ['createRfq', 'getRfq', 'updateRfq', 'sendRfq']);
     apiSpy = jasmine.createSpyObj('ApiService', ['products', 'suppliers']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
+    dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of(true),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+    rfqApiSpy.sendRfq.and.returnValue(
+      of({
+        rfq: { id: 'rfq-default', status: 'sent' } as Rfq,
+        recipients: [],
+      }),
+    );
+    rfqApiSpy.updateRfq.and.returnValue(
+      of({
+        rfq: { id: 'rfq-default', status: 'draft' } as Rfq,
+        lines: [],
+        recipients: [],
+        rejected_recipients: [],
+      }),
+    );
 
     apiSpy.products.and.returnValue(
       of({ items: [{ id: 'prod-1', tenant_name: 'Product 1' } as Product], next_cursor: null }),
@@ -50,6 +73,7 @@ describe('RfqCreateComponent', () => {
         { provide: RfqApi, useValue: rfqApiSpy },
         { provide: ApiService, useValue: apiSpy },
         { provide: MatSnackBar, useValue: snackBarSpy },
+        { provide: MatDialog, useValue: dialogSpy },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -66,6 +90,7 @@ describe('RfqCreateComponent', () => {
       ],
     })
       .overrideProvider(MatSnackBar, { useValue: snackBarSpy })
+      .overrideProvider(MatDialog, { useValue: dialogSpy })
       .compileComponents();
 
     router = TestBed.inject(Router);
@@ -88,6 +113,16 @@ describe('RfqCreateComponent', () => {
             validationError: 'Please check the following RFQ fields:',
             neededByDateLabel: 'Needed By Date',
             saveError: 'SAVE FALLBACK',
+            neededByPastError: "The needed-by date can't be in the past",
+            neededByDateRequired: 'Needed by date is required',
+            neededByDateFormat: 'Enter a date as {{format}}',
+            productDuplicate: 'The same product cannot be added more than once',
+            productDuplicateOnLine: 'Already on line {{line}}',
+            alreadyAdded: 'Already added',
+            confirmSendMessage: {
+              one: 'Send this RFQ to {{suppliers}} for {{itemCount}} item, needed by {{date}}?',
+              other: 'Send this RFQ to {{suppliers}} for {{itemCount}} items, needed by {{date}}?',
+            },
             errors: { notFound: 'The requested RFQ resource could not be found.' },
           },
           history: {
@@ -104,6 +139,10 @@ describe('RfqCreateComponent', () => {
     fixture = TestBed.createComponent(RfqCreateComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    jasmine.clock().uninstall();
   });
 
 
@@ -148,11 +187,6 @@ describe('RfqCreateComponent', () => {
 
     fixture.detectChanges();
     expect(component.form.controls.tenantTerms.invalid).toBeTrue();
-    expect(
-      (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button[type="submit"]')
-        ?.disabled,
-    ).toBeTrue();
-
     component.form.controls.tenantTerms.setValue('x'.repeat(4000));
     fixture.detectChanges();
     expect(component.form.controls.tenantTerms.valid).toBeTrue();
@@ -201,6 +235,12 @@ describe('RfqCreateComponent', () => {
 
   it('should call sendRfq when explicit send is triggered, show snackbar, and navigate to history', () => {
     component.rfqId.set('rfq-1');
+    component.products.set([{ id: 'prod-1', tenant_name: 'Product 1' } as Product]);
+    component.form.patchValue({
+      lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+      supplierIds: ['sup-1'],
+      neededByDate: new Date(2026, 11, 15),
+    });
     rfqApiSpy.sendRfq.and.returnValue(
       of({
         rfq: { id: 'rfq-1', status: 'sent' } as Rfq,
@@ -218,6 +258,12 @@ describe('RfqCreateComponent', () => {
 
   it('stays on the page and reports partial delivery', () => {
     component.rfqId.set('rfq-1');
+    component.products.set([{ id: 'prod-1', tenant_name: 'Product 1' } as Product]);
+    component.form.patchValue({
+      lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+      supplierIds: ['sup-1'],
+      neededByDate: new Date(2026, 11, 15),
+    });
     rfqApiSpy.sendRfq.and.returnValue(of({
       rfq: { id: 'rfq-1', status: 'sent' } as Rfq,
       recipients: [{ status: 'sent' }, { status: 'failed' }] as never[],
@@ -229,6 +275,12 @@ describe('RfqCreateComponent', () => {
 
   it('stays on the page and reports no delivery', () => {
     component.rfqId.set('rfq-1');
+    component.products.set([{ id: 'prod-1', tenant_name: 'Product 1' } as Product]);
+    component.form.patchValue({
+      lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+      supplierIds: ['sup-1'],
+      neededByDate: new Date(2026, 11, 15),
+    });
     rfqApiSpy.sendRfq.and.returnValue(of({
       rfq: { id: 'rfq-1', status: 'draft' } as Rfq,
       recipients: [{ status: 'failed' }] as never[],
@@ -475,11 +527,11 @@ describe('RfqCreateComponent', () => {
     component.form.patchValue({
       lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
       supplierIds: ['sup-1'],
-      neededByDate: new Date(2026, 9, 20),
+      neededByDate: new Date(2026, 11, 20),
     });
     component.onSave();
     expect(rfqApiSpy.createRfq).toHaveBeenCalledWith(
-      jasmine.objectContaining({ needed_by_date: '2026-10-20' }),
+      jasmine.objectContaining({ needed_by_date: '2026-12-20' }),
     );
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain(
@@ -507,7 +559,7 @@ describe('RfqCreateComponent', () => {
     component.form.patchValue({
       lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
       supplierIds: ['sup-1'],
-      neededByDate: new Date(2026, 9, 20),
+      neededByDate: new Date(2026, 11, 20),
     });
 
     component.onSave();
@@ -532,7 +584,7 @@ describe('RfqCreateComponent', () => {
     component.form.patchValue({
       lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
       supplierIds: ['sup-1'],
-      neededByDate: new Date(2026, 9, 20),
+      neededByDate: new Date(2026, 11, 20),
     });
     component.onSave();
     fixture.detectChanges();
@@ -555,7 +607,7 @@ describe('RfqCreateComponent', () => {
     component.form.patchValue({
       lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
       supplierIds: ['sup-1'],
-      neededByDate: new Date(2026, 9, 20),
+      neededByDate: new Date(2026, 11, 20),
     });
     component.onSave();
     fixture.detectChanges();
@@ -615,14 +667,15 @@ describe('RfqCreateComponent', () => {
   });
 
   describe('Focus moves to Quantity after product picked (R1)', () => {
-    it('moves focus to the quantity input when onProductSelected is called', () => {
+    it('moves focus to the quantity input when onProductSelected is called', fakeAsync(() => {
       const inputs = component.quantityInputs();
       expect(inputs.length).toBeGreaterThan(0);
       const focusSpy = spyOn(inputs[0].nativeElement, 'focus').and.callThrough();
 
       component.onProductSelected(0);
+      tick();
       expect(focusSpy).toHaveBeenCalled();
-    });
+    }));
   });
 
   describe('Supplier email in options and trigger shows names only (R4)', () => {
@@ -829,5 +882,500 @@ describe('RfqCreateComponent', () => {
       expect(matError).not.toBeNull();
       expect(matError?.textContent?.trim()).toBe('Select a product from the catalogue.');
     });
+  });
+
+  describe('Never send what is not on screen (PPS-90)', () => {
+    it('dirty form -> send saves then sends (spy order)', () => {
+      component.rfqId.set('rfq-edit-1');
+      component.isEditMode.set(true);
+      component.products.set([{ id: 'prod-1', tenant_name: 'Product 1' } as Product]);
+      component.suppliers.set([{ id: 'sup-1', name: 'Supplier 1', contact_email: 'sup@test.com' } as Supplier]);
+      component.form.patchValue({
+        lines: [{ workspace_product_id: 'prod-1', quantity: '50' }],
+        supplierIds: ['sup-1'],
+        neededByDate: new Date(2026, 11, 15),
+      });
+      component.form.markAsDirty();
+
+      rfqApiSpy.updateRfq.and.returnValue(
+        of({
+          rfq: { id: 'rfq-edit-1', status: 'draft' } as Rfq,
+          lines: [],
+          recipients: [],
+          rejected_recipients: [],
+        }),
+      );
+      rfqApiSpy.sendRfq.and.returnValue(
+        of({
+          rfq: { id: 'rfq-edit-1', status: 'sent' } as Rfq,
+          recipients: [{ id: 'rec-1', status: 'sent' }] as never[],
+        }),
+      );
+
+      component.onSend();
+
+      expect(dialogSpy.open).toHaveBeenCalled();
+      expect(rfqApiSpy.updateRfq).toHaveBeenCalledBefore(rfqApiSpy.sendRfq);
+      expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-edit-1');
+    });
+
+    it('invalid form -> neither call', () => {
+      component.rfqId.set('rfq-edit-1');
+      component.isEditMode.set(true);
+      component.form.controls.lines.at(0).get('quantity')?.setValue('');
+      expect(component.form.invalid).toBeTrue();
+
+      component.onSend();
+
+      expect(dialogSpy.open).not.toHaveBeenCalled();
+      expect(rfqApiSpy.updateRfq).not.toHaveBeenCalled();
+      expect(rfqApiSpy.sendRfq).not.toHaveBeenCalled();
+    });
+
+    it('canDeactivate asks only when dirty', () => {
+      dialogSpy.open.calls.reset();
+      expect(component.form.dirty).toBeFalse();
+      const allowWhenPristine = component.canDeactivate();
+      expect(allowWhenPristine).toBeTrue();
+      expect(dialogSpy.open).not.toHaveBeenCalled();
+
+      component.form.markAsDirty();
+      const result$ = component.canDeactivate();
+      expect(dialogSpy.open).toHaveBeenCalledWith(
+        CatalogueConfirmDialogComponent,
+        jasmine.objectContaining({
+          data: jasmine.objectContaining({
+            titleKey: 'rfq.create.discardChangesTitle',
+            messageKey: 'rfq.create.discardChangesMessage',
+            isDestructive: true,
+          }),
+        }),
+      );
+      expect(result$).not.toBe(true);
+    });
+
+    it('no prompt after successful save or send', () => {
+      component.form.markAsDirty();
+      component.rfqId.set('rfq-edit-1');
+      component.products.set([{ id: 'prod-1', tenant_name: 'Product 1' } as Product]);
+      component.suppliers.set([{ id: 'sup-1', name: 'Supplier 1', contact_email: 'sup@test.com' } as Supplier]);
+      component.form.patchValue({
+        lines: [{ workspace_product_id: 'prod-1', quantity: '50' }],
+        supplierIds: ['sup-1'],
+        neededByDate: new Date(2026, 11, 15),
+      });
+
+      rfqApiSpy.updateRfq.and.returnValue(
+        of({
+          rfq: { id: 'rfq-edit-1', status: 'draft' } as Rfq,
+          lines: [],
+          recipients: [],
+          rejected_recipients: [],
+        }),
+      );
+
+      component.onSave();
+      expect(component.form.dirty).toBeFalse();
+
+      dialogSpy.open.calls.reset();
+      const canLeave = component.canDeactivate();
+      expect(canLeave).toBeTrue();
+      expect(dialogSpy.open).not.toHaveBeenCalled();
+    });
+
+    it('send with a past date calls neither updateRfq nor sendRfq and opens no dialog', () => {
+      component.rfqId.set('rfq-edit-1');
+      component.products.set([{ id: 'prod-1', tenant_name: 'Product 1' } as Product]);
+      component.suppliers.set([{ id: 'sup-1', name: 'Al-Ahram Supplies', contact_email: 'sup@test.com' } as Supplier]);
+      component.form.patchValue({
+        lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+        supplierIds: ['sup-1'],
+        neededByDate: new Date(2026, 8, 1), // Sept 1, 2026 is past relative to Oct 2026
+      });
+
+      component.onSend();
+
+      expect(dialogSpy.open).not.toHaveBeenCalled();
+      expect(rfqApiSpy.updateRfq).not.toHaveBeenCalled();
+      expect(rfqApiSpy.sendRfq).not.toHaveBeenCalled();
+      expect(component.form.controls.neededByDate.touched).toBeTrue();
+      expect(component.form.controls.neededByDate.hasError('pastDate')).toBeTrue();
+    });
+
+    it('dialog data contains supplier names and the date without past-date warning when needed-by is valid', () => {
+      dialogSpy.open.and.returnValue({
+        afterClosed: () => of(false),
+      } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+      component.rfqId.set('rfq-edit-1');
+      component.products.set([{ id: 'prod-1', tenant_name: 'Product 1' } as Product]);
+      component.suppliers.set([{ id: 'sup-1', name: 'Al-Ahram Supplies', contact_email: 'sup@test.com' } as Supplier]);
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 10);
+      component.form.patchValue({
+        lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+        supplierIds: ['sup-1'],
+        neededByDate: futureDate,
+      });
+
+      component.onSend();
+
+      expect(dialogSpy.open).toHaveBeenCalledWith(
+        CatalogueConfirmDialogComponent,
+        jasmine.objectContaining({
+          data: jasmine.objectContaining({
+            suppliers: jasmine.stringMatching(/Al-Ahram Supplies/),
+            date: jasmine.any(String),
+          }),
+        }),
+      );
+      const dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as Record<string, unknown>;
+      expect(dialogData['warningKey']).toBeUndefined();
+    });
+
+    it('formats plural confirm message for 1 item', () => {
+      dialogSpy.open.and.returnValue({
+        afterClosed: () => of(false),
+      } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+      component.rfqId.set('rfq-edit-1');
+      component.products.set([{ id: 'prod-1', tenant_name: 'Product 1' } as Product]);
+      component.suppliers.set([{ id: 'sup-1', name: 'Al-Ahram Supplies', contact_email: 'sup@test.com' } as Supplier]);
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 10);
+      component.form.patchValue({
+        lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+        supplierIds: ['sup-1'],
+        neededByDate: futureDate,
+      });
+
+      component.onSend();
+
+      expect(dialogSpy.open).toHaveBeenCalled();
+      const dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as Record<string, unknown>;
+      expect(dialogData['messageKey']).toBe('rfq.create.confirmSendMessage.one');
+      const message = translate.instant(dialogData['messageKey'] as string, dialogData['messageParams'] as Record<string, unknown>);
+      expect(message).toContain('1 item');
+    });
+
+    it('formats plural confirm message for 3 items', () => {
+      dialogSpy.open.and.returnValue({
+        afterClosed: () => of(false),
+      } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+      component.rfqId.set('rfq-edit-1');
+      component.products.set([
+        { id: 'prod-1', tenant_name: 'Product 1' } as Product,
+        { id: 'prod-2', tenant_name: 'Product 2' } as Product,
+        { id: 'prod-3', tenant_name: 'Product 3' } as Product,
+      ]);
+      component.suppliers.set([{ id: 'sup-1', name: 'Al-Ahram Supplies', contact_email: 'sup@test.com' } as Supplier]);
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 10);
+
+      component.addLine();
+      component.addLine();
+
+      component.form.patchValue({
+        lines: [
+          { workspace_product_id: 'prod-1', quantity: '10' },
+          { workspace_product_id: 'prod-2', quantity: '20' },
+          { workspace_product_id: 'prod-3', quantity: '30' },
+        ],
+        supplierIds: ['sup-1'],
+        neededByDate: futureDate,
+      });
+
+      component.onSend();
+
+      expect(dialogSpy.open).toHaveBeenCalled();
+      const dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as Record<string, unknown>;
+      expect(dialogData['messageKey']).toBe('rfq.create.confirmSendMessage.other');
+      const message = translate.instant(dialogData['messageKey'] as string, dialogData['messageParams'] as Record<string, unknown>);
+      expect(message).toContain('3 items');
+    });
+
+    it('formats Arabic plural confirm message for 1 and 3 items', () => {
+      translate.setTranslation(
+        'ar',
+        {
+          rfq: {
+            create: {
+              confirmSendMessage: {
+                one: 'هل تريد إرسال طلب عرض الأسعار هذا إلى {{suppliers}} لسلعة واحدة، وتاريخ الحاجة {{date}}؟',
+                few: 'هل تريد إرسال طلب عرض الأسعار هذا إلى {{suppliers}} لـ {{itemCount}} سلع، وتاريخ الحاجة {{date}}؟',
+                many: 'هل تريد إرسال طلب عرض الأسعار هذا إلى {{suppliers}} لـ {{itemCount}} سلعة، وتاريخ الحاجة {{date}}؟',
+                other: 'هل تريد إرسال طلب عرض الأسعار هذا إلى {{suppliers}} لـ {{itemCount}} سلعة، وتاريخ الحاجة {{date}}؟',
+              },
+            },
+          },
+        },
+        true,
+      );
+      translate.use('ar');
+
+      dialogSpy.open.and.returnValue({
+        afterClosed: () => of(false),
+      } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+      component.rfqId.set('rfq-edit-1');
+      component.products.set([
+        { id: 'prod-1', tenant_name: 'Product 1' } as Product,
+        { id: 'prod-2', tenant_name: 'Product 2' } as Product,
+        { id: 'prod-3', tenant_name: 'Product 3' } as Product,
+      ]);
+      component.suppliers.set([{ id: 'sup-1', name: 'Al-Ahram Supplies', contact_email: 'sup@test.com' } as Supplier]);
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 10);
+
+      // 1 item in Arabic
+      component.form.patchValue({
+        lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+        supplierIds: ['sup-1'],
+        neededByDate: futureDate,
+      });
+      component.onSend();
+      let dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as Record<string, unknown>;
+      expect(dialogData['messageKey']).toBe('rfq.create.confirmSendMessage.one');
+      let msg = translate.instant(dialogData['messageKey'] as string, dialogData['messageParams'] as Record<string, unknown>);
+      expect(msg).toContain('سلعة واحدة');
+
+      // 3 items in Arabic
+      component.addLine();
+      component.addLine();
+      component.form.patchValue({
+        lines: [
+          { workspace_product_id: 'prod-1', quantity: '10' },
+          { workspace_product_id: 'prod-2', quantity: '20' },
+          { workspace_product_id: 'prod-3', quantity: '30' },
+        ],
+      });
+      component.onSend();
+      dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as Record<string, unknown>;
+      expect(dialogData['messageKey']).toBe('rfq.create.confirmSendMessage.few');
+      msg = translate.instant(dialogData['messageKey'] as string, dialogData['messageParams'] as Record<string, unknown>);
+      expect(msg).toContain('سلع');
+    });
+
+    it('disables form controls while updateRfq is pending in saveDraftAndSend and re-enables on error', () => {
+      const updateSubject = new Subject<RfqCreateResponse>();
+      rfqApiSpy.updateRfq.and.returnValue(updateSubject.asObservable());
+
+      component.rfqId.set('rfq-edit-1');
+      component.products.set([{ id: 'prod-1', tenant_name: 'Product 1' } as Product]);
+      component.suppliers.set([{ id: 'sup-1', name: 'Al-Ahram Supplies', contact_email: 'sup@test.com' } as Supplier]);
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 10);
+
+      component.form.patchValue({
+        lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+        supplierIds: ['sup-1'],
+        neededByDate: futureDate,
+      });
+      component.form.markAsDirty();
+
+      dialogSpy.open.and.returnValue({
+        afterClosed: () => of(true),
+      } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+      component.onSend();
+
+      // updateRfq is now in flight
+      expect(rfqApiSpy.updateRfq).toHaveBeenCalled();
+      expect(component.isSaving()).toBeTrue();
+      expect(component.form.disabled).toBeTrue();
+
+      // Emit error to fail the pending update
+      updateSubject.error(new HttpErrorResponse({ status: 500 }));
+
+      expect(component.isSaving()).toBeFalse();
+      expect(component.form.disabled).toBeFalse();
+      expect(component.errorMessage()).toBeTruthy();
+    });
+  });
+
+  describe('Past dates and repeated products (PPS-91)', () => {
+    it('sets min date to today and marks past needed-by date invalid with pastDate error', () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      expect(component.minDate.getTime()).toBeLessThanOrEqual(today.getTime());
+
+      // Past date: yesterday
+      const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+      component.form.controls.neededByDate.setValue(yesterday);
+      component.form.controls.neededByDate.updateValueAndValidity();
+      expect(component.form.controls.neededByDate.invalid).toBeTrue();
+      expect(component.form.controls.neededByDate.hasError('pastDate')).toBeTrue();
+
+      // Today is valid
+      component.form.controls.neededByDate.setValue(today);
+      component.form.controls.neededByDate.updateValueAndValidity();
+      expect(component.form.controls.neededByDate.hasError('pastDate')).toBeFalse();
+
+      // Future date is valid
+      const future = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7);
+      component.form.controls.neededByDate.setValue(future);
+      component.form.controls.neededByDate.updateValueAndValidity();
+      expect(component.form.controls.neededByDate.hasError('pastDate')).toBeFalse();
+    });
+
+    it('marks later line invalid with "Already on line N" when product is duplicated across lines', () => {
+      component.products.set([
+        { id: 'prod-1', tenant_name: 'Product 1' } as Product,
+        { id: 'prod-2', tenant_name: 'Product 2' } as Product,
+      ]);
+      component.addLine(); // Now has 2 lines
+
+      const line0 = component.linesFormArray.at(0);
+      const line1 = component.linesFormArray.at(1);
+
+      line0.get('workspace_product_id')?.setValue('prod-1');
+      line1.get('workspace_product_id')?.setValue('prod-1');
+
+      component.form.updateValueAndValidity();
+
+      // Line 0 is the first line: valid
+      expect(line0.get('workspace_product_id')?.hasError('duplicateProduct')).toBeFalse();
+      // Line 1 is the later line: invalid with line: 1
+      expect(line1.get('workspace_product_id')?.invalid).toBeTrue();
+      expect(line1.get('workspace_product_id')?.getError('duplicateProduct')).toEqual({ line: 1 });
+
+      // In autocomplete, prod-1 is disabled for line 1, but NOT for line 0
+      expect(component.isProductSelectedOnOtherLine('prod-1', 1)).toBeTrue();
+      expect(component.isProductSelectedOnOtherLine('prod-1', 0)).toBeFalse();
+
+      // Changing line 1 to prod-2 clears the duplicate error
+      line1.get('workspace_product_id')?.setValue('prod-2');
+      component.form.updateValueAndValidity();
+      expect(line1.get('workspace_product_id')?.hasError('duplicateProduct')).toBeFalse();
+    });
+
+    it('maps 422 API errors with needed_by_in_past and duplicate_product reasons to user-friendly messages', () => {
+      const pastErr = new HttpErrorResponse({
+        status: 422,
+        error: { details: { reason: 'needed_by_in_past' } },
+      });
+      const pastMsg = (component as unknown as { getErrorMessage: (e: unknown, f: string) => string }).getErrorMessage(
+        pastErr,
+        'rfq.create.saveError',
+      );
+      expect(pastMsg).toBe("The needed-by date can't be in the past");
+
+      const dupErr = new HttpErrorResponse({
+        status: 422,
+        error: { reason: 'duplicate_product' },
+      });
+      const dupMsg = (component as unknown as { getErrorMessage: (e: unknown, f: string) => string }).getErrorMessage(
+        dupErr,
+        'rfq.create.saveError',
+      );
+      expect(dupMsg).toBe('The same product cannot be added more than once');
+    });
+  });
+
+  describe('Feedback on the form (PPS-92)', () => {
+    it('shows hint text with the format derived from date adapter', () => {
+      fixture.detectChanges();
+      const hints = fixture.nativeElement.querySelectorAll('mat-hint');
+      const textContents = Array.from(hints).map((h: unknown) => (h as HTMLElement).textContent?.trim());
+      expect(textContents.some((t) => t?.includes(component.dateFormatHint))).toBeTrue();
+      expect(component.dateFormatHint).toMatch(/DD\/MM\/YYYY|MM\/DD\/YYYY/);
+    });
+
+    it('displays mat-error for required and matDatepickerParse on neededByDate', () => {
+      const neededByControl = component.form.controls.neededByDate;
+      neededByControl.markAsTouched();
+      fixture.detectChanges();
+
+      let errorEls = fixture.nativeElement.querySelectorAll('mat-error');
+      let texts = Array.from(errorEls).map((el: unknown) => (el as HTMLElement).textContent?.trim());
+      expect(texts.some((t) => t?.includes('Needed by date is required'))).toBeTrue();
+
+      neededByControl.setErrors({ matDatepickerParse: { text: 'invalid-date' } });
+      fixture.detectChanges();
+      errorEls = fixture.nativeElement.querySelectorAll('mat-error');
+      texts = Array.from(errorEls).map((el: unknown) => (el as HTMLElement).textContent?.trim());
+      expect(texts.some((t) => t?.includes(`Enter a date as ${component.dateFormatHint}`))).toBeTrue();
+    });
+
+    it('does not leave quantity touched or invalid-styled right after product selection', fakeAsync(() => {
+      fixture.detectChanges();
+      const qtyInputEl = fixture.nativeElement.querySelector(
+        'input[formcontrolname="quantity"]',
+      ) as HTMLInputElement;
+
+      const line0Qty = component.linesFormArray.at(0).get('quantity');
+      expect(line0Qty?.touched).toBeFalse();
+
+      component.onProductSelected(0);
+      tick();
+      fixture.detectChanges();
+
+      expect(line0Qty?.touched).toBeFalse();
+      expect(qtyInputEl.classList.contains('ng-touched')).toBeFalse();
+    }));
+
+    it('clicking save on invalid form calls no API and touches all controls', () => {
+      expect(component.form.invalid).toBeTrue();
+
+      component.onSave();
+
+      expect(rfqApiSpy.createRfq).not.toHaveBeenCalled();
+      expect(rfqApiSpy.updateRfq).not.toHaveBeenCalled();
+      expect(component.form.touched).toBeTrue();
+      expect(component.linesFormArray.at(0).get('workspace_product_id')?.touched).toBeTrue();
+      expect(component.linesFormArray.at(0).get('quantity')?.touched).toBeTrue();
+      expect(component.form.controls.supplierIds.touched).toBeTrue();
+      expect(component.form.controls.neededByDate.touched).toBeTrue();
+    });
+
+    it('addLine focuses the new line product input', fakeAsync(() => {
+      fixture.detectChanges();
+      expect(component.linesFormArray.length).toBe(1);
+
+      component.addLine();
+      expect(component.linesFormArray.length).toBe(2);
+      fixture.detectChanges();
+
+      tick();
+      fixture.detectChanges();
+
+      const productInputs = fixture.nativeElement.querySelectorAll(
+        'input[formcontrolname="workspace_product_id"]',
+      );
+      expect(productInputs.length).toBe(2);
+      expect(document.activeElement).toBe(productInputs[1]);
+    }));
+
+    it('focuses the first line product input after onSave() on an invalid form', fakeAsync(() => {
+      fixture.detectChanges();
+      expect(component.form.valid).toBeFalse();
+
+      component.onSave();
+      tick();
+      fixture.detectChanges();
+
+      const productInput = fixture.nativeElement.querySelector(
+        'input[formcontrolname="workspace_product_id"]',
+      );
+      expect(document.activeElement).toBe(productInput);
+    }));
+
+    it('focuses the needed-by input after onSave() when needed-by is the first invalid control', fakeAsync(() => {
+      component.products.set([{ id: 'prod-1', tenant_name: 'Product 1' } as Product]);
+      component.suppliers.set([{ id: 'sup-1', name: 'Supplier 1', contact_email: 'sup@test.com' } as Supplier]);
+      component.form.patchValue({
+        lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+        supplierIds: ['sup-1'],
+        neededByDate: null,
+      });
+      fixture.detectChanges();
+
+      component.onSave();
+      tick();
+      fixture.detectChanges();
+
+      const neededByInput = fixture.nativeElement.querySelector(
+        'input[formcontrolname="neededByDate"]',
+      );
+      expect(document.activeElement).toBe(neededByInput);
+    }));
   });
 });

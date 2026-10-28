@@ -109,6 +109,13 @@ class MatchDecision(BaseModel):
         )
     )
     alias_id: UUID | None = None
+    supersedes_decision_id: UUID | None = Field(
+        default=None, description="The decision this one corrects (spec 023 FR-005)."
+    )
+    learned_from_decision_id: UUID | None = Field(
+        default=None,
+        description="The human decision whose learned wording made this one (spec 023 FR-011).",
+    )
 
 
 class QuotationMatchSummary(BaseModel):

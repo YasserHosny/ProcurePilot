@@ -1,0 +1,66 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot matching — RFQ fit and corrections (023)
+  version: 0.1.0
+  description: >
+    Additions only. Existing matching endpoints are unchanged except that candidate `reasons` may
+    carry `rfq` and `measured` (see data-model.md). Error envelope {code, message, details, trace_id}.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /quotation-lines/{line_id}/match/corrections:
+    post:
+      summary: Correct the current match decision of a line (FR-005)
+      description: >
+        Inserts a human decision that supersedes the line's current decision. Owner or buyer.
+        Requires Idempotency-Key. Refused while the current decision prices a live purchase
+        request line.
+      parameters:
+        - { name: line_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expected_current_decision_id, outcome]
+              properties:
+                expected_current_decision_id: { type: string, format: uuid }
+                outcome: { type: string, enum: [same_product, no_match_new_product] }
+                selected_match_candidate_id: { type: string, format: uuid }
+                new_product: { $ref: '#/components/schemas/NewProductInput' }
+                learn_alias: { type: boolean, default: true }
+      responses:
+        '200':
+          description: The new current decision, plus lines matched through the superseded decision's wording (FR-012).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [decision, superseded_decision_id, lines_matched_through_old_wording]
+                properties:
+                  decision: { $ref: '#/components/schemas/MatchDecision' }
+                  superseded_decision_id: { type: string, format: uuid }
+                  lines_matched_through_old_wording:
+                    type: array
+                    items: { type: string, format: uuid }
+        '404': { description: Line not found in the caller's tenant }
+        '409':
+          description: >
+            details.reason one of: line_on_purchase_request (details.purchase_request_id),
+            decision_changed (expected_current_decision_id is not the head), no_decision.
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  schemas:
+    NewProductInput:
+      type: object
+      description: Same shape as the existing resolve endpoint's new-product input.
+    MatchDecision:
+      type: object
+      description: >
+        Existing MatchDecision plus `supersedes_decision_id` and `learned_from_decision_id`
+        (both nullable uuid).

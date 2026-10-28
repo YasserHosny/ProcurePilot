@@ -500,7 +500,7 @@ class RfqService:
                     join rfq_recipient rec on r.rfq_recipient_id = rec.id
                     join quotation q on r.quotation_id = q.id
                     left join quotation_line ql on r.quotation_id = ql.quotation_id
-                    left join match_decision md on ql.id = md.quotation_line_id
+                    left join current_match_decision md on ql.id = md.quotation_line_id
                     where r.tenant_id = %s and rec.rfq_id = %s
                     order by r.created_at, ql.created_at
                     """,
@@ -685,7 +685,7 @@ class RfqService:
                     select ql.unit_price_amount, ql.unit_price_currency, \
                            md.matched_workspace_product_id
                     from quotation_line ql
-                    left join match_decision md on ql.id = md.quotation_line_id
+                    left join current_match_decision md on ql.id = md.quotation_line_id
                     where ql.quotation_id = %s
                     """,
                     (resp_row["quotation_id"],),

@@ -171,3 +171,139 @@ def test_read_current_offers_projects_from_normalised_base_unit_not_pack_quantit
                 finally:
                     cur.execute("set session_replication_role = default")
             conn.commit()
+
+
+def test_read_current_offers_ignores_a_superseded_match_decision() -> None:
+    """Spec 023 R5: a corrected match moves the line's price to the corrected product.
+
+    The supplier's line was first matched to cooking oil (automatic), then corrected to sugar.
+    A basket asking for cooking oil must no longer see that line's price.
+    """
+    psycopg = pytest.importorskip("psycopg")
+    from psycopg.types.json import Jsonb
+
+    from procurepilot_optimiser_worker.repository import read_current_offers
+
+    tenant_id, user_id, membership_id, invitation_id = uuid4(), uuid4(), uuid4(), uuid4()
+    supplier_id = uuid4()
+    oil_id, sugar_id = uuid4(), uuid4()
+    document_id, quotation_id, line_id = uuid4(), uuid4(), uuid4()
+    oil_candidate, sugar_candidate = uuid4(), uuid4()
+    first_decision, correction = uuid4(), uuid4()
+    email = f"optimiser-supersede-{tenant_id.hex[:8]}@example.test"
+
+    with psycopg.connect(os.environ["TEST_DATABASE_URL"]) as conn:
+        with conn.cursor() as cur:
+            for statement in (
+                "insert into supported_region (code,label_en,label_ar) "
+                "values ('GB','UK','ب') on conflict do nothing",
+                "insert into supported_currency (code,label_en,label_ar) "
+                "values ('GBP','Pound','ج') on conflict do nothing",
+                "insert into supported_tax_model (code,label_en,label_ar,region_code) "
+                "values ('uk_vat','UK VAT','ض','GB') on conflict do nothing",
+            ):
+                cur.execute(statement)
+            cur.execute("insert into auth.users (id,email) values (%s,%s)", (user_id, email))
+            cur.execute(
+                "insert into platform_invitation (id,email,token_hash,expires_at) "
+                "values (%s,%s,%s, now() + interval '7 days')",
+                (invitation_id, email, f"hash-{invitation_id}"),
+            )
+            cur.execute(
+                "insert into tenant "
+                "(id,name,slug,region,currency,tax_model,platform_invitation_id) "
+                "values (%s,'Supersede','supersede','GB','GBP','uk_vat',%s)",
+                (tenant_id, invitation_id),
+            )
+            cur.execute(
+                "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
+                "values (%s,%s,%s,%s,'owner',true)",
+                (membership_id, tenant_id, user_id, email),
+            )
+            cur.execute(
+                "insert into supplier (id,tenant_id,name,status) "
+                "values (%s,%s,'Al Wafra','active')",
+                (supplier_id, tenant_id),
+            )
+            for product_id, name in ((oil_id, "Cooking Oil"), (sugar_id, "Sugar")):
+                canonical_id = uuid4()
+                cur.execute(
+                    "insert into canonical_product (id,name,base_unit) "
+                    "values (%s,%s,'kilogram')",
+                    (canonical_id, f"{name} {tenant_id.hex[:6]}"),
+                )
+                cur.execute(
+                    "insert into workspace_product "
+                    "(id,tenant_id,canonical_product_id,tenant_name,status) "
+                    "values (%s,%s,%s,%s,'active')",
+                    (product_id, tenant_id, canonical_id, name),
+                )
+            cur.execute(
+                "insert into document "
+                "(id,tenant_id,storage_bucket,storage_path,mime_type,created_by) "
+                "values (%s,%s,'quotations',%s,'application/pdf',%s)",
+                (document_id, tenant_id, f"tenants/{tenant_id}/quotations/q.pdf", membership_id),
+            )
+            cur.execute(
+                "insert into quotation (id,tenant_id,document_id,supplier_id,currency,status) "
+                "values (%s,%s,%s,%s,'GBP','reviewed')",
+                (quotation_id, tenant_id, document_id, supplier_id),
+            )
+            cur.execute(
+                "insert into quotation_line (id,tenant_id,quotation_id,line_number,original_text) "
+                "values (%s,%s,%s,1,'سكر 50 كجم')",
+                (line_id, tenant_id, quotation_id),
+            )
+            for candidate_id, product_id, rank in (
+                (oil_candidate, oil_id, 1),
+                (sugar_candidate, sugar_id, 2),
+            ):
+                cur.execute(
+                    "insert into match_candidate (id,tenant_id,quotation_line_id,"
+                    "candidate_workspace_product_id,confidence,reasons,rank,scoring_version) "
+                    "values (%s,%s,%s,%s,0.95,%s,%s,'v1')",
+                    (candidate_id, tenant_id, line_id, product_id, Jsonb({}), rank),
+                )
+            cur.execute(
+                "insert into match_decision (id,tenant_id,quotation_line_id,"
+                "matched_workspace_product_id,selected_match_candidate_id,outcome,is_automatic,"
+                "confidence) values (%s,%s,%s,%s,%s,'same_product',true,0.95)",
+                (first_decision, tenant_id, line_id, oil_id, oil_candidate),
+            )
+            cur.execute(
+                "insert into match_decision (id,tenant_id,quotation_line_id,"
+                "matched_workspace_product_id,selected_match_candidate_id,outcome,is_automatic,"
+                "decided_by,confidence,supersedes_decision_id) "
+                "values (%s,%s,%s,%s,%s,'same_product',false,%s,0.95,%s)",
+                (correction, tenant_id, line_id, sugar_id, sugar_candidate, membership_id,
+                 first_decision),
+            )
+            for decision_id in (first_decision, correction):
+                cur.execute(
+                    """
+                    insert into landed_cost (
+                        tenant_id, quotation_line_id, match_decision_id,
+                        quantity, normalised_base_quantity, base_unit,
+                        unit_price_amount, unit_price_currency, vat_amount, vat_currency,
+                        delivery_fee_amount, delivery_fee_currency, discount_amount,
+                        discount_currency, other_charges_currency, total_amount, total_currency,
+                        raw_inputs, rule_version, valid_from
+                    ) values (%s, %s, %s, 1, 50, 'kilogram', 81, 'GBP', 0, 'GBP', 0, 'GBP',
+                              0, 'GBP', 'GBP', 81, 'GBP', %s, 'v1', now())
+                    """,
+                    (tenant_id, line_id, decision_id, Jsonb({})),
+                )
+
+            def offers_for(product_id: object) -> list[object]:
+                job = BasketJob(
+                    id=uuid4(),
+                    tenant_id=tenant_id,
+                    supplier_ids=[supplier_id, uuid4()],
+                    items=[BasketItem(workspace_product_id=product_id, quantity="50.000000")],
+                )
+                return read_current_offers(conn, job=job)
+
+            assert offers_for(oil_id) == []
+            sugar_offers = offers_for(sugar_id)
+            assert [offer.supplier_id for offer in sugar_offers] == [supplier_id]
+        conn.rollback()

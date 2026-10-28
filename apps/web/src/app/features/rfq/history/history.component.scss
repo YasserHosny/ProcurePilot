@@ -72,6 +72,11 @@ table {
   }
 }
 
+.mat-column-neededBy,
+.mat-column-sentAt {
+  white-space: nowrap;
+}
+
 .number-cell {
   text-align: end;
 }
@@ -132,6 +137,11 @@ td.mat-mdc-cell:last-of-type {
 
 .recipients-btn,
 .table-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 24px;
+  min-block-size: 24px;
   background: none;
   border: none;
   padding: 0;

@@ -20,7 +20,7 @@ select ql.unit_price_amount, ql.unit_price_currency, md.matched_workspace_produc
        lc.id as landed_cost_id, lc.total_amount, lc.total_currency, lc.quantity
 from rfq_response resp
 join quotation_line ql on ql.quotation_id = resp.quotation_id
-join match_decision md on md.quotation_line_id = ql.id
+join current_match_decision md on md.quotation_line_id = ql.id
 left join lateral (
   select id, total_amount, total_currency, quantity
   from landed_cost
@@ -41,7 +41,7 @@ select
   lc.total_currency,
   lc.quantity
 from workspace_product wp
-join match_decision md on md.matched_workspace_product_id = wp.id
+join current_match_decision md on md.matched_workspace_product_id = wp.id
 join landed_cost lc on lc.match_decision_id = md.id
 where wp.id = %(workspace_product_id)s
 order by lc.recorded_at desc, lc.id desc
@@ -119,7 +119,7 @@ QUOTED_PRICES_SQL = """
 select md.matched_workspace_product_id, ql.unit_price_amount, ql.unit_price_currency
 from rfq_response resp
 join quotation_line ql on ql.quotation_id = resp.quotation_id
-join match_decision md on md.quotation_line_id = ql.id
+join current_match_decision md on md.quotation_line_id = ql.id
 where resp.id = %(rfq_response_id)s
   and md.matched_workspace_product_id = any(%(product_ids)s)
   and ql.unit_price_amount is not null
