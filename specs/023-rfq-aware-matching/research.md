@@ -74,6 +74,37 @@ to that commit.
     and is not explainable.
   - Embeddings. Rejected: the hosted embedding mode is a stub (`STUB_EMBEDDING_MODEL`).
 
+### R3 calibration (T002, 2026-10-29, read-only on hosted «مطاعم رواق», RFQ `1b7cd76b`)
+
+The RFQ asked for 4 products. Both replies (الذهبي, الوفرة) quote the same 4 texts, each the product
+name **without** the bracketed pack: «أرز بسمتي», «زيت دوار الشمس», «سكر أبيض», «دقيق». **None of
+the 8 lines has a pack** (R1-M9). Raw `similarity(lower(text), lower(tenant_name))`:
+
+| Quoted text | rice (كيس 10 كجم) | oil (تنكة 18 لتر) | sugar (كيس 10 كجم) | flour (كيس 45 كجم) |
+|---|---|---|---|---|
+| أرز بسمتي | **0.500** | 0.000 | 0.036 | 0.000 |
+| زيت دوار الشمس | 0.000 | **0.556** | 0.000 | 0.034 |
+| سكر أبيض | 0.036 | 0.000 | **0.474** | 0.000 |
+| دقيق | 0.000 | 0.032 | 0.000 | **0.333** |
+
+Findings that change R3:
+
+1. **Compare against the product stem.** Catalogue names carry the pack in brackets, which dilutes
+   trigram similarity: the right pairs score 0.33–0.56 raw. With the bracketed segment removed
+   (the stem), every round-1 text equals its stem (score 1.0), and the runner-ups stay ≤ 0.04.
+2. **Pack is missing for every line today**, so round 1 exercises the wording-only path (FR-006,
+   doubled margin). On raw trigrams «دقيق» clears the doubled margin of 0.30 by −0.001, a fail.
+   On stems or token containment it clears it easily.
+3. **RFQ positions on hosted are 0-based**, while quotation `line_number` is 1-based. The position
+   tie-break compares *order*: the quoted line's rank among the quotation's lines against the RFQ
+   line's rank in RFQ order. It never compares the raw numbers.
+
+Committed values: floor 0.30, margin 0.15, doubled when the pack is unknown. The wording score is the
+max of three things: trigram similarity against the stem, trigram similarity against each alias,
+and 1.0 when every token of the stem appears in the text or every token of the text appears in the
+stem. «زيت» against two oil products is containment-1.0 for both, so it is ambiguous and no fit, as
+FR-002 intends.
+
 ## R4. Explaining a candidate without placeholders (FR-009, FR-010)
 
 - **Decision.**
