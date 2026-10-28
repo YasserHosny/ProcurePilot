@@ -146,6 +146,15 @@
   border-radius: 4px;
   color: var(--pp-info);
   font-weight: 500;
+
+  .source-request-banner-link {
+    color: inherit;
+    text-decoration: underline;
+
+    &:hover {
+      opacity: 0.85;
+    }
+  }
 }
 
 .line-reference-info {

@@ -76,6 +76,7 @@ export class RequestListComponent implements OnInit {
   readonly displayedColumns: readonly string[] = [
     'requiredByDate',
     'branch',
+    'supplier',
     'status',
     'estimatedTotal',
     'actions',

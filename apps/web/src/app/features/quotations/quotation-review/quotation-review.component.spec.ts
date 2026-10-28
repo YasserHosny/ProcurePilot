@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { MatDatepicker } from '@angular/material/datepicker';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
@@ -572,6 +573,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     // the backend only sees supplier_id once this PATCH lands (regression guard: a supplier-only
     // change must not be silently skipped just because pendingCorrections is empty).
     apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
+    apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
     apiService.confirmQuotation.and.returnValue(of(confirmedQuotation));
 
     component.selectedSupplierId.set('sup-1');
@@ -599,6 +601,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       status: 'reviewed' as const,
       supplier_id: 'sup-1',
     };
+    apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
     apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
     apiService.confirmQuotation.and.returnValue(of(confirmedQuotation));
 
@@ -638,6 +641,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     const alreadyConfirmedSupplier = { ...mockQuotationDetail, supplier_id: 'sup-1' };
     component.quotation.set(alreadyConfirmedSupplier);
     const confirmedQuotation = { ...alreadyConfirmedSupplier, status: 'reviewed' as const };
+    apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
     apiService.confirmQuotation.and.returnValue(of(confirmedQuotation));
 
     component.selectedSupplierId.set('sup-1');
@@ -788,5 +792,106 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(valueEl).toBeTruthy();
     expect(valueEl.textContent?.trim()).not.toBe('2026-08-20');
     expect(valueEl.textContent?.trim()).toBe(formatService.formatDate(new Date(2026, 7, 20)));
+  });
+
+  it('shows success snackbar and "Next step" card with Match lines and Back to inbox after successful authorize', () => {
+    const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+    spyOn(snackBar, 'open');
+
+    const confirmedQuotation = {
+      ...mockQuotationDetail,
+      status: 'reviewed' as const,
+      supplier_id: 'sup-1',
+    };
+    component.quotation.set({ ...mockQuotationDetail, supplier_id: 'sup-1' });
+    component.selectedSupplierId.set('sup-1');
+    apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
+    apiService.confirmQuotation.and.returnValue(of(confirmedQuotation));
+    apiService.getQuotation.and.returnValue(of(confirmedQuotation));
+
+    component.confirmQuotation();
+    fixture.detectChanges();
+
+    expect(snackBar.open).toHaveBeenCalledWith(
+      enCatalog.quotations.review.actions.confirmSuccess,
+      undefined,
+      { duration: 4000 },
+    );
+
+    const nextStepCard = fixture.nativeElement.querySelector('[data-testid="next-step-card"]');
+    expect(nextStepCard).toBeTruthy();
+
+    const matchBtn = fixture.nativeElement.querySelector('[data-testid="next-step-match-lines"]');
+    expect(matchBtn).toBeTruthy();
+    expect(matchBtn.textContent.trim()).toBe('Match lines');
+
+    const inboxBtn = fixture.nativeElement.querySelector('[data-testid="next-step-back-inbox"]');
+    expect(inboxBtn).toBeTruthy();
+    expect(inboxBtn.textContent.trim()).toBe('Back to the inbox');
+  });
+
+  it('distinguishes between changed value (Corrected by Human) and confirmed-as-is (Confirmed)', () => {
+    const lowConfField = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-currency',
+      quotation_id: 'q-review-1',
+      entity_type: 'quotation' as const,
+      entity_id: 'q-review-1',
+      field_name: 'currency',
+      extracted_value: 'SAR',
+      corrected_value: null,
+      confidence: '0.6000',
+      corrected_by: null,
+      corrected_at: null,
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      field_extractions: [lowConfField],
+    });
+    fixture.detectChanges();
+
+    // 1. Initially neither changed nor confirmed
+    expect(component.isFieldChanged('quotation', 'q-review-1', 'currency')).toBeFalse();
+    expect(component.isFieldConfirmedAsIs('quotation', 'q-review-1', 'currency')).toBeFalse();
+
+    // 2. Confirmed as-is (value equals extracted_value)
+    component.confirmFieldAsIs('quotation', 'q-review-1', 'currency');
+    fixture.detectChanges();
+    expect(component.isFieldChanged('quotation', 'q-review-1', 'currency')).toBeFalse();
+    expect(component.isFieldConfirmedAsIs('quotation', 'q-review-1', 'currency')).toBeTrue();
+
+    const confirmedBadge = fixture.nativeElement.querySelector('[data-testid="confirmed-badge"]');
+    expect(confirmedBadge).toBeTruthy();
+    expect(confirmedBadge.textContent.trim()).toBe('Confirmed');
+    expect(fixture.nativeElement.querySelector('.corrected-tag')).toBeNull();
+
+    // 3. Changed value (different from extracted_value)
+    component.currencySelectionChanged('USD');
+    fixture.detectChanges();
+    expect(component.isFieldChanged('quotation', 'q-review-1', 'currency')).toBeTrue();
+    expect(component.isFieldConfirmedAsIs('quotation', 'q-review-1', 'currency')).toBeFalse();
+
+    const correctedTag = fixture.nativeElement.querySelector('.corrected-tag');
+    expect(correctedTag).toBeTruthy();
+    expect(correctedTag.textContent.trim()).toBe('Corrected by Human');
+  });
+
+  it('formats quote review unit prices with 0 or 2 decimals (e.g. 85.0000 -> 85)', () => {
+    component.quotation.set({
+      ...mockQuotationDetail,
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          unit_price: { amount: '85.0000', currency: 'SAR' },
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    const unitPriceInput = fixture.nativeElement.querySelector(
+      '#field-fe-line1-price input',
+    ) as HTMLInputElement | null;
+    expect(unitPriceInput).toBeTruthy();
+    expect(unitPriceInput?.value).toBe('85');
   });
 });

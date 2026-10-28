@@ -19,6 +19,17 @@
     }
   </div>
 
+  @if (existingRequest()?.source; as source) {
+    <div class="request-source-line" data-testid="request-source-line">
+      {{ 'requests.source.from' | translate }}
+      <a [routerLink]="['/rfq', source.rfq_id]">{{ 'requests.source.rfq' | translate }}</a>
+      @if (source.supplier_name) {
+        · <span class="source-supplier" dir="auto">{{ source.supplier_name }}</span>
+      }
+      · <a [routerLink]="['/quotations', source.quotation_id, 'review']">{{ 'requests.source.quote' | translate }}</a>
+    </div>
+  }
+
   @if (existingRequest()?.auto_prepared; as auto) {
     <div class="auto-prepared-banner" role="status" data-testid="auto-prepared-banner">
       <mat-icon class="auto-prepared-icon" aria-hidden="true">smart_toy</mat-icon>

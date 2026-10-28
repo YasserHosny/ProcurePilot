@@ -2,7 +2,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink, provideRouter } from '@angular/router';
+import { By } from '@angular/platform-browser';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, Subject, throwError } from 'rxjs';
 
@@ -67,6 +68,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
       imports: [RequestFormComponent],
       providers: [
         provideTranslateService(),
+        provideRouter([]),
         { provide: RequestsApiService, useValue: requestsApi },
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: api },
@@ -254,6 +256,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       imports: [RequestFormComponent],
       providers: [
         provideTranslateService(),
+        provideRouter([]),
         { provide: RequestsApiService, useValue: requestsApi },
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: api },
@@ -731,5 +734,37 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     const compiled = hostFixture.nativeElement as HTMLElement;
     const section = compiled.querySelector('.approval-step');
     expect(section?.textContent).toContain('unknown-approver-id');
+  });
+
+  it('renders a source line linking to RFQ and quote and naming the supplier with dir="auto"', () => {
+    const sourcedRequest: PurchaseRequest = {
+      ...mockRequest,
+      source: {
+        rfq_id: 'rfq-123',
+        rfq_response_id: 'resp-456',
+        quotation_id: 'quote-789',
+        supplier_id: 'sup-1',
+        supplier_name: 'الوفرة للمواد الغذائية',
+      },
+    };
+    requestsApi.getRequest.and.returnValue(of(sourcedRequest));
+
+    const hostFixture = TestBed.createComponent(RequestFormComponent);
+    hostFixture.detectChanges();
+
+    const compiled = hostFixture.nativeElement as HTMLElement;
+    const sourceLine = compiled.querySelector('[data-testid="request-source-line"]');
+    expect(sourceLine).toBeTruthy();
+    expect(sourceLine?.textContent).toContain('الوفرة للمواد الغذائية');
+
+    const supplierSpan = sourceLine?.querySelector('.source-supplier');
+    expect(supplierSpan?.getAttribute('dir')).toBe('auto');
+
+    const linkDirectives = hostFixture.debugElement.queryAll(By.directive(RouterLink));
+    expect(linkDirectives.length).toBe(2);
+    const getLinkInput = (dir: typeof linkDirectives[0]) =>
+      (dir.injector.get(RouterLink) as unknown as Record<string, () => unknown>)['routerLinkInput']();
+    expect(getLinkInput(linkDirectives[0])).toEqual(['/rfq', 'rfq-123']);
+    expect(getLinkInput(linkDirectives[1])).toEqual(['/quotations', 'quote-789', 'review']);
   });
 });

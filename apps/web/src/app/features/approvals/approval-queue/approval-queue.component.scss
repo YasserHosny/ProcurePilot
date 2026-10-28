@@ -126,6 +126,15 @@
   }
 }
 
+.total-cell {
+  .supplier-name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--pp-text-muted);
+    margin-block-end: 0.125rem;
+  }
+}
+
 .incomplete-badge {
   display: inline-block;
   margin-inline-start: 0.5rem;

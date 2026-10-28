@@ -116,6 +116,16 @@ export class OrderDetailComponent implements OnInit {
       : this.formatService.formatExactQuantity(value);
   }
 
+  lineRemainingQuantity(summary: LifecycleLineSummary): string {
+    if (summary.remaining_quantity !== null && summary.remaining_quantity !== undefined) {
+      return this.formatService.formatExactQuantity(summary.remaining_quantity);
+    }
+    const ordered = parseFloat(summary.ordered_quantity) || 0;
+    const received = summary.received?.quantity ? parseFloat(summary.received.quantity) || 0 : 0;
+    const remaining = Math.max(0, ordered - received);
+    return this.formatService.formatExactQuantity(String(remaining));
+  }
+
   /** Purchase outcomes (savings) can be recorded from a sent order, not a draft or cancelled one. */
   canRecordOutcome(status: string): boolean {
     return ['submitted', 'confirmed', 'partially_received', 'received', 'closed'].includes(status);

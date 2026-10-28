@@ -126,6 +126,45 @@ export class QuotationLinesComponent {
     );
   }
 
+  isFieldChanged(
+    entityType: 'quotation' | 'quotation_line',
+    entityId: string,
+    fieldName: string,
+  ): boolean {
+    const fe = this.getFieldExtraction(entityType, entityId, fieldName);
+    if (!fe) return false;
+    const effective = this.pendingCorrections.has(fe.id)
+      ? this.pendingCorrections.get(fe.id)
+      : fe.corrected_value;
+    if (effective === null || effective === undefined) return false;
+    return String(effective).trim() !== String(fe.extracted_value ?? '').trim();
+  }
+
+  isFieldConfirmedAsIs(
+    entityType: 'quotation' | 'quotation_line',
+    entityId: string,
+    fieldName: string,
+  ): boolean {
+    const fe = this.getFieldExtraction(entityType, entityId, fieldName);
+    if (!fe) return false;
+    const hasCorrection =
+      this.pendingCorrections.has(fe.id) ||
+      (fe.corrected_value !== null && fe.corrected_value !== undefined);
+    if (!hasCorrection) return false;
+    const effective = this.pendingCorrections.has(fe.id)
+      ? this.pendingCorrections.get(fe.id)
+      : fe.corrected_value;
+    return String(effective ?? '').trim() === String(fe.extracted_value ?? '').trim();
+  }
+
+  formatUnitPrice(value: string | number | null | undefined): string {
+    if (value === null || value === undefined || value === '') return '0';
+    const num = typeof value === 'number' ? value : parseFloat(value);
+    if (isNaN(num)) return '0';
+    const rounded = Math.round(num * 100) / 100;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+  }
+
   getFieldConfidence(
     entityType: 'quotation' | 'quotation_line',
     entityId: string,

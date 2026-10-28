@@ -106,6 +106,7 @@ export class ResolutionQueueComponent implements OnInit {
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
   readonly hasActiveFilters = computed<boolean>(
     () =>
+      this.quotationId() !== null ||
       this.statusFilter() !== 'open' ||
       this.priorityFilter() !== 'all' ||
       this.reasonFilter() !== 'all' ||
@@ -361,6 +362,7 @@ export class ResolutionQueueComponent implements OnInit {
   }
 
   clearFilters(): void {
+    this.quotationId.set(null);
     this.statusFilter.set('open');
     this.priorityFilter.set('all');
     this.reasonFilter.set('all');

@@ -67,7 +67,7 @@
         <mat-card-content class="line-metrics-grid">
           <div class="metric-item">
             <span class="metric-label">{{ 'matching.resolution.lineDetails.quantity' | translate }}</span>
-            <span class="metric-value">{{ l.quantity || '1' }}</span>
+            <span class="metric-value">{{ (l.quantity || '1') | formatQuantity }}</span>
           </div>
           @if (l.pack) {
             <div class="metric-item">
@@ -159,7 +159,16 @@
               <mat-card-title class="cost-title">{{ 'matching.resolution.landedCost.title' | translate }}</mat-card-title>
               <mat-card-subtitle>{{ 'matching.resolution.landedCost.subtitle' | translate }}</mat-card-subtitle>
             </div>
-            <span class="rule-version-badge">{{ lc.rule_version }}</span>
+            <details class="landed-cost-details">
+              <summary class="landed-cost-summary">{{ 'matching.resolution.landedCost.details' | translate }}</summary>
+              <div class="landed-cost-details-content">
+                <span class="rule-version-badge">{{ lc.rule_version }}</span>
+                <div class="replay-notice">
+                  <mat-icon aria-hidden="true">lock</mat-icon>
+                  <span>{{ 'matching.resolution.landedCost.replayableNotice' | translate: { version: lc.rule_version } }}</span>
+                </div>
+              </div>
+            </details>
           </div>
         </mat-card-header>
         <mat-card-content>
@@ -196,10 +205,6 @@
             <div class="norm-info">
               <span class="norm-label">{{ 'matching.resolution.landedCost.normalisedQuantity' | translate }}:</span>
               <strong class="norm-val">{{ lc.normalised_base_quantity | formatQuantity }} {{ lc.base_unit | unitLabel }}</strong>
-            </div>
-            <div class="replay-notice">
-              <mat-icon aria-hidden="true">lock</mat-icon>
-              <span>{{ 'matching.resolution.landedCost.replayableNotice' | translate: { version: lc.rule_version } }}</span>
             </div>
           </div>
         </mat-card-content>

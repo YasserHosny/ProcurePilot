@@ -11,7 +11,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { forkJoin, of, type Observable } from 'rxjs';
 import { catchError, distinctUntilChanged, finalize, switchMap, tap } from 'rxjs/operators';
@@ -62,6 +62,7 @@ interface LineFormGroup {
     MatSnackBarModule,
     TranslatePipe,
     FormatDatePipe,
+    RouterLink,
   ],
   templateUrl: './request-form.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,

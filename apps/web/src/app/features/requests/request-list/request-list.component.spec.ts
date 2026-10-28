@@ -131,6 +131,47 @@ describe('RequestListComponent (T017)', () => {
     expect(compiled.textContent).toContain('b1');
   });
 
+  it('renders a Supplier column placed after Branch, showing source.supplier_name or —', () => {
+    expect(component.displayedColumns).toEqual([
+      'requiredByDate',
+      'branch',
+      'supplier',
+      'status',
+      'estimatedTotal',
+      'actions',
+    ]);
+
+    requestsApi.listRequests.and.returnValue(
+      of({
+        items: [
+          {
+            ...mockRequests[0],
+            source: {
+              rfq_id: 'rfq-1',
+              rfq_response_id: 'resp-1',
+              quotation_id: 'q-1',
+              supplier_id: 'sup-1',
+              supplier_name: 'الوفرة للمواد الغذائية',
+            },
+          },
+          mockRequests[1],
+        ],
+        next_cursor: null,
+      }),
+    );
+    component.loadRequests();
+    fixture.detectChanges();
+
+    const header = fixture.nativeElement.querySelector('th.mat-column-supplier');
+    expect(header?.textContent?.trim()).toBe('Supplier');
+
+    const cells = fixture.nativeElement.querySelectorAll('td.mat-column-supplier');
+    expect(cells.length).toBe(2);
+    expect(cells[0].textContent?.trim()).toBe('الوفرة للمواد الغذائية');
+    expect(cells[0].getAttribute('dir')).toBe('auto');
+    expect(cells[1].textContent?.trim()).toBe('—');
+  });
+
   it('marks a guardrail-prepared request and leaves manual ones unmarked', () => {
     requestsApi.listRequests.and.returnValue(
       of({

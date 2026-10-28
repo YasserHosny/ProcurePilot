@@ -899,6 +899,12 @@
       "clearFilters": "مسح عوامل التصفية"
     },
     "review": {
+      "nextStep": {
+        "title": "الخطوة التالية",
+        "description": "تم تأكيد عرض السعر هذا. قم بمطابقة البنود المستخرجة مع منتجات الكتالوج لمقارنة الأسعار.",
+        "matchLines": "مطابقة البنود",
+        "backToInbox": "العودة إلى الوارد"
+      },
       "title": "مراجعة واعتماد عرض السعر",
       "currencyFallbackReview": "تم تعيين العملة من العملة الأساسية. يُرجى تأكيدها أو تصحيحها.",
       "subtitle": "فحص الحقول المستخرجة جنباً إلى جنب مع المستند الأصلي. تحقق من المورد وعالج أي فروقات.",
@@ -1019,6 +1025,7 @@
         "cancelCorrection": "إلغاء",
         "editTooltip": "تصحيح قيمة هذا الحقل",
         "correctedBadge": "تم التصحيح يدوياً",
+        "confirmedBadge": "مؤكد",
         "confirmAsIsTooltip": "تأكيد أن هذه القيمة صحيحة كما استُخرجت"
       },
       "arithmetic": {
@@ -1261,6 +1268,8 @@
       "loadMore": "تحميل المزيد",
       "emptyTitle": "لا توجد مهام مطابقة",
       "emptyMessage": "لا توجد بنود عروض أسعار بانتظار تسوية المطابقة حالياً.",
+      "allLinesMatchedTitle": "تمت مطابقة جميع بنود عرض السعر هذا",
+      "compareResponses": "مقارنة الردود",
       "badgeAutoAccepted": "مطابق تلقائياً",
       "badgeResolved": "تمت التسوية",
       "autoAcceptedBanner": "تمت المطابقة تلقائياً فوق الحد دون مراجعة بشرية. للعرض فقط.",
@@ -1313,7 +1322,7 @@
       },
       "candidates": {
         "title": "المنتجات المرشحة حسب الأولوية",
-        "subtitle": "تم التقييم عبر المفاتيح المحددة، التشابه اللفظي (pg_trgm)، التشابه الدلالي (pgvector)، ومعقولية السمات.",
+        "subtitle": "تم الترتيب حسب مدى مطابقة كل منتج في الكتالوج لبند المورد.",
         "rank": "الترتيب #{{rank}}",
         "confidence": "درجة المطابقة",
         "scoreExplainer": "هذه الدرجة لترتيب المرشحين، وليست احتمالاً معايراً بعد.",
@@ -1412,7 +1421,8 @@
         "noPreferredSupplier": "لا يوجد (بدون مورد مفضل)"
       },
       "landedCost": {
-        "title": "التكلفة الإجمالية الواصلة (US3)",
+        "title": "التكلفة الواصلة",
+        "details": "التفاصيل",
         "subtitle": "تكلفة واصلة قابلة لإعادة الاحتساب وموحدة حسب الوحدة الأساسية في الدليل.",
         "unitPrice": "سعر الوحدة",
         "vatAmount": "ضريبة القيمة المضافة المحسوبة",
@@ -1442,7 +1452,7 @@
         "confirm": "تأكيد قرار المطابقة",
         "confirmAndNext": "تسوية والانتقال للتالي",
         "confirming": "جاري التأكيد...",
-        "saveSuccess": "تم تأكيد قرار المطابقة وحفظ الاسم المرادف بنجاح.",
+        "saveSuccess": "تم حفظ المطابقة. ستتم مطابقة هذا النص تلقائياً في المرات القادمة.",
         "queueCleared": "تمت تسوية جميع مهام المطابقة — القائمة خالية.",
         "candidateRequired": "يُرجى اختيار منتج مرشح قبل التأكيد.",
         "formInvalid": "يُرجى تصحيح أخطاء إنشاء المنتج قبل التأكيد."
@@ -2106,11 +2116,17 @@
     },
     "columns": {
       "branch": "الفرع",
+      "supplier": "المورد",
       "costCentre": "مركز التكلفة",
       "requiredByDate": "مطلوب بحلول",
       "status": "الحالة",
       "estimatedTotal": "الإجمالي المقدر",
       "actions": "إجراءات"
+    },
+    "source": {
+      "from": "من",
+      "rfq": "طلب تسعير",
+      "quote": "عرض سعر"
     },
     "actions": {
       "view": "عرض الطلب",
@@ -2230,8 +2246,10 @@
     },
     "actions": {
       "approve": "اعتماد",
-      "reject": "رفض"
+      "reject": "رفض",
+      "createOrder": "إنشاء أمر شراء"
     },
+    "createOrderAction": "إنشاء أمر شراء",
     "decisionDialog": {
       "approveTitle": "اعتماد {{amount}} لـ {{branchName}}؟",
       "approveTitleDefault": "اعتماد طلب الشراء",
@@ -3395,6 +3413,7 @@
     "backToOrders": "العودة إلى الطلبات",
     "open": "فتح الطلب",
     "orderDate": "تم الطلب في {{date}}",
+    "createdDate": "تم الإنشاء في {{date}}",
     "lineCount": "{{count}} بند",
     "notProvided": "غير متوفر",
     "createButton": "إنشاء طلب",
@@ -3403,6 +3422,8 @@
     "create": {
       "title": "إنشاء أمر شراء",
       "subtitle": "تسجيل أمر شراء داخلي يدويًا.",
+      "fromRequestSubtitle": "راجع أمر الشراء ثم قم بإنشائه.",
+      "fromApprovedRequestBanner": "من طلب شراء معتمد — {{supplier}}، {{branch}}",
       "orderNumber": "رقم الطلب",
       "orderNumberPlaceholder": "مثال: PO-2026-001",
       "supplier": "المورد",
@@ -3443,7 +3464,7 @@
       "quotedCurrencyMismatch": "عملة أمر الشراء ({{order}}) تختلف عن عملة عرض المورّد ({{quoted}}). استخدم {{quoted}} أو عدّل الأسعار.",
       "packUnit": "عبوة {{size}} {{unit}}",
       "baseUnitPrice": "لكل {{unit}}",
-      "remainingQuantity": "الكمية المتبقية للتخصيص"
+      "remainingQuantity": "المتبقي للطلب"
     },
     "status": {
       "draft": "مسودة",
@@ -3466,6 +3487,7 @@
     "detail": {
       "eyebrow": "أمر شراء",
       "createdAt": "تم الإنشاء {{date}}",
+      "fromRequest": "من الطلب",
       "orderDate": "تاريخ الطلب",
       "expectedDelivery": "التسليم المتوقع",
       "total": "إجمالي الطلب",

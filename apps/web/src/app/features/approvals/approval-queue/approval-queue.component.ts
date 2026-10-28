@@ -16,11 +16,13 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
+import { SessionService } from '../../../core/auth/session.service';
 import type {
   ApiError,
   ApprovalDecisionInput,
@@ -166,6 +168,8 @@ export class ApprovalQueueComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
+  private readonly session = inject(SessionService);
+  private readonly router = inject(Router);
 
   readonly isLoading = signal<boolean>(true);
   readonly pendingRequests = signal<PurchaseRequest[]>([]);
@@ -300,11 +304,24 @@ export class ApprovalQueueComponent implements OnInit {
       next: () => {
         this.processingRequestId.set(null);
         this.loadPendingApprovals();
-        const msgKey =
-          action === 'approve'
-            ? `${I18N}.approveSuccess`
-            : `${I18N}.rejectSuccess`;
-        this.snackBar.open(this.translate.instant(msgKey), undefined, { duration: 3500 });
+        if (action === 'approve') {
+          const msg = this.translate.instant(`${I18N}.approveSuccess`);
+          if (this.session.hasRole('owner', 'buyer')) {
+            const actionLabel = this.translate.instant(`${I18N}.createOrderAction`);
+            const snackRef = this.snackBar.open(msg, actionLabel, { duration: 6000 });
+            snackRef.onAction().subscribe(() => {
+              this.router.navigate(['/orders/new'], {
+                queryParams: { source_request_id: requestId },
+              });
+            });
+          } else {
+            this.snackBar.open(msg, undefined, { duration: 3500 });
+          }
+        } else {
+          this.snackBar.open(this.translate.instant(`${I18N}.rejectSuccess`), undefined, {
+            duration: 3500,
+          });
+        }
       },
       error: (err: unknown) => {
         this.processingRequestId.set(null);

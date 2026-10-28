@@ -10,6 +10,7 @@ import type {
   PurchaseRequestList,
   PurchaseRequestStatus,
   PurchaseRequestUpdate,
+  RequestSource,
 } from '../../core/api/models';
 
 export type {
@@ -20,6 +21,7 @@ export type {
   PurchaseRequestList,
   PurchaseRequestStatus,
   PurchaseRequestUpdate,
+  RequestSource,
 };
 
 @Injectable({ providedIn: 'root' })

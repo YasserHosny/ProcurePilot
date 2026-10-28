@@ -13,6 +13,7 @@ import { ApiService } from '../../../core/api/api.service';
 import type { OrderEvidenceProjection } from '../orders-api';
 import { OrdersApiService } from '../orders-api';
 import { RequestsApiService } from '../../requests/requests-api';
+import { OrganisationApiService } from '../../settings/organisation-api';
 import { SessionService } from '../../../core/auth/session.service';
 import { OrderCreateComponent } from './order-create.component';
 
@@ -24,6 +25,7 @@ describe('OrderCreateComponent', () => {
   let apiService: jasmine.SpyObj<ApiService>;
   let ordersApiService: jasmine.SpyObj<OrdersApiService>;
   let requestsApiService: jasmine.SpyObj<RequestsApiService>;
+  let organisationApiService: jasmine.SpyObj<OrganisationApiService>;
   let router: Router;
   let routeSnapshot: { paramMap: ReturnType<typeof convertToParamMap>; queryParamMap: ReturnType<typeof convertToParamMap> };
   let homeCurrency: ReturnType<typeof signal<string | undefined>>;
@@ -39,6 +41,7 @@ describe('OrderCreateComponent', () => {
       'getRequestPrefill',
     ]);
     requestsApiService = jasmine.createSpyObj('RequestsApiService', ['getRequest']);
+    organisationApiService = jasmine.createSpyObj('OrganisationApiService', ['listBranches']);
     routeSnapshot = {
       paramMap: convertToParamMap({}),
       queryParamMap: convertToParamMap({}),
@@ -52,6 +55,14 @@ describe('OrderCreateComponent', () => {
     ordersApiService.getAllocations.and.returnValue(of({ source_request_id: 'req-1', lines: [] }));
     ordersApiService.getNextOrderNumber.and.returnValue(of({ order_number: 'PO-000101' }));
     ordersApiService.getRequestPrefill.and.returnValue(of({ source_request_id: 'req-1', supplier: null }));
+    organisationApiService.listBranches.and.returnValue(
+      of({
+        items: [
+          { id: 'b1', name: 'فرع العليا', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+        ],
+        next_cursor: null,
+      }),
+    );
 
     await TestBed.configureTestingModule({
       imports: [OrderCreateComponent],
@@ -64,6 +75,7 @@ describe('OrderCreateComponent', () => {
         { provide: ApiService, useValue: apiService },
         { provide: OrdersApiService, useValue: ordersApiService },
         { provide: RequestsApiService, useValue: requestsApiService },
+        { provide: OrganisationApiService, useValue: organisationApiService },
         { provide: SessionService, useValue: { homeCurrency } },
         { provide: ActivatedRoute, useValue: { snapshot: routeSnapshot } },
       ],
@@ -134,6 +146,90 @@ describe('OrderCreateComponent', () => {
     expect(component.form.controls.order_number.value).toBe('PO-000777');
     expect(component.form.controls.supplier_id.value).toBe('s-cairo');
     expect(component.suppliers().some(s => s.id === 's-cairo' && s.name === 'Cairo Foods')).toBeTrue();
+  });
+
+  it('displays approved request banner with supplier and branch, changes subtitle, pre-fills expected delivery, makes currency readonly, and uses "Still to order"', () => {
+    fixture.destroy();
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.use('en');
+    routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-42' });
+    requestsApiService.getRequest.and.returnValue(
+      of({
+        id: 'req-42',
+        branch_id: 'b1',
+        requested_by_membership_id: 'm1',
+        required_by_date: '2026-10-01',
+        status: 'approved',
+        source: {
+          rfq_id: 'rfq-1',
+          rfq_response_id: 'resp-1',
+          quotation_id: 'q-1',
+          supplier_id: 's-cairo',
+          supplier_name: 'الوفرة للمواد الغذائية',
+        },
+        lines: [
+          {
+            id: 'rl-1',
+            workspace_product_id: 'p1',
+            quantity: '3.000000',
+            estimated_unit_price: { amount: '12.0000', currency: 'SAR' },
+          },
+        ],
+        has_incomplete_estimate: false,
+        created_at: '2026-09-29T00:00:00Z',
+      } as unknown as import('../../../core/api/models').PurchaseRequest),
+    );
+    ordersApiService.getAllocations.and.returnValue(
+      of({
+        source_request_id: 'req-42',
+        lines: [
+          {
+            source_request_line_id: 'rl-1',
+            requested_quantity: '3.000000',
+            allocated_quantity: '0.000000',
+            remaining_quantity: '3.000000',
+          },
+        ],
+      }),
+    );
+    ordersApiService.getNextOrderNumber.and.returnValue(of({ order_number: 'PO-000777' }));
+    ordersApiService.getRequestPrefill.and.returnValue(
+      of({
+        source_request_id: 'req-42',
+        supplier: { id: 's-cairo', name: 'الوفرة للمواد الغذائية' },
+      }),
+    );
+
+    fixture = TestBed.createComponent(OrderCreateComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    // 1. Banner shows supplier and branch, linked to the request
+    const bannerLink = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="source-request-link"]',
+    );
+    expect(bannerLink).toBeTruthy();
+    expect(bannerLink?.getAttribute('href')).toBe('/requests/req-42');
+    expect(bannerLink?.textContent).toContain('الوفرة للمواد الغذائية');
+    expect(bannerLink?.textContent).toContain('فرع العليا');
+
+    // 2. Subtitle changes to "Check the order, then create it."
+    const subtitle = (fixture.nativeElement as HTMLElement).querySelector('.page-header p');
+    expect(subtitle?.textContent?.trim()).toBe('Check the order, then create it.');
+
+    // 3. Expected delivery date pre-filled from required_by_date
+    expect(component.form.controls.expected_delivery_date.value).toEqual(new Date(2026, 9, 1));
+
+    // 4. Currency is readonly
+    const currencyInput = (fixture.nativeElement as HTMLElement).querySelector(
+      'input[formControlName="currency"]',
+    );
+    expect(currencyInput?.hasAttribute('readonly')).toBeTrue();
+
+    // 5. Line remaining badge says "Still to order"
+    const remainingBadge = (fixture.nativeElement as HTMLElement).querySelector('.remaining-badge');
+    expect(remainingBadge?.textContent).toContain('Still to order: 3');
   });
 
   it('handles prefill and next-number failures gracefully by leaving fields blank', () => {

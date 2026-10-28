@@ -1,15 +1,18 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { signal } from '@angular/core';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Router } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { PurchaseRequest } from '../../../core/api/models';
+import type { PurchaseRequest, Role } from '../../../core/api/models';
+import { SessionService } from '../../../core/auth/session.service';
 import { RequestsApiService } from '../../requests/requests-api';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { ApprovalsApiService } from '../approvals-api';
@@ -76,8 +79,19 @@ describe('ApprovalQueueComponent', () => {
   let api: jasmine.SpyObj<ApiService>;
   let dialogSpy: jasmine.SpyObj<MatDialog>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
+  let routerSpy: jasmine.SpyObj<Router>;
+  const role = signal<Role | null>('buyer');
+  let sessionSpy: { hasRole: jasmine.Spy; role: typeof role };
 
   beforeEach(async () => {
+    role.set('buyer');
+    sessionSpy = {
+      hasRole: jasmine.createSpy('hasRole').and.callFake((...roles: readonly Role[]) => {
+        const current = role();
+        return current ? roles.includes(current) : false;
+      }),
+      role,
+    };
     approvalsApi = jasmine.createSpyObj('ApprovalsApiService', ['listPendingApprovals']);
     requestsApi = jasmine.createSpyObj('RequestsApiService', [
       'approveRequest',
@@ -90,6 +104,10 @@ describe('ApprovalQueueComponent', () => {
     api = jasmine.createSpyObj('ApiService', ['products']);
     dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
+    routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    snackBarSpy.open.and.returnValue({
+      onAction: () => of(undefined),
+    } as unknown as ReturnType<MatSnackBar['open']>);
 
     approvalsApi.listPendingApprovals.and.returnValue(
       of({ items: mockPendingRequests, next_cursor: null }),
@@ -153,6 +171,8 @@ describe('ApprovalQueueComponent', () => {
         { provide: RequestsApiService, useValue: requestsApi },
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: api },
+        { provide: SessionService, useValue: sessionSpy },
+        { provide: Router, useValue: routerSpy },
       ],
     })
       .overrideComponent(ApprovalQueueComponent, {
@@ -160,6 +180,8 @@ describe('ApprovalQueueComponent', () => {
           providers: [
             { provide: MatDialog, useValue: dialogSpy },
             { provide: MatSnackBar, useValue: snackBarSpy },
+            { provide: SessionService, useValue: sessionSpy },
+            { provide: Router, useValue: routerSpy },
           ],
         },
       })
@@ -197,6 +219,76 @@ describe('ApprovalQueueComponent', () => {
 
     expect(compiled.textContent).toContain('South Branch');
     expect(compiled.textContent).toContain('None (branch-level)');
+  });
+
+  it('displays the supplier name above/next to the estimated total when source.supplier_name is set', () => {
+    approvalsApi.listPendingApprovals.and.returnValue(
+      of({
+        items: [
+          {
+            ...mockPendingRequests[0],
+            source: {
+              rfq_id: 'rfq-1',
+              rfq_response_id: 'resp-1',
+              quotation_id: 'q-1',
+              supplier_id: 's-1',
+              supplier_name: 'الوفرة للمواد الغذائية',
+            },
+          },
+        ],
+        next_cursor: null,
+      }),
+    );
+    component.loadPendingApprovals();
+    fixture.detectChanges();
+
+    const supplierEl = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="approval-supplier"]',
+    );
+    expect(supplierEl).toBeTruthy();
+    expect(supplierEl?.textContent?.trim()).toBe('الوفرة للمواد الغذائية');
+    expect(supplierEl?.getAttribute('dir')).toBe('auto');
+  });
+
+  it('shows "Create purchase order" snackbar action on approve for owner/buyer and navigates to orders/new', () => {
+    role.set('buyer');
+    const actionSubject = new Subject<void>();
+    snackBarSpy.open.and.returnValue({
+      onAction: () => actionSubject.asObservable(),
+    } as unknown as ReturnType<MatSnackBar['open']>);
+
+    requestsApi.approveRequest.and.returnValue(
+      of({ ...mockPendingRequests[0], status: 'approved' } as PurchaseRequest),
+    );
+
+    component.submitDecision('req-001', 'approve');
+
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      'Request approved.',
+      'Create purchase order',
+      { duration: 6000 },
+    );
+
+    actionSubject.next();
+    expect(routerSpy.navigate).toHaveBeenCalledWith(['/orders/new'], {
+      queryParams: { source_request_id: 'req-001' },
+    });
+  });
+
+  it('does not offer "Create purchase order" action to non-buyer non-owner roles on approve', () => {
+    role.set('approver');
+    requestsApi.approveRequest.and.returnValue(
+      of({ ...mockPendingRequests[0], status: 'approved' } as PurchaseRequest),
+    );
+
+    component.submitDecision('req-001', 'approve');
+
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      'Request approved.',
+      undefined,
+      { duration: 3500 },
+    );
+    expect(routerSpy.navigate).not.toHaveBeenCalled();
   });
 
   it('should prefer requester_name over requester_email and fall back to short id only when both are null', () => {
@@ -406,9 +498,11 @@ describe('ApprovalQueueComponent', () => {
       comment: 'Budget approved',
     });
     expect(approvalsApi.listPendingApprovals).toHaveBeenCalledTimes(2);
-    expect(snackBarSpy.open).toHaveBeenCalledWith('Request approved.', undefined, {
-      duration: 3500,
-    });
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      'Request approved.',
+      'Create purchase order',
+      { duration: 6000 },
+    );
   });
 
   it('should open decision dialog for reject and call rejectRequest on confirm', () => {

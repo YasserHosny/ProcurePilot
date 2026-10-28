@@ -142,6 +142,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   readonly isLoading = signal<boolean>(true);
   readonly isSaving = signal<boolean>(false);
   readonly isConfirming = signal<boolean>(false);
+  readonly showNextStep = signal<boolean>(false);
   readonly isRefusing = signal<boolean>(false);
   readonly isArchiving = signal<boolean>(false);
   readonly isRetryingExtraction = signal<boolean>(false);
@@ -637,6 +638,29 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const fe = this.getFieldExtraction(entityType, entityId, fieldName);
     if (!fe) return false;
     return this.pendingCorrections().has(fe.id) || fe.corrected_value !== null && fe.corrected_value !== undefined;
+  }
+
+  isFieldChanged(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): boolean {
+    const fe = this.getFieldExtraction(entityType, entityId, fieldName);
+    if (!fe) return false;
+    const effective = this.pendingCorrections().has(fe.id)
+      ? this.pendingCorrections().get(fe.id)
+      : fe.corrected_value;
+    if (effective === null || effective === undefined) return false;
+    return String(effective).trim() !== String(fe.extracted_value ?? '').trim();
+  }
+
+  isFieldConfirmedAsIs(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): boolean {
+    const fe = this.getFieldExtraction(entityType, entityId, fieldName);
+    if (!fe) return false;
+    const hasCorrection =
+      this.pendingCorrections().has(fe.id) ||
+      (fe.corrected_value !== null && fe.corrected_value !== undefined);
+    if (!hasCorrection) return false;
+    const effective = this.pendingCorrections().has(fe.id)
+      ? this.pendingCorrections().get(fe.id)
+      : fe.corrected_value;
+    return String(effective ?? '').trim() === String(fe.extracted_value ?? '').trim();
   }
 
   getFieldConfidence(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): number {
@@ -1200,6 +1224,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (confirmed) => {
           this.isConfirming.set(false);
+          this.showNextStep.set(true);
           this.loadQuotation(confirmed.id);
           this.snackBar.open(
             this.translate.instant('quotations.review.actions.confirmSuccess'),
