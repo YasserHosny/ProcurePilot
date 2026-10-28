@@ -40,7 +40,11 @@ Recap rows, pain → fix:
   unchanged (owner, 2026-10-27).
 - **9:16 length:** the new chapter and the recap make the vertical cuts 1:14. Files drop the `-60s` suffix.
 
-## Known follow-up
+## Arabic re-shoot (PPS-84, 2026-10-28)
 
-- The Arabic app screens still show «EGP ٣٠٠» / «SAR …». PPS-84 changes the Arabic UI to «٣٠٠ ج.م» / «ر.س».
-  The Arabic rounds are then re-recorded and the Arabic cuts rebuilt.
+The Arabic cuts were re-filmed after the UI moved to «٢٤٬٦٤٠ ج.م» / «٤٬٩١٠ ر.س»:
+- beats 5–7, 10, 11, plus the read-only beats 1, 13 and 14, are new footage;
+- beats 8 and 12 keep the original (old «ج.م.» style, no «EGP»);
+- the Saudi beat 14 card is now ٣١٠ ر.س, today's ledger total.
+
+Figures in the captions are unchanged. Details: [`../../source/edit-v2.5/README.md`](../../source/edit-v2.5/README.md).

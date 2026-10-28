@@ -33,6 +33,32 @@ Bodies are 119.5 s for 16:9 and 65.97 s for 9:16 in every market. Each outro is 
 The copy is in `make_data.py`. Egyptian Arabic and English were approved in chat. The Saudi lines are the
 same copy in Saudi dialect («تدوّر على كل مورد لحاله», «اعتماد من الجوال», «كل مشكلة ولها حل»).
 
+## Arabic re-shoot for «ج.م» / «ر.س» (PPS-84, 2026-10-27/28)
+
+After the Arabic UI moved from «EGP ٢٤٬٦٤٠» to «٢٤٬٦٤٠ ج.م» (#305, #308, #311), the money screens of the Arabic cuts were
+re-filmed on hosted (record: [`../../../demo-tenant/round-6/README.md`](../../../demo-tenant/round-6/README.md),
+[`../../../gcc/rounds/README.md`](../../../gcc/rounds/README.md)). In `make_data.py`, `RESHOOT`
+replaces the Arabic spans of:
+- beats 5–7: inbox, quote review and Authorise, plus the «تمت المراجعة والاعتماد» insert;
+- beat 10: the guardrail's draft request, then Submit;
+- beat 11: phone approval, plus the approval-block insert;
+- beats 1, 13 and 14: PO, outcome form and ledger, as read-only re-takes.
+
+The re-shot clips are plates `r-<clip>`. Beats 8 (Smart Compare) and 12 (PO creation) keep the original footage: neither shows
+«EGP», and today's compare shows a 0% margin. The Saudi ledger now totals ٣١٠ ر.س (rounds A and E), so beat 14's card shows that.
+
+Privacy: `reshoot_privacy.py` runs v2.4's detector on the new clips with templates from those clips:
+- the quote review's «رُفع بواسطة»;
+- the phone list and detail «مقدم الطلب»;
+- the request page's approval block «معيّن إلى» (smaller font, its own template).
+
+It masks with a five-frame halo, then checks:
+- the re-scan of all 16 masked clips finds 0 matches;
+- the control on the raw clips still finds the email.
+
+`reshoot_plates.py` refuses to extract plates without that audit. Raw and masked clips stay on the recording machine
+(`~/Videos/pp-recording/v25-reshoot/`).
+
 ## Build
 
 ```bash
