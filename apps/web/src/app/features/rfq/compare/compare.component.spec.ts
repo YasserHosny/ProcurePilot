@@ -5,6 +5,7 @@ import { formatExactQuantity, formatLocaleNumber } from '../../../core/format/fo
 import {
   RfqApi,
   RfqDetail,
+  RfqResponseComparison,
   RfqResponseComparisonList,
   PrepareRequestResponse,
   RfqSendResponse,
@@ -574,6 +575,260 @@ describe('CompareComponent (RFQ)', () => {
     fixture.detectChanges();
     compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('.pp-chip-best')).toBeNull();
+  });
+
+  it('does NOT render Lowest total chip when responses cover different sets of products (e.g. four-product vs one-product)', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.use('en');
+
+    const fourProductResp: RfqResponseComparison = {
+      id: 'resp-four-prod',
+      rfq_id: 'rfq-1',
+      supplier_id: 'supp-1',
+      quotation_id: 'quote-4p',
+      quotation_status: 'reviewed',
+      submitted_at: '2026-09-25T10:00:00Z',
+      lines: [
+        {
+          workspace_product_id: 'prod-1',
+          original_text: 'Product 1',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '100.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+        {
+          workspace_product_id: 'prod-2',
+          original_text: 'Product 2',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '100.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+        {
+          workspace_product_id: 'prod-3',
+          original_text: 'Product 3',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '100.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+        {
+          workspace_product_id: 'prod-4',
+          original_text: 'Product 4',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '100.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+      ],
+    };
+
+    const oneProductResp: RfqResponseComparison = {
+      id: 'resp-one-prod',
+      rfq_id: 'rfq-1',
+      supplier_id: 'supp-2',
+      quotation_id: 'quote-1p',
+      quotation_status: 'reviewed',
+      submitted_at: '2026-09-25T11:00:00Z',
+      lines: [
+        {
+          workspace_product_id: 'prod-1',
+          original_text: 'Product 1 only',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '90.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+      ],
+    };
+
+    component.responses.set([fourProductResp, oneProductResp]);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.pp-chip-best')).toBeNull();
+    expect(component.lowestTotalResponseIds().size).toBe(0);
+  });
+
+  it('does NOT render Lowest total chip when responses cover same products but differ in quantity on any product', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.use('en');
+
+    const respA: RfqResponseComparison = {
+      id: 'resp-a',
+      rfq_id: 'rfq-1',
+      supplier_id: 'supp-1',
+      quotation_id: 'quote-a',
+      quotation_status: 'reviewed',
+      submitted_at: '2026-09-25T10:00:00Z',
+      lines: [
+        {
+          workspace_product_id: 'prod-1',
+          original_text: 'Product 1',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '5.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+        {
+          workspace_product_id: 'prod-2',
+          original_text: 'Product 2',
+          quoted_quantity: '20',
+          quoted_unit_price_amount: '5.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+      ],
+    };
+
+    const respB: RfqResponseComparison = {
+      id: 'resp-b',
+      rfq_id: 'rfq-1',
+      supplier_id: 'supp-2',
+      quotation_id: 'quote-b',
+      quotation_status: 'reviewed',
+      submitted_at: '2026-09-25T11:00:00Z',
+      lines: [
+        {
+          workspace_product_id: 'prod-1',
+          original_text: 'Product 1',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '5.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+        {
+          workspace_product_id: 'prod-2',
+          original_text: 'Product 2',
+          quoted_quantity: '15',
+          quoted_unit_price_amount: '5.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+      ],
+    };
+
+    component.responses.set([respA, respB]);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.pp-chip-best')).toBeNull();
+    expect(component.lowestTotalResponseIds().size).toBe(0);
+  });
+
+  it('renders Lowest total chip on cheapest response (and both on tie) when products and quantities match', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.use('en');
+
+    const respHigher: RfqResponseComparison = {
+      id: 'resp-higher',
+      rfq_id: 'rfq-1',
+      supplier_id: 'supp-1',
+      quotation_id: 'quote-h',
+      quotation_status: 'reviewed',
+      submitted_at: '2026-09-25T10:00:00Z',
+      lines: [
+        {
+          workspace_product_id: 'prod-1',
+          original_text: 'Product 1',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '5.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+        {
+          workspace_product_id: 'prod-2',
+          original_text: 'Product 2',
+          quoted_quantity: '20',
+          quoted_unit_price_amount: '5.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+      ],
+    };
+
+    const respCheapest1: RfqResponseComparison = {
+      id: 'resp-cheap-1',
+      rfq_id: 'rfq-1',
+      supplier_id: 'supp-2',
+      quotation_id: 'quote-c1',
+      quotation_status: 'reviewed',
+      submitted_at: '2026-09-25T11:00:00Z',
+      lines: [
+        {
+          workspace_product_id: 'prod-1',
+          original_text: 'Product 1',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '4.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+        {
+          workspace_product_id: 'prod-2',
+          original_text: 'Product 2',
+          quoted_quantity: '20',
+          quoted_unit_price_amount: '4.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+      ],
+    };
+
+    const respCheapest2: RfqResponseComparison = {
+      id: 'resp-cheap-2',
+      rfq_id: 'rfq-1',
+      supplier_id: 'supp-3',
+      quotation_id: 'quote-c2',
+      quotation_status: 'reviewed',
+      submitted_at: '2026-09-25T12:00:00Z',
+      lines: [
+        {
+          workspace_product_id: 'prod-1',
+          original_text: 'Product 1',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '4.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+        {
+          workspace_product_id: 'prod-2',
+          original_text: 'Product 2',
+          quoted_quantity: '20',
+          quoted_unit_price_amount: '4.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+      ],
+    };
+
+    // Subcase 1: single cheapest
+    component.responses.set([respHigher, respCheapest1]);
+    fixture.detectChanges();
+
+    let compiled = fixture.nativeElement as HTMLElement;
+    let chips = compiled.querySelectorAll('.pp-chip-best');
+    expect(chips.length).toBe(1);
+    expect(component.lowestTotalResponseIds()).toEqual(new Set(['resp-cheap-1']));
+    let cards = compiled.querySelectorAll('.response-card');
+    expect(cards[0].querySelector('.pp-chip-best')).toBeNull();
+    expect(cards[1].querySelector('.pp-chip-best')).not.toBeNull();
+
+    // Subcase 2: tie for cheapest -> both get the chip
+    component.responses.set([respHigher, respCheapest1, respCheapest2]);
+    fixture.detectChanges();
+
+    compiled = fixture.nativeElement as HTMLElement;
+    chips = compiled.querySelectorAll('.pp-chip-best');
+    expect(chips.length).toBe(2);
+    expect(component.lowestTotalResponseIds()).toEqual(new Set(['resp-cheap-1', 'resp-cheap-2']));
+    cards = compiled.querySelectorAll('.response-card');
+    expect(cards[0].querySelector('.pp-chip-best')).toBeNull();
+    expect(cards[1].querySelector('.pp-chip-best')).not.toBeNull();
+    expect(cards[2].querySelector('.pp-chip-best')).not.toBeNull();
   });
 
   it('renders Match N lines link with href carrying quotation_id when lines are unmatched', () => {

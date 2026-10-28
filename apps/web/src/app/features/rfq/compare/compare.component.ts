@@ -109,6 +109,40 @@ export class CompareComponent implements OnInit, OnChanges {
     if (currencies.size !== 1) {
       return new Set<string>();
     }
+
+    const getProductQuantities = (response: RfqResponseComparison): Map<string, number> | null => {
+      const map = new Map<string, number>();
+      for (const line of response.lines) {
+        if (!line.workspace_product_id) {
+          return null;
+        }
+        const qty = Number(line.quoted_quantity);
+        if (Number.isNaN(qty)) {
+          return null;
+        }
+        map.set(line.workspace_product_id, (map.get(line.workspace_product_id) ?? 0) + qty);
+      }
+      return map;
+    };
+
+    const baselineMap = getProductQuantities(eligible[0]);
+    if (!baselineMap) {
+      return new Set<string>();
+    }
+
+    for (let i = 1; i < eligible.length; i++) {
+      const currentMap = getProductQuantities(eligible[i]);
+      if (!currentMap || currentMap.size !== baselineMap.size) {
+        return new Set<string>();
+      }
+      for (const [productId, baselineQty] of baselineMap.entries()) {
+        const currentQty = currentMap.get(productId);
+        if (currentQty === undefined || Math.abs(currentQty - baselineQty) > 1e-9) {
+          return new Set<string>();
+        }
+      }
+    }
+
     const totals = eligible.map((r) => ({ id: r.id, total: this.responseTotal(r) }));
     const minTotal = Math.min(...totals.map((t) => t.total));
     const ids = new Set<string>();
