@@ -165,6 +165,40 @@ export class QuotationLinesComponent {
     return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
   }
 
+  getEffectiveUnitPriceAmount(line: QuotationLine): string {
+    const fe = this.getFieldExtraction('quotation_line', line.id, 'unit_price');
+    if (fe && this.pendingCorrections.has(fe.id)) {
+      const pending = this.pendingCorrections.get(fe.id);
+      if (pending && typeof pending === 'object' && 'amount' in pending) {
+        return String((pending as { amount: unknown }).amount ?? '');
+      }
+      if (typeof pending === 'string') return pending;
+    }
+    if (fe?.corrected_value) {
+      if (typeof fe.corrected_value === 'object' && 'amount' in fe.corrected_value) {
+        return String((fe.corrected_value as { amount: unknown }).amount ?? '');
+      }
+      if (typeof fe.corrected_value === 'string') return fe.corrected_value;
+    }
+    return line.unit_price?.amount ?? '';
+  }
+
+  onUnitPriceBlur(line: QuotationLine, targetValue: string): void {
+    const original = line.unit_price?.amount ?? '';
+    if (targetValue === original) {
+      return;
+    }
+    this.fieldReviewed.emit({
+      entityType: 'quotation_line',
+      entityId: line.id,
+      fieldName: 'unit_price',
+      reviewedValue: {
+        amount: targetValue,
+        currency: line.unit_price?.currency || this.effectiveCurrency,
+      },
+    });
+  }
+
   getFieldConfidence(
     entityType: 'quotation' | 'quotation_line',
     entityId: string,

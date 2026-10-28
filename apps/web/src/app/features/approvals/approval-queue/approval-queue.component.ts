@@ -264,6 +264,11 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   openDecisionDialog(request: PurchaseRequest, action: 'approve' | 'reject'): void {
+    const branchName = this.branchNameById().get(request.branch_id);
+    const amount = request.estimated_total
+      ? this.formatService.formatCurrencyAmount(request.estimated_total)
+      : undefined;
+
     const dialogRef = this.dialog.open<
       ApprovalDecisionDialogComponent,
       ApprovalDecisionDialogData,
@@ -273,8 +278,8 @@ export class ApprovalQueueComponent implements OnInit {
       data: {
         action,
         requestId: request.id,
-        amount: this.formatMoney(request),
-        branchName: this.getBranchName(request.branch_id),
+        amount,
+        branchName,
       },
     });
 

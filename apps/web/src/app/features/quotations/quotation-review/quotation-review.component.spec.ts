@@ -876,9 +876,11 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(correctedTag.textContent.trim()).toBe('Corrected by Human');
   });
 
-  it('formats quote review unit prices with 0 or 2 decimals (e.g. 85.0000 -> 85)', () => {
+  it('displays exact stored amount in editable unit price input while read-only display formats with 0 or 2 decimals (e.g. 85.0000 -> 85)', () => {
+    // 1. Read-only display of 85.0000 still shows "85"
     component.quotation.set({
       ...mockQuotationDetail,
+      status: 'reviewed',
       lines: [
         {
           ...mockQuotationDetail.lines[0],
@@ -888,10 +890,86 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     });
     fixture.detectChanges();
 
+    const readOnlyInput = fixture.nativeElement.querySelector(
+      '#field-fe-line1-price input',
+    ) as HTMLInputElement | null;
+    expect(readOnlyInput).toBeTruthy();
+    expect(readOnlyInput?.value).toBe('85');
+
+    // 2. Editable input carries exact stored amount (85.0000)
+    component.quotation.set({
+      ...mockQuotationDetail,
+      status: 'extracted',
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          unit_price: { amount: '85.0000', currency: 'SAR' },
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    const editableInput = fixture.nativeElement.querySelector(
+      '#field-fe-line1-price input',
+    ) as HTMLInputElement | null;
+    expect(editableInput).toBeTruthy();
+    expect(editableInput?.value).toBe('85.0000');
+  });
+
+  it('preserves exact 4-decimal unit price on blur and save of unchanged low-confidence price without staging rounded correction', () => {
+    const lowConfPriceExtraction = {
+      ...mockQuotationDetail.field_extractions[1],
+      id: 'fe-line1-price',
+      field_name: 'unit_price',
+      extracted_value: { amount: '0.1234', currency: 'SAR' },
+      confidence: '0.5000',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      status: 'extracted',
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          unit_price: { amount: '0.1234', currency: 'SAR' },
+        },
+      ],
+      field_extractions: [
+        mockQuotationDetail.field_extractions[0],
+        lowConfPriceExtraction,
+      ],
+    });
+    fixture.detectChanges();
+
     const unitPriceInput = fixture.nativeElement.querySelector(
       '#field-fe-line1-price input',
     ) as HTMLInputElement | null;
     expect(unitPriceInput).toBeTruthy();
-    expect(unitPriceInput?.value).toBe('85');
+    expect(unitPriceInput?.value).toBe('0.1234');
+
+    // Trigger blur on unedited field
+    unitPriceInput?.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    // Blur on an unedited field must not stage a correction at all (or, if staged, exactly 0.1234)
+    const staged = component.pendingCorrections().get('fe-line1-price');
+    if (staged) {
+      expect((staged as { amount: string }).amount).toBe('0.1234');
+    } else {
+      expect(component.pendingCorrections().has('fe-line1-price')).toBeFalse();
+    }
+
+    // Saving must not send a rounded 0.12 correction
+    apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+    component.saveCorrections();
+
+    if (apiService.patchQuotation.calls.count() > 0) {
+      const patchPayload = apiService.patchQuotation.calls.mostRecent().args[1];
+      const priceCorr = patchPayload.corrections?.find(
+        (c) => c.field_extraction_id === 'fe-line1-price',
+      );
+      if (priceCorr) {
+        expect((priceCorr.corrected_value as { amount: string }).amount).toBe('0.1234');
+      }
+    }
   });
 });

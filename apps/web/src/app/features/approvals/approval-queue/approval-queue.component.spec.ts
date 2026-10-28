@@ -16,7 +16,11 @@ import { SessionService } from '../../../core/auth/session.service';
 import { RequestsApiService } from '../../requests/requests-api';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { ApprovalsApiService } from '../approvals-api';
-import { ApprovalDecisionDialogComponent, ApprovalQueueComponent } from './approval-queue.component';
+import {
+  ApprovalDecisionDialogComponent,
+  ApprovalQueueComponent,
+  type ApprovalDecisionDialogData,
+} from './approval-queue.component';
 
 const mockPendingRequests: PurchaseRequest[] = [
   {
@@ -755,6 +759,38 @@ describe('ApprovalQueueComponent', () => {
       }),
     );
   });
+
+  it('omits amount when estimated_total is null so default title takes over', () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of({ confirmed: false }),
+    } as MatDialogRef<unknown, unknown>);
+
+    const reqWithoutTotal = {
+      ...mockPendingRequests[0],
+      estimated_total: null,
+    };
+
+    component.openDecisionDialog(reqWithoutTotal, 'approve');
+
+    const dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as ApprovalDecisionDialogData;
+    expect(dialogData.amount).toBeUndefined();
+  });
+
+  it('omits branchName when branch id is not in branchNameById so default title takes over', () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of({ confirmed: false }),
+    } as MatDialogRef<unknown, unknown>);
+
+    const reqWithUnknownBranch = {
+      ...mockPendingRequests[0],
+      branch_id: 'unknown-branch-uuid',
+    };
+
+    component.openDecisionDialog(reqWithUnknownBranch, 'approve');
+
+    const dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as ApprovalDecisionDialogData;
+    expect(dialogData.branchName).toBeUndefined();
+  });
 });
 
 describe('ApprovalDecisionDialogComponent', () => {
@@ -796,5 +832,79 @@ describe('ApprovalDecisionDialogComponent', () => {
     translate.use('ar');
     dialogFixture.detectChanges();
     expect(titleEl?.textContent?.trim()).toBe('اعتماد SAR 4,137 لـ فرع العليا؟');
+  });
+
+  it('shows default title when amount is missing (estimated_total was null) in en and ar', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ApprovalDecisionDialogComponent],
+      providers: [
+        provideTranslateService(),
+        {
+          provide: MAT_DIALOG_DATA,
+          useValue: {
+            action: 'approve',
+            requestId: 'req-001',
+            branchName: 'North Branch',
+          },
+        },
+        {
+          provide: MatDialogRef,
+          useValue: jasmine.createSpyObj('MatDialogRef', ['close']),
+        },
+      ],
+    }).compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    translate.use('en');
+
+    dialogFixture = TestBed.createComponent(ApprovalDecisionDialogComponent);
+    dialogFixture.detectChanges();
+
+    const titleEl = dialogFixture.nativeElement.querySelector('[mat-dialog-title]');
+    expect(titleEl?.textContent?.trim()).toBe('Approve Purchase Request');
+
+    translate.use('ar');
+    dialogFixture.detectChanges();
+    expect(titleEl?.textContent?.trim()).toBe('اعتماد طلب الشراء');
+  });
+
+  it('shows default title when branchName is missing (unknown branch) in en and ar', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ApprovalDecisionDialogComponent],
+      providers: [
+        provideTranslateService(),
+        {
+          provide: MAT_DIALOG_DATA,
+          useValue: {
+            action: 'approve',
+            requestId: 'req-001',
+            amount: 'SAR 1,250',
+          },
+        },
+        {
+          provide: MatDialogRef,
+          useValue: jasmine.createSpyObj('MatDialogRef', ['close']),
+        },
+      ],
+    }).compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    translate.use('en');
+
+    dialogFixture = TestBed.createComponent(ApprovalDecisionDialogComponent);
+    dialogFixture.detectChanges();
+
+    const titleEl = dialogFixture.nativeElement.querySelector('[mat-dialog-title]');
+    expect(titleEl?.textContent?.trim()).toBe('Approve Purchase Request');
+
+    translate.use('ar');
+    dialogFixture.detectChanges();
+    expect(titleEl?.textContent?.trim()).toBe('اعتماد طلب الشراء');
   });
 });
