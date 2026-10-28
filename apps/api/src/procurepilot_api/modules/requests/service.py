@@ -331,7 +331,7 @@ class RequestsService:
                 line_rows = conn.execute(
                     f"select {LINE_COLUMNS} from purchase_request_line "
                     "where tenant_id = %s and purchase_request_id = %s "
-                    "order by created_at, id",
+                    "order by position, created_at, id",
                     (member.tenant_id, request_id),
                 ).fetchall()
 
@@ -1450,6 +1450,7 @@ class RequestsService:
                 "tenant_id": tenant_id,
                 "purchase_request_id": request_id,
                 "workspace_product_id": str(line.workspace_product_id),
+                "position": position,
                 "quantity": line.quantity,
                 "pack_base_quantity": pack_quantities.get(str(line.workspace_product_id)),
                 "note": line.note,
@@ -1465,7 +1466,7 @@ class RequestsService:
                     else None
                 ),
             }
-            for line, est in zip(payload_lines, estimates, strict=True)
+            for position, (line, est) in enumerate(zip(payload_lines, estimates, strict=True))
         ]
         try:
             response = client.table("purchase_request_line").insert(inserts).execute()
@@ -1616,6 +1617,7 @@ class RequestsService:
                 client.table("purchase_request_line")
                 .select(LINE_COLUMNS)
                 .in_("purchase_request_id", request_ids)
+                .order("position")
                 .order("created_at")
                 .order("id")
                 .execute()
