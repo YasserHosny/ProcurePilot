@@ -142,8 +142,8 @@
               </td>
             </ng-container>
 
-            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="clickable-row" (click)="onRowClick(row)"></tr>
+            <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns();" class="clickable-row" (click)="onRowClick(row)"></tr>
           </table>
         </div>
       }
@@ -169,6 +169,16 @@
         <mat-icon aria-hidden="true">content_copy</mat-icon>
         <span>{{ 'rfq.history.duplicate' | translate }}</span>
       </a>
+      @if (showCountsInMenu()) {
+        <a mat-menu-item [routerLink]="['/rfq', rfq.id]" [queryParams]="{ tab: 'recipients' }">
+          <mat-icon aria-hidden="true">people</mat-icon>
+          <span>{{ 'rfq.history.recipientsCount' | translate: { count: rfq.recipient_count } }}</span>
+        </a>
+        <a mat-menu-item [routerLink]="['/rfq', rfq.id]" [queryParams]="{ tab: 'responses' }">
+          <mat-icon aria-hidden="true">reply</mat-icon>
+          <span>{{ 'rfq.history.responsesCount' | translate: { count: rfq.response_count } }}</span>
+        </a>
+      }
     </ng-template>
   </mat-menu>
 

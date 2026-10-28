@@ -12,6 +12,25 @@
   line-height: 1.5;
 }
 
+.dialog-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--pp-error);
+  font-size: 0.875rem;
+  margin: 0;
+  margin-block-end: 1rem;
+  line-height: 1.5;
+
+  .inline-warning-icon {
+    font-size: 18px;
+    inline-size: 18px;
+    block-size: 18px;
+    color: var(--pp-error);
+    flex-shrink: 0;
+  }
+}
+
 .target-badge {
   display: inline-flex;
   align-items: center;

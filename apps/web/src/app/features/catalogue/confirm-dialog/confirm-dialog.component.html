@@ -9,6 +9,12 @@
   <p class="dialog-message">
     {{ data.messageKey | translate: data.messageParams }}
   </p>
+  @if (data.warningKey) {
+    <p class="dialog-warning" role="alert">
+      <mat-icon class="inline-warning-icon" aria-hidden="true">warning</mat-icon>
+      <span>{{ data.warningKey | translate: data.warningParams }}</span>
+    </p>
+  }
   @if (data.itemName) {
     <div class="target-badge">
       <mat-icon aria-hidden="true">inventory_2</mat-icon>

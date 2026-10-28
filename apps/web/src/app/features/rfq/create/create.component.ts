@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal, ChangeDetectionStrategy, ElementRef, viewChildren } from '@angular/core';
 
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { ReactiveFormsModule, FormBuilder, Validators, FormArray, AbstractControl, ValidationErrors } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, Validators, FormArray, AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -10,19 +10,23 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { DateAdapter } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { EMPTY, Observable, expand, forkJoin, reduce } from 'rxjs';
+import { EMPTY, Observable, expand, forkJoin, map, reduce } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { Rfq, RfqApi, RfqDetail } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { Product, Supplier } from '../../../core/api/models';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
-import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
+import { AppDateAdapter, provideAppDateAdapter } from '../../../core/i18n/date-adapter';
+import { FormatService } from '../../../core/format/format.service';
 import { trimDecimal } from '../../../core/format/trim-decimal';
 import { normaliseSearchText } from '../../../core/format/search-normalise';
+import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 
 @Component({
   providers: [provideAppDateAdapter()],
@@ -40,6 +44,7 @@ import { normaliseSearchText } from '../../../core/format/search-normalise';
     MatIconModule,
     MatDatepickerModule,
     MatProgressSpinnerModule,
+    MatDialogModule,
     TranslatePipe,
 ],
   templateUrl: './create.component.html',
@@ -52,13 +57,42 @@ export class RfqCreateComponent implements OnInit {
   private readonly apiService = inject(ApiService);
   private readonly translate = inject(TranslateService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
+  private readonly formatService = inject(FormatService);
+  private readonly elementRef = inject(ElementRef);
+  private readonly dateAdapter = inject<DateAdapter<Date>>(DateAdapter, { optional: true });
   private readonly route = inject(ActivatedRoute, { optional: true });
   private readonly router = inject(Router, { optional: true });
 
   readonly quantityInputs = viewChildren<ElementRef<HTMLInputElement>>('quantityInput');
+  readonly productInputs = viewChildren<ElementRef<HTMLInputElement>>('productInput');
+
+  readonly minDate = (() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  })();
+
+  get dateFormatHint(): string {
+    const isDayFirst = (this.dateAdapter as unknown as AppDateAdapter)?.isDayFirst
+      ? (this.dateAdapter as unknown as AppDateAdapter).isDayFirst()
+      : true;
+    return isDayFirst ? 'DD/MM/YYYY' : 'MM/DD/YYYY';
+  }
 
   readonly products = signal<Product[]>([]);
   readonly suppliers = signal<Supplier[]>([]);
+
+  private readonly pastDateValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+    const val = control.value;
+    if (!val) return null;
+    const d = typeof val === 'string' ? parseIsoDateLocal(val) : val;
+    if (!d || isNaN(d.getTime())) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    return target.getTime() < today.getTime() ? { pastDate: true } : null;
+  };
 
   private readonly productValidator = (control: AbstractControl): ValidationErrors | null => {
     const value = control.value;
@@ -72,6 +106,42 @@ export class RfqCreateComponent implements OnInit {
     return null;
   };
 
+  private readonly duplicateProductsValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+    const formArray = control as FormArray;
+    if (!formArray || !formArray.controls) return null;
+
+    const seen = new Map<string, number>();
+    let hasDuplicate = false;
+
+    formArray.controls.forEach((group, idx) => {
+      const prodControl = group.get('workspace_product_id');
+      const prodId = prodControl?.value;
+      if (prodId && typeof prodId === 'string' && prodId.trim() !== '') {
+        if (seen.has(prodId)) {
+          const firstLine = seen.get(prodId)!;
+          const currentErrors = prodControl?.errors || {};
+          prodControl?.setErrors({ ...currentErrors, duplicateProduct: { line: firstLine } });
+          hasDuplicate = true;
+        } else {
+          seen.set(prodId, idx + 1);
+          if (prodControl?.hasError('duplicateProduct')) {
+            const rest = { ...(prodControl.errors || {}) };
+            delete rest['duplicateProduct'];
+            prodControl.setErrors(Object.keys(rest).length ? rest : null);
+          }
+        }
+      } else {
+        if (prodControl?.hasError('duplicateProduct')) {
+          const rest = { ...(prodControl.errors || {}) };
+          delete rest['duplicateProduct'];
+          prodControl.setErrors(Object.keys(rest).length ? rest : null);
+        }
+      }
+    });
+
+    return hasDuplicate ? { duplicateProducts: true } : null;
+  };
+
   readonly form = this.fb.nonNullable.group({
     lines: this.fb.array(
       [
@@ -80,10 +150,10 @@ export class RfqCreateComponent implements OnInit {
           quantity: ['', [Validators.required, Validators.min(0.01)]],
         }),
       ],
-      Validators.required,
+      [Validators.required, this.duplicateProductsValidator],
     ),
     supplierIds: [[] as string[], Validators.required],
-    neededByDate: this.fb.control<Date | null>(null, Validators.required),
+    neededByDate: this.fb.control<Date | null>(null, [Validators.required, this.pastDateValidator]),
     tenantTerms: ['', Validators.maxLength(4000)],
   });
 
@@ -124,16 +194,26 @@ export class RfqCreateComponent implements OnInit {
   }
 
   onProductSelected(index: number): void {
-    const inputs = this.quantityInputs();
-    const target = inputs[index]?.nativeElement;
-    if (target) {
-      target.focus();
-      setTimeout(() => target.focus(), 0);
-    }
+    const qtyControl = this.linesFormArray.at(index)?.get('quantity');
+    setTimeout(() => {
+      const inputs = this.quantityInputs();
+      const target = inputs[index]?.nativeElement;
+      if (target) {
+        target.focus();
+      }
+      qtyControl?.markAsUntouched();
+    }, 0);
+  }
+
+  isProductSelectedOnOtherLine(productId: string, currentIndex: number): boolean {
+    if (!productId) return false;
+    return this.linesFormArray.controls.some((group, i) => {
+      return i < currentIndex && group.get('workspace_product_id')?.value === productId;
+    });
   }
 
   selectedSupplierNames(): string {
-    const selectedIds = this.form.controls.supplierIds.value;
+    const selectedIds = this.form.getRawValue().supplierIds;
     if (!selectedIds || selectedIds.length === 0) return '';
     const map = new Map(this.suppliers().map((s) => [s.id, s.name]));
     return selectedIds
@@ -313,23 +393,26 @@ export class RfqCreateComponent implements OnInit {
         quantity: ['', [Validators.required, Validators.min(0.01)]],
       }),
     );
+    const newIndex = this.linesFormArray.length - 1;
+    setTimeout(() => {
+      const inputs = this.productInputs();
+      const target = inputs[newIndex]?.nativeElement;
+      if (target) {
+        target.focus();
+      }
+    }, 0);
   }
 
   removeLine(index: number): void {
     if (this.linesFormArray.length > 1) {
       this.linesFormArray.removeAt(index);
+      this.linesFormArray.updateValueAndValidity();
     }
   }
 
-  onSave(): void {
-    if (this.form.invalid) return;
-
-    this.isSaving.set(true);
-    this.errorMessage.set(null);
-    this.rejectedSuppliers.set([]);
-
+  private buildSavePayload() {
     const val = this.form.getRawValue();
-    const payload = {
+    return {
       lines: val.lines.map((line) => ({
         workspace_product_id: line.workspace_product_id,
         quantity: String(line.quantity),
@@ -338,7 +421,21 @@ export class RfqCreateComponent implements OnInit {
       needed_by_date: toIsoDateOrNull(val.neededByDate)!,
       tenant_terms: val.tenantTerms || undefined,
     };
+  }
 
+  onSave(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.focusFirstInvalidControl();
+      return;
+    }
+
+    this.isSaving.set(true);
+    this.form.disable({ emitEvent: false });
+    this.errorMessage.set(null);
+    this.rejectedSuppliers.set([]);
+
+    const payload = this.buildSavePayload();
     const existingId = this.rfqId();
     const request$ = existingId
       ? this.rfqApi.updateRfq(existingId, payload)
@@ -347,10 +444,12 @@ export class RfqCreateComponent implements OnInit {
     request$.subscribe({
       next: (res) => {
         const wasCreate = existingId === null;
+        this.form.markAsPristine();
         this.rfqId.set(res.rfq.id);
         this.rfqStatus.set(res.rfq.status);
         this.rejectedSuppliers.set(res.rejected_recipients ?? []);
         this.isSaving.set(false);
+        this.form.enable({ emitEvent: false });
         this.isEditMode.set(true);
         this.snackBar.open(
           this.translate.instant('rfq.create.draftSaved'),
@@ -365,6 +464,7 @@ export class RfqCreateComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.isSaving.set(false);
+        this.form.enable({ emitEvent: false });
         if (err instanceof HttpErrorResponse && err.status === 403) {
           this.errorMessage.set(this.translate.instant('rfq.creatorOnly'));
           return;
@@ -374,27 +474,122 @@ export class RfqCreateComponent implements OnInit {
     });
   }
 
+  private getConfirmSendMessageKey(count: number): string {
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    const specificKey = `rfq.create.confirmSendMessage.${category}`;
+    return this.translate.instant(specificKey) !== specificKey
+      ? specificKey
+      : 'rfq.create.confirmSendMessage.other';
+  }
+
   onSend(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.focusFirstInvalidControl();
+      return;
+    }
+
     const id = this.rfqId();
     if (!id) return;
 
+    const val = this.form.getRawValue();
+    const supplierNames = this.selectedSupplierNames();
+    const formattedDate = this.formatService.formatDate(val.neededByDate);
+    const itemCount = this.linesFormArray.length;
+
+    const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
+      width: '440px',
+      data: {
+        titleKey: 'rfq.history.confirmSendTitle',
+        messageKey: this.getConfirmSendMessageKey(itemCount),
+        messageParams: {
+          suppliers: supplierNames,
+          itemCount,
+          count: itemCount,
+          date: formattedDate,
+        },
+        suppliers: supplierNames,
+        date: formattedDate,
+        itemCount,
+        confirmKey: 'rfq.history.confirmSendButton',
+        cancelKey: 'rfq.history.cancelSendButton',
+        isDestructive: false,
+      },
+    });
+
+    dialogRef.afterClosed().subscribe((confirmed) => {
+      if (!confirmed) return;
+
+      if (this.form.dirty) {
+        this.saveDraftAndSend(id);
+      } else {
+        this.executeSend(id);
+      }
+    });
+  }
+
+  private saveDraftAndSend(id: string): void {
+    this.isSaving.set(true);
+    this.form.disable({ emitEvent: false });
+    this.errorMessage.set(null);
+    this.rejectedSuppliers.set([]);
+
+    const payload = this.buildSavePayload();
+    this.rfqApi.updateRfq(id, payload).subscribe({
+      next: (res) => {
+        this.isSaving.set(false);
+        this.form.markAsPristine();
+        this.rfqStatus.set(res.rfq.status);
+        this.rejectedSuppliers.set(res.rejected_recipients ?? []);
+        this.executeSend(id);
+      },
+      error: (err: unknown) => {
+        this.isSaving.set(false);
+        this.form.enable({ emitEvent: false });
+        if (err instanceof HttpErrorResponse && err.status === 403) {
+          this.errorMessage.set(this.translate.instant('rfq.creatorOnly'));
+          return;
+        }
+        this.errorMessage.set(this.getErrorMessage(err, 'rfq.create.saveError'));
+      },
+    });
+  }
+
+  private executeSend(id: string): void {
     this.isSending.set(true);
+    this.form.disable({ emitEvent: false });
     this.errorMessage.set(null);
     this.rfqApi.sendRfq(id).subscribe({
       next: (res) => {
+        this.form.markAsPristine();
         this.rfqStatus.set(res.rfq.status);
         this.isSending.set(false);
+        this.form.enable({ emitEvent: false });
         const total = res.recipients.length;
         const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
-        const key = sent === total && total > 0 ? 'rfq.create.sentSuccess' : sent > 0 ? 'rfq.create.sentPartial' : 'rfq.create.sentNone';
-        const params = sent === total && total > 0 ? { count: sent } : { sent, total, failed: total - sent };
-        this.snackBar.open(this.translate.instant(key, params), this.translate.instant('rfq.history.dismiss'), { duration: 5000 });
+        const key =
+          sent === total && total > 0
+            ? 'rfq.create.sentSuccess'
+            : sent > 0
+              ? 'rfq.create.sentPartial'
+              : 'rfq.create.sentNone';
+        const params =
+          sent === total && total > 0
+            ? { count: sent }
+            : { sent, total, failed: total - sent };
+        this.snackBar.open(
+          this.translate.instant(key, params),
+          this.translate.instant('rfq.history.dismiss'),
+          { duration: 5000 },
+        );
         if (sent === total && total > 0 && this.router) {
           void this.router.navigate(['/rfq/history'])?.catch(() => undefined);
         }
       },
       error: (err: unknown) => {
         this.isSending.set(false);
+        this.form.enable({ emitEvent: false });
         if (err instanceof HttpErrorResponse && err.status === 403) {
           this.errorMessage.set(this.translate.instant('rfq.creatorOnly'));
           return;
@@ -404,6 +599,37 @@ export class RfqCreateComponent implements OnInit {
     });
   }
 
+  canDeactivate(): Observable<boolean> | boolean {
+    if (!this.form.dirty || this.isSaving() || this.isSending()) {
+      return true;
+    }
+    const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
+      width: '440px',
+      data: {
+        titleKey: 'rfq.create.discardChangesTitle',
+        messageKey: 'rfq.create.discardChangesMessage',
+        confirmKey: 'rfq.create.discardChangesConfirm',
+        cancelKey: 'rfq.create.discardChangesCancel',
+        isDestructive: true,
+      },
+    });
+    return dialogRef.afterClosed().pipe(map((res) => !!res));
+  }
+
+  private focusFirstInvalidControl(): void {
+    setTimeout(() => {
+      const el = this.elementRef.nativeElement.querySelector(
+        'mat-form-field.ng-invalid, mat-form-field .ng-invalid',
+      ) as HTMLElement | null;
+      if (!el) return;
+
+      const control = el.matches('input, textarea, mat-select')
+        ? el
+        : el.querySelector<HTMLElement>('input, textarea, mat-select');
+      control?.focus();
+    }, 0);
+  }
+
   private getErrorMessage(err: unknown, fallbackKey: string): string {
     const fallback = this.translate.instant(fallbackKey);
     if (!(err instanceof HttpErrorResponse) || err.status >= 500) return fallback;
@@ -411,9 +637,23 @@ export class RfqCreateComponent implements OnInit {
     const envelope = err.error as {
       code?: unknown;
       message?: unknown;
-      details?: { loc?: unknown }[];
+      reason?: string;
+      details?: { loc?: unknown; reason?: string } | { loc?: unknown; reason?: string }[];
     } | null;
+
+    const errReason =
+      (envelope as { reason?: string })?.reason ??
+      (Array.isArray(envelope?.details) ? undefined : (envelope?.details as { reason?: string })?.reason);
+
+    if (errReason === 'needed_by_in_past') {
+      return this.translate.instant('rfq.create.neededByPastError');
+    }
+    if (errReason === 'duplicate_product') {
+      return this.translate.instant('rfq.create.productDuplicate');
+    }
+
     if (envelope?.code === 'validation.invalid_request') {
+      const detailsList = Array.isArray(envelope.details) ? envelope.details : [];
       const fieldKeys: Record<string, string> = {
         lines: 'rfq.create.itemsLabel',
         recipient_supplier_ids: 'rfq.create.suppliersLabel',
@@ -422,7 +662,7 @@ export class RfqCreateComponent implements OnInit {
       };
       const labels = [
         ...new Set(
-          (Array.isArray(envelope.details) ? envelope.details : [])
+          detailsList
             .map((detail) => (Array.isArray(detail?.loc) ? detail.loc.at(-1) : undefined))
             .filter((field): field is string => typeof field === 'string' && field in fieldKeys),
         ),
