@@ -711,12 +711,15 @@ describe('ApprovalQueueComponent', () => {
     expect(linesCell?.querySelector('.reject-btn')).toBeNull();
   });
 
-  it('makes the whole N lines control one clickable button without tooltip', () => {
+  it('makes the whole N lines control one clickable button without tooltip whose accessible name contains visible text and flips aria-expanded', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const linesCell = compiled.querySelector('td.mat-column-lines');
     const toggleBtn = linesCell?.querySelector<HTMLButtonElement>('.lines-toggle-btn');
     expect(toggleBtn).not.toBeNull();
-    expect(toggleBtn?.textContent).toContain('2 lines');
+    const visibleText = toggleBtn?.querySelector('.lines-count')?.textContent?.trim() ?? '';
+    expect(visibleText).toBe('2 lines');
+    expect(toggleBtn?.textContent).toContain(visibleText);
+    expect(toggleBtn?.getAttribute('aria-label')).toBeNull();
     expect(toggleBtn?.getAttribute('aria-expanded')).toBe('false');
     expect(toggleBtn?.hasAttribute('matTooltip')).toBeFalse();
     expect(toggleBtn?.getAttribute('ng-reflect-message')).toBeNull();
@@ -726,6 +729,12 @@ describe('ApprovalQueueComponent', () => {
     fixture.detectChanges();
     expect(component.isExpanded('req-001')).toBeTrue();
     expect(toggleBtn?.getAttribute('aria-expanded')).toBe('true');
+
+    // Clicking again collapses lines
+    toggleBtn?.click();
+    fixture.detectChanges();
+    expect(component.isExpanded('req-001')).toBeFalse();
+    expect(toggleBtn?.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('renders "—" for empty optional line note instead of "Not available"', () => {
@@ -760,7 +769,7 @@ describe('ApprovalQueueComponent', () => {
     );
   });
 
-  it('omits amount when estimated_total is null so default title takes over', () => {
+  it('omits amount when estimated_total is null so branch-only title can take over', () => {
     dialogSpy.open.and.returnValue({
       afterClosed: () => of({ confirmed: false }),
     } as MatDialogRef<unknown, unknown>);
@@ -834,7 +843,7 @@ describe('ApprovalDecisionDialogComponent', () => {
     expect(titleEl?.textContent?.trim()).toBe('اعتماد SAR 4,137 لـ فرع العليا؟');
   });
 
-  it('shows default title when amount is missing (estimated_total was null) in en and ar', () => {
+  it('shows branch-only title when amount is missing (estimated_total was null) in en and ar', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [ApprovalDecisionDialogComponent],
@@ -864,11 +873,11 @@ describe('ApprovalDecisionDialogComponent', () => {
     dialogFixture.detectChanges();
 
     const titleEl = dialogFixture.nativeElement.querySelector('[mat-dialog-title]');
-    expect(titleEl?.textContent?.trim()).toBe('Approve Purchase Request');
+    expect(titleEl?.textContent?.trim()).toBe('Approve the request for North Branch?');
 
     translate.use('ar');
     dialogFixture.detectChanges();
-    expect(titleEl?.textContent?.trim()).toBe('اعتماد طلب الشراء');
+    expect(titleEl?.textContent?.trim()).toBe('اعتماد الطلب لـ North Branch؟');
   });
 
   it('shows default title when branchName is missing (unknown branch) in en and ar', () => {
@@ -883,6 +892,42 @@ describe('ApprovalDecisionDialogComponent', () => {
             action: 'approve',
             requestId: 'req-001',
             amount: 'SAR 1,250',
+          },
+        },
+        {
+          provide: MatDialogRef,
+          useValue: jasmine.createSpyObj('MatDialogRef', ['close']),
+        },
+      ],
+    }).compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    translate.use('en');
+
+    dialogFixture = TestBed.createComponent(ApprovalDecisionDialogComponent);
+    dialogFixture.detectChanges();
+
+    const titleEl = dialogFixture.nativeElement.querySelector('[mat-dialog-title]');
+    expect(titleEl?.textContent?.trim()).toBe('Approve Purchase Request');
+
+    translate.use('ar');
+    dialogFixture.detectChanges();
+    expect(titleEl?.textContent?.trim()).toBe('اعتماد طلب الشراء');
+  });
+
+  it('shows default title when neither amount nor branchName is present in en and ar', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ApprovalDecisionDialogComponent],
+      providers: [
+        provideTranslateService(),
+        {
+          provide: MAT_DIALOG_DATA,
+          useValue: {
+            action: 'approve',
+            requestId: 'req-001',
           },
         },
         {

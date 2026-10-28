@@ -72,9 +72,11 @@ export interface ApprovalDecisionDialogResult {
       {{
         (data.action === 'approve' && data.amount && data.branchName
           ? ('approvals.decisionDialog.approveTitle' | translate: { amount: data.amount, branchName: data.branchName })
-          : data.action === 'approve'
-            ? ('approvals.decisionDialog.approveTitleDefault' | translate)
-            : ('approvals.decisionDialog.rejectTitle' | translate)
+          : data.action === 'approve' && data.branchName
+            ? ('approvals.decisionDialog.approveTitleBranchOnly' | translate: { branchName: data.branchName })
+            : data.action === 'approve'
+              ? ('approvals.decisionDialog.approveTitleDefault' | translate)
+              : ('approvals.decisionDialog.rejectTitle' | translate)
         )
       }}
     </h2>

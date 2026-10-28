@@ -2252,6 +2252,7 @@
     "createOrderAction": "Create purchase order",
     "decisionDialog": {
       "approveTitle": "Approve {{amount}} for {{branchName}}?",
+      "approveTitleBranchOnly": "Approve the request for {{branchName}}?",
       "approveTitleDefault": "Approve Purchase Request",
       "rejectTitle": "Reject Purchase Request",
       "commentLabel": "Comment (optional)",

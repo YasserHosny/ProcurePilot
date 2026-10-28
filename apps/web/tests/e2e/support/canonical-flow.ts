@@ -163,7 +163,7 @@ export async function correctStatedTotal(page: Page): Promise<void> {
 export async function resolveIssueDateFlag(page: Page): Promise<void> {
   const fieldBox = page.locator('.field-box', { hasText: 'Issue Date' });
   await fieldBox.locator('.confirm-as-is-btn').click();
-  await expect(fieldBox.locator('.corrected-tag')).toBeVisible();
+  await expect(fieldBox.locator('.confirmed-tag')).toBeVisible();
 }
 
 /** Saves pending corrections and asserts they were persisted with attribution and took effect. */

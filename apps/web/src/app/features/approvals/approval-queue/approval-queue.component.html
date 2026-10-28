@@ -157,7 +157,6 @@
                 class="lines-toggle-btn expand-lines-btn"
                 (click)="toggleExpand(req.id)"
                 [attr.aria-expanded]="isExpanded(req.id)"
-                [attr.aria-label]="(isExpanded(req.id) ? 'approvals.hideLines' : 'approvals.viewLines') | translate"
               >
                 <span class="lines-count">{{ lineCountLabel(req.lines.length) }}</span>
                 <mat-icon class="toggle-icon" aria-hidden="true">{{ isExpanded(req.id) ? 'expand_less' : 'expand_more' }}</mat-icon>
