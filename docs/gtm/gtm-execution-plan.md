@@ -125,7 +125,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-69 | PPS-99 | P-70 | PPS-100 | P-71 | PPS-101 |
 | P-72 | PPS-102 | P-73 | PPS-103 | P-74 | PPS-104 |
 | P-75 | PPS-105 | P-76 | PPS-106 | P-77 | PPS-107 |
-| P-78 | PPS-108 | | | | |
+| P-78 | PPS-108 | P-79 | PPS-109 | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -344,5 +344,6 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-28 | Claude | P-76 (PPS-106): competitor quick-scan profiles in `docs/gtm/competitor-profiles/` (Supy, Foodics, Suplyd, MarketMan, Apicbase + `_summary.md`). No competitor shows RFQ / quote comparison on the pages checked; Supy is the GCC reference, Suplyd the Egypt objection, Foodics a likely integration. Next: verify gaps in a Supy demo, battlecards via `sales-enablement`. | |
 | 2026-10-28 | Claude | P-77 (PPS-107): cold email sequence `docs/gtm/outreach/cold-email-sequence.md`, 4 emails / 14 days, AR + EN, beside the DM script; Supy/Suplyd/Foodics variants, KSA adaptation. Owner decisions before first send: secondary sending domain + warm-up, footer postal address, KSA price. | |
 | 2026-10-29 | Claude | P-78 (PPS-108): prospect list wave 1, Egypt multi-branch F&B, 24 accounts (9 Warm, 0 Hot: no verified contacts). Kept local in `docs/gtm/prospects/` (excluded from git: public repo); SP is the system of record. Next: contact paths for Warm accounts, load into SP at Target. | |
+| 2026-10-29 | Claude | P-78: 9 Warm Egypt leads loaded into SP (SP-2 to SP-10, Target). P-79 (PPS-109): KSA prospect list wave 1, 13 rows, 5 Warm, local only; research targets until KSA price, Saudi demo workspace (PPS-39) and Gulf copy exist. | |
 | 2026-10-28 | Claude (orchestrator) | P-65/P-66 (PPS-95/96): drafted specs `specs/023-rfq-aware-matching` (replies to an RFQ match against the RFQ's own lines; one confirmation of a wording clears every open line using it; extraction keeps the printed pack) and `specs/024-rfq-basket-split` (split an RFQ from its Responses, priced only from its replies; prepare one draft request per supplier, all-or-nothing; approver sees the split). Owner decisions the same day: Q1, an RFQ match that fits exactly one RFQ line is accepted automatically (so match decisions become correctable); Q2, a split's requests are approved as one group, routed by the combined total. Next: `/speckit.plan` for each. | |
 | | | | |
