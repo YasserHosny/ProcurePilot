@@ -124,7 +124,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-66 | PPS-96 | P-67 | PPS-97 | P-68 | PPS-98 |
 | P-69 | PPS-99 | P-70 | PPS-100 | P-71 | PPS-101 |
 | P-72 | PPS-102 | P-73 | PPS-103 | P-74 | PPS-104 |
-| P-75 | PPS-105 | | | | |
+| P-75 | PPS-105 | P-76 | PPS-106 | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -340,5 +340,6 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-24 | Claude (orchestrator) | P-23 (PPS-49): the mobile guide's mockups are replaced by real renders of the shipped app, which supersedes the "mobile mockups still show the old look" note above. Regenerate with `cd apps/mobile && flutter test --tags docs --run-skipped test/docs/`. The real request-detail render exposed a bug: the approval step shows the approver's raw member ID and an ISO timestamp. It is documented as a limitation and suggested as a separate fix. | Approver name and local date on mobile request detail (not yet tracked in Jira); dark mode needs an owner decision |
 | 2026-10-25 | Claude (orchestrator) | P-37 (PPS-67): `find-skills` (vercel-labs/skills) added to the repo at `.claude/skills/find-skills/`, unchanged from the source, so every session can search for and suggest skills; merged in #288. PPS-67 Done. | — |
 | 2026-10-28 | Claude (orchestrator) | P-59 (PPS-89): UX audit of the RFQ pages and of round 1 end to end on «مطاعم رواق» with four skills (ux-audit, ux-heuristics, impeccable critique, ui-ux-pro-max); reports in `docs/quality/ux-audits/2026-10-28-*`. Both verdicts Fail: round-1 heuristic score 5/10, impeccable 21/40; every step dead-ends, the RFQ is lost after step 1, request/approval/PO never name the supplier. Fix tasks P-60 to P-75 (PPS-90 to PPS-105) in the backlog; P-73 (PPS-103) needs owner decisions; P-65/P-66 need a short spec. | |
+| 2026-10-28 | Claude | P-76 (PPS-106): competitor quick-scan profiles in `docs/gtm/competitor-profiles/` (Supy, Foodics, Suplyd, MarketMan, Apicbase + `_summary.md`). No competitor shows RFQ / quote comparison on the pages checked; Supy is the GCC reference, Suplyd the Egypt objection, Foodics a likely integration. Next: verify gaps in a Supy demo, battlecards via `sales-enablement`. | |
 | 2026-10-28 | Claude (orchestrator) | P-65/P-66 (PPS-95/96): drafted specs `specs/023-rfq-aware-matching` (replies to an RFQ match against the RFQ's own lines; one confirmation of a wording clears every open line using it; extraction keeps the printed pack) and `specs/024-rfq-basket-split` (split an RFQ from its Responses, priced only from its replies; prepare one draft request per supplier, all-or-nothing; approver sees the split). Owner decisions the same day: Q1, an RFQ match that fits exactly one RFQ line is accepted automatically (so match decisions become correctable); Q2, a split's requests are approved as one group, routed by the combined total. Next: `/speckit.plan` for each. | |
 | | | | |
