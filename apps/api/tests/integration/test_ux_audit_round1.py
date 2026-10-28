@@ -26,13 +26,20 @@ from integration.quotation_helpers import (
 from integration.smart_compare_helpers import committed_smart_context, member_from_workspace
 from integration.test_order_tracking import _app as _orders_app
 from integration.test_order_tracking import _base_order_payload, _setup_approved_request
-from integration.test_purchase_requests import _current_member, _make_branch, _service
+from integration.test_purchase_requests import (
+    _current_member,
+    _make_branch,
+    _make_member,
+    _service,
+    _TestSupabaseClient,
+)
 from procurepilot_api import db
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import current_member
 from procurepilot_api.main import app
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.orders import service as orders_service_module
+from procurepilot_api.modules.requests import service as requests_service_module
 from procurepilot_api.modules.requests.schemas import (
     PurchaseRequestCreate,
     PurchaseRequestLineInput,
@@ -354,6 +361,77 @@ def test_a_request_prepared_from_an_rfq_names_its_supplier_and_source(
         assert request.source.model_dump() == expected
 
 
+def test_an_approver_sees_the_supplier_of_a_request_prepared_from_an_rfq(
+    committing_conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review finding: RFQ tables are readable only by owners, buyers and the RFQ's creator, so a
+    source read through them left the supplier blank for the approver deciding the request."""
+    with committing_conn.cursor() as cur:
+        ws = make_workspace(cur, "ux-r1-approver-source")
+        branch = _make_branch(cur, ws)
+        quote = make_extracted_quotation(cur, ws)
+        act_as(cur, ws)
+        cur.execute(
+            "update supplier set name = 'الذهبي للتموين' where id = %s", (quote.supplier_id,)
+        )
+        reset_role(cur)
+        approver = _make_member(cur, ws.tenant_id, f"approver-{uuid4().hex[:8]}", "approver")
+        rfq_id, recipient_id, response_id, request_id = uuid4(), uuid4(), uuid4(), uuid4()
+        cur.execute(
+            "insert into rfq "
+            "(id,tenant_id,created_by_membership_id,idempotency_key,needed_by_date,status) "
+            "values (%s,%s,%s,gen_random_uuid(),current_date+7,'converted')",
+            (rfq_id, ws.tenant_id, ws.membership_id),
+        )
+        cur.execute(
+            "insert into rfq_recipient (id,tenant_id,rfq_id,supplier_id,status) "
+            "values (%s,%s,%s,%s,'sent')",
+            (recipient_id, ws.tenant_id, rfq_id, quote.supplier_id),
+        )
+        cur.execute(
+            "insert into rfq_response (id,tenant_id,rfq_recipient_id,quotation_id) "
+            "values (%s,%s,%s,%s)",
+            (response_id, ws.tenant_id, recipient_id, quote.quotation_id),
+        )
+        cur.execute(
+            "insert into purchase_request (id,tenant_id,branch_id,requested_by_membership_id,"
+            "required_by_date,status,source_rfq_response_id) "
+            "values (%s,%s,%s,%s,current_date+7,'submitted',%s)",
+            (request_id, ws.tenant_id, branch, ws.membership_id, response_id),
+        )
+        cur.execute(
+            "insert into approval_step "
+            "(tenant_id,purchase_request_id,assigned_membership_id,source,status) "
+            "values (%s,%s,%s,'threshold_match','pending')",
+            (ws.tenant_id, request_id, approver.membership_id),
+        )
+    committing_conn.commit()
+
+    service = _service(committing_conn, monkeypatch)
+    # Read as the approver, under row-level security, not as the test superuser.
+    monkeypatch.setattr(
+        requests_service_module,
+        "authenticated_client",
+        lambda _settings, _token: _TestSupabaseClient(committing_conn, claims=approver.claims()),
+    )
+    approver_member = _current_member(ws, approver)
+    expected_supplier = ("الذهبي للتموين", quote.supplier_id, quote.quotation_id, rfq_id)
+
+    pending = service.list_pending_approvals(bearer_token="token", member=approver_member).items
+    detail = service.get_request(
+        bearer_token="token", member=approver_member, request_id=request_id
+    )
+    row = next(r for r in pending if r.id == request_id)
+    for request in (row, detail):
+        assert request.source is not None
+        assert (
+            request.source.supplier_name,
+            request.source.supplier_id,
+            request.source.quotation_id,
+            request.source.rfq_id,
+        ) == expected_supplier
+
+
 def test_a_purchase_order_names_its_supplier(monkeypatch: pytest.MonkeyPatch) -> None:
     """R1-H3: PO-000004's page never showed «الوفرة»; order cards had no supplier either."""
     with committed_smart_context("ux-r1-po-supplier") as context:
@@ -390,3 +468,51 @@ def test_a_purchase_order_names_its_supplier(monkeypatch: pytest.MonkeyPatch) ->
     assert next(o for o in listed.json()["items"] if o["id"] == order_id)["supplier_name"] == (
         supplier_name
     )
+
+
+def test_a_request_source_snapshot_cannot_be_forged() -> None:
+    """The snapshot is derived from source_rfq_response_id on every write, so a member who names
+    another supplier gets the response's supplier, and clearing the response clears the source."""
+    with rolled_back() as conn, conn.cursor() as cur:
+        ws = make_workspace(cur, "ux-r1-source-forge")
+        branch = _make_branch(cur, ws)
+        quote = make_extracted_quotation(cur, ws)
+        other_supplier = make_supplier(cur, ws, name="Somebody Else")
+        reset_role(cur)
+        rfq_id, recipient_id, response_id = uuid4(), uuid4(), uuid4()
+        cur.execute(
+            "insert into rfq "
+            "(id,tenant_id,created_by_membership_id,idempotency_key,needed_by_date,status) "
+            "values (%s,%s,%s,gen_random_uuid(),current_date+7,'responded')",
+            (rfq_id, ws.tenant_id, ws.membership_id),
+        )
+        cur.execute(
+            "insert into rfq_recipient (id,tenant_id,rfq_id,supplier_id,status) "
+            "values (%s,%s,%s,%s,'sent')",
+            (recipient_id, ws.tenant_id, rfq_id, quote.supplier_id),
+        )
+        cur.execute(
+            "insert into rfq_response (id,tenant_id,rfq_recipient_id,quotation_id) "
+            "values (%s,%s,%s,%s)",
+            (response_id, ws.tenant_id, recipient_id, quote.quotation_id),
+        )
+        act_as(cur, ws)
+        cur.execute(
+            "insert into purchase_request (tenant_id,branch_id,requested_by_membership_id,"
+            "required_by_date,status,source_rfq_response_id,source_supplier_id) "
+            "values (%s,%s,%s,current_date+7,'draft',%s,%s) "
+            "returning id, source_rfq_id, source_quotation_id, source_supplier_id",
+            (ws.tenant_id, branch, ws.membership_id, response_id, other_supplier),
+        )
+        request_id, snap_rfq, snap_quote, snap_supplier = cur.fetchone()
+        assert (snap_rfq, snap_quote, snap_supplier) == (
+            rfq_id,
+            quote.quotation_id,
+            quote.supplier_id,
+        )
+        cur.execute(
+            "update purchase_request set source_rfq_response_id = null where id = %s "
+            "returning source_rfq_id, source_quotation_id, source_supplier_id",
+            (request_id,),
+        )
+        assert cur.fetchone() == (None, None, None)

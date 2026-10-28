@@ -76,7 +76,8 @@ from procurepilot_api.shared.storage_keys import safe_object_name
 
 REQUEST_COLUMNS = (
     "id,tenant_id,branch_id,cost_centre_id,requested_by_membership_id,"
-    "required_by_date,status,source_rfq_response_id,estimated_total_amount,estimated_total_currency,"
+    "required_by_date,status,source_rfq_response_id,source_rfq_id,source_quotation_id,"
+    "source_supplier_id,estimated_total_amount,estimated_total_currency,"
     "has_incomplete_estimate,submitted_at,withdrawn_at,delivered_at,"
     "delivery_confirmed_by_membership_id,has_delivery_discrepancy,"
     "created_at,updated_at"
@@ -364,17 +365,20 @@ class RequestsService:
                     ).fetchone()
 
                 source_row = None
-                if request_row.get("source_rfq_response_id"):
-                    source_row = conn.execute(
-                        "select rec.rfq_id, r.id as rfq_response_id, r.quotation_id, "
-                        "rec.supplier_id, s.name as supplier_name from rfq_response r "
-                        "join rfq_recipient rec "
-                        "on rec.tenant_id = r.tenant_id and rec.id = r.rfq_recipient_id "
-                        "left join supplier s "
-                        "on s.tenant_id = rec.tenant_id and s.id = rec.supplier_id "
-                        "where r.tenant_id = %s and r.id = %s",
-                        (member.tenant_id, request_row["source_rfq_response_id"]),
+                if request_row.get("source_supplier_id"):
+                    # The request's own snapshot (20261029060000): RFQ tables are not readable by
+                    # approvers or branch managers, the request and supplier tables are.
+                    supplier = conn.execute(
+                        "select name from supplier where tenant_id = %s and id = %s",
+                        (member.tenant_id, request_row["source_supplier_id"]),
                     ).fetchone()
+                    source_row = {
+                        "rfq_id": request_row["source_rfq_id"],
+                        "rfq_response_id": request_row["source_rfq_response_id"],
+                        "quotation_id": request_row["source_quotation_id"],
+                        "supplier_id": request_row["source_supplier_id"],
+                        "supplier_name": supplier["name"] if supplier else None,
+                    }
         except (ConflictError, NotFoundError, UnprocessableEntityError):
             raise
         except psycopg.Error as exc:
@@ -2175,67 +2179,32 @@ class RequestsService:
     def _fetch_sources_batch(
         self, client: Client, request_rows: list[dict[str, object]]
     ) -> dict[str, RequestSource]:
-        """RFQ, quotation and supplier per request prepared from an RFQ response (R1-H4)."""
-        response_by_request = {
-            str(row["id"]): str(row["source_rfq_response_id"])
-            for row in request_rows
-            if row.get("source_rfq_response_id")
-        }
-        if not response_by_request:
+        """RFQ, quotation and supplier per request prepared from an RFQ response (R1-H4).
+
+        Built from the request's own source snapshot (20261029060000) so approvers and branch
+        managers, who cannot read the RFQ tables, still see the supplier.
+        """
+        sourced = [row for row in request_rows if row.get("source_supplier_id")]
+        if not sourced:
             return {}
+        supplier_ids = sorted({str(row["source_supplier_id"]) for row in sourced})
         try:
-            responses = _rows(
-                client.table("rfq_response")
-                .select("id,rfq_recipient_id,quotation_id")
-                .in_("id", sorted(set(response_by_request.values())))
-                .execute()
-                .data
-            )
-            recipient_ids = sorted({str(r["rfq_recipient_id"]) for r in responses})
-            recipients = (
-                _rows(
-                    client.table("rfq_recipient")
-                    .select("id,rfq_id,supplier_id")
-                    .in_("id", recipient_ids)
-                    .execute()
-                    .data
-                )
-                if recipient_ids
-                else []
-            )
-            supplier_ids = sorted({str(r["supplier_id"]) for r in recipients})
-            suppliers = (
-                _rows(
-                    client.table("supplier")
-                    .select("id,name")
-                    .in_("id", supplier_ids)
-                    .execute()
-                    .data
-                )
-                if supplier_ids
-                else []
+            suppliers = _rows(
+                client.table("supplier").select("id,name").in_("id", supplier_ids).execute().data
             )
         except APIError:
-            logger.warning("Request source lookup failed", exc_info=True)
-            return {}
-        recipient_by_id = {str(r["id"]): r for r in recipients}
+            logger.warning("Request source supplier lookup failed", exc_info=True)
+            suppliers = []
         supplier_names = {str(s["id"]): s.get("name") for s in suppliers}
-        source_by_response: dict[str, RequestSource] = {}
-        for response in responses:
-            recipient = recipient_by_id.get(str(response["rfq_recipient_id"]))
-            if recipient is None:
-                continue
-            source_by_response[str(response["id"])] = RequestSource(
-                rfq_id=recipient["rfq_id"],
-                rfq_response_id=response["id"],
-                quotation_id=response["quotation_id"],
-                supplier_id=recipient["supplier_id"],
-                supplier_name=supplier_names.get(str(recipient["supplier_id"])),
-            )
         return {
-            request_id: source_by_response[response_id]
-            for request_id, response_id in response_by_request.items()
-            if response_id in source_by_response
+            str(row["id"]): RequestSource(
+                rfq_id=row["source_rfq_id"],
+                rfq_response_id=row["source_rfq_response_id"],
+                quotation_id=row["source_quotation_id"],
+                supplier_id=row["source_supplier_id"],
+                supplier_name=supplier_names.get(str(row["source_supplier_id"])),
+            )
+            for row in sourced
         }
 
     def _fetch_auto_prepared_batch(
