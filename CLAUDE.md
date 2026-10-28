@@ -43,7 +43,7 @@ Redis + RQ (job queues: extraction, basket-split, exports, report scheduling, pu
 
 **Mobile** — Flutter. Shipped, not a placeholder: auth (sign-in, biometric, device registration),
 home, purchase requests, approvals, low-stock reporting, delivery confirmation and quality-issue
-photos, push notifications. 31 Dart source files, 22 test files (`apps/mobile/lib/features/`).
+photos, push notifications (`apps/mobile/lib/features/`).
 
 ## Project structure
 
@@ -156,135 +156,21 @@ demo findings and code alike (site, cloudId and the plan-ID → key map in
 
 ## Current phase
 
-Every spec through `021-rfq-sourcing-autonomy` is complete and merged (`specs/*/tasks.md` fully
-checked, or verified against actual code where the checkboxes themselves were stale — see the
-dated notes inside `specs/004-matching-normalisation/tasks.md` and
-`specs/008-requests-approvals/tasks.md` for examples of that verification). Some boxes are left
-open on purpose, as their notes explain: `specs/018-forecasting-reorder/tasks.md` T011, T016, T019,
-T020 and T024 call for tests that were never written, and `specs/004-matching-normalisation/tasks.md`
-T049 cannot be tested until the landed-cost rule version can change. Do not tick them without that
-evidence. That includes:
-Phase 4 (Predictive Procurement, R4.0–R4.3 — RFQ sourcing with guarded auto-preparation, passed its
-T047 live hosted walkthrough including a guardrail firing autonomously on hosted, evidence
-`docs/quality/r4.3-release-evidence.md`); `016-order-tracking-three-way-match`, including its final
-User Story 4 (draft purchase orders generated from an approved request, with edit/cancel) merged
-2026-10-02; and a follow-on matching-quality round merged the same day: fuzzy (similarity-only)
-candidates no longer auto-accept by default, a real Bedrock embedding provider exists behind a
-still-off-by-default switch, and score calibration was investigated and found genuinely not
-feasible yet — the hosted database has only 9 confirmed human match decisions (1 of them fuzzy),
-far short of the 500+ labelled benchmark `specs/004-matching-normalisation/research.md` R5/R10
-requires before fitting anything; the existing eval harness (`ml/evals/product_matching/`) already
-reports this honestly rather than faking a number.
+Specs `001`–`021` are complete and merged; the open spec work is `022`'s three tasks (top of this
+file). The next feature has not been scoped. For what shipped when, read `git log` and the PRs.
 
-Guardrails are evaluated at match-decision time, not email capture (ADR-019). The G3 stage gate
-remains unmet on operational metrics (pilot accounts, 180-day history, integration-sourced quotes).
-
-`018-forecasting-reorder` and `019-supplier-risk-negotiation` are also both complete and merged
-(2026-10-03 finding: both were already fully shipped, just undocumented in `specs/` — `018` had
-no `tasks.md`, `019` had neither a `plan.md` nor a `tasks.md`; both were reconstructed
-retroactively against the real code, see the dated verification notes in each). That
-reconstruction surfaced two real bugs, both now fixed:
-
-- **T019 (FR-011A)**: the shipped negotiation brief only ever used reliability risk for
-  `service_performance`, never the three-way-match or quality-incident signals FR-011A requires.
-  Fixed in PR #68 — a new `load_service_risk_evidence()` repository query plus
-  `_service_performance_item()` taking the max of all three signals. A Codex review of that PR
-  caught and fixed 5 further real bugs before merge (most seriously, evidence-row deduplication
-  not scoped by `metric_id`, which could abort the whole `prepare` transaction on a later
-  snapshot — see the PR's own commit history for the full list).
-- **T012 (forecasting pagination)**: `ForecastingService.list_proposals()` fetched the 1001 most
-  recent non-dismissed `reorder_proposal` rows tenant-wide, then deduped to one-per-product in
-  Python — a product whose only proposal was older than 1001 other rows silently never appeared,
-  on any page. Fixed in PR #67 by moving the dedup into Postgres (`ROW_NUMBER() OVER (PARTITION
-  BY ...)` via a new `forecasting_latest_reorder_proposals` RPC).
-
-Investigating T019/T012 also surfaced a real, separate product gap: `specs/004-matching-
-normalisation`'s resolution queue (`/matching`) had zero notification path — no sidebar badge,
-not in the weekly digest — so a real match-task backlog would pile up silently with nobody
-prompted to look. Decided to extend the weekly digest rather than add a sidebar badge (no UI
-precedent for one anywhere in this app, and closer to the "no passive dashboard" principle
-`specs/004`'s own `plan.md` explicitly designed against). Shipped as `012-reporting-hardening`'s
-6th digest section (`pending_match_resolutions`, FR-009 amended, T043, PR #69).
-
-With `018`/`019` closed out and both real bugs fixed, the only open spec work is `022`'s three
-tasks (see the top of this file). The next feature has not been scoped.
+- Some `tasks.md` boxes stay open on purpose: `specs/018-forecasting-reorder/tasks.md` T011, T016,
+  T019, T020, T024 (tests never written) and `specs/004-matching-normalisation/tasks.md` T049
+  (untestable until the landed-cost rule version can change). Tick them only with that evidence.
+- Match-score calibration is not feasible yet: hosted has a handful of confirmed human match
+  decisions, far short of the 500+ labelled benchmark `specs/004-matching-normalisation/research.md`
+  R5/R10 requires. `ml/evals/product_matching/` reports this; keep it that way.
+- Guardrails are evaluated at match-decision time, not email capture (ADR-019).
+- The G3 stage gate is unmet on operational metrics (pilot accounts, 180-day history,
+  integration-sourced quotes).
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
-
-## Active Technologies
-- unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV (002-catalogue-suppliers)
-- Supabase Postgres 17 via the Supabase CLI local stack. Migrations continue in (002-catalogue-suppliers)
-- unchanged — Python 3.12 (`apps/api` and the new `services/extraction-worker`), + unchanged from chunks 4.1–4.2 for `apps/api`, plus a Redis client (003-quotation-inbox-extraction)
-- Supabase Postgres 17 (unchanged) for `document`, `quotation`, `quotation_line`, (003-quotation-inbox-extraction)
-- unchanged — Python 3.12 (`apps/api`), TypeScript 5.6 / Angular 19 (web), SQL + unchanged. No new library. This chunk is schema, RLS, and CRUD over the (007-organisation-model)
-- Supabase Postgres 17 (unchanged). New tables: `branch`, `cost_centre`, `budget`, (007-organisation-model)
-- unchanged — Python 3.12 (`apps/api`), TypeScript 5.6 / Angular 19 (web), SQL + unchanged. No new library. `dateutil.relativedelta` (already a (008-requests-approvals)
-- Supabase Postgres 17 (unchanged). New tables: `purchase_request`, (008-requests-approvals)
-- Unchanged — `apps/api`: Python 3.12; `apps/mobile`: Dart/Flutter (stable + `apps/api` gains no new dependency — the new endpoints are ordinary (010-mobile-approvals-receipt)
-- Supabase Postgres 17 (unchanged). New columns on `purchase_request` for the delivery (010-mobile-approvals-receipt)
-- Python 3.12 (`apps/api`), TypeScript 5.6 / Angular 19 (`apps/web`) — + FastAPI (existing), `httpx` (existing, already used for outbound HTTP — (014-accounting-integration)
-- Supabase Postgres 17 (unchanged). New tables: `accounting_connection`, (014-accounting-integration)
-- Python 3.12 (`apps/api`), TypeScript 5.6 / Angular 19 (`apps/web`) — + FastAPI (existing), `httpx` (existing — sufficient for Square's plain (015-pos-inventory-integration)
-- Supabase Postgres 17 (unchanged). New tables: `pos_connection`, (015-pos-inventory-integration)
-- Python 3.12 (`apps/api`), TypeScript 5.6 / Angular 19 (`apps/web`) — no new provider: question
-  understanding reuses the existing Bedrock/Claude client (ADR-004/ADR-014), extended with a new
-  `analyst` module (020-grounded-procurement-analyst)
-- Supabase Postgres 17 (unchanged). New tables: `analyst_conversation`, `analyst_turn`,
-  `analyst_turn_citation` (020-grounded-procurement-analyst)
-- Python 3.12 (`apps/api`), TypeScript 5.6 / Angular 19 (`apps/web`) — Mailgun Messages API for
-  outbound sending (new, ADR-018 — reuses the existing inbound Mailgun vendor relationship from
-  003-quotation-inbox-extraction rather than adding a second one); no new LLM usage (021-rfq-sourcing-autonomy)
-- Supabase Postgres 17 (unchanged). New tables: `rfq`, `rfq_recipient`, `rfq_response`,
-  `auto_preparation_guardrail`, `auto_preparation_event`; new column `supplier.contact_email`
-  (021-rfq-sourcing-autonomy)
-- Python 3.12 (`apps/api`, `services/extraction-worker`), TypeScript 5.6 / Angular 19 (`apps/web`), Dart/Flutter (`apps/mobile`) + existing only. Mobile: add `intl` to `pubspec.yaml` (the one new dependency; check it is already transitively present via `flutter_localizations` before adding). (022-home-currency-readiness)
-- Supabase Postgres 17, unchanged. Reuses `tenant.currency`; audit via existing `record_audit_event`. (022-home-currency-readiness)
-
-## Recent Changes
-- 2026-10-24: web app on Angular 22 + Material 22, TypeScript 6.0, ngx-translate 18, Sentry 11;
-  builders moved to `@angular/build` (Karma kept); Node 24 in CI and the web image (PP-29).
-- 2026-10-15 to 10-18: hosted demo-tenant fix wave (findings in `docs/gtm/demo-tenant/README.md`).
-  Ingestion: RFQ-reply supplier wins attribution (#84), Arabic filenames no longer lose emails (#90).
-  Extraction: DD/MM quote dates parsed in Python, unparsed dates go to review (#96); Arabic RTL tables
-  read row by row, merged lines and unverified totals never auto-accept (#100). Review: a quotation
-  can always be authorised, specific 409 reasons (#104, spec 003 FR-013A). RFQ: localised supplier
-  email with buyer terms (#89), draft edit/send via `GET/PUT /rfq/{id}` (#103). Matching: human
-  decisions show as verified, bulk confirm of exact-name matches (#109). Requests: per-pack estimates
-  from the source RFQ response (#110, ADR-020). Basket split: optimiser worker image + deploy, stuck
-  jobs fail instead of spinning (#108; the bunny.net container was created and the worker deployed on 2026-10-17). Platform:
-  `prepare_threshold=None` on every connection (#87), local calendar dates (#88). CI: docs-only PRs
-  skip heavy jobs, E2E sharded across 3 runners (`docs/operations/ci-pipeline.md`).
-- 2026-10-14: 022-home-currency-readiness (PR #73) -- the existing `tenant.currency` is now the home
-  currency: web forms default to it instead of USD, `PATCH /tenant` accepts and audits it, extraction
-  recognises EGP markers/Arabic-Indic digits and stores no currency when none is evidenced and routes to review as `currency_unresolved` with the home currency only as a suggestion (no more
-  silent GBP), landed cost no longer defaults to GBP, mobile approval screens format money per locale.
-- 2026-10-03/04: Added a `docs-screenshots` CI job (`.github/workflows/docs-screenshots.yml`,
-  PR #70) that regenerates `docs/user/screenshots/` against a real local stack on frontend/i18n
-  PRs plus a weekly cron, and fails with an uploaded diff artifact on drift — catching the same
-  category of staleness that let §25 of the user docs describe a five-section digest for days
-  after `pending_match_resolutions` shipped as the sixth section; that prose was also fixed
-  directly (PR #71).
-- 2026-10-03: E2E flakiness root-caused and fixed (PR #63/#65 — Playwright `setup` project's
-  chrome channel, `storageState` scoped to only the files that need it, two deterministic
-  test-locator bugs); specs 018/019 retroactively verified against already-shipped code (PR #66),
-  surfacing and fixing two real bugs — T012 forecasting pagination (PR #67) and T019's FR-011A
-  service-risk formula, which also absorbed 5 Codex-caught fixes before merge (PR #68); weekly
-  digest gained a 6th section, `pending_match_resolutions` (T043, PR #69), closing a real
-  notification gap in the match-resolution queue.
-- 2026-10-02: 016-order-tracking-three-way-match's final story shipped — draft purchase orders
-  generated from an approved request, with edit and cancel (PR #61). Same day: fuzzy product
-  matches no longer auto-accept by default (PR #59), a real Bedrock embedding provider landed
-  behind an off-by-default switch (PR #62), and CI's date-bomb test fixture plus two dependency
-  advisories were fixed (PR #60).
-- 021-rfq-sourcing-autonomy: R4.3 merged (PR #26) plus T047 live-walkthrough fixes (PRs #28–#40):
-  real Mailgun inbound payload parsing, deployed email-ingestion worker, document source-channel
-  and empty-extraction review fixes, guardrail pack-size normalisation, and guardrail evaluation
-  moved to match-decision time (ADR-019); guardrail settings UI + compare-view explanations
-  (T037/T038)
-- 020-grounded-procurement-analyst: R4.2 merged to main (PR #25) — grounded, cited
-  question-answering over tenant data, all four user stories plus Polish complete
-- 002-catalogue-suppliers: Added unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV
 
 ## Agent skills
 
