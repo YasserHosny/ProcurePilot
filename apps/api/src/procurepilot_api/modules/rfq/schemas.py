@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from procurepilot_api.modules.quotations.schemas import QuotationStatus
 
@@ -188,7 +188,16 @@ class RfqSummary(BaseModel):
     created_by_membership_id: UUID
     recipient_count: int
     response_count: int
-    converted_purchase_request_id: UUID | None
+    converted_purchase_request_ids: list[UUID] = Field(default_factory=list)
+    request_group_id: UUID | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def converted_purchase_request_id(self) -> UUID | None:
+        """The first converted request, kept for clients that predate splits (spec 024)."""
+        return (
+            self.converted_purchase_request_ids[0] if self.converted_purchase_request_ids else None
+        )
 
 
 class RfqList(BaseModel):

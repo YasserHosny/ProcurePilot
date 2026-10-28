@@ -342,6 +342,7 @@ class BasketSplitJob(BaseModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     pack_snapshot: dict[str, PackSnapshot] | None = None
+    rfq_id: UUID | None = None
 
 
 class SupplierQuantityTier(StrictApiModel):

@@ -89,6 +89,35 @@ def _validate_rfq_lines(lines_data: list) -> None:
         seen.add(line.workspace_product_id)
 
 
+def lock_rfq_for_preparation(
+    cur: psycopg.Cursor, *, tenant_id: uuid.UUID, rfq_id: uuid.UUID
+) -> str | None:
+    """Serialise every preparation of one RFQ — a single-supplier request or a split (spec 024
+    research R4) — and return its status, or None when the caller cannot see it.
+
+    The transaction-scoped advisory lock is held until the caller's transaction ends, so the
+    preparation that converts the RFQ commits before another can read its status.
+    """
+    cur.execute(
+        "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+        (f"rfq-prepare:{tenant_id}:{rfq_id}",),
+    )
+    cur.execute("select status from rfq where id = %s and tenant_id = %s", (rfq_id, tenant_id))
+    row = cur.fetchone()
+    if row is None:
+        return None
+    return str(row["status"] if isinstance(row, dict) else row[0])
+
+
+def mark_converted(
+    cur: psycopg.Cursor, *, rfq_id: uuid.UUID, purchase_request_id: uuid.UUID
+) -> None:
+    """Close an RFQ after a preparation (20261019000001): rfq_update matches only the RFQ's
+    creator, so any other owner or buyer goes through the mark_rfq_converted definer, which checks
+    the request came from this RFQ."""
+    cur.execute("select mark_rfq_converted(%s, %s)", (rfq_id, purchase_request_id))
+
+
 class RfqService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -636,16 +665,8 @@ class RfqService:
         # 'converted'. The guardrail evaluator's own lock uses a different key.
         with _authenticated_db(self.settings, member) as lock_conn:
             with lock_conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
-                    "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
-                    (f"rfq-prepare:{member.tenant_id}:{rfq_id}",),
-                )
-                cur.execute(
-                    "select status from rfq where id = %s and tenant_id = %s",
-                    (rfq_id, member.tenant_id),
-                )
-                rfq_row = cur.fetchone()
-                if rfq_row is not None and rfq_row["status"] == "converted":
+                status = lock_rfq_for_preparation(cur, tenant_id=member.tenant_id, rfq_id=rfq_id)
+                if status == "converted":
                     # A retry of the preparation that converted it gets that request back -- only a
                     # request with this key that was prepared from one of this RFQ's responses.
                     cur.execute(
@@ -861,10 +882,7 @@ class RfqService:
                 # closes the sourcing loop for this RFQ. rfq_update only matches the RFQ's
                 # creator, so any other owner or buyer goes through mark_rfq_converted
                 # (20261019000001), which checks the request came from this RFQ.
-                cur.execute(
-                    "select mark_rfq_converted(%s, %s)",
-                    (rfq_id, purchase_request.id),
-                )
+                mark_converted(cur, rfq_id=rfq_id, purchase_request_id=purchase_request.id)
 
         return RfqPrepareRequestResponse(
             purchase_request_id=purchase_request.id, status=purchase_request.status
@@ -1049,13 +1067,16 @@ class RfqService:
                     WHERE rr2.rfq_id = r.id
                 ) as response_count,
                 (
-                    SELECT pr.id 
-                    FROM purchase_request pr 
+                    SELECT coalesce(array_agg(pr.id ORDER BY pr.created_at, pr.id), '{{}}')
+                    FROM purchase_request pr
                     JOIN rfq_response resp ON pr.source_rfq_response_id = resp.id
                     JOIN rfq_recipient rr3 ON resp.rfq_recipient_id = rr3.id
-                    WHERE rr3.rfq_id = r.id 
-                    LIMIT 1
-                ) as converted_purchase_request_id
+                    WHERE rr3.rfq_id = r.id
+                ) as converted_purchase_request_ids,
+                (
+                    SELECT g.id FROM purchase_request_group g
+                    WHERE g.tenant_id = r.tenant_id AND g.rfq_id = r.id
+                ) as request_group_id
             FROM rfq r
             WHERE {" AND ".join(query_filters)}
             ORDER BY r.created_at DESC, r.id DESC
