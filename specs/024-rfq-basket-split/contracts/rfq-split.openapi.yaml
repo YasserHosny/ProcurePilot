@@ -1,0 +1,119 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot RFQ split and request groups (024)
+  version: 0.1.0
+  description: >
+    Additions only. Error envelope {code, message, details, trace_id}. Every mutation requires
+    Idempotency-Key. Tenant from the JWT; a cross-tenant id answers 404.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /rfq/{rfq_id}/split:
+    post:
+      summary: Start a basket split for an RFQ from its eligible replies (FR-001..FR-003)
+      description: Owner or buyer. Builds items (pack → base units) and suppliers server-side.
+      parameters:
+        - { name: rfq_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '202':
+          description: Queued advanced basket job (existing BasketSplitJob shape plus rfq_id).
+        '409':
+          description: >
+            details.reason one of: rfq_already_converted, not_enough_replies (details.eligible,
+            details.unmatched_quotation_ids), mixed_currency.
+  /baskets/{basket_id}/prepare-requests:
+    post:
+      summary: Turn a completed RFQ split into one draft request per supplier (FR-005..FR-009)
+      parameters:
+        - { name: basket_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [branch_id, required_by_date]
+              properties:
+                branch_id: { type: string, format: uuid }
+                cost_centre_id: { type: string, format: uuid }
+                required_by_date: { type: string, format: date }
+                confirm_expired_quotation_ids:
+                  type: array
+                  description: Replies past their expiry date that the buyer confirmed (spec edge case).
+                  items: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Group created (a replay with the same key returns 200 with the same body).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [request_group_id, purchase_request_ids]
+                properties:
+                  request_group_id: { type: string, format: uuid }
+                  purchase_request_ids: { type: array, items: { type: string, format: uuid } }
+        '409':
+          description: >
+            details.reason one of: not_rfq_split, split_not_completed, split_stale,
+            rfq_already_converted (details.purchase_request_ids), allocation_not_whole_packs,
+            expired_quotation_unconfirmed (details.quotation_ids).
+  /request-groups/{group_id}/submit:
+    post:
+      summary: Submit every request of a split; routes to the approver for the combined total (FR-010, FR-011)
+      parameters:
+        - { name: group_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: The group's requests (PurchaseRequest[] with request_group). }
+        '409': { description: details.reason not_draft }
+  /request-groups/{group_id}/approve:
+    post:
+      summary: Approve every request of a split at once
+      parameters:
+        - { name: group_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { comment: { type: string, maxLength: 2000 } } }
+      responses:
+        '200': { description: The group's requests, all approved. }
+        '403': { description: Caller is not the assigned approver (or owner). }
+        '409': { description: details.reason not_submitted }
+  /request-groups/{group_id}/reject:
+    post:
+      summary: Reject every request of a split with one reason
+      parameters:
+        - { name: group_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comment]
+              properties: { comment: { type: string, minLength: 1, maxLength: 2000 } }
+      responses:
+        '200': { description: The group's requests, all rejected. }
+  /request-groups/{group_id}/withdraw:
+    post:
+      summary: Withdraw every request of a split
+      parameters:
+        - { name: group_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: The group's requests, all withdrawn. }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  x-changed-endpoints:
+    description: >
+      POST /requests/{id}/submit|withdraw|approve|reject answer 409
+      part_of_split (details.request_group_id) for a grouped request. GET /requests/{id},
+      GET /requests and GET /approvals/pending add PurchaseRequest.request_group (nullable; see
+      data-model.md). GET /rfq/{id} adds converted_purchase_request_ids and request_group_id.
