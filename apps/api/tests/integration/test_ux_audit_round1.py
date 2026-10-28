@@ -18,12 +18,21 @@ from integration.catalogue_helpers import (
     make_workspace_product,
     reset_role,
 )
-from integration.quotation_helpers import make_extracted_quotation, make_supplier
+from integration.quotation_helpers import (
+    PsycopgSupabaseClient,
+    make_extracted_quotation,
+    make_supplier,
+)
+from integration.smart_compare_helpers import committed_smart_context, member_from_workspace
+from integration.test_order_tracking import _app as _orders_app
+from integration.test_order_tracking import _base_order_payload, _setup_approved_request
 from integration.test_purchase_requests import _current_member, _make_branch, _service
 from procurepilot_api import db
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import current_member
 from procurepilot_api.main import app
+from procurepilot_api.modules.auth.jwt import MemberRole
+from procurepilot_api.modules.orders import service as orders_service_module
 from procurepilot_api.modules.requests.schemas import (
     PurchaseRequestCreate,
     PurchaseRequestLineInput,
@@ -285,3 +294,99 @@ def test_a_draft_whose_needed_by_date_has_passed_is_not_sent(
 
     assert response.status_code == 422, response.text
     assert response.json()["details"]["reason"] == "needed_by_in_past"
+
+
+def test_a_request_prepared_from_an_rfq_names_its_supplier_and_source(
+    committing_conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R1-H4: request, requests list and approval row never said which supplier or RFQ."""
+    with committing_conn.cursor() as cur:
+        ws = make_workspace(cur, "ux-r1-request-source")
+        branch = _make_branch(cur, ws)
+        quote = make_extracted_quotation(cur, ws)
+        act_as(cur, ws)
+        cur.execute(
+            "update supplier set name = 'الوفرة للمواد الغذائية' where id = %s",
+            (quote.supplier_id,),
+        )
+        reset_role(cur)
+        rfq_id, recipient_id, response_id, request_id = uuid4(), uuid4(), uuid4(), uuid4()
+        cur.execute(
+            "insert into rfq "
+            "(id,tenant_id,created_by_membership_id,idempotency_key,needed_by_date,status) "
+            "values (%s,%s,%s,gen_random_uuid(),current_date+7,'converted')",
+            (rfq_id, ws.tenant_id, ws.membership_id),
+        )
+        cur.execute(
+            "insert into rfq_recipient (id,tenant_id,rfq_id,supplier_id,status) "
+            "values (%s,%s,%s,%s,'sent')",
+            (recipient_id, ws.tenant_id, rfq_id, quote.supplier_id),
+        )
+        cur.execute(
+            "insert into rfq_response (id,tenant_id,rfq_recipient_id,quotation_id) "
+            "values (%s,%s,%s,%s)",
+            (response_id, ws.tenant_id, recipient_id, quote.quotation_id),
+        )
+        cur.execute(
+            "insert into purchase_request (id,tenant_id,branch_id,requested_by_membership_id,"
+            "required_by_date,status,source_rfq_response_id) "
+            "values (%s,%s,%s,%s,current_date+7,'draft',%s)",
+            (request_id, ws.tenant_id, branch, ws.membership_id, response_id),
+        )
+    committing_conn.commit()
+
+    service = _service(committing_conn, monkeypatch)
+    member = _current_member(ws, ws)
+    expected = {
+        "rfq_id": rfq_id,
+        "rfq_response_id": response_id,
+        "quotation_id": quote.quotation_id,
+        "supplier_id": quote.supplier_id,
+        "supplier_name": "الوفرة للمواد الغذائية",
+    }
+
+    detail = service.get_request(bearer_token="token", request_id=request_id)
+    by_member = service.get_request(bearer_token="token", member=member, request_id=request_id)
+    listed = service.list_requests(bearer_token="token", member=member).items
+
+    for request in (detail, by_member, next(r for r in listed if r.id == request_id)):
+        assert request.source is not None
+        assert request.source.model_dump() == expected
+
+
+def test_a_purchase_order_names_its_supplier(monkeypatch: pytest.MonkeyPatch) -> None:
+    """R1-H3: PO-000004's page never showed «الوفرة»; order cards had no supplier either."""
+    with committed_smart_context("ux-r1-po-supplier") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        app = _orders_app(monkeypatch, member)
+        client = TestClient(app, raise_server_exceptions=False)
+        supplier_id = context.supplier_ids[0]
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+            with conn.cursor() as cur:
+                cur.execute("select name from supplier where id = %s", (supplier_id,))
+                supplier_name = cur.fetchone()[0]
+
+        created = client.post(
+            "/api/v1/orders",
+            json=_base_order_payload(supplier_id, req_id, line_id, context.product_id),
+            headers={"Idempotency-Key": str(uuid4())},
+        )
+        assert created.status_code == 201, created.text
+        order_id = created.json()["id"]
+        # Reads go through PostgREST; serve them from the test database as this workspace.
+        with psycopg.connect(TEST_DATABASE_URL or "", autocommit=True) as read_conn:
+            monkeypatch.setattr(
+                orders_service_module,
+                "authenticated_client",
+                lambda *_: PsycopgSupabaseClient(read_conn, claims=context.workspace.claims()),
+            )
+            detail = client.get(f"/api/v1/orders/{order_id}")
+            listed = client.get("/api/v1/orders")
+
+    assert created.json()["supplier_name"] == supplier_name
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["order"]["supplier_name"] == supplier_name
+    assert next(o for o in listed.json()["items"] if o["id"] == order_id)["supplier_name"] == (
+        supplier_name
+    )

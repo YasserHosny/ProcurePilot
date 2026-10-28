@@ -75,9 +75,21 @@ class AutoPreparedProvenance(BaseModel):
     created_at: datetime
 
 
+class RequestSource(BaseModel):
+    """The RFQ response a request was prepared from, so request, approval and order screens can
+    say which supplier and RFQ it is about (UX audit 2026-10-28, R1-H4)."""
+
+    rfq_id: UUID
+    rfq_response_id: UUID
+    quotation_id: UUID
+    supplier_id: UUID
+    supplier_name: str | None = None
+
+
 class PurchaseRequest(BaseModel):
     id: UUID
     source_rfq_response_id: UUID | None = None
+    source: RequestSource | None = None
     auto_prepared: AutoPreparedProvenance | None = None
     branch_id: UUID
     cost_centre_id: UUID | None = None
