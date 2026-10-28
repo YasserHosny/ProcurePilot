@@ -7,36 +7,33 @@
 | Content type | problem-solution |
 | Persona and stage | Operations leader · problem-aware |
 | Proof ids | CO-05, CO-03 |
-| Link (UTM) | https://www.iron-sys.com/?utm_source=linkedin&utm_medium=organic&utm_campaign=2026-11-company-ai-in-production&utm_content=cp-04 |
-| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
+| Link | `www.iron-sys.com` at the end of the post (owner, 2026-10-29) |
+| Status | approved 2026-10-29 by Yasser (G-asset); **scheduled** on the Iron Systems LinkedIn page for 2026-11-10 10:00 Cairo (owner's instruction, 2026-10-29); not yet live |
 
 Problem lines are the website's own (services, "The problem").
 
 ## LinkedIn (bilingual, final)
 
-Post this block as one LinkedIn post (decision MD-13). 945 characters (LinkedIn limit 3,000).
+v2, humanized everyday language, approved by Yasser on 2026-10-29 (MD-15). Post this block as one LinkedIn post. 820 characters.
 
 ```
-أشخاص أكفاء يقضون أسبوعهم في خطوات متكررة تحكمها قواعد ثابتة.
-وبيانات تُعاد كتابتها بين أنظمة ERP وCRM والمحاسبة وجداول البيانات، حتى تختلف النسخ عن بعضها.
+فيه ناس شاطرة جداً بتضيّع أسبوعها في نسخ ولصق.
+ونفس البيانات بتتكتب مرتين وتلاتة بين الـERP والمحاسبة والإكسيل… لحد ما الأرقام تبطّل تتطابق.
 
-المشكلتان قابلتان للحل دون إبعاد فريقك عن القرار.
+ومش محتاج تشيل الناس من الصورة عشان تحل ده.
+السيستم يعمل الروتين، والاستثناء يروح لحد يقرر فيه، وكل خطوة تبقى واضحة وتقدر تعدّلها.
+وإحنا بنربط الأنظمة اللي عندك أصلاً، عشان البيانات تتكتب مرة واحدة بس.
 
-نبني مسارات عمل تتولّى الروتين وتحيل الاستثناءات إلى شخص، وكل خطوة فيها ظاهرة وقابلة للتعديل. ونربط الأنظمة التي تستخدمها اليوم، لتنتقل البيانات مرة واحدة وتبقى متّسقة.
-
-أين يعيد فريقك كتابة البيانات نفسها مرتين؟
-www.iron-sys.com
+فين في شغلك البيانات بتتكتب مرتين؟
 
 ———
 
-Skilled people spending their week on repetitive, rule-based steps.
-Data re-typed between ERP, CRM, accounting and spreadsheets, until the copies drift apart.
+Good people lose their week to copy and paste. The same data gets typed into the ERP, then accounting, then Excel, until the numbers stop matching.
 
-Both are fixable without taking people out of the decisions.
+You don't have to take people out of the loop to fix that. Let the system handle the routine, send the exceptions to a person, and keep every step visible and editable. We connect the systems you already have, so data gets entered once.
 
-We build workflows that handle the routine and route the exceptions to a person, with every step visible and open to override. And we connect the systems you already use, so data moves once and stays consistent.
+Where does your team type the same thing twice?
 
-Where does your team re-type the same data twice?
 www.iron-sys.com
 ```
 

@@ -2,45 +2,44 @@
 
 | Field | Value |
 |---|---|
-| Channel | LinkedIn (Yasser's profile; Iron Systems page reshares) |
+| Channel | LinkedIn, Iron Systems company page (MD-16; was Yasser's profile) |
 | Format | text + one image |
 | Content type | thought leadership / objection |
 | Persona and stage | Owner / GM, approver · product-aware |
 | Proof ids | C-05, C-06, C-09, C-14 |
-| Link (UTM) | none |
-| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
+| Link | `procurepilot.iron-sys.com` at the end of the post (owner, 2026-10-29) |
+| Status | approved 2026-10-29 by Yasser (G-asset); **scheduled** on the Iron Systems LinkedIn page for 2026-11-19 10:00 Cairo (owner's instruction, 2026-10-29); not yet live |
 
 ## LinkedIn (bilingual, final)
 
-Post this block as one LinkedIn post (decision MD-13). 1085 characters (LinkedIn limit 3,000).
+v2, humanized everyday language, approved by Yasser on 2026-10-29 (MD-15). Post this block as one LinkedIn post. 903 characters.
 
 ```
-هو البرنامج بيشتري لوحده؟ لأ. ومينفعش.
+هو البرنامج بيشتري لوحده؟ لأ. ومينفعش أصلاً.
 
-في ProcurePilot الأتمتة بتجهّز: بتقرا عروض الأسعار، وبتقارنها، وممكن تجهّز مسودة طلب من أحسن عرض. لكن القرار لحد من فريقك.
+ProcurePilot بيجهّز: بيقرا العروض، ويقارنها، وممكن يجهّز مسودة طلب من أحسن عرض. لكن القرار لحد من فريقك.
+طلب الفرع بيوصل للمدير ومعاه الميزانية الفاضلة، ومفيش حاجة بتتطلب قبل ما يوافق، وممكن يوافق من موبايله.
 
-طلبات الفروع بتوصل للمعتمِد ومعاها الميزانية المتبقية. مفيش حاجة بتتطلب قبل الاعتماد ده، وطلبات الشراء ممكن تتعتمد من الموبايل.
+عملناه كده عن قصد: اللي فاهم الفرع والمورد والميزانية هو اللي يقرر، والبرنامج يخلي الصورة كاملة قدامه.
 
-عملناه كده عن قصد: اللي فاهم الفرع والمورد والميزانية هو اللي ياخد القرار. والبرنامج بيضمن إنه ياخده والصورة كاملة قدامه.
-
-مين بيعتمد المشتريات في فروعك النهارده؟
+مين بيعتمد المشتريات عندكم النهارده؟
 
 ———
 
-Does the software buy things by itself? No. And it shouldn't.
+Does the software buy things on its own? No, and it shouldn't.
 
-In ProcurePilot, automation prepares: it reads the quotes, compares them, and can prepare a draft request from the best offer. A person decides.
+ProcurePilot prepares: it reads the quotes, compares them, and can draft a request from the best offer. A person on your team decides. The branch request reaches the manager with the remaining budget, nothing is ordered before they approve, and they can approve from their phone.
 
-Branch requests reach the approver with the remaining budget shown. Nothing is ordered before that approval, and requests can be approved from the phone.
-
-We built it that way on purpose. The people who know the branch, the supplier and the budget make the call. The software makes sure they make it with the full picture.
+We built it that way on purpose. The people who know the branch, the supplier and the budget make the call.
 
 Who approves purchases in your branches today?
 
-#Procurement #Restaurants #FoodAndBeverage
+procurepilot.iron-sys.com
 ```
 
-## Copy (EN)
+## Earlier copy (v1, superseded by the v2 block above)
+
+### Copy (EN)
 
 ```
 Does the software buy things by itself? No. And it shouldn't.

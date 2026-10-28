@@ -7,35 +7,33 @@
 | Content type | proof / product education |
 | Persona and stage | Owner, IT lead · solution-aware |
 | Proof ids | CO-08, CO-09, CO-10 · ProcurePilot C-01, C-02, C-05, C-07, C-14, C-16 |
-| Link (UTM) | https://www.iron-sys.com/?utm_source=linkedin&utm_medium=organic&utm_campaign=2026-11-company-ai-in-production&utm_content=cp-03 |
-| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
+| Link | `www.iron-sys.com` at the end of the post (owner, 2026-10-29) |
+| Status | approved 2026-10-29 by Yasser (G-asset); not scheduled: the video (19 to 29 MB) is over the 10 MB upload limit of the scheduling tool, so Yasser attaches it on LinkedIn |
 
 This is the company angle on ProcurePilot: what it shows about how Iron Systems builds. The product's own posts
 (founder voice) stay in `ProcurePilot/campaigns/`.
 
 ## LinkedIn (bilingual, final)
 
-Post this block as one LinkedIn post (decision MD-13). 1168 characters (LinkedIn limit 3,000).
+v2, humanized everyday language, approved by Yasser on 2026-10-29 (MD-15). Post this block as one LinkedIn post. 733 characters.
 
 ```
-أفضل دليل على طريقتنا في البناء هو شيء بنيناه.
+أحسن طريقة نوريكم بنشتغل إزاي؟ نوريكم حاجة عملناها.
 
-ProcurePilot منتجنا للذكاء الاصطناعي لفرق المشتريات. يقرأ عروض أسعار الموردين، ملفات PDF وصورًا، بالعربية أو الإنجليزية. كل سطر مستخرج يبقى مرتبطًا بصفحته في عرض السعر الأصلي مع نسبة ثقة، وأي شيء غير واضح يُحال إلى شخص قبل اعتماده. يقارن العروض ويجهّز الطلب، ويعتمد شخص من فريقك كل عملية شراء.
+ProcurePilot ده منتجنا للمشتريات. بيقرا عروض أسعار الموردين، PDF أو صورة، عربي أو إنجليزي.
+كل سطر بيفضل مربوط بمكانه في العرض الأصلي، وأي حاجة مش واضحة بتروح لحد يراجعها.
+بيقارن العروض، ويجهّز الطلب، وفي الآخر حد من الفريق هو اللي بيعتمد.
 
-ذكاء المستندات، والإنسان في الحلقة، والعربية والإنجليزية، ومتاح الآن ضمن تجربة بالدعوة: مبني بالطريقة نفسها التي نبني بها كل نظام.
-
-دقيقتان من المنتج الحقيقي (ببيانات تجريبية) في الفيديو.
-www.iron-sys.com
+دقيقتين من المنتج الحقيقي (ببيانات تجريبية) في الفيديو.
 
 ———
 
-The best proof of how we build is something we built.
+Best way to show how we build? Show you something we built.
 
-ProcurePilot is our own AI product for purchasing teams. It reads supplier quotes, PDFs and photos, in Arabic or English. Every extracted line keeps a link to its page in the original quote, with a confidence score, and anything unclear goes to a person before it's trusted. It compares offers, prepares the request, and a person approves every purchase.
+ProcurePilot is our purchasing product. It reads supplier quotes, PDFs or photos, in Arabic or English, keeps every line linked to its source, and sends anything unclear to a person. It compares the offers, prepares the request, and someone on the team approves it.
 
-Document AI, a human in the loop, Arabic and English, live as an invitation-only pilot: built the way we build every system.
+Two minutes of the real product below (demo data).
 
-Two minutes of the real product (synthetic demo data) below.
 www.iron-sys.com
 ```
 

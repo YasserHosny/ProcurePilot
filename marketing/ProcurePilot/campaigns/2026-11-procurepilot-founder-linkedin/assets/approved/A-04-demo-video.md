@@ -2,13 +2,13 @@
 
 | Field | Value |
 |---|---|
-| Channel | LinkedIn (Yasser's profile), native video upload |
+| Channel | LinkedIn, Iron Systems company page (MD-16; was Yasser's profile) |
 | Format | video 16:9 |
 | Content type | product education |
 | Persona and stage | Owner, purchasing manager · product-aware |
 | Proof ids | C-01, C-03, C-07, C-09, C-14, C-15 and **C-16 (proposed: one RFQ to every supplier)** |
-| Link (UTM) | none |
-| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
+| Link | `procurepilot.iron-sys.com` at the end of the post (owner, 2026-10-29) |
+| Status | approved 2026-10-29 by Yasser (G-asset); not scheduled: the video (19 to 29 MB) is over the 10 MB upload limit of the scheduling tool, so Yasser attaches it on LinkedIn |
 
 Text reuses the owner-approved v2.5 script: the bridge line of beat 1 and the recap rows (SRC-029). The video's
 disclosure pill was removed in v2.5 because "the description carries the disclosure": the last line below is that
@@ -24,39 +24,36 @@ All three are in the repo, in `../docs/gtm/video/cuts/`.
 
 ## LinkedIn (bilingual, final)
 
-Post this block as one LinkedIn post (decision MD-13). 977 characters (LinkedIn limit 3,000).
+v2, humanized everyday language, approved by Yasser on 2026-10-29 (MD-15). Post this block as one LinkedIn post. 683 characters.
 
 ```
-من بلاغ نقص لأمر شراء تبعته للموردين… والتوفير متسجّل.
+من بلاغ نقص في الفرع لحد أمر شراء اتبعت للموردين، والتوفير متسجّل.
 
-ProcurePilot في حوالي دقيقتين:
+ده ProcurePilot في حوالي دقيقتين:
 نسخ الأسعار بإيدك ← بيقرا الـPDF والصور لوحده
 مورد مورد ← طلب عرض سعر واحد لكل الموردين
 عبوات مختلفة ← مقارنة بالعبوة شامل الضريبة والتوصيل
 اعتماد متأخر ← اعتماد من الموبايل
 وفّرنا كام؟ ← سجل توفير معتمد
 
-لو حابب تشوفه على عروض أسعار مورّدينك، ابعتلي رسالة.
+حابب تشوفه على عروض أسعار مورّدينك؟ ابعتلنا.
 
-شاشات حقيقية ببيانات تجريبية: مجموعة المطاعم والموردين والأسعار مش حقيقية.
+شاشات حقيقية ببيانات تجريبية: المطاعم والموردين والأسعار مش حقيقية.
 
 ———
 
-From a low-stock report to a sent purchase order, with the saving logged.
+From a low-stock report to a purchase order sent to suppliers, with the saving logged. ProcurePilot in about two minutes.
 
-ProcurePilot in about two minutes:
-Retyping prices → PDFs and photos read automatically
-One supplier at a time → One RFQ to every supplier
-Different pack sizes → Per pack, VAT and delivery included
-Slow approvals → Approval from the phone
-What did we save? → A verified savings ledger
+Want to see it on your own suppliers' quotes? Message us.
 
-If you'd like to see it with your own suppliers' quotes, send me a message.
+Real screens, demo data: the restaurants, suppliers and prices are made up.
 
-Real screens with synthetic data: the restaurant group, suppliers and prices are made up for this demonstration.
+procurepilot.iron-sys.com
 ```
 
-## Copy (EN)
+## Earlier copy (v1, superseded by the v2 block above)
+
+### Copy (EN)
 
 ```
 From a low-stock report to a sent purchase order, with the saving logged.

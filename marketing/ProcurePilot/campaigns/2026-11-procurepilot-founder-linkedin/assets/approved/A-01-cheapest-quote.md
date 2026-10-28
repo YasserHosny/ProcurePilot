@@ -2,61 +2,51 @@
 
 | Field | Value |
 |---|---|
-| Channel | LinkedIn (Yasser's profile; Iron Systems page reshares) |
+| Channel | LinkedIn, Iron Systems company page (MD-16; was Yasser's profile) |
 | Format | text + one image |
 | Content type | problem-solution |
 | Persona and stage | Purchasing manager, owner · problem-aware |
 | Proof ids | C-03, C-14 · headline MD-09 |
-| Link (UTM) | none (CTA is a conversation, MD-04) |
-| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
+| Link | `procurepilot.iron-sys.com` at the end of the post (owner, 2026-10-29) |
+| Status | approved 2026-10-29 by Yasser (G-asset); **scheduled** on the Iron Systems LinkedIn page for 2026-11-03 10:00 Cairo (owner's instruction, 2026-10-29); not yet live |
 
 ## LinkedIn (bilingual, final)
 
-Post this block as one LinkedIn post (decision MD-13). 1600 characters (LinkedIn limit 3,000).
+v2, humanized everyday language, approved by Yasser on 2026-10-29 (MD-15). Post this block as one LinkedIn post. 1162 characters.
 
 ```
-أرخص عرض سعر مش دايماً أرخص طلبية.
+سؤال: إمتى آخر مرة اخترت أرخص عرض سعر… وطلع مش الأرخص؟
 
-موردين بعتولك أسعار رز (أرقام للتوضيح):
-• المورد (أ): شوال 25 كيلو بـ 900 جنيه، يعني 36 جنيه للكيلو.
-• المورد (ب): كيس 10 كيلو بـ 420 جنيه، يعني 42 جنيه للكيلو.
+مثال (الأرقام للتوضيح):
+مورد بيبيع شوال رز 25 كيلو بـ 900 جنيه، يعني الكيلو بـ 36.
+ومورد تاني بيبيع كيس 10 كيلو بـ 420، يعني الكيلو بـ 42.
 
-(أ) شكله أرخص. طيب اطلب 50 كيلو:
-• (أ): شوالين + 400 جنيه توصيل = 2,200 جنيه (44 للكيلو)
-• (ب): 5 أكياس والتوصيل مجاني = 2,100 جنيه (42 للكيلو)
+الأول باين أرخص. بس لو هتطلب 50 كيلو:
+الأول: شوالين بـ 1,800 + توصيل 400 = 2,200 جنيه
+التاني: 5 أكياس بـ 2,100 والتوصيل ببلاش = 2,100 جنيه
 
-المورد "الغالي" كسب بـ 100 جنيه في طلبية واحدة.
+يعني "الغالي" وفّرلك 100 جنيه في طلبية واحدة.
 
-لما الأسعار تكون في شات واتساب وشيت إكسيل، فرق العبوات ورسوم التوصيل بيضيعوا بسهولة. وده من اللي عملنا ProcurePilot عشانه: بيقارن كل عرض عبوة بعبوة، شامل رسوم توصيل كل مورد، ويوريك أسباب الترشيح.
+الحسبة دي بتضيع بسهولة لما الأسعار جاية على الواتساب ومتسجلة في إكسيل. وده بالظبط اللي بيعمله ProcurePilot: بيقارن العروض عبوة بعبوة، والتوصيل محسوب.
 
-لو بتشتري لفرعين أو أكتر، بتقارن عروض الأسعار إزاي النهارده؟ قولّي في الكومنتات أو ابعتلي رسالة.
-
-(الأرقام للتوضيح، مش من عميل.)
+إنت بتقارن عروض الأسعار إزاي النهارده؟
 
 ———
 
-The cheapest quote isn't always the cheapest order.
+When did you last pick the cheapest quote and find out it wasn't?
 
-Two suppliers quote you rice (example numbers):
-• Supplier A: 25 kg sack, EGP 900. That's EGP 36 a kilo.
-• Supplier B: 10 kg bag, EGP 420. That's EGP 42 a kilo.
+Made-up example: Supplier A sells a 25 kg sack of rice for EGP 900, so EGP 36 a kilo. Supplier B sells a 10 kg bag for EGP 420, EGP 42 a kilo. A looks cheaper. Now order 50 kg: A is 2 sacks plus EGP 400 delivery, EGP 2,200. B is 5 bags with free delivery, EGP 2,100. The "expensive" one saves you EGP 100 on a single order.
 
-A looks cheaper. Now order 50 kg:
-• A: 2 sacks + EGP 400 delivery = EGP 2,200 (EGP 44 a kilo)
-• B: 5 bags, free delivery = EGP 2,100 (EGP 42 a kilo)
+That math gets lost when prices come in on WhatsApp and live in Excel. It's exactly what ProcurePilot does: compares offers pack for pack, delivery included.
 
-The "expensive" supplier wins by EGP 100 on a single order.
+How do you compare quotes today?
 
-When quotes live in a WhatsApp chat and an Excel sheet, pack sizes and delivery fees are easy to miss. That's one of the things we built ProcurePilot for: it compares every offer pack for pack, with each supplier's delivery fee included, and shows the scoring.
-
-If you buy for 2+ branches, how do you compare quotes today? Tell me in the comments or send me a message.
-
-(Example numbers, not a customer's.)
-
-#Procurement #Restaurants #FoodAndBeverage
+procurepilot.iron-sys.com
 ```
 
-## Copy (EN)
+## Earlier copy (v1, superseded by the v2 block above)
+
+### Copy (EN)
 
 ```
 The cheapest quote isn't always the cheapest order.

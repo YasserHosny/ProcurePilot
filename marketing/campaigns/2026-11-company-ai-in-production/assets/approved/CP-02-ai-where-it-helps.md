@@ -7,35 +7,32 @@
 | Content type | thought leadership |
 | Persona and stage | Owner, IT lead · problem-aware |
 | Proof ids | CO-04, CO-06 |
-| Link (UTM) | https://www.iron-sys.com/?utm_source=linkedin&utm_medium=organic&utm_campaign=2026-11-company-ai-in-production&utm_content=cp-02 |
-| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
+| Link | `www.iron-sys.com` at the end of the post (owner, 2026-10-29) |
+| Status | approved 2026-10-29 by Yasser (G-asset); **scheduled** on the Iron Systems LinkedIn page for 2026-11-05 10:00 Cairo (owner's instruction, 2026-10-29); not yet live |
 
 ## LinkedIn (bilingual, final)
 
-Post this block as one LinkedIn post (decision MD-13). 961 characters (LinkedIn limit 3,000).
+v2, humanized everyday language, approved by Yasser on 2026-10-29 (MD-15). Post this block as one LinkedIn post. 683 characters.
 
 ```
-ليست كل مشكلة بحاجة إلى ذكاء اصطناعي.
+مش كل مشكلة محتاجة ذكاء اصطناعي.
+ساعات قاعدة بسيطة أو فورم أحسن بيحلّوها أسرع وأرخص.
 
-قبل أن نطلق أي نموذج، نختبر هل يضيف قيمة مقارنةً بقاعدة أبسط أو نموذج إدخال أفضل. وحين يضيف، نبنيه على بياناتك، ونقيّمه قبل الإطلاق ونراقبه بعده.
+عشان كده قبل ما نطلق أي نموذج بنسأل: هل فعلاً بيضيف قيمة؟
+لو آه، بنبنيه على بياناتكم، ونختبره قبل الإطلاق، ونتابعه بعده.
+ولو القرار مهم، بيفضل في إيد حد من فريقكم.
 
-وحيث يكون القرار مهمًا، يبقى الإنسان في الحلقة: النظام يجهّز، وفريقك يقرّر.
-
-هذا ما نعنيه بـ"الذكاء الاصطناعي حيث يفيد"، وهو أحد ثلاثة مبادئ وراء كل ما نبنيه، مع "المشكلة أولًا" و"مبني ليدوم".
-
-ما المهمة في عملك التي لن تسلّمها للذكاء الاصطناعي أبدًا؟
+إيه الشغلانة اللي عمرك ما هتسلّمها للذكاء الاصطناعي؟
 
 ———
 
-Not every problem needs AI.
+Not every problem needs AI. Sometimes a simple rule or a better form does the job faster and cheaper.
 
-Before we ship a model, we test whether it adds value over a simpler rule or a better form. When it does, we build it on your own data, evaluate it before launch and monitor it after.
+So before we ship a model, we ask one question: does it actually add value? If it does, we build it on your data, test it before launch and keep watching it after. And when a decision matters, a person on your team makes it.
 
-And where a decision matters, a person stays in the loop: the system prepares, your team decides.
+What's one task you'd never hand over to AI?
 
-That's what we mean by "AI where it helps". It's one of three principles behind everything we build, next to "problem first" and "built to last".
-
-What's one task in your operation you'd never hand to AI?
+www.iron-sys.com
 ```
 
 ## LinkedIn (EN)

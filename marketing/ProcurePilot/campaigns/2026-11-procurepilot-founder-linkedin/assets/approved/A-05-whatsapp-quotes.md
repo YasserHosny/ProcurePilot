@@ -2,47 +2,46 @@
 
 | Field | Value |
 |---|---|
-| Channel | LinkedIn (Yasser's profile; Iron Systems page reshares) |
+| Channel | LinkedIn, Iron Systems company page (MD-16; was Yasser's profile) |
 | Format | text + one image |
 | Content type | objection / product education |
 | Persona and stage | Purchasing manager, owner · product-aware |
 | Proof ids | C-01, C-02, C-10, C-14 |
-| Link (UTM) | none |
-| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
+| Link | `procurepilot.iron-sys.com` at the end of the post (owner, 2026-10-29) |
+| Status | approved 2026-10-29 by Yasser (G-asset); **scheduled** on the Iron Systems LinkedIn page for 2026-11-17 10:00 Cairo (owner's instruction, 2026-10-29); not yet live |
 
 ## LinkedIn (bilingual, final)
 
-Post this block as one LinkedIn post (decision MD-13). 1010 characters (LinkedIn limit 3,000).
+v2, humanized everyday language, approved by Yasser on 2026-10-29 (MD-15). Post this block as one LinkedIn post. 917 characters.
 
 ```
-"مورّدينا مابيبعتوش أسعار غير على الواتساب."
+"موردينّا مابيبعتوش أسعار غير على الواتساب."
+ماشي، خليها كده.
 
-تمام. خليها كده.
+احفظ الصورة أو الـPDF وارفعها على ProcurePilot، أو حوّلها على الإيميل.
+مفيش ربط مباشر بالواتساب، ومش محتاج المورد يغيّر أي حاجة.
 
-احفظ الـPDF أو الصورة وارفعها على ProcurePilot، أو حوّلها بالإيميل. مفيش ربط مباشر بالواتساب، ومورّدينك مش محتاجين يغيروا حاجة.
+كل سطر بيتقري بيفضل مربوط بمكانه في العرض الأصلي، ومعاه نسبة ثقة، وأي حاجة مش واضحة بتروح لحد يراجعها قبل ما تتعتمد.
+يعني عرض السعر اللي بعته المورد هو نفسه الدليل.
 
-كل سطر بيتقري بيفضل مربوط بصفحته في عرض السعر الأصلي، ومعاه نسبة ثقة. وأي حاجة مش واضحة بتروح لحد من فريقك يراجعها قبل ما تتعتمد.
-
-يعني عرض السعر اللي بعته المورد بيفضل هو الدليل ورا كل سعر بتقارنه.
-
-مورّدينك بيبعتوا الأسعار إزاي؟ واتساب، إيميل، ولا ورق؟
+موردينك بيبعتوا الأسعار إزاي؟ واتساب، إيميل، ولا ورق؟
 
 ———
 
-"Our suppliers only send quotes on WhatsApp."
+"Our suppliers only send prices on WhatsApp." Fine, keep it that way.
 
-Good. Keep it that way.
+Save the photo or PDF and upload it to ProcurePilot, or forward it by email. There's no direct WhatsApp connection, and your suppliers don't have to change a thing.
 
-Save the PDF or the photo and upload it to ProcurePilot, or forward it by email. There's no direct WhatsApp connection, and your suppliers don't have to change anything.
+Every line it reads stays linked to its place in the original quote, with a confidence score, and anything unclear goes to a person before it's approved. The quote your supplier sent is the evidence.
 
-Every line it reads keeps a link to its page in the original quote, with a confidence score. Anything unclear goes to a person on your team before it's trusted.
+How do your suppliers send prices: WhatsApp, email or paper?
 
-So the quote your supplier sent stays the evidence behind every price you compare.
-
-How do your suppliers send quotes today: WhatsApp, email, or paper?
+procurepilot.iron-sys.com
 ```
 
-## Copy (EN)
+## Earlier copy (v1, superseded by the v2 block above)
+
+### Copy (EN)
 
 ```
 "Our suppliers only send quotes on WhatsApp."

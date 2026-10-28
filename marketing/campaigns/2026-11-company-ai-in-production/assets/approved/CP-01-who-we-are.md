@@ -7,44 +7,39 @@
 | Content type | announcement / brand |
 | Persona and stage | Owner, operations leader, IT lead · unaware |
 | Proof ids | CO-01, CO-02, CO-03, CO-06, CO-08 |
-| Link (UTM) | https://www.iron-sys.com/?utm_source=linkedin&utm_medium=organic&utm_campaign=2026-11-company-ai-in-production&utm_content=cp-01 (LinkedIn); same with utm_source=x / facebook / instagram elsewhere |
-| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
+| Link | `www.iron-sys.com` at the end of the post (owner, 2026-10-29) |
+| Status | approved 2026-10-29 by Yasser (G-asset); **scheduled** on the Iron Systems LinkedIn page for 2026-11-01 10:00 Cairo (owner's instruction, 2026-10-29); not yet live |
 
 ## LinkedIn (bilingual, final)
 
-Post this block as one LinkedIn post (decision MD-13). 1481 characters (LinkedIn limit 3,000).
+v2, humanized everyday language, approved by Yasser on 2026-10-29 (MD-15). Post this block as one LinkedIn post. 1096 characters.
 
 ```
-ذكاء اصطناعي يعمل في بيئة الإنتاج.
+فيه ذكاء اصطناعي شكله حلو في العرض التقديمي، وفيه ذكاء اصطناعي بيشتغل كل يوم في شغلك.
+إحنا بنبني التاني.
 
-Iron Systems تبني حلول الذكاء الاصطناعي للشركات. نصمّم ونبني ونشغّل أنظمة ذكاء اصطناعي تتولّى عملًا تشغيليًا حقيقيًا، من الفكرة الأولى حتى نظام يعمل فعليًا في بيئة الإنتاج:
-• مساعدون ذكيون يجيبون من بياناتك أنت
-• ذكاء المستندات: قراءة العقود والفواتير وعروض الأسعار وتصنيفها والتحقق منها
-• أتمتة ذكية تتولّى الروتين وتحيل الاستثناءات إلى شخص من فريقك
-• والبرمجيات المخصّصة والتكاملات التي تحيط بها
+في Iron Systems بنبني حلول ذكاء اصطناعي للشركات، من أول فكرة لحد ما النظام يشتغل فعلاً:
+• مساعد ذكي بيرد من بياناتكم انتوا
+• قراءة العقود والفواتير وعروض الأسعار ومراجعتها
+• أتمتة بتخلّص الشغل المتكرر، وأي استثناء بيروح لحد من فريقكم
+• والبرمجيات والربط بين الأنظمة اللي حوالين ده كله
 
-طريقتنا: المشكلة أولًا. الذكاء الاصطناعي حيث يفيد. مبني ليدوم.
+طريقتنا بسيطة: نفهم المشكلة الأول، نستخدم الذكاء الاصطناعي بس لما يفيد، ونبني حاجة تعيش.
 
-ونبني منتجاتنا أيضًا. أولها ProcurePilot، يقرأ عروض أسعار الموردين بالعربية والإنجليزية، ومتاح الآن ضمن تجربة بالدعوة.
+وبنعمل منتجاتنا كمان. أولها ProcurePilot للمشتريات، ومتاح دلوقتي كتجربة بالدعوة.
 
-أخبرنا بالمشكلة التي تريد حلّها: hello@iron-sys.com
-www.iron-sys.com
+عندك مشكلة في شغلك عايز تحلها؟ ابعتلنا: hello@iron-sys.com
 
 ———
 
-AI that works in production.
+There's AI that looks good in a demo, and AI that runs your operations every day. We build the second kind.
 
-Iron Systems builds AI solutions for businesses. We design, build and run AI that takes on real operational work, from the first idea to a system running in production:
-• AI assistants that answer from your own data
-• Document AI that reads, classifies and checks contracts, invoices and quotes
-• Intelligent automation that handles the routine and passes exceptions to a person
-• The custom software and integrations around them
+Iron Systems builds AI solutions for businesses: assistants that answer from your own data, document AI for contracts, invoices and quotes, and automation that handles the routine and hands exceptions to your team.
 
-How we work: problem first. AI where it helps. Built to last.
+We also build our own products. The first, ProcurePilot, is live as an invitation-only pilot.
 
-We also build our own products. The first, ProcurePilot, reads supplier quotes in Arabic and English and is live as an invitation-only pilot.
+Got a problem worth solving? hello@iron-sys.com
 
-Tell us the problem you want to solve: hello@iron-sys.com
 www.iron-sys.com
 ```
 
