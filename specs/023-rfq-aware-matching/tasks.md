@@ -136,8 +136,8 @@ tasks are left open.
 **Independent test**: an RFQ-proposed candidate and a similarity-only candidate. Neither shows a 50 %
 placeholder, and the RFQ one leads with the RFQ line.
 
-- [ ] T021 [P] [US2] Write unit tests in `apps/api/tests/unit/test_matching_scoring.py`: `reason_payload` includes a `measured` map with only non-None inputs, and the deterministic and similarity builders pass through the inputs they actually measured.
-- [ ] T022 [US2] Add `measured` to `reason_payload` in `apps/api/src/procurepilot_api/modules/matching/scoring.py`, and pass the measured inputs from `apps/api/src/procurepilot_api/modules/matching/search.py` and `deterministic.py`. Leave stored rows untouched. T021 green.
+- [x] T021 [P] [US2] Write unit tests in `apps/api/tests/unit/test_matching_scoring.py`: `reason_payload` includes a `measured` map with only non-None inputs, and the deterministic and similarity builders pass through the inputs they actually measured.
+- [x] T022 [US2] Add `measured` to `reason_payload` in `apps/api/src/procurepilot_api/modules/matching/scoring.py`, and pass the measured inputs from `apps/api/src/procurepilot_api/modules/matching/search.py` and `deterministic.py`. Leave stored rows untouched. T021 green.
 - [ ] T023 [P] [US2] Web, delegated to Agy: `apps/web/src/app/features/matching/match-resolution/match-resolution-candidates.component.{ts,html,scss}` and its spec:
   - render only the `measured` signals; legacy rows without `measured` follow the rule in research R4;
   - "Semantic: Not available" and 50 % feature bars are gone;
