@@ -1,5 +1,5 @@
 Hi everyone 👋
-I'm building ProcurePilot — a tool that helps restaurants and multi-branch businesses compare supplier quotes side by side, approve purchase requests from their phone, and see exactly how much they saved.
+I'm building ProcurePilot, for restaurant purchasing: it reads supplier quotes (PDF or photo), compares them per pack with VAT and delivery included, lets the manager approve from their phone, and records the saving on every order.
 
-I'm looking for 1–2 companies to try it with me free for 14 days.
-If you (or someone you know) handle purchasing and are interested, send me a private message 🙏
+I'm looking for 1–2 restaurants to try it with me free for 2 weeks — we set it up with you.
+If you (or someone you know) run purchasing at a restaurant and are interested, send me a private message 🙏
