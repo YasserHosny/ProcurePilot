@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
@@ -36,6 +37,7 @@ from procurepilot_api.modules.matching.service import (
     DECISION_COLUMNS,
     LINE_COLUMNS,
     PRODUCT_COLUMNS,
+    MatchingService,
     _candidate,
     _decision,
     _decision_for_line,
@@ -45,6 +47,8 @@ from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
+
+logger = logging.getLogger(__name__)
 
 EXACT_CONFIRM_WORKERS = 12  # overlap hosted RTT; never more than twelve in-flight lines
 EXACT_CONFIRM_BATCH = 100  # exact pairs returned per call
@@ -89,6 +93,7 @@ class MatchResolutionService:
         payload: MatchResolutionRequest,
         idempotency_key: UUID | None,
         defer_guardrail: Callable[[UUID], None] | None = None,
+        defer_alias_sweep: Callable[[MatchDecision], None] | None = None,
     ) -> MatchDecision:
         """The same resolution pipeline for single requests and isolated bulk workers."""
         fingerprint = _request_fingerprint(payload)
@@ -102,10 +107,14 @@ class MatchResolutionService:
                     or str(existing_request["request_fingerprint"]) != fingerprint
                 ):
                     raise ConflictError(details={"reason": "idempotency_key_reused"})
-                return _decision(
+                decision = _decision(
                     client,
                     _decision_by_id(client, UUID(str(existing_request["match_decision_id"]))),
                 )
+                decision.lines_matched_by_same_wording = self._previous_swept_lines(
+                    client, decision.id
+                )
+                return decision
         line = _line_row(client, line_id)
         existing_decision = _decision_for_line(client, line_id)
         if existing_decision is not None:
@@ -123,6 +132,9 @@ class MatchResolutionService:
                     idempotency_key=idempotency_key,
                     request_fingerprint=fingerprint,
                     repair_existing_decision=True,
+                )
+                decision.lines_matched_by_same_wording = self._previous_swept_lines(
+                    client, decision.id
                 )
                 return decision
             raise ConflictError(details={"reason": "line_already_matched"})
@@ -192,7 +204,77 @@ class MatchResolutionService:
             request_fingerprint=fingerprint,
             repair_existing_decision=False,
         )
+        if defer_alias_sweep is not None:
+            defer_alias_sweep(decision)
+        else:
+            # The teacher's quotation was already enqueued on insert.
+            def enqueue_other(affected: UUID) -> None:
+                if affected != quotation_id:
+                    enqueue_guardrail_evaluation(
+                        self._settings, tenant_id=member.tenant_id, quotation_id=affected
+                    )
+
+            decision.lines_matched_by_same_wording = self._sweep_learned_alias(
+                client, member, decision, bearer_token, defer_guardrail=enqueue_other
+            )
         return decision
+
+    def _sweep_learned_alias(
+        self,
+        client: object,
+        member: CurrentMember,
+        decision: MatchDecision,
+        bearer_token: str,
+        *,
+        defer_guardrail: Callable[[UUID], None] | None = None,
+    ) -> list[UUID]:
+        if decision.is_automatic or decision.alias_id is None:
+            return []
+        try:
+            alias = _one_row(
+                client.table("product_alias")
+                .select("id,workspace_product_id,alias_text")
+                .eq("id", str(decision.alias_id))
+                .limit(1)
+                .execute()
+                .data,
+                resource="product_alias",
+            )
+            matching = MatchingService(self._settings)
+            matching._landed_cost = self._landed_cost
+            return sorted(
+                matching.sweep_open_lines_for_alias(
+                    client,
+                    member,
+                    alias,
+                    decision.id,
+                    bearer_token,
+                    defer_guardrail=defer_guardrail,
+                )
+            )
+        except Exception:
+            # The human decision is committed; even a failure reading the alias cannot undo it.
+            logger.exception("Alias sweep failed after human decision %s", decision.id)
+            return []
+
+    def _previous_swept_lines(self, client: object, decision_id: UUID) -> list[UUID]:
+        try:
+            # History, not heads: correcting a swept line cannot change the teacher's replay.
+            return sorted(
+                {
+                    UUID(str(row["quotation_line_id"]))
+                    for row in _rows(
+                        client.table("match_decision")
+                        .select("quotation_line_id")
+                        .eq("learned_from_decision_id", str(decision_id))
+                        .execute()
+                        .data
+                    )
+                }
+            )
+        except Exception:
+            logger.exception("Could not read alias sweep result for decision %s", decision_id)
+            return []
 
     def correct(
         self,
@@ -399,6 +481,16 @@ class MatchResolutionService:
         enqueue_guardrail_evaluation(
             self._settings, tenant_id=member.tenant_id, quotation_id=UUID(str(line["quotation_id"]))
         )
+
+        def enqueue_other(quotation_id: UUID) -> None:
+            if quotation_id != UUID(str(line["quotation_id"])):
+                enqueue_guardrail_evaluation(
+                    self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
+                )
+
+        result.lines_matched_by_same_wording = self._sweep_learned_alias(
+            client, member, result.decision, bearer_token, defer_guardrail=enqueue_other
+        )
         get_audit_writer().record(
             AuditEventCreate(
                 tenant_id=member.tenant_id,
@@ -506,6 +598,13 @@ class MatchResolutionService:
             groups.setdefault(texts.get(str(pair[0]), str(pair[0])), []).append(pair)
         quotations: set[UUID] = set()
         quotation_lock = Lock()
+        teachers: dict[UUID, MatchDecision] = {}
+        sweep_quotations: set[UUID] = set()
+
+        def defer_alias_sweep(decision: MatchDecision) -> None:
+            if decision.alias_id is not None:
+                with quotation_lock:
+                    teachers.setdefault(decision.alias_id, decision)
 
         def defer_guardrail(quotation_id: UUID) -> None:
             with quotation_lock:
@@ -517,6 +616,7 @@ class MatchResolutionService:
             read_client = _BulkReadClient(worker_client)
             read_client.rows.update(inputs)
             confirmed = skipped = 0
+            swept: set[UUID] = set()
             try:
                 for line_id, candidate_id in group:
                     line_key = (
@@ -525,7 +625,7 @@ class MatchResolutionService:
                         else None
                     )
                     try:
-                        self._resolve_with_client(
+                        decision = self._resolve_with_client(
                             client=read_client,
                             bearer_token=bearer_token,
                             member=member,
@@ -535,12 +635,18 @@ class MatchResolutionService:
                             ),
                             idempotency_key=line_key,
                             defer_guardrail=defer_guardrail,
+                            defer_alias_sweep=defer_alias_sweep,
                         )
+                        swept.update(decision.lines_matched_by_same_wording or [])
                     except ConflictError:
                         skipped += 1
                         continue
                     confirmed += 1
-                return BulkConfirmResult(confirmed=confirmed, skipped=skipped)
+                return BulkConfirmResult(
+                    confirmed=confirmed,
+                    skipped=skipped,
+                    lines_matched_by_same_wording=sorted(swept),
+                )
             finally:
                 postgrest = getattr(worker_client, "postgrest", None)
                 if postgrest is not None:
@@ -554,16 +660,37 @@ class MatchResolutionService:
                     for group in groups.values()
                 ]
                 results = [future.result() for future in futures]
+            swept = {
+                line_id
+                for result in results
+                for line_id in (result.lines_matched_by_same_wording or [])
+            }
+            for decision in teachers.values():
+                swept.update(
+                    self._sweep_learned_alias(
+                        client,
+                        member,
+                        decision,
+                        bearer_token,
+                        defer_guardrail=sweep_quotations.add,
+                    )
+                )
         finally:
             # The executor waits even on failure. Evaluate completed decisions only after all
             # workers finish; preserve enqueue-on-insert even if a later side effect failed.
-            for quotation_id in sorted(quotations):
-                enqueue_guardrail_evaluation(
-                    self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
-                )
+            for quotation_id in sorted(quotations | sweep_quotations):
+                try:
+                    enqueue_guardrail_evaluation(
+                        self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
+                    )
+                except Exception:
+                    if quotation_id in quotations:
+                        raise
+                    logger.exception("Alias sweep guardrail enqueue failed for %s", quotation_id)
         return BulkConfirmResult(
             confirmed=sum(result.confirmed for result in results),
             skipped=sum(result.skipped for result in results),
+            lines_matched_by_same_wording=sorted(swept),
         )
 
     def _exact_match_pairs(

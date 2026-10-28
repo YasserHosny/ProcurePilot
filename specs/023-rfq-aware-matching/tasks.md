@@ -151,13 +151,13 @@ placeholder, and the RFQ one leads with the RFQ line.
 
 **Independent test**: quickstart §5.
 
-- [ ] T024 [P] [US3] Write integration tests in `apps/api/tests/integration/test_alias_sweep.py`:
+- [x] T024 [P] [US3] Write integration tests in `apps/api/tests/integration/test_alias_sweep.py`:
   - two quotes with an open «دقيق» line: resolving one with learn_alias decides the other automatically, with `learned_from_decision_id`, and the task is resolved;
   - «دقيق فاخر» stays open;
   - lines from another tenant are untouched;
   - the sweep caps at 200 lines;
   - an RFQ automatic decision triggers no sweep.
-- [ ] T025 [US3] Implement `sweep_open_lines_for_alias(client, member, alias_row, learned_from_decision_id)` in `apps/api/src/procurepilot_api/modules/matching/service.py`. Use the normalisation in `exact.normalise_name` and write the audit `matching.alias_sweep_matched`. Call it after a successful alias learn in `resolution_service._complete_resolution_side_effects` and in the correction path (T017). A sweep failure is logged and does not fail the resolution. T024 green.
+- [x] T025 [US3] Implement `sweep_open_lines_for_alias(client, member, alias_row, learned_from_decision_id)` in `apps/api/src/procurepilot_api/modules/matching/service.py`. Use the normalisation in `exact.normalise_name` and write the audit `matching.alias_sweep_matched`. Call it after a successful alias learn in `resolution_service._complete_resolution_side_effects` and in the correction path (T017). A sweep failure is logged and does not fail the resolution. T024 green.
 - [ ] T026 [P] [US3] Web, delegated to Agy: after a resolution or correction that swept lines, the snackbar says "Also matched N more lines with the same wording". This goes in `apps/web/src/app/features/matching/match-resolution/match-resolution.component.ts`, with i18n en and ar.
 
 ---
