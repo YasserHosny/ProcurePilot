@@ -82,6 +82,7 @@
           <div class="cand-signals">
             <div class="signals-title">{{ 'matching.resolution.candidates.signalsTitle' | translate }}</div>
 
+            <!-- RFQ Badges (US1) -->
             <div class="signal-badges">
               @if (cand.reasons.rfq?.rfq_line_id && cand.reasons.rfq?.pack_check !== 'conflict') {
                 <span class="signal-badge rfq-badge">
@@ -110,69 +111,34 @@
                   {{ 'matching.resolution.candidates.signals.multiFittingRfqLines' | translate }}
                 </span>
               }
-              @if (cand.reasons.alias_hit) {
-                <span class="signal-badge hit" [matTooltip]="'matching.resolution.candidates.signals.aliasHitDesc' | translate">
-                  <mat-icon aria-hidden="true">check</mat-icon>
-                  {{ 'matching.resolution.candidates.signals.aliasHit' | translate }}
-                </span>
-              }
-              @if (cand.reasons.gtin_match) {
-                <span class="signal-badge hit" [matTooltip]="'matching.resolution.candidates.signals.gtinMatchDesc' | translate">
-                  <mat-icon aria-hidden="true">qr_code_2</mat-icon>
-                  {{ 'matching.resolution.candidates.signals.gtinMatch' | translate }}
-                </span>
-              }
-              @if (cand.reasons.supplier_code_match) {
-                <span class="signal-badge hit" [matTooltip]="'matching.resolution.candidates.signals.supplierCodeMatchDesc' | translate">
-                  <mat-icon aria-hidden="true">tag</mat-icon>
-                  {{ 'matching.resolution.candidates.signals.supplierCodeMatch' | translate }}
-                </span>
-              }
             </div>
 
-            <!-- Similarity Scores -->
-            <div class="similarity-meters">
-              <div class="sim-row">
-                <span class="sim-name">{{ 'matching.resolution.candidates.signals.lexicalSimilarity' | translate }}</span>
-                <span class="sim-score">{{ formatScore(cand.reasons.lexical_similarity) }}%</span>
+            <!-- Deterministic Hit Line -->
+            @if (getDeterministicHit(cand); as detHit) {
+              <div class="deterministic-line">
+                <mat-icon aria-hidden="true">{{ detHit.icon }}</mat-icon>
+                <span>{{ detHit.key | translate }}</span>
               </div>
-              @if (shouldShowSemanticSignal(cand)) {
-                <div class="sim-row">
-                  <span class="sim-name">{{ 'matching.resolution.candidates.signals.semanticSimilarity' | translate }}</span>
-                  <span class="sim-score">{{ formatScore(cand.reasons.semantic_similarity) }}%</span>
-                </div>
-              } @else {
-                <div class="sim-row unavailable">
-                  <span class="sim-name">{{ 'matching.resolution.candidates.signals.semanticSimilarity' | translate }}</span>
-                  <span class="sim-score">{{ 'matching.resolution.candidates.signals.unavailableForStub' | translate }}</span>
+            }
+
+            <!-- Measured Signals Only (US2) -->
+            @if (getMeasuredSignals(cand); as signals) {
+              @if (signals.length > 0) {
+                <div class="measured-signals">
+                  @for (sig of signals; track sig.type) {
+                    <div class="measured-signal-row" [class]="'sig-' + sig.type">
+                      @if (sig.isTextOnly) {
+                        <span class="sig-text">{{ sig.textKey | translate }}</span>
+                      } @else if (sig.isFullSentence) {
+                        <span class="sig-sentence">{{ sig.labelKey | translate: { percent: sig.percent } }}</span>
+                      } @else {
+                        <span class="sig-label">{{ sig.labelKey | translate }}</span>
+                        <span class="sig-score">{{ sig.percent }}%</span>
+                      }
+                    </div>
+                  }
                 </div>
               }
-            </div>
-
-            <!-- Feature Scores -->
-            @if (cand.reasons.feature_score; as feat) {
-              <div class="feature-scores-grid">
-                <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.brandMatch' | translate">
-                  <span class="feat-lbl">{{ 'matching.resolution.candidates.product.brand' | translate }}:</span>
-                  <span class="feat-val">{{ formatScore(feat.brand_match) }}%</span>
-                </div>
-                <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.variantMatch' | translate">
-                  <span class="feat-lbl">{{ 'matching.resolution.candidates.product.variant' | translate }}:</span>
-                  <span class="feat-val">{{ formatScore(feat.variant_match) }}%</span>
-                </div>
-                <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.packUnitMatch' | translate">
-                  <span class="feat-lbl">{{ 'matching.resolution.candidates.signals.packUnitMatch' | translate }}:</span>
-                  <span class="feat-val">{{ formatScore(feat.pack_unit_match) }}%</span>
-                </div>
-                <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.packSizePlausibility' | translate">
-                  <span class="feat-lbl">{{ 'matching.resolution.candidates.signals.packSizePlausibility' | translate }}:</span>
-                  <span class="feat-val">{{ formatScore(feat.pack_size_plausibility) }}%</span>
-                </div>
-                <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.pricePlausibility' | translate">
-                  <span class="feat-lbl">{{ 'matching.resolution.candidates.signals.pricePlausibility' | translate }}:</span>
-                  <span class="feat-val">{{ formatScore(feat.price_plausibility) }}%</span>
-                </div>
-              </div>
             }
           </div>
 
