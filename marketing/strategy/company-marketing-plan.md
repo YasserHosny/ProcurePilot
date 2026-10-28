@@ -18,6 +18,7 @@ claims register), `strategy/content-strategy.md` (pillars, draft), `config/chann
 | CD-01 | **Goal: both.** Win custom AI and software project inquiries, and back ProcurePilot's sales; ProcurePilot is shown as proof | Every company post either explains what we build or shows ProcurePilot as evidence of it. No client claims until real ones exist |
 | CD-02 | **Lead message: AI solutions first** (as on LinkedIn), with software, automation and integration as the foundation | Resolves D-04 for social channels. The website keeps its four-discipline layout unless Yasser asks for a website change |
 | CD-03 | **Market: Egypt + Saudi Arabia** | Arabic and English. Company Arabic is Modern Standard Arabic (neutral across both markets, as on the website); dialects stay for ProcurePilot posts and video |
+| CD-05 | **LinkedIn first (2026-10-29).** X, Facebook and Instagram wait until the owner restarts them; the competitor-research merge with docs/gtm/competitor-profiles waits too | Profile kits stay as drafts; no new channel work until asked |
 | CD-04 | **Channels: Iron Systems LinkedIn page, X (Twitter), Facebook, Instagram.** Not chosen: website articles, founder reshares of company posts | X added to `config/channels.yaml`. Facebook, Instagram and X accounts don't exist yet: Yasser creates them; profile kits are prepared (below) |
 
 ## Goal and measures
