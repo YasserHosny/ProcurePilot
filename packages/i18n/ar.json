@@ -2233,7 +2233,8 @@
       "reject": "رفض"
     },
     "decisionDialog": {
-      "approveTitle": "اعتماد طلب الشراء",
+      "approveTitle": "اعتماد {{amount}} لـ {{branchName}}؟",
+      "approveTitleDefault": "اعتماد طلب الشراء",
       "rejectTitle": "رفض طلب الشراء",
       "commentLabel": "تعليق (اختياري)",
       "commentPlaceholder": "أضف تعليقًا لمقدم الطلب...",
@@ -3855,8 +3856,14 @@
       "quantity": "الكمية",
       "unitPrice": "سعر الوحدة",
       "totalValue": "القيمة الإجمالية",
+      "total": "الإجمالي",
+      "lowestTotal": "أقل إجمالي",
       "pendingMatch": "في انتظار المطابقة",
       "pendingMatchExplanation": "غير مرتبط بمنتج في الكتالوج بعد.",
+      "matchLine": "مطابقة بند واحد",
+      "matchLines": "مطابقة {{count}} بنود",
+      "matchLinesTwo": "مطابقة بندين",
+      "chooseBranchFirst": "اختر فرع التوصيل أولاً",
       "prepareRequest": "إعداد طلب",
       "cannotPreparePending": "لا يمكن إعداد الطلب بينما توجد بنود غير مطابقة",
       "prepareSuccess": "تم إعداد مسودة طلب الشراء بنجاح.",
@@ -3930,6 +3937,17 @@
     "detail": {
       "title": "تفاصيل طلب عرض الأسعار",
       "subtitle": "ما تم طلبه، وإلى من أُرسل، وما هي الردود الواردة.",
+      "responsesReceivedTitle": "تم استلام {{count}} من الردود",
+      "responsesReceived": {
+        "zero": "لم يتم استلام أي ردود",
+        "one": "تم استلام رد واحد",
+        "two": "تم استلام ردين",
+        "few": "تم استلام {{count}} ردود",
+        "many": "تم استلام {{count}} ردًا",
+        "other": "تم استلام {{count}} رد"
+      },
+      "responsesReceivedDescription": "ردود الموردين جاهزة للمقارنة. راجع البنود وقارن الإجماليات وأعد طلب شراء.",
+      "compareResponses": "مقارنة الردود",
       "breadcrumbRfqSent": "طلب عرض أسعار · أُرسل {{date}} · {{time}}",
       "breadcrumbRfqDraft": "طلب عرض أسعار · مسودة",
       "tabDetails": "التفاصيل",

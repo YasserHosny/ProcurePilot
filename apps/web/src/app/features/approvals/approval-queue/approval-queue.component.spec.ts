@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
@@ -13,7 +13,7 @@ import type { PurchaseRequest } from '../../../core/api/models';
 import { RequestsApiService } from '../../requests/requests-api';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { ApprovalsApiService } from '../approvals-api';
-import { ApprovalQueueComponent } from './approval-queue.component';
+import { ApprovalDecisionDialogComponent, ApprovalQueueComponent } from './approval-queue.component';
 
 const mockPendingRequests: PurchaseRequest[] = [
   {
@@ -598,5 +598,109 @@ describe('ApprovalQueueComponent', () => {
     expect(cell).toBeTruthy();
     expect(cell.classList.contains('date-cell')).toBeTrue();
     expect(getComputedStyle(cell).overflow).toBe('visible');
+  });
+
+  it('renders approve and reject buttons inside the actions cell and lines toggle in lines cell', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const actionsCell = compiled.querySelector('td.mat-column-actions');
+    expect(actionsCell).not.toBeNull();
+    expect(actionsCell?.querySelector('.approve-btn')).not.toBeNull();
+    expect(actionsCell?.querySelector('.reject-btn')).not.toBeNull();
+
+    const linesCell = compiled.querySelector('td.mat-column-lines');
+    expect(linesCell).not.toBeNull();
+    expect(linesCell?.querySelector('.approve-btn')).toBeNull();
+    expect(linesCell?.querySelector('.reject-btn')).toBeNull();
+  });
+
+  it('makes the whole N lines control one clickable button without tooltip', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const linesCell = compiled.querySelector('td.mat-column-lines');
+    const toggleBtn = linesCell?.querySelector<HTMLButtonElement>('.lines-toggle-btn');
+    expect(toggleBtn).not.toBeNull();
+    expect(toggleBtn?.textContent).toContain('2 lines');
+    expect(toggleBtn?.getAttribute('aria-expanded')).toBe('false');
+    expect(toggleBtn?.hasAttribute('matTooltip')).toBeFalse();
+    expect(toggleBtn?.getAttribute('ng-reflect-message')).toBeNull();
+
+    // Clicking the toggle button expands lines
+    toggleBtn?.click();
+    fixture.detectChanges();
+    expect(component.isExpanded('req-001')).toBeTrue();
+    expect(toggleBtn?.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('renders "—" for empty optional line note instead of "Not available"', () => {
+    component.toggleExpand('req-001');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const noteCols = compiled.querySelectorAll('.note-col');
+    expect(noteCols.length).toBe(2);
+    expect(noteCols[0].textContent?.trim()).toBe('Latex-free boxes');
+    // Line 2 has note: null -> should be "—"
+    expect(noteCols[1].textContent?.trim()).toBe('—');
+  });
+
+  it('passes amount and branch name to decision dialog and restates what is approved in title', () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of({ confirmed: false }),
+    } as MatDialogRef<unknown, unknown>);
+
+    component.openDecisionDialog(mockPendingRequests[0], 'approve');
+
+    expect(dialogSpy.open).toHaveBeenCalledWith(
+      jasmine.anything(),
+      jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          action: 'approve',
+          requestId: 'req-001',
+          amount: 'SAR 1,250',
+          branchName: 'North Branch',
+        }),
+      }),
+    );
+  });
+});
+
+describe('ApprovalDecisionDialogComponent', () => {
+  let dialogFixture: ComponentFixture<ApprovalDecisionDialogComponent>;
+
+  it('restates what is approved in the dialog title with amount and branch name in en and ar', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ApprovalDecisionDialogComponent],
+      providers: [
+        provideTranslateService(),
+        {
+          provide: MAT_DIALOG_DATA,
+          useValue: {
+            action: 'approve',
+            requestId: 'req-001',
+            amount: 'SAR 4,137',
+            branchName: 'فرع العليا',
+          },
+        },
+        {
+          provide: MatDialogRef,
+          useValue: jasmine.createSpyObj('MatDialogRef', ['close']),
+        },
+      ],
+    }).compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    translate.use('en');
+
+    dialogFixture = TestBed.createComponent(ApprovalDecisionDialogComponent);
+    dialogFixture.detectChanges();
+
+    const titleEl = dialogFixture.nativeElement.querySelector('[mat-dialog-title]');
+    expect(titleEl?.textContent?.trim()).toBe('Approve SAR 4,137 for فرع العليا?');
+
+    translate.use('ar');
+    dialogFixture.detectChanges();
+    expect(titleEl?.textContent?.trim()).toBe('اعتماد SAR 4,137 لـ فرع العليا؟');
   });
 });

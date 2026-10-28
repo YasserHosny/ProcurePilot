@@ -45,6 +45,8 @@ const I18N = 'approvals';
 export interface ApprovalDecisionDialogData {
   readonly action: 'approve' | 'reject';
   readonly requestId: string;
+  readonly amount?: string;
+  readonly branchName?: string;
 }
 
 export interface ApprovalDecisionDialogResult {
@@ -66,10 +68,12 @@ export interface ApprovalDecisionDialogResult {
   template: `
     <h2 mat-dialog-title>
       {{
-        (data.action === 'approve'
-          ? 'approvals.decisionDialog.approveTitle'
-          : 'approvals.decisionDialog.rejectTitle'
-        ) | translate
+        (data.action === 'approve' && data.amount && data.branchName
+          ? ('approvals.decisionDialog.approveTitle' | translate: { amount: data.amount, branchName: data.branchName })
+          : data.action === 'approve'
+            ? ('approvals.decisionDialog.approveTitleDefault' | translate)
+            : ('approvals.decisionDialog.rejectTitle' | translate)
+        )
       }}
     </h2>
     <mat-dialog-content>
@@ -262,7 +266,12 @@ export class ApprovalQueueComponent implements OnInit {
       ApprovalDecisionDialogResult
     >(ApprovalDecisionDialogComponent, {
       width: '480px',
-      data: { action, requestId: request.id },
+      data: {
+        action,
+        requestId: request.id,
+        amount: this.formatMoney(request),
+        branchName: this.getBranchName(request.branch_id),
+      },
     });
 
     dialogRef.afterClosed().subscribe((result?: ApprovalDecisionDialogResult) => {

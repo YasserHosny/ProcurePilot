@@ -215,6 +215,37 @@ td.date-cell {
   white-space: nowrap;
 }
 
+.lines-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: var(--pp-radius-control, 6px);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--pp-text-strong);
+
+  &:hover {
+    background-color: var(--pp-surface-sunken);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--pp-focus);
+    outline-offset: 2px;
+  }
+
+  .toggle-icon {
+    font-size: 20px;
+    inline-size: 20px;
+    block-size: 20px;
+    color: var(--pp-text-muted);
+  }
+}
+
 .approve-btn,
 .reject-btn {
   display: inline-flex;

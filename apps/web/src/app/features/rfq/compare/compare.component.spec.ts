@@ -10,7 +10,7 @@ import {
   RfqSendResponse,
 } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, UrlTree } from '@angular/router';
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -74,11 +74,13 @@ describe('CompareComponent (RFQ)', () => {
         id: 'resp-1',
         rfq_id: 'rfq-1',
         supplier_id: 'supp-1',
+        quotation_id: 'quote-1',
         quotation_status: 'reviewed',
         submitted_at: '2026-09-25T10:00:00Z',
         lines: [
           {
             workspace_product_id: 'prod-1',
+            original_text: 'Supplier Product 1 text',
             quoted_quantity: '10',
             quoted_unit_price_amount: '5.00',
             quoted_unit_price_currency: 'USD',
@@ -91,11 +93,13 @@ describe('CompareComponent (RFQ)', () => {
         id: 'resp-2',
         rfq_id: 'rfq-1',
         supplier_id: 'supp-2',
+        quotation_id: 'quote-2',
         quotation_status: 'reviewed',
         submitted_at: '2026-09-25T11:00:00Z',
         lines: [
           {
             workspace_product_id: null,
+            original_text: 'Unmatched Special Spices 500g',
             quoted_quantity: '10',
             quoted_unit_price_amount: '4.50',
             quoted_unit_price_currency: 'USD',
@@ -166,7 +170,17 @@ describe('CompareComponent (RFQ)', () => {
         next_cursor: string | null;
       }),
     );
-    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
+    mockRouter = jasmine.createSpyObj('Router', ['navigate', 'createUrlTree', 'serializeUrl']);
+    mockRouter.createUrlTree.and.callFake((commands: unknown[], navigationExtras?: { queryParams?: Record<string, string> }) => {
+      return { commands, navigationExtras } as unknown as ReturnType<Router['createUrlTree']>;
+    });
+    mockRouter.serializeUrl.and.callFake((urlTree: UrlTree) => {
+      const treeRecord = urlTree as unknown as { commands?: string[]; navigationExtras?: { queryParams?: Record<string, string> } };
+      const qp = treeRecord.navigationExtras?.queryParams;
+      const qStr = qp ? '?' + new URLSearchParams(qp).toString() : '';
+      const path = (treeRecord.commands || []).join('/');
+      return (path.startsWith('/') ? path : '/' + path) + qStr;
+    });
     mockSnackBar = jasmine.createSpyObj('MatSnackBar', ['open']);
     mockSnackBar.open.and.returnValue({
       onAction: () => of(undefined),
@@ -442,6 +456,176 @@ describe('CompareComponent (RFQ)', () => {
     expect(mockRfqApi.getRfq).toHaveBeenCalledWith('rfq-1');
     expect(mockRfqApi.listResponses).toHaveBeenCalledTimes(1);
     expect(mockRfqApi.listResponses).toHaveBeenCalledWith('rfq-1');
+  });
+
+  it('renders unmatched line with pending match badge and supplier original_text', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.use('en');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const cards = compiled.querySelectorAll('.response-card');
+    const resp2Card = cards[1];
+    const productCell = resp2Card.querySelector('td.mat-column-product');
+    expect(productCell).not.toBeNull();
+    expect(productCell?.textContent).toContain('Pending Match');
+    expect(productCell?.textContent).toContain('Unmatched Special Spices 500g');
+    const originalTextSpan = productCell?.querySelector('[dir="auto"]');
+    expect(originalTextSpan).not.toBeNull();
+    expect(originalTextSpan?.textContent?.trim()).toBe('Unmatched Special Spices 500g');
+  });
+
+  it('renders total row per supplier card with formatted total in figures style', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const totalRows = compiled.querySelectorAll('tr.total-row');
+    expect(totalRows.length).toBe(2);
+
+    const totalCells = compiled.querySelectorAll('td.total-value-cell');
+    expect(totalCells.length).toBe(2);
+    // resp-1: 10 * 5.00 = USD 50
+    expect(totalCells[0].textContent).toContain('USD 50');
+    expect(totalCells[0].classList.contains('pp-figures')).toBeTrue();
+  });
+
+  it('renders Lowest total chip when at least two non-refused responses are fully matched and share a currency', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.use('en');
+
+    const resp3 = {
+      id: 'resp-3',
+      rfq_id: 'rfq-1',
+      supplier_id: 'supp-3',
+      quotation_id: 'quote-3',
+      quotation_status: 'reviewed' as const,
+      submitted_at: '2026-09-25T12:00:00Z',
+      lines: [
+        {
+          workspace_product_id: 'prod-1',
+          original_text: 'Supplier Product 1 text',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '3.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+      ],
+    };
+    // resp-1 total is 50 USD, resp-3 total is 30 USD, resp-2 has unmatched lines
+    component.responses.set([dummyResponses.items[0], dummyResponses.items[1], resp3]);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const chips = compiled.querySelectorAll('.pp-chip-best');
+    expect(chips.length).toBe(1);
+    expect(chips[0].textContent?.trim()).toBe('Lowest total');
+
+    // resp-3 card has the chip, resp-1 does not
+    const cards = compiled.querySelectorAll('.response-card');
+    expect(cards[0].querySelector('.pp-chip-best')).toBeNull();
+    expect(cards[2].querySelector('.pp-chip-best')).not.toBeNull();
+  });
+
+  it('does NOT render Lowest total chip on refused response or when currencies are mixed', () => {
+    const respRefused = {
+      ...dummyResponses.items[0],
+      id: 'resp-refused',
+      quotation_status: 'refused' as const,
+      lines: [
+        {
+          workspace_product_id: 'prod-1',
+          original_text: 'Cheap but refused',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '1.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+      ],
+    };
+    const respMatched = {
+      ...dummyResponses.items[0],
+      id: 'resp-matched',
+      quotation_status: 'reviewed' as const,
+    };
+    // Only one non-refused fully matched response
+    component.responses.set([respRefused, respMatched]);
+    fixture.detectChanges();
+
+    let compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.pp-chip-best')).toBeNull();
+
+    // Mixed currencies: USD and SAR
+    const respSar = {
+      ...dummyResponses.items[0],
+      id: 'resp-sar',
+      quotation_status: 'reviewed' as const,
+      lines: [
+        {
+          workspace_product_id: 'prod-1',
+          original_text: 'SAR Product',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '10.00',
+          quoted_unit_price_currency: 'SAR',
+          pending_match: false,
+        },
+      ],
+    };
+    component.responses.set([respMatched, respSar]);
+    fixture.detectChanges();
+    compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.pp-chip-best')).toBeNull();
+  });
+
+  it('renders Match N lines link with href carrying quotation_id when lines are unmatched', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.use('en');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const cards = compiled.querySelectorAll('.response-card');
+    const resp2Card = cards[1];
+    const matchLink = resp2Card.querySelector<HTMLAnchorElement>('a.match-lines-link');
+    expect(matchLink).not.toBeNull();
+    expect(matchLink?.textContent?.trim()).toBe('Match 1 line');
+    expect(matchLink?.getAttribute('href')).toContain('quotation_id=quote-2');
+  });
+
+  it('shows short reason under prepare button when no delivery branch is chosen', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.use('en');
+
+    component.selectedBranchId.set('');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const cards = compiled.querySelectorAll('.response-card');
+    // resp-1 is eligible but branch is empty -> shows short reason
+    const resp1Actions = cards[0].querySelector('.prepare-actions');
+    expect(resp1Actions?.textContent).toContain('Choose a delivery branch first');
+
+    // resp-2 has unmatched lines -> disabled, but no branch reason under button (the link above is the reason)
+    const resp2Actions = cards[1].querySelector('.prepare-actions');
+    expect(resp2Actions?.textContent).not.toContain('Choose a delivery branch first');
+  });
+
+  it('renders non-fired guardrail reason in muted style and fired reason in red', () => {
+    const respWithEvaluations = {
+      ...dummyResponses.items[0],
+      guardrail_evaluations: [
+        { guardrail_id: 'g-1', fired: false, reason: 'price_variance_exceeded' },
+        { guardrail_id: 'g-1', fired: true, reason: 'min_responses_unmet' },
+      ],
+    };
+    component.responses.set([respWithEvaluations]);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const reasons = compiled.querySelectorAll('.outcome-reason');
+    expect(reasons.length).toBe(2);
+    expect(reasons[0].classList.contains('fired')).toBeFalse();
+    expect(reasons[1].classList.contains('fired')).toBeTrue();
   });
 });
 

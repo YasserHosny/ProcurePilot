@@ -1,10 +1,11 @@
-import { Component, OnInit, OnChanges, inject, signal, input, model, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnChanges, inject, signal, computed, input, model, ChangeDetectionStrategy } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
+import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatTableModule } from '@angular/material/table';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -38,6 +39,7 @@ const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
     RouterModule,
     MatCardModule,
     MatButtonModule,
+    MatChipsModule,
     MatDialogModule,
     MatTableModule,
     MatSnackBarModule,
@@ -82,6 +84,62 @@ export class CompareComponent implements OnInit, OnChanges {
   readonly currentMembershipId = signal<string | null>(null);
 
   formatQuantity(value: string | number): string { return this.formatService.formatExactQuantity(value); }
+
+  responseTotal(response: RfqResponseComparison): number {
+    return response.lines.reduce((sum, line) => {
+      const qty = Number(line.quoted_quantity) || 0;
+      const price = Number(line.quoted_unit_price_amount) || 0;
+      return sum + (qty * price);
+    }, 0);
+  }
+
+  responseCurrency(response: RfqResponseComparison): string {
+    return response.lines[0]?.quoted_unit_price_currency || '';
+  }
+
+  readonly lowestTotalResponseIds = computed<Set<string>>(() => {
+    const all = this.responses();
+    const eligible = all.filter(
+      (r) => r.quotation_status !== 'refused' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
+    );
+    if (eligible.length < 2) {
+      return new Set<string>();
+    }
+    const currencies = new Set(eligible.map((r) => this.responseCurrency(r)));
+    if (currencies.size !== 1) {
+      return new Set<string>();
+    }
+    const totals = eligible.map((r) => ({ id: r.id, total: this.responseTotal(r) }));
+    const minTotal = Math.min(...totals.map((t) => t.total));
+    const ids = new Set<string>();
+    for (const t of totals) {
+      if (t.total === minTotal) {
+        ids.add(t.id);
+      }
+    }
+    return ids;
+  });
+
+  hasLowestTotal(response: RfqResponseComparison): boolean {
+    return this.lowestTotalResponseIds().has(response.id);
+  }
+
+  unmatchedCount(response: RfqResponseComparison): number {
+    return response.lines.filter((l) => l.pending_match).length;
+  }
+
+  matchLinesLabel(count: number): string {
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    if (count === 1) {
+      return this.translate.instant('rfq.compare.matchLine');
+    }
+    if (count === 2 && locale.startsWith('ar')) {
+      return this.translate.instant('rfq.compare.matchLinesTwo');
+    }
+    return this.translate.instant('rfq.compare.matchLines', {
+      count: this.formatService.formatNumber(count),
+    });
+  }
 
   readonly displayedColumns = ['product', 'quantity', 'unitPrice', 'totalValue'];
 

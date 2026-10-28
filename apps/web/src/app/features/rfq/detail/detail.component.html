@@ -43,6 +43,28 @@
       <!-- Tab 0: Details -->
       <mat-tab [label]="'rfq.detail.tabDetails' | translate">
         <div class="tab-content">
+          @if (detail.rfq.status === 'responded') {
+            <mat-card class="draft-notice-card responded-notice-card" data-testid="rfq-detail-responded-notice">
+              <div class="draft-notice-content">
+                <div class="draft-notice-text">
+                  <h2>{{ responsesReceivedTitle() }}</h2>
+                  <p>{{ 'rfq.detail.responsesReceivedDescription' | translate }}</p>
+                </div>
+                <div class="draft-notice-actions">
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    (click)="onCompareResponses()"
+                    data-testid="rfq-detail-compare-responses-button"
+                  >
+                    {{ 'rfq.detail.compareResponses' | translate }}
+                  </button>
+                </div>
+              </div>
+            </mat-card>
+          }
+
           @if (detail.rfq.status === 'draft') {
             <mat-card class="draft-notice-card" data-testid="rfq-detail-draft-notice">
               <div class="draft-notice-content">

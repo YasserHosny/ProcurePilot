@@ -180,7 +180,7 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
 
     // Approve the request
     await row.locator('.approve-btn').click();
-    const dialog = page.locator('mat-dialog-container', { hasText: 'Approve Purchase Request' });
+    const dialog = page.locator('mat-dialog-container', { hasText: 'Approve' });
     await expect(dialog).toBeVisible();
     await dialog.locator('textarea').fill('Approved in PP7 E2E flow');
     await dialog.locator('.confirm-btn').click();

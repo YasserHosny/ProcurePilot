@@ -2233,7 +2233,8 @@
       "reject": "Reject"
     },
     "decisionDialog": {
-      "approveTitle": "Approve Purchase Request",
+      "approveTitle": "Approve {{amount}} for {{branchName}}?",
+      "approveTitleDefault": "Approve Purchase Request",
       "rejectTitle": "Reject Purchase Request",
       "commentLabel": "Comment (optional)",
       "commentPlaceholder": "Add a comment for the requester...",
@@ -3855,8 +3856,14 @@
       "quantity": "Quantity",
       "unitPrice": "Unit Price",
       "totalValue": "Total Value",
+      "total": "Total",
+      "lowestTotal": "Lowest total",
       "pendingMatch": "Pending Match",
       "pendingMatchExplanation": "Not yet linked to a catalogue product.",
+      "matchLine": "Match 1 line",
+      "matchLines": "Match {{count}} lines",
+      "matchLinesTwo": "Match 2 lines",
+      "chooseBranchFirst": "Choose a delivery branch first",
       "prepareRequest": "Prepare Request",
       "cannotPreparePending": "Cannot prepare request while lines are unmatched",
       "prepareSuccess": "Draft purchase request prepared successfully.",
@@ -3930,6 +3937,17 @@
     "detail": {
       "title": "RFQ Details",
       "subtitle": "What was asked, who it went to and what came back.",
+      "responsesReceivedTitle": "{{count}} responses received",
+      "responsesReceived": {
+        "zero": "0 responses received",
+        "one": "1 response received",
+        "two": "2 responses received",
+        "few": "{{count}} responses received",
+        "many": "{{count}} responses received",
+        "other": "{{count}} responses received"
+      },
+      "responsesReceivedDescription": "Supplier responses are ready for comparison. Review lines, compare totals, and prepare a purchase request.",
+      "compareResponses": "Compare responses",
       "breadcrumbRfqSent": "RFQ · Sent {{date}} · {{time}}",
       "breadcrumbRfqDraft": "RFQ · Draft",
       "tabDetails": "Details",
