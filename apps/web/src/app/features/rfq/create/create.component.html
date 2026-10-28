@@ -23,6 +23,12 @@
     </mat-card>
   } @else {
     <mat-card class="form-card">
+      @if (isDuplicated()) {
+        <div class="duplicate-notice" role="status" data-testid="duplicate-notice">
+          <mat-icon aria-hidden="true">info</mat-icon>
+          <span>{{ 'rfq.create.duplicateNotice' | translate }}</span>
+        </div>
+      }
       @if (errorMessage(); as error) {
         <mat-card class="state error" role="alert">
           <mat-card-content>{{ error }}</mat-card-content>
@@ -37,17 +43,40 @@
             <div [formGroupName]="i" class="line-row">
               <mat-form-field appearance="outline" class="item-product-field">
                 <mat-label>{{ 'rfq.create.productIdLabel' | translate }}</mat-label>
-                <mat-select formControlName="workspace_product_id" required [placeholder]="'rfq.create.productIdPlaceholder' | translate">
-                  @for (prod of products(); track prod.id) {
+                @let filtered = getFilteredProducts(line.get('workspace_product_id')?.value);
+                <input
+                  matInput
+                  dir="auto"
+                  type="text"
+                  formControlName="workspace_product_id"
+                  [matAutocomplete]="auto"
+                  required
+                  [placeholder]="'rfq.create.productIdPlaceholder' | translate"
+                  [attr.aria-label]="'rfq.create.productIdLabel' | translate"
+                />
+                <mat-autocomplete
+                  #auto="matAutocomplete"
+                  [displayWith]="displayProduct"
+                  (optionSelected)="onProductSelected(i)"
+                >
+                  @for (prod of filtered; track prod.id) {
                     <mat-option [value]="prod.id">
-                      {{ prod.tenant_name }} @if (prod.variant) { ({{ prod.variant }}) }
+                      {{ productLabel(prod) }}
                     </mat-option>
                   }
-                </mat-select>
+                  @if (filtered.length === 0) {
+                    <mat-option disabled class="no-products-option">
+                      {{ 'rfq.create.noProductsMatch' | translate }}
+                    </mat-option>
+                  }
+                </mat-autocomplete>
+                @if (line.get('workspace_product_id')?.hasError('required') || line.get('workspace_product_id')?.hasError('invalidProduct')) {
+                  <mat-error>{{ 'rfq.create.productRequired' | translate }}</mat-error>
+                }
               </mat-form-field>
               <mat-form-field appearance="outline" class="item-qty-field">
                 <mat-label>{{ 'rfq.create.quantityLabel' | translate }}</mat-label>
-                <input matInput type="number" step="0.01" min="0.01" formControlName="quantity" required [placeholder]="'rfq.create.quantityPlaceholder' | translate" />
+                <input #quantityInput matInput type="number" step="0.01" min="0.01" formControlName="quantity" required [placeholder]="'rfq.create.quantityPlaceholder' | translate" />
               </mat-form-field>
               <button mat-icon-button type="button" color="warn" (click)="removeLine(i)" [disabled]="linesFormArray.length === 1" [attr.aria-label]="'rfq.create.removeLineButton' | translate">
                 <mat-icon aria-hidden="true">delete</mat-icon>
@@ -65,8 +94,18 @@
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>{{ 'rfq.create.suppliersLabel' | translate }}</mat-label>
             <mat-select multiple formControlName="supplierIds" required [placeholder]="'rfq.create.suppliersPlaceholder' | translate">
+              <mat-select-trigger>
+                {{ selectedSupplierNames() }}
+              </mat-select-trigger>
               @for (supp of suppliers(); track supp.id) {
-                <mat-option [value]="supp.id">{{ supp.name }}</mat-option>
+                <mat-option [value]="supp.id">
+                  <div class="supplier-option">
+                    <span class="supplier-name">{{ supp.name }}</span>
+                    @if (supp.contact_email) {
+                      <span class="supplier-email" dir="ltr">{{ supp.contact_email }}</span>
+                    }
+                  </div>
+                </mat-option>
               }
             </mat-select>
           </mat-form-field>
@@ -84,7 +123,7 @@
         <div class="form-section">
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>{{ 'rfq.create.tenantTermsLabel' | translate }}</mat-label>
-            <textarea matInput formControlName="tenantTerms" rows="4" maxlength="4000" [placeholder]="'rfq.create.tenantTermsPlaceholder' | translate"></textarea>
+            <textarea matInput dir="auto" formControlName="tenantTerms" rows="4" maxlength="4000" [placeholder]="'rfq.create.tenantTermsPlaceholder' | translate"></textarea>
             <mat-hint align="end">{{ form.controls.tenantTerms.value?.length ?? 0 }} / 4000</mat-hint>
             @if (form.controls.tenantTerms.hasError('maxlength')) {
               <mat-error>{{ 'rfq.create.tenantTermsTooLong' | translate }}</mat-error>

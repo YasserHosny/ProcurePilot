@@ -8,11 +8,11 @@ L.run(async () => {
   const { page } = await L.connect();
   await page.goto(L.BASE + '/rfq/history'); await page.waitForLoadState('networkidle').catch(() => {}); await L.sleep(1500);
   await L.click(page, page.getByRole('link', { name: L.rx('rfq.history.createRfq') }).or(page.getByRole('button', { name: L.rx('rfq.history.createRfq') })).first(), 1500);
-  const selects = () => page.locator('mat-select[formcontrolname="workspace_product_id"]');
+  const prods = () => page.locator('input[formcontrolname="workspace_product_id"]');
   const qtys = () => page.locator('input[formcontrolname="quantity"]');
   for (let i = 0; i < W.lines.length; i++) {
     if (i > 0) await L.click(page, page.getByRole('button', { name: L.rx('rfq.create.addLineButton') }), 600);
-    await L.click(page, selects().nth(i).locator('.mat-mdc-select-trigger'), 700);
+    await L.type(page, prods().nth(i), W.lines[i][0], 40);
     await L.click(page, page.getByRole('option', { name: W.lines[i][0], exact: true }), 500);
     await L.type(page, qtys().nth(i), W.lines[i][1], 40);
   }

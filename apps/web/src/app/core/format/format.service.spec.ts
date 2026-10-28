@@ -245,5 +245,34 @@ describe('FormatService (T069)', () => {
     it('should return placeholder for null date', () => {
       expect(service.formatDate(null)).toBe('—');
     });
+
+    it('formats date-only strings as local calendar dates, not UTC instants (O2b)', () => {
+      let capturedDate: Date | undefined;
+      const originalFormatGetter = Object.getOwnPropertyDescriptor(
+        Intl.DateTimeFormat.prototype,
+        'format',
+      )?.get;
+
+      spyOnProperty(Intl.DateTimeFormat.prototype, 'format', 'get').and.callFake(function (
+        this: Intl.DateTimeFormat,
+      ) {
+        const boundFormat = originalFormatGetter?.call(this);
+        return (d: Date | number | undefined) => {
+          if (d instanceof Date) {
+            capturedDate = d;
+          }
+          return boundFormat?.call(this, d) ?? '';
+        };
+      });
+
+      service.formatDate('2026-11-04');
+      expect(capturedDate).toBeDefined();
+      expect(capturedDate!.getTime()).toBe(new Date(2026, 10, 4).getTime());
+
+      capturedDate = undefined;
+      service.formatDate('2026-11-04T10:15:00Z');
+      expect(capturedDate).toBeDefined();
+      expect(capturedDate!.getTime()).toBe(new Date('2026-11-04T10:15:00Z').getTime());
+    });
   });
 });

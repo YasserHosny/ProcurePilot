@@ -13,12 +13,12 @@ L.run(async () => {
   try {
     await L.click(page, page.getByRole('link', { name: L.rx('rfq.history.createRfq') }).or(page.getByRole('button', { name: L.rx('rfq.history.createRfq') })).first(), 1500);
     await L.hideNav(page); await L.ensureCursor(page);
-    const selects = () => page.locator('mat-select[formcontrolname="workspace_product_id"]');
+    const prods = () => page.locator('input[formcontrolname="workspace_product_id"]');
     const qtys = () => page.locator('input[formcontrolname="quantity"]');
     const lines = W.lines;
     for (let i = 0; i < lines.length; i++) {
       if (i > 0) await L.click(page, page.getByRole('button', { name: L.rx('rfq.create.addLineButton') }), 600);
-      await L.click(page, selects().nth(i).locator('.mat-mdc-select-trigger'), 700);
+      await L.type(page, prods().nth(i), lines[i][0], 60);
       await L.click(page, page.getByRole('option', { name: lines[i][0], exact: true }), 500);
       await L.type(page, qtys().nth(i), lines[i][1], 120);
     }

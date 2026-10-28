@@ -631,6 +631,7 @@
       "notSet": "Not configured",
       "columns": {
         "name": "Supplier Name",
+        "contactEmail": "Contact email",
         "paymentTerms": "Payment Terms",
         "leadTime": "Lead Time",
         "minOrderValue": "Min. Order Value",
@@ -3787,6 +3788,9 @@
       "itemsLabel": "Items",
       "productIdLabel": "Product",
       "productIdPlaceholder": "Search products...",
+      "productRequired": "Select a product from the catalogue.",
+      "noProductsMatch": "No products match",
+      "duplicateNotice": "Duplicated from an earlier RFQ — check the dates and suppliers before saving",
       "quantityLabel": "Quantity",
       "quantityPlaceholder": "Enter quantity",
       "addLineButton": "Add Line",

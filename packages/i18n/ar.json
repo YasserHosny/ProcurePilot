@@ -631,6 +631,7 @@
       "notSet": "غير محدد",
       "columns": {
         "name": "اسم المورد",
+        "contactEmail": "البريد الإلكتروني للتواصل",
         "paymentTerms": "شروط الدفع",
         "leadTime": "مدة التوريد",
         "minOrderValue": "الحد الأدنى للطلب",
@@ -3787,6 +3788,9 @@
       "itemsLabel": "العناصر",
       "productIdLabel": "المنتج",
       "productIdPlaceholder": "ابحث عن المنتجات...",
+      "productRequired": "اختر منتجًا من الكتالوج.",
+      "noProductsMatch": "لا توجد منتجات مطابقة",
+      "duplicateNotice": "تم النسخ من طلب عرض أسعار سابق — تحقق من التواريخ والموردين قبل الحفظ",
       "quantityLabel": "الكمية",
       "quantityPlaceholder": "أدخل الكمية",
       "addLineButton": "إضافة سطر",

@@ -23,6 +23,7 @@ describe("SupplierListComponent (T024)", () => {
     {
       id: "s1",
       name: "Acme Supplies",
+      contact_email: "orders@acme.test",
       payment_terms: "Net 30",
       lead_time_days: 2,
       minimum_order_value: { amount: "100.00", currency: "GBP" },
@@ -93,5 +94,25 @@ describe("SupplierListComponent (T024)", () => {
     expect(apiService.archiveSupplier).toHaveBeenCalledWith("s1");
     expect(apiService.suppliers).toHaveBeenCalledTimes(2);
     expect(snackBarSpy.open).toHaveBeenCalled();
+  });
+
+  it("displays supplier contact email in a dedicated column (R4)", () => {
+    const emailCell = fixture.nativeElement.querySelector("td.mat-column-contactEmail");
+    expect(emailCell).toBeTruthy();
+    expect(emailCell.textContent).toContain("orders@acme.test");
+  });
+
+  it("displays placeholder dash when supplier contact email is empty (R4)", () => {
+    component.suppliers.set([
+      {
+        ...mockSuppliers[0],
+        id: "s2",
+        contact_email: null,
+      },
+    ]);
+    fixture.detectChanges();
+    const cells = fixture.nativeElement.querySelectorAll(".mat-column-contactEmail");
+    const cellText = Array.from<Element>(cells).map((c) => c.textContent?.trim() ?? "");
+    expect(cellText.some((text) => text.includes("—"))).toBeTrue();
   });
 });

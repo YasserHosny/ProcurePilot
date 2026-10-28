@@ -62,7 +62,7 @@
 
 .line-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
 
   .item-product-field {
@@ -72,6 +72,53 @@
   .item-qty-field {
     inline-size: 120px;
   }
+
+  button {
+    margin-block-start: 8px;
+  }
+}
+
+.duplicate-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-inline: 16px;
+  padding-block: 12px;
+  margin-block-end: 20px;
+  background-color: var(--pp-primary-container);
+  border: 1px solid var(--pp-primary);
+  border-radius: 8px;
+  color: var(--pp-primary);
+  font-size: 14px;
+
+  mat-icon {
+    font-size: 20px;
+    inline-size: 20px;
+    block-size: 20px;
+    color: var(--pp-primary);
+    flex-shrink: 0;
+  }
+}
+
+.supplier-option {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+
+  .supplier-name {
+    font-size: 14px;
+    color: var(--pp-text-strong);
+  }
+
+  .supplier-email {
+    font-size: 12px;
+    color: var(--pp-text-muted);
+  }
+}
+
+.no-products-option {
+  font-style: italic;
+  color: var(--pp-text-muted);
 }
 
 .form-section {
@@ -98,4 +145,9 @@
 
 ::ng-deep .mat-mdc-form-field-bottom-align {
   display: none;
+}
+
+::ng-deep .mat-form-field-invalid .mat-mdc-form-field-bottom-align,
+::ng-deep .mat-mdc-form-field-has-error .mat-mdc-form-field-bottom-align {
+  display: flex !important;
 }
