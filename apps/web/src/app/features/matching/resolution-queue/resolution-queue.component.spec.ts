@@ -15,6 +15,14 @@ describe('ResolutionQueueComponent', () => {
   let component: ResolutionQueueComponent;
   let fixture: ComponentFixture<ResolutionQueueComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  let mockSession: {
+    hasRole: jasmine.Spy;
+    role: ReturnType<typeof signal<Role | null>>;
+    currentMember: ReturnType<typeof signal<unknown>>;
+    isAuthenticated: ReturnType<typeof signal<boolean>>;
+    tenant: ReturnType<typeof signal<unknown>>;
+    activeLocale: ReturnType<typeof signal<string>>;
+  };
 
   const mockTasks: MatchTask[] = [
     {
@@ -128,6 +136,8 @@ describe('ResolutionQueueComponent', () => {
   beforeEach(async () => {
     apiService = jasmine.createSpyObj('ApiService', [
       'getMatchTasks',
+      'getMatchTaskForLine',
+      'correctMatch',
       'getExactMatchCount',
       'confirmExactMatches',
       'listCatalogueRefreshReviews',
@@ -139,7 +149,7 @@ describe('ResolutionQueueComponent', () => {
     apiService.getExactMatchCount.and.returnValue(of({ count: 3 }));
     apiService.confirmExactMatches.and.returnValue(of({ confirmed: 3, skipped: 0 }));
 
-    const mockSession = {
+    mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
       role: signal<Role | null>('buyer'),
       currentMember: signal(null),
@@ -493,5 +503,154 @@ describe('ResolutionQueueComponent', () => {
     expect(component.isLoading()).toBeFalse();
     expect(component.errorMessage()).toBe('Failed to fetch tasks');
     expect(component.errorTraceId()).toBe('tr-err-1');
+  });
+
+  describe('RFQ-aware matching in queue (spec 023 US1)', () => {
+    it('shows "Correct match" button for auto-accepted line when isWriter, and hides it for non-writer', () => {
+      const autoTask: MatchTask = {
+        ...mockTasks[0],
+        id: 'task-auto-1',
+        status: 'auto_accepted',
+      };
+      component.tasks.set([autoTask]);
+      fixture.detectChanges();
+
+      let correctBtn = fixture.nativeElement.querySelector('.correct-match-btn') as HTMLButtonElement | null;
+      expect(correctBtn).toBeTruthy();
+      expect(correctBtn?.textContent).toContain('Correct match');
+
+      mockSession.hasRole.and.returnValue(false);
+      fixture.detectChanges();
+
+      correctBtn = fixture.nativeElement.querySelector('.correct-match-btn') as HTMLButtonElement | null;
+      expect(correctBtn).toBeNull();
+    });
+
+    it('displays "From your RFQ line {n}" when task has RFQ matched candidate', () => {
+      const rfqTask: MatchTask = {
+        ...mockTasks[0],
+        id: 'task-auto-rfq',
+        status: 'auto_accepted',
+        candidates: [
+          {
+            ...mockTasks[0].candidates[0],
+            reasons: {
+              ...mockTasks[0].candidates[0].reasons,
+              rfq: {
+                rfq_id: 'rfq-1',
+                rfq_line_id: 'rfq-line-1',
+                position: 2,
+                pack_check: 'equal',
+                matched: true,
+                fitting_rfq_line_ids: ['rfq-line-1'],
+              },
+            },
+          },
+        ],
+      };
+      component.tasks.set([rfqTask]);
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('From your RFQ line 2');
+    });
+
+    it('opens dialog and submits correction when Correct match is clicked', () => {
+      const autoTask: MatchTask = {
+        ...mockTasks[0],
+        id: 'task-auto-1',
+        status: 'auto_accepted',
+        decision: {
+          id: 'dec-1',
+          quotation_line_id: 'line-101',
+          matched_product: mockTasks[0].candidates[0].candidate_product,
+          outcome: 'same_product',
+          selected_match_candidate_id: 'cand-1',
+          decided_at: '2026-08-21T01:00:00Z',
+          decided_by: 'buyer@example.com',
+          is_automatic: true,
+          confidence: '0.8500',
+        },
+      };
+      apiService.getMatchTaskForLine.and.returnValue(of(autoTask));
+      apiService.correctMatch.and.returnValue(
+        of({
+          decision: { ...autoTask.decision!, id: 'dec-2' },
+          superseded_decision_id: 'dec-1',
+          lines_matched_through_old_wording: [],
+        }),
+      );
+
+      component.tasks.set([autoTask]);
+      fixture.detectChanges();
+
+      const dialogSpy = spyOn((component as unknown as { dialog: { open: jasmine.Spy } }).dialog, 'open').and.returnValue({
+        afterClosed: () => of({
+          expected_current_decision_id: 'dec-1',
+          outcome: 'same_product',
+          selected_match_candidate_id: 'cand-2',
+          learn_alias: true,
+        }),
+      } as never);
+
+      component.openCorrectMatchDialog(autoTask);
+
+      expect(apiService.getMatchTaskForLine).toHaveBeenCalledWith('line-101');
+      expect(dialogSpy).toHaveBeenCalled();
+      expect(apiService.correctMatch).toHaveBeenCalledWith(
+        'line-101',
+        jasmine.objectContaining({
+          expected_current_decision_id: 'dec-1',
+          selected_match_candidate_id: 'cand-2',
+        }),
+        jasmine.stringMatching(/^[0-9a-f-]{36}$/),
+      );
+    });
+
+    it('handles 409 conflict when correcting match in queue', () => {
+      const autoTask: MatchTask = {
+        ...mockTasks[0],
+        id: 'task-auto-1',
+        status: 'auto_accepted',
+        decision: {
+          id: 'dec-1',
+          quotation_line_id: 'line-101',
+          matched_product: mockTasks[0].candidates[0].candidate_product,
+          outcome: 'same_product',
+          selected_match_candidate_id: 'cand-1',
+          decided_at: '2026-08-21T01:00:00Z',
+          decided_by: 'buyer@example.com',
+          is_automatic: true,
+          confidence: '0.8500',
+        },
+      };
+      const errorResponse = new HttpErrorResponse({
+        status: 409,
+        error: {
+          code: 'conflict',
+          message: 'Line is on a live purchase request',
+          details: {
+            reason: 'line_on_purchase_request',
+            purchase_request_id: '12345678-abcd-ef01-2345-6789abcdef01',
+          },
+        },
+      });
+
+      apiService.getMatchTaskForLine.and.returnValue(of(autoTask));
+      apiService.correctMatch.and.returnValue(throwError(() => errorResponse));
+
+      spyOn((component as unknown as { dialog: { open: jasmine.Spy } }).dialog, 'open').and.returnValue({
+        afterClosed: () => of({
+          expected_current_decision_id: 'dec-1',
+          outcome: 'same_product',
+          selected_match_candidate_id: 'cand-2',
+          learn_alias: true,
+        }),
+      } as never);
+
+      component.openCorrectMatchDialog(autoTask);
+
+      expect(component.errorMessage()).toContain('12345678');
+    });
   });
 });

@@ -293,12 +293,21 @@
                       } @else {
                         <strong>{{ 'matching.queue.noCandidateEvidence' | translate }}</strong>
                       }
+                      @if (rfqPositionForTask(task); as rfqPos) {
+                        <span class="reason-chip rfq-chip">{{ 'matching.queue.fromRfqLine' | translate: { position: rfqPos } }}</span>
+                      }
                     </div>
                     <div class="line-action">
                       @if (task.status === 'auto_accepted') {
                         <span class="status-badge status-auto_accepted" [matTooltip]="'matching.queue.autoAcceptedBanner' | translate">{{ 'matching.queue.badgeAutoAccepted' | translate }}</span>
                       } @else {
                         <span class="status-badge status-{{ task.status }}">{{ 'matching.queue.status.' + task.status | translate }}</span>
+                      }
+                      @if (isWriter() && (task.status === 'auto_accepted' || task.status === 'resolved')) {
+                        <button mat-stroked-button type="button" class="action-btn correct-match-btn" (click)="openCorrectMatchDialog(task)">
+                          <mat-icon aria-hidden="true">edit</mat-icon>
+                          <span>{{ 'matching.queue.actions.correctMatch' | translate }}</span>
+                        </button>
                       }
                       <a mat-stroked-button [routerLink]="['/matching', task.quotation_line.id]" [queryParams]="detailQueryParams(group.quotation.id)" class="action-btn">
                         <mat-icon aria-hidden="true">{{ task.status !== 'auto_accepted' && isWriter() && task.status !== 'resolved' ? 'compare_arrows' : 'visibility' }}</mat-icon>

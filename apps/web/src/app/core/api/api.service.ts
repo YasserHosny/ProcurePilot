@@ -47,6 +47,8 @@ import type {
   LimitCheck,
   MatchDecision,
   MatchResolutionRequest,
+  MatchCorrectionRequest,
+  MatchCorrectionResponse,
   MatchQueueItem,
   MatchTask,
   MatchTaskPriority,
@@ -695,6 +697,19 @@ export class ApiService {
     const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
     return this.http.post<MatchDecision>(
       `${this.base}/quotation-lines/${lineId}/match`,
+      body,
+      { headers },
+    );
+  }
+
+  correctMatch(
+    lineId: string,
+    body: MatchCorrectionRequest,
+    idempotencyKey?: string,
+  ): Observable<MatchCorrectionResponse> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<MatchCorrectionResponse>(
+      `${this.base}/quotation-lines/${lineId}/match/corrections`,
       body,
       { headers },
     );

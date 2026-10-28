@@ -9,6 +9,7 @@ import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
 import type {
   LandedCost,
+  MatchCorrectionRequest,
   MatchDecision,
   MatchTask,
   Role,
@@ -20,6 +21,14 @@ describe('MatchResolutionComponent (T039)', () => {
   let component: MatchResolutionComponent;
   let fixture: ComponentFixture<MatchResolutionComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  let mockSession: {
+    hasRole: jasmine.Spy;
+    role: ReturnType<typeof signal<Role | null>>;
+    currentMember: ReturnType<typeof signal<unknown>>;
+    isAuthenticated: ReturnType<typeof signal<boolean>>;
+    tenant: ReturnType<typeof signal<unknown>>;
+    activeLocale: ReturnType<typeof signal<string>>;
+  };
 
   const mockTask: MatchTask = {
     id: 'task-resolve-1',
@@ -163,6 +172,7 @@ describe('MatchResolutionComponent (T039)', () => {
       'baseUnits',
       'suppliers',
       'resolveMatch',
+      'correctMatch',
       'getLandedCost',
     ]);
     apiService.getMatchTasks.and.returnValue(of({ items: [mockTask], next_cursor: null }));
@@ -189,7 +199,7 @@ describe('MatchResolutionComponent (T039)', () => {
     apiService.resolveMatch.and.returnValue(of(mockDecision));
     apiService.getLandedCost.and.returnValue(of(mockLandedCost));
 
-    const mockSession = {
+    mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
       role: signal<Role | null>('buyer'),
       currentMember: signal(null),
@@ -504,5 +514,372 @@ describe('MatchResolutionComponent (T039)', () => {
     const metricValues = fixture.nativeElement.querySelectorAll('.metric-item .metric-value');
     const quantityText = metricValues[0]?.textContent?.trim();
     expect(quantityText).toBe('8');
+  });
+
+  describe('RFQ-aware matching (spec 023 US1)', () => {
+    it('shows "Your RFQ line {n}" when candidate has rfq_line_id and pack_check is not conflict', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          candidates: [
+            {
+              ...mockTask.candidates[0],
+              confidence: '0.6400',
+              reasons: {
+                ...mockTask.candidates[0].reasons,
+                rfq: {
+                  rfq_id: 'rfq-1',
+                  rfq_line_id: 'rfq-line-1',
+                  position: 2,
+                  wording_score: '0.6400',
+                  pack_check: 'equal',
+                  quoted_pack_base_quantity: '10.000000',
+                  rfq_pack_base_quantity: '10.000000',
+                  fitting_rfq_line_ids: ['rfq-line-1'],
+                  not_in_rfq: false,
+                  matched: false,
+                },
+              },
+            },
+          ],
+        }),
+      );
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Your RFQ line 2');
+    });
+
+    it('shows warning "Pack differs from your RFQ ({asked} asked, {quoted} quoted)" when pack_check is conflict', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          candidates: [
+            {
+              ...mockTask.candidates[0],
+              candidate_product: {
+                ...mockTask.candidates[0].candidate_product,
+                base_unit: 'kilogram',
+              },
+              reasons: {
+                ...mockTask.candidates[0].reasons,
+                rfq: {
+                  rfq_id: 'rfq-1',
+                  rfq_line_id: 'rfq-line-1',
+                  position: 1,
+                  pack_check: 'conflict',
+                  quoted_pack_base_quantity: '5.000000',
+                  rfq_pack_base_quantity: '10.000000',
+                  fitting_rfq_line_ids: ['rfq-line-1'],
+                  not_in_rfq: false,
+                  matched: false,
+                },
+              },
+            },
+          ],
+        }),
+      );
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Pack differs from your RFQ (10 kg asked, 5 kg quoted)');
+    });
+
+    it('shows neutral chip "Not in your RFQ" when candidate has not_in_rfq', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          candidates: [
+            {
+              ...mockTask.candidates[0],
+              reasons: {
+                ...mockTask.candidates[0].reasons,
+                rfq: {
+                  rfq_id: 'rfq-1',
+                  not_in_rfq: true,
+                  fitting_rfq_line_ids: [],
+                },
+              },
+            },
+          ],
+        }),
+      );
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Not in your RFQ');
+    });
+
+    it('shows hint "Could be more than one of your RFQ lines" when multiple fitting_rfq_line_ids', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          candidates: [
+            {
+              ...mockTask.candidates[0],
+              reasons: {
+                ...mockTask.candidates[0].reasons,
+                rfq: {
+                  rfq_id: 'rfq-1',
+                  rfq_line_id: 'rfq-line-1',
+                  position: 1,
+                  pack_check: 'equal',
+                  fitting_rfq_line_ids: ['rfq-line-1', 'rfq-line-2'],
+                },
+              },
+            },
+          ],
+        }),
+      );
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Could be more than one of your RFQ lines');
+    });
+
+    it('does not style RFQ candidates with low confidence red class even if score is below 70%', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          candidates: [
+            {
+              ...mockTask.candidates[0],
+              confidence: '0.2800',
+              reasons: {
+                ...mockTask.candidates[0].reasons,
+                rfq: {
+                  rfq_id: 'rfq-1',
+                  rfq_line_id: 'rfq-line-1',
+                  position: 2,
+                  pack_check: 'equal',
+                  fitting_rfq_line_ids: ['rfq-line-1'],
+                },
+              },
+            },
+          ],
+        }),
+      );
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      const badge = fixture.nativeElement.querySelector('.cand-confidence-badge') as HTMLElement;
+      expect(badge).toBeTruthy();
+      expect(badge.classList.contains('low')).toBeFalse();
+    });
+
+    it('shows "From your RFQ line {n}" in the decision banner when decision candidate has reasons.rfq.matched', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          decision: {
+            ...mockDecision,
+            selected_match_candidate_id: 'cand-1',
+          },
+          candidates: [
+            {
+              ...mockTask.candidates[0],
+              reasons: {
+                ...mockTask.candidates[0].reasons,
+                rfq: {
+                  rfq_id: 'rfq-1',
+                  rfq_line_id: 'rfq-line-1',
+                  position: 3,
+                  pack_check: 'equal',
+                  matched: true,
+                  fitting_rfq_line_ids: ['rfq-line-1'],
+                },
+              },
+            },
+          ],
+        }),
+      );
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      const banner = fixture.nativeElement.querySelector('.decision-banner') as HTMLElement;
+      expect(banner).toBeTruthy();
+      expect(banner.textContent).toContain('From your RFQ line 3');
+    });
+
+    it('shows "Correct match" button for buyer/owner on decided line, and hides it for non-writer', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          decision: mockDecision,
+        }),
+      );
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      let correctBtn = fixture.nativeElement.querySelector('.correct-match-btn') as HTMLButtonElement | null;
+      expect(correctBtn).toBeTruthy();
+      expect(correctBtn?.textContent).toContain('Correct match');
+
+      // Non-writer role (e.g. viewer)
+      mockSession.hasRole.and.returnValue(false);
+      fixture.detectChanges();
+
+      correctBtn = fixture.nativeElement.querySelector('.correct-match-btn') as HTMLButtonElement | null;
+      expect(correctBtn).toBeNull();
+    });
+
+    it('submits correction with expected_current_decision_id, selected candidate, learn_alias, and idempotency key', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          decision: mockDecision,
+        }),
+      );
+      apiService.correctMatch.and.returnValue(
+        of({
+          decision: { ...mockDecision, id: 'dec-corrected-1' },
+          superseded_decision_id: mockDecision.id,
+          lines_matched_through_old_wording: [],
+        }),
+      );
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      const request: MatchCorrectionRequest = {
+        expected_current_decision_id: mockDecision.id,
+        outcome: 'same_product',
+        selected_match_candidate_id: 'cand-2',
+        learn_alias: true,
+      };
+
+      component.executeCorrection('line-99', request);
+
+      expect(apiService.correctMatch).toHaveBeenCalledWith(
+        'line-99',
+        request,
+        jasmine.stringMatching(/^[0-9a-f-]{36}$/),
+      );
+      expect(component.decision()?.id).toBe('dec-corrected-1');
+    });
+
+    it('handles success with dependent lines and alias conflict', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          decision: mockDecision,
+        }),
+      );
+      apiService.correctMatch.and.returnValue(
+        of({
+          decision: { ...mockDecision, id: 'dec-corrected-2' },
+          superseded_decision_id: mockDecision.id,
+          lines_matched_through_old_wording: ['dep-line-1', 'dep-line-2'],
+          alias_conflict_product_id: 'prod-conflict-1',
+        }),
+      );
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      component.executeCorrection('line-99', {
+        expected_current_decision_id: mockDecision.id,
+        outcome: 'same_product',
+        selected_match_candidate_id: 'cand-2',
+        learn_alias: true,
+      });
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('2 other lines were matched through the old wording — review them');
+      expect(text).toContain('The wording already points to another product; it was not changed');
+
+      const queueLink = fixture.nativeElement.querySelector('.dependent-lines-banner a') as HTMLAnchorElement | null;
+      expect(queueLink).toBeTruthy();
+    });
+
+    it('handles 409 line_on_purchase_request with short id and link to /requests/{id}', () => {
+      const errorResponse = new HttpErrorResponse({
+        status: 409,
+        error: {
+          code: 'conflict',
+          message: 'Line is on a live purchase request',
+          details: {
+            reason: 'line_on_purchase_request',
+            purchase_request_id: 'abcdef01-2345-6789-abcd-ef0123456789',
+          },
+        },
+      });
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          decision: mockDecision,
+        }),
+      );
+      apiService.correctMatch.and.returnValue(throwError(() => errorResponse));
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      component.executeCorrection('line-99', {
+        expected_current_decision_id: mockDecision.id,
+        outcome: 'same_product',
+        selected_match_candidate_id: 'cand-2',
+        learn_alias: true,
+      });
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('This match prices request abcdef01 — withdraw it first');
+
+      const reqLink = fixture.nativeElement.querySelector('a[href*="/requests/abcdef01-2345-6789-abcd-ef0123456789"]') as HTMLAnchorElement | null;
+      expect(reqLink).toBeTruthy();
+    });
+
+    it('handles 409 decision_changed with reload prompt', () => {
+      const errorResponse = new HttpErrorResponse({
+        status: 409,
+        error: {
+          code: 'conflict',
+          message: 'Decision changed',
+          details: {
+            reason: 'decision_changed',
+          },
+        },
+      });
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          decision: mockDecision,
+        }),
+      );
+      apiService.correctMatch.and.returnValue(throwError(() => errorResponse));
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      component.executeCorrection('line-99', {
+        expected_current_decision_id: mockDecision.id,
+        outcome: 'same_product',
+        selected_match_candidate_id: 'cand-2',
+        learn_alias: true,
+      });
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Someone changed this match — reload');
+    });
   });
 });

@@ -26,10 +26,40 @@
       <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
       <div class="error-content">
         <span class="error-text">{{ errorMessage() }}</span>
+        @if (purchaseRequestConflict(); as pr) {
+          <a class="error-link" [routerLink]="['/requests', pr.id]" [href]="'/requests/' + pr.id">
+            {{ 'matching.resolution.errors.viewRequest' | translate }} ({{ pr.shortId }})
+          </a>
+        }
+        @if (isReloadable()) {
+          <button mat-stroked-button type="button" class="reload-btn" (click)="loadTask(routeId())">
+            <mat-icon aria-hidden="true">refresh</mat-icon>
+            <span>{{ 'matching.resolution.errors.reload' | translate }}</span>
+          </button>
+        }
         @if (errorTraceId()) {
           <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
         }
       </div>
+    </div>
+  }
+
+  <!-- Dependent Lines Notice -->
+  @if (dependentLinesCount() > 0) {
+    <div class="info-banner dependent-lines-banner" role="status">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      <div class="banner-content">
+        <span>{{ 'matching.resolution.correction.dependentLinesNotice' | translate: { count: dependentLinesCount() } }}</span>
+        <a routerLink="/matching" class="queue-link">{{ 'matching.resolution.correction.reviewQueue' | translate }}</a>
+      </div>
+    </div>
+  }
+
+  <!-- Alias Conflict Notice -->
+  @if (aliasConflictNotice()) {
+    <div class="warning-banner alias-conflict-banner" role="status">
+      <mat-icon aria-hidden="true">warning</mat-icon>
+      <span>{{ 'matching.resolution.correction.aliasConflictNotice' | translate }}</span>
     </div>
   }
 
@@ -125,7 +155,18 @@
                 {{ (dec.is_automatic ? 'matching.resolution.decision.automatic' : 'matching.resolution.decision.human') | translate }}
               </span>
             }
+            @if (matchedRfqPosition(); as pos) {
+              <span class="decision-tag rfq-matched-tag">
+                {{ 'matching.resolution.decision.fromRfqLine' | translate: { position: pos } }}
+              </span>
+            }
           </div>
+          @if (isWriter() && decision()) {
+            <button mat-stroked-button color="primary" type="button" class="correct-match-btn" (click)="openCorrectMatchDialog()">
+              <mat-icon aria-hidden="true">edit</mat-icon>
+              <span>{{ 'matching.resolution.actions.correctMatch' | translate }}</span>
+            </button>
+          }
         </div>
         <div class="decision-details-grid">
           <div>

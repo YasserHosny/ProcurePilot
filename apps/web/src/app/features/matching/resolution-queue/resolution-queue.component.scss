@@ -94,12 +94,28 @@
 }
 
 .reason-chip {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+
   &.reason-low_confidence { background: var(--pp-warning-container); color: var(--pp-warning); }
   &.reason-close_candidates { background: var(--pp-primary-container); color: var(--pp-primary); }
   &.reason-fuzzy_match_review { background: var(--pp-warning-container); color: var(--pp-warning); }
   &.reason-no_candidate { background: var(--pp-error-container); color: var(--pp-error); }
   &.reason-alias_conflict { background: var(--pp-error-container); color: var(--pp-error); }
   &.reason-auto_accepted { background: var(--pp-success-container); color: var(--pp-success); }
+  &.rfq-chip {
+    background: var(--pp-info-container);
+    color: var(--pp-info);
+    border: 1px solid var(--pp-info);
+    margin-block-start: 0.25rem;
+  }
+}
+
+.correct-match-btn {
+  color: var(--pp-primary);
 }
 
 .status-badge {

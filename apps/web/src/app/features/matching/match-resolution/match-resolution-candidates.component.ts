@@ -7,6 +7,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe } from '@ngx-translate/core';
 
 import type { MatchCandidate, MatchOutcome } from '../../../core/api/models';
+import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 
 @Component({
@@ -18,8 +19,9 @@ import { UnitLabelPipe } from '../../../core/format/unit-label';
     MatDividerModule,
     MatTooltipModule,
     TranslatePipe,
-    UnitLabelPipe
-],
+    FormatQuantityPipe,
+    UnitLabelPipe,
+  ],
   templateUrl: './match-resolution-candidates.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './match-resolution-candidates.component.scss',
@@ -41,5 +43,9 @@ export class MatchResolutionCandidatesComponent {
 
   shouldShowSemanticSignal(candidate: MatchCandidate): boolean {
     return candidate.embedding_model !== 'stub-hash-v1';
+  }
+
+  isRfqCandidate(candidate: MatchCandidate): boolean {
+    return Boolean(candidate.reasons?.rfq && !candidate.reasons.rfq.not_in_rfq && candidate.reasons.rfq.rfq_line_id);
   }
 }

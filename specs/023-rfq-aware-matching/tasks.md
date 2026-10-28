@@ -119,13 +119,13 @@ tasks are left open.
   - insert the superseding human decision, compute landed cost, enqueue the guardrail evaluation, write the audit, and optionally learn the alias;
   - return the lines with `learned_from_decision_id` = the superseded decision (FR-012).
 - [x] T018 [US1] Add the route `POST /quotation-lines/{line_id}/match/corrections` with owner/buyer role, a required Idempotency-Key, and the request/response models from `contracts/matching-rfq.openapi.yaml`. Changes go in `apps/api/src/procurepilot_api/modules/matching/router.py` and `schemas.py`. T013 green.
-- [ ] T019 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/matching/match-resolution/match-resolution.component.{ts,html,scss,spec.ts}` and `matching-api.ts`, add:
+- [x] T019 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/matching/match-resolution/match-resolution.component.{ts,html,scss,spec.ts}` and `matching-api.ts`, add:
   - "From your RFQ line N" on automatic matches;
   - "Not in your RFQ" and "Pack differs from your RFQ (X asked, Y quoted)" labels;
   - a "Correct match" action that calls the corrections endpoint, maps the 409 reasons to copy ("On request PR-…: withdraw it first"), and lists the lines matched through the old wording.
 
   Add i18n keys in `packages/i18n/{en,ar}.json`. Karma red → green.
-- [ ] T020 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/matching/resolution-queue/resolution-queue.component.{ts,html,spec.ts}`, the auto-accepted filter shows the RFQ label and a Correct link per row.
+- [x] T020 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/matching/resolution-queue/resolution-queue.component.{ts,html,spec.ts}`, the auto-accepted filter shows the RFQ label and a Correct link per row.
 
 **Checkpoint**: US1 works end to end on the throwaway DB, and the round-1 replay passes.
 
