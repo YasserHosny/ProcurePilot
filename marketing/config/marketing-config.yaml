@@ -1,0 +1,78 @@
+# Iron Systems Marketing OS: main configuration.
+# Values marked "verified" come from workspace sources (see research/source-log.md). "unknown" means not found;
+# ask the owner, never fill it in by guessing.
+
+company:
+  name: Iron Systems                     # verified: brand v3.3. Not "Iron System" (v2, superseded) or "Iron-Sys" in copy
+  handle: iron-sys                       # verified: domain and LinkedIn URL
+  website: https://www.iron-sys.com      # verified
+  linkedin: https://www.linkedin.com/company/iron-sys/   # verified
+  tagline: "Powering Businesses with Intelligent Technologies."
+  tagline_ar: "نمكّن الأعمال بتقنيات ذكية."
+  brand_line: "Intelligence, Engineered."   # secondary sign-off only; not used on LinkedIn since v1.2
+  description: "Engineering-first software house: AI solutions, custom software, intelligent automation, system integration."
+  brand_source: <workspace>/Branding/Identity-v3     # source of truth; never <workspace>/Branding/_archive
+  website_repo: <workspace>/Website/iron-system-next
+  owner_approver: Yasser                    # verified: approvals recorded in LinkedIn and video version notes
+  headquarters: unknown
+  target_regions: unknown                   # see research/discrepancies.md D-07
+  contact_inboxes:                          # verified: website lib/site.ts
+    new_inquiries: hello@iron-sys.com
+    product_support: support@iron-sys.com
+
+marketing_model:
+  type: B2B
+  scope: organic                            # website, SEO, LinkedIn, Facebook, Instagram, video
+  paid_advertising: false                   # out of scope until explicitly requested
+  outbound_contact: false                   # no cold email, prospecting or contacting leads
+  goals: [brand-awareness, demand-generation, product-education, thought-leadership]
+
+products:
+  - id: procurepilot
+    name: ProcurePilot
+    status_on_website: pilot                # verified: Website lib/products/registry.ts
+    url: https://procurepilot.iron-sys.com/
+    onboarding_status: positioning-approved # not-started | discovery-in-progress | discovery-report-ready | positioning-approved | active
+    folder: ProcurePilot                    # product hub: knowledge/, planning/, campaigns/, demo-video/, design-system/ (product docs: ../docs/)
+    knowledge_dir: ProcurePilot/knowledge   # created by product-discovery (npm run new:product -- procurepilot ProcurePilot)
+    existing_assets: ProcurePilot/          # demo videos and design system, kept as they are
+    sources: [procurepilot-repo, live-pages]   # config/sources.yaml; run npm run sources:sync before product work
+    sub_brand: true                         # own logo and palette (Navy/Teal); see ProcurePilot/design-system
+
+channels:
+  enabled: [website, seo, linkedin, x, facebook, instagram, video]   # definitions in config/channels.yaml; x (Twitter) added 2026-10-28 by the owner
+  disabled: [paid-social, search-ads, display, email-marketing, sms]
+
+languages:
+  primary: en
+  supported: [en, ar]
+  arabic:
+    website: modern-standard-arabic         # verified: website README
+    social_and_video: decide-per-campaign   # precedents: Egyptian (demo v2.2), Gulf (demo v2.3)
+    rules: [readex-pro-type, latin-script-for-brand-and-product-names, western-digits, written-not-translated]
+
+evidence:
+  labels: [verified, interpretation, hypothesis, unknown]
+  public_claims_require: [verified-source, approved-claim-in-proof-points]
+  forbidden_without_permissioned_evidence: [testimonials, customer-logos, case-studies, roi-figures, savings-figures, endorsements, market-statistics]
+  synthetic_data_must_be_labelled: true
+  source_log: research/source-log.md
+  discrepancy_log: research/discrepancies.md
+
+approvals:
+  approver: Yasser
+  record_in: approvals.md                   # in each campaign folder
+  required_before: [publish, schedule, send, live-website-change, positioning-final, claims-new, brand-exception, new-integration, account-creation]
+  not_required_for: [research, analysis, planning, drafting, local-validation]
+
+reporting:
+  date_format: YYYY-MM-DD
+  timezone: unknown                         # set when known
+  period: monthly
+  template: analytics/reporting-template.md
+  rule: report only measured data with its source and date range; label estimates and hypotheses
+
+conventions:
+  campaign_id: "YYYY-MM-<product-or-company>-<slug>"   # e.g. 2026-11-procurepilot-pilot-launch
+  asset_versions: "vMAJOR.MINOR-<name>_<YYYY-MM-DD>"   # existing convention (LinkedIn/, ProcurePilot/demo-video/); never overwrite a version
+  asset_states: [drafts, in-review, approved]           # subfolders of campaigns/<id>/assets/

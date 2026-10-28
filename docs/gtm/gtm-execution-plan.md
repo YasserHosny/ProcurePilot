@@ -118,6 +118,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-45 | PPS-75 | P-46 | PPS-76 | | |
 | P-49 | PPS-79 | | | | |
 | P-52 | PPS-82 | P-53 | PPS-83 | P-54 | PPS-84 |
+| G-14 | PPS-111 | | | | |
 | P-57 | PPS-87 | P-58 | PPS-88 | P-59 | PPS-89 |
 | P-60 | PPS-90 | P-61 | PPS-91 | P-62 | PPS-92 |
 | P-63 | PPS-93 | P-64 | PPS-94 | P-65 | PPS-95 |
@@ -208,6 +209,7 @@ Atlassian connector) · **Lane** (code lane via Speckit: Codex / agy / OpenCode)
 | [ ] G-8 | Pilot onboarding runbook: CSV/manual supplier + catalogue load, branches/approvers, inbound-email address for WhatsApp-forwarded quotes, first live RFQ, support WhatsApp group (4 working-hour response) | Orch | E-1, P-1, P-3 | Runbook doc linked on PPS task, dry-run on demo tenant | PPS |
 | [ ] G-9 | Outreach: work SP to 20 conversations at Talked+ | User | G-2, G-5, G-7 | 20 Leads at Talked or beyond | SP |
 | [ ] G-10 | Company formation: Egyptian one-person company on the simplified regime (research in `docs/gtm/company-formation/`) | User | — | Company registered; name + tax ID on PPS-11, then into G-6 | PPS |
+| [ ] G-14 | Marketing OS in the repo (`marketing/`): organic marketing for ProcurePilot and Iron Systems, moved from the workspace on the owner's request (2026-10-29). Knowledge, approved positioning and claims, decisions, the founder LinkedIn and company campaigns, profile kits, research, skills and checks. Rules: `marketing/CLAUDE.md`; nothing is published without the owner's approval | Orch, User (approvals) | — | PR merged; `cd marketing && npm test` green on main | PPS |
 
 ### P — Product tasks (PPS `from-demo` → Speckit spec → code lane)
 
@@ -346,3 +348,4 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-28 | Claude (orchestrator) | P-65/P-66 (PPS-95/96): `/speckit.tasks` for 023 (35 tasks: foundational supersession migration, view and reader move in-house; US1 RFQ fit and correction; US2 measured signals; US3 alias sweep; US4 pack column) and 024 (37 tasks: foundational group table, RLS and conversion lock in-house; US1 split from RFQ; US2 prepare N requests; US3 group approval by combined total, which must ship with US2; US4 standalone page). Tests are written first throughout. Next: implementation, 023 Phase 2 first. | |
 | 2026-10-29 | Claude (orchestrator) | P-80 (PPS-110): `test_supplier_iq` trace test failed from 00:00 to 03:00 Cairo time because it compared `date.today()` (local) with the scorecard's UTC `window_end`. The service stays on the UTC date (specs 011/019 name no time zone; `reporting_timezone` is for scheduled reports only). Fix: `supplier_iq._utc_now()` clock seam; the test reads today from it; a regression test freezes 00:30 Cairo (21:30 UTC the day before). Verified red then green on hosted (:5432) under TZ=Africa/Cairo and UTC. | |
 | | | | |
+| 2026-10-29 | Claude (marketing session) | G-14 (PPS-111): the Marketing OS moved into the repo as `marketing/` on the owner's request (branch `docs/marketing-os`). It links to `docs/gtm`, `docs/brand` and `packages/i18n` instead of mirroring them. Same day, with the owner: LinkedIn About updated (EN; AR added as a page language, product paragraph removed), positioning approved (Arabic-first + verified savings), claims approved, 10 LinkedIn drafts with v2 images built from real v2.5 frames. Nothing posted. | Owner reviews the 10 drafts and images; merge the PR |
