@@ -37,29 +37,29 @@ implementation task.
 **Purpose**: correctable, append-only match decisions (research R5) and the RFQ read interface. US1
 needs both: automatic RFQ matches must be correctable.
 
-- [ ] T003 Write a failing migration test in `apps/api/tests/integration/test_match_decision_supersession.py` (throwaway DB) covering:
+- [x] T003 Write a failing migration test in `apps/api/tests/integration/test_match_decision_supersession.py` (throwaway DB) covering:
   1. a second root decision for a line raises a unique violation;
   2. a correction pointing at the head is accepted, and `current_match_decision` returns only it;
   3. a correction pointing at a non-head, or at another line's or tenant's decision, raises `23514` from the trigger;
   4. `UPDATE`/`DELETE` on `match_decision` as `authenticated` is denied;
   5. a member JWT sees no other tenant's rows in `current_match_decision`.
-- [ ] T004 Create `supabase/migrations/20261029000000_match_decision_supersession.sql`:
+- [x] T004 Create `supabase/migrations/20261029000000_match_decision_supersession.sql`:
   - **Columns**: add `supersedes_decision_id` and `learned_from_decision_id`, each with a composite FK `(tenant_id, …) → match_decision (tenant_id, id)`.
   - **Constraints**: drop `match_decision_one_per_line`. Add `match_decision_one_root_per_line unique nulls not distinct (tenant_id, quotation_line_id, supersedes_decision_id)` and `match_decision_superseded_once unique (supersedes_decision_id)`.
   - **Trigger**: `match_decision_supersession_same_line` (before insert): same tenant, same line, and the target is the current head.
   - **View**: `current_match_decision` with `security_invoker = true`, granted the same `select` as `match_decision`.
   - **Data**: no backfill is needed (all existing rows are roots).
   - **Done when**: T003 is green on `pp-x-db`.
-- [ ] T005 Add `current_match_decision` coverage to `apps/api/tests/integration/test_tenant_isolation.py` (cross-tenant read returns nothing), then run `pnpm test:isolation` against the throwaway DB.
-- [ ] T006 Classify every `match_decision` reference as **current** (means "the line's match") or **history** (audit, a past purchase's evidence). Run `grep -rn "match_decision" apps/api/src services/*/src` and record the table under research.md §R5 "Reader classification" in `specs/023-rfq-aware-matching/research.md`. Expected current: landed_cost, offers (service, supplier_iq, supplier_iq_repository), requests/valuation, rfq/service, rfq/guardrail_evaluation, alerts/conditions, analyst/service, workers/offer_refresh_scheduler, matching/service, and the optimiser repository. Expected history: savings evidence and baseline.
-- [ ] T007 Move the **current** readers from T006 in the API modules to `current_match_decision`, in SQL strings and PostgREST `.table(...)` calls. The files are those listed in T006 under `apps/api/src/procurepilot_api/modules/`. Keep `match_decision` for inserts and history reads. Then run the existing integration suites for offers, rfq, requests, savings, alerts and analyst on the throwaway DB, and check they stay green.
-- [ ] T008 [P] Move `read_current_offers` and the advanced offer query to `current_match_decision` in `services/optimiser/src/procurepilot_optimiser_worker/repository.py`. Update the fixtures in `services/optimiser/tests/test_repository.py`, and add a case where a superseded decision's landed cost is ignored.
-- [ ] T009 [P] Add `rfq_lines_for_quotation(conn, tenant_id, quotation_id) -> RfqContext | None` in a new `apps/api/src/procurepilot_api/modules/rfq/read_api.py`.
+- [x] T005 Add `current_match_decision` coverage to `apps/api/tests/integration/test_tenant_isolation.py` (cross-tenant read returns nothing), then run `pnpm test:isolation` against the throwaway DB.
+- [x] T006 Classify every `match_decision` reference as **current** (means "the line's match") or **history** (audit, a past purchase's evidence). Run `grep -rn "match_decision" apps/api/src services/*/src` and record the table under research.md §R5 "Reader classification" in `specs/023-rfq-aware-matching/research.md`. Expected current: landed_cost, offers (service, supplier_iq, supplier_iq_repository), requests/valuation, rfq/service, rfq/guardrail_evaluation, alerts/conditions, analyst/service, workers/offer_refresh_scheduler, matching/service, and the optimiser repository. Expected history: savings evidence and baseline.
+- [x] T007 Move the **current** readers from T006 in the API modules to `current_match_decision`, in SQL strings and PostgREST `.table(...)` calls. The files are those listed in T006 under `apps/api/src/procurepilot_api/modules/`. Keep `match_decision` for inserts and history reads. Then run the existing integration suites for offers, rfq, requests, savings, alerts and analyst on the throwaway DB, and check they stay green.
+- [x] T008 [P] Move `read_current_offers` and the advanced offer query to `current_match_decision` in `services/optimiser/src/procurepilot_optimiser_worker/repository.py`. Update the fixtures in `services/optimiser/tests/test_repository.py`, and add a case where a superseded decision's landed cost is ignored.
+- [x] T009 [P] Add `rfq_lines_for_quotation(conn, tenant_id, quotation_id) -> RfqContext | None` in a new `apps/api/src/procurepilot_api/modules/rfq/read_api.py`.
   - It reads `rfq_id` and `(rfq_line_id, workspace_product_id, quantity, position, product tenant_name, aliases, pack base_quantity, base_unit)`.
   - It uses one query through `rfq_response → rfq_recipient → rfq_line`, joining `workspace_product`, `pack_definition` and `product_alias`.
   - It returns `None` for a quotation that answers no RFQ.
   - Unit test: `apps/api/tests/integration/test_rfq_read_api.py`.
-- [ ] T010 Add `supersedes_decision_id: UUID | None` and `learned_from_decision_id: UUID | None` to `MatchDecision` in `apps/api/src/procurepilot_api/modules/matching/schemas.py`, and set them in `_decision()` in `apps/api/src/procurepilot_api/modules/matching/service.py`.
+- [x] T010 Add `supersedes_decision_id: UUID | None` and `learned_from_decision_id: UUID | None` to `MatchDecision` in `apps/api/src/procurepilot_api/modules/matching/schemas.py`, and set them in `_decision()` in `apps/api/src/procurepilot_api/modules/matching/service.py`.
 
 **Checkpoint**: the schema is merged-ready, every reader follows the current decision, and the
 existing suites are green.
