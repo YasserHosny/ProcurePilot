@@ -20,9 +20,11 @@ describe('RfqCreateComponent', () => {
   let router: Router;
   let translate: TranslateService;
   let routeId: string | null;
+  let fromId: string | null;
 
   beforeEach(async () => {
     routeId = null;
+    fromId = null;
     rfqApiSpy = jasmine.createSpyObj('RfqApi', ['createRfq', 'getRfq', 'updateRfq', 'sendRfq']);
     apiSpy = jasmine.createSpyObj('ApiService', ['products', 'suppliers']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
@@ -55,6 +57,9 @@ describe('RfqCreateComponent', () => {
               paramMap: {
                 get: (key: string) => (key === 'id' ? routeId : null),
               },
+              queryParamMap: {
+                get: (key: string) => (key === 'from' ? fromId : null),
+              },
             },
           },
         },
@@ -75,6 +80,7 @@ describe('RfqCreateComponent', () => {
             title: 'Create RFQ',
             editTitle: 'Edit RFQ draft',
             draftSaved: 'Draft saved',
+            productRequired: 'Select a product from the catalogue.',
             sentSuccess: 'RFQ sent. Suppliers emailed: {{count}}',
             notDraftTitle: 'RFQ cannot be edited',
             notDraftMessage: 'Only draft RFQs can be edited. This RFQ has already been sent.',
@@ -308,6 +314,126 @@ describe('RfqCreateComponent', () => {
     expect(snackBarSpy.open).toHaveBeenCalledWith('Draft saved', 'Close', { duration: 4000 });
   });
 
+  it('edit mode with line whose product id is not in products response clears display, marks line invalid, and renders error', async () => {
+    routeId = 'rfq-edit-inactive';
+    const editDetailWithInactive: RfqDetail = {
+      rfq: {
+        id: 'rfq-edit-inactive',
+        tenant_id: 't-1',
+        created_by_membership_id: 'm-1',
+        status: 'draft',
+        needed_by_date: '2026-11-15',
+        tenant_terms: 'Some terms',
+        idempotency_key: 'edit-key',
+        created_at: '2026-10-01T00:00:00Z',
+      },
+      lines: [
+        {
+          id: 'l-edit-inactive',
+          tenant_id: 't-1',
+          rfq_id: 'rfq-edit-inactive',
+          workspace_product_id: 'prod-inactive-uuid',
+          quantity: '15',
+          created_at: '2026-10-01T00:00:00Z',
+        },
+      ],
+      recipients: [],
+    };
+    rfqApiSpy.getRfq.and.returnValue(of(editDetailWithInactive));
+
+    const editFixture = TestBed.createComponent(RfqCreateComponent);
+    const editComp = editFixture.componentInstance;
+    editFixture.detectChanges();
+    await editFixture.whenStable();
+    editFixture.detectChanges();
+
+    const lineControl = editComp.linesFormArray.at(0).get('workspace_product_id');
+    expect(lineControl?.value).toBe('prod-inactive-uuid');
+    expect(lineControl?.invalid).toBeTrue();
+    expect(lineControl?.hasError('invalidProduct')).toBeTrue();
+    expect(lineControl?.touched).toBeTrue();
+
+    const productInput = editFixture.nativeElement.querySelector(
+      'input[formcontrolname="workspace_product_id"]',
+    ) as HTMLInputElement;
+    expect(productInput.value).toBe('');
+
+    const matError = editFixture.nativeElement.querySelector('mat-error');
+    expect(matError).not.toBeNull();
+    expect(matError?.textContent?.trim()).toBe('Select a product from the catalogue.');
+  });
+
+  it('paginates active products across multiple pages: validates page-2 product in edit mode, displays label, and filters by picker', async () => {
+    routeId = 'rfq-edit-page-2';
+    const page1Product: Product = {
+      id: 'prod-p1',
+      tenant_name: 'Product Page 1',
+      variant: null,
+    } as Product;
+    const page2Product: Product = {
+      id: 'prod-p2',
+      tenant_name: 'Product Page 2',
+      variant: 'Special Variant',
+    } as Product;
+
+    apiSpy.products.and.callFake((params?: { cursor?: string; limit?: number; status?: 'active' | 'archived' | 'all'; q?: string }) => {
+      if (params?.cursor === 'c2') {
+        return of({ items: [page2Product], next_cursor: null });
+      }
+      return of({ items: [page1Product], next_cursor: 'c2' });
+    });
+    apiSpy.products.calls.reset();
+
+    const editDetailWithPage2: RfqDetail = {
+      rfq: {
+        id: 'rfq-edit-page-2',
+        tenant_id: 't-1',
+        created_by_membership_id: 'm-1',
+        status: 'draft',
+        needed_by_date: '2026-11-15',
+        tenant_terms: 'Page 2 terms',
+        idempotency_key: 'edit-key-p2',
+        created_at: '2026-10-01T00:00:00Z',
+      },
+      lines: [
+        {
+          id: 'l-edit-page-2',
+          tenant_id: 't-1',
+          rfq_id: 'rfq-edit-page-2',
+          workspace_product_id: 'prod-p2',
+          quantity: '5',
+          created_at: '2026-10-01T00:00:00Z',
+        },
+      ],
+      recipients: [],
+    };
+    rfqApiSpy.getRfq.and.returnValue(of(editDetailWithPage2));
+
+    const editFixture = TestBed.createComponent(RfqCreateComponent);
+    const editComp = editFixture.componentInstance;
+    editFixture.detectChanges();
+    await editFixture.whenStable();
+    editFixture.detectChanges();
+
+    expect(apiSpy.products).toHaveBeenCalledTimes(2);
+    expect(apiSpy.products.calls.argsFor(0)[0]).toEqual({ limit: 100, status: 'active' });
+    expect(apiSpy.products.calls.argsFor(1)[0]).toEqual({ limit: 100, status: 'active', cursor: 'c2' });
+
+    const lineControl = editComp.linesFormArray.at(0).get('workspace_product_id');
+    expect(lineControl?.value).toBe('prod-p2');
+    expect(lineControl?.valid).toBeTrue();
+    expect(lineControl?.hasError('invalidProduct')).toBeFalse();
+
+    const productInput = editFixture.nativeElement.querySelector(
+      'input[formcontrolname="workspace_product_id"]',
+    ) as HTMLInputElement;
+    expect(productInput.value).toBe(editComp.productLabel(page2Product));
+    expect(editComp.displayProduct('prod-p2')).toBe(editComp.productLabel(page2Product));
+
+    const filterResults = editComp.getFilteredProducts('Page 2');
+    expect(filterResults.some((p) => p.id === 'prod-p2')).toBeTrue();
+  });
+
   it('shows non-draft message and hides editable form when RFQ is not a draft', () => {
     routeId = 'rfq-sent-1';
     const sentDetail: RfqDetail = {
@@ -437,5 +563,271 @@ describe('RfqCreateComponent', () => {
     const alert = fixture.nativeElement.querySelector('[role="alert"]') as HTMLElement;
     expect(alert.textContent).toContain('SAVE FALLBACK');
     expect(alert.textContent).not.toContain('Untrusted server detail');
+  });
+
+  describe('Product autocomplete and Arabic normalisation (R5)', () => {
+    beforeEach(() => {
+      component.products.set([
+        { id: 'p-rice', tenant_name: 'أرز بسمتي', variant: '5 كجم' } as Product,
+        { id: 'p-sugar', tenant_name: 'سكر أبيض ناعم 10 كجم', variant: null } as Product,
+        { id: 'p-milk', tenant_name: 'Fresh Milk', variant: 'Whole 2L' } as Product,
+      ]);
+      fixture.detectChanges();
+    });
+
+    it('filters products anywhere in tenant_name and variant with Arabic-aware normalisation', () => {
+      // أرز بسمتي found by ارز
+      const riceMatches = component.getFilteredProducts('ارز');
+      expect(riceMatches.some((p) => p.id === 'p-rice')).toBeTrue();
+
+      // سكر found inside سكر أبيض ناعم 10 كجم
+      const sugarMatches = component.getFilteredProducts('سكر');
+      expect(sugarMatches.some((p) => p.id === 'p-sugar')).toBeTrue();
+
+      // variant match
+      const milkMatches = component.getFilteredProducts('whole');
+      expect(milkMatches.some((p) => p.id === 'p-milk')).toBeTrue();
+
+      // empty / non-matching
+      const emptyMatches = component.getFilteredProducts('منتج_غير_موجود');
+      expect(emptyMatches.length).toBe(0);
+    });
+
+    it('formats product label via displayProduct', () => {
+      expect(component.displayProduct('p-rice')).toBe('أرز بسمتي (5 كجم)');
+      expect(component.displayProduct('p-sugar')).toBe('سكر أبيض ناعم 10 كجم');
+      expect(component.displayProduct('unknown-uuid')).toBe('');
+      expect(component.displayProduct('')).toBe('');
+    });
+
+    it('marks workspace_product_id control invalid (required) when typed text is not a picked product', () => {
+      const line = component.linesFormArray.at(0);
+      line.get('workspace_product_id')?.setValue('invalid-typed-text');
+      line.get('workspace_product_id')?.updateValueAndValidity();
+      expect(line.get('workspace_product_id')?.valid).toBeFalse();
+      expect(line.get('workspace_product_id')?.hasError('required')).toBeTrue();
+
+      // valid product id
+      line.get('workspace_product_id')?.setValue('p-rice');
+      line.get('workspace_product_id')?.updateValueAndValidity();
+      expect(line.get('workspace_product_id')?.valid).toBeTrue();
+    });
+  });
+
+  describe('Focus moves to Quantity after product picked (R1)', () => {
+    it('moves focus to the quantity input when onProductSelected is called', () => {
+      const inputs = component.quantityInputs();
+      expect(inputs.length).toBeGreaterThan(0);
+      const focusSpy = spyOn(inputs[0].nativeElement, 'focus').and.callThrough();
+
+      component.onProductSelected(0);
+      expect(focusSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('Supplier email in options and trigger shows names only (R4)', () => {
+    it('shows supplier email in picker option and only names in trigger', () => {
+      component.suppliers.set([
+        { id: 's-1', name: 'Al-Ahram Supplies', contact_email: 'sales@ahram.test' } as Supplier,
+        { id: 's-2', name: 'Nile Traders', contact_email: 'nile@traders.test' } as Supplier,
+      ]);
+      component.form.controls.supplierIds.setValue(['s-1', 's-2']);
+      fixture.detectChanges();
+
+      expect(component.selectedSupplierNames()).toBe('Al-Ahram Supplies, Nile Traders');
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const select = compiled.querySelector('mat-select[formControlName="supplierIds"]');
+      expect(select).toBeTruthy();
+    });
+  });
+
+  describe('Arabic free text dir="auto" (R3)', () => {
+    it('renders tenantTerms textarea and product input with dir="auto"', () => {
+      const textarea = fixture.nativeElement.querySelector(
+        'textarea[formControlName="tenantTerms"]',
+      ) as HTMLTextAreaElement;
+      expect(textarea).toBeTruthy();
+      expect(textarea.getAttribute('dir')).toBe('auto');
+
+      const productInput = fixture.nativeElement.querySelector(
+        'input[formControlName="workspace_product_id"]',
+      ) as HTMLInputElement;
+      expect(productInput).toBeTruthy();
+      expect(productInput.getAttribute('dir')).toBe('auto');
+    });
+  });
+
+  describe('Duplicate RFQ (create side)', () => {
+    const mockSourceDetail: RfqDetail = {
+      rfq: {
+        id: 'rfq-src-1',
+        tenant_id: 't-1',
+        created_by_membership_id: 'm-1',
+        status: 'sent',
+        needed_by_date: '2026-09-01',
+        tenant_terms: 'Original duplicate terms',
+        idempotency_key: 'src-key',
+        created_at: '2026-09-01T00:00:00Z',
+      },
+      lines: [
+        {
+          id: 'l-1',
+          tenant_id: 't-1',
+          rfq_id: 'rfq-src-1',
+          workspace_product_id: 'prod-1',
+          quantity: '50.000000',
+          created_at: '2026-09-01T00:00:00Z',
+        },
+      ],
+      recipients: [
+        {
+          id: 'r-1',
+          tenant_id: 't-1',
+          rfq_id: 'rfq-src-1',
+          supplier_id: 'sup-1',
+          status: 'sent',
+          outbound_message_id: null,
+          sent_at: null,
+          created_at: '2026-09-01T00:00:00Z',
+        },
+        {
+          id: 'r-2',
+          tenant_id: 't-1',
+          rfq_id: 'rfq-src-1',
+          supplier_id: 'sup-inactive',
+          status: 'sent',
+          outbound_message_id: null,
+          sent_at: null,
+          created_at: '2026-09-01T00:00:00Z',
+        },
+      ],
+    };
+
+    it('pre-fills new draft from earlier RFQ with lines, active suppliers, terms, and leaves neededByDate empty', () => {
+      fromId = 'rfq-src-1';
+      rfqApiSpy.getRfq.and.returnValue(of(mockSourceDetail));
+
+      const dupFixture = TestBed.createComponent(RfqCreateComponent);
+      const dupComp = dupFixture.componentInstance;
+      dupFixture.detectChanges();
+
+      expect(rfqApiSpy.getRfq).toHaveBeenCalledWith('rfq-src-1');
+      expect(dupComp.isEditMode()).toBeFalse();
+      expect(dupComp.rfqId()).toBeNull();
+      expect(dupComp.isDuplicated()).toBeTrue();
+
+      // Lines prefilled in order and trimmed
+      expect(dupComp.form.getRawValue().lines).toEqual([
+        { workspace_product_id: 'prod-1', quantity: '50' },
+      ]);
+      // Only active supplier with email (sup-1), sup-inactive filtered out
+      expect(dupComp.form.controls.supplierIds.value).toEqual(['sup-1']);
+      // Terms prefilled
+      expect(dupComp.form.controls.tenantTerms.value).toBe('Original duplicate terms');
+      // Needed by date left empty
+      expect(dupComp.form.controls.neededByDate.value).toBeNull();
+
+      // Notice rendered
+      const notice = dupFixture.nativeElement.querySelector('.duplicate-notice');
+      expect(notice).toBeTruthy();
+    });
+
+    it('saving a duplicated RFQ calls createRfq, not updateRfq', () => {
+      fromId = 'rfq-src-1';
+      rfqApiSpy.getRfq.and.returnValue(of(mockSourceDetail));
+      rfqApiSpy.createRfq.and.returnValue(
+        of({
+          rfq: { id: 'rfq-new-dup', status: 'draft' } as Rfq,
+          lines: [],
+          recipients: [],
+          rejected_recipients: [],
+        }),
+      );
+
+      const dupFixture = TestBed.createComponent(RfqCreateComponent);
+      const dupComp = dupFixture.componentInstance;
+      dupFixture.detectChanges();
+
+      dupComp.form.controls.neededByDate.setValue(new Date(2026, 11, 25));
+      dupFixture.detectChanges();
+
+      dupComp.onSave();
+
+      expect(rfqApiSpy.createRfq).toHaveBeenCalled();
+      expect(rfqApiSpy.updateRfq).not.toHaveBeenCalled();
+      expect(dupComp.rfqId()).toBe('rfq-new-dup');
+    });
+
+    it('shows error card and keeps empty form when loading source RFQ fails in duplicate mode', () => {
+      fromId = 'rfq-src-missing';
+      rfqApiSpy.getRfq.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 404,
+              error: { code: 'not_found', message: 'Not found' },
+            }),
+        ),
+      );
+
+      const dupFixture = TestBed.createComponent(RfqCreateComponent);
+      const dupComp = dupFixture.componentInstance;
+      dupFixture.detectChanges();
+
+      expect(dupComp.errorMessage()).toBeTruthy();
+      expect(dupComp.linesFormArray.length).toBe(1);
+      expect(dupComp.form.controls.tenantTerms.value).toBe('');
+      expect(dupFixture.nativeElement.querySelector('.form-card.loading-card')).toBeNull();
+    });
+
+    it('duplicate with source line whose product id is not in products response clears display, marks line invalid, and renders error', async () => {
+      fromId = 'rfq-src-inactive-prod';
+      const detailWithInactiveProd: RfqDetail = {
+        rfq: {
+          id: 'rfq-src-inactive-prod',
+          tenant_id: 't-1',
+          created_by_membership_id: 'm-1',
+          status: 'sent',
+          needed_by_date: '2026-09-01',
+          tenant_terms: 'Original duplicate terms',
+          idempotency_key: 'src-key-2',
+          created_at: '2026-09-01T00:00:00Z',
+        },
+        lines: [
+          {
+            id: 'l-inactive',
+            tenant_id: 't-1',
+            rfq_id: 'rfq-src-inactive-prod',
+            workspace_product_id: 'prod-inactive-uuid',
+            quantity: '10',
+            created_at: '2026-09-01T00:00:00Z',
+          },
+        ],
+        recipients: [],
+      };
+      rfqApiSpy.getRfq.and.returnValue(of(detailWithInactiveProd));
+
+      const dupFixture = TestBed.createComponent(RfqCreateComponent);
+      const dupComp = dupFixture.componentInstance;
+      dupFixture.detectChanges();
+      await dupFixture.whenStable();
+      dupFixture.detectChanges();
+
+      const lineControl = dupComp.linesFormArray.at(0).get('workspace_product_id');
+      expect(lineControl?.value).toBe('prod-inactive-uuid');
+      expect(lineControl?.invalid).toBeTrue();
+      expect(lineControl?.hasError('invalidProduct')).toBeTrue();
+      expect(lineControl?.touched).toBeTrue();
+
+      const productInput = dupFixture.nativeElement.querySelector(
+        'input[formcontrolname="workspace_product_id"]',
+      ) as HTMLInputElement;
+      expect(productInput.value).toBe('');
+
+      const matError = dupFixture.nativeElement.querySelector('mat-error');
+      expect(matError).not.toBeNull();
+      expect(matError?.textContent?.trim()).toBe('Select a product from the catalogue.');
+    });
   });
 });

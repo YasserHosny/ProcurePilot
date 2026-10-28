@@ -68,6 +68,7 @@ export class SupplierListComponent implements OnInit {
 
   readonly displayedColumns: readonly string[] = [
     "name",
+    "contactEmail",
     "paymentTerms",
     "leadTime",
     "minOrderValue",

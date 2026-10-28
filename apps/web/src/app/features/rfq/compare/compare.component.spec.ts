@@ -394,6 +394,55 @@ describe('CompareComponent (RFQ)', () => {
     expect(component.formatQuantity('1.234567')).toBe('1.234567');
     expect(component.formatQuantity('50.000000')).toBe('50');
   });
+
+  it('renders breadcrumb on standalone compare page', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const breadcrumb = compiled.querySelector('nav.breadcrumb');
+    expect(breadcrumb).not.toBeNull();
+    expect(breadcrumb?.getAttribute('aria-label')).toBe(TestBed.inject(TranslateService).instant('common.breadcrumbLabel'));
+    const link = breadcrumb?.querySelector('a.breadcrumb-link');
+    expect(link?.getAttribute('routerLink') ?? link?.getAttribute('href')).toBe('/rfq/history');
+  });
+
+  it('supports embedded input mode: loads data from rfqId input and hides header/breadcrumb', async () => {
+    mockRfqApi.getRfq.calls.reset();
+    mockRfqApi.listResponses.calls.reset();
+
+    fixture.componentRef.setInput('embedded', true);
+    fixture.componentRef.setInput('rfqId', 'rfq-embedded-1');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(mockRfqApi.getRfq).toHaveBeenCalledWith('rfq-embedded-1');
+    expect(mockRfqApi.listResponses).toHaveBeenCalledWith('rfq-embedded-1');
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('nav.breadcrumb')).toBeNull();
+    expect(compiled.querySelector('.page-header')).toBeNull();
+  });
+
+  it('loads data exactly once when embedded with rfqId input bound (embedded mode)', () => {
+    mockRfqApi.getRfq.calls.reset();
+    mockRfqApi.listResponses.calls.reset();
+
+    const embeddedFixture = TestBed.createComponent(CompareComponent);
+    embeddedFixture.componentRef.setInput('embedded', true);
+    embeddedFixture.componentRef.setInput('rfqId', 'rfq-embedded-1');
+    embeddedFixture.detectChanges();
+
+    expect(mockRfqApi.getRfq).toHaveBeenCalledTimes(1);
+    expect(mockRfqApi.getRfq).toHaveBeenCalledWith('rfq-embedded-1');
+    expect(mockRfqApi.listResponses).toHaveBeenCalledTimes(1);
+    expect(mockRfqApi.listResponses).toHaveBeenCalledWith('rfq-embedded-1');
+  });
+
+  it('loads data exactly once in standalone route mode without rfqId input', () => {
+    expect(mockRfqApi.getRfq).toHaveBeenCalledTimes(1);
+    expect(mockRfqApi.getRfq).toHaveBeenCalledWith('rfq-1');
+    expect(mockRfqApi.listResponses).toHaveBeenCalledTimes(1);
+    expect(mockRfqApi.listResponses).toHaveBeenCalledWith('rfq-1');
+  });
 });
 
 describe('RFQ quantity display', () => {

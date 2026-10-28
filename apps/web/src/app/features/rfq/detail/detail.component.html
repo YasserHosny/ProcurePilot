@@ -1,0 +1,239 @@
+<div class="page-container">
+  @if (loading()) {
+    <div class="loading-state">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>{{ 'rfq.detail.loading' | translate }}</p>
+    </div>
+  } @else if (isNotFound()) {
+    <div class="empty-state not-found-state" data-testid="rfq-detail-not-found">
+      <mat-icon aria-hidden="true">search_off</mat-icon>
+      <p>{{ 'rfq.detail.notFound' | translate }}</p>
+      <a routerLink="/rfq/history" class="back-link">
+        {{ 'rfq.detail.backToHistory' | translate }}
+      </a>
+    </div>
+  } @else if (errorMessage()) {
+    <div class="error-state">
+      <mat-icon color="warn" aria-hidden="true">error_outline</mat-icon>
+      <p>{{ errorMessage() }}</p>
+    </div>
+  } @else if (rfqDetail(); as detail) {
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb" [attr.aria-label]="'common.breadcrumbLabel' | translate">
+      <a routerLink="/rfq/history" class="breadcrumb-link">{{ 'rfq.history.title' | translate }}</a>
+      <mat-icon class="breadcrumb-sep rtl-flip" aria-hidden="true">chevron_right</mat-icon>
+      <span class="breadcrumb-current">{{ breadcrumbText() }}</span>
+    </nav>
+
+    <!-- Page Header -->
+    <header class="page-header">
+      <div class="header-titles">
+        <h1 class="page-title">{{ 'rfq.detail.title' | translate }}</h1>
+        <p class="page-subtitle">{{ 'rfq.detail.subtitle' | translate }}</p>
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <mat-tab-group
+      [selectedIndex]="selectedTabIndex()"
+      (selectedIndexChange)="onTabChange($event)"
+      animationDuration="0ms"
+      class="detail-tabs"
+    >
+      <!-- Tab 0: Details -->
+      <mat-tab [label]="'rfq.detail.tabDetails' | translate">
+        <div class="tab-content">
+          @if (detail.rfq.status === 'draft') {
+            <mat-card class="draft-notice-card" data-testid="rfq-detail-draft-notice">
+              <div class="draft-notice-content">
+                <div class="draft-notice-text">
+                  <h2>{{ 'rfq.compare.draftNoticeTitle' | translate }}</h2>
+                  <p>{{ 'rfq.compare.draftNoticeDescription' | translate }}</p>
+                </div>
+                @if (isCreator()) {
+                  <div class="draft-notice-actions">
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      (click)="onEditDraft()"
+                      data-testid="rfq-detail-edit-button"
+                    >
+                      {{ 'rfq.compare.editDraft' | translate }}
+                    </button>
+                    <button
+                      mat-flat-button
+                      color="primary"
+                      type="button"
+                      (click)="onSendDraft()"
+                      data-testid="rfq-detail-send-button"
+                    >
+                      {{ 'rfq.compare.sendDraft' | translate }}
+                    </button>
+                  </div>
+                }
+              </div>
+            </mat-card>
+          }
+
+          <mat-card class="details-card">
+            <dl class="details-grid">
+              <div class="detail-field">
+                <dt>{{ 'rfq.detail.statusLabel' | translate }}</dt>
+                <dd>
+                  <span class="status-badge" [ngClass]="getStatusClass(detail.rfq.status)">
+                    {{ 'rfq.history.status_' + detail.rfq.status | translate }}
+                  </span>
+                </dd>
+              </div>
+
+              <div class="detail-field">
+                <dt>{{ 'rfq.detail.sentAtLabel' | translate }}</dt>
+                <dd>
+                  @if (latestSentAt()) {
+                    {{ formatDate(latestSentAt()!) }} · {{ formatTime(latestSentAt()!) }}
+                  } @else {
+                    {{ 'rfq.detail.notSent' | translate }}
+                  }
+                </dd>
+              </div>
+
+              <div class="detail-field">
+                <dt>{{ 'rfq.detail.neededByLabel' | translate }}</dt>
+                <dd>{{ formatDate(detail.rfq.needed_by_date) }}</dd>
+              </div>
+
+              <div class="detail-field">
+                <dt>{{ 'rfq.detail.createdAtLabel' | translate }}</dt>
+                <dd>{{ formatDate(detail.rfq.created_at) }}</dd>
+              </div>
+
+              <div class="detail-field full-width">
+                <dt>{{ 'rfq.detail.termsLabel' | translate }}</dt>
+                <dd>
+                  @if (detail.rfq.tenant_terms) {
+                    <div class="terms-content" dir="auto">{{ detail.rfq.tenant_terms }}</div>
+                  } @else {
+                    <span class="text-muted">{{ 'rfq.detail.noTerms' | translate }}</span>
+                  }
+                </dd>
+              </div>
+            </dl>
+          </mat-card>
+        </div>
+      </mat-tab>
+
+      <!-- Tab 1: Items -->
+      <mat-tab [label]="'rfq.detail.tabItems' | translate">
+        <div class="tab-content">
+          <mat-card class="table-card">
+            <div class="table-container">
+              <table mat-table [dataSource]="detail.lines" class="items-table">
+                <!-- Product Column -->
+                <ng-container matColumnDef="product">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'rfq.detail.product' | translate }}</th>
+                  <td mat-cell *matCellDef="let line">
+                    <div class="product-cell">
+                      <span class="product-name">
+                        {{ line.product_name || ('rfq.detail.unknownProduct' | translate) }}
+                      </span>
+                      @if (line.product_variant) {
+                        <span class="product-variant">{{ line.product_variant }}</span>
+                      }
+                    </div>
+                  </td>
+                </ng-container>
+
+                <!-- Quantity Column -->
+                <ng-container matColumnDef="quantity">
+                  <th mat-header-cell *matHeaderCellDef class="number-cell">{{ 'rfq.detail.quantity' | translate }}</th>
+                  <td mat-cell *matCellDef="let line" class="number-cell pp-figures">
+                    {{ formatQuantity(line.quantity) }} {{ 'rfq.detail.packs' | translate }}
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="displayedItemColumns"></tr>
+                <tr
+                  mat-row
+                  *matRowDef="let line; columns: displayedItemColumns;"
+                  data-testid="detail-item-row"
+                ></tr>
+              </table>
+            </div>
+          </mat-card>
+        </div>
+      </mat-tab>
+
+      <!-- Tab 2: Recipients (n) -->
+      <mat-tab [label]="'rfq.detail.tabRecipients' | translate: { count: detail.recipients.length }">
+        <div class="tab-content">
+          <mat-card class="table-card">
+            <div class="table-container">
+              <table mat-table [dataSource]="detail.recipients" class="recipients-table">
+                <!-- Supplier Column -->
+                <ng-container matColumnDef="supplier">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'rfq.detail.supplier' | translate }}</th>
+                  <td mat-cell *matCellDef="let recipient">
+                    <span class="supplier-name">
+                      {{ recipient.supplier_name || ('rfq.detail.unknownSupplier' | translate) }}
+                    </span>
+                  </td>
+                </ng-container>
+
+                <!-- Contact Email Column -->
+                <ng-container matColumnDef="contactEmail">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'rfq.detail.contactEmail' | translate }}</th>
+                  <td mat-cell *matCellDef="let recipient">
+                    @if (recipient.supplier_contact_email) {
+                      <bdi dir="ltr" class="contact-email">{{ recipient.supplier_contact_email }}</bdi>
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                </ng-container>
+
+                <!-- Status Column -->
+                <ng-container matColumnDef="status">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'rfq.history.status' | translate }}</th>
+                  <td mat-cell *matCellDef="let recipient">
+                    <div class="recipient-status-wrap">
+                      <span class="status-dot" [ngClass]="'dot-' + recipient.status"></span>
+                      <span class="status-text">
+                        {{ 'rfq.detail.recipientStatus_' + recipient.status | translate }}
+                      </span>
+                    </div>
+                  </td>
+                </ng-container>
+
+                <!-- Sent At Column -->
+                <ng-container matColumnDef="sentAt">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'rfq.detail.sentAt' | translate }}</th>
+                  <td mat-cell *matCellDef="let recipient">
+                    @if (recipient.sent_at) {
+                      {{ formatDate(recipient.sent_at) }} · {{ formatTime(recipient.sent_at) }}
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="displayedRecipientColumns"></tr>
+                <tr
+                  mat-row
+                  *matRowDef="let recipient; columns: displayedRecipientColumns;"
+                  data-testid="detail-recipient-row"
+                ></tr>
+              </table>
+            </div>
+          </mat-card>
+        </div>
+      </mat-tab>
+
+      <!-- Tab 3: Responses (n) -->
+      <mat-tab [label]="'rfq.detail.tabResponses' | translate: { count: responseCount() }">
+        <div class="tab-content responses-tab-content">
+          <app-rfq-compare [rfqId]="rfqId()" [embedded]="true"></app-rfq-compare>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  }
+</div>

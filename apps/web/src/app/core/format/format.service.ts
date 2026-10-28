@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
 
 import type { Money } from '../api/models';
+import { parseIsoDateLocal } from './iso-date';
 
 export type MoneyLike = Money | { amount: string | number; currency: string };
 
@@ -244,7 +245,12 @@ export class FormatService {
   ): string {
     if (!date) return '—';
 
-    const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+    const d =
+      typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? (parseIsoDateLocal(date) ?? new Date(NaN))
+        : typeof date === 'string' || typeof date === 'number'
+          ? new Date(date)
+          : date;
     if (isNaN(d.getTime())) return '—';
 
     const locale = this.resolveLocale(localeOverride);

@@ -5,7 +5,7 @@ import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { provideTranslateService } from '@ngx-translate/core';
+import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -13,6 +13,9 @@ import { signal } from '@angular/core';
 import { SessionService } from '../../../core/auth/session.service';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { ApiService } from '../../../core/api/api.service';
+
+import enCatalog from '../../../../../../../packages/i18n/en.json';
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 
 describe('HistoryComponent', () => {
   let component: HistoryComponent;
@@ -64,13 +67,45 @@ describe('HistoryComponent', () => {
   };
 
   beforeEach(async () => {
-    rfqApiSpy = jasmine.createSpyObj('RfqApi', ['listRfqs', 'sendRfq']);
+    rfqApiSpy = jasmine.createSpyObj('RfqApi', ['listRfqs', 'sendRfq', 'getRfq']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
     const apiSpy = jasmine.createSpyObj('ApiService', ['members']);
     apiSpy.members.and.returnValue(of({ items: [{ id: 'm1', email: 'user@test.com' }], next_cursor: null }));
     dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
 
     rfqApiSpy.listRfqs.and.returnValue(of(mockRfqList));
+    rfqApiSpy.getRfq.and.returnValue(
+      of({
+        rfq: { ...mockRfqs[1], tenant_id: 't1', idempotency_key: 'k1', tenant_terms: null },
+        lines: [],
+        recipients: [
+          {
+            id: 'rec-1',
+            tenant_id: 't1',
+            rfq_id: 'rfq-1',
+            supplier_id: 's1',
+            supplier_name: 'Supplier Alpha',
+            supplier_contact_email: 'alpha@example.test',
+            status: 'sent',
+            outbound_message_id: null,
+            sent_at: '2026-09-26T14:30:00Z',
+            created_at: '2026-09-25T10:00:00Z',
+          },
+          {
+            id: 'rec-2',
+            tenant_id: 't1',
+            rfq_id: 'rfq-1',
+            supplier_id: 's2',
+            supplier_name: null,
+            supplier_contact_email: null,
+            status: 'failed',
+            outbound_message_id: null,
+            sent_at: null,
+            created_at: '2026-09-25T10:00:00Z',
+          },
+        ],
+      }),
+    );
 
     await TestBed.configureTestingModule({
       imports: [HistoryComponent, NoopAnimationsModule],
@@ -118,10 +153,10 @@ describe('HistoryComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/rfq', 'rfq-draft-1', 'edit']);
   });
 
-  it('routes another member’s draft to compare and hides draft actions', async () => {
+  it('routes another member’s draft to RFQ details and hides draft actions', async () => {
     component.currentMembershipId.set('different-member');
     component.onRowClick(mockRfqs[0]);
-    expect(router.navigate).toHaveBeenCalledWith(['/rfq/compare', 'rfq-draft-1']);
+    expect(router.navigate).toHaveBeenCalledWith(['/rfq', 'rfq-draft-1']);
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -130,9 +165,9 @@ describe('HistoryComponent', () => {
     expect(compiled.querySelector('[data-testid="rfq-send-button"]')).toBeNull();
   });
 
-  it('should navigate to compare view for non-converted sent RFQ', () => {
+  it('should navigate to details view for non-converted sent RFQ', () => {
     component.onRowClick(mockRfqs[1]);
-    expect(router.navigate).toHaveBeenCalledWith(['/rfq/compare', 'rfq-1']);
+    expect(router.navigate).toHaveBeenCalledWith(['/rfq', 'rfq-1']);
   });
 
   it('should navigate to request view for converted RFQ', () => {
@@ -151,7 +186,7 @@ describe('HistoryComponent', () => {
     );
   });
 
-  it('renders "—" for draft Sent Date and formatted sent_at for sent RFQs', async () => {
+  it('renders "—" for draft Sent Date and date + time with middle dot for sent RFQs', async () => {
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -160,7 +195,81 @@ describe('HistoryComponent', () => {
     const sentCells = compiled.querySelectorAll('[data-testid="rfq-sent-at-cell"]');
     expect(sentCells.length).toBe(3);
     expect(sentCells[0].textContent?.trim()).toBe('—');
-    expect(sentCells[1].textContent?.trim()).not.toBe('—');
+    expect(sentCells[1].textContent?.trim()).toContain('·');
+  });
+
+  it('renders responses count as link with ?tab=responses when > 0, and plain 0 when 0', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const responseCells = compiled.querySelectorAll('[data-testid="rfq-responses-cell"]');
+    expect(responseCells.length).toBe(3);
+
+    // mockRfqs[0] has response_count: 0 -> plain "0", no link
+    expect(responseCells[0].querySelector('a')).toBeNull();
+    expect(responseCells[0].textContent?.trim()).toBe('0');
+
+    // mockRfqs[1] has response_count: 2 -> link
+    const link = responseCells[1].querySelector<HTMLAnchorElement>('a');
+    expect(link).not.toBeNull();
+    expect(link?.textContent?.trim()).toBe('2');
+  });
+
+  it('stops propagation when clicking the responses link', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    spyOn(component, 'onRowClick');
+    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      '[data-testid="rfq-responses-cell"] a',
+    );
+    expect(link).not.toBeNull();
+    link?.click();
+    expect(component.onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('renders actions menu button for all rows and stops propagation on click', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    spyOn(component, 'onRowClick');
+    const actionButtons = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+      '[data-testid="rfq-actions-button"]',
+    );
+    expect(actionButtons.length).toBe(3);
+
+    actionButtons[0].click();
+    expect(component.onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('recipients count is a button when count > 0 and clicking stops propagation and opens popover lazily', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    spyOn(component, 'onRowClick');
+    const recipientButtons = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+      '[data-testid="rfq-recipients-button"]',
+    );
+    expect(recipientButtons.length).toBeGreaterThan(0);
+
+    recipientButtons[0].click();
+    expect(component.onRowClick).not.toHaveBeenCalled();
+    expect(rfqApiSpy.getRfq).toHaveBeenCalledWith('rfq-draft-1');
+
+    // Second click should use cache
+    recipientButtons[0].click();
+    expect(rfqApiSpy.getRfq).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows error state in popover when rfqApi.getRfq fails', async () => {
+    rfqApiSpy.getRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+    component.loadRecipients('rfq-error');
+    expect(component.recipientsCache()['rfq-error']?.error).toBeTrue();
   });
 
   it('navigates to edit page when Edit button is clicked without triggering row click', async () => {
@@ -231,5 +340,109 @@ describe('HistoryComponent', () => {
       jasmine.any(String),
       { duration: 5000 },
     );
+  });
+
+  it('invalidates recipientsCache on loadRfqs so reopening popover after sending refetches recipients with new status', async () => {
+    const draftRecipients = [
+      {
+        id: 'rec-draft-1',
+        tenant_id: 't1',
+        rfq_id: 'rfq-draft-1',
+        supplier_id: 's1',
+        supplier_name: 'Supplier Alpha',
+        supplier_contact_email: 'alpha@example.test',
+        status: 'draft' as const,
+        outbound_message_id: null,
+        sent_at: null,
+        created_at: '2026-09-25T10:00:00Z',
+      },
+    ];
+    rfqApiSpy.getRfq.and.returnValue(
+      of({
+        rfq: { ...mockRfqs[0], tenant_id: 't1', idempotency_key: 'k0', tenant_terms: null },
+        lines: [],
+        recipients: draftRecipients,
+      }),
+    );
+
+    // Popover opened on draft RFQ
+    component.loadRecipients('rfq-draft-1');
+    expect(rfqApiSpy.getRfq).toHaveBeenCalledWith('rfq-draft-1');
+    expect(rfqApiSpy.getRfq).toHaveBeenCalledTimes(1);
+    expect(component.recipientsCache()['rfq-draft-1']?.recipients?.[0].status).toBe('draft');
+
+    // sendRfq succeeds
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of(true),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+    const sentRecipients = [
+      {
+        ...draftRecipients[0],
+        status: 'sent' as const,
+        sent_at: '2026-09-26T14:30:00Z',
+      },
+    ];
+    rfqApiSpy.sendRfq.and.returnValue(
+      of({
+        rfq: { id: 'rfq-draft-1', status: 'sent' },
+        recipients: sentRecipients,
+      } as unknown as RfqSendResponse),
+    );
+
+    rfqApiSpy.getRfq.and.returnValue(
+      of({
+        rfq: { ...mockRfqs[0], status: 'sent', tenant_id: 't1', idempotency_key: 'k0', tenant_terms: null },
+        lines: [],
+        recipients: sentRecipients,
+      }),
+    );
+
+    component.onSendDraft(mockRfqs[0]);
+    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-draft-1');
+
+    // Reopen popover on the RFQ
+    component.loadRecipients('rfq-draft-1');
+    expect(rfqApiSpy.getRfq).toHaveBeenCalledTimes(2);
+    expect(component.recipientsCache()['rfq-draft-1']?.recipients?.[0].status).toBe('sent');
+  });
+
+  it('renders recipientsDraftHeader for draft RFQ and sentToSuppliers for sent RFQ in popover header', async () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.use('en');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const recipientButtons = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+      '[data-testid="rfq-recipients-button"]',
+    );
+    expect(recipientButtons.length).toBeGreaterThanOrEqual(2);
+
+    // Open popover for draft (mockRfqs[0] has count 3, status draft)
+    recipientButtons[0].click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const draftHeader = document.querySelector('.popover-header strong');
+    expect(draftHeader?.textContent?.trim()).toBe('3 suppliers, not sent yet');
+
+    // Open popover for sent RFQ (mockRfqs[1] has count 5, status sent)
+    recipientButtons[1].click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const sentHeaders = document.querySelectorAll('.popover-header strong');
+    const sentHeader = sentHeaders[sentHeaders.length - 1];
+    expect(sentHeader?.textContent?.trim()).toBe('Sent to 5 suppliers');
+  });
+
+  it('provides English and Arabic recipientsDraftHeader translation keys', () => {
+    for (const catalog of [enCatalog, arCatalog]) {
+      const history = (catalog.rfq as { history: Record<string, string> }).history;
+      expect(history['recipientsDraftHeader']).toBeTruthy();
+      expect(history['recipientsDraftHeader']).toContain('{{count}}');
+    }
   });
 });

@@ -118,7 +118,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-45 | PPS-75 | P-46 | PPS-76 | | |
 | P-49 | PPS-79 | | | | |
 | P-52 | PPS-82 | P-53 | PPS-83 | P-54 | PPS-84 |
-| P-57 | PPS-87 | | | | |
+| P-57 | PPS-87 | P-58 | PPS-88 | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -261,6 +261,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-53 | — | Demo video v2.5 in every version (owner-approved 2026-10-27): 10-s problem chapter with each market's own quotes, a logo-build brand turn, beat 1 on the fix caption, full-page saving, pain-to-fix recap, no disclosure pill, music crossfade into the outro. 12 cuts (Egypt ar/en, Saudi ar/en, Rawaq English, Liffey × 16:9/9:16); one build for every market (`docs/gtm/video/source/edit-v2.5/`) | Orch | P-41 | PR open (PPS-83) |
 | [ ] P-54 | — | Arabic UI showed money as «EGP ٣٠٠» (owner, 2026-10-27): Arabic now reads «٣٠٠ ج.م» / «ر.س» (Intl symbol, English unchanged); then re-record the Arabic rounds and rebuild the Arabic v2.5 cuts. UI: #305, #308, #311; re-shoot and cuts: this PR | Orch → Agy | P-53 | PR open (PPS-84) |
 | [ ] P-57 | — | Faster Claude sessions (owner, 2026-10-26): every session started at ~102k tokens and 31% of model calls ran past 400k, where a call is ~60% slower. Trimmed always-loaded context: `CLAUDE.md` 21 → 10 KB (stale speckit tech list, change log and narrative phase removed) and, outside the repo, 147 unrelated subagent definitions archived | Orch | — | PR open (PPS-87) |
+| [ ] P-58 | — | RFQ flow review 2026-10-28 on «مطاعم رواق» (`docs/gtm/gcc/rounds/flow-review-2026-10-28/`): RFQ lines keep the buyer's order (`rfq_line.position`, R2); product picker search (R5); supplier emails shown (R4); `dir="auto"` on terms (R3); Quantity focus after a pick (R1); new RFQ Details page with Details / Items / Recipients / Responses tabs and breadcrumbs (O4, O5); history: sent date + time (O1), recipients popover (O3), responses link and "•••" menu with Duplicate (O6); date-only strings stay on their calendar day (O2). Out of scope pending owner: RFQ email locale (R6), delivered/opened tracking, cancel/resend | Orch → Codex + Agy | — | PR open (PPS-88) |
 
 ### E — Pilot environment
 

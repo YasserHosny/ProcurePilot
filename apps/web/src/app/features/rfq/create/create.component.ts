@@ -1,18 +1,19 @@
-import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy, ElementRef, viewChildren } from '@angular/core';
 
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { ReactiveFormsModule, FormBuilder, Validators, FormArray } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, Validators, FormArray, AbstractControl, ValidationErrors } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { forkJoin } from 'rxjs';
+import { EMPTY, Observable, expand, forkJoin, reduce } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { Rfq, RfqApi, RfqDetail } from '../rfq-api';
@@ -21,6 +22,7 @@ import { Product, Supplier } from '../../../core/api/models';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 import { trimDecimal } from '../../../core/format/trim-decimal';
+import { normaliseSearchText } from '../../../core/format/search-normalise';
 
 @Component({
   providers: [provideAppDateAdapter()],
@@ -33,6 +35,7 @@ import { trimDecimal } from '../../../core/format/trim-decimal';
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
+    MatAutocompleteModule,
     MatButtonModule,
     MatIconModule,
     MatDatepickerModule,
@@ -52,14 +55,28 @@ export class RfqCreateComponent implements OnInit {
   private readonly route = inject(ActivatedRoute, { optional: true });
   private readonly router = inject(Router, { optional: true });
 
+  readonly quantityInputs = viewChildren<ElementRef<HTMLInputElement>>('quantityInput');
+
   readonly products = signal<Product[]>([]);
   readonly suppliers = signal<Supplier[]>([]);
+
+  private readonly productValidator = (control: AbstractControl): ValidationErrors | null => {
+    const value = control.value;
+    if (!value || typeof value !== 'string' || value.trim() === '') {
+      return { required: true };
+    }
+    const products = this.products();
+    if (products.length > 0 && !products.some((p) => p.id === value)) {
+      return { required: true, invalidProduct: true };
+    }
+    return null;
+  };
 
   readonly form = this.fb.nonNullable.group({
     lines: this.fb.array(
       [
         this.fb.nonNullable.group({
-          workspace_product_id: ['', Validators.required],
+          workspace_product_id: ['', [Validators.required, this.productValidator]],
           quantity: ['', [Validators.required, Validators.min(0.01)]],
         }),
       ],
@@ -71,6 +88,7 @@ export class RfqCreateComponent implements OnInit {
   });
 
   readonly isEditMode = signal(false);
+  readonly isDuplicated = signal(false);
   readonly isLoadingRfq = signal(false);
   readonly isNotDraft = signal(false);
   readonly isSaving = signal(false);
@@ -79,6 +97,56 @@ export class RfqCreateComponent implements OnInit {
   readonly rfqStatus = signal<Rfq['status'] | null>(null);
   readonly rejectedSuppliers = signal<{ supplier_id: string; reason: string }[]>([]);
   readonly errorMessage = signal<string | null>(null);
+
+  productLabel(prod: Product): string {
+    return prod.variant ? `${prod.tenant_name} (${prod.variant})` : prod.tenant_name;
+  }
+
+  readonly displayProduct = (value: string): string => {
+    if (!value) return '';
+    const prod = this.products().find((p) => p.id === value);
+    return prod ? this.productLabel(prod) : '';
+  };
+
+  getFilteredProducts(value: string | null | undefined): Product[] {
+    const prods = this.products();
+    if (!value) return prods;
+    if (prods.some((p) => p.id === value)) {
+      return prods;
+    }
+    const q = normaliseSearchText(value);
+    if (!q) return prods;
+    return prods.filter((p) => {
+      const name = normaliseSearchText(p.tenant_name);
+      const variant = p.variant ? normaliseSearchText(p.variant) : '';
+      return name.includes(q) || variant.includes(q);
+    });
+  }
+
+  onProductSelected(index: number): void {
+    const inputs = this.quantityInputs();
+    const target = inputs[index]?.nativeElement;
+    if (target) {
+      target.focus();
+      setTimeout(() => target.focus(), 0);
+    }
+  }
+
+  selectedSupplierNames(): string {
+    const selectedIds = this.form.controls.supplierIds.value;
+    if (!selectedIds || selectedIds.length === 0) return '';
+    const map = new Map(this.suppliers().map((s) => [s.id, s.name]));
+    return selectedIds
+      .map((id) => map.get(id))
+      .filter((name): name is string => !!name)
+      .join(', ');
+  }
+
+  private revalidateLines(): void {
+    this.linesFormArray.controls.forEach((c) => {
+      c.get('workspace_product_id')?.updateValueAndValidity();
+    });
+  }
 
   ngOnInit(): void {
     const routeId = this.route?.snapshot?.paramMap?.get('id') ?? null;
@@ -89,11 +157,91 @@ export class RfqCreateComponent implements OnInit {
       return;
     }
 
-    this.apiService.products({ limit: 100, status: 'active' }).subscribe((res) => {
-      this.products.set(res.items);
+    const fromId = this.route?.snapshot?.queryParamMap?.get('from') ?? null;
+    if (fromId) {
+      this.loadDuplicateData(fromId);
+      return;
+    }
+
+    this.loadAllActiveProducts().subscribe((items) => {
+      this.products.set(items);
+      this.revalidateLines();
     });
     this.apiService.suppliers({ limit: 100, status: 'active' }).subscribe((res) => {
       this.suppliers.set(res.items.filter((s) => !!s.contact_email));
+    });
+  }
+
+  private loadAllActiveProducts(): Observable<Product[]> {
+    return this.apiService.products({ limit: 100, status: 'active' }).pipe(
+      expand((res) =>
+        res.next_cursor
+          ? this.apiService.products({ limit: 100, status: 'active', cursor: res.next_cursor })
+          : EMPTY,
+      ),
+      reduce((acc, res) => acc.concat(res.items), [] as Product[]),
+    );
+  }
+
+  private loadDuplicateData(fromId: string): void {
+    this.isLoadingRfq.set(true);
+    this.errorMessage.set(null);
+
+    forkJoin({
+      products: this.loadAllActiveProducts(),
+      suppliers: this.apiService.suppliers({ limit: 100, status: 'active' }),
+      detail: this.rfqApi.getRfq(fromId),
+    }).subscribe({
+      next: ({ products, suppliers, detail }) => {
+        this.products.set(products);
+        const validSuppliers = suppliers.items.filter((s) => !!s.contact_email);
+        this.suppliers.set(validSuppliers);
+        this.applyDuplicateDetail(detail, validSuppliers);
+        this.isLoadingRfq.set(false);
+      },
+      error: (err: unknown) => {
+        this.isLoadingRfq.set(false);
+        this.errorMessage.set(
+          err instanceof HttpErrorResponse && err.status === 403
+            ? this.translate.instant('rfq.creatorOnly')
+            : this.getErrorMessage(err, 'rfq.create.saveError'),
+        );
+      },
+    });
+  }
+
+  private applyDuplicateDetail(detail: RfqDetail, activeSuppliers: Supplier[]): void {
+    this.isDuplicated.set(true);
+    this.isEditMode.set(false);
+    this.rfqId.set(null);
+    this.rfqStatus.set(null);
+    this.isNotDraft.set(false);
+
+    this.linesFormArray.clear();
+    const linesToLoad =
+      detail.lines.length > 0
+        ? detail.lines
+        : [{ workspace_product_id: '', quantity: '' }];
+    for (const line of linesToLoad) {
+      const lineGroup = this.fb.nonNullable.group({
+        workspace_product_id: [line.workspace_product_id, [Validators.required, this.productValidator]],
+        quantity: [trimDecimal(String(line.quantity)), [Validators.required, Validators.min(0.01)]],
+      });
+      if (line.workspace_product_id && !this.products().some((p) => p.id === line.workspace_product_id)) {
+        lineGroup.get('workspace_product_id')?.markAsTouched();
+      }
+      this.linesFormArray.push(lineGroup);
+    }
+
+    const activeSupplierIds = new Set(activeSuppliers.map((s) => s.id));
+    const prefilledSuppliers = detail.recipients
+      .map((r) => r.supplier_id)
+      .filter((id) => activeSupplierIds.has(id));
+
+    this.form.patchValue({
+      supplierIds: prefilledSuppliers,
+      neededByDate: null,
+      tenantTerms: detail.rfq.tenant_terms ?? '',
     });
   }
 
@@ -102,12 +250,12 @@ export class RfqCreateComponent implements OnInit {
     this.errorMessage.set(null);
 
     forkJoin({
-      products: this.apiService.products({ limit: 100, status: 'active' }),
+      products: this.loadAllActiveProducts(),
       suppliers: this.apiService.suppliers({ limit: 100, status: 'active' }),
       detail: this.rfqApi.getRfq(rfqId),
     }).subscribe({
       next: ({ products, suppliers, detail }) => {
-        this.products.set(products.items);
+        this.products.set(products);
         this.suppliers.set(suppliers.items.filter((s) => !!s.contact_email));
         this.applyRfqDetail(detail);
         this.isLoadingRfq.set(false);
@@ -136,13 +284,15 @@ export class RfqCreateComponent implements OnInit {
         ? detail.lines
         : [{ workspace_product_id: '', quantity: '' }];
     for (const line of linesToLoad) {
-      this.linesFormArray.push(
-        this.fb.nonNullable.group({
-          workspace_product_id: [line.workspace_product_id, Validators.required],
-          // numeric(18,6) comes back as '120.000000'; the narrow field would show only its tail.
-          quantity: [trimDecimal(String(line.quantity)), [Validators.required, Validators.min(0.01)]],
-        }),
-      );
+      const lineGroup = this.fb.nonNullable.group({
+        workspace_product_id: [line.workspace_product_id, [Validators.required, this.productValidator]],
+        // numeric(18,6) comes back as '120.000000'; the narrow field would show only its tail.
+        quantity: [trimDecimal(String(line.quantity)), [Validators.required, Validators.min(0.01)]],
+      });
+      if (line.workspace_product_id && !this.products().some((p) => p.id === line.workspace_product_id)) {
+        lineGroup.get('workspace_product_id')?.markAsTouched();
+      }
+      this.linesFormArray.push(lineGroup);
     }
 
     this.form.patchValue({
@@ -159,7 +309,7 @@ export class RfqCreateComponent implements OnInit {
   addLine(): void {
     this.linesFormArray.push(
       this.fb.nonNullable.group({
-        workspace_product_id: ['', Validators.required],
+        workspace_product_id: ['', [Validators.required, this.productValidator]],
         quantity: ['', [Validators.required, Validators.min(0.01)]],
       }),
     );

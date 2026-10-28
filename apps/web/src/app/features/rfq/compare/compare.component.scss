@@ -6,6 +6,40 @@
   padding: 24px;
   max-inline-size: 1200px;
   margin-inline: auto;
+
+  &.embedded {
+    padding: 16px 0 0;
+    max-inline-size: none;
+  }
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-block-end: 1rem;
+  font-size: 0.9rem;
+}
+
+.breadcrumb-link {
+  color: var(--pp-info);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.breadcrumb-sep {
+  font-size: 18px;
+  inline-size: 18px;
+  block-size: 18px;
+  color: var(--pp-text-muted);
+}
+
+.breadcrumb-current {
+  color: var(--pp-text-muted);
+  font-weight: 500;
 }
 
 .page-header {

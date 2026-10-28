@@ -7,7 +7,7 @@
   } @else {
     @if (quotation(); as q) {
       <!-- Breadcrumb -->
-      <nav class="breadcrumb" aria-label="breadcrumb">
+      <nav class="breadcrumb" [attr.aria-label]="'common.breadcrumbLabel' | translate">
         <a routerLink="/quotations" class="breadcrumb-link">{{ 'quotations.breadcrumb.inbox' | translate }}</a>
         <mat-icon class="breadcrumb-sep" aria-hidden="true">chevron_right</mat-icon>
         <span class="breadcrumb-current">{{ truncateId(q.id) }}</span>

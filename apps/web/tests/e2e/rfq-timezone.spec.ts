@@ -21,7 +21,7 @@ test('saves an RFQ with the picked local calendar day', async ({ page }) => {
   await signInUi(page, credentials.ownerEmail, credentials.ownerPassword);
   await page.goto('/rfq/create');
 
-  await openAsyncSelect(page, page.locator('mat-select[formControlName="workspace_product_id"]'));
+  await page.locator('input[formControlName="workspace_product_id"]').fill(product.tenant_name);
   await page.locator('mat-option', { hasText: product.tenant_name }).click();
   await page.locator('input[formControlName="quantity"]').fill('2');
   await openAsyncSelect(page, page.locator('mat-select[formControlName="supplierIds"]'));

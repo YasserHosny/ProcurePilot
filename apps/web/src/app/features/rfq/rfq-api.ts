@@ -23,6 +23,9 @@ export interface RfqLine {
   workspace_product_id: string;
   quantity: number | string;
   created_at: string;
+  position?: number;
+  product_name?: string | null;
+  product_variant?: string | null;
 }
 
 export interface RfqRecipient {
@@ -34,6 +37,8 @@ export interface RfqRecipient {
   outbound_message_id: string | null;
   sent_at: string | null;
   created_at: string;
+  supplier_name?: string | null;
+  supplier_contact_email?: string | null;
 }
 
 export interface RfqDetail {

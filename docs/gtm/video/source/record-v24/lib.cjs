@@ -20,6 +20,12 @@ const ASSEMBLE = path.join(__dirname, '../opening/assemble.py');
 const I18N = JSON.parse(fs.readFileSync(path.join(REPO, `packages/i18n/${LANG}.json`), 'utf8'));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+function neededByDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 7);
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+}
+
 // t('rfq.create.sendButton') -> the label in the recording language; {{x}} placeholders become `vars`.
 function t(key, vars = {}) {
   let v = key.split('.').reduce((o, k) => (o && typeof o === 'object' ? o[k] : undefined), I18N);
@@ -129,4 +135,4 @@ async function api(page, p) {
 
 const run = (fn) => fn().then(() => process.exit(0)).catch((e) => { console.error('FAIL', e.message); process.exit(1); });
 
-module.exports = { LANG, BASE, OUT, t, rx, connect, sleep, click, type, moveTo, ensureCursor, hideNav, showNav, startRec, stopRec, scrollToEl, api, run };
+module.exports = { neededByDate, LANG, BASE, OUT, t, rx, connect, sleep, click, type, moveTo, ensureCursor, hideNav, showNav, startRec, stopRec, scrollToEl, api, run };
