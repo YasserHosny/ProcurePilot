@@ -68,7 +68,7 @@ paths:
         - { name: group_id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
       responses:
-        '200': { description: The group's requests (PurchaseRequest[] with request_group). }
+        '200': { description: "The group's requests (PurchaseRequest list, each with request_group)." }
         '409': { description: details.reason not_draft }
   /request-groups/{group_id}/approve:
     post:
