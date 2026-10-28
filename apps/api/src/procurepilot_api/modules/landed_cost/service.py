@@ -47,16 +47,20 @@ class LandedCostService:
 
     def get_landed_cost(self, *, bearer_token: str, line_id: UUID) -> LandedCost:
         client = authenticated_client(self._settings, bearer_token)
-        row = self._latest_landed_cost(client, line_id)
+        decision = self._decision_for_line(client, line_id)
+        if decision is None:
+            raise ConflictError(details={"reason": "line_not_matched"})
+        row = self._latest_landed_cost(client, UUID(str(decision["id"])))
         if row is not None:
             return _landed_cost(row)
-        if self._decision_for_line(client, line_id) is None:
-            raise ConflictError(details={"reason": "line_not_matched"})
         raise NotFoundError(details={"resource": "landed_cost"})
 
     def get_landed_cost_or_none(self, *, bearer_token: str, line_id: UUID) -> LandedCost | None:
         client = authenticated_client(self._settings, bearer_token)
-        row = self._latest_landed_cost(client, line_id)
+        decision = self._decision_for_line(client, line_id)
+        if decision is None:
+            return None
+        row = self._latest_landed_cost(client, UUID(str(decision["id"])))
         return _landed_cost(row) if row else None
 
     def compute_for_line_with_client(
@@ -68,13 +72,15 @@ class LandedCostService:
         rule_version: str | None = None,
     ) -> LandedCost:
         version = rule_version or self.active_rule_version
-        existing = self._landed_cost_for_rule(client, line_id, version)
-        if existing is not None:
-            return _landed_cost(existing)
-        line = _line_row(client, line_id)
+        # Cost belongs to a decision, not a line: after a correction (spec 023 R5) the line has a
+        # cost row per decision, and only the current decision's counts.
         decision = self._decision_for_line(client, line_id)
         if decision is None:
             raise ConflictError(details={"reason": "line_not_matched"})
+        existing = self._landed_cost_for_rule(client, UUID(str(decision["id"])), version)
+        if existing is not None:
+            return _landed_cost(existing)
+        line = _line_row(client, line_id)
         product = _product_row(client, UUID(str(decision["matched_workspace_product_id"])))
         canonical = _canonical_row(client, UUID(str(product["canonical_product_id"])))
         pack = _pack_row(client, UUID(str(product["id"])))
@@ -166,12 +172,12 @@ class LandedCostService:
             raise ServiceUnavailableError(details={"reason": "multiple_match_decisions"})
         return rows[0] if rows else None
 
-    def _latest_landed_cost(self, client: object, line_id: UUID) -> dict[str, object] | None:
+    def _latest_landed_cost(self, client: object, decision_id: UUID) -> dict[str, object] | None:
         try:
             rows = _rows(
                 client.table("landed_cost")
                 .select(LANDED_COLUMNS)
-                .eq("quotation_line_id", str(line_id))
+                .eq("match_decision_id", str(decision_id))
                 .order("recorded_at", desc=True)
                 .limit(1)
                 .execute()
@@ -184,14 +190,14 @@ class LandedCostService:
     def _landed_cost_for_rule(
         self,
         client: object,
-        line_id: UUID,
+        decision_id: UUID,
         rule_version: str,
     ) -> dict[str, object] | None:
         try:
             rows = _rows(
                 client.table("landed_cost")
                 .select(LANDED_COLUMNS)
-                .eq("quotation_line_id", str(line_id))
+                .eq("match_decision_id", str(decision_id))
                 .eq("rule_version", rule_version)
                 .limit(2)
                 .execute()
