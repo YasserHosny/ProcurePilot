@@ -8,7 +8,7 @@
 | Persona and stage | Purchasing manager, owner · product-aware |
 | Proof ids | C-01, C-02, C-10, C-14 |
 | Link (UTM) | none |
-| Status | draft, ready for review (not published) |
+| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
 
 ## LinkedIn (bilingual, final)
 
@@ -92,7 +92,7 @@ How do your suppliers send quotes today: WhatsApp, email, or paper?
 
 ## Visual
 
-**Rendered image v2 (2026-10-29, current):** `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/drafts/images/v2/A-05-1080x1350.png`: the round-6 WhatsApp quote photo beside the real "arithmetic check passed" panel (same total, 24,640 ج.م) from the Egypt v2.5 cut.
+**Rendered image v2 (2026-10-29, current):** `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/approved/images/v2/A-05-1080x1350.png`: the round-6 WhatsApp quote photo beside the real "arithmetic check passed" panel (same total, 24,640 ج.م) from the Egypt v2.5 cut.
 
 | Slide / frame | On-image text | Visual description | Brand assets used |
 |---|---|---|---|

@@ -5,9 +5,9 @@ An approval is valid for the item, version and action named in its row only.
 
 | Date | Gate | Item and version | Decision (approved / changes / rejected) | By | Where given (chat, comment) | Notes |
 |---|---|---|---|---|---|---|
-| | G-campaign-strategy | campaign-brief v1 (2026-10-28) | pending | | | Brief only; no separate strategy file (the approved positioning and MD-01 to MD-11 are the strategy) |
+| 2026-10-29 | G-campaign-strategy | campaign-brief v1 (2026-10-28) | approved | Yasser | chat ("ok i approved") | Brief only; no separate strategy file (the approved positioning and MD-01 to MD-11 are the strategy) | Given together with the post approval |
 | 2026-10-28 | G-claims | C-16 (one RFQ to every supplier) for A-04 | approved | Yasser | chat | MD-12 |
-| | G-asset | A-01 to A-06 v1 (EN, AR-EG, AR-SA) | pending | | | Each post needs a native check of the Arabic and its image |
+| 2026-10-29 | G-asset | A-01 to A-06 v1.1 text (bilingual blocks) + v2 images | approved | Yasser | chat ("ok i approved") | Arabic approved as written by the owner; v2 images (real material only) |
 | | G-publish | each post, when posted by Yasser | pending | | | Claude never posts |
 
 ## Review results (campaign-review)

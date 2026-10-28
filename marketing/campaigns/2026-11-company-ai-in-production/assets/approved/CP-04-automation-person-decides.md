@@ -8,7 +8,7 @@
 | Persona and stage | Operations leader · problem-aware |
 | Proof ids | CO-05, CO-03 |
 | Link (UTM) | https://www.iron-sys.com/?utm_source=linkedin&utm_medium=organic&utm_campaign=2026-11-company-ai-in-production&utm_content=cp-04 |
-| Status | draft, ready for review (not published) |
+| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
 
 Problem lines are the website's own (services, "The problem").
 
@@ -91,7 +91,7 @@ Routine to the system, exceptions to your team, every step visible and open to o
 
 ## Visual
 
-**Rendered image v2 (2026-10-29, current):** `campaigns/2026-11-company-ai-in-production/assets/drafts/images/v2/CP-04-1080x1350.png`.
+**Rendered image v2 (2026-10-29, current):** `campaigns/2026-11-company-ai-in-production/assets/approved/images/v2/CP-04-1080x1350.png`.
 
 | Slide / frame | On-image text | Visual description | Brand assets used |
 |---|---|---|---|

@@ -19,7 +19,7 @@ const COC = path.join(ROOT, 'campaigns/2026-11-company-ai-in-production/assets/d
 const mime = (p) => (p.endsWith('.svg') ? 'image/svg+xml' : p.endsWith('.png') ? 'image/png' : 'image/jpeg');
 const img = (p) => `data:${mime(p)};base64,${fs.readFileSync(p).toString('base64')}`;
 const en = (s) => `<span dir="ltr" style="unicode-bidi:isolate">${s}</span>`;
-const SRC = (f) => img(path.join(PPC, 'source', f));
+const SRC = (f) => img(path.join(PPC, '..', 'approved', 'source', f)); // approved sources (2026-10-29); new renders go to drafts/
 
 const FONTS = '<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,800&family=Inter:wght@400;500;600&family=Readex+Pro:wght@300;400;500;600;700&display=block" rel="stylesheet">';
 const GRAIN = `url("data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 0"/></filter><rect width="100%" height="100%" filter="url(#n)"/></svg>')}")`;

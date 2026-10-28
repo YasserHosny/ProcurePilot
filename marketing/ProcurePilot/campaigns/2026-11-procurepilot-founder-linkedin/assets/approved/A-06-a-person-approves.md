@@ -8,7 +8,7 @@
 | Persona and stage | Owner / GM, approver · product-aware |
 | Proof ids | C-05, C-06, C-09, C-14 |
 | Link (UTM) | none |
-| Status | draft, ready for review (not published) |
+| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
 
 ## LinkedIn (bilingual, final)
 
@@ -86,7 +86,7 @@ Who approves purchases in your branches today?
 
 ## Visual
 
-**Rendered image v2 (2026-10-29, current):** `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/drafts/images/v2/A-06-1080x1350.png`: the real phone approval screen from the Egypt v2.5 cut.
+**Rendered image v2 (2026-10-29, current):** `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/approved/images/v2/A-06-1080x1350.png`: the real phone approval screen from the Egypt v2.5 cut.
 
 | Slide / frame | On-image text | Visual description | Brand assets used |
 |---|---|---|---|

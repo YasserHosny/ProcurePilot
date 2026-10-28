@@ -11,4 +11,4 @@ Rules, statuses and the approval flow are in `campaigns/README.md`.
 
 | Campaign | Stage | Next gate |
 |---|---|---|
-| `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/` | review: six posts drafted | Yasser: brief, C-16, posts |
+| `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/` | approved 2026-10-29; posting 2026-11-03 to 2026-11-22 (`POSTING.md`) | G-publish per post (Yasser) |

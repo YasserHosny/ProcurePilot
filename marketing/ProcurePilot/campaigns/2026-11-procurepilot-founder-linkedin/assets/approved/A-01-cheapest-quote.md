@@ -8,7 +8,7 @@
 | Persona and stage | Purchasing manager, owner · problem-aware |
 | Proof ids | C-03, C-14 · headline MD-09 |
 | Link (UTM) | none (CTA is a conversation, MD-04) |
-| Status | draft, ready for review (not published) |
+| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
 
 ## LinkedIn (bilingual, final)
 
@@ -125,7 +125,7 @@ If you buy for 2+ branches, how do you compare quotes today? Tell me in the comm
 
 ## Visual
 
-**Rendered image v2 (2026-10-29, current):** `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/drafts/images/v2/A-01-carousel-1080x1350.pdf` (5 pages; PNGs `A-01-p1..p5`). Page 1 shows the round-6 WhatsApp quote photo; page 5 a real Egypt Smart Compare frame from the approved v2.5 cut. v1 kept in `images/`.
+**Rendered image v2 (2026-10-29, current):** `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/approved/images/v2/A-01-carousel-1080x1350.pdf` (5 pages; PNGs `A-01-p1..p5`). Page 1 shows the round-6 WhatsApp quote photo; page 5 a real Egypt Smart Compare frame from the approved v2.5 cut. v1 kept in `images/`.
 
 | Slide / frame | On-image text | Visual description | Brand assets used |
 |---|---|---|---|

@@ -12,8 +12,8 @@ Id format: `YYYY-MM-<product-or-company>-<slug>`. When the product part is a pro
 
 | Campaign | Product | Objective | Stage | Next gate | Owner |
 |---|---|---|---|---|---|
-| `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/` | ProcurePilot | Credibility for founder-led sales: six LinkedIn posts (EN, Egyptian and Gulf Arabic) | review | G-campaign-strategy, G-asset (claims approved) | Yasser |
-| `campaigns/2026-11-company-ai-in-production/` | company | Introduce Iron Systems on LinkedIn, X, Facebook, Instagram: four ideas (EN + MSA Arabic) | review | G-campaign-strategy, G-claims (CO-01–CO-10), G-asset | Yasser |
+| `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/` | ProcurePilot | Credibility for founder-led sales: six LinkedIn posts (EN, Egyptian and Gulf Arabic) | approved (posting 2026-11-03 to 2026-11-22) | G-publish per post (Yasser) | Yasser |
+| `campaigns/2026-11-company-ai-in-production/` | company | Introduce Iron Systems on LinkedIn, X, Facebook, Instagram: four ideas (EN + MSA Arabic) | approved (posting 2026-11-01 to 2026-11-15) | G-publish per post (Yasser) | Yasser |
 
 Stages: `brief` → `strategy` → `production` → `review` → `approved` → `published` → `reporting` → `closed`.
 

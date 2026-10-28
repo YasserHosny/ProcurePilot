@@ -8,7 +8,7 @@
 | Persona and stage | Owner, purchasing manager · product-aware |
 | Proof ids | C-01, C-03, C-07, C-09, C-14, C-15 and **C-16 (proposed: one RFQ to every supplier)** |
 | Link (UTM) | none |
-| Status | draft, ready for review (not published) |
+| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
 
 Text reuses the owner-approved v2.5 script: the bridge line of beat 1 and the recap rows (SRC-029). The video's
 disclosure pill was removed in v2.5 because "the description carries the disclosure": the last line below is that
@@ -109,7 +109,7 @@ ProcurePilot في حوالي دقيقتين:
 
 ## Visual
 
-**Rendered image v2 (2026-10-29, current):** thumbnail `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/drafts/images/v2/A-04-thumb-1920x1080.png` (real opening frame of the Egypt cut).
+**Rendered image v2 (2026-10-29, current):** thumbnail `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/approved/images/v2/A-04-thumb-1920x1080.png` (real opening frame of the Egypt cut).
 
 | Slide / frame | On-image text | Visual description | Brand assets used |
 |---|---|---|---|

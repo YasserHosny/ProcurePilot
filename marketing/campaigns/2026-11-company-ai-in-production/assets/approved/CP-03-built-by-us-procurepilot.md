@@ -8,7 +8,7 @@
 | Persona and stage | Owner, IT lead · solution-aware |
 | Proof ids | CO-08, CO-09, CO-10 · ProcurePilot C-01, C-02, C-05, C-07, C-14, C-16 |
 | Link (UTM) | https://www.iron-sys.com/?utm_source=linkedin&utm_medium=organic&utm_campaign=2026-11-company-ai-in-production&utm_content=cp-03 |
-| Status | draft, ready for review (not published) |
+| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
 
 This is the company angle on ProcurePilot: what it shows about how Iron Systems builds. The product's own posts
 (founder voice) stay in `ProcurePilot/campaigns/`.
@@ -86,7 +86,7 @@ We built ProcurePilot the way we build every system: it reads quotes in Arabic, 
 
 ## Visual
 
-**Rendered image v2 (2026-10-29, current):** thumbnail `campaigns/2026-11-company-ai-in-production/assets/drafts/images/v2/CP-03-thumb-1920x1080.png` (real Egypt Smart Compare frame).
+**Rendered image v2 (2026-10-29, current):** thumbnail `campaigns/2026-11-company-ai-in-production/assets/approved/images/v2/CP-03-thumb-1920x1080.png` (real Egypt Smart Compare frame).
 
 | Slide / frame | On-image text | Visual description | Brand assets used |
 |---|---|---|---|

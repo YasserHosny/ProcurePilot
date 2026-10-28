@@ -8,7 +8,7 @@
 | Persona and stage | Owner, IT lead · problem-aware |
 | Proof ids | CO-04, CO-06 |
 | Link (UTM) | https://www.iron-sys.com/?utm_source=linkedin&utm_medium=organic&utm_campaign=2026-11-company-ai-in-production&utm_content=cp-02 |
-| Status | draft, ready for review (not published) |
+| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
 
 ## LinkedIn (bilingual, final)
 
@@ -89,7 +89,7 @@ Not every problem needs AI. We test a model's value before we ship it, and keep 
 
 ## Visual
 
-**Rendered image v2 (2026-10-29, current):** `campaigns/2026-11-company-ai-in-production/assets/drafts/images/v2/CP-02-1080x1350.png`.
+**Rendered image v2 (2026-10-29, current):** `campaigns/2026-11-company-ai-in-production/assets/approved/images/v2/CP-02-1080x1350.png`.
 
 | Slide / frame | On-image text | Visual description | Brand assets used |
 |---|---|---|---|

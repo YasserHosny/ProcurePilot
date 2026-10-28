@@ -63,7 +63,7 @@ export function scanSecrets(text) {
 
 /** Returns { data, body, error }. Frontmatter must start on the first line (Claude Code requirement). */
 export function parseFrontmatter(text) {
-  const t = text.replace(/^﻿/, '');
+  const t = text.replace(/^﻿/, '').replace(/\r\n/g, '\n'); // CRLF checkouts parse the same as LF
   if (!t.startsWith('---\n') && !t.startsWith('---\r\n')) return { error: 'frontmatter must start with --- on the first line' };
   const end = t.indexOf('\n---', 4);
   if (end < 0) return { error: 'frontmatter has no closing ---' };
@@ -112,7 +112,12 @@ function walk(dir, filter = () => true) {
   return out;
 }
 const rel = (root, p) => path.relative(root, p).split(path.sep).join('/');
-const sha256 = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+// Line-ending neutral: a text file hashes the same with CRLF or LF, so Windows checkouts match the lock (PR #326).
+const sha256 = (p) => {
+  const b = fs.readFileSync(p);
+  const text = !b.includes(0);
+  return createHash('sha256').update(text ? b.toString('utf8').replace(/\r\n/g, '\n') : b).digest('hex');
+};
 
 const PATH_PREFIXES = ['config/', 'knowledge/', 'research/', 'strategy/', 'workflows/', 'campaigns/', 'templates/', 'analytics/',
   'integrations/', 'scripts/', 'tests/', '.claude/', '.agents/', 'LinkedIn/', 'ProcurePilot/', '../'];

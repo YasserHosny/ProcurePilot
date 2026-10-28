@@ -52,7 +52,12 @@ try { version = JSON.parse(fs.readFileSync(path.join(source, '.claude-plugin/plu
 // Skill test material (evals/) is not installed: it is only used to test skills upstream, and its sample prompts
 // contain fake credentials that trip the repo's secret scan (gitleaks), see PR #326.
 const EXCLUDE_DIRS = new Set(['evals']);
-const hashFile = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+// Line-ending neutral: a text file hashes the same with CRLF or LF, so Windows checkouts match the lock (PR #326).
+const hashFile = (p) => {
+  const b = fs.readFileSync(p);
+  const text = !b.includes(0);
+  return createHash('sha256').update(text ? b.toString('utf8').replace(/\r\n/g, '\n') : b).digest('hex');
+};
 function walk(dir, base = dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const p = path.join(dir, e.name);

@@ -8,7 +8,7 @@
 | Persona and stage | Owner, purchasing manager · solution-aware |
 | Proof ids | C-01, C-03, C-05, C-06, C-07, C-08, C-11, C-12, C-15 |
 | Link (UTM) | Egypt and EN: optional https://procurepilot.iron-sys.com/?lang=en (or `?lang=ar`). Saudi: none until D-11 is fixed |
-| Status | draft, ready for review (not published) |
+| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
 
 Opening lines reuse the owner-approved v2.5 video script (problem chapter, SRC-029).
 
@@ -98,7 +98,7 @@ It's live now as an invitation-only pilot, free for the agreed pilot period. If 
 
 ## Visual
 
-**Rendered image v2 (2026-10-29, current):** `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/drafts/images/v2/A-03-1080x1350.png`.
+**Rendered image v2 (2026-10-29, current):** `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/approved/images/v2/A-03-1080x1350.png`.
 
 | Slide / frame | On-image text | Visual description | Brand assets used |
 |---|---|---|---|

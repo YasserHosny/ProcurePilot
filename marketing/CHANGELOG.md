@@ -2,6 +2,9 @@
 
 ## 2.0.0 · 2026-10-29
 
+- **Posts approved** by Yasser (MD-14): A-01..A-06 and CP-01..CP-04 with their v2 images, moved to `assets/approved/`; posting 2026-11-01 to 2026-11-22 (`content-calendar.md`, `POSTING.md` in each campaign). Yasser posts.
+- Line endings: `marketing/.gitattributes` keeps LF on every OS; upstream-skill hashes and skill frontmatter parsing are line-ending neutral (a Windows CRLF checkout passes `npm test`).
+
 - Upstream skills are installed without their `evals/` test folders (`scripts/sync-upstream-skills.mjs`): a sample prompt there carries a fake key that the repo's secret scan (gitleaks) flags.
 - **Moved into the ProcurePilot repo** as `marketing/` (owner request; G-14, PPS-111; branch `docs/marketing-os`). Product docs are linked from the repo (`../docs/gtm`, `../docs/brand`, `../packages/i18n`) instead of mirrored; `config/sources.yaml` reads this repo (warns when behind origin) and treats the website and brand folders as optional workspace sources. Brand files needed for production copied to `brand/iron-systems/`. Demo video v2.2 (pre-limiter mix) not copied: the repo holds the corrected cut.
 - LinkedIn About updated on the live page (EN; AR added as a page language), 2026-10-29.

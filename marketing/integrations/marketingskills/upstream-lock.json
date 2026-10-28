@@ -7,218 +7,218 @@
   "skills": {
     "product-marketing": {
       "files": {
-        "references/brand-voice.md": "595871313bf032be3996a567a053b4531837bc9362f91e76c253f4b95542ac60",
-        "SKILL.md": "e6cd52d37b248c38d8020017acb3d2ce2b3106ed8a6ca774338dd6844622e654"
+        "references/brand-voice.md": "932f3453db2761f03050792e39800150495dab449750b40913a4314ea97e7672",
+        "SKILL.md": "19ece0fa75c72a5a8b6e90db80f506586f54cc93bae6bffbb1bd2ef4ae7d603c"
       }
     },
     "customer-research": {
       "files": {
-        "references/interviews-and-surveys.md": "6583191c870887feb288eee93248bd82cc997b6b010762076fe16a49b67806f5",
-        "references/source-guides.md": "23db7acf05f07da54af9bee47003c8f08a18b4ccef7da3e8e3d128aa06d1ca58",
-        "SKILL.md": "fdca4d8bfca510faa4aca7a9c2ba365c9e7cf24f833808381b09b66dda0faa98"
+        "references/interviews-and-surveys.md": "56adecdc40af1242464937100349fc1a161627394909551720494bc5ee537076",
+        "references/source-guides.md": "7490a8d04f209d4c8c987530e79d0883a6b42027b86a920fc751cf8ea9904892",
+        "SKILL.md": "905e65e67268448d88b3b96cf045c6b3615cdd87c1060e129b148a31aa627669"
       }
     },
     "competitor-profiling": {
       "files": {
-        "references/templates.md": "146dcb7130d01c6d7d8b25292c5be8dd13934f895b7b4f0eecd51146e5d607fe",
-        "references/tool-reference.md": "f90f4a0bfc852e33defcc2f9d15fb2abcb13d8b01cba3408c0d66a0c319a3878",
-        "SKILL.md": "4ea0896c2e73b49361f2708f084e33ed21663b9af4c1096b886845e0de9fe834"
+        "references/templates.md": "710d78cb519012eb7e39f63643e22d7b9026c91c569262b44c45535c10717a91",
+        "references/tool-reference.md": "fda64910bc1b3a2bc7df21c15701220849b4b79a58a51f9d3ccae1b7311dbd79",
+        "SKILL.md": "dd97331ef22b65be8dc75ee36e6ccb154096e2303aac2f7d627f3d002191a8ae"
       }
     },
     "competitors": {
       "files": {
-        "references/content-architecture.md": "cf55870fa8a606f0adb16d4a8728ab3b0b6c987c373e6edd6ee18b448831bff2",
-        "references/templates.md": "bb4e8fb211f3f639f16a341e77d7f5ea46333aa6e89177011d3f4342a2315754",
-        "SKILL.md": "52b0fe4578524139f6ec78cd05d20671846ca276cda09cd571ed3377f07f5695"
+        "references/content-architecture.md": "893b0bf30a630753bff02345029a96959ac359a5221467132d553d8e09a2d433",
+        "references/templates.md": "138f4367a45fc9cc775f9fd67324f8a6f1e1f5c3c1a90bd952db4731f080844f",
+        "SKILL.md": "ff77b76dfe43158b2fc248bb8c41fe94745d1264abb0a0c665b2c55318287a35"
       }
     },
     "marketing-plan": {
       "files": {
-        "references/aarrr-framework.md": "ad6d14748ea5515908cbec2f1624ff4c1f500b2fb689de960e86104de5e1fdda",
-        "references/budget-planning.md": "e8e2bedff793550fedef907fabf3011f2638650e8aec881bbda9441de58ccda8",
-        "references/client-types.md": "ca1313061b1057e6b001bff94833c6711805cdd0ab4910b551fad8fe2e675a9e",
-        "references/current-state-rubric.md": "b293de9d8ff7d3e1d08f53f4906f5457472f272e924d325cbe06349d8c2b8440",
-        "references/example-quietude.md": "349f4445a76e148add8763915b897dff7883c075807780ac761a65418c8a7311",
-        "references/funding-stage-unlocks.md": "07b35998d35942040fd81b7fdb16c0421e9cd532039f850b4642351c35f77fa0",
-        "references/growth-patterns.md": "5ac4d4684b7567834586f582c77385de68257e5cceeb8593b859d73a84b08806",
-        "references/idea-cross-reference.md": "3024a740912a8b375898cf7f0e94f08ca1580a0d4b00510a587e8aae4b0a0489",
-        "references/market-sizing.md": "1e1fe0bf2a30cca3bcc2a0119507632e448edb9ec327813dc0cc1b9e58e7b1d6",
-        "references/measurement-framework.md": "0f210adca0709cac1e770a97b6f1546e7bfbaa12a1ed95c2a2a06a1bdf3665cd",
-        "references/methodology.md": "656117913f0a7c9ef3ef4def1731cdf006c22be3d7007308bad8823c3dc53426",
-        "references/ops-stack-mapping.md": "e002db4200074bc8456881b8715f81fc741d39be9cdca80962288acc53fd7352",
-        "references/plan-template.md": "c13c6799f9335808aacfe60e95eebd9c048abbffce5be00314fe3af79c14a694",
-        "references/team-and-agency-model.md": "669c6bdb1f71f35f4e15c890ae12f3829cc649f3e2aea0258d214db2d2faf66b",
-        "SKILL.md": "342aff693830f9e7d2c72b07ce960c5925e58224a1a22f3fd0a2a2c17c024977"
+        "references/aarrr-framework.md": "5c7bf583c2aa62e193789b6b1a88a978bf3ba9dc0c8c6653b53f7f62c0c1a0e3",
+        "references/budget-planning.md": "4351fa1712b66e3e527b71ec9a2e01a68edb43e77b6d310bb424756c6d1a17f7",
+        "references/client-types.md": "06e3d0a6f3e9b7195a8c0b43d5186769d1554d1dfd8b1212aca220f9ce09fc01",
+        "references/current-state-rubric.md": "8ab1d4a4d16ec01c2bf61d83807c0abd857aadd82f3eeaf4e4842b4bbeff1f03",
+        "references/example-quietude.md": "63c002257ee1f6eaeb7c99c4ab9c650ea8bd8f7586c75e4565c2322faef82a04",
+        "references/funding-stage-unlocks.md": "49f073653ac32dd42b7e5e10c3deabd7adae8120c41baf0cf813ec20164c6488",
+        "references/growth-patterns.md": "fafa84b8c3a62ed9c33c30fc25c7422e0d87b935de990d0acbf91889e1a053de",
+        "references/idea-cross-reference.md": "350fa9c6f4cb4cd8f23698adb8479ae94cd6564a06b2b7cfcdf1430448e68d2f",
+        "references/market-sizing.md": "e991bf2f38948ea4e829c74fea83f367fbcacb4d6c2ca0f4ca89fc8b9fb2bc0e",
+        "references/measurement-framework.md": "93d9bf9d9e624a6031a27ce61cf1617e3aa5a8fff57e1c6f80194f847234b745",
+        "references/methodology.md": "a5ae96ee26c800aa40eafcb525139e3dd49b2c1d24005fdcc038287ad25ede7e",
+        "references/ops-stack-mapping.md": "9a506816d87ed176c0578d13bbf25c5f8398872d9002b3589e2dfa42ad17c907",
+        "references/plan-template.md": "bce84c2c3c31c9163a0849a1371aadb13f6ab8b29402e64b7d5b95c316a79656",
+        "references/team-and-agency-model.md": "0c5e55c0992de4d5d24cd299eb46765a8986cb204ebd7c65bce32c868ae0d5f7",
+        "SKILL.md": "2b75dfae852bdb61fd96eebe3d2b373f99f67c86ff830f796310f662ba8906e8"
       }
     },
     "marketing-ideas": {
       "files": {
-        "references/guerrilla-marketing.md": "d2bb0df8b06aec856d9dc6a79e49d6d92a26ca66590e4017d5f1ab2bdcf1ceb0",
-        "references/ideas-by-category.md": "c0710cde1d82fc96181dcaf1dedab8a501035ac31fe42509c2d19fcf457362c4",
-        "SKILL.md": "1b210d02967f0ff627d4f1633f1cf5c77d9730661fa69b31e301835d97f42c06"
+        "references/guerrilla-marketing.md": "07b0534b579ce1916a60e79ab426cd936e78b4b261802d6486ad145f7bf552ae",
+        "references/ideas-by-category.md": "8b6aa55b3255616ea80c0ea45eca8f2bb70e528510ed76f6392e71475dd0c09b",
+        "SKILL.md": "d5ea46d2d2eb2fb039494e8b545550a6bd5b5b9aedc5e65a228ac514deb018ff"
       }
     },
     "marketing-psychology": {
       "files": {
-        "SKILL.md": "f02e4fe8370d629d914032f5f8a3a988e2825e5bdae08215cf08cfb4ff07de73"
+        "SKILL.md": "573bbe4f6e300e7fb75299e314f56e26382d284782caa2ae0e0f33eb2e646548"
       }
     },
     "content-strategy": {
       "files": {
-        "references/content-distribution.md": "7c752892cfd6504621872584ca461c5e564aa66ae7fc0756f8344a2bb1972cb4",
-        "references/headless-cms.md": "6e79cc642da23d7eb09f61c27a9fedb20accb0971eb0a50626fd60456c31192d",
-        "SKILL.md": "cd8c5939b4e26b0fc478bfeb332a2956746b2d69ce47b44a34829c42510a9899"
+        "references/content-distribution.md": "1861a1aab0627ab29c279000879a9889242da1ba85e677acdc759c66a6241778",
+        "references/headless-cms.md": "efc796ae9596d1efcb876683db2d9b7c10c83e76e1cb69e527097907d5b4fc3f",
+        "SKILL.md": "5097ae8c11c27e2846be307b30f09ac17333fd1ffab1bae19728c81444767001"
       }
     },
     "copywriting": {
       "files": {
-        "references/ai-tells.md": "e440070f751a959d793c08edb461d421983ba3291b2c19b3007daf1fa1613824",
-        "references/copy-frameworks.md": "148295b56de4e7864706a92bc9247e9d8637cca7b7d68738157f2c5ee5f49a9e",
-        "references/natural-transitions.md": "0e2cdaf06b93e484a01ebd99e86b1864f26d743398b6dceb41279c1380ee2dcb",
-        "SKILL.md": "6e90506cb53d1b38efdb55ac8bd395ba78e16310b8e3d08c88d606820f00f705"
+        "references/ai-tells.md": "b98c3a19b3a75c714d69e80a0076e4c07244b0e833c2ce81ff2631224fb7f7b2",
+        "references/copy-frameworks.md": "352122944bf9e891ceb0e003adce41591d111e9d97057700626249919dfe430d",
+        "references/natural-transitions.md": "9bd61b0de5be2c4de4ce130c68236b4f290b12737823827a458bb2b4c8584683",
+        "SKILL.md": "13c580c2432a4499e9dfdcf5d553df7aa6589e90cf5bd869fb4fbde5caf9f567"
       }
     },
     "copy-editing": {
       "files": {
-        "references/checklist.md": "3ee21b8b58ab852090f05d669d8c121a46f59f638e8e5cdea278e5fda5ee827e",
-        "references/content-refresh.md": "33a3a7dbf4fc4b9425a10378ea05ed177929ab04d3b9f532650b5f01f55b7144",
-        "references/plain-english-alternatives.md": "0bde00902bb1ae02d6fda0b87928d5f2caa9eb4bd0367015eae368cb0f7d3c0f",
-        "SKILL.md": "c8f598d952a85d87349abc56462ba022fca4a8f987975d98eeafbaddec91ab72"
+        "references/checklist.md": "4cf94c922286223681fc53721fcc65ae7299f1e36e797e7397d369d674580c60",
+        "references/content-refresh.md": "ba73cdf278fe6b552eee27eb1452494f11f9d17ef67d720657e0982f76fb961b",
+        "references/plain-english-alternatives.md": "df4f820d4c63ae8a517c64a243c101658352cd07d002355bf3c97de0a00f3775",
+        "SKILL.md": "2a072606d9d5662509ea6ef62c65719487dcb68876acab9286bde4d1af5c030f"
       }
     },
     "social": {
       "files": {
-        "references/carousel-frameworks.md": "88dabd955dda8b6683d5ffe6906549916e8a028cd3cfd0110fd6559c15eb8e90",
-        "references/listening-sources-template.md": "7a756c72e1210365fa7182898d3f944a374dcc9aa63e68307d1ee3588e81c117",
-        "references/listening.md": "a79924afb89333eab14f198085fddf6e73a73f5ab24c5dc865671f067a6430e5",
-        "references/platform-limits.md": "39fbf03f9ae4b470f8a242d48e563ed0ab3a943fe78880ccba3859e1ad0d382f",
-        "references/platforms.md": "39322cd2c3cfcd86061f9396a3a92b93b6ae841e04b7ae11077c9b90a8eb83b5",
-        "references/post-templates.md": "aed94b32ebcf2bbd6c30c49b811c883a8688f566865d930eef19c03090ff6120",
-        "references/reverse-engineering.md": "8d2a8637deecaa41baf6d3d529868289c58b544bab1fd3247412cb6607e63959",
-        "references/short-form-video.md": "6935ac6a7e8d37ada9265cb59b702044b16b3089d19677d209e2e6df09e975ce",
-        "references/x-algorithm.md": "62d2076caffef6640863ff6fa1f0820be3ac0db0eabad31f180a68937cc3050a",
-        "SKILL.md": "ea0e808fa6851f6604d77359e3f4fd1bcd4159266bfcdbdcce913d6c7ba5b411"
+        "references/carousel-frameworks.md": "e703aa530ec9f68cdf5b58e8e0d4d1a5cc3f22b9e2d3e3222f16a9763d423247",
+        "references/listening-sources-template.md": "c68bc6f57b0a48c432b1ce72c9324d41a04d0e7784d0bab91afb4a6065a43e38",
+        "references/listening.md": "52cf68aaaa57a69b69b3587ffd9b848a6f1ca7e0d51378f566339ad7f2b730e0",
+        "references/platform-limits.md": "6ecc6b40ff82b95c48906341f7d3c58337671d4d94f624c858764f1ed5a77c3c",
+        "references/platforms.md": "a070eda1f54bdba103a9c89613d83331fc5c53c9e8a48543e0198f1a2995cb0c",
+        "references/post-templates.md": "9cca4680c95801daedfd8acadf9089d0083784c2567784888807569896f71d9b",
+        "references/reverse-engineering.md": "c27bef59d463b3b11331c1770f4a23e9e6bbce7d7c8db1e7f7f4f14ba206243f",
+        "references/short-form-video.md": "ed0976bd7ac1f85b7b8c162087e346118f2cf0ef46b3ccafc6a7a329118987d1",
+        "references/x-algorithm.md": "943b2c5a819aad53ebf62a1652adc47956d6fdf738e18cd98eeb609819a66180",
+        "SKILL.md": "dd4c01d0925f571562d4e8dea4af6b60bd9d491149187d94927e65280fad1bee"
       }
     },
     "video": {
       "files": {
-        "references/ai-video-prompting.md": "cc1c2db4e76c38096a1b252792e0267b9819565ca7c2c077aa4ba2d894334c41",
-        "references/edit-anatomy.md": "59e652260e6e7ae64d28c40d15269dc2ebc33fe63bfa7c8ccd7416aeef0e7951",
-        "references/product-demo-recording.md": "4f499a6f2bd3ae93bf41a2e2694f3af04bb17aa4d649443cf9120dee382b18e6",
-        "SKILL.md": "88e72738fd7d74dff8280a7e2cbe97824739f40e54f1f2678b09df5855519532"
+        "references/ai-video-prompting.md": "210eaecc05367aacbaf35660ed7352809e31fb326123d0cfd6ab03c09681d13e",
+        "references/edit-anatomy.md": "3d59e1f01d46eb04bcdbf88e2165bbf5aa80f626beb955522432ec4aede3c9fb",
+        "references/product-demo-recording.md": "4bbc44e02f963df8c36e06d96ae195d3e8af911f604cb08fd7b7ea72c974fba5",
+        "SKILL.md": "e40df76b4355ef15ea1b069662461eed3e295771be81b0a33e081da272051c67"
       }
     },
     "image": {
       "files": {
-        "references/ai-image-prompting.md": "17237cdd22a0ef19b326fe1616346aa88140425d5993126500563c02373bb251",
-        "SKILL.md": "58a2f2d29b8c0e2aded87349fcfba89841ff6f3bb90beb9c87883eab8717864d"
+        "references/ai-image-prompting.md": "d69aee48af3727479c7802536a81c9bc04ac3579aa6e9c16c4154859fa7b2c65",
+        "SKILL.md": "a03da6dd4aed940f2fb8df1337a8dbe0f4108b3bef864e996f759fa4d94e2600"
       }
     },
     "seo-audit": {
       "files": {
-        "references/ai-writing-detection.md": "847cbc0e9effb41e9fbdc98f05b85e2824ebe266dcbc291689a23ee0ea320f11",
-        "references/international-seo.md": "69f6bca80580fe7bcd03a54edd5f99f83317ffc359d5aea50a4a436f1a59a4f7",
-        "references/local-seo-pages-and-measurement.md": "d701d6f05343566e4766cbaba2289393972d32b13e1328f537243d9238ed105f",
-        "references/local-seo-profile-and-citations.md": "a391b633149be3c0cf3e5fb7cb31746cf8c970581fbdc6feb1fb59423c83ea05",
-        "references/local-seo.md": "6930b7c10c69ac2136e3b135432f69f9da68640206c7bbcb28b28e74d9a8468f",
-        "references/rankings-push.md": "6ad38a99617cb0db839b8825adc18795d3a094ff304a73765d3966c1891bdde0",
-        "references/title-tags.md": "a31be7db8a68ce18f3c482b58d77a292aaccab9f08bff3c0ace5f4f9f9127c6a",
-        "SKILL.md": "66c18add7037cc5ee3e9242858d007151690ba82557a3d6eb7e3fe4a5ad19577"
+        "references/ai-writing-detection.md": "f1e273f56ce7e2215ff218bf903680ddcec0fd026ab90c3ebfb3439ed0edfaa4",
+        "references/international-seo.md": "0603022cca968acf7889fc224221aa0e70955ba64355bc18b06f7e86b32f45e5",
+        "references/local-seo-pages-and-measurement.md": "20607ef91c4b8b37346f42130a6f51ed4ce64dc2731b6e1328b5b14f16917fe3",
+        "references/local-seo-profile-and-citations.md": "83b1b63eb6083e7aab1f56c4928335ea2a235e837861a9e9e8043b6af162a1f3",
+        "references/local-seo.md": "d2666d9c225bc36f9737ce612894abbe7e263b5974e2db7c1efc50f6010bb376",
+        "references/rankings-push.md": "c21d6d4f9faf7ce5b1dc0f8bd508e7513967492fcd8ed9510a175ce243daf8c8",
+        "references/title-tags.md": "c40b3c6af3600ca15670db8eb81000c7ca6fa25265a6550ccc630f53db3fcf51",
+        "SKILL.md": "e0ebb5808787f2ff26b96d7b429423874d9785541cd4ab775629a5cf1137e7a9"
       }
     },
     "ai-seo": {
       "files": {
-        "references/agent-defaults.md": "52dd7927b9d94865617d1eb1491788cd531b080a59e79bb59d5df9483893834b",
-        "references/agent-readiness.md": "8bd473df80104ddf3f2e41e9772fadb23eeeed73f690fc0bd6a02b8b596e2e9b",
-        "references/ai-attribution.md": "c0a71b165a31650ff7e44ab6db3ef293d4fe0918c06691b88d0d4662edb4b679",
-        "references/answer-accuracy.md": "9269e683d4c74d77bb357ef5da9ddfbcd23e4e29ff857ee50e3446e251a2a87d",
-        "references/citations-vs-recommendations.md": "2ebf7faa308402d98e13f1507f60ffa59d0163598f2618b25a3b434f5a07b696",
-        "references/content-patterns.md": "470833aed12593a88e13696dfa1188e3a47411f9fd07e2d493e75c763e98f080",
-        "references/content-types.md": "e9bb6f9fb7c532654e838fca2c273e6136b838e843159f864916c0de5b6efe39",
-        "references/format-volatility.md": "d3a1bf01fee577b6081c500206e4cfbee95547bbc90d6dc1f71f6491599f0ae7",
-        "references/linkedin-ai-citations.md": "1cfef30d80ac4e6bce84a737ad34e8e352c45e745f0170ebabdd69ff53798c1f",
-        "references/multilingual-and-commerce.md": "a0028cb618a0277f591d7ad4a0acb241875b843152bd0e642d5a5f2bae92c744",
-        "references/okf.md": "7fd63ae9a47ce1705edaf3d8cb0d00d61755791019a483aa510d1d2b6ed9a509",
-        "references/platform-ranking-factors.md": "0141f1347c849772e101d339157be9674071c862fa61c718ae32bd230a9c2a8b",
-        "references/positioning-and-consensus.md": "764deaaee11b7895c73ef4a997b97a6988bce6d47008459bf19d8e69958c682d",
-        "references/prompt-portfolio.md": "ecbc9717bf802d2b047ad26f7e6c1f8d1628b85a30742ede217c8d5ec47c8fb5",
-        "references/youtube-ai-citations.md": "a482fd623e7e1f9626e28677ffef0c733c31256e3e5cc6f6dde4c73f327a605f",
-        "SKILL.md": "109c91a9a2f4790de01915a0871d177e3c5046bca192af0dc952400d89a61714"
+        "references/agent-defaults.md": "4f009f323b381553961914bf7d67755ee3c178dd10f1570f61fe306cd0054b21",
+        "references/agent-readiness.md": "8f2584846e9d71c08e5ea5eaf21d0a3a936f9decc23bd8ea131b5694bd5b0813",
+        "references/ai-attribution.md": "accaf004e50fd92d16e5e1b57ce0aa5f5c0f88d1ba7bb2ce6939de29fe3e1728",
+        "references/answer-accuracy.md": "9c9115a720c6891fc7e0122d465ed38643170b026fa461de5971feb642f0da57",
+        "references/citations-vs-recommendations.md": "90adc950592b24d8ebd46460ef7ada6a2c4df0f4e4752903c93341cbe182b919",
+        "references/content-patterns.md": "2aa584f93587c322f08697f2eedcb6b48fd79bccb75d1f0ae2072dfcc8c7c684",
+        "references/content-types.md": "2323104990cb3057f3ce135c2b7bac71e5369992d5aeb24cec009c8f6d841d0b",
+        "references/format-volatility.md": "235858ee4d820dd0b89d3c7ffc65f4f59c7904f63feef7d2fff78cc6818caddf",
+        "references/linkedin-ai-citations.md": "2bd191703b543fc5f3ae36f5e367ed6d5504ad38e7446797cd3c5fe23ababd4b",
+        "references/multilingual-and-commerce.md": "5d65db4b85c9c257f4d052a9b3b65bb2f72af140076e2b2dc4cf7dd34d111057",
+        "references/okf.md": "4abcab5b8ee90b63c5d09c98387a8ec3cdb8f5df33e75d3b4b91eb817283bfd8",
+        "references/platform-ranking-factors.md": "a289cacc5fe20698a3d4ad52a69e90a8bd2d67e711e1061ed342e9576a5c8ce6",
+        "references/positioning-and-consensus.md": "b7618247e57a4560c3785155c34de77adc232784b7dd91b2c44a77a73617b9b4",
+        "references/prompt-portfolio.md": "8891f4e747d4eb17a4a2f1d075a081d4261a6084eaa1e9fdb862ed09ebb505c0",
+        "references/youtube-ai-citations.md": "eee24cd9f377db5f59933c775a740f5ff7ece9f238b051157ba72531d9507a99",
+        "SKILL.md": "01de1dc928391751a422ca04ac3cb8cbb6f9156e0b21a306583386d62a6bc4d7"
       }
     },
     "site-architecture": {
       "files": {
-        "references/mermaid-templates.md": "0b080be5dee5c1ee354853994fc6610ab8f03f301f2d63cd05602c237555a23a",
-        "references/navigation-patterns.md": "499fd8af66a4701827d85d68b06b8e746a7ecee2f0dc8540796ddf375764fca6",
-        "references/platforms-and-migration.md": "5d5e9b36189b5a5a8e8115ab2c2533c553ebc839a3e6e70eb2770286d6cea175",
-        "references/site-type-templates.md": "dbf487f57f0f96294ceaa58b31e3a8f84c3d067db9988e49bfb9f6b492289ef5",
-        "SKILL.md": "13d406a17779c430955db53db5802c16a86d5dd5fc521e41a46b86613dbe98b8"
+        "references/mermaid-templates.md": "362190c7d3f419d5f445170f1fb17beecc163937d2068922893b7a69eeb25f0f",
+        "references/navigation-patterns.md": "2efa772709b753e33d5018c007147ca30aaa95a04b04dc0df6227ea5a053078b",
+        "references/platforms-and-migration.md": "391f12c5994e1e577db75cd6044e038a276f14eda1c2ebc7f6a92293fbc59448",
+        "references/site-type-templates.md": "3c3cd7ce5e31c502dc071baf82bb58cb30f5edf4a2fd8ca052fbc8f3777db140",
+        "SKILL.md": "55c0128ac29f628944444f8850b97913517f57131673824ebcad4d5ffb26ddd2"
       }
     },
     "schema": {
       "files": {
-        "references/schema-examples.md": "741b79db51909479e27e9e48955664394a3981e7083071a555a08b02e9f6b529",
-        "SKILL.md": "5606f9b71487823eeac123de47ee7c4745dd73ef25d89da0cac4d8ca31fa8653"
+        "references/schema-examples.md": "9b093bce816fac8494c8ccfd588eeb0c00e1308fe99bb46388ff222664ed94be",
+        "SKILL.md": "d298f5d6e1b33b6825f38ecaa05c4d33ba9e45e346b224bd86f9834e46f67a94"
       }
     },
     "link-building": {
       "files": {
-        "references/prospecting-and-outreach.md": "bca9eff40b77891b770fc2e4bd3c2ff3aeaa1eff6c6d8750af7e45501f606949",
-        "references/risk-policy.md": "6fdace7097eeacf154cd682763d7a75377c8ebdff436b02cb9bd349eb634be19",
-        "references/tactics.md": "f6fc7edf5122625f9131e2c9d58dc553e4bd900c5c3a0e3caf784aa74a28c7c2",
-        "SKILL.md": "66bffa73dc6287c7e9a03ec08654d8e08b089cae13e1495d29d608d04af48f98"
+        "references/prospecting-and-outreach.md": "06891dbd25cf5b82d7e0cc8093e174d0eef32a3fdebd34f8dcf4bd3c2f366a34",
+        "references/risk-policy.md": "e4e1b74c1e7c782f0c24b4ef0c68acd5969ecb5e5fb3b66840f665d414e1d3a1",
+        "references/tactics.md": "a03af97971dbfcf92000fd4c9c874e9a2af6e035ef135390b0dedfbc620487fc",
+        "SKILL.md": "1ba02b7d18057351f654bdd9c4105dfbcbd94e19cf973f5ca1db6115d96ea321"
       }
     },
     "cro": {
       "files": {
-        "references/experiments.md": "f3103edc47e61e62eb4c733f30aa6bebe31e117beb74d61b3d44b766ae9324a1",
-        "references/form.md": "5629d0b9710edd5a40cb7bdce11b560523cd2167578560bc389d2d6c0415d604",
-        "SKILL.md": "0cf92820dd627b8a65fdfb6f5ffcd7168dbdad314f564ca0e68fd73d097ed0a8"
+        "references/experiments.md": "bbcc356c0af36cfaa4556bf9e929deac30c65cafb37f909d7c51d4777fe254ca",
+        "references/form.md": "49b8f29b3da1ae6510572288cad3eb1f3d43a969373443be98b38639746587e6",
+        "SKILL.md": "6e172cc38178c800ff41ceb097f36c6a1db8035fb88a1fee53043f8ec38a6f35"
       }
     },
     "analytics": {
       "files": {
-        "references/event-library.md": "716aa9c1fa771319a1248eda96bdec66ad97e4cf6363a0432db9459f5e880b38",
-        "references/ga4-implementation.md": "dcaf5d3c084226012cdbebebe5aa5d0f2fa95154aee64865b5089f35d4fb7455",
-        "references/gtm-implementation.md": "65eb4493ab6bc835259cd70456c5ea28c1dfa77bbd2d9b45e60f0c222f65bdd0",
-        "SKILL.md": "61264ff9f4d6dbef63139f9077dbaf21af073ff7ad1b144384fda0c1570b65ad"
+        "references/event-library.md": "c60e3e145e6b06258570350b614913ed9150143b4494a71396abaef479502b05",
+        "references/ga4-implementation.md": "b0232fc2ee873ffa5e6cbdf0ae712a5d74b18263372139d8ae72f9dcf48a8db4",
+        "references/gtm-implementation.md": "0b161102de710c978cc2ac52c78c79f32e184bc028aa946eba18e777d7a60d64",
+        "SKILL.md": "675e284b745837d595aa4d36903cb54b3921181fd343cc519d31f34fe8002196"
       }
     },
     "ab-testing": {
       "files": {
-        "references/sample-size-guide.md": "1ac90d26e4754d9d380d1ee704d6c0b0f058de54991c9d62b912d1df06d8a510",
-        "references/test-templates.md": "1ececdef6d9fcbca75d8e871691d5fe68e2bc8ccbf6943166def4fe5d51198e6",
-        "SKILL.md": "42b285d19e400bf06707b59569b15b3b7b4cbe88489b2c41772f111d3d1b3627"
+        "references/sample-size-guide.md": "8288381cc11f9e4821c0a6a5ec3eec73506832a189af45207dcc583c371f3e7b",
+        "references/test-templates.md": "761a40b9de8d16f18fa7f60b59e77aa749607ac8014af43e0b022f47fa87c812",
+        "SKILL.md": "fba679be14a9b21a06cde009caf17a652b92040c6f78a520a5d4baec0a5bd5da"
       }
     },
     "launch": {
       "files": {
-        "references/shipped-changes.md": "e7410ed62626e50187bdd38f018f1e2b1114ce7ab481a3abe6d05b067fd39100",
-        "references/site-launch-qa.md": "3b0dd3f36ad55266b6f3217bdd3eeabf059e65a43a598b7da6d7740a8edf6e30",
-        "SKILL.md": "73b0e3e2eb40cf18935b7b76d047618da56d0a0de187fe87b1689b2083f5b044"
+        "references/shipped-changes.md": "873c79d17d3f428147348a9cc2a5e3d6bb8282cf13fc8a143d539840e8abaa96",
+        "references/site-launch-qa.md": "aac0447d0d518468e86e971f4e781b61ee05e81dada402e2edcef709cc6418ab",
+        "SKILL.md": "30537ad3f4b0429fcc4053cf6bf04bc0dee316b9e5f7e7ec2e74a9bc44a9ead7"
       }
     },
     "sales-enablement": {
       "files": {
-        "references/cold-call-scripts.md": "ef2de0344a649c877d70ce4b292b472968724b88be07d16d7fb0e410339f9c7b",
-        "references/deck-frameworks.md": "b5a75e2bc15dfae40a2cb38a7694fc707f2ec8159a0afaca58deff4385323ef3",
-        "references/demo-scripts.md": "1f2c4f8f9b0581caab53ca89ccad7e440f8c3a49761165fd4c40cf19b803c0ac",
-        "references/objection-library.md": "6611abfd7b3a8c97e4dce01e68d613f7777aa4606d41261fbf5a0a63273aa10e",
-        "references/one-pager-templates.md": "06bb842227d4f753d45c2eba3da1df0050523f1f11fde1b02fe90a989b933969",
-        "references/win-loss-analysis.md": "6753eaee214d75823df0783ec1ec87f2902dbe5b36d93a16ff645de972966b83",
-        "SKILL.md": "3e0345f5ecb6b65a04568c6aea41a9f391cf705a79b43675efcfff4a3bcbd552"
+        "references/cold-call-scripts.md": "cc4e3248070804539f8c1de01fd63918d8e40a6ad858dea2a519d50a060e268f",
+        "references/deck-frameworks.md": "265eea6c1b358d10f2dd22fd987789a9d115c14d30bf77a9086734ac60659336",
+        "references/demo-scripts.md": "505616ebf73d30fe84a844540727ab8f3aeae29ebcda8c8ace28a18ada003da3",
+        "references/objection-library.md": "e0cdfeffc41afbdbe2c014bcd9b3c024318eac9bd23159e871ec796aba29e0b2",
+        "references/one-pager-templates.md": "2197326faff4ede03fb40e332e9c80a4e084d8efd48c74df8720d70817ac5ded",
+        "references/win-loss-analysis.md": "f6f34c503f4cc506a8f24bfea6e75b260e3eff661da206399e162960141f090a",
+        "SKILL.md": "d30008d34e6a314b422e0a35cacf38aea39d39d2c48683e1ef6edcbdfca30ebd"
       }
     },
     "lead-magnets": {
       "files": {
-        "references/benchmarks.md": "dcb59c5f88a09b8410af1e7ca6f30ffbf10ed9d24d30be15f206ce680ee8e8db",
-        "references/content-to-skill-corpus-design.md": "99451d8f46c0c3f10c83ff8930e134141be78ed7bcb80da0fdc4efcd061d89b4",
-        "references/content-to-skill-release.md": "d0d6610f9769441f749162dc5b3b4bf40c75b693cf7734b56be418ba654e06fd",
-        "references/content-to-skill.md": "3bd37f154c9a7b163c866630a52e1bd96a71dbcea94011c458b2a03f7117ebc0",
-        "references/format-guide.md": "fbb0bd857f91a4deb92326387e665af47178534ca90002074129af38221fc68c",
-        "SKILL.md": "43b70a1ac3b642f149469fae4230895da9ce516bbd7943b24860ca3c2a42e507"
+        "references/benchmarks.md": "becdf4bcde17e788ead10794c797294548c712ea1074e042336da93433a61187",
+        "references/content-to-skill-corpus-design.md": "a6db00a8298b2ce52965c40b57c01120a0f9ff4caf5ca55ede81bc2f242bae56",
+        "references/content-to-skill-release.md": "87bcc9218232b73b824e8cebac1e64deacffa755779ce2cc0db799c92873c891",
+        "references/content-to-skill.md": "dacbfff6d538ee37167f20034165dbf3a273d8bd1607def6450c649e40ebafa9",
+        "references/format-guide.md": "401f65d709cefbd7ee2df11273e0b616ec50e37e71d914556c800067fdcdef8e",
+        "SKILL.md": "190a64c72a9a36fdde3a6b0888798e1bb9dd4e7406b00a6bbf90dba5e64c047b"
       }
     }
   },
-  "note": "evals/ folders excluded from the install (2026-10-29, PR #326 secret scan)"
+  "note": "evals/ folders excluded from the install (2026-10-29, PR #326 secret scan); hashes are line-ending neutral (CRLF normalised to LF) since 2026-10-29"
 }

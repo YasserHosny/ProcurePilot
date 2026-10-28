@@ -8,7 +8,7 @@
 | Persona and stage | Owner / GM · problem-aware |
 | Proof ids | C-07, C-14 · headline MD-09 |
 | Link (UTM) | none (MD-04) |
-| Status | draft, ready for review (not published) |
+| Status | approved 2026-10-29 by Yasser (G-asset); not published. Posting date in `content-calendar.md` |
 
 ## LinkedIn (bilingual, final)
 
@@ -96,7 +96,7 @@ How do you track savings across your branches today?
 
 ## Visual
 
-**Rendered image v2 (2026-10-29, current):** `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/drafts/images/v2/A-02-1080x1350.png` (designed ledger slip, landing page demo figures, labelled).
+**Rendered image v2 (2026-10-29, current):** `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/approved/images/v2/A-02-1080x1350.png` (designed ledger slip, landing page demo figures, labelled).
 
 | Slide / frame | On-image text | Visual description | Brand assets used |
 |---|---|---|---|
