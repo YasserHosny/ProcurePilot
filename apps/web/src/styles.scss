@@ -398,6 +398,12 @@ html {
 // Dialogs keep the CDK's public default backdrop class, so the scrim is set on that instead.
 .cdk-overlay-backdrop.cdk-overlay-dark-backdrop { background: var(--pp-dialog-scrim); }
 
+// RFQ History recipients popover menu: allow wider panel than Material's default 280px cap to fit supplier row without horizontal scroll
+.mat-mdc-menu-panel.recipients-popover-menu {
+  max-inline-size: 380px;
+  overflow-x: hidden;
+}
+
 // Rows Material has no state for: the best offer and the selected row. The edge sits at the inline start.
 tr.pp-best > td { background: var(--pp-table-best-bg); }
 tr[aria-selected='true'] > td { background: var(--pp-table-row-selected-bg); }

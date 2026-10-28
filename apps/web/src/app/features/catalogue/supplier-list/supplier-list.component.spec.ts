@@ -102,6 +102,12 @@ describe("SupplierListComponent (T024)", () => {
     expect(emailCell.textContent).toContain("orders@acme.test");
   });
 
+  it("prevents contact email from wrapping across lines", () => {
+    const emailEl = fixture.nativeElement.querySelector(".supplier-email");
+    expect(emailEl).toBeTruthy();
+    expect(getComputedStyle(emailEl).whiteSpace).toBe("nowrap");
+  });
+
   it("displays placeholder dash when supplier contact email is empty (R4)", () => {
     component.suppliers.set([
       {
