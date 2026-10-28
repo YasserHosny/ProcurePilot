@@ -52,3 +52,21 @@ Three Arabic shots still showed «وفورات» / «الوفر» (recorded befo
 | Record-outcome form for PO-000008 (outcomes already recorded, not saved again) | [01](screens-pps63/01-outcome-form-po-000008.jpg) |
 | Ledger as hosted shows it now, cursor on round 6's rows (+١٦٠ / +١٢٠ / +٢٠ = ٣٠٠ ج.م) | [02](screens-pps63/02-ledger-round6-rows.jpg) |
 | Verified ledger with the sidebar: ١٬٧٦٠ ج.م, 15 verified outcomes (rounds 3–7) | [03](screens-pps63/03-ledger-verified.jpg) |
+
+## Re-shoot for «ج.م» (2026-10-27, PPS-84)
+
+The Arabic UI moved from «EGP ٢٤٬٦٤٠» to «٢٤٬٦٤٠ ج.م» (#305, #308, #311). The money screens were re-filmed for the v2.5 cuts,
+with the owner signed in and the two emails OK'd:
+
+| Step | Record |
+|---|---|
+| RFQ for the same three lines to الأمانة only, not filmed (`record-v24/rfq-one.cjs`) | `3042c2ec` |
+| الأمانة's reply from its Gmail alias, threaded on the RFQ, carrying round 6's photo `IMG-20261024-WA0021.jpg` again | quotation `44c25347`, 24,640 EGP (same figures) |
+| Quote review → Authorise, filmed | `s2-quote-photo`, `s2r-authorised` |
+| Guardrail draft → Submit, filmed; phone approval, filmed | request `a545cd1a`; `s3-guardrail-draft`, `s4-phone-approve`, `s4r-approved` |
+| Request **withdrawn** afterwards: no PO, no saving | `a545cd1a` withdrawn |
+| Read-only re-takes: PO-000008, its outcome form (nothing saved), the ledger (١٬٧٦٠ ج.م) | `s5r-outcome-form`, `s5r-ledger`, `s6-savings-close` |
+
+The phone app was built from #311 (0 or 2 decimals) with `API_BASE_URL`, `SUPABASE_URL` and `SUPABASE_ANON_KEY` dart-defines. Without
+the Supabase defines, sign-in fails with the generic connection error. Smart Compare now reads ١٢٬٦٠٠ vs ١٢٬٦٨٠ ج.م (0% margin)
+against round 7's النور price, so the video keeps the original compare clip.

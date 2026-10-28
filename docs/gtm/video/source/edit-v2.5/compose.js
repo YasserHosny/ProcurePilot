@@ -147,7 +147,7 @@ function buildTimeline(fmt,lang){
     panel.k('sx',[[st,.96],[st+.5,1,'out']]);
     let cursor=st;
     for(const [name,a,b,slot] of scene.spans_by_language[lang]){
-      const key=lang+'/'+name,phone=name.includes('phone');
+      const key=lang+'/'+name,phone=name.includes('phone'),base=name.replace(/^r-/,'');  // r-<clip>: PPS-84 Arabic re-shoot
       const crop=phone?null:(scene.crop||(!vertical&&[1,14].includes(scene.beat)?[0,0,1920,1080]:[220,60,1480,980]));
       let width=vertical?(phone?450:960):(phone?390:1260);
       let centerX=vertical?540:(rtl?670:1250),centerY=vertical?(phone?1020:1160):535;
@@ -166,14 +166,16 @@ function buildTimeline(fmt,lang){
       // PPS-63: the re-shot Arabic outcome form (s5 34–42 s) sits further right, nav hidden; keep its title in frame.
       if(MARKET==='eg'&&rtl&&scene.beat===13&&name==='s5-po-savings'&&a>=34&&a<42)useCrop=vertical?[460,60,1440,980]:[420,60,1480,980];
       // Saudi/Irish outcome form (s5 32–41 s): nav hidden, so the form hugs the reading edge; keep its title in frame.
+      // Re-shot outcome form (nav hidden): same reading-edge crop as the originals.
+      if(name==='r-s5r-outcome-form'&&a>=7)useCrop=rtl?(vertical?[460,60,1440,980]:[420,60,1480,980]):(vertical?[20,60,1440,980]:[20,60,1480,980]);
       if(MARKET!=='eg'&&scene.beat===13&&name==='s5-po-savings'&&a<41)useCrop=rtl?(vertical?[460,60,1440,980]:[420,60,1480,980]):(vertical?[20,60,1440,980]:[20,60,1480,980]);
       if(scene.beat===8){useCrop=compareCrops(vertical,rtl).main;centerY=vertical?1040:360;}
       // Real end-state inserts: source coordinates never include quotation identity fields.
-      if(name==='s2r-authorised'){
+      if(base==='s2r-authorised'){
         useCrop=vertical?[rtl?1070:220,140,rtl?640:790,330]:[rtl?1070:220,60,rtl?640:790,410];
         width=vertical?960:1260;centerY=vertical?1120:535;
       }
-      if(name==='s4r-approved'){
+      if(base==='s4r-approved'){
         useCrop=vertical?[rtl?1070:570,775,rtl?280:370,120]:[570,775,780,120];
         width=vertical?960:1260;centerY=vertical?1120:535;
       }
@@ -202,9 +204,9 @@ function buildTimeline(fmt,lang){
           const idx=Math.max(1,Math.min(m.frames,Math.floor(seconds*FPS+1e-6)+1));
           if(idx!==rows.cur){rows.cur=idx;ri.src=`${PLATES}/${key}/${String(idx).padStart(4,'0')}.jpg`;PENDING.push(ri);}};
       }
-      if(name==='s2r-authorised'||name==='s4r-approved'){
+      if(base==='s2r-authorised'||base==='s4r-approved'){
         const sc=width/useCrop[2];
-        const status=name==='s2r-authorised'?[rtl?1100:790,202,rtl?168:190]:[rtl?1280:592,831,rtl?55:65];
+        const status=base==='s2r-authorised'?[rtl?1100:790,202,rtl?168:190]:[rtl?1280:592,831,rtl?55:65];
         const hit=R({w:status[2]*sc,h:4*sc,x:centerX-width/2+(status[0]-useCrop[0])*sc,
           y:centerY-useCrop[3]*sc/2+(status[1]-useCrop[1])*sc,ax:0,ay:0,z:15,color:C.teal,t0:sourceStart,t1:sourceStart+slot});
         hit.k('sx',[[sourceStart,0],[sourceStart+.2,1,'out']]);

@@ -42,7 +42,7 @@ EN_IE['recap']['rows'][2][1]='Per pack, delivery included'  # Irish quotes are e
 MONEY={
  'eg':{'ar':{'cards':{1:'٣٠٠ ج.م',6:'٢٤٬٦٤٠ ج.م',8:'٢٠٠ ج.م',13:'٣٠٠ ج.م',14:'١٬٧٦٠ ج.م'},'saving':300,'decimals':0,'prefix':'','suffix':' ج.م','label':'ج.م'},
        'en':{'cards':{1:'EGP 200',6:'EGP 24,440',8:'EGP 200',13:'EGP 200',14:'EGP 1,760'},'saving':200,'decimals':0,'prefix':'EGP ','suffix':'','label':'EGP'}},
- 'sa':{'ar':{'cards':{1:'١٩٠ ر.س',6:'٤٬٩١٠ ر.س',8:'٤٠ ر.س',13:'١٩٠ ر.س',14:'١٩٠ ر.س'},'saving':190,'decimals':0,'prefix':'','suffix':' ر.س','label':'ر.س'},
+ 'sa':{'ar':{'cards':{1:'١٩٠ ر.س',6:'٤٬٩١٠ ر.س',8:'٤٠ ر.س',13:'١٩٠ ر.س',14:'٣١٠ ر.س'},'saving':190,'decimals':0,'prefix':'','suffix':' ر.س','label':'ر.س'},
        'en':{'cards':{1:'SAR 120',6:'SAR 4,790',8:'SAR 40',13:'SAR 120',14:'SAR 310'},'saving':120,'decimals':0,'prefix':'SAR ','suffix':'','label':'SAR'}},
  'sa-en':{'en':{'cards':{1:'SAR 310',6:'SAR 4,790',8:'SAR 40',13:'SAR 310',14:'SAR 310'},'saving':310,'decimals':0,'prefix':'SAR ','suffix':'','label':'SAR'}},
  'ie':{'en':{'cards':{1:'€53.50',6:'€1,289.50',8:'€13',13:'€53.50',14:'€93.50'},'saving':53.5,'decimals':2,'prefix':'€','suffix':'','label':''}},
@@ -53,6 +53,35 @@ MARKETS={
  'sa':('edit-sa',['ar','en'],'gcc-sa-v2','procurepilot-demo-sa-{lang}',{'ar':AR_SA,'en':EN}),
  'sa-en':('edit-sa-en',['en'],'gcc-sa-en-v2','procurepilot-demo-sa-en',{'en':EN}),
  'ie':('edit-ie',['en'],'eu-en-v2','procurepilot-demo-ie-en',{'en':EN_IE}),
+}
+# PPS-84 Arabic re-shoot (2026-10-27/28): the Arabic UI now shows «٢٤٬٦٤٠ ج.م» / «٤٬٩١٠ ر.س». These Arabic beats come from
+# the re-shot clips (plates r-<clip>, masked by reshoot_privacy.py); beats 8 and 12 keep the original footage (no «EGP» in
+# them, and a re-shot compare would show a 0% margin). [beat][fmt] -> spans; the 9:16 beat-13 hold still grows 1.5 s.
+def _r(name,a,b,slot):return ['r-'+name,a,b,slot]
+_COMMON={
+ 1:{'h':[_r('s5r-outcome-form',.5,2.5,4),_r('s5r-ledger',4,4,4)],'v':[_r('s5r-outcome-form',1,1,2.5),_r('s5r-ledger',4,4,1.5)]},
+ 5:{'h':[_r('s2-quote-photo',.3,4.8,5)],'v':[_r('s2-quote-photo',.3,4.8,3)]},
+ 13:{'h':[_r('s5r-outcome-form',8,11,2),_r('s5r-outcome-form',12,15,3),_r('s5r-ledger',9,9,2)],
+     'v':[_r('s5r-outcome-form',12,14.5,2.5),_r('s5r-ledger',9,9,2)]},
+ 14:{'h':[_r('s6-savings-close',4,8,6)]},
+}
+RESHOOT={
+ 'eg':{**_COMMON,
+  6:{'h':[_r('s2-quote-photo',8,11,3),_r('s2-quote-photo',22,23,3),_r('s2-quote-photo',24,25,4),_r('s2-quote-photo',8.5,8.5,2)],
+     'v':[_r('s2-quote-photo',8,11,2),_r('s2-quote-photo',24,25,3),_r('s2-quote-photo',8.5,8.5,2)]},
+  7:{'h':[_r('s2-quote-photo',24.5,26.3,3.2),_r('s2r-authorised',.5,2.3,1.8)],'v':[_r('s2-quote-photo',24.5,26.3,1.2),_r('s2r-authorised',.5,2.3,1.8)]},
+  10:{'h':[_r('s3-guardrail-draft',6,10,4),_r('s3-guardrail-draft',16,22,4),_r('s3-guardrail-draft',22.5,24.5,2)],
+      'v':[_r('s3-guardrail-draft',6,10,3),_r('s3-guardrail-draft',21,24,2)]},
+  11:{'h':[_r('s4-phone-approve',5,5.5,1),_r('s4-phone-approve',7,8,2),_r('s4-phone-approve',12.2,15.4,3.2),_r('s4r-approved',.5,2.3,1.8)],
+      'v':[_r('s4-phone-approve',7,8,1),_r('s4-phone-approve',13.2,15.4,2.2),_r('s4r-approved',.5,2.3,1.8)]}},
+ 'sa':{**_COMMON,
+  6:{'h':[_r('s2-quote-photo',8,11,3),_r('s2-quote-photo',25,26.5,3),_r('s2-quote-photo',27.5,28.5,4),_r('s2-quote-photo',8.5,8.5,2)],
+     'v':[_r('s2-quote-photo',8,11,2),_r('s2-quote-photo',27.5,28.5,3),_r('s2-quote-photo',8.5,8.5,2)]},
+  7:{'h':[_r('s2-quote-photo',29.2,31.2,3.2),_r('s2r-authorised',.5,2.3,1.8)],'v':[_r('s2-quote-photo',29.2,31.2,1.2),_r('s2r-authorised',.5,2.3,1.8)]},
+  10:{'h':[_r('s3-guardrail-draft',6,10,4),_r('s3-guardrail-draft',16,22,4),_r('s3-guardrail-draft',22.3,24.3,2)],
+      'v':[_r('s3-guardrail-draft',6,10,3),_r('s3-guardrail-draft',20.5,23.5,2)]},
+  11:{'h':[_r('s4-phone-approve',5,5.5,1),_r('s4-phone-approve',7,8,2),_r('s4-phone-approve',12.2,15.4,3.2),_r('s4r-approved',.5,2.3,1.8)],
+      'v':[_r('s4-phone-approve',7,8,1),_r('s4-phone-approve',13,15.2,2.2),_r('s4r-approved',.5,2.3,1.8)]}},
 }
 # The bridge says who the PO goes to (owner, 2026-10-27).
 BRIDGE={'لأمر شراء متبعت…':'لأمر شراء تبعته للموردين…','لأمر شراء منرسل…':'لأمر شراء ترسله للموردين…'}
@@ -84,7 +113,12 @@ def build(market,fmt):
                 text=s['cards_by_language'][l][-1]['text']
                 for a,b in BRIDGE.items():text=text.replace(a,b)
                 s['cards_by_language'][l]=[card(text,0,s['duration'])]
+        if 'ar' in langs and fmt in RESHOOT.get(market,{}).get(s['beat'],{}):
+            spans=[list(x) for x in RESHOOT[market][s['beat']][fmt]]
+            assert abs(sum(x[3] for x in spans)-s['duration'])<.001,(market,fmt,s['beat'])
+            s['spans_by_language']={**s['spans_by_language'],'ar':spans}
         if s['beat']==13 and fmt=='v':
+
             # Room for the full-page saving: the ledger hold grows 1.5 s.
             s['duration']+=1.5
             for l in langs:

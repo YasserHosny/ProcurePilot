@@ -111,15 +111,15 @@
           "spans_by_language": {
             "ar": [
               [
-                "s5-po-savings",
-                26,
-                28,
+                "r-s5r-outcome-form",
+                0.5,
+                2.5,
                 4
               ],
               [
-                "s5-po-savings",
-                52.5,
-                52.5,
+                "r-s5r-ledger",
+                4,
+                4,
                 4
               ]
             ],
@@ -375,7 +375,7 @@
           "spans_by_language": {
             "ar": [
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 0.3,
                 4.8,
                 5
@@ -455,25 +455,25 @@
           "spans_by_language": {
             "ar": [
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 8,
                 11,
                 3
               ],
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 22,
                 23,
                 3
               ],
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 24,
                 25,
                 4
               ],
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 8.5,
                 8.5,
                 2
@@ -547,13 +547,13 @@
           "spans_by_language": {
             "ar": [
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 24.5,
                 26.3,
                 3.2
               ],
               [
-                "s2r-authorised",
+                "r-s2r-authorised",
                 0.5,
                 2.3,
                 1.8
@@ -719,21 +719,21 @@
           "spans_by_language": {
             "ar": [
               [
-                "s3-guardrail-draft",
-                5,
+                "r-s3-guardrail-draft",
+                6,
                 10,
                 4
               ],
               [
-                "s3-guardrail-draft",
+                "r-s3-guardrail-draft",
                 16,
                 22,
                 4
               ],
               [
-                "s3-guardrail-draft",
+                "r-s3-guardrail-draft",
                 22.5,
-                24.1,
+                24.5,
                 2
               ]
             ],
@@ -823,25 +823,25 @@
           "spans_by_language": {
             "ar": [
               [
-                "s4-phone-approve",
+                "r-s4-phone-approve",
                 5,
                 5.5,
                 1
               ],
               [
-                "s4-phone-approve",
+                "r-s4-phone-approve",
                 7,
                 8,
                 2
               ],
               [
-                "s4-phone-approve",
-                13.5,
-                15.15,
+                "r-s4-phone-approve",
+                12.2,
+                15.4,
                 3.2
               ],
               [
-                "s4r-approved",
+                "r-s4r-approved",
                 0.5,
                 2.3,
                 1.8
@@ -1025,21 +1025,21 @@
           "spans_by_language": {
             "ar": [
               [
-                "s5-po-savings",
-                35,
-                38,
+                "r-s5r-outcome-form",
+                8,
+                11,
                 2
               ],
               [
-                "s5-po-savings",
-                39,
-                41.5,
+                "r-s5r-outcome-form",
+                12,
+                15,
                 3
               ],
               [
-                "s5-po-savings",
-                52.5,
-                52.5,
+                "r-s5r-ledger",
+                9,
+                9,
                 2
               ]
             ],
@@ -1111,7 +1111,7 @@
           "spans_by_language": {
             "ar": [
               [
-                "s6-savings-close",
+                "r-s6-savings-close",
                 4,
                 8,
                 6
@@ -1400,15 +1400,15 @@
           "spans_by_language": {
             "ar": [
               [
-                "s5-po-savings",
-                26,
-                26,
+                "r-s5r-outcome-form",
+                1,
+                1,
                 2.5
               ],
               [
-                "s5-po-savings",
-                52.5,
-                52.5,
+                "r-s5r-ledger",
+                4,
+                4,
                 1.5
               ]
             ],
@@ -1548,7 +1548,7 @@
           "spans_by_language": {
             "ar": [
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 0.3,
                 4.8,
                 3
@@ -1610,19 +1610,19 @@
           "spans_by_language": {
             "ar": [
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 8,
                 11,
                 2
               ],
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 24,
                 25,
                 3
               ],
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 8.5,
                 8.5,
                 2
@@ -1690,13 +1690,13 @@
           "spans_by_language": {
             "ar": [
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 24.5,
                 26.3,
                 1.2
               ],
               [
-                "s2r-authorised",
+                "r-s2r-authorised",
                 0.5,
                 2.3,
                 1.8
@@ -1826,15 +1826,15 @@
           "spans_by_language": {
             "ar": [
               [
-                "s3-guardrail-draft",
-                5,
+                "r-s3-guardrail-draft",
+                6,
                 10,
                 3
               ],
               [
-                "s3-guardrail-draft",
-                20,
-                23,
+                "r-s3-guardrail-draft",
+                21,
+                24,
                 2
               ]
             ],
@@ -1900,19 +1900,19 @@
           "spans_by_language": {
             "ar": [
               [
-                "s4-phone-approve",
+                "r-s4-phone-approve",
                 7,
                 8,
                 1
               ],
               [
-                "s4-phone-approve",
-                13.5,
-                15.15,
+                "r-s4-phone-approve",
+                13.2,
+                15.4,
                 2.2
               ],
               [
-                "s4r-approved",
+                "r-s4r-approved",
                 0.5,
                 2.3,
                 1.8
@@ -2032,15 +2032,15 @@
           "duration": 6.0,
           "spans": [
             [
-              "s5-po-savings",
-              39,
-              41.5,
+              "r-s5r-outcome-form",
+              12,
+              14.5,
               2.5
             ],
             [
-              "s5-po-savings",
-              52.5,
-              52.5,
+              "r-s5r-ledger",
+              9,
+              9,
               3.5
             ]
           ],
@@ -2048,15 +2048,15 @@
           "spans_by_language": {
             "ar": [
               [
-                "s5-po-savings",
-                39,
-                41.5,
+                "r-s5r-outcome-form",
+                12,
+                14.5,
                 2.5
               ],
               [
-                "s5-po-savings",
-                52.5,
-                52.5,
+                "r-s5r-ledger",
+                9,
+                9,
                 3.5
               ]
             ],
@@ -2358,15 +2358,15 @@
           "spans_by_language": {
             "ar": [
               [
-                "s5-po-savings",
-                27,
-                29,
+                "r-s5r-outcome-form",
+                0.5,
+                2.5,
                 4
               ],
               [
-                "s5-po-savings",
-                43,
-                43,
+                "r-s5r-ledger",
+                4,
+                4,
                 4
               ]
             ],
@@ -2622,7 +2622,7 @@
           "spans_by_language": {
             "ar": [
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 0.3,
                 4.8,
                 5
@@ -2702,25 +2702,25 @@
           "spans_by_language": {
             "ar": [
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 8,
                 11,
                 3
               ],
               [
-                "s2-quote-photo",
-                22,
-                23.5,
+                "r-s2-quote-photo",
+                25,
+                26.5,
                 3
               ],
               [
-                "s2-quote-photo",
-                26.5,
-                27.3,
+                "r-s2-quote-photo",
+                27.5,
+                28.5,
                 4
               ],
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 8.5,
                 8.5,
                 2
@@ -2794,13 +2794,13 @@
           "spans_by_language": {
             "ar": [
               [
-                "s2-quote-photo",
-                27.5,
-                29.5,
+                "r-s2-quote-photo",
+                29.2,
+                31.2,
                 3.2
               ],
               [
-                "s2r-authorised",
+                "r-s2r-authorised",
                 0.5,
                 2.3,
                 1.8
@@ -2966,21 +2966,21 @@
           "spans_by_language": {
             "ar": [
               [
-                "s3-guardrail-draft",
+                "r-s3-guardrail-draft",
                 6,
                 10,
                 4
               ],
               [
-                "s3-guardrail-draft",
+                "r-s3-guardrail-draft",
                 16,
                 22,
                 4
               ],
               [
-                "s3-guardrail-draft",
-                22.6,
-                25.2,
+                "r-s3-guardrail-draft",
+                22.3,
+                24.3,
                 2
               ]
             ],
@@ -3070,25 +3070,25 @@
           "spans_by_language": {
             "ar": [
               [
-                "s4-phone-approve",
+                "r-s4-phone-approve",
                 5,
                 5.5,
                 1
               ],
               [
-                "s4-phone-approve",
+                "r-s4-phone-approve",
                 7,
                 8,
                 2
               ],
               [
-                "s4-phone-approve",
-                13.3,
-                15.2,
+                "r-s4-phone-approve",
+                12.2,
+                15.4,
                 3.2
               ],
               [
-                "s4r-approved",
+                "r-s4r-approved",
                 0.5,
                 2.3,
                 1.8
@@ -3272,21 +3272,21 @@
           "spans_by_language": {
             "ar": [
               [
-                "s5-po-savings",
-                32,
-                35,
+                "r-s5r-outcome-form",
+                8,
+                11,
                 2
               ],
               [
-                "s5-po-savings",
-                36,
-                39,
+                "r-s5r-outcome-form",
+                12,
+                15,
                 3
               ],
               [
-                "s5-po-savings",
-                43,
-                43,
+                "r-s5r-ledger",
+                9,
+                9,
                 2
               ]
             ],
@@ -3358,7 +3358,7 @@
           "spans_by_language": {
             "ar": [
               [
-                "s6-savings-close",
+                "r-s6-savings-close",
                 4,
                 8,
                 6
@@ -3503,7 +3503,7 @@
             "6": "٤٬٩١٠ ر.س",
             "8": "٤٠ ر.س",
             "13": "١٩٠ ر.س",
-            "14": "١٩٠ ر.س"
+            "14": "٣١٠ ر.س"
           },
           "saving": 190,
           "decimals": 0,
@@ -3647,15 +3647,15 @@
           "spans_by_language": {
             "ar": [
               [
-                "s5-po-savings",
-                27,
-                27,
+                "r-s5r-outcome-form",
+                1,
+                1,
                 2.5
               ],
               [
-                "s5-po-savings",
-                43,
-                43,
+                "r-s5r-ledger",
+                4,
+                4,
                 1.5
               ]
             ],
@@ -3795,7 +3795,7 @@
           "spans_by_language": {
             "ar": [
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 0.3,
                 4.8,
                 3
@@ -3857,19 +3857,19 @@
           "spans_by_language": {
             "ar": [
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 8,
                 11,
                 2
               ],
               [
-                "s2-quote-photo",
-                26.5,
-                27.3,
+                "r-s2-quote-photo",
+                27.5,
+                28.5,
                 3
               ],
               [
-                "s2-quote-photo",
+                "r-s2-quote-photo",
                 8.5,
                 8.5,
                 2
@@ -3937,13 +3937,13 @@
           "spans_by_language": {
             "ar": [
               [
-                "s2-quote-photo",
-                27.5,
-                29.5,
+                "r-s2-quote-photo",
+                29.2,
+                31.2,
                 1.2
               ],
               [
-                "s2r-authorised",
+                "r-s2r-authorised",
                 0.5,
                 2.3,
                 1.8
@@ -4073,13 +4073,13 @@
           "spans_by_language": {
             "ar": [
               [
-                "s3-guardrail-draft",
+                "r-s3-guardrail-draft",
                 6,
                 10,
                 3
               ],
               [
-                "s3-guardrail-draft",
+                "r-s3-guardrail-draft",
                 20.5,
                 23.5,
                 2
@@ -4147,19 +4147,19 @@
           "spans_by_language": {
             "ar": [
               [
-                "s4-phone-approve",
+                "r-s4-phone-approve",
                 7,
                 8,
                 1
               ],
               [
-                "s4-phone-approve",
-                13.3,
+                "r-s4-phone-approve",
+                13,
                 15.2,
                 2.2
               ],
               [
-                "s4r-approved",
+                "r-s4r-approved",
                 0.5,
                 2.3,
                 1.8
@@ -4279,15 +4279,15 @@
           "duration": 6.0,
           "spans": [
             [
-              "s5-po-savings",
-              36,
-              39,
+              "r-s5r-outcome-form",
+              12,
+              14.5,
               2.5
             ],
             [
-              "s5-po-savings",
-              43,
-              43,
+              "r-s5r-ledger",
+              9,
+              9,
               3.5
             ]
           ],
@@ -4295,15 +4295,15 @@
           "spans_by_language": {
             "ar": [
               [
-                "s5-po-savings",
-                36,
-                39,
+                "r-s5r-outcome-form",
+                12,
+                14.5,
                 2.5
               ],
               [
-                "s5-po-savings",
-                43,
-                43,
+                "r-s5r-ledger",
+                9,
+                9,
                 3.5
               ]
             ],
@@ -4464,7 +4464,7 @@
             "6": "٤٬٩١٠ ر.س",
             "8": "٤٠ ر.س",
             "13": "١٩٠ ر.س",
-            "14": "١٩٠ ر.س"
+            "14": "٣١٠ ر.س"
           },
           "saving": 190,
           "decimals": 0,

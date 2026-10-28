@@ -123,3 +123,16 @@ step numbers above.
 |---|---|---|
 | b | After an RFQ is sent, the RFQ list can still say "Loading RFQs…" more than a second later (Liffey). So the cut holds on the "RFQ sent. Suppliers emailed: 3" toast. | `/rfq`, Liffey round E |
 | c | Euro amounts drop a trailing zero ("EUR 1,289.5"), and a zero saving shows as red "-SAR 0.00" (PPS-66). | purchase request, `/savings` |
+
+## Re-shoot for «ر.س» (2026-10-28, PPS-84)
+
+Same procedure as round 6's re-shoot ([`../../demo-tenant/round-6/README.md`](../../demo-tenant/round-6/README.md)), on «مطاعم رواق» with the
+Arabic UI:
+- RFQ `b81271cd` sent to الذهبي only;
+- الذهبي's reply carrying round A's photo `IMG-20261025-WA0035.jpg` → quotation `341970a1`, 4,910 SAR, authorised on camera;
+- guardrail draft `2bceafd8` submitted and approved on the phone, then **withdrawn** (no PO, no saving);
+- read-only re-takes of PO-000002's outcome form and the ledger, which now totals **٣١٠ ر.س** (rounds A and E). The beat 13
+  hold points at round A's rows (+٤٠ +٩٠ +٦٠ = ١٩٠).
+
+The kiosk's browser had English chosen from the Rawaq Restaurant Group sign-in, so the app was switched to Arabic with its own
+toggle first. Smart Compare now ties at ١٬٥٢٠ ر.س, so the video keeps the original compare clip.
