@@ -80,9 +80,13 @@ class RfqService:
         rejections that were never stored)."""
         cur.execute("select * from rfq where id = %s", (rfq_id,))
         rfq = Rfq(**cur.fetchone())
-        cur.execute("select * from rfq_line where rfq_id = %s order by created_at", (rfq_id,))
+        cur.execute(
+            "select * from rfq_line where rfq_id = %s order by position, created_at, id", (rfq_id,)
+        )
         lines = [RfqLine(**r) for r in cur.fetchall()]
-        cur.execute("select * from rfq_recipient where rfq_id = %s order by created_at", (rfq_id,))
+        cur.execute(
+            "select * from rfq_recipient where rfq_id = %s order by created_at, id", (rfq_id,)
+        )
         recipients = [RfqRecipient(**r) for r in cur.fetchall()]
         return rfq, lines, recipients, []
 
@@ -149,13 +153,16 @@ class RfqService:
                 rfq = Rfq(**rfq_row)
 
                 created_lines = []
-                for line_data in lines_data:
+                for position, line_data in enumerate(lines_data):
                     line_id = uuid.uuid4()
                     cur.execute(
                         """
-                        insert into rfq_line (id, tenant_id, rfq_id, workspace_product_id, quantity)
-                        values (%s, %s, %s, %s, %s)
-                        returning id, tenant_id, rfq_id, workspace_product_id, quantity, created_at
+                        insert into rfq_line (
+                            id, tenant_id, rfq_id, workspace_product_id, quantity, position
+                        )
+                        values (%s, %s, %s, %s, %s, %s)
+                        returning id, tenant_id, rfq_id, workspace_product_id, quantity,
+                                  position, created_at
                         """,
                         (
                             line_id,
@@ -163,6 +170,7 @@ class RfqService:
                             rfq_id,
                             line_data.workspace_product_id,
                             line_data.quantity,
+                            position,
                         ),
                     )
                     created_lines.append(RfqLine(**cur.fetchone()))
@@ -192,11 +200,24 @@ class RfqService:
                 if row is None:
                     raise NotFoundError(details={"resource": "rfq"})
                 cur.execute(
-                    "select * from rfq_line where rfq_id = %s order by created_at", (rfq_id,)
+                    """select l.*, wp.tenant_name as product_name, cp.variant as product_variant
+                       from rfq_line l
+                       left join workspace_product wp
+                         on wp.id = l.workspace_product_id and wp.tenant_id = l.tenant_id
+                       left join canonical_product cp on cp.id = wp.canonical_product_id
+                       where l.rfq_id = %s
+                       order by l.position, l.created_at, l.id""",
+                    (rfq_id,),
                 )
                 lines = [RfqLine(**item) for item in cur.fetchall()]
                 cur.execute(
-                    "select * from rfq_recipient where rfq_id = %s order by created_at", (rfq_id,)
+                    """select r.*, s.name as supplier_name,
+                              s.contact_email as supplier_contact_email
+                       from rfq_recipient r
+                       left join supplier s on s.id = r.supplier_id and s.tenant_id = r.tenant_id
+                       where r.rfq_id = %s
+                       order by r.created_at, r.id""",
+                    (rfq_id,),
                 )
                 recipients = [RfqRecipient(**item) for item in cur.fetchall()]
                 return RfqDetail(rfq=Rfq(**row), lines=lines, recipients=recipients)
@@ -241,12 +262,18 @@ class RfqService:
                 )
                 rfq = Rfq(**cur.fetchone())
                 lines = []
-                for item in lines_data:
+                for position, item in enumerate(lines_data):
                     cur.execute(
                         "insert into rfq_line "
-                        "(tenant_id,rfq_id,workspace_product_id,quantity) "
-                        "values (%s,%s,%s,%s) returning *",
-                        (member.tenant_id, rfq_id, item.workspace_product_id, item.quantity),
+                        "(tenant_id,rfq_id,workspace_product_id,quantity,position) "
+                        "values (%s,%s,%s,%s,%s) returning *",
+                        (
+                            member.tenant_id,
+                            rfq_id,
+                            item.workspace_product_id,
+                            item.quantity,
+                            position,
+                        ),
                     )
                     lines.append(RfqLine(**cur.fetchone()))
                 recipients = []
@@ -294,7 +321,10 @@ class RfqService:
                 rfq_row = _lock_rfq_for_creator(cur, member, rfq_id)
                 rfq = Rfq(**rfq_row)
 
-                cur.execute("select * from rfq_line where rfq_id = %s", (rfq_id,))
+                cur.execute(
+                    "select * from rfq_line where rfq_id = %s order by position, created_at, id",
+                    (rfq_id,),
+                )
                 line_rows = cur.fetchall()
                 lines = [RfqLine(**r) for r in line_rows]
 
@@ -326,7 +356,9 @@ class RfqService:
                 product_by_id = {r["workspace_product_id"]: r for r in cur.fetchall()}
 
                 cur.execute(
-                    "select * from rfq_recipient where rfq_id = %s and status = 'draft'", (rfq_id,)
+                    "select * from rfq_recipient where rfq_id = %s and status = 'draft' "
+                    "order by created_at, id",
+                    (rfq_id,),
                 )
                 recipient_rows = cur.fetchall()
                 draft_recipients = [RfqRecipient(**r) for r in recipient_rows]
@@ -409,7 +441,10 @@ class RfqService:
                         updated_recipients.append(recipient)
 
                 # Fetch all recipients to return
-                cur.execute("select * from rfq_recipient where rfq_id = %s", (rfq_id,))
+                cur.execute(
+                    "select * from rfq_recipient where rfq_id = %s order by created_at, id",
+                    (rfq_id,),
+                )
                 all_recipients = [RfqRecipient(**r) for r in cur.fetchall()]
 
                 if any_sent and rfq.status == "draft":
@@ -674,7 +709,7 @@ class RfqService:
 
                 cur.execute(
                     "select workspace_product_id, quantity from rfq_line "
-                    "where rfq_id = %s and tenant_id = %s",
+                    "where rfq_id = %s and tenant_id = %s order by position, created_at, id",
                     (rfq_id, member.tenant_id),
                 )
                 rfq_lines = cur.fetchall()

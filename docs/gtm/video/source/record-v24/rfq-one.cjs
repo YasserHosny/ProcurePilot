@@ -3,7 +3,7 @@
 // usage: node rfq-one.cjs   (PP_TENANT picks the workspace; PP_NEEDED the needed-by date)
 const L = require('./lib.cjs');
 const W = require('./tenants.cjs');
-const NEEDED = process.env.PP_NEEDED || '30/10/2026';
+const NEEDED = process.env.PP_NEEDED || L.neededByDate();
 L.run(async () => {
   const { page } = await L.connect();
   await page.goto(L.BASE + '/rfq/history'); await page.waitForLoadState('networkidle').catch(() => {}); await L.sleep(1500);

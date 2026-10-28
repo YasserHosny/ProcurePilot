@@ -33,6 +33,9 @@ class RfqLine(BaseModel):
     rfq_id: UUID
     workspace_product_id: UUID
     quantity: Decimal
+    position: int
+    product_name: str | None = None
+    product_variant: str | None = None
     created_at: datetime
 
 
@@ -43,6 +46,8 @@ class RfqRecipient(BaseModel):
     tenant_id: UUID
     rfq_id: UUID
     supplier_id: UUID
+    supplier_name: str | None = None
+    supplier_contact_email: str | None = None
     status: RfqRecipientStatus
     outbound_message_id: str | None = None
     sent_at: datetime | None = None

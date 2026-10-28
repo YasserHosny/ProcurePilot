@@ -3,7 +3,7 @@
 const L = require('./lib.cjs');
 const W = require('./tenants.cjs');
 const DRY = process.env.PP_DRY === '1';
-const NEEDED = process.env.PP_NEEDED || '28/10/2026';
+const NEEDED = process.env.PP_NEEDED || L.neededByDate();
 const TERMS = W.terms[L.LANG];
 L.run(async () => {
   const { page } = await L.connect();
