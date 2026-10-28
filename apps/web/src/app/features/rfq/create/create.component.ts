@@ -213,7 +213,7 @@ export class RfqCreateComponent implements OnInit {
   }
 
   selectedSupplierNames(): string {
-    const selectedIds = this.form.controls.supplierIds.value;
+    const selectedIds = this.form.getRawValue().supplierIds;
     if (!selectedIds || selectedIds.length === 0) return '';
     const map = new Map(this.suppliers().map((s) => [s.id, s.name]));
     return selectedIds
@@ -431,6 +431,7 @@ export class RfqCreateComponent implements OnInit {
     }
 
     this.isSaving.set(true);
+    this.form.disable({ emitEvent: false });
     this.errorMessage.set(null);
     this.rejectedSuppliers.set([]);
 
@@ -448,6 +449,7 @@ export class RfqCreateComponent implements OnInit {
         this.rfqStatus.set(res.rfq.status);
         this.rejectedSuppliers.set(res.rejected_recipients ?? []);
         this.isSaving.set(false);
+        this.form.enable({ emitEvent: false });
         this.isEditMode.set(true);
         this.snackBar.open(
           this.translate.instant('rfq.create.draftSaved'),
@@ -462,6 +464,7 @@ export class RfqCreateComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.isSaving.set(false);
+        this.form.enable({ emitEvent: false });
         if (err instanceof HttpErrorResponse && err.status === 403) {
           this.errorMessage.set(this.translate.instant('rfq.creatorOnly'));
           return;
@@ -528,6 +531,7 @@ export class RfqCreateComponent implements OnInit {
 
   private saveDraftAndSend(id: string): void {
     this.isSaving.set(true);
+    this.form.disable({ emitEvent: false });
     this.errorMessage.set(null);
     this.rejectedSuppliers.set([]);
 
@@ -542,6 +546,7 @@ export class RfqCreateComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.isSaving.set(false);
+        this.form.enable({ emitEvent: false });
         if (err instanceof HttpErrorResponse && err.status === 403) {
           this.errorMessage.set(this.translate.instant('rfq.creatorOnly'));
           return;
@@ -553,12 +558,14 @@ export class RfqCreateComponent implements OnInit {
 
   private executeSend(id: string): void {
     this.isSending.set(true);
+    this.form.disable({ emitEvent: false });
     this.errorMessage.set(null);
     this.rfqApi.sendRfq(id).subscribe({
       next: (res) => {
         this.form.markAsPristine();
         this.rfqStatus.set(res.rfq.status);
         this.isSending.set(false);
+        this.form.enable({ emitEvent: false });
         const total = res.recipients.length;
         const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
         const key =
@@ -582,6 +589,7 @@ export class RfqCreateComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.isSending.set(false);
+        this.form.enable({ emitEvent: false });
         if (err instanceof HttpErrorResponse && err.status === 403) {
           this.errorMessage.set(this.translate.instant('rfq.creatorOnly'));
           return;
@@ -610,16 +618,15 @@ export class RfqCreateComponent implements OnInit {
 
   private focusFirstInvalidControl(): void {
     setTimeout(() => {
-      const invalidElement = this.elementRef.nativeElement.querySelector(
-        '.ng-invalid:not(form):not([formArrayName]):not([formGroupName])',
+      const el = this.elementRef.nativeElement.querySelector(
+        'mat-form-field.ng-invalid, mat-form-field .ng-invalid',
       ) as HTMLElement | null;
-      if (invalidElement) {
-        if (typeof invalidElement.focus === 'function') {
-          invalidElement.focus();
-        } else {
-          invalidElement.querySelector<HTMLElement>('input, select, textarea')?.focus();
-        }
-      }
+      if (!el) return;
+
+      const control = el.matches('input, textarea, mat-select')
+        ? el
+        : el.querySelector<HTMLElement>('input, textarea, mat-select');
+      control?.focus();
     }, 0);
   }
 

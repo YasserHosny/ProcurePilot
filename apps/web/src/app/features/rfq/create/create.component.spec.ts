@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { RfqCreateComponent } from './create.component';
-import { RfqApi, Rfq, RfqDetail } from '../rfq-api';
+import { RfqApi, Rfq, RfqDetail, RfqCreateResponse } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { provideHttpClient, HttpErrorResponse, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -8,7 +8,7 @@ import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Product, Supplier } from '../../../core/api/models';
@@ -26,6 +26,8 @@ describe('RfqCreateComponent', () => {
   let fromId: string | null;
 
   beforeEach(async () => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(2026, 9, 28));
     routeId = null;
     fromId = null;
     rfqApiSpy = jasmine.createSpyObj('RfqApi', ['createRfq', 'getRfq', 'updateRfq', 'sendRfq']);
@@ -137,6 +139,10 @@ describe('RfqCreateComponent', () => {
     fixture = TestBed.createComponent(RfqCreateComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    jasmine.clock().uninstall();
   });
 
 
@@ -1146,6 +1152,42 @@ describe('RfqCreateComponent', () => {
       msg = translate.instant(dialogData['messageKey'] as string, dialogData['messageParams'] as Record<string, unknown>);
       expect(msg).toContain('سلع');
     });
+
+    it('disables form controls while updateRfq is pending in saveDraftAndSend and re-enables on error', () => {
+      const updateSubject = new Subject<RfqCreateResponse>();
+      rfqApiSpy.updateRfq.and.returnValue(updateSubject.asObservable());
+
+      component.rfqId.set('rfq-edit-1');
+      component.products.set([{ id: 'prod-1', tenant_name: 'Product 1' } as Product]);
+      component.suppliers.set([{ id: 'sup-1', name: 'Al-Ahram Supplies', contact_email: 'sup@test.com' } as Supplier]);
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 10);
+
+      component.form.patchValue({
+        lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+        supplierIds: ['sup-1'],
+        neededByDate: futureDate,
+      });
+      component.form.markAsDirty();
+
+      dialogSpy.open.and.returnValue({
+        afterClosed: () => of(true),
+      } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+      component.onSend();
+
+      // updateRfq is now in flight
+      expect(rfqApiSpy.updateRfq).toHaveBeenCalled();
+      expect(component.isSaving()).toBeTrue();
+      expect(component.form.disabled).toBeTrue();
+
+      // Emit error to fail the pending update
+      updateSubject.error(new HttpErrorResponse({ status: 500 }));
+
+      expect(component.isSaving()).toBeFalse();
+      expect(component.form.disabled).toBeFalse();
+      expect(component.errorMessage()).toBeTruthy();
+    });
   });
 
   describe('Past dates and repeated products (PPS-91)', () => {
@@ -1300,6 +1342,40 @@ describe('RfqCreateComponent', () => {
       );
       expect(productInputs.length).toBe(2);
       expect(document.activeElement).toBe(productInputs[1]);
+    }));
+
+    it('focuses the first line product input after onSave() on an invalid form', fakeAsync(() => {
+      fixture.detectChanges();
+      expect(component.form.valid).toBeFalse();
+
+      component.onSave();
+      tick();
+      fixture.detectChanges();
+
+      const productInput = fixture.nativeElement.querySelector(
+        'input[formcontrolname="workspace_product_id"]',
+      );
+      expect(document.activeElement).toBe(productInput);
+    }));
+
+    it('focuses the needed-by input after onSave() when needed-by is the first invalid control', fakeAsync(() => {
+      component.products.set([{ id: 'prod-1', tenant_name: 'Product 1' } as Product]);
+      component.suppliers.set([{ id: 'sup-1', name: 'Supplier 1', contact_email: 'sup@test.com' } as Supplier]);
+      component.form.patchValue({
+        lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+        supplierIds: ['sup-1'],
+        neededByDate: null,
+      });
+      fixture.detectChanges();
+
+      component.onSave();
+      tick();
+      fixture.detectChanges();
+
+      const neededByInput = fixture.nativeElement.querySelector(
+        'input[formcontrolname="neededByDate"]',
+      );
+      expect(document.activeElement).toBe(neededByInput);
     }));
   });
 });

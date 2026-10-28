@@ -71,6 +71,8 @@ describe('HistoryComponent', () => {
   };
 
   beforeEach(async () => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(2026, 9, 28));
     rfqApiSpy = jasmine.createSpyObj('RfqApi', ['listRfqs', 'sendRfq', 'getRfq']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
     const apiSpy = jasmine.createSpyObj('ApiService', ['members']);
@@ -147,6 +149,10 @@ describe('HistoryComponent', () => {
     router = TestBed.inject(Router);
     spyOn(router, 'navigate');
     fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    jasmine.clock().uninstall();
   });
 
   it('should create and load RFQs', () => {
