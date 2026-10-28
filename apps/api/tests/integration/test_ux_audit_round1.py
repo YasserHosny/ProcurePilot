@@ -270,6 +270,65 @@ def test_an_rfq_cannot_ask_for_a_past_date_or_the_same_product_twice(
     assert response.json()["details"]["reason"] == reason
 
 
+@pytest.mark.parametrize("method", ["create", "update"])
+def test_a_retry_after_midnight_returns_the_rfq_it_already_saved(
+    monkeypatch: pytest.MonkeyPatch, method: str
+) -> None:
+    """Review finding: the past-date check ran before the idempotent replay lookup, so a retry of
+    a save that committed with today's date, arriving after midnight, got 422 needed_by_in_past
+    instead of the RFQ that already exists."""
+    today = date.today()
+    with rolled_back() as db_conn:
+        with db_conn.cursor() as cur:
+            ws, rice, oil, supplier = _rfq_fixture(cur, "ux-r1-rfq-midnight")
+        body = {
+            "lines": [
+                {"workspace_product_id": str(rice), "quantity": "20"},
+                {"workspace_product_id": str(oil), "quantity": "10"},
+            ],
+            "recipient_supplier_ids": [str(supplier)],
+            "needed_by_date": str(today),
+        }
+        key = str(uuid4())
+        with api_as(monkeypatch, db_conn, ws) as client:
+            if method == "create":
+                first = client.post("/api/v1/rfq", json=body, headers={"Idempotency-Key": key})
+            else:
+                created = client.post(
+                    "/api/v1/rfq",
+                    json={**body, "needed_by_date": str(today + timedelta(days=7))},
+                    headers={"Idempotency-Key": str(uuid4())},
+                )
+                assert created.status_code == 201, created.text
+                rfq_id = created.json()["rfq"]["id"]
+                first = client.put(
+                    f"/api/v1/rfq/{rfq_id}", json=body, headers={"Idempotency-Key": key}
+                )
+            assert first.status_code in (200, 201), first.text
+
+            class _Tomorrow(date):
+                @classmethod
+                def today(cls) -> date:
+                    return today + timedelta(days=1)
+
+            monkeypatch.setattr(rfq_module, "date", _Tomorrow)
+            if method == "create":
+                retry = client.post("/api/v1/rfq", json=body, headers={"Idempotency-Key": key})
+            else:
+                retry = client.put(
+                    f"/api/v1/rfq/{rfq_id}", json=body, headers={"Idempotency-Key": key}
+                )
+            # A new save with the same date and a fresh key is refused, as before.
+            fresh = client.post(
+                "/api/v1/rfq", json=body, headers={"Idempotency-Key": str(uuid4())}
+            )
+
+    assert retry.status_code == first.status_code, retry.text
+    assert retry.json()["rfq"]["id"] == first.json()["rfq"]["id"]
+    assert fresh.status_code == 422
+    assert fresh.json()["details"]["reason"] == "needed_by_in_past"
+
+
 def test_a_draft_whose_needed_by_date_has_passed_is_not_sent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

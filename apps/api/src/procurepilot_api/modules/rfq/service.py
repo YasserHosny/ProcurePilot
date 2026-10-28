@@ -66,12 +66,17 @@ def _authenticated_db(settings: Settings, member: CurrentMember) -> Iterator[psy
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
 
-def _validate_rfq_request(lines_data: list, needed_by_date: date) -> None:
-    """Refuse what a supplier email must never carry: a past date or one product twice."""
+def _validate_needed_by(needed_by_date: date) -> None:
+    """A supplier email must never ask for a date that has passed. Callers run this after their
+    idempotent replay lookup: a retry of a save that committed yesterday must get its RFQ back."""
     if needed_by_date < date.today():
         raise UnprocessableEntityError(
             details={"reason": "needed_by_in_past", "field": "needed_by_date"}
         )
+
+
+def _validate_rfq_lines(lines_data: list) -> None:
+    """A supplier email must never ask for one product twice."""
     seen: set[uuid.UUID] = set()
     for line in lines_data:
         if line.workspace_product_id in seen:
@@ -118,7 +123,7 @@ class RfqService:
         idempotency_key: uuid.UUID,
         tenant_terms: str | None = None,
     ) -> tuple[Rfq, list[RfqLine], list[RfqRecipient], list[dict]]:
-        _validate_rfq_request(lines_data, needed_by_date)
+        _validate_rfq_lines(lines_data)
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 # True idempotent replay: a retry with the same key after the original
@@ -134,6 +139,7 @@ class RfqService:
                 existing = cur.fetchone()
                 if existing is not None:
                     return self._fetch_created(cur, existing["id"])
+                _validate_needed_by(needed_by_date)
 
                 cur.execute(
                     "select pg_try_advisory_xact_lock(%s)",
@@ -252,7 +258,7 @@ class RfqService:
         tenant_terms: str | None,
         idempotency_key: uuid.UUID,
     ) -> tuple[Rfq, list[RfqLine], list[RfqRecipient], list[dict]]:
-        _validate_rfq_request(lines_data, needed_by_date)
+        _validate_rfq_lines(lines_data)
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 row = _lock_rfq_for_creator(cur, member, rfq_id)
@@ -261,6 +267,7 @@ class RfqService:
                     # result without re-creating lines/recipients or auditing again.
                     rfq, lines, recipients, _ = self._fetch_created(cur, rfq_id)
                     return rfq, lines, recipients, []
+                _validate_needed_by(needed_by_date)
                 if row["status"] != "draft":
                     from procurepilot_api.errors import ConflictError
 
