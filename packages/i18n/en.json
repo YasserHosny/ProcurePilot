@@ -3894,6 +3894,7 @@
       "compareResponses": "Compare responses",
       "duplicate": "Duplicate",
       "sentToSuppliers": "Sent to {{count}} suppliers",
+      "recipientsDraftHeader": "{{count}} suppliers, not sent yet",
       "viewAllRecipients": "View all recipients →",
       "recipientsLoadError": "Failed to load recipients.",
       "recipientStatus_sent": "Sent",

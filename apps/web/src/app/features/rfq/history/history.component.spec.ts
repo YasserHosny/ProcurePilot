@@ -5,7 +5,7 @@ import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { provideTranslateService } from '@ngx-translate/core';
+import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -13,6 +13,9 @@ import { signal } from '@angular/core';
 import { SessionService } from '../../../core/auth/session.service';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { ApiService } from '../../../core/api/api.service';
+
+import enCatalog from '../../../../../../../packages/i18n/en.json';
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 
 describe('HistoryComponent', () => {
   let component: HistoryComponent;
@@ -337,5 +340,109 @@ describe('HistoryComponent', () => {
       jasmine.any(String),
       { duration: 5000 },
     );
+  });
+
+  it('invalidates recipientsCache on loadRfqs so reopening popover after sending refetches recipients with new status', async () => {
+    const draftRecipients = [
+      {
+        id: 'rec-draft-1',
+        tenant_id: 't1',
+        rfq_id: 'rfq-draft-1',
+        supplier_id: 's1',
+        supplier_name: 'Supplier Alpha',
+        supplier_contact_email: 'alpha@example.test',
+        status: 'draft' as const,
+        outbound_message_id: null,
+        sent_at: null,
+        created_at: '2026-09-25T10:00:00Z',
+      },
+    ];
+    rfqApiSpy.getRfq.and.returnValue(
+      of({
+        rfq: { ...mockRfqs[0], tenant_id: 't1', idempotency_key: 'k0', tenant_terms: null },
+        lines: [],
+        recipients: draftRecipients,
+      }),
+    );
+
+    // Popover opened on draft RFQ
+    component.loadRecipients('rfq-draft-1');
+    expect(rfqApiSpy.getRfq).toHaveBeenCalledWith('rfq-draft-1');
+    expect(rfqApiSpy.getRfq).toHaveBeenCalledTimes(1);
+    expect(component.recipientsCache()['rfq-draft-1']?.recipients?.[0].status).toBe('draft');
+
+    // sendRfq succeeds
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of(true),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+    const sentRecipients = [
+      {
+        ...draftRecipients[0],
+        status: 'sent' as const,
+        sent_at: '2026-09-26T14:30:00Z',
+      },
+    ];
+    rfqApiSpy.sendRfq.and.returnValue(
+      of({
+        rfq: { id: 'rfq-draft-1', status: 'sent' },
+        recipients: sentRecipients,
+      } as unknown as RfqSendResponse),
+    );
+
+    rfqApiSpy.getRfq.and.returnValue(
+      of({
+        rfq: { ...mockRfqs[0], status: 'sent', tenant_id: 't1', idempotency_key: 'k0', tenant_terms: null },
+        lines: [],
+        recipients: sentRecipients,
+      }),
+    );
+
+    component.onSendDraft(mockRfqs[0]);
+    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-draft-1');
+
+    // Reopen popover on the RFQ
+    component.loadRecipients('rfq-draft-1');
+    expect(rfqApiSpy.getRfq).toHaveBeenCalledTimes(2);
+    expect(component.recipientsCache()['rfq-draft-1']?.recipients?.[0].status).toBe('sent');
+  });
+
+  it('renders recipientsDraftHeader for draft RFQ and sentToSuppliers for sent RFQ in popover header', async () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.use('en');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const recipientButtons = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+      '[data-testid="rfq-recipients-button"]',
+    );
+    expect(recipientButtons.length).toBeGreaterThanOrEqual(2);
+
+    // Open popover for draft (mockRfqs[0] has count 3, status draft)
+    recipientButtons[0].click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const draftHeader = document.querySelector('.popover-header strong');
+    expect(draftHeader?.textContent?.trim()).toBe('3 suppliers, not sent yet');
+
+    // Open popover for sent RFQ (mockRfqs[1] has count 5, status sent)
+    recipientButtons[1].click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const sentHeaders = document.querySelectorAll('.popover-header strong');
+    const sentHeader = sentHeaders[sentHeaders.length - 1];
+    expect(sentHeader?.textContent?.trim()).toBe('Sent to 5 suppliers');
+  });
+
+  it('provides English and Arabic recipientsDraftHeader translation keys', () => {
+    for (const catalog of [enCatalog, arCatalog]) {
+      const history = (catalog.rfq as { history: Record<string, string> }).history;
+      expect(history['recipientsDraftHeader']).toBeTruthy();
+      expect(history['recipientsDraftHeader']).toContain('{{count}}');
+    }
   });
 });

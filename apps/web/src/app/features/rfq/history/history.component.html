@@ -176,7 +176,7 @@
     <ng-template matMenuContent let-rfq="rfq">
       <div class="recipients-popover">
         <div class="popover-header">
-          <strong>{{ 'rfq.history.sentToSuppliers' | translate: { count: rfq.recipient_count } }}</strong>
+          <strong>{{ (rfq.status === 'draft' ? 'rfq.history.recipientsDraftHeader' : 'rfq.history.sentToSuppliers') | translate: { count: rfq.recipient_count } }}</strong>
         </div>
         @if (recipientsCache()[rfq.id]?.loading) {
           <div class="popover-loading">

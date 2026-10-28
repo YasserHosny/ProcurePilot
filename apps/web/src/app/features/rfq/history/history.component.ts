@@ -76,6 +76,7 @@ export class HistoryComponent implements OnInit {
   }
 
   loadRfqs(): void {
+    this.recipientsCache.set({});
     this.loading.set(true);
     this.rfqApi.listRfqs().subscribe({
       next: (response) => {

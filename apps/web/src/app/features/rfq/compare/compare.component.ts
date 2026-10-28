@@ -90,9 +90,7 @@ export class CompareComponent implements OnInit, OnChanges {
       const email = this.session.currentMember()?.email;
       this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
     });
-    if (this.rfqId()) {
-      this.loadData(this.rfqId());
-    } else {
+    if (!this.rfqId()) {
       this.route.paramMap.subscribe((params) => {
         const id = params.get('id');
         if (id) {

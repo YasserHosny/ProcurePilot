@@ -3894,6 +3894,7 @@
       "compareResponses": "مقارنة الردود",
       "duplicate": "تكرار",
       "sentToSuppliers": "أُرسل إلى {{count}} موردين",
+      "recipientsDraftHeader": "{{count}} موردين، لم يُرسل بعد",
       "viewAllRecipients": "عرض جميع المستلمين ←",
       "recipientsLoadError": "فشل تحميل المستلمين.",
       "recipientStatus_sent": "مرسل",
