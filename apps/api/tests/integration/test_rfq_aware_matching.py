@@ -191,7 +191,9 @@ def test_round_one_two_replies_auto_match_without_learning_aliases(
             bearer_token="test", member=_member(ws), quotation_id=quote
         )
         assert len(result.lines) == 4
-        assert [row.decision.matched_product.id for row in result.lines] == products
+        # The PsycopgTableQuery test double ignores order(); compare by line number.
+        by_line = sorted(result.lines, key=lambda row: row.line.line_number)
+        assert [row.decision.matched_product.id for row in by_line] == products
         assert all(
             row.decision.is_automatic and row.decision.alias_id is None for row in result.lines
         )
