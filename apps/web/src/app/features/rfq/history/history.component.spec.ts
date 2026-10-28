@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HistoryComponent } from './history.component';
 import { RfqApi, RfqSummary, RfqList, RfqSendResponse } from '../rfq-api';
 import { Router, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
@@ -15,6 +15,7 @@ import { MatMenu } from '@angular/material/menu';
 import { SessionService } from '../../../core/auth/session.service';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { ApiService } from '../../../core/api/api.service';
+import { BreakpointObserver, BreakpointState } from '@angular/cdk/layout';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
@@ -26,13 +27,14 @@ describe('HistoryComponent', () => {
   let router: Router;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
   let dialogSpy: jasmine.SpyObj<MatDialog>;
+  let breakpointSpy: jasmine.SpyObj<BreakpointObserver>;
 
   const mockRfqs: RfqSummary[] = [
     {
       id: 'rfq-draft-1',
       created_by_membership_id: 'm1',
       status: 'draft',
-      needed_by_date: '2026-10-10',
+      needed_by_date: '2026-12-31',
       created_at: '2026-09-20T10:00:00Z',
       sent_at: null,
       recipient_count: 3,
@@ -74,6 +76,9 @@ describe('HistoryComponent', () => {
     const apiSpy = jasmine.createSpyObj('ApiService', ['members']);
     apiSpy.members.and.returnValue(of({ items: [{ id: 'm1', email: 'user@test.com' }], next_cursor: null }));
     dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
+    breakpointSpy = jasmine.createSpyObj('BreakpointObserver', ['observe', 'isMatched']);
+    breakpointSpy.observe.and.returnValue(of({ matches: false, breakpoints: {} }));
+    breakpointSpy.isMatched.and.returnValue(false);
 
     rfqApiSpy.listRfqs.and.returnValue(of(mockRfqList));
     rfqApiSpy.getRfq.and.returnValue(
@@ -120,6 +125,7 @@ describe('HistoryComponent', () => {
         { provide: ApiService, useValue: apiSpy },
         { provide: MatSnackBar, useValue: snackBarSpy },
         { provide: MatDialog, useValue: dialogSpy },
+        { provide: BreakpointObserver, useValue: breakpointSpy },
         {
           provide: SessionService,
           useValue: {
@@ -319,13 +325,78 @@ describe('HistoryComponent', () => {
       CatalogueConfirmDialogComponent,
       jasmine.objectContaining({
         data: jasmine.objectContaining({
-          messageParams: { count: 3 },
+          messageParams: jasmine.objectContaining({
+            count: 3,
+            date: jasmine.any(String),
+          }),
         }),
       }),
     );
+    const sendDialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as Record<string, unknown>;
+    expect(sendDialogData['warningKey']).toBeUndefined();
     expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-draft-1');
     expect(snackBarSpy.open).toHaveBeenCalled();
     expect(rfqApiSpy.listRfqs).toHaveBeenCalled();
+  });
+
+  it('history send with a past date opens the "has passed" dialog and confirming navigates to edit', () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of(true),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+    const pastRfq: RfqSummary = {
+      ...mockRfqs[0],
+      id: 'rfq-draft-past',
+      needed_by_date: '2026-09-01',
+    };
+
+    component.onSendDraft(pastRfq);
+
+    expect(dialogSpy.open).toHaveBeenCalledWith(
+      CatalogueConfirmDialogComponent,
+      jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          titleKey: 'rfq.history.neededByPassedTitle',
+          messageKey: 'rfq.history.neededByPassedMessage',
+          confirmKey: 'rfq.history.neededByPassedConfirm',
+        }),
+      }),
+    );
+    expect(router.navigate).toHaveBeenCalledWith(['/rfq', 'rfq-draft-past', 'edit']);
+    expect(rfqApiSpy.sendRfq).not.toHaveBeenCalled();
+  });
+
+  it('confirms send without past-date warning when needed_by_date is in the future', () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of(true),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+    rfqApiSpy.sendRfq.and.returnValue(
+      of({
+        rfq: { id: 'rfq-draft-future', status: 'sent' },
+        recipients: [{ id: 'r1' }],
+      } as unknown as RfqSendResponse),
+    );
+
+    const futureRfq: RfqSummary = {
+      ...mockRfqs[0],
+      id: 'rfq-draft-future',
+      needed_by_date: '2026-12-31',
+    };
+
+    component.onSendDraft(futureRfq);
+
+    expect(dialogSpy.open).toHaveBeenCalledWith(
+      CatalogueConfirmDialogComponent,
+      jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          messageParams: jasmine.objectContaining({
+            date: jasmine.any(String),
+          }),
+        }),
+      }),
+    );
+    const futureDialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as Record<string, unknown>;
+    expect(futureDialogData['warningKey']).toBeUndefined();
   });
 
   it('shows error snackbar when sendRfq fails after confirmation', () => {
@@ -445,6 +516,11 @@ describe('HistoryComponent', () => {
       const history = (catalog.rfq as { history: Record<string, string> }).history;
       expect(history['recipientsDraftHeader']).toBeTruthy();
       expect(history['recipientsDraftHeader']).toContain('{{count}}');
+      expect(history['neededByPassedTitle']).toBeTruthy();
+      expect(history['neededByPassedMessage']).toBeTruthy();
+      expect(history['neededByPassedConfirm']).toBeTruthy();
+      expect(history['neededByPassedCancel']).toBeTruthy();
+      expect(history['neededByPastWarning']).toBeUndefined();
     }
   });
 
@@ -469,5 +545,72 @@ describe('HistoryComponent', () => {
 
     const panel = document.querySelector('.mat-mdc-menu-panel.recipients-popover-menu');
     expect(panel).not.toBeNull();
+  });
+
+  describe('Responsive columns (PPS-94)', () => {
+    it('shows all columns at desktop (>= 1200px)', () => {
+      component.isBelow1200.set(false);
+      component.isBelow768.set(false);
+      expect(component.displayedColumns()).toEqual([
+        'status',
+        'neededBy',
+        'sentAt',
+        'recipients',
+        'responses',
+        'actions',
+      ]);
+      expect(component.showCountsInMenu()).toBeFalse();
+    });
+
+    it('hides recipients and responses below 1200px', () => {
+      component.isBelow1200.set(true);
+      component.isBelow768.set(false);
+      expect(component.displayedColumns()).toEqual(['status', 'neededBy', 'sentAt', 'actions']);
+      expect(component.showCountsInMenu()).toBeTrue();
+    });
+
+    it('shows only status, neededBy, and actions below 768px', () => {
+      component.isBelow1200.set(true);
+      component.isBelow768.set(true);
+      expect(component.displayedColumns()).toEqual(['status', 'neededBy', 'actions']);
+      expect(component.showCountsInMenu()).toBeTrue();
+    });
+
+    it('updates displayed columns when BreakpointObserver emits matches', () => {
+      const tabletSubject = new Subject<BreakpointState>();
+      const mobileSubject = new Subject<BreakpointState>();
+
+      breakpointSpy.observe.and.callFake((query: string | readonly string[]) => {
+        const q = Array.isArray(query) ? query.join(',') : query;
+        if (q.includes('1199.98')) return tabletSubject;
+        if (q.includes('767.98')) return mobileSubject;
+        return of({ matches: false, breakpoints: {} });
+      });
+
+      const respFixture = TestBed.createComponent(HistoryComponent);
+      const respComp = respFixture.componentInstance;
+      respFixture.detectChanges();
+
+      // Tablet size (below 1200px, not below 768px)
+      tabletSubject.next({ matches: true, breakpoints: { '(max-width: 1199.98px)': true } });
+      mobileSubject.next({ matches: false, breakpoints: { '(max-width: 767.98px)': false } });
+      expect(respComp.displayedColumns()).toEqual(['status', 'neededBy', 'sentAt', 'actions']);
+
+      // Mobile size (below 768px)
+      mobileSubject.next({ matches: true, breakpoints: { '(max-width: 767.98px)': true } });
+      expect(respComp.displayedColumns()).toEqual(['status', 'neededBy', 'actions']);
+
+      // Back to desktop (above 1200px)
+      tabletSubject.next({ matches: false, breakpoints: { '(max-width: 1199.98px)': false } });
+      mobileSubject.next({ matches: false, breakpoints: { '(max-width: 767.98px)': false } });
+      expect(respComp.displayedColumns()).toEqual([
+        'status',
+        'neededBy',
+        'sentAt',
+        'recipients',
+        'responses',
+        'actions',
+      ]);
+    });
   });
 });

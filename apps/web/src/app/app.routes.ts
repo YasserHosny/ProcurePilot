@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { authGuard, guestGuard, roleGuard } from './core/auth/auth.guard';
+import { rfqDirtyGuard } from './features/rfq/create/rfq-create.guard';
 
 export const rfqGuardrailsOwnerGuard = roleGuard('owner');
 
@@ -288,6 +289,7 @@ export const routes: Routes = [
       {
         path: 'rfq/create',
         canActivate: [roleGuard('owner', 'buyer')],
+        canDeactivate: [rfqDirtyGuard],
         loadComponent: () =>
           import('./features/rfq/create/create.component').then((m) => m.RfqCreateComponent),
       },
@@ -306,6 +308,7 @@ export const routes: Routes = [
       {
         path: 'rfq/:id/edit',
         canActivate: [roleGuard('owner', 'buyer')],
+        canDeactivate: [rfqDirtyGuard],
         loadComponent: () =>
           import('./features/rfq/create/create.component').then((m) => m.RfqCreateComponent),
       },

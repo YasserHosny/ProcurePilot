@@ -45,6 +45,7 @@
                 <mat-label>{{ 'rfq.create.productIdLabel' | translate }}</mat-label>
                 @let filtered = getFilteredProducts(line.get('workspace_product_id')?.value);
                 <input
+                  #productInput
                   matInput
                   dir="auto"
                   type="text"
@@ -60,8 +61,11 @@
                   (optionSelected)="onProductSelected(i)"
                 >
                   @for (prod of filtered; track prod.id) {
-                    <mat-option [value]="prod.id">
+                    <mat-option [value]="prod.id" [disabled]="isProductSelectedOnOtherLine(prod.id, i)">
                       {{ productLabel(prod) }}
+                      @if (isProductSelectedOnOtherLine(prod.id, i)) {
+                        <span class="already-added-suffix"> — {{ 'rfq.create.alreadyAdded' | translate }}</span>
+                      }
                     </mat-option>
                   }
                   @if (filtered.length === 0) {
@@ -70,7 +74,9 @@
                     </mat-option>
                   }
                 </mat-autocomplete>
-                @if (line.get('workspace_product_id')?.hasError('required') || line.get('workspace_product_id')?.hasError('invalidProduct')) {
+                @if (line.get('workspace_product_id')?.getError('duplicateProduct'); as dup) {
+                  <mat-error>{{ 'rfq.create.productDuplicateOnLine' | translate: { line: dup.line } }}</mat-error>
+                } @else if (line.get('workspace_product_id')?.hasError('required') || line.get('workspace_product_id')?.hasError('invalidProduct')) {
                   <mat-error>{{ 'rfq.create.productRequired' | translate }}</mat-error>
                 }
               </mat-form-field>
@@ -114,9 +120,17 @@
         <div class="form-section">
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>{{ 'rfq.create.neededByDateLabel' | translate }}</mat-label>
-            <input matInput [matDatepicker]="picker" formControlName="neededByDate" required />
+            <input matInput [matDatepicker]="picker" [min]="minDate" formControlName="neededByDate" required />
             <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
             <mat-datepicker #picker></mat-datepicker>
+            <mat-hint>{{ dateFormatHint }}</mat-hint>
+            @if (form.controls.neededByDate.hasError('required')) {
+              <mat-error>{{ 'rfq.create.neededByDateRequired' | translate }}</mat-error>
+            } @else if (form.controls.neededByDate.hasError('matDatepickerParse')) {
+              <mat-error>{{ 'rfq.create.neededByDateFormat' | translate: { format: dateFormatHint } }}</mat-error>
+            } @else if (form.controls.neededByDate.hasError('pastDate')) {
+              <mat-error>{{ 'rfq.create.neededByPastError' | translate }}</mat-error>
+            }
           </mat-form-field>
         </div>
 
@@ -132,7 +146,7 @@
         </div>
 
         <div class="actions">
-          <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || isSaving() || rfqStatus() === 'sent'">
+          <button mat-flat-button color="primary" type="submit" [disabled]="isSaving() || rfqStatus() === 'sent'">
             @if (isSaving()) {
               <mat-spinner diameter="18"></mat-spinner>
               <span>{{ 'rfq.create.submittingButton' | translate }}</span>

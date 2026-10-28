@@ -12,6 +12,9 @@ export interface ConfirmDialogData {
   readonly confirmKey: string;
   readonly cancelKey?: string;
   readonly isDestructive?: boolean;
+  readonly warningKey?: string;
+  readonly warningParams?: Record<string, unknown>;
+  readonly [key: string]: unknown;
 }
 
 @Component({
