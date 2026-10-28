@@ -34,10 +34,10 @@ test.describe('RFQ Details page', () => {
     const token = await signIn(credentials.ownerEmail, credentials.ownerPassword);
 
     const product1 = await createTestProduct(token, {
-      tenant_name: `Alpha Gala Apple ${Date.now()}`,
+      tenant_name: `Zaatar Mix ${Date.now()}`,
     });
     const product2 = await createTestProduct(token, {
-      tenant_name: `Beta Cavendish Banana ${Date.now()}`,
+      tenant_name: `Basmati Rice ${Date.now()}`,
     });
 
     const supplier = await createTestSupplier(token, `Delta Produce ${Date.now()}`);
@@ -97,5 +97,12 @@ test.describe('RFQ Details page', () => {
     // Breadcrumb link returns to RFQ History
     await breadcrumb.locator('.breadcrumb-link').click();
     await expect(page).toHaveURL(/\/rfq\/history$/);
+
+    await expect(row).toBeVisible();
+    await row.locator('[data-testid="rfq-actions-button"]').click();
+    await expect(page.getByRole('menuitem', { name: /View details/i })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /Compare responses/i })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /Duplicate/i })).toBeVisible();
+    await page.keyboard.press('Escape');
   });
 });
