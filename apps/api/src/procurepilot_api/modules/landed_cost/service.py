@@ -153,7 +153,7 @@ class LandedCostService:
     def _decision_for_line(self, client: object, line_id: UUID) -> dict[str, object] | None:
         try:
             rows = _rows(
-                client.table("match_decision")
+                client.table("current_match_decision")
                 .select(DECISION_COLUMNS)
                 .eq("quotation_line_id", str(line_id))
                 .limit(2)

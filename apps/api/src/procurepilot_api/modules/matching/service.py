@@ -70,7 +70,8 @@ CANDIDATE_COLUMNS = (
 TASK_COLUMNS = "id,quotation_line_id,status,priority,reason,created_at,resolved_at"
 DECISION_COLUMNS = (
     "id,quotation_line_id,matched_workspace_product_id,selected_match_candidate_id,outcome,"
-    "is_automatic,decided_by,decided_at,confidence,alias_id,created_at"
+    "is_automatic,decided_by,decided_at,confidence,alias_id,created_at,"
+    "supersedes_decision_id,learned_from_decision_id"
 )
 ALIAS_COLUMNS = "id,workspace_product_id,supplier_id,alias_text,created_by,created_at"
 
@@ -404,7 +405,7 @@ class MatchingService:
                     coalesce(md.decided_at, md.created_at) as resolved_at,
                     top_candidate.product_name as top_candidate_name,
                     coalesce(top_candidate.confidence, md.confidence) as top_candidate_confidence
-                from match_decision md
+                from current_match_decision md
                 join quotation_line ql
                   on ql.tenant_id = md.tenant_id and ql.id = md.quotation_line_id
                 join quotation q on q.tenant_id = md.tenant_id and q.id = ql.quotation_id
@@ -805,7 +806,11 @@ class MatchingService:
         ):
             return []
         try:
-            query = client.table("match_decision").select(DECISION_COLUMNS).eq("is_automatic", True)
+            query = (
+                client.table("current_match_decision")
+                .select(DECISION_COLUMNS)
+                .eq("is_automatic", True)
+            )
             if date_from is not None:
                 query = query.gte("decided_at", date_from)
             if date_to is not None:
@@ -1331,7 +1336,7 @@ def _candidate_is_deterministic(candidate: dict[str, object]) -> bool:
 def _decision_for_line(client: object, line_id: UUID) -> dict[str, object] | None:
     try:
         rows = _rows(
-            client.table("match_decision")
+            client.table("current_match_decision")
             .select(DECISION_COLUMNS)
             .eq("quotation_line_id", str(line_id))
             .limit(2)
@@ -1449,7 +1454,13 @@ def _decision(client: object, row: dict[str, object]) -> MatchDecision:
         decided_at=row["decided_at"],
         confidence=decimal_string(row["confidence"]),
         alias_id=UUID(str(row["alias_id"])) if row.get("alias_id") else None,
+        supersedes_decision_id=_optional_uuid(row.get("supersedes_decision_id")),
+        learned_from_decision_id=_optional_uuid(row.get("learned_from_decision_id")),
     )
+
+
+def _optional_uuid(value: object) -> UUID | None:
+    return UUID(str(value)) if value else None
 
 
 def _product_summary(client: object, product_id: UUID) -> ProductSummary:

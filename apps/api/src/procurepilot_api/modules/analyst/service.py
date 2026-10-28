@@ -494,7 +494,7 @@ def _load_orders_quotations(
                    q.issue_date
             from quotation_line ql
             join quotation q on q.tenant_id = ql.tenant_id and q.id = ql.quotation_id
-            left join match_decision md
+            left join current_match_decision md
               on md.tenant_id = ql.tenant_id and md.quotation_line_id = ql.id
             where q.tenant_id = %s
               and (%s::uuid is null or q.supplier_id = %s::uuid)

@@ -1188,6 +1188,61 @@ def test_another_workspaces_match_decisions_are_invisible(
     assert row is not None and row[0] == 0
 
 
+def test_another_workspaces_current_match_decisions_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """Spec 023 R5: the view is security_invoker, so match_decision's RLS applies through it."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from current_match_decision where quotation_line_id = %s",
+            (beta.quotation_line_id,),
+        )
+        hidden = cur.fetchone()
+        act_as(cur, beta)
+        cur.execute(
+            "select count(*) from current_match_decision where quotation_line_id = %s",
+            (beta.quotation_line_id,),
+        )
+        own = cur.fetchone()
+    assert hidden is not None and hidden[0] == 0
+    assert own is not None and own[0] == 1
+
+
+def test_a_member_cannot_supersede_another_workspaces_match_decision(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, beta)
+        cur.execute(
+            "select id, matched_workspace_product_id, selected_match_candidate_id "
+            "from match_decision where quotation_line_id = %s",
+            (beta.quotation_line_id,),
+        )
+        row = cur.fetchone()
+        assert row is not None
+        beta_decision_id, beta_product_id, beta_candidate_id = row
+        act_as(cur, alpha)
+        with pytest.raises((psycopg.errors.CheckViolation, psycopg.errors.ForeignKeyViolation)):
+            with conn.transaction():
+                cur.execute(
+                    "insert into match_decision "
+                    "(tenant_id,quotation_line_id,matched_workspace_product_id,"
+                    "selected_match_candidate_id,outcome,is_automatic,confidence,"
+                    "supersedes_decision_id) "
+                    "values (%s,%s,%s,%s,'same_product',true,0.9,%s)",
+                    (
+                        alpha.tenant_id,
+                        beta.quotation_line_id,
+                        beta_product_id,
+                        beta_candidate_id,
+                        beta_decision_id,
+                    ),
+                )
+
+
 def test_another_workspaces_landed_costs_are_invisible(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:

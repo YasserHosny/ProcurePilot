@@ -98,7 +98,7 @@ def _competing_offers(conn: object, product_id: UUID) -> list[dict[str, object]]
             select lc.id as landed_cost_id, q.supplier_id, s.name as supplier_name,
                    lc.total_amount, lc.total_currency, lc.recorded_at,
                    lc.quotation_line_id, lc.match_decision_id
-            from match_decision md
+            from current_match_decision md
             join landed_cost lc on lc.match_decision_id = md.id
             join quotation_line ql on ql.id = lc.quotation_line_id
             join quotation q on q.id = ql.quotation_id
