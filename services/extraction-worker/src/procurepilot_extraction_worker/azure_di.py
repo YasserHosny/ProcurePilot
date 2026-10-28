@@ -4,7 +4,7 @@ import re
 import unicodedata
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, NamedTuple
 
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
@@ -49,6 +49,60 @@ _BEFORE_TAX_SUBTOTAL_RE = re.compile(
     r"(?:sub[\s\-]*total|(?:لل|[وبفل])?(?:ال)?(?:مجموع|اجمالي)\s+(?:ال)?فرعي)(?![^\W\d_])",
     re.IGNORECASE,
 )
+_PACK_TEXT_RE = re.compile(
+    r"(?:[^\W\d_]+\s+)*"  # Optional container words; never infer a size from the container.
+    r"(?:(?P<count>\d+)\s*[×x]\s*)?"
+    r"(?P<size>\d+(?:[.٫]\d+)?)\s*(?P<unit>[^\W\d_]+)"
+    r"(?:\s+[^\W\d_]+)*"  # English quotes also print the container after the size.
+)
+_PACK_UNITS = {
+    "kg": "kilogram",
+    "kgs": "kilogram",
+    "kilogram": "kilogram",
+    "kilograms": "kilogram",
+    "كجم": "kilogram",
+    "كيلو": "kilogram",
+    "كيلوجرام": "kilogram",
+    "g": "gram",
+    "gram": "gram",
+    "grams": "gram",
+    "جم": "gram",
+    "جرام": "gram",
+    "l": "litre",
+    "litre": "litre",
+    "litres": "litre",
+    "liter": "litre",
+    "liters": "litre",
+    "لتر": "litre",
+    "ml": "millilitre",
+    "millilitre": "millilitre",
+    "millilitres": "millilitre",
+    "milliliter": "millilitre",
+    "milliliters": "millilitre",
+    "مل": "millilitre",
+    "مليلتر": "millilitre",
+}
+
+
+class ParsedPack(NamedTuple):
+    pack_count: int
+    unit_size: Decimal
+    pack_unit: str
+
+
+def parse_pack_text(text: str) -> ParsedPack | None:
+    """Parse a printed size or count × size, keeping its explicit mass/volume unit."""
+    match = _PACK_TEXT_RE.fullmatch(_normalise_header(text).strip())
+    if match is None:
+        return None
+    unit = _PACK_UNITS.get(match["unit"])
+    if unit is None:
+        return None
+    count = int(match["count"]) if match["count"] is not None else 1
+    size = parse_localised_decimal(match["size"])
+    if count <= 0 or size <= 0:
+        return None
+    return ParsedPack(count, size, unit)
 
 
 class AzureDocumentIntelligenceProvider:
@@ -379,6 +433,20 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                     line_fields["unit_price"] = _money_field(
                         "unit_price", price, currency, confidence
                     )
+            if "pack" in data:
+                pack = parse_pack_text(data["pack"])
+                if pack is None:
+                    line_fields["pack_text"] = ExtractedField("pack_text", data["pack"], 0.4)
+                else:
+                    line_fields["pack_count"] = ExtractedField(
+                        "pack_count", pack.pack_count, confidence
+                    )
+                    line_fields["unit_size"] = ExtractedField(
+                        "unit_size", format(pack.unit_size, "f"), confidence
+                    )
+                    line_fields["pack_unit"] = ExtractedField(
+                        "pack_unit", pack.pack_unit, confidence
+                    )
             lines.append(ExtractedLine(len(lines) + 1, desc, line_fields))
     if charge_amount and lines:
         # The existing arithmetic model adds a line's delivery fee once, so attach a
@@ -453,7 +521,19 @@ def _header_role(text: str) -> str | None:
     n = _normalise_header(text)
     compact = re.sub(r"\s+", "", n)
     candidates = [
-        ("unit_price", ("سعر الوحدة", "سعر", "الفئة", "unit price", "unitprice", "price", "rate")),
+        (
+            "unit_price",
+            (
+                "سعر الوحدة",
+                "سعر العبوة",
+                "سعر",
+                "الفئة",
+                "unit price",
+                "unitprice",
+                "price",
+                "rate",
+            ),
+        ),
         ("line_total", ("الإجمالي", "القيمة", "المبلغ", "total", "amount")),
         (
             "description",
@@ -461,9 +541,13 @@ def _header_role(text: str) -> str | None:
         ),
         ("quantity", ("الكمية", "العدد", "quantity", "qty")),
         ("unit", ("الوحدة", "unit", "uom")),
+        ("pack", ("العبوة", "التعبئة", "الحجم", "pack", "packing", "pack size", "packaging")),
     ]
     matches: list[tuple[int, str]] = []
     for role, words in candidates:
+        # A pack word must not take over an existing price, quantity, unit or total header.
+        if role == "pack" and matches:
+            break
         for word in words:
             wn = _normalise_header(word)
             if wn in n or re.sub(r"\s+", "", wn) in compact:
