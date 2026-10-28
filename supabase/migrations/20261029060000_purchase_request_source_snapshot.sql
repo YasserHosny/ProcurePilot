@@ -29,12 +29,7 @@ alter table purchase_request
   add constraint purchase_request_source_quotation_fkey
     foreign key (tenant_id, source_quotation_id) references quotation (tenant_id, id),
   add constraint purchase_request_source_supplier_fkey
-    foreign key (tenant_id, source_supplier_id) references supplier (tenant_id, id),
-  add constraint purchase_request_source_snapshot_complete
-    check (
-      (source_rfq_response_id is null)
-      = (source_rfq_id is null and source_quotation_id is null and source_supplier_id is null)
-    );
+    foreign key (tenant_id, source_supplier_id) references supplier (tenant_id, id);
 
 -- Existing requests (before the trigger exists, so nothing else fires).
 update purchase_request pr
@@ -46,6 +41,14 @@ join rfq_recipient rec
   on rec.tenant_id = resp.tenant_id and rec.id = resp.rfq_recipient_id
 where resp.tenant_id = pr.tenant_id
   and resp.id = pr.source_rfq_response_id;
+
+-- Only after the backfill: existing requests prepared from an RFQ would otherwise violate it.
+alter table purchase_request
+  add constraint purchase_request_source_snapshot_complete
+    check (
+      (source_rfq_response_id is null)
+      = (source_rfq_id is null and source_quotation_id is null and source_supplier_id is null)
+    );
 
 create or replace function purchase_request_source_snapshot()
 returns trigger
