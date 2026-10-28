@@ -10,6 +10,8 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
+import { MatMenu } from '@angular/material/menu';
 import { SessionService } from '../../../core/auth/session.service';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { ApiService } from '../../../core/api/api.service';
@@ -444,5 +446,28 @@ describe('HistoryComponent', () => {
       expect(history['recipientsDraftHeader']).toBeTruthy();
       expect(history['recipientsDraftHeader']).toContain('{{count}}');
     }
+  });
+
+  it('applies recipients-popover-menu panel class to recipients mat-menu', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const menuDebugEls = fixture.debugElement.queryAll(By.directive(MatMenu));
+    const recipientsMatMenu = menuDebugEls
+      .map((debugEl) => debugEl.componentInstance as MatMenu)
+      .find((menu) => menu.panelClass?.includes('recipients-popover-menu'));
+    expect(recipientsMatMenu).toBeDefined();
+
+    const recipientButtons = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+      '[data-testid="rfq-recipients-button"]',
+    );
+    expect(recipientButtons.length).toBeGreaterThan(0);
+    recipientButtons[0].click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const panel = document.querySelector('.mat-mdc-menu-panel.recipients-popover-menu');
+    expect(panel).not.toBeNull();
   });
 });

@@ -136,3 +136,7 @@ Arabic UI:
 
 The kiosk's browser had English chosen from the Rawaq Restaurant Group sign-in, so the app was switched to Arabic with its own
 toggle first. Smart Compare now ties at ١٬٥٢٠ ر.س, so the video keeps the original compare clip.
+
+## Flow review 2026-10-28
+
+Fixes from the 2026-10-28 RFQ flow review, checked live after #314: [`flow-review-2026-10-28/fixes-pps-88/`](flow-review-2026-10-28/fixes-pps-88/README.md) (PPS-88).
