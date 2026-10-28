@@ -49,6 +49,7 @@
 - Security reviews: [R2.5](quality/r2.5-security-review-record.md) · [R3.0](quality/r3.0-security-review-record.md) · [R3.1 accounting](quality/r3.1-accounting-security-review-record.md) · [R3.2–R4.3 + Oct 2026 fixes](quality/r3.2-r4.x-security-review-record.md); critique: [R2.5 hardening](quality/r2.5-security-hardening-critique.md).
 - R2.5 baselines and audits: [performance and accessibility](quality/r2.5-performance-accessibility-baseline.md) · [docs gap audit](quality/r2.5-docs-gap-audit.md) · [reporting product critique](quality/r2.5-reporting-hardening-product-critique-agy.md).
 - Matching reviews: [functionality critique](quality/matching-functionality-critique.md) · [normalisation audit](quality/matching-normalisation-audit.md) · [resolution-queue critique](quality/match-resolution-queue-critique.md).
+- UX audits (2026-10-28, ux-audit + ux-heuristics + impeccable + ui-ux-pro-max): [RFQ pages](quality/ux-audits/2026-10-28-rfq/README.md) · [round 1 end to end](quality/ux-audits/2026-10-28-round-1/README.md) — findings tracked as PPS-89 to PPS-105.
 
 ## Go-to-market and brand
 

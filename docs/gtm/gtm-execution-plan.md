@@ -118,7 +118,13 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-45 | PPS-75 | P-46 | PPS-76 | | |
 | P-49 | PPS-79 | | | | |
 | P-52 | PPS-82 | P-53 | PPS-83 | P-54 | PPS-84 |
-| P-57 | PPS-87 | P-58 | PPS-88 | | |
+| P-57 | PPS-87 | P-58 | PPS-88 | P-59 | PPS-89 |
+| P-60 | PPS-90 | P-61 | PPS-91 | P-62 | PPS-92 |
+| P-63 | PPS-93 | P-64 | PPS-94 | P-65 | PPS-95 |
+| P-66 | PPS-96 | P-67 | PPS-97 | P-68 | PPS-98 |
+| P-69 | PPS-99 | P-70 | PPS-100 | P-71 | PPS-101 |
+| P-72 | PPS-102 | P-73 | PPS-103 | P-74 | PPS-104 |
+| P-75 | PPS-105 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -333,4 +339,5 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-24 | Claude (orchestrator) | P-16 to P-18 done, all implemented by Agy and verified by the orchestrator. P-16 (#241): email wrapping, `material-icons` removed. Two Agy attempts at the 4 kB style budgets were rejected because they deleted 31 mobile breakpoint rules; the owner chose to leave those warnings. P-17 (#245): mobile design system plus the blank mobile-web-build fix; review caught an Arabic `MaterialLocalizations` crash and an 85 px app-bar overflow first. P-18 (#246, #249): grouped, collapsible sidebar; three flat-sidebar E2E tests updated. Plan IDs were renumbered from P-13 to P-15 after colliding with another session's rows. | Mobile mockups in `docs/user/screenshots/mobile/` still show the old look; dark mode needs an owner decision |
 | 2026-10-24 | Claude (orchestrator) | P-23 (PPS-49): the mobile guide's mockups are replaced by real renders of the shipped app, which supersedes the "mobile mockups still show the old look" note above. Regenerate with `cd apps/mobile && flutter test --tags docs --run-skipped test/docs/`. The real request-detail render exposed a bug: the approval step shows the approver's raw member ID and an ISO timestamp. It is documented as a limitation and suggested as a separate fix. | Approver name and local date on mobile request detail (not yet tracked in Jira); dark mode needs an owner decision |
 | 2026-10-25 | Claude (orchestrator) | P-37 (PPS-67): `find-skills` (vercel-labs/skills) added to the repo at `.claude/skills/find-skills/`, unchanged from the source, so every session can search for and suggest skills; merged in #288. PPS-67 Done. | — |
+| 2026-10-28 | Claude (orchestrator) | P-59 (PPS-89): UX audit of the RFQ pages and of round 1 end to end on «مطاعم رواق» with four skills (ux-audit, ux-heuristics, impeccable critique, ui-ux-pro-max); reports in `docs/quality/ux-audits/2026-10-28-*`. Both verdicts Fail: round-1 heuristic score 5/10, impeccable 21/40; every step dead-ends, the RFQ is lost after step 1, request/approval/PO never name the supplier. Fix tasks P-60 to P-75 (PPS-90 to PPS-105) in the backlog; P-73 (PPS-103) needs owner decisions; P-65/P-66 need a short spec. | |
 | | | | |
