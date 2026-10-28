@@ -180,3 +180,89 @@ def _candidate(cur: psycopg.Cursor, workspace: object, line_id: UUID, product_id
         ),
     )
     return candidate_id
+
+
+def test_a_corrected_match_gets_its_own_landed_cost(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec 023 R5: landed cost follows the line's current decision, not just the line.
+
+    Decision A (oil) is costed; correction B (sugar) supersedes it. Computing again must record
+    B's own cost (not return A's), get_landed_cost must return B's, and a second compute must
+    not fail on the two cost rows the line now has.
+    """
+    from procurepilot_api.modules.landed_cost import service as landed_cost_module
+    from procurepilot_api.modules.landed_cost.service import LandedCostService
+
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        workspace = make_workspace(cur, "landed-cost-correction")
+        supplier_id = make_supplier(cur, workspace)
+        quotation_id = make_quotation(
+            cur,
+            workspace,
+            document_id=make_document(cur, workspace),
+            supplier_id=supplier_id,
+            status="reviewed",
+            arithmetic_status="reconciled",
+        )
+        line_id = make_line(cur, workspace, quotation_id)
+        oil = make_workspace_product(cur, workspace, name="Oil 18 L")
+        sugar = make_workspace_product(cur, workspace, name="Sugar 50 kg")
+        oil_candidate = _candidate(cur, workspace, line_id, oil)
+        sugar_candidate = uuid4()
+        act_as(cur, workspace)
+        cur.execute(
+            "insert into match_candidate (id, tenant_id, quotation_line_id, "
+            "candidate_workspace_product_id, confidence, reasons, rank, scoring_version, "
+            "embedding_model) values (%s,%s,%s,%s,0.6,'{}'::jsonb,2,'matching-score-v2',"
+            "'stub-hash-v1')",
+            (sugar_candidate, workspace.tenant_id, line_id, sugar),
+        )
+        first, correction = uuid4(), uuid4()
+        cur.execute(
+            "insert into match_decision (id, tenant_id, quotation_line_id, "
+            "matched_workspace_product_id, selected_match_candidate_id, outcome, is_automatic, "
+            "confidence) values (%s,%s,%s,%s,%s,'same_product',true,0.7)",
+            (first, workspace.tenant_id, line_id, oil, oil_candidate),
+        )
+        client = PsycopgSupabaseClient(conn)
+        monkeypatch.setattr(landed_cost_module, "authenticated_client", lambda *_args: client)
+        service = LandedCostService(cast(Settings, _Settings()))
+        member = _member(workspace)
+
+        first_cost = service.compute_for_line_with_client(
+            client=client, member=member, line_id=line_id
+        )
+        assert first_cost.match_decision_id == first
+
+        act_as(cur, workspace)
+        cur.execute(
+            "insert into match_decision (id, tenant_id, quotation_line_id, "
+            "matched_workspace_product_id, selected_match_candidate_id, outcome, is_automatic, "
+            "decided_by, confidence, supersedes_decision_id) "
+            "values (%s,%s,%s,%s,%s,'same_product',false,%s,0.6,%s)",
+            (
+                correction,
+                workspace.tenant_id,
+                line_id,
+                sugar,
+                sugar_candidate,
+                workspace.membership_id,
+                first,
+            ),
+        )
+
+        corrected_cost = service.compute_for_line_with_client(
+            client=client, member=member, line_id=line_id
+        )
+        assert corrected_cost.match_decision_id == correction
+        assert corrected_cost.id != first_cost.id
+
+        again = service.compute_for_line_with_client(client=client, member=member, line_id=line_id)
+        assert again.id == corrected_cost.id
+        assert service.get_landed_cost(bearer_token="t", line_id=line_id).id == corrected_cost.id
+        assert (
+            service.get_landed_cost_or_none(bearer_token="t", line_id=line_id).id
+            == corrected_cost.id
+        )

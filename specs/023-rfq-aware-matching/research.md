@@ -134,6 +134,37 @@ to that commit.
   `match_decision` reference and classifies it (current or history) in this file before code
   changes. The isolation suite (`pnpm test:isolation`) covers the new view.
 
+### R5 reader classification (T006, 2026-10-29, `main` at 6c62dc1c)
+
+`landed_cost` has no product column, so every product attribution goes through a decision. A
+superseded decision means its product attribution was wrong, so every reader that answers "what is
+this line, or product, matched to and priced at" reads **current**. Only lookups of one specific
+decision by id stay on the table.
+
+| Reference | Class | Why |
+|---|---|---|
+| `matching/service.py:407` (auto-accepted queue SQL) | current | lists lines' standing automatic matches |
+| `matching/service.py:808` (`is_automatic` list) | current | same, PostgREST path |
+| `matching/service.py:1334` `_decision_for_line` | current | raises `multiple_match_decisions` on >1 row, so it **must** move |
+| `matching/service.py:655`, `resolution_service.py:151` | table (insert) | writes stay on the table |
+| `matching/resolution_service.py:701` `_decision_by_id` | table (by id) | one specific decision |
+| `landed_cost/service.py:156` `_decision_for_line` | current | must move (same `multiple_match_decisions` guard) |
+| `offers/service.py:71,103` | current | offer comparison per product |
+| `offers/supplier_iq.py:798,822`, `supplier_iq_repository.py:180` | current | a wrong attribution must stop counting toward a supplier's price history |
+| `requests/valuation.py:23,44,122` | current | request estimates and quoted prices |
+| `rfq/service.py:503,688` | current | responses comparison, prepare-request |
+| `rfq/guardrail_evaluation.py:94,218` | current | eligibility and 90-day baseline |
+| `alerts/conditions.py:61,308` | current | price alerts |
+| `analyst/service.py:497` | current | grounded answers cite the standing match |
+| `savings/baseline.py:64`, `savings/evidence.py:101` (`_competing_offers`) | current | baseline and competing offers for a product |
+| `savings/evidence.py:85` `_match_decision(id)` | table (by id) | the decision a saving record cites |
+| `workers/offer_refresh_scheduler.py:40` | current | refreshes standing offers |
+| `services/optimiser/.../repository.py:128,183` | current | basket prices |
+
+Readers that join `landed_cost` without a decision (`supplier_iq.py:775` via
+`purchase_request_line.estimated_unit_price_source_landed_cost_id`, `alerts/conditions.py:718`) price
+what a request actually used. They stay as they are.
+
 ## R6. A learned wording clears open lines (FR-011, FR-012)
 
 - **Finding.**

@@ -68,7 +68,7 @@ ranked as (
       order by lc.recorded_at desc, lc.id desc
     ) as rn
   from product p
-  join match_decision md on md.matched_workspace_product_id = p.id
+  join current_match_decision md on md.matched_workspace_product_id = p.id
   join landed_cost lc on lc.match_decision_id = md.id
   join quotation_line ql on ql.id = lc.quotation_line_id
   join quotation q on q.id = ql.quotation_id
@@ -100,7 +100,7 @@ select
   lc.base_unit,
   wp.tenant_name
 from workspace_product wp
-join match_decision md on md.matched_workspace_product_id = wp.id
+join current_match_decision md on md.matched_workspace_product_id = wp.id
 join landed_cost lc on lc.match_decision_id = md.id
 join quotation_line ql on ql.id = lc.quotation_line_id
 join quotation q on q.id = ql.quotation_id

@@ -795,7 +795,7 @@ select
   lc.total_currency as currency,
   lc.recorded_at
 from landed_cost lc
-join match_decision md
+join current_match_decision md
   on md.tenant_id = lc.tenant_id
  and md.id = lc.match_decision_id
 join quotation_line ql
@@ -819,7 +819,7 @@ select
   lc.total_currency as currency,
   lc.recorded_at
 from landed_cost lc
-join match_decision md
+join current_match_decision md
   on md.tenant_id = lc.tenant_id
  and md.id = lc.match_decision_id
 join quotation_line ql

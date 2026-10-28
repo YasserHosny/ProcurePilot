@@ -177,7 +177,7 @@ def load_risk_input(
                    lc.base_unit, lc.total_currency, lc.total_amount,
                    lc.normalised_base_quantity, lc.recorded_at, lc.valid_from, lc.valid_to
             from landed_cost lc
-            join match_decision md
+            join current_match_decision md
               on md.tenant_id = lc.tenant_id and md.id = lc.match_decision_id
             join quotation_line ql
               on ql.tenant_id = lc.tenant_id and ql.id = lc.quotation_line_id

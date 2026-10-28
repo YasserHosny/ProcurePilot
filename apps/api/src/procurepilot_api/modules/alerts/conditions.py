@@ -58,7 +58,7 @@ select distinct on (lc.id)
   s.reliability_score,
   pd.base_quantity as pack_base_quantity
 from workspace_product wp
-join match_decision md on md.matched_workspace_product_id = wp.id
+join current_match_decision md on md.matched_workspace_product_id = wp.id
 join landed_cost lc on lc.match_decision_id = md.id
 join quotation_line ql on ql.id = lc.quotation_line_id
 join quotation q on q.id = ql.quotation_id
@@ -305,7 +305,7 @@ def _has_historical_offer(
             cur.execute(
                 """
                 select lc.id
-                from match_decision md
+                from current_match_decision md
                 join landed_cost lc on lc.match_decision_id = md.id
                 join quotation_line ql on ql.id = lc.quotation_line_id
                 join quotation q on q.id = ql.quotation_id
