@@ -102,6 +102,8 @@ def test_reviewed_typo_line_persists_ranked_similarity_candidates_and_routes_to_
             lambda _settings, _token: db_client,
         )
         monkeypatch.setattr(matching_module, "get_audit_writer", lambda: _PsycopgAuditWriter(conn))
+        # This legacy quotation has no RFQ; keep the new reader off the settings stub.
+        monkeypatch.setattr(matching_module, "rfq_lines_for_quotation", lambda *_: None)
         service = MatchingService(cast(Settings, _PipelineSettings()))
         monkeypatch.setattr(
             service,

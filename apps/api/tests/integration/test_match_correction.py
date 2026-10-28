@@ -460,3 +460,74 @@ def test_retry_finishes_costing_after_a_failed_side_effect(
     with case.conn.cursor() as cur:
         cur.execute("select count(*) from match_decision where quotation_line_id=%s", (case.line,))
         assert cur.fetchone()[0] == 2
+
+
+def test_failed_replay_mapping_rolls_back_correction_and_same_key_can_retry(
+    case: Case,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from integration.quotation_helpers import PsycopgTableQuery
+    from procurepilot_api.errors import ServiceUnavailableError
+
+    key = uuid4()
+    sql_execute = psycopg.Cursor.execute
+    rest_execute = PsycopgTableQuery.execute
+    failures = 0
+
+    def fail_mapping() -> None:
+        nonlocal failures
+        with case.conn.cursor() as cur:
+            cur.execute(
+                "select count(*) from match_decision where quotation_line_id=%s", (case.line,)
+            )
+            assert cur.fetchone()[0] == 2  # Failure really occurs AFTER the decision insert.
+        failures += 1
+        raise ServiceUnavailableError(details={"dependency": "database"})
+
+    def sql_fail_once(
+        cur: psycopg.Cursor, query: object, params: object = None, **kwargs: object
+    ) -> object:
+        if (
+            isinstance(query, str)
+            and "insert into match_resolution_idempotency" in query.lower()
+            and failures == 0
+        ):
+            fail_mapping()
+        return sql_execute(cur, query, params, **kwargs)
+
+    def rest_fail_once(query: PsycopgTableQuery) -> object:
+        if (
+            query._table == "match_resolution_idempotency"
+            and query._operation == "insert"
+            and failures == 0
+        ):
+            fail_mapping()
+        return rest_execute(query)
+
+    monkeypatch.setattr(psycopg.Cursor, "execute", sql_fail_once)
+    monkeypatch.setattr(PsycopgTableQuery, "execute", rest_fail_once)
+    with pytest.raises(ServiceUnavailableError):
+        case.correct(key=key, learn_alias=False)
+    assert failures == 1
+    with case.conn.cursor() as cur:
+        cur.execute(
+            "select id from current_match_decision where quotation_line_id=%s", (case.line,)
+        )
+        assert cur.fetchone()[0] == case.head
+        cur.execute("select count(*) from match_decision where quotation_line_id=%s", (case.line,))
+        assert cur.fetchone()[0] == 1
+        cur.execute(
+            "select count(*) from match_resolution_idempotency where idempotency_key=%s", (key,)
+        )
+        assert cur.fetchone()[0] == 0
+    result = case.correct(key=key, learn_alias=False)
+    assert result.superseded_decision_id == case.head
+    assert case.correct(key=key, learn_alias=False).model_dump() == result.model_dump()
+    assert len(case.enqueued) == 1
+    with case.conn.cursor() as cur:
+        cur.execute("select count(*) from audit_event where action='matching.decision_corrected'")
+        assert cur.fetchone()[0] == 1
+        cur.execute(
+            "select match_decision_id from landed_cost where quotation_line_id=%s", (case.line,)
+        )
+        assert {row[0] for row in cur.fetchall()} == {case.head, result.decision.id}

@@ -27,7 +27,7 @@ from procurepilot_api.modules.matching.embeddings import (
 )
 from procurepilot_api.modules.matching.quoted_exposure import quoted_exposure
 from procurepilot_api.modules.matching.rfq_fit import RULE_VERSION as RFQ_FIT_VERSION
-from procurepilot_api.modules.matching.rfq_fit import fit_against_rfq
+from procurepilot_api.modules.matching.rfq_fit import RfqFit, fit_against_rfq
 from procurepilot_api.modules.matching.schemas import (
     MatchCandidate,
     MatchDecision,
@@ -147,7 +147,7 @@ class MatchingService:
         clean_search = search.strip()[:200].lower() if search else None
         try:
             _sync_open_match_tasks(client)
-            needs_merge = status in ("all", "auto_accepted") or clean_search is not None
+            needs_merge = status in ("all", "auto_accepted", "resolved") or clean_search is not None
             if status == "auto_accepted":
                 rows = []
             else:
@@ -212,11 +212,12 @@ class MatchingService:
 
             rows = filtered_rows
 
-        # Automatic decisions are queue items only for the explicit auto status or all statuses.
+        # The auto/decided filter also retains corrected heads, reported as resolved/corrected.
         auto_tasks: list[MatchTask] = []
-        if status in ("all", "auto_accepted"):
+        if status in ("all", "auto_accepted", "resolved"):
             auto_tasks = self._auto_accepted_tasks(
                 client,
+                status=status,
                 quotation_id=quotation_id,
                 date_from=date_from,
                 date_to=date_to,
@@ -282,7 +283,10 @@ class MatchingService:
             "status": "status_rank",
         }[sort_by]
         direction = "asc" if sort_order == "asc" else "desc"
-        filters = ["(%(status)s = 'all' or status = %(status)s)"]
+        filters = [
+            "(%(status)s = 'all' or status = %(status)s "
+            "or (%(status)s = 'auto_accepted' and reason = 'corrected'))"
+        ]
         params: dict[str, object] = {
             "tenant_id": member.tenant_id,
             "status": status,
@@ -402,9 +406,11 @@ class MatchingService:
                     ql.delivery_fee_currency,
                     ql.discount_amount,
                     ql.discount_currency,
-                    'auto_accepted'::text as status,
+                    case when md.supersedes_decision_id is not null then 'resolved'
+                         else 'auto_accepted' end::text as status,
                     'normal'::text as priority,
-                    'auto_accepted'::text as reason,
+                    case when md.supersedes_decision_id is not null then 'corrected'
+                         else 'auto_accepted' end::text as reason,
                     coalesce(md.decided_at, md.created_at) as created_at,
                     coalesce(md.decided_at, md.created_at) as resolved_at,
                     top_candidate.product_name as top_candidate_name,
@@ -429,7 +435,13 @@ class MatchingService:
                     order by (mc.id = md.selected_match_candidate_id) desc, mc.rank
                     limit 1
                 ) top_candidate on true
-                where md.tenant_id = %(tenant_id)s and md.is_automatic = true
+                where md.tenant_id = %(tenant_id)s
+                  and (md.is_automatic or md.supersedes_decision_id is not null)
+                  and (md.is_automatic or not exists (
+                      select 1 from match_task existing_task
+                      where existing_task.tenant_id = md.tenant_id
+                        and existing_task.quotation_line_id = md.quotation_line_id
+                  ))
             )
             select *,
                    case priority
@@ -479,18 +491,8 @@ class MatchingService:
         task = _latest_task_for_line(client, line_id)
         if task is None:
             decision = _decision_for_line(client, line_id)
-            if decision and bool(decision.get("is_automatic")):
-                decided_at = decision.get("decided_at") or decision.get("created_at")
-                synthetic_row: dict[str, object] = {
-                    "id": decision["id"],
-                    "quotation_line_id": decision["quotation_line_id"],
-                    "status": "auto_accepted",
-                    "priority": "normal",
-                    "reason": "auto_accepted",
-                    "created_at": decided_at,
-                    "resolved_at": decided_at,
-                }
-                return self._task(client, synthetic_row, line_row=line)
+            if decision:
+                return self._task(client, _synthetic_decided_task(decision), line_row=line)
             raise NotFoundError(details={"resource": "match_task"})
         return self._task(client, task, line_row=line)
 
@@ -622,8 +624,10 @@ class MatchingService:
                 and deterministic.workspace_product_id not in excluded_products
             ):
                 reasons = deterministic.reasons
-                if context is not None and fit is not None and not fit.fitting_lines:
-                    reasons["rfq"] = {"not_in_rfq": True, "rfq_id": str(context.rfq_id)}
+                if context is not None and fit is not None:
+                    reasons["rfq"] = _rfq_reason_for_product(
+                        context, fit, deterministic.workspace_product_id
+                    )
                 persisted = self._persist_candidates(
                     client,
                     member,
@@ -696,8 +700,10 @@ class MatchingService:
                     continue
                 seen.add(candidate.workspace_product_id)
                 reasons = candidate.reasons
-                if context is not None and fit is not None and not fit.fitting_lines:
-                    reasons["rfq"] = {"not_in_rfq": True, "rfq_id": str(context.rfq_id)}
+                if context is not None and fit is not None:
+                    reasons["rfq"] = _rfq_reason_for_product(
+                        context, fit, candidate.workspace_product_id
+                    )
                 proposals.append(
                     {
                         "workspace_product_id": candidate.workspace_product_id,
@@ -986,6 +992,7 @@ class MatchingService:
         self,
         client: object,
         *,
+        status: str = "auto_accepted",
         quotation_id: UUID | None,
         date_from: str | None,
         date_to: str | None,
@@ -994,15 +1001,11 @@ class MatchingService:
         reason: MatchTaskReason | None,
     ) -> list[MatchTask]:
         if (priority is not None and priority != "normal") or (
-            reason is not None and reason != "auto_accepted"
+            reason is not None and reason not in ("auto_accepted", "corrected")
         ):
             return []
         try:
-            query = (
-                client.table("current_match_decision")
-                .select(DECISION_COLUMNS)
-                .eq("is_automatic", True)
-            )
+            query = client.table("current_match_decision").select(DECISION_COLUMNS)
             if date_from is not None:
                 query = query.gte("decided_at", date_from)
             if date_to is not None:
@@ -1015,7 +1018,11 @@ class MatchingService:
             response = query.execute()
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        decision_rows = _rows(response.data)
+        decision_rows = [
+            row
+            for row in _rows(response.data)
+            if row.get("is_automatic") or row.get("supersedes_decision_id") is not None
+        ]
         if clean_search:
             line_ids = list({str(row["quotation_line_id"]) for row in decision_rows})
             context_by_line = _prefetch_search_context(client, line_ids) if line_ids else {}
@@ -1047,16 +1054,16 @@ class MatchingService:
                 line = _line_row(client, UUID(str(dec["quotation_line_id"])))
             except NotFoundError:
                 continue
-            decided_at = dec.get("decided_at") or dec.get("created_at")
-            synthetic_row: dict[str, object] = {
-                "id": dec["id"],
-                "quotation_line_id": dec["quotation_line_id"],
-                "status": "auto_accepted",
-                "priority": "normal",
-                "reason": "auto_accepted",
-                "created_at": decided_at,
-                "resolved_at": decided_at,
-            }
+            synthetic_row = _synthetic_decided_task(dec)
+            if status == "resolved" and synthetic_row["status"] != "resolved":
+                continue
+            if reason is not None and synthetic_row["reason"] != reason:
+                continue
+            if (
+                dec.get("supersedes_decision_id") is not None
+                and _latest_task_for_line(client, UUID(str(dec["quotation_line_id"]))) is not None
+            ):
+                continue
             try:
                 task = self._task(client, synthetic_row, line_row=line)
             except (NotFoundError, ServiceUnavailableError):
@@ -1859,3 +1866,35 @@ def _queue_item(row: dict[str, object]) -> MatchQueueItem:
         resolved_at=row.get("resolved_at"),
         supplier_name=row.get("supplier_name"),
     )
+
+
+def _synthetic_decided_task(decision: dict[str, object]) -> dict[str, object]:
+    """Taskless heads stay addressable. Corrections are resolved/corrected, while the
+    auto_accepted queue filter includes them for continuity with their automatic root.
+    """
+    corrected = decision.get("supersedes_decision_id") is not None
+    decided_at = decision.get("decided_at") or decision.get("created_at")
+    return {
+        "id": decision["id"],
+        "quotation_line_id": decision["quotation_line_id"],
+        "status": "resolved" if corrected or not decision.get("is_automatic") else "auto_accepted",
+        "priority": "normal",
+        "reason": "corrected"
+        if corrected
+        else ("auto_accepted" if decision.get("is_automatic") else "human_decided"),
+        "created_at": decided_at,
+        "resolved_at": decided_at,
+    }
+
+
+def _rfq_reason_for_product(
+    context: RfqContext, fit: RfqFit, product_id: UUID
+) -> dict[str, object]:
+    # Membership and fit answer different questions: a requested product can conflict on pack.
+    for score in fit.scores:
+        if score.rfq_line.workspace_product_id == product_id:
+            return score.reasons["rfq"]
+    return {
+        "rfq_id": str(context.rfq_id),
+        "not_in_rfq": all(line.workspace_product_id != product_id for line in context.lines),
+    }

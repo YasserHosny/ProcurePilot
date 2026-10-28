@@ -10,7 +10,9 @@ from datetime import UTC, datetime
 from threading import Lock
 from uuid import UUID, uuid5
 
+import psycopg
 from postgrest.exceptions import APIError
+from psycopg.rows import dict_row
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
@@ -203,9 +205,9 @@ class MatchResolutionService:
         client = authenticated_client(self._settings, bearer_token)
         fingerprint = _request_fingerprint(payload)
         # Transaction-scoped advisory locks work across API processes and pooler connections.
-        # Keep the lock connection separate from PostgREST writes: a row FOR UPDATE on that
-        # connection would block the FK checks performed by those writes.
-        with _authenticated_db(self._settings, member) as conn:
+        # The head and its replay mapping must commit together on the member/RLS connection.
+        # An explicit transaction also rolls both back when this connection is shared.
+        with _authenticated_db(self._settings, member) as conn, conn.transaction():
             with conn.cursor() as cur:
                 for scope in (
                     f"correction-key:{member.tenant_id}:{idempotency_key}",
@@ -221,106 +223,112 @@ class MatchResolutionService:
                     ):
                         raise ConflictError(details={"reason": "idempotency_key_reused"})
                     decision = _decision_by_id(client, UUID(str(existing["match_decision_id"])))
-                    return self._finish_correction(
-                        client=client,
-                        bearer_token=bearer_token,
-                        member=member,
-                        line=line,
-                        decision_row=decision,
-                        report_alias_conflict=payload.learn_alias,
-                    )
-                head = _decision_for_line(client, line_id)
-                if head is None:
-                    raise ConflictError(details={"reason": "no_decision"})
-                if str(head["id"]) != str(payload.expected_current_decision_id):
-                    raise ConflictError(details={"reason": "decision_changed"})
-                # Tenant-pinned definer (20261029070000): a branch-assigned buyer cannot see
-                # other branches' requests, but a request priced from this match still locks it.
-                cur.execute(
-                    "select match_decision_live_request(%s)",
-                    (payload.expected_current_decision_id,),
-                )
-                request = cur.fetchone()
-                if request is not None and request[0] is not None:
-                    raise ConflictError(
-                        details={
-                            "reason": "line_on_purchase_request",
-                            "purchase_request_id": str(request[0]),
-                        }
-                    )
-                if payload.outcome == "no_match_new_product":
-                    # The boundary validator guarantees new_product for this outcome.
-                    product, _created = self._catalogue.create_product(
-                        bearer_token=bearer_token, member=member, payload=payload.new_product
-                    )
-                    product_id, candidate_id, confidence = product.id, None, "1.0000"
                 else:
-                    row = self._candidate_row(client, payload.selected_match_candidate_id, line_id)
-                    _candidate(client, row)
-                    product_id = UUID(str(row["candidate_workspace_product_id"]))
-                    candidate_id = payload.selected_match_candidate_id
-                    confidence = decimal_string(row["confidence"])
-                alias_id = None
-                if payload.learn_alias:
-                    try:
-                        alias_id = self._aliases.learn_or_reuse_alias(
-                            client=client,
-                            tenant_id=member.tenant_id,
-                            membership_id=member.membership_id,
-                            workspace_product_id=product_id,
-                            supplier_id=self._quotation_supplier_id(
-                                client, UUID(str(line["quotation_id"]))
-                            ),
-                            alias_text=str(line["original_text"]),
-                        )
-                    except ConflictError as exc:
-                        if exc.details is None or exc.details.get("reason") != "alias_conflict":
-                            raise
-                        # Aliases are evidence too: never rewrite an old human's wording.
-                try:
-                    response = (
-                        client.table("match_decision")
-                        .insert(
-                            {
-                                "tenant_id": str(member.tenant_id),
-                                "quotation_line_id": str(line_id),
-                                "matched_workspace_product_id": str(product_id),
-                                "selected_match_candidate_id": str(candidate_id)
-                                if candidate_id
-                                else None,
-                                "outcome": payload.outcome,
-                                "is_automatic": False,
-                                "decided_by": str(member.membership_id),
-                                "confidence": confidence,
-                                "alias_id": str(alias_id) if alias_id else None,
-                                "supersedes_decision_id": str(payload.expected_current_decision_id),
+                    head = _decision_for_line(client, line_id)
+                    if head is None:
+                        raise ConflictError(details={"reason": "no_decision"})
+                    if str(head["id"]) != str(payload.expected_current_decision_id):
+                        raise ConflictError(details={"reason": "decision_changed"})
+                    # Tenant-pinned definer (20261029070000): a branch-assigned buyer cannot see
+                    # other branches' requests, but a request priced from this match still locks it.
+                    cur.execute(
+                        "select match_decision_live_request(%s)",
+                        (payload.expected_current_decision_id,),
+                    )
+                    request = cur.fetchone()
+                    if request is not None and request[0] is not None:
+                        raise ConflictError(
+                            details={
+                                "reason": "line_on_purchase_request",
+                                "purchase_request_id": str(request[0]),
                             }
                         )
-                        .execute()
-                    )
-                except APIError as exc:
-                    if exc.code in ("23505", "23514"):
-                        raise ConflictError(details={"reason": "decision_changed"}) from exc
-                    raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-                decision = _one_row(response.data, resource="match_decision")
-                # Store the replay mapping before fallible side effects, so a retry can finish
-                # an inserted correction instead of trying to supersede the old head twice.
-                _record_idempotency_decision(
-                    client=client,
-                    member=member,
-                    idempotency_key=idempotency_key,
-                    line_id=line_id,
-                    request_fingerprint=fingerprint,
-                    decision_id=UUID(str(decision["id"])),
-                )
-                return self._finish_correction(
-                    client=client,
-                    bearer_token=bearer_token,
-                    member=member,
-                    line=line,
-                    decision_row=decision,
-                    report_alias_conflict=payload.learn_alias,
-                )
+                    if payload.outcome == "no_match_new_product":
+                        # The boundary validator guarantees new_product for this outcome.
+                        product, _created = self._catalogue.create_product(
+                            bearer_token=bearer_token, member=member, payload=payload.new_product
+                        )
+                        product_id, candidate_id, confidence = product.id, None, "1.0000"
+                    else:
+                        row = self._candidate_row(
+                            client, payload.selected_match_candidate_id, line_id
+                        )
+                        _candidate(client, row)
+                        product_id = UUID(str(row["candidate_workspace_product_id"]))
+                        candidate_id = payload.selected_match_candidate_id
+                        confidence = decimal_string(row["confidence"])
+                    alias_id = None
+                    if payload.learn_alias:
+                        try:
+                            alias_id = self._aliases.learn_or_reuse_alias(
+                                client=client,
+                                tenant_id=member.tenant_id,
+                                membership_id=member.membership_id,
+                                workspace_product_id=product_id,
+                                supplier_id=self._quotation_supplier_id(
+                                    client, UUID(str(line["quotation_id"]))
+                                ),
+                                alias_text=str(line["original_text"]),
+                            )
+                        except ConflictError as exc:
+                            if exc.details is None or exc.details.get("reason") != "alias_conflict":
+                                raise
+                            # Aliases are evidence too: never rewrite an old human's wording.
+                    try:
+                        with conn.cursor(row_factory=dict_row) as decision_cur:
+                            decision_cur.execute(
+                                "insert into match_decision (tenant_id,quotation_line_id,"
+                                "matched_workspace_product_id,selected_match_candidate_id,outcome,"
+                                "is_automatic,decided_by,confidence,alias_id,"
+                                "supersedes_decision_id) "
+                                "values (%s,%s,%s,%s,%s,false,%s,%s,%s,%s) returning *",
+                                (
+                                    member.tenant_id,
+                                    line_id,
+                                    product_id,
+                                    candidate_id,
+                                    payload.outcome,
+                                    member.membership_id,
+                                    confidence,
+                                    alias_id,
+                                    payload.expected_current_decision_id,
+                                ),
+                            )
+                            decision = dict(decision_cur.fetchone())
+                        cur.execute(
+                            "insert into match_resolution_idempotency "
+                            "(tenant_id,idempotency_key,quotation_line_id,request_fingerprint,"
+                            "match_decision_id) values (%s,%s,%s,%s,%s)",
+                            (
+                                member.tenant_id,
+                                idempotency_key,
+                                line_id,
+                                fingerprint,
+                                decision["id"],
+                            ),
+                        )
+                    except psycopg.Error as exc:
+                        if exc.sqlstate in ("23505", "23514"):
+                            raise ConflictError(details={"reason": "decision_changed"}) from exc
+                        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+        # PostgREST side effects must see the committed head. Reacquire the same locks so
+        # concurrent replays cannot duplicate the audit event while finishing side effects.
+        with _authenticated_db(self._settings, member) as conn:
+            with conn.cursor() as cur:
+                for scope in (
+                    f"correction-key:{member.tenant_id}:{idempotency_key}",
+                    f"correction-line:{member.tenant_id}:{line_id}",
+                ):
+                    cur.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))", (scope,))
+            return self._finish_correction(
+                client=client,
+                bearer_token=bearer_token,
+                member=member,
+                line=line,
+                decision_row=decision,
+                report_alias_conflict=payload.learn_alias,
+            )
 
     def _finish_correction(
         self,

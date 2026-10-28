@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictStr, model_validator
 from procurepilot_api.modules.catalogue.models import ProductCreate
 from procurepilot_api.modules.quotations.schemas import Money, Pack
 
+# Synthetic corrections use resolved/corrected; auto_accepted filters include them too.
 MatchTaskStatus = Literal["open", "in_progress", "resolved", "auto_accepted"]
 MatchTaskStatusFilter = Literal["open", "in_progress", "resolved", "auto_accepted", "all"]
 MatchTaskPriority = Literal["low", "normal", "high"]
@@ -19,6 +20,8 @@ MatchTaskReason = Literal[
     "no_candidate",
     "alias_conflict",
     "auto_accepted",
+    "corrected",
+    "human_decided",
 ]
 QuotedExposureIssue = Literal["currency_mismatch"]
 MatchOutcome = Literal[

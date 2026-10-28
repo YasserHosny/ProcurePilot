@@ -411,3 +411,185 @@ def test_archived_rfq_product_is_not_proposed(
     )
     assert row.decision is None
     assert not row.candidates
+
+
+@pytest.mark.parametrize("queue_status", ("all", "auto_accepted", "resolved"))
+def test_corrected_rfq_auto_match_stays_reachable_and_can_be_corrected_again(
+    conn: psycopg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+    queue_status: str,
+) -> None:
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from procurepilot_api.deps import bearer_token, current_member
+    from procurepilot_api.errors import register_exception_handlers
+    from procurepilot_api.modules.matching import resolution_service as resolution_module
+    from procurepilot_api.modules.matching.resolution_service import MatchResolutionService
+    from procurepilot_api.modules.matching.router import router
+    from procurepilot_api.modules.matching.schemas import MatchCorrectionRequest
+    from procurepilot_api.modules.matching.service import get_matching_service
+
+    wire(monkeypatch, conn)
+    client = PsycopgSupabaseClient(conn)
+    monkeypatch.setattr(resolution_module, "authenticated_client", lambda *_: client)
+    monkeypatch.setattr(resolution_module, "get_audit_writer", lambda: _PsycopgAuditWriter(conn))
+    monkeypatch.setattr(resolution_module, "enqueue_guardrail_evaluation", lambda *_, **__: None)
+
+    @contextmanager
+    def scoped(*_: object) -> Iterator[psycopg.Connection]:
+        yield conn
+
+    monkeypatch.setattr(resolution_module, "_authenticated_db", scoped)
+    monkeypatch.setattr(matching_module, "_authenticated_db", scoped)
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        ws = make_workspace(cur, "rfq-correct-reopen")
+        product = round_one_product(cur, ws, 0)
+        other = make_workspace_product(cur, ws, name="Corrected product")
+        quote = reply(cur, ws, make_rfq(cur, ws, [product]), (TEXTS[0],))
+    matching = MatchingService(settings())
+    original = matching.quotation_matches(
+        bearer_token="test", member=_member(ws), quotation_id=quote
+    ).lines[0]
+    assert original.decision.is_automatic
+    assert original.candidates[0].reasons.rfq.matched
+    line_id = original.line.id
+    candidate_id = uuid4()
+    with conn.cursor() as cur:
+        cur.execute(
+            "insert into match_candidate (id,tenant_id,quotation_line_id,"
+            "candidate_workspace_product_id,confidence,reasons,rank,scoring_version,"
+            "embedding_model) values (%s,%s,%s,%s,0.9,%s,2,'matching-score-v2','stub-hash-v1')",
+            (
+                candidate_id,
+                ws.tenant_id,
+                line_id,
+                other,
+                psycopg.types.json.Jsonb(
+                    {"alias_hit": False, "gtin_match": False, "supplier_code_match": False}
+                ),
+            ),
+        )
+    resolution = MatchResolutionService(settings())
+    corrected = resolution.correct(
+        bearer_token="test",
+        member=_member(ws),
+        line_id=line_id,
+        payload=MatchCorrectionRequest(
+            expected_current_decision_id=original.decision.id,
+            outcome="same_product",
+            selected_match_candidate_id=candidate_id,
+            learn_alias=False,
+        ),
+        idempotency_key=uuid4(),
+    ).decision
+    app = FastAPI()
+    register_exception_handlers(app)
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[current_member] = lambda: _member(ws)
+    app.dependency_overrides[bearer_token] = lambda: "test"
+    app.dependency_overrides[get_matching_service] = lambda: matching
+    with TestClient(app) as http:
+        response = http.get(f"/api/v1/quotation-lines/{line_id}/match-task")
+        assert response.status_code == 200, response.text
+        task = response.json()
+        assert task["decision"]["id"] == str(corrected.id)
+        assert task["status"] == "resolved"
+        assert task["reason"] == "corrected"
+        response = http.get(
+            "/api/v1/match-tasks",
+            params={
+                "quotation_id": str(quote),
+                "status": queue_status,
+            },
+        )
+        assert response.status_code == 200, response.text
+        items = response.json()["items"]
+        assert len(items) == 1
+        assert items[0]["quotation_line"]["id"] == str(line_id)
+        assert items[0]["status"] == "resolved"
+        assert items[0]["reason"] == "corrected"
+    # The legacy PostgREST queue reader must retain the same current head.
+    tasks = matching.list_match_tasks(
+        bearer_token="test",
+        quotation_id=quote,
+        status=queue_status,
+    ).items
+    assert len(tasks) == 1
+    assert tasks[0].decision.id == corrected.id
+    assert tasks[0].status == "resolved"
+    assert tasks[0].reason == "corrected"
+    second = resolution.correct(
+        bearer_token="test",
+        member=_member(ws),
+        line_id=line_id,
+        payload=MatchCorrectionRequest(
+            expected_current_decision_id=corrected.id,
+            outcome="same_product",
+            selected_match_candidate_id=original.candidates[0].id,
+            learn_alias=False,
+        ),
+        idempotency_key=uuid4(),
+    ).decision
+    assert second.supersedes_decision_id == corrected.id
+    assert second.matched_product.id == product
+    assert (
+        matching.match_task_for_line(bearer_token="test", line_id=line_id).decision.id == second.id
+    )
+
+
+@pytest.mark.parametrize("learned_alias", (True, False))
+def test_rfq_product_keeps_pack_conflict_evidence_for_catalogue_candidates(
+    conn: psycopg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+    learned_alias: bool,
+) -> None:
+    wire(monkeypatch, conn)
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        ws = make_workspace(cur, "rfq-alias-pack")
+        product = make_workspace_product(cur, ws, name="Flour")
+        # The legacy helper's canonical unit is litre; make this a 10 kg flour product.
+        reset_role(cur)
+        cur.execute(
+            "update canonical_product set base_unit='kilogram' where id="
+            "(select canonical_product_id from workspace_product where id=%s)",
+            (product,),
+        )
+        act_as(cur, ws)
+        cur.execute(
+            "update pack_definition set pack_count=1,unit_size=10 where workspace_product_id=%s",
+            (product,),
+        )
+        rfq = make_rfq(cur, ws, [product])
+        # A high floor makes the similarity candidate exercise the catalogue fallback as well.
+        quote = reply(cur, ws, rfq, ("Flourr",))
+        cur.execute(
+            "update quotation_line set pack_count=1,unit_size=5,pack_unit='kilogram' "
+            "where quotation_id=%s",
+            (quote,),
+        )
+        if learned_alias:
+            cur.execute(
+                "insert into product_alias (tenant_id,workspace_product_id,alias_text,created_by) "
+                "values (%s,%s,'Flourr',%s)",
+                (ws.tenant_id, product, ws.membership_id),
+            )
+    row = (
+        MatchingService(settings().model_copy(update={"matching_rfq_fit_floor": 0.9}))
+        .quotation_matches(
+            bearer_token="test",
+            member=_member(ws),
+            quotation_id=quote,
+        )
+        .lines[0]
+    )
+    candidate = next(c for c in row.candidates if c.candidate_product.id == product)
+    reason = candidate.reasons.rfq
+    assert reason.not_in_rfq is False
+    assert reason.pack_check == "conflict"
+    assert reason.quoted_pack_base_quantity == "5.000000"
+    assert reason.rfq_pack_base_quantity == "10.000000"
+    assert reason.rfq_line_id is not None
+    assert candidate.reasons.alias_hit is learned_alias
