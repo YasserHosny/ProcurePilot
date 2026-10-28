@@ -31,7 +31,6 @@ from integration.test_purchase_requests import (
     _make_branch,
     _make_member,
     _service,
-    _TestSupabaseClient,
 )
 from procurepilot_api import db
 from procurepilot_api.config import get_settings
@@ -413,6 +412,13 @@ def test_a_request_prepared_from_an_rfq_names_its_supplier_and_source(
 
     detail = service.get_request(bearer_token="token", request_id=request_id)
     by_member = service.get_request(bearer_token="token", member=member, request_id=request_id)
+    # List as the owner, under RLS: the superuser test client would page through every tenant's
+    # requests in the shared test database and could miss this one.
+    monkeypatch.setattr(
+        requests_service_module,
+        "authenticated_client",
+        lambda _settings, _token: PsycopgSupabaseClient(committing_conn, claims=ws.claims()),
+    )
     listed = service.list_requests(bearer_token="token", member=member).items
 
     for request in (detail, by_member, next(r for r in listed if r.id == request_id)):
@@ -471,7 +477,7 @@ def test_an_approver_sees_the_supplier_of_a_request_prepared_from_an_rfq(
     monkeypatch.setattr(
         requests_service_module,
         "authenticated_client",
-        lambda _settings, _token: _TestSupabaseClient(committing_conn, claims=approver.claims()),
+        lambda _settings, _token: PsycopgSupabaseClient(committing_conn, claims=approver.claims()),
     )
     approver_member = _current_member(ws, approver)
     expected_supplier = ("الذهبي للتموين", quote.supplier_id, quote.quotation_id, rfq_id)
