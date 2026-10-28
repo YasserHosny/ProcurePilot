@@ -16,6 +16,8 @@ from procurepilot_api.modules.matching.resolution_service import (
 from procurepilot_api.modules.matching.schemas import (
     BulkConfirmResult,
     ExactMatchSummary,
+    MatchCorrectionRequest,
+    MatchCorrectionResponse,
     MatchDecision,
     MatchQueueList,
     MatchResolutionRequest,
@@ -151,4 +153,22 @@ def confirm_exact_matches(
 ) -> BulkConfirmResult:
     return service.confirm_exact_matches(
         bearer_token=token, member=member, idempotency_key=idempotency_key
+    )
+
+
+@router.post("/quotation-lines/{line_id}/match/corrections", response_model=MatchCorrectionResponse)
+def correct_match(
+    line_id: UUID,
+    payload: Annotated[MatchCorrectionRequest, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[MatchResolutionService, Depends(get_match_resolution_service)],
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+) -> MatchCorrectionResponse:
+    return service.correct(
+        bearer_token=token,
+        member=member,
+        line_id=line_id,
+        payload=payload,
+        idempotency_key=idempotency_key,
     )

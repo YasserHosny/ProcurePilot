@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import PurePosixPath
@@ -25,6 +26,8 @@ from procurepilot_api.modules.matching.embeddings import (
     vector_literal,
 )
 from procurepilot_api.modules.matching.quoted_exposure import quoted_exposure
+from procurepilot_api.modules.matching.rfq_fit import RULE_VERSION as RFQ_FIT_VERSION
+from procurepilot_api.modules.matching.rfq_fit import fit_against_rfq
 from procurepilot_api.modules.matching.schemas import (
     MatchCandidate,
     MatchDecision,
@@ -48,6 +51,7 @@ from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.modules.quotations.schemas import Money, Pack
 from procurepilot_api.modules.quotations.schemas import decimal_string as quantity_string
+from procurepilot_api.modules.rfq.read_api import RfqContext, rfq_lines_for_quotation
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 
@@ -499,23 +503,127 @@ class MatchingService:
         lines: list[dict[str, object]],
         bearer_token: str | None = None,
     ) -> None:
+        context = rfq_lines_for_quotation(self._settings, member, UUID(str(quote["id"])))
+        excluded_products: set[UUID] = set()
+        if context is not None:
+            # RFQs can outlive catalogue products. Archived products must never be proposed.
+            active = {
+                str(row["id"])
+                for row in _rows(
+                    client.table("workspace_product")
+                    .select("id")
+                    .eq("status", "active")
+                    .in_("id", [str(line.workspace_product_id) for line in context.lines])
+                    .execute()
+                    .data
+                )
+            }
+            excluded_products = {
+                line.workspace_product_id
+                for line in context.lines
+                if str(line.workspace_product_id) not in active
+            }
         self._backfill_missing_embeddings(client)
-        for line in lines:
+        pending: set[UUID] = set()
+        try:
+            self._match_lines(
+                client=client,
+                member=member,
+                lines=lines,
+                context=context,
+                bearer_token=bearer_token,
+                defer_guardrail=pending.add if context is not None else None,
+                excluded_products=excluded_products,
+            )
+        finally:
+            # Evaluate the settled quotation, including decisions inserted before a later error.
+            for quotation_id in sorted(pending):
+                enqueue_guardrail_evaluation(
+                    self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
+                )
+
+    def _match_lines(
+        self,
+        *,
+        client: object,
+        member: CurrentMember,
+        lines: list[dict[str, object]],
+        context: RfqContext | None,
+        bearer_token: str | None,
+        defer_guardrail: Callable[[UUID], None] | None,
+        excluded_products: set[UUID],
+    ) -> None:
+        for rank, line in enumerate(
+            sorted(lines, key=lambda row: int(row["line_number"])), start=1
+        ):
             if _decision_for_line(client, UUID(str(line["id"]))) is not None:
                 continue
             existing_candidates = _candidate_rows(client, UUID(str(line["id"])))
             if existing_candidates:
                 self._route_or_accept(
-                    client, member, line, existing_candidates, bearer_token=bearer_token
+                    client,
+                    member,
+                    line,
+                    existing_candidates,
+                    bearer_token=bearer_token,
+                    defer_guardrail=defer_guardrail,
                 )
                 continue
+            fit = None
+            if context is not None:
+                fit = fit_against_rfq(
+                    original_text=str(line["original_text"]),
+                    pack_count=Decimal(str(line["pack_count"]))
+                    if line.get("pack_count") is not None
+                    else None,
+                    unit_size=Decimal(str(line["unit_size"]))
+                    if line.get("unit_size") is not None
+                    else None,
+                    pack_unit=str(line["pack_unit"]) if line.get("pack_unit") else None,
+                    rank=rank,
+                    context=context,
+                    excluded_products=frozenset(excluded_products),
+                    floor=Decimal(str(self._settings.matching_rfq_fit_floor)),
+                    margin=Decimal(str(self._settings.matching_rfq_fit_margin)),
+                )
+                if fit.matched_rfq_line is not None:
+                    reasons = fit.reasons
+                    reasons["rfq"]["matched"] = True
+                    persisted = self._persist_candidates(
+                        client,
+                        member,
+                        line,
+                        [
+                            {
+                                "workspace_product_id": fit.matched_rfq_line.workspace_product_id,
+                                "confidence": Decimal("1.0000"),
+                                "reasons": reasons,
+                                "scoring_version": RFQ_FIT_VERSION,
+                            }
+                        ],
+                    )
+                    self._route_or_accept(
+                        client,
+                        member,
+                        line,
+                        persisted,
+                        bearer_token=bearer_token,
+                        defer_guardrail=defer_guardrail,
+                    )
+                    continue
             deterministic = find_deterministic_candidate(
                 line=line,
                 products=_deterministic_products_for_line(client, line),
                 aliases=_aliases_for_line(client, line),
                 supplier_code_aliases=_supplier_code_aliases_for_line(client, line),
             )
-            if deterministic is not None:
+            if (
+                deterministic is not None
+                and deterministic.workspace_product_id not in excluded_products
+            ):
+                reasons = deterministic.reasons
+                if context is not None and fit is not None and not fit.fitting_lines:
+                    reasons["rfq"] = {"not_in_rfq": True, "rfq_id": str(context.rfq_id)}
                 persisted = self._persist_candidates(
                     client,
                     member,
@@ -524,40 +632,88 @@ class MatchingService:
                         {
                             "workspace_product_id": deterministic.workspace_product_id,
                             "confidence": deterministic.confidence,
-                            "reasons": deterministic.reasons,
+                            "reasons": reasons,
                         }
                     ],
                 )
                 if _candidate_is_deterministic(persisted[0]):
                     self._create_automatic_decision(
-                        client, member, line, persisted[0], bearer_token=bearer_token
+                        client,
+                        member,
+                        line,
+                        persisted[0],
+                        bearer_token=bearer_token,
+                        defer_guardrail=defer_guardrail,
                     )
                 else:
-                    # A concurrent runner persisted a non-deterministic set first.
+                    # A concurrent runner may have persisted another candidate set first.
                     self._route_or_accept(
-                        client, member, line, persisted, bearer_token=bearer_token
+                        client,
+                        member,
+                        line,
+                        persisted,
+                        bearer_token=bearer_token,
+                        defer_guardrail=defer_guardrail,
                     )
                 continue
+            proposals: list[dict[str, object]] = []
+            seen: set[UUID] = set()
+            if fit is not None:
+                # Keep conflicting RFQ packs visible as evidence, after non-conflicting fits.
+                offered = sorted(
+                    (
+                        score
+                        for score in fit.scores
+                        if score.wording_score
+                        >= Decimal(str(self._settings.matching_rfq_fit_floor))
+                    ),
+                    key=lambda score: score.pack_check == "conflict",
+                )
+                for score in offered:
+                    product_id = score.rfq_line.workspace_product_id
+                    if product_id in seen:
+                        continue
+                    seen.add(product_id)
+                    proposals.append(
+                        {
+                            "workspace_product_id": product_id,
+                            "confidence": score.score,
+                            "reasons": score.reasons,
+                            "scoring_version": RFQ_FIT_VERSION,
+                        }
+                    )
             candidates = build_similarity_candidates(
                 client=client,
                 line=_line_summary_dict(line),
                 embedding_provider=self._embeddings,
                 trigram_threshold=self._settings.matching_trigram_threshold,
             )
-            persisted = self._persist_candidates(
-                client,
-                member,
-                line,
-                [
+            for candidate in candidates:
+                if (
+                    candidate.workspace_product_id in seen
+                    or candidate.workspace_product_id in excluded_products
+                ):
+                    continue
+                seen.add(candidate.workspace_product_id)
+                reasons = candidate.reasons
+                if context is not None and fit is not None and not fit.fitting_lines:
+                    reasons["rfq"] = {"not_in_rfq": True, "rfq_id": str(context.rfq_id)}
+                proposals.append(
                     {
                         "workspace_product_id": candidate.workspace_product_id,
                         "confidence": candidate.confidence,
-                        "reasons": candidate.reasons,
+                        "reasons": reasons,
                     }
-                    for candidate in candidates
-                ],
+                )
+            persisted = self._persist_candidates(client, member, line, proposals)
+            self._route_or_accept(
+                client,
+                member,
+                line,
+                persisted,
+                bearer_token=bearer_token,
+                defer_guardrail=defer_guardrail,
             )
-            self._route_or_accept(client, member, line, persisted, bearer_token=bearer_token)
 
     def _persist_candidates(
         self,
@@ -576,7 +732,7 @@ class MatchingService:
                 "confidence": decimal_string(candidate["confidence"]),
                 "reasons": candidate["reasons"],
                 "rank": rank,
-                "scoring_version": SCORING_VERSION,
+                "scoring_version": candidate.get("scoring_version", SCORING_VERSION),
                 "embedding_model": self._embeddings.model,
             }
             for rank, candidate in enumerate(candidates, start=1)
@@ -603,6 +759,7 @@ class MatchingService:
         candidates: list[dict[str, object]],
         *,
         bearer_token: str | None = None,
+        defer_guardrail: Callable[[UUID], None] | None = None,
     ) -> None:
         if not candidates:
             self._create_task(
@@ -610,6 +767,17 @@ class MatchingService:
             )
             return
         top = candidates[0]
+        rfq = top.get("reasons", {}).get("rfq", {})
+        if top.get("scoring_version") == RFQ_FIT_VERSION and rfq.get("matched") is True:
+            self._create_automatic_decision(
+                client,
+                member,
+                line,
+                top,
+                bearer_token=bearer_token,
+                defer_guardrail=defer_guardrail,
+            )
+            return
         second = candidates[1] if len(candidates) > 1 else None
         top_confidence = Decimal(str(top["confidence"]))
         close_call = second is not None and top_confidence - Decimal(
@@ -620,10 +788,19 @@ class MatchingService:
             top_confidence >= Decimal(str(self._settings.matching_auto_accept_threshold))
             and not close_call
         )
-        if threshold_and_margin_pass and (
-            deterministic or self._settings.matching_fuzzy_auto_accept_enabled
+        if (
+            top.get("scoring_version") != RFQ_FIT_VERSION
+            and threshold_and_margin_pass
+            and (deterministic or self._settings.matching_fuzzy_auto_accept_enabled)
         ):
-            self._create_automatic_decision(client, member, line, top, bearer_token=bearer_token)
+            self._create_automatic_decision(
+                client,
+                member,
+                line,
+                top,
+                bearer_token=bearer_token,
+                defer_guardrail=defer_guardrail,
+            )
             return
         fuzzy_auto_accept_withheld = threshold_and_margin_pass and not deterministic
         self._create_task(
@@ -650,6 +827,7 @@ class MatchingService:
         candidate: dict[str, object],
         *,
         bearer_token: str | None = None,
+        defer_guardrail: Callable[[UUID], None] | None = None,
     ) -> dict[str, object]:
         try:
             response = (
@@ -676,9 +854,13 @@ class MatchingService:
                     return existing
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         decision = _one_row(response.data, resource="match_decision")
-        enqueue_guardrail_evaluation(
-            self._settings, tenant_id=member.tenant_id, quotation_id=UUID(str(line["quotation_id"]))
-        )
+        quotation_id = UUID(str(line["quotation_id"]))
+        if defer_guardrail is None:
+            enqueue_guardrail_evaluation(
+                self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
+            )
+        else:
+            defer_guardrail(quotation_id)
         if bearer_token is not None:
             self._record(
                 bearer_token=bearer_token,
@@ -694,6 +876,16 @@ class MatchingService:
                     "score": decimal_string(candidate["confidence"]),
                     "threshold": decimal_string(self._settings.matching_auto_accept_threshold),
                     "scoring_version": candidate.get("scoring_version") or SCORING_VERSION,
+                    **(
+                        {
+                            "reason": "rfq_fit",
+                            "rfq_id": candidate["reasons"]["rfq"]["rfq_id"],
+                            "rfq_line_id": candidate["reasons"]["rfq"]["rfq_line_id"],
+                            "rule_version": RFQ_FIT_VERSION,
+                        }
+                        if candidate.get("scoring_version") == RFQ_FIT_VERSION
+                        else {}
+                    ),
                 },
             )
         self._landed_cost.compute_for_line_with_client(

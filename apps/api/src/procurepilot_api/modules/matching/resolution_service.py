@@ -23,12 +23,15 @@ from procurepilot_api.modules.matching.exact import is_exact_name_match
 from procurepilot_api.modules.matching.schemas import (
     BulkConfirmResult,
     ExactMatchSummary,
+    MatchCorrectionRequest,
+    MatchCorrectionResponse,
     MatchDecision,
     MatchResolutionRequest,
 )
 from procurepilot_api.modules.matching.scoring import decimal_string
 from procurepilot_api.modules.matching.service import (
     CANONICAL_COLUMNS,
+    DECISION_COLUMNS,
     LINE_COLUMNS,
     PRODUCT_COLUMNS,
     _candidate,
@@ -37,6 +40,7 @@ from procurepilot_api.modules.matching.service import (
     _line_row,
 )
 from procurepilot_api.modules.members.service import authenticated_client
+from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 
@@ -186,6 +190,218 @@ class MatchResolutionService:
             repair_existing_decision=False,
         )
         return decision
+
+    def correct(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        line_id: UUID,
+        payload: MatchCorrectionRequest,
+        idempotency_key: UUID,
+    ) -> MatchCorrectionResponse:
+        client = authenticated_client(self._settings, bearer_token)
+        fingerprint = _request_fingerprint(payload)
+        # Transaction-scoped advisory locks work across API processes and pooler connections.
+        # Keep the lock connection separate from PostgREST writes: a row FOR UPDATE on that
+        # connection would block the FK checks performed by those writes.
+        with _authenticated_db(self._settings, member) as conn:
+            with conn.cursor() as cur:
+                for scope in (
+                    f"correction-key:{member.tenant_id}:{idempotency_key}",
+                    f"correction-line:{member.tenant_id}:{line_id}",
+                ):
+                    cur.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))", (scope,))
+                line = _line_row(client, line_id)
+                existing = _idempotency_record_for_key(client, member.tenant_id, idempotency_key)
+                if existing is not None:
+                    if (
+                        str(existing["quotation_line_id"]) != str(line_id)
+                        or existing["request_fingerprint"] != fingerprint
+                    ):
+                        raise ConflictError(details={"reason": "idempotency_key_reused"})
+                    decision = _decision_by_id(client, UUID(str(existing["match_decision_id"])))
+                    return self._finish_correction(
+                        client=client,
+                        bearer_token=bearer_token,
+                        member=member,
+                        line=line,
+                        decision_row=decision,
+                        report_alias_conflict=payload.learn_alias,
+                    )
+                head = _decision_for_line(client, line_id)
+                if head is None:
+                    raise ConflictError(details={"reason": "no_decision"})
+                if str(head["id"]) != str(payload.expected_current_decision_id):
+                    raise ConflictError(details={"reason": "decision_changed"})
+                # Tenant-pinned definer (20261029070000): a branch-assigned buyer cannot see
+                # other branches' requests, but a request priced from this match still locks it.
+                cur.execute(
+                    "select match_decision_live_request(%s)",
+                    (payload.expected_current_decision_id,),
+                )
+                request = cur.fetchone()
+                if request is not None and request[0] is not None:
+                    raise ConflictError(
+                        details={
+                            "reason": "line_on_purchase_request",
+                            "purchase_request_id": str(request[0]),
+                        }
+                    )
+                if payload.outcome == "no_match_new_product":
+                    # The boundary validator guarantees new_product for this outcome.
+                    product, _created = self._catalogue.create_product(
+                        bearer_token=bearer_token, member=member, payload=payload.new_product
+                    )
+                    product_id, candidate_id, confidence = product.id, None, "1.0000"
+                else:
+                    row = self._candidate_row(client, payload.selected_match_candidate_id, line_id)
+                    _candidate(client, row)
+                    product_id = UUID(str(row["candidate_workspace_product_id"]))
+                    candidate_id = payload.selected_match_candidate_id
+                    confidence = decimal_string(row["confidence"])
+                alias_id = None
+                if payload.learn_alias:
+                    try:
+                        alias_id = self._aliases.learn_or_reuse_alias(
+                            client=client,
+                            tenant_id=member.tenant_id,
+                            membership_id=member.membership_id,
+                            workspace_product_id=product_id,
+                            supplier_id=self._quotation_supplier_id(
+                                client, UUID(str(line["quotation_id"]))
+                            ),
+                            alias_text=str(line["original_text"]),
+                        )
+                    except ConflictError as exc:
+                        if exc.details is None or exc.details.get("reason") != "alias_conflict":
+                            raise
+                        # Aliases are evidence too: never rewrite an old human's wording.
+                try:
+                    response = (
+                        client.table("match_decision")
+                        .insert(
+                            {
+                                "tenant_id": str(member.tenant_id),
+                                "quotation_line_id": str(line_id),
+                                "matched_workspace_product_id": str(product_id),
+                                "selected_match_candidate_id": str(candidate_id)
+                                if candidate_id
+                                else None,
+                                "outcome": payload.outcome,
+                                "is_automatic": False,
+                                "decided_by": str(member.membership_id),
+                                "confidence": confidence,
+                                "alias_id": str(alias_id) if alias_id else None,
+                                "supersedes_decision_id": str(payload.expected_current_decision_id),
+                            }
+                        )
+                        .execute()
+                    )
+                except APIError as exc:
+                    if exc.code in ("23505", "23514"):
+                        raise ConflictError(details={"reason": "decision_changed"}) from exc
+                    raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+                decision = _one_row(response.data, resource="match_decision")
+                # Store the replay mapping before fallible side effects, so a retry can finish
+                # an inserted correction instead of trying to supersede the old head twice.
+                _record_idempotency_decision(
+                    client=client,
+                    member=member,
+                    idempotency_key=idempotency_key,
+                    line_id=line_id,
+                    request_fingerprint=fingerprint,
+                    decision_id=UUID(str(decision["id"])),
+                )
+                return self._finish_correction(
+                    client=client,
+                    bearer_token=bearer_token,
+                    member=member,
+                    line=line,
+                    decision_row=decision,
+                    report_alias_conflict=payload.learn_alias,
+                )
+
+    def _finish_correction(
+        self,
+        *,
+        client: object,
+        bearer_token: str,
+        member: CurrentMember,
+        line: dict[str, object],
+        decision_row: dict[str, object],
+        report_alias_conflict: bool = True,
+    ) -> MatchCorrectionResponse:
+        decision_id = UUID(str(decision_row["id"]))
+        try:
+            events = _rows(
+                client.table("audit_event")
+                .select("target")
+                .eq("action", "matching.decision_corrected")
+                .eq("target->>decision_id", str(decision_id))
+                .limit(1)
+                .execute()
+                .data
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "audit_event"}) from exc
+        if events:
+            # Snapshot the full response in append-only audit evidence, including the dependent
+            # lines and alias conflict, so a later correction or sweep cannot change a replay.
+            return MatchCorrectionResponse.model_validate(events[0]["target"]["response"])
+        superseded_id = UUID(str(decision_row["supersedes_decision_id"]))
+        old = _decision_by_id(client, superseded_id)
+        try:
+            learned = _rows(
+                client.table("current_match_decision")
+                .select("quotation_line_id")
+                .eq("learned_from_decision_id", str(superseded_id))
+                .execute()
+                .data
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        conflict_product = None
+        if report_alias_conflict and decision_row.get("alias_id") is None:
+            alias = self._aliases._find_alias(client, str(line["original_text"]))
+            if alias is not None and str(alias["workspace_product_id"]) != str(
+                decision_row["matched_workspace_product_id"]
+            ):
+                conflict_product = UUID(str(alias["workspace_product_id"]))
+        result = MatchCorrectionResponse(
+            decision=_decision(client, decision_row),
+            superseded_decision_id=superseded_id,
+            lines_matched_through_old_wording=sorted(
+                {UUID(str(row["quotation_line_id"])) for row in learned}
+            ),
+            alias_conflict_product_id=conflict_product,
+        )
+        self._landed_cost.compute_for_line_with_client(
+            client=client, member=member, line_id=UUID(str(line["id"]))
+        )
+        enqueue_guardrail_evaluation(
+            self._settings, tenant_id=member.tenant_id, quotation_id=UUID(str(line["quotation_id"]))
+        )
+        get_audit_writer().record(
+            AuditEventCreate(
+                tenant_id=member.tenant_id,
+                actor_membership_id=member.membership_id,
+                actor_email=member.email,
+                action="matching.decision_corrected",
+                outcome="success",
+                trace_id=get_trace_id(),
+                target={
+                    "quotation_line_id": str(line["id"]),
+                    "superseded_decision_id": str(superseded_id),
+                    "decision_id": str(decision_id),
+                    "from_product_id": str(old["matched_workspace_product_id"]),
+                    "to_product_id": str(decision_row["matched_workspace_product_id"]),
+                    "response": result.model_dump(mode="json"),
+                },
+            ),
+            bearer_token=bearer_token,
+        )
+        return result
 
     def count_exact_matches(self, *, bearer_token: str) -> ExactMatchSummary:
         client = authenticated_client(self._settings, bearer_token)
@@ -593,7 +809,7 @@ def get_match_resolution_service() -> MatchResolutionService:
     return MatchResolutionService()
 
 
-def _request_fingerprint(payload: MatchResolutionRequest) -> str:
+def _request_fingerprint(payload: MatchResolutionRequest | MatchCorrectionRequest) -> str:
     encoded = json.dumps(
         payload.model_dump(mode="json", exclude_none=True),
         sort_keys=True,
@@ -699,10 +915,7 @@ def _decision_by_id(client: object, decision_id: UUID) -> dict[str, object]:
     try:
         response = (
             client.table("match_decision")
-            .select(
-                "id,quotation_line_id,matched_workspace_product_id,selected_match_candidate_id,outcome,"
-                "is_automatic,decided_by,decided_at,confidence,alias_id,created_at"
-            )
+            .select(DECISION_COLUMNS)
             .eq("id", str(decision_id))
             .limit(2)
             .execute()
