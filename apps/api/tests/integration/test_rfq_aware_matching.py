@@ -704,3 +704,165 @@ def test_rfq_product_keeps_pack_conflict_evidence_for_catalogue_candidates(
     assert reason.rfq_pack_base_quantity == "10.000000"
     assert reason.rfq_line_id is not None
     assert candidate.reasons.alias_hit is learned_alias
+
+
+@pytest.fixture
+def correctable_rfq(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Workspace, UUID, list[UUID], MatchingService]:
+    wire(monkeypatch, conn)
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        ws = make_workspace(cur, "rfq-correction-options", role="buyer")
+        products = [
+            make_workspace_product(cur, ws, name=name)
+            for name in ("Basmati rice", "Basmati grain", "Basmati rice substitute")
+        ]
+        cur.execute(
+            "update pack_definition set unit_size=10 where workspace_product_id=%s",
+            (products[1],),
+        )
+        quote = reply(cur, ws, make_rfq(cur, ws, products[:2]), ("Basmati rice",))
+        cur.execute(
+            "update quotation_line set pack_count=6,unit_size=5,pack_unit='litre' "
+            "where quotation_id=%s",
+            (quote,),
+        )
+    return ws, quote, products, MatchingService(settings())
+
+
+def test_rfq_auto_match_retains_ranked_rfq_and_similarity_alternatives(
+    conn: psycopg.Connection,
+    correctable_rfq: tuple[Workspace, UUID, list[UUID], MatchingService],
+) -> None:
+    from procurepilot_api.modules.matching.search import build_similarity_candidates
+    from procurepilot_api.modules.matching.service import _line_row, _line_summary_dict
+
+    ws, quote, products, service = correctable_rfq
+    row = service.quotation_matches(
+        bearer_token="test", member=_member(ws), quotation_id=quote
+    ).lines[0]
+    assert row.decision.is_automatic
+    assert len(row.candidates) > 1
+    assert [c.candidate_product.id for c in row.candidates[:2]] == products[:2]
+    winner, alternative = row.candidates[:2]
+    assert winner.rank == 1
+    assert winner.confidence == "1.0000"
+    assert winner.reasons.rfq.matched is True
+    assert row.decision.selected_match_candidate_id == winner.id
+    assert alternative.rank == 2
+    assert alternative.reasons.rfq.matched is False
+    assert alternative.reasons.rfq.pack_check == "conflict"
+    assert alternative.scoring_version == "rfq-fit-v1"
+    client = PsycopgSupabaseClient(conn)
+    similarity = build_similarity_candidates(
+        client=client,
+        line=_line_summary_dict(_line_row(client, row.line.id)),
+        embedding_provider=service._embeddings,
+        trigram_threshold=settings().matching_trigram_threshold,
+    )
+    expected = [c for c in similarity if c.workspace_product_id not in products[:2]]
+    assert expected  # Exercise catalogue proposals too, rather than RFQ proposals alone.
+    assert [c.candidate_product.id for c in row.candidates[2:]] == [
+        c.workspace_product_id for c in expected
+    ]
+    for actual, searched in zip(row.candidates[2:], expected, strict=True):
+        assert actual.confidence == format(searched.confidence, ".4f")
+        actual_reasons = actual.reasons.model_dump()
+        assert all(actual_reasons[key] == value for key, value in searched.reasons.items())
+    assert len({c.candidate_product.id for c in row.candidates}) == len(row.candidates)
+
+
+def test_buyer_corrects_rfq_auto_match_to_rank_two_existing_product(
+    conn: psycopg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+    correctable_rfq: tuple[Workspace, UUID, list[UUID], MatchingService],
+) -> None:
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from procurepilot_api.deps import bearer_token, current_member
+    from procurepilot_api.errors import register_exception_handlers
+    from procurepilot_api.modules.matching import resolution_service as resolution_module
+    from procurepilot_api.modules.matching.resolution_service import MatchResolutionService
+    from procurepilot_api.modules.matching.router import router
+    from procurepilot_api.modules.requests.valuation import (
+        estimate_from_source_response,
+        estimate_line_value,
+        quoted_prices_from_source_response,
+    )
+
+    ws, quote, products, matching = correctable_rfq
+    row = matching.quotation_matches(
+        bearer_token="test", member=_member(ws), quotation_id=quote
+    ).lines[0]
+    assert len(row.candidates) > 1, (
+        "RFQ automatic matches must offer an existing-product correction"
+    )
+    with conn.cursor() as cur:
+        cur.execute("select id from rfq_response where quotation_id=%s", (quote,))
+        response_id = cur.fetchone()[0]
+    before = estimate_line_value(conn, workspace_product_id=products[0])
+    assert (before.unit_price_amount, before.unit_price_currency) == (12, "GBP")
+    resolution = MatchResolutionService(settings())
+    client = PsycopgSupabaseClient(conn)
+    monkeypatch.setattr(resolution_module, "authenticated_client", lambda *_: client)
+    monkeypatch.setattr(resolution_module, "get_audit_writer", lambda: _PsycopgAuditWriter(conn))
+    monkeypatch.setattr(resolution_module, "enqueue_guardrail_evaluation", lambda *_, **__: None)
+
+    @contextmanager
+    def scoped(*_: object) -> Iterator[psycopg.Connection]:
+        yield conn
+
+    monkeypatch.setattr(resolution_module, "_authenticated_db", scoped)
+    app = FastAPI()
+    register_exception_handlers(app)
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[current_member] = lambda: _member(ws)
+    app.dependency_overrides[bearer_token] = lambda: "test"
+    app.dependency_overrides[resolution_module.get_match_resolution_service] = lambda: resolution
+    with TestClient(app) as http:
+        response = http.post(
+            f"/api/v1/quotation-lines/{row.line.id}/match/corrections",
+            headers={"Idempotency-Key": str(uuid4())},
+            json={
+                "expected_current_decision_id": str(row.decision.id),
+                "outcome": "same_product",
+                "selected_match_candidate_id": str(row.candidates[1].id),
+                "learn_alias": False,
+            },
+        )
+    assert response.status_code == 200, response.text
+    corrected = response.json()["decision"]
+    assert corrected["id"] != str(row.decision.id)
+    assert corrected["supersedes_decision_id"] == str(row.decision.id)
+    assert corrected["matched_product"]["id"] == str(products[1])
+    assert corrected["is_automatic"] is False
+    with conn.cursor() as cur:
+        cur.execute(
+            "select id from current_match_decision where quotation_line_id=%s", (row.line.id,)
+        )
+        assert str(cur.fetchone()[0]) == corrected["id"]
+        cur.execute(
+            "select match_decision_id from landed_cost where quotation_line_id=%s", (row.line.id,)
+        )
+        assert {str(r[0]) for r in cur.fetchall()} == {str(row.decision.id), corrected["id"]}
+        # Corrections must not change the supplier's quoted price/quantity (per purchasing pack).
+        cur.execute(
+            "select quantity,unit_price_amount,unit_price_currency,pack_count,unit_size "
+            "from quotation_line where id=%s",
+            (row.line.id,),
+        )
+        assert cur.fetchone() == (2, 12, "GBP", 6, 5)
+    # Requests still use the current decision and a price per purchasing pack, including
+    # when sourced from this RFQ response. Historical costs must not price the old product.
+    assert estimate_line_value(conn, workspace_product_id=products[0]).unit_price_amount is None
+    after = estimate_line_value(conn, workspace_product_id=products[1])
+    assert (after.unit_price_amount, after.unit_price_currency) == (12, "GBP")
+    assert after.source_landed_cost_id != before.source_landed_cost_id
+    assert estimate_from_source_response(
+        conn, rfq_response_id=response_id, product_ids=products
+    ) == {products[1]: after}
+    assert quoted_prices_from_source_response(
+        conn, rfq_response_id=response_id, product_ids=products
+    ) == {products[1]: (12, "GBP")}

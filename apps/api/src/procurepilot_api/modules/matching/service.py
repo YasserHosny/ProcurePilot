@@ -581,6 +581,8 @@ class MatchingService:
                 )
                 continue
             fit = None
+            proposals: list[dict[str, object]] = []
+            seen: set[UUID] = set()
             if context is not None:
                 fit = fit_against_rfq(
                     original_text=str(line["original_text"]),
@@ -600,33 +602,26 @@ class MatchingService:
                 if fit.matched_rfq_line is not None:
                     reasons = fit.reasons
                     reasons["rfq"]["matched"] = True
-                    persisted = self._persist_candidates(
-                        client,
-                        member,
-                        line,
-                        [
-                            {
-                                "workspace_product_id": fit.matched_rfq_line.workspace_product_id,
-                                "confidence": Decimal("1.0000"),
-                                "reasons": reasons,
-                                "scoring_version": RFQ_FIT_VERSION,
-                            }
-                        ],
+                    # Keep the automatic winner first, then retain the ordinary proposals
+                    # so a buyer can correct it to another existing catalogue product.
+                    seen.add(fit.matched_rfq_line.workspace_product_id)
+                    proposals.append(
+                        {
+                            "workspace_product_id": fit.matched_rfq_line.workspace_product_id,
+                            "confidence": Decimal("1.0000"),
+                            "reasons": reasons,
+                            "scoring_version": RFQ_FIT_VERSION,
+                        }
                     )
-                    self._route_or_accept(
-                        client,
-                        member,
-                        line,
-                        persisted,
-                        bearer_token=bearer_token,
-                        defer_guardrail=defer_guardrail,
-                    )
-                    continue
-            deterministic = find_deterministic_candidate(
-                line=line,
-                products=_deterministic_products_for_line(client, line),
-                aliases=_aliases_for_line(client, line),
-                supplier_code_aliases=_supplier_code_aliases_for_line(client, line),
+            deterministic = (
+                find_deterministic_candidate(
+                    line=line,
+                    products=_deterministic_products_for_line(client, line),
+                    aliases=_aliases_for_line(client, line),
+                    supplier_code_aliases=_supplier_code_aliases_for_line(client, line),
+                )
+                if not proposals
+                else None
             )
             if (
                 deterministic is not None
@@ -669,8 +664,6 @@ class MatchingService:
                         defer_guardrail=defer_guardrail,
                     )
                 continue
-            proposals: list[dict[str, object]] = []
-            seen: set[UUID] = set()
             if fit is not None:
                 # Keep conflicting RFQ packs visible as evidence, after non-conflicting fits.
                 offered = sorted(
@@ -687,6 +680,7 @@ class MatchingService:
                     if product_id in seen:
                         continue
                     seen.add(product_id)
+                    score.reasons["rfq"]["matched"] = False
                     proposals.append(
                         {
                             "workspace_product_id": product_id,

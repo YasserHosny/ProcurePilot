@@ -50,6 +50,7 @@ EXACT_CONFIRM_WORKERS = 12  # overlap hosted RTT; never more than twelve in-flig
 EXACT_CONFIRM_BATCH = 100  # exact pairs returned per call
 EXACT_SCAN_LIMIT = 1000  # open tasks examined while collecting them
 EXACT_LOOKUP_CHUNK = 100  # lines per batched read (keeps PostgREST URLs short)
+CORRECTION_PRODUCT_NAMESPACE = UUID("c3db433e-668c-44be-9fc4-124f4e77b375")
 
 
 class MatchResolutionService:
@@ -246,7 +247,13 @@ class MatchResolutionService:
                     if payload.outcome == "no_match_new_product":
                         # The boundary validator guarantees new_product for this outcome.
                         product, _created = self._catalogue.create_product(
-                            bearer_token=bearer_token, member=member, payload=payload.new_product
+                            bearer_token=bearer_token,
+                            member=member,
+                            payload=payload.new_product,
+                            idempotency_key=uuid5(
+                                CORRECTION_PRODUCT_NAMESPACE,
+                                f"match-correction:{idempotency_key}:{line_id}",
+                            ),
                         )
                         product_id, candidate_id, confidence = product.id, None, "1.0000"
                     else:
@@ -257,6 +264,8 @@ class MatchResolutionService:
                         product_id = UUID(str(row["candidate_workspace_product_id"]))
                         candidate_id = payload.selected_match_candidate_id
                         confidence = decimal_string(row["confidence"])
+                    if product_id == UUID(str(head["matched_workspace_product_id"])):
+                        raise ConflictError(details={"reason": "same_product_as_current"})
                     alias_id = None
                     if payload.learn_alias:
                         try:

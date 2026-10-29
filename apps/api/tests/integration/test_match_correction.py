@@ -83,6 +83,19 @@ def case(conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch) -> Iterator[
         new = make_workspace_product(cur, ws, name="Correct rice")
         quote = make_quotation(cur, ws, supplier_id=make_supplier(cur, ws), status="reviewed")
         line = make_line(cur, ws, quote)
+        cur.execute(
+            "insert into match_candidate (tenant_id,quotation_line_id,"
+            "candidate_workspace_product_id,confidence,reasons,rank,scoring_version,"
+            "embedding_model) values (%s,%s,%s,0.9,%s,1,'matching-score-v2','stub-hash-v1')",
+            (
+                ws.tenant_id,
+                line,
+                old,
+                psycopg.types.json.Jsonb(
+                    {"alias_hit": False, "gtin_match": False, "supplier_code_match": False}
+                ),
+            ),
+        )
         head = _decide(cur, ws, line, old, automatic=True)
         candidate = uuid4()
         cur.execute(
@@ -392,7 +405,16 @@ def test_dependent_lines_are_current_only_and_replay_keeps_snapshot(case: Case) 
     result = case.correct(key=key)
     assert result.lines_matched_through_old_wording == [current_dependent]
     # A second correction and a later dependent-line correction cannot change the first replay.
-    next_result = case.correct(expected_current_decision_id=result.decision.id, learn_alias=False)
+    with case.conn.cursor() as cur:
+        cur.execute(
+            "select selected_match_candidate_id from match_decision where id=%s", (case.head,)
+        )
+        original_candidate = cur.fetchone()[0]
+    next_result = case.correct(
+        expected_current_decision_id=result.decision.id,
+        selected_match_candidate_id=original_candidate,
+        learn_alias=False,
+    )
     assert next_result.decision.supersedes_decision_id == result.decision.id
     assert case.correct(key=key).model_dump() == result.model_dump()
 
@@ -531,3 +553,134 @@ def test_failed_replay_mapping_rolls_back_correction_and_same_key_can_retry(
             "select match_decision_id from landed_cost where quotation_line_id=%s", (case.line,)
         )
         assert {row[0] for row in cur.fetchall()} == {case.head, result.decision.id}
+
+
+def test_correction_to_current_heads_product_is_refused(case: Case) -> None:
+    with case.conn.cursor() as cur:
+        cur.execute(
+            "select selected_match_candidate_id from current_match_decision "
+            "where quotation_line_id=%s",
+            (case.line,),
+        )
+        current_candidate = cur.fetchone()[0]
+    assert_conflict(case, "same_product_as_current", selected_match_candidate_id=current_candidate)
+    # Check the current head, including after a successful correction.
+    corrected = case.correct(learn_alias=False)
+    assert_conflict(
+        case,
+        "same_product_as_current",
+        expected_current_decision_id=corrected.decision.id,
+    )
+    with case.conn.cursor() as cur:
+        cur.execute("select count(*) from match_decision where quotation_line_id=%s", (case.line,))
+        assert cur.fetchone()[0] == 2
+
+
+def test_new_product_retry_after_decision_insert_failure(
+    case: Case, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from unittest.mock import Mock
+
+    from postgrest.exceptions import APIError
+
+    from integration.catalogue_helpers import delete_tenant_scoped_rows
+    from integration.quotation_helpers import PsycopgTableQuery
+    from procurepilot_api import db
+    from procurepilot_api.errors import ServiceUnavailableError
+    from procurepilot_api.modules.catalogue import service as catalogue_module
+
+    # PostgREST commits the product independently of the decision transaction. A second,
+    # autocommit connection preserves precisely that boundary, including on the failed call.
+    case.conn.commit()
+    key = uuid4()
+    name = f"Correction retry flour {key}"
+    changes = {
+        "outcome": "no_match_new_product",
+        "selected_match_candidate_id": None,
+        "learn_alias": False,
+        "new_product": {
+            "tenant_name": name,
+            "base_unit": "kilogram",
+            "pack": {"pack_count": 1, "unit_size": "10"},
+        },
+    }
+    sql_execute = psycopg.Cursor.execute
+    rest_execute = PsycopgTableQuery.execute
+    failures = 0
+    try:
+        with db.connect(TEST_DATABASE_URL or "", autocommit=True) as catalogue_conn:
+            catalogue_client = PsycopgSupabaseClient(catalogue_conn, claims=case.ws.claims())
+            monkeypatch.setattr(
+                catalogue_module, "authenticated_client", lambda *_: catalogue_client
+            )
+            monkeypatch.setattr(
+                catalogue_module,
+                "create_client",
+                lambda *_: PsycopgSupabaseClient(catalogue_conn, service_role=True),
+            )
+            monkeypatch.setattr(catalogue_module, "get_audit_writer", lambda: Mock())
+            monkeypatch.setattr(
+                catalogue_module.BillingService,
+                "ensure_can_add_active_product",
+                lambda *_, **__: None,
+            )
+
+            def rest_with_api_errors(query: PsycopgTableQuery) -> object:
+                try:
+                    return rest_execute(query)
+                except psycopg.Error as exc:
+                    if query._conn is not catalogue_conn:
+                        raise
+                    raise APIError(
+                        {"code": exc.sqlstate, "message": str(exc), "details": None, "hint": None}
+                    ) from exc
+
+            def fail_decision_once(
+                cur: psycopg.Cursor, query: object, params: object = None, **kwargs: object
+            ) -> object:
+                nonlocal failures
+                if (
+                    cur.connection is case.conn
+                    and isinstance(query, str)
+                    and "insert into match_decision " in query.lower()
+                    and failures == 0
+                ):
+                    with catalogue_conn.cursor() as check:
+                        check.execute(
+                            "select count(*) from workspace_product where tenant_id=%s "
+                            "and tenant_name=%s",
+                            (case.ws.tenant_id, name),
+                        )
+                        assert check.fetchone()[0] == 1  # Product is already durable.
+                    failures += 1
+                    raise psycopg.OperationalError("temporary decision insert failure")
+                return sql_execute(cur, query, params, **kwargs)
+
+            monkeypatch.setattr(PsycopgTableQuery, "execute", rest_with_api_errors)
+            monkeypatch.setattr(psycopg.Cursor, "execute", fail_decision_once)
+            with pytest.raises(ServiceUnavailableError):
+                case.correct(key=key, **changes)
+            assert failures == 1
+            with case.conn.cursor() as cur:
+                act_as(cur, case.ws)
+                cur.execute(
+                    "select id from current_match_decision where quotation_line_id=%s",
+                    (case.line,),
+                )
+                assert cur.fetchone()[0] == case.head
+            result = case.correct(key=key, **changes)
+            assert result.decision.matched_product.tenant_name == name
+            assert result.decision.supersedes_decision_id == case.head
+            with catalogue_conn.cursor() as cur:
+                cur.execute(
+                    "select count(*) from workspace_product where tenant_id=%s and tenant_name=%s",
+                    (case.ws.tenant_id, name),
+                )
+                assert cur.fetchone()[0] == 1
+            assert case.correct(key=key, **changes).model_dump() == result.model_dump()
+    finally:
+        case.conn.rollback()
+        with case.conn.cursor() as cur:
+            cur.execute("reset role")
+            delete_tenant_scoped_rows(cur, case.ws.tenant_id)
+        case.conn.commit()

@@ -113,7 +113,7 @@ tasks are left open.
   - On fitting lines without a single fit: persist them as the top-ranked candidates, then the similarity candidates, and route to a task.
   - T012 green.
 - [x] T016 [US1] Make sure automatic RFQ decisions never learn an alias (FR-004). Assert this in `apps/api/tests/integration/test_rfq_aware_matching.py`, and guard any alias write on `reasons.rfq` in `apps/api/src/procurepilot_api/modules/matching/resolution_service.py`.
-- [x] T017 [US1] Implement correction in `apps/api/src/procurepilot_api/modules/matching/resolution_service.py`:
+- [x] T017 [US1] Implement correction in `apps/api/src/procurepilot_api/modules/matching/resolution_service.py`: — The lines_matched_through_old_wording list fills once US3 (T025) writes learned_from_decision_id.
   - add `MatchResolutionService.correct(line_id, payload, idempotency_key)`;
   - lock the line, compare `expected_current_decision_id` with the head, and check the purchase-request lock through `purchase_request_line.estimated_unit_price_source_landed_cost_id` (statuses not in withdrawn or rejected);
   - insert the superseding human decision, compute landed cost, enqueue the guardrail evaluation, write the audit, and optionally learn the alias;
