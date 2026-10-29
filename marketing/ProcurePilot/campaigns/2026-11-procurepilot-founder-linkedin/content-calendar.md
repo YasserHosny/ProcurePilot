@@ -1,4 +1,4 @@
-# Content calendar
+| scheduled (LinkedIn, 10:00 Cairo) |# Content calendar
 
 Status values: `planned` → `drafting` → `in-review` → `approved` → `scheduled` → `published` (only after G-publish).
 Review values: `not-reviewed` · `changes-requested` · `passed`.
@@ -8,7 +8,7 @@ Review values: `not-reviewed` · `changes-requested` · `passed`.
 | A-01 | 2026-11-03 (Tue) | LinkedIn (Iron Systems page) | problem-solution | The cheapest quote isn't always the cheapest order | 3 · compared fairly (+ headline 1) | EN · AR-EG · AR-SA | Yasser posts | scheduled (LinkedIn, 10:00 Cairo) | passed | `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/approved/A-01-cheapest-quote.md` | |
 | A-02 | 2026-11-08 (Sun) | LinkedIn (Iron Systems page) | thought leadership | Did you really save, or think you did? | 2 · verified savings (+ headline 2) | EN · AR-EG · AR-SA | Yasser posts | scheduled (LinkedIn, 10:00 Cairo) | passed | `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/approved/A-02-saved-or-think-you-saved.md` | |
 | A-03 | 2026-11-12 (Thu) | LinkedIn (Iron Systems page) | announcement | What ProcurePilot is | 1 · built in Arabic | EN · AR-EG · AR-SA | Yasser posts | scheduled (LinkedIn, 10:00 Cairo) | passed | `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/approved/A-03-what-procurepilot-is.md` | |
-| A-04 | 2026-11-22 (Sun) | LinkedIn (Iron Systems page) | product education (video) | ProcurePilot in two minutes | all | EN · AR-EG · AR-SA | Yasser posts | approved; video to attach by Yasser | passed | `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/approved/A-04-demo-video.md` | |
+| A-04 | 2026-11-22 (Sun) | LinkedIn (Iron Systems page) | product education (video) | ProcurePilot in two minutes | all | EN · AR-EG · AR-SA | Yasser posts | scheduled (LinkedIn, 10:00 Cairo) | passed | `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/approved/A-04-demo-video.md` | |
 | A-05 | 2026-11-17 (Tue) | LinkedIn (Iron Systems page) | objection | "Our suppliers only send quotes on WhatsApp." | 1 · built in Arabic / 3 | EN · AR-EG · AR-SA | Yasser posts | scheduled (LinkedIn, 10:00 Cairo) | passed | `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/approved/A-05-whatsapp-quotes.md` | |
 | A-06 | 2026-11-19 (Thu) | LinkedIn (Iron Systems page) | objection | Does the software buy by itself? | 2 · in control | EN · AR-EG · AR-SA | Yasser posts | scheduled (LinkedIn, 10:00 Cairo) | passed | `ProcurePilot/campaigns/2026-11-procurepilot-founder-linkedin/assets/approved/A-06-a-person-approves.md` | |
 

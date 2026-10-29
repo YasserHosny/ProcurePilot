@@ -8,7 +8,7 @@
 | Persona and stage | Owner, IT lead · solution-aware |
 | Proof ids | CO-08, CO-09, CO-10 · ProcurePilot C-01, C-02, C-05, C-07, C-14, C-16 |
 | Link | `www.iron-sys.com` at the end of the post (owner, 2026-10-29) |
-| Status | approved 2026-10-29 by Yasser (G-asset); not scheduled: the video (19 to 29 MB) is over the 10 MB upload limit of the scheduling tool, so Yasser attaches it on LinkedIn |
+| Status | approved 2026-10-29 by Yasser (G-asset); **scheduled** on the Iron Systems LinkedIn page for 2026-11-15 10:00 Cairo (owner's instruction, 2026-10-29) with the light Arabic 9:16 cut (1:14, 4.9 MB, made by Yasser from v2.5) and LinkedIn's own frame as thumbnail (the landscape thumbnail does not fit a vertical video); not yet live |
 
 This is the company angle on ProcurePilot: what it shows about how Iron Systems builds. The product's own posts
 (founder voice) stay in `ProcurePilot/campaigns/`.

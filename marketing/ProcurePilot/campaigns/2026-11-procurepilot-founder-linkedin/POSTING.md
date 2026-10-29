@@ -1,6 +1,6 @@
 # Posting guide: ProcurePilot posts on the Iron Systems LinkedIn page (changed from Yasser's profile, MD-16)
 
-Approved by Yasser on 2026-10-29 (G-asset). **Scheduling (2026-10-29):** at Yasser's instruction ("Schedule all 10 on the agreed dates"), Claude scheduled the image and document posts on the Iron Systems LinkedIn page for 10:00 Cairo time; nothing was published directly. The two video posts (CP-03, A-04) are not scheduled: the videos are over the 10 MB upload limit, so Yasser attaches them on LinkedIn. Every post ends with its link (company: `www.iron-sys.com`, ProcurePilot: `procurepilot.iron-sys.com`). Pin CP-01 after it goes live. Each post: one
+Approved by Yasser on 2026-10-29 (G-asset). **Scheduling (2026-10-29):** at Yasser's instruction ("Schedule all 10 on the agreed dates"), Claude scheduled the image and document posts on the Iron Systems LinkedIn page for 10:00 Cairo time; nothing was published directly. The two video posts were scheduled the same evening with light versions Yasser made of the v2.5 Arabic cuts (CP-03: 9:16, 1:14; A-04: 16:9, 2:09), so all 10 are scheduled. The light files are not in the repo (kept outside git). Every post ends with its link (company: `www.iron-sys.com`, ProcurePilot: `procurepilot.iron-sys.com`). Pin CP-01 after it goes live. Each post: one
 bilingual LinkedIn post (Arabic first, then English), the block under "LinkedIn (bilingual, final)" in its file.
 
 | Date | Where | Post | Text (copy the bilingual block) | Image / video | Note |
