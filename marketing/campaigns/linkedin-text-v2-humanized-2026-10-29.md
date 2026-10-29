@@ -96,16 +96,12 @@ www.iron-sys.com
 ProcurePilot ده منتجنا للمشتريات. بيقرا عروض أسعار الموردين، PDF أو صورة، عربي أو إنجليزي.
 كل سطر بيفضل مربوط بمكانه في العرض الأصلي، وأي حاجة مش واضحة بتروح لحد يراجعها.
 بيقارن العروض، ويجهّز الطلب، وفي الآخر حد من الفريق هو اللي بيعتمد.
-
-دقيقتين من المنتج الحقيقي (ببيانات تجريبية) في الفيديو.
 ```
 
 ```
 Best way to show how we build? Show you something we built.
 
 ProcurePilot is our purchasing product. It reads supplier quotes, PDFs or photos, in Arabic or English, keeps every line linked to its source, and sends anything unclear to a person. It compares the offers, prepares the request, and someone on the team approves it.
-
-Two minutes of the real product below (demo data).
 
 www.iron-sys.com
 ```

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Channel | LinkedIn page · X · Facebook · Instagram (reel) |
-| Format | video (ProcurePilot v2.5 cut) + text |
+| Format | video (ProcurePilot v2.5 Arabic 9:16 cut, 1:14; light version under 10 MB) + text |
 | Content type | proof / product education |
 | Persona and stage | Owner, IT lead · solution-aware |
 | Proof ids | CO-08, CO-09, CO-10 · ProcurePilot C-01, C-02, C-05, C-07, C-14, C-16 |
@@ -15,7 +15,7 @@ This is the company angle on ProcurePilot: what it shows about how Iron Systems 
 
 ## LinkedIn (bilingual, final)
 
-v2, humanized everyday language, approved by Yasser on 2026-10-29 (MD-15). Post this block as one LinkedIn post. 733 characters.
+v2, humanized everyday language, approved by Yasser on 2026-10-29 (MD-15). Post this block as one LinkedIn post. 624 characters. The "two minutes" line was removed by Yasser on 2026-10-29 (the post now carries the 1:14 vertical cut).
 
 ```
 أحسن طريقة نوريكم بنشتغل إزاي؟ نوريكم حاجة عملناها.
@@ -24,15 +24,11 @@ ProcurePilot ده منتجنا للمشتريات. بيقرا عروض أسعا�
 كل سطر بيفضل مربوط بمكانه في العرض الأصلي، وأي حاجة مش واضحة بتروح لحد يراجعها.
 بيقارن العروض، ويجهّز الطلب، وفي الآخر حد من الفريق هو اللي بيعتمد.
 
-دقيقتين من المنتج الحقيقي (ببيانات تجريبية) في الفيديو.
-
 ———
 
 Best way to show how we build? Show you something we built.
 
 ProcurePilot is our purchasing product. It reads supplier quotes, PDFs or photos, in Arabic or English, keeps every line linked to its source, and sends anything unclear to a person. It compares the offers, prepares the request, and someone on the team approves it.
-
-Two minutes of the real product below (demo data).
 
 www.iron-sys.com
 ```
