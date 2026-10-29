@@ -6,6 +6,7 @@ import {
   type CreatedMember,
 } from './support/api';
 import {
+  confirmMatchAndReturnToQueue,
   reconcileAndConfirmQuotation,
 } from './support/canonical-flow';
 
@@ -101,8 +102,12 @@ test.describe('Match Resolution & Keyboard-Only Navigation (T032, US2)', () => {
       page.locator('mat-radio-button', { hasText: 'Different Pack Size' }),
     ).toHaveClass(/mat-mdc-radio-checked/);
 
-    // Confirm the resolution via Enter alone and assert the decision was recorded.
-    await page.keyboard.press('Enter');
+    // Confirm the resolution via Enter alone. The confirm now routes back to the queue, so
+    // reopen the resolved line (the queue's .action-btn route) to assert the recorded decision.
+    const lineId = await confirmMatchAndReturnToQueue(page, quotationId, () =>
+      page.keyboard.press('Enter'),
+    );
+    await page.goto(`/matching/${lineId}`);
     await expect(page.locator('.decision-banner')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.landed-cost-card')).toBeVisible();
   });

@@ -279,12 +279,50 @@ export async function resolveLineAsNewProduct(
   await page.locator('mat-option', { hasText: '(kilogram)' }).click();
 
   // Two buttons share .confirm-resolution-btn (Confirm Match Decision / Resolve and Next);
-  // target the primary flat one — class-based, so it works regardless of the active locale.
-  await page.locator('.confirm-resolution-btn.mat-mdc-unelevated-button').click();
-  await expect(page.locator('.decision-banner')).toBeVisible({ timeout: 15000 });
+  // confirmMatchAndReturnToQueue targets the primary flat one and waits for the return to queue.
+  await confirmMatchAndReturnToQueue(page, quotationId);
 
   const ownerToken = await signInOwner();
   return { productId: (await findProductByName(ownerToken, productName)).id, via: 'ui_resolution' };
+}
+
+/**
+ * Confirms a match decision via the primary "Confirm Match Decision" action and waits for the
+ * page to navigate back to the quotation's queue.
+ *
+ * On success the confirm POSTs to /api/v1/quotation-lines/<lineId>/match and the component now
+ * routes back to /matching?quotation_id=<id> instead of staying on the line, so the line's
+ * .decision-banner is no longer on screen after a confirm. Callers that still need to assert on
+ * the line reopen it via /matching/<lineId> — the same route the queue's .action-btn uses.
+ *
+ * `trigger` defaults to clicking the primary flat confirm button (class-based, so it works
+ * regardless of the active locale); pass a callback to drive the confirm another way, e.g. press
+ * Enter in the keyboard-only spec. Returns the resolved line's id, parsed from the POST URL.
+ */
+export async function confirmMatchAndReturnToQueue(
+  page: Page,
+  quotationId?: string,
+  trigger: () => Promise<void> = () =>
+    page.locator('.confirm-resolution-btn.mat-mdc-unelevated-button').click(),
+): Promise<string> {
+  const matchResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      /\/api\/v1\/quotation-lines\/[^/]+\/match$/.test(new URL(response.url()).pathname),
+  );
+  await trigger();
+  const response = await matchResponse;
+  const body = await response.text();
+  expect(response.ok(), `match confirm returned ${response.status()}: ${body.slice(0, 500)}`).toBe(true);
+
+  const lineId = new URL(response.url()).pathname.split('/').filter(Boolean).at(-2)!;
+  await page.waitForURL((url) => {
+    if (url.pathname !== '/matching') return false;
+    const qid = url.searchParams.get('quotation_id');
+    if (!qid) return false;
+    return quotationId ? qid === quotationId : true;
+  });
+  return lineId;
 }
 
 /** Polls the matches endpoint until the pipeline has auto-decided the line, then returns its product. */

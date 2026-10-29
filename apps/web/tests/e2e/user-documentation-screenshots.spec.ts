@@ -18,6 +18,7 @@ import {
   type Credentials,
 } from './support/api';
 import {
+  confirmMatchAndReturnToQueue,
   confirmQuotation,
   resolveIssueDateFlag,
   correctStatedTotal,
@@ -731,8 +732,7 @@ async function captureAndResolveMatchScreenshots(
   await page.fill('input[formControlName="tenant_name"]', productName);
   await openAsyncSelect(page, page.locator('mat-select[formControlName="base_unit"]'));
   await page.locator('mat-option', { hasText: '(kilogram)' }).click();
-  await page.locator('.confirm-resolution-btn.mat-mdc-unelevated-button').click();
-  await expect(page.locator('.decision-banner')).toBeVisible({ timeout: 15_000 });
+  await confirmMatchAndReturnToQueue(page, quotationId);
   return findProductByName(await signInOwner(), productName);
 }
 
