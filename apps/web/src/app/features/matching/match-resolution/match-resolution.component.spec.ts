@@ -462,4 +462,47 @@ describe('MatchResolutionComponent (T039)', () => {
     expect(banner).toBeTruthy();
     expect(banner?.textContent).toContain('Canonical Whole Milk 2L');
   });
+
+  it('returns to the queue for the same quotation after Confirm Match Decision', () => {
+    const router = (component as unknown as { router: { navigate: (...args: unknown[]) => Promise<boolean> } }).router;
+    const navSpy = spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+    component.quotationId.set('q-99');
+
+    component.confirmResolution(false);
+
+    expect(apiService.resolveMatch).toHaveBeenCalled();
+    expect(navSpy).toHaveBeenCalledWith(['/matching'], {
+      queryParams: jasmine.objectContaining({ quotation_id: 'q-99' }),
+    });
+  });
+
+  it('places the rule version chip and pinned to rule version notice inside a collapsed details disclosure', () => {
+    component.landedCost.set(mockLandedCost);
+    fixture.detectChanges();
+
+    const details = fixture.nativeElement.querySelector('details.landed-cost-details') as HTMLDetailsElement | null;
+    expect(details).toBeTruthy();
+    expect(details?.open).toBeFalse();
+
+    const summary = details?.querySelector('summary');
+    expect(summary?.textContent?.trim()).toBe(enCatalog.matching.resolution.landedCost.details);
+
+    const badge = details?.querySelector('.rule-version-badge');
+    expect(badge?.textContent?.trim()).toBe(mockLandedCost.rule_version);
+
+    const replayNotice = details?.querySelector('.replay-notice');
+    expect(replayNotice).toBeTruthy();
+  });
+
+  it('formats line quantity using shared quantity formatter (e.g. 8.0 -> 8)', () => {
+    component.line.set({
+      ...mockTask.quotation_line,
+      quantity: '8.0',
+    });
+    fixture.detectChanges();
+
+    const metricValues = fixture.nativeElement.querySelectorAll('.metric-item .metric-value');
+    const quantityText = metricValues[0]?.textContent?.trim();
+    expect(quantityText).toBe('8');
+  });
 });

@@ -460,6 +460,27 @@ describe('ResolutionQueueComponent', () => {
     expect(compiled.querySelector('.clear-filters-btn')).toBeTruthy();
   });
 
+  it('shows "All lines of this quote are matched" empty state with compare responses button and clear filters link when filtered by quotation_id', () => {
+    component.tasks.set([]);
+    component.quotationId.set('q-101');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const emptyTitle = compiled.querySelector('.empty-title')?.textContent?.trim();
+    expect(emptyTitle).toBe(enCatalog.matching.queue.allLinesMatchedTitle);
+
+    const compareBtn = compiled.querySelector('a.compare-responses-btn') as HTMLAnchorElement | null;
+    expect(compareBtn).toBeTruthy();
+    expect(compareBtn?.textContent?.trim()).toContain(enCatalog.matching.queue.compareResponses);
+    expect(compareBtn?.getAttribute('href')).toBe('/rfq/history');
+
+    const clearBtn = compiled.querySelector('.clear-filters-btn') as HTMLButtonElement | null;
+    expect(clearBtn).toBeTruthy();
+
+    clearBtn?.click();
+    expect(component.quotationId()).toBeNull();
+  });
+
   it('should handle error when loading tasks fails', () => {
     const errorResponse = new HttpErrorResponse({
       status: 500,

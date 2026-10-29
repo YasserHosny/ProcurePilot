@@ -134,6 +134,23 @@ export class DetailComponent implements OnInit {
     });
   }
 
+  responsesReceivedTitle(): string {
+    const count = this.responseCount();
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    const key = `rfq.detail.responsesReceived.${category}`;
+    const formatted = this.formatService.formatNumber(count);
+    const translated = this.translate.instant(key, { count: formatted });
+    if (translated && translated !== key) {
+      return translated;
+    }
+    return this.translate.instant('rfq.detail.responsesReceivedTitle', { count: formatted });
+  }
+
+  onCompareResponses(): void {
+    this.onTabChange(TAB_MAP['responses']);
+  }
+
   latestSentAt(): string | null {
     const detail = this.rfqDetail();
     if (!detail || !detail.recipients?.length) return null;

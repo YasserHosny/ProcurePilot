@@ -66,6 +66,29 @@ def _authenticated_db(settings: Settings, member: CurrentMember) -> Iterator[psy
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
 
+def _validate_needed_by(needed_by_date: date) -> None:
+    """A supplier email must never ask for a date that has passed. Callers run this after their
+    idempotent replay lookup: a retry of a save that committed yesterday must get its RFQ back."""
+    if needed_by_date < date.today():
+        raise UnprocessableEntityError(
+            details={"reason": "needed_by_in_past", "field": "needed_by_date"}
+        )
+
+
+def _validate_rfq_lines(lines_data: list) -> None:
+    """A supplier email must never ask for one product twice."""
+    seen: set[uuid.UUID] = set()
+    for line in lines_data:
+        if line.workspace_product_id in seen:
+            raise UnprocessableEntityError(
+                details={
+                    "reason": "duplicate_product",
+                    "workspace_product_id": str(line.workspace_product_id),
+                }
+            )
+        seen.add(line.workspace_product_id)
+
+
 class RfqService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -100,6 +123,7 @@ class RfqService:
         idempotency_key: uuid.UUID,
         tenant_terms: str | None = None,
     ) -> tuple[Rfq, list[RfqLine], list[RfqRecipient], list[dict]]:
+        _validate_rfq_lines(lines_data)
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 # True idempotent replay: a retry with the same key after the original
@@ -115,6 +139,7 @@ class RfqService:
                 existing = cur.fetchone()
                 if existing is not None:
                     return self._fetch_created(cur, existing["id"])
+                _validate_needed_by(needed_by_date)
 
                 cur.execute(
                     "select pg_try_advisory_xact_lock(%s)",
@@ -233,6 +258,7 @@ class RfqService:
         tenant_terms: str | None,
         idempotency_key: uuid.UUID,
     ) -> tuple[Rfq, list[RfqLine], list[RfqRecipient], list[dict]]:
+        _validate_rfq_lines(lines_data)
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 row = _lock_rfq_for_creator(cur, member, rfq_id)
@@ -241,6 +267,7 @@ class RfqService:
                     # result without re-creating lines/recipients or auditing again.
                     rfq, lines, recipients, _ = self._fetch_created(cur, rfq_id)
                     return rfq, lines, recipients, []
+                _validate_needed_by(needed_by_date)
                 if row["status"] != "draft":
                     from procurepilot_api.errors import ConflictError
 
@@ -320,6 +347,10 @@ class RfqService:
 
                 rfq_row = _lock_rfq_for_creator(cur, member, rfq_id)
                 rfq = Rfq(**rfq_row)
+                if rfq.status == "draft" and rfq.needed_by_date < date.today():
+                    raise UnprocessableEntityError(
+                        details={"reason": "needed_by_in_past", "field": "needed_by_date"}
+                    )
 
                 cur.execute(
                     "select * from rfq_line where rfq_id = %s order by position, created_at, id",
@@ -490,8 +521,10 @@ class RfqService:
                         r.id as response_id,
                         rec.supplier_id,
                         r.created_at as submitted_at,
+                        q.id as quotation_id,
                         q.status as quotation_status,
                         ql.id as ql_id,
+                        ql.original_text,
                         ql.quantity,
                         ql.unit_price_amount,
                         ql.unit_price_currency,
@@ -501,8 +534,17 @@ class RfqService:
                     join quotation q on r.quotation_id = q.id
                     left join quotation_line ql on r.quotation_id = ql.quotation_id
                     left join current_match_decision md on ql.id = md.quotation_line_id
+                    -- Lines follow the RFQ's own line order (the product each line matched);
+                    -- unmatched lines come last, in the supplier's document order.
+                    left join lateral (
+                        select min(rl.position) as position
+                        from rfq_line rl
+                        where rl.rfq_id = rec.rfq_id
+                          and rl.workspace_product_id = md.matched_workspace_product_id
+                    ) rfq_order on true
                     where r.tenant_id = %s and rec.rfq_id = %s
-                    order by r.created_at, ql.created_at
+                    order by r.created_at, r.id, rfq_order.position nulls last,
+                             ql.line_number, ql.id
                     """,
                     (member.tenant_id, rfq_id),
                 )
@@ -553,6 +595,7 @@ class RfqService:
                             "id": resp_id,
                             "rfq_id": rfq_id,
                             "supplier_id": row["supplier_id"],
+                            "quotation_id": row["quotation_id"],
                             "submitted_at": row["submitted_at"],
                             "quotation_status": row["quotation_status"],
                             "lines": [],
@@ -564,6 +607,7 @@ class RfqService:
                         responses_by_id[resp_id]["lines"].append(
                             {
                                 "workspace_product_id": row["matched_workspace_product_id"],
+                                "original_text": row["original_text"],
                                 "quoted_quantity": row["quantity"],
                                 "quoted_unit_price_amount": row["unit_price_amount"],
                                 "quoted_unit_price_currency": row["unit_price_currency"],

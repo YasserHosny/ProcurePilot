@@ -88,6 +88,7 @@ class PurchaseOrder(StrictModel):
     tenant_id: UUID
     order_number: str = Field(min_length=1, max_length=100)
     supplier_id: UUID
+    supplier_name: str | None = None
     status: OrderStatus
     order_date: date
     expected_delivery_date: date | None = None

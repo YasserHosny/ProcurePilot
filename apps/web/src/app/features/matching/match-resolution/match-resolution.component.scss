@@ -128,6 +128,26 @@ kbd {
 }
 
 .cost-title { font-size: 1.1rem; font-weight: 700; }
+.landed-cost-details {
+  font-size: 0.8rem;
+  color: var(--pp-text-muted);
+
+  summary {
+    cursor: pointer;
+    user-select: none;
+    font-weight: 500;
+    color: var(--pp-primary);
+    text-align: end;
+  }
+
+  .landed-cost-details-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-block-start: 0.5rem;
+    flex-wrap: wrap;
+  }
+}
 .rule-version-badge {
   font-family: monospace;
   font-size: 0.75rem;

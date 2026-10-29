@@ -110,7 +110,10 @@ export class MatchResolutionComponent implements OnInit {
       if (v) out[k] = v;
     }
     // Ensure quotation_id falls back to loaded task's quotation id
-    if (!out['quotation_id'] && this.quotationId()) out['quotation_id'] = this.quotationId()!;
+    if (!out['quotation_id']) {
+      const qid = this.quotationId() || this.task()?.quotation_id;
+      if (qid) out['quotation_id'] = qid;
+    }
     return out;
   });
 
@@ -487,8 +490,8 @@ export class MatchResolutionComponent implements OnInit {
           undefined,
           { duration: 3500 },
         );
-        // Refresh landed cost for the resolved line
         this.loadLandedCost(l.id);
+        void this.router.navigate(['/matching'], { queryParams: this.backQueryParams() });
       },
       error: (err: unknown) => {
         this.isSubmitting.set(false);

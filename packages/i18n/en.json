@@ -899,6 +899,12 @@
       "clearFilters": "Clear filters"
     },
     "review": {
+      "nextStep": {
+        "title": "Next step",
+        "description": "This quotation is confirmed. Match the extracted lines to your catalogue products to compare prices.",
+        "matchLines": "Match lines",
+        "backToInbox": "Back to the inbox"
+      },
       "title": "Quotation Review & Authorization",
       "currencyFallbackReview": "Currency defaulted from home currency. Please confirm or correct it.",
       "subtitle": "Inspect extracted fields side by side with the source document. Verify supplier and resolve any discrepancies.",
@@ -1019,6 +1025,7 @@
         "cancelCorrection": "Cancel",
         "editTooltip": "Correct this field value",
         "correctedBadge": "Corrected by Human",
+        "confirmedBadge": "Confirmed",
         "confirmAsIsTooltip": "Confirm this value is correct as extracted"
       },
       "arithmetic": {
@@ -1261,6 +1268,8 @@
       "loadMore": "Load More",
       "emptyTitle": "No match tasks found",
       "emptyMessage": "There are no quotation lines currently awaiting match resolution.",
+      "allLinesMatchedTitle": "All lines of this quote are matched",
+      "compareResponses": "Compare responses",
       "badgeAutoAccepted": "Auto-matched",
       "badgeResolved": "Resolved",
       "autoAcceptedBanner": "Auto-matched above threshold without human review. View details only.",
@@ -1313,7 +1322,7 @@
       },
       "candidates": {
         "title": "Ranked Product Candidates",
-        "subtitle": "Evaluated through deterministic keys, lexical (pg_trgm), semantic (pgvector), and feature plausibility scoring.",
+        "subtitle": "Ranked by how closely each catalogue product matches the supplier's line.",
         "rank": "Rank #{{rank}}",
         "confidence": "Match Score",
         "scoreExplainer": "This score ranks candidates; it is not yet a calibrated probability.",
@@ -1412,7 +1421,8 @@
         "noPreferredSupplier": "None (No preferred supplier)"
       },
       "landedCost": {
-        "title": "Deterministic Landed Cost (US3)",
+        "title": "Landed cost",
+        "details": "Details",
         "subtitle": "Replayable landed cost normalised to the catalogue base unit.",
         "unitPrice": "Unit Price",
         "vatAmount": "Derived VAT",
@@ -1442,7 +1452,7 @@
         "confirm": "Confirm Match Decision",
         "confirmAndNext": "Resolve and Next",
         "confirming": "Confirming...",
-        "saveSuccess": "Match decision confirmed and alias saved successfully.",
+        "saveSuccess": "Match saved. Next time this wording matches automatically.",
         "queueCleared": "All match tasks resolved — queue cleared.",
         "candidateRequired": "Please select a candidate before confirming.",
         "formInvalid": "Please correct the product creation errors before confirming."
@@ -2106,11 +2116,17 @@
     },
     "columns": {
       "branch": "Branch",
+      "supplier": "Supplier",
       "costCentre": "Cost Centre",
       "requiredByDate": "Required By",
       "status": "Status",
       "estimatedTotal": "Estimated Total",
       "actions": "Actions"
+    },
+    "source": {
+      "from": "From",
+      "rfq": "RFQ",
+      "quote": "quote"
     },
     "actions": {
       "view": "View request",
@@ -2230,10 +2246,14 @@
     },
     "actions": {
       "approve": "Approve",
-      "reject": "Reject"
+      "reject": "Reject",
+      "createOrder": "Create purchase order"
     },
+    "createOrderAction": "Create purchase order",
     "decisionDialog": {
-      "approveTitle": "Approve Purchase Request",
+      "approveTitle": "Approve {{amount}} for {{branchName}}?",
+      "approveTitleBranchOnly": "Approve the request for {{branchName}}?",
+      "approveTitleDefault": "Approve Purchase Request",
       "rejectTitle": "Reject Purchase Request",
       "commentLabel": "Comment (optional)",
       "commentPlaceholder": "Add a comment for the requester...",
@@ -3394,6 +3414,7 @@
     "backToOrders": "Back to orders",
     "open": "Open order",
     "orderDate": "Ordered {{date}}",
+    "createdDate": "Created {{date}}",
     "lineCount": "{{count}} line(s)",
     "notProvided": "Not provided",
     "createButton": "Create Order",
@@ -3402,6 +3423,8 @@
     "create": {
       "title": "Create Purchase Order",
       "subtitle": "Manually record an internal purchase order.",
+      "fromRequestSubtitle": "Check the order, then create it.",
+      "fromApprovedRequestBanner": "From an approved request — {{supplier}}, {{branch}}",
       "orderNumber": "Order Number",
       "orderNumberPlaceholder": "e.g. PO-2026-001",
       "supplier": "Supplier",
@@ -3442,7 +3465,7 @@
       "quotedCurrencyMismatch": "The order currency ({{order}}) differs from the supplier's quoted currency ({{quoted}}). Use {{quoted}} or edit the prices.",
       "packUnit": "pack of {{size}} {{unit}}",
       "baseUnitPrice": "per {{unit}}",
-      "remainingQuantity": "Remaining Allocatable"
+      "remainingQuantity": "Still to order"
     },
     "status": {
       "draft": "Draft",
@@ -3465,6 +3488,7 @@
     "detail": {
       "eyebrow": "Purchase order",
       "createdAt": "Created {{date}}",
+      "fromRequest": "From request",
       "orderDate": "Order date",
       "expectedDelivery": "Expected delivery",
       "total": "Order total",
@@ -3855,8 +3879,14 @@
       "quantity": "Quantity",
       "unitPrice": "Unit Price",
       "totalValue": "Total Value",
+      "total": "Total",
+      "lowestTotal": "Lowest total",
       "pendingMatch": "Pending Match",
       "pendingMatchExplanation": "Not yet linked to a catalogue product.",
+      "matchLine": "Match 1 line",
+      "matchLines": "Match {{count}} lines",
+      "matchLinesTwo": "Match 2 lines",
+      "chooseBranchFirst": "Choose a delivery branch first",
       "prepareRequest": "Prepare Request",
       "cannotPreparePending": "Cannot prepare request while lines are unmatched",
       "prepareSuccess": "Draft purchase request prepared successfully.",
@@ -3930,6 +3960,17 @@
     "detail": {
       "title": "RFQ Details",
       "subtitle": "What was asked, who it went to and what came back.",
+      "responsesReceivedTitle": "{{count}} responses received",
+      "responsesReceived": {
+        "zero": "0 responses received",
+        "one": "1 response received",
+        "two": "2 responses received",
+        "few": "{{count}} responses received",
+        "many": "{{count}} responses received",
+        "other": "{{count}} responses received"
+      },
+      "responsesReceivedDescription": "Supplier responses are ready for comparison. Review lines, compare totals, and prepare a purchase request.",
+      "compareResponses": "Compare responses",
       "breadcrumbRfqSent": "RFQ · Sent {{date}} · {{time}}",
       "breadcrumbRfqDraft": "RFQ · Draft",
       "tabDetails": "Details",

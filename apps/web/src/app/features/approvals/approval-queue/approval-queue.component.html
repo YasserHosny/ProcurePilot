@@ -73,6 +73,9 @@
               {{ 'approvals.columns.estimatedTotal' | translate }}
             </th>
             <td mat-cell *matCellDef="let req" class="pp-figures total-cell">
+              @if (req.source?.supplier_name; as supplier) {
+                <div class="supplier-name" dir="auto" data-testid="approval-supplier">{{ supplier }}</div>
+              }
               <span class="total-amount">{{ formatMoney(req) }}</span>
               @if (req.has_incomplete_estimate) {
                 <span class="incomplete-badge">
@@ -149,17 +152,14 @@
               {{ 'approvals.columns.lines' | translate }}
             </th>
             <td mat-cell *matCellDef="let req" class="lines-cell">
-              <span class="lines-count">{{ lineCountLabel(req.lines.length) }}</span>
               <button
-                mat-icon-button
                 type="button"
-                class="expand-lines-btn"
+                class="lines-toggle-btn expand-lines-btn"
                 (click)="toggleExpand(req.id)"
                 [attr.aria-expanded]="isExpanded(req.id)"
-                [attr.aria-label]="(isExpanded(req.id) ? 'approvals.hideLines' : 'approvals.viewLines') | translate"
-                [matTooltip]="(isExpanded(req.id) ? 'approvals.hideLines' : 'approvals.viewLines') | translate"
               >
-                <mat-icon aria-hidden="true">{{ isExpanded(req.id) ? 'expand_less' : 'expand_more' }}</mat-icon>
+                <span class="lines-count">{{ lineCountLabel(req.lines.length) }}</span>
+                <mat-icon class="toggle-icon" aria-hidden="true">{{ isExpanded(req.id) ? 'expand_less' : 'expand_more' }}</mat-icon>
               </button>
             </td>
           </ng-container>
@@ -222,7 +222,7 @@
                               <td class="pp-figures quantity-col">{{ line.quantity | formatQuantity }}</td>
                               <td class="pp-figures price-col">{{ formatLinePrice(line) }}</td>
                               <td class="note-col">
-                                {{ line.note || ('approvals.notAvailable' | translate) }}
+                                {{ line.note || '—' }}
                               </td>
                             </tr>
                           }

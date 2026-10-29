@@ -1012,7 +1012,10 @@ class OrdersService:
             "where purchase_order_id = %s order by line_number",
             (order_id,),
         )
-        return _order_model(row, cur.fetchall())
+        lines = cur.fetchall()
+        cur.execute("select name from supplier where id = %s", (row["supplier_id"],))
+        supplier = cur.fetchone()
+        return _order_model(row, lines, supplier["name"] if supplier else None)
 
     @staticmethod
     def _load_confirmation_cursor(cur: psycopg.Cursor, identifier: UUID) -> SupplierConfirmation:
@@ -1059,7 +1062,10 @@ class OrdersService:
             .execute()
             .data
         )
-        return _order_model(row, lines)
+        suppliers = _rows(
+            client.table("supplier").select("name").eq("id", str(row["supplier_id"])).execute().data
+        )
+        return _order_model(row, lines, str(suppliers[0]["name"]) if suppliers else None)
 
     def _load_confirmations(self, client: Client, order_id: UUID) -> list[SupplierConfirmation]:
         rows = _rows(
@@ -1191,7 +1197,9 @@ def _assert_same_order(row: dict[str, object], order_id: UUID) -> None:
 
 
 def _order_model(
-    row: dict[str, object], lines: list[dict[str, object]] | tuple[dict[str, object], ...]
+    row: dict[str, object],
+    lines: list[dict[str, object]] | tuple[dict[str, object], ...],
+    supplier_name: str | None = None,
 ) -> PurchaseOrder:
     return _model(
         PurchaseOrder,
@@ -1200,6 +1208,7 @@ def _order_model(
             "tenant_id": row["tenant_id"],
             "order_number": row["order_number"],
             "supplier_id": row["supplier_id"],
+            "supplier_name": supplier_name,
             "status": row["status"],
             "order_date": row["order_date"],
             "expected_delivery_date": row["expected_delivery_date"],

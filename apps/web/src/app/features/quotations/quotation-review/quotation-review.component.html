@@ -13,6 +13,38 @@
         <span class="breadcrumb-current">{{ truncateId(q.id) }}</span>
       </nav>
 
+      @if (showNextStep() || q.status === 'reviewed') {
+        <mat-card class="next-step-card" data-testid="next-step-card">
+          <div class="next-step-body">
+            <div class="next-step-info">
+              <mat-icon class="next-step-icon" aria-hidden="true">task_alt</mat-icon>
+              <div>
+                <h2 class="next-step-title">{{ 'quotations.review.nextStep.title' | translate }}</h2>
+                <p class="next-step-description">{{ 'quotations.review.nextStep.description' | translate }}</p>
+              </div>
+            </div>
+            <div class="next-step-actions">
+              <a
+                mat-flat-button
+                color="primary"
+                [routerLink]="['/matching']"
+                [queryParams]="{ quotation_id: q.id }"
+                data-testid="next-step-match-lines"
+              >
+                {{ 'quotations.review.nextStep.matchLines' | translate }}
+              </a>
+              <a
+                mat-stroked-button
+                routerLink="/quotations"
+                data-testid="next-step-back-inbox"
+              >
+                {{ 'quotations.review.nextStep.backToInbox' | translate }}
+              </a>
+            </div>
+          </div>
+        </mat-card>
+      }
+
       <!-- Page Header -->
     <header class="page-header">
       <div class="header-titles">
@@ -299,8 +331,10 @@
                     }
                   </mat-select>
                 </mat-form-field>
-                @if (isFieldCorrected('quotation', q.id, 'currency')) {
+                @if (isFieldChanged('quotation', q.id, 'currency')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation', q.id, 'currency')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
                 }
                 @if (getFieldExtraction('quotation', q.id, 'currency'); as fe) {
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'currency') < 0.85">
@@ -357,8 +391,10 @@
                     (closed)="reviewFieldValue('quotation', q.id, 'issue_date', canonicalDateValue(q, 'issue_date'))"
                   ></mat-datepicker>
                 </mat-form-field>
-                @if (isFieldCorrected('quotation', q.id, 'issue_date')) {
+                @if (isFieldChanged('quotation', q.id, 'issue_date')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation', q.id, 'issue_date')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
                 }
                 @if (getFieldExtraction('quotation', q.id, 'issue_date'); as fe) {
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'issue_date') < 0.85">
@@ -420,8 +456,10 @@
                     {{ badge.labelKey | translate:{ count: badge.count } }}
                   </span>
                 }
-                @if (isFieldCorrected('quotation', q.id, 'expiry_date')) {
+                @if (isFieldChanged('quotation', q.id, 'expiry_date')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation', q.id, 'expiry_date')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
                 }
                 @if (getFieldExtraction('quotation', q.id, 'expiry_date'); as fe) {
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'expiry_date') < 0.85">
@@ -466,8 +504,10 @@
                   />
                   <span matTextSuffix class="currency-suffix">{{ (q.stated_total?.currency || effectiveQuotationCurrency()) | currencySymbol }}</span>
                 </mat-form-field>
-                @if (isFieldCorrected('quotation', q.id, 'stated_total')) {
+                @if (isFieldChanged('quotation', q.id, 'stated_total')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation', q.id, 'stated_total')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
                 }
                 @if (getFieldExtraction('quotation', q.id, 'stated_total'); as fe) {
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'stated_total') < 0.85">

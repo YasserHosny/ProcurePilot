@@ -1417,6 +1417,14 @@ export interface ApprovalStep {
 }
 
 /** Set when an RFQ auto-preparation guardrail, not a person, drafted the request. */
+export interface RequestSource {
+  readonly rfq_id: string;
+  readonly rfq_response_id: string;
+  readonly quotation_id: string;
+  readonly supplier_id: string;
+  readonly supplier_name?: string | null;
+}
+
 export interface AutoPreparedProvenance {
   readonly guardrail_id: string;
   readonly rfq_id?: string | null;
@@ -1428,6 +1436,7 @@ export interface AutoPreparedProvenance {
 export interface PurchaseRequest {
   readonly id: string;
   readonly source_rfq_response_id?: string | null;
+  readonly source?: RequestSource | null;
   readonly auto_prepared?: AutoPreparedProvenance | null;
   readonly branch_id: string;
   readonly cost_centre_id?: string | null;

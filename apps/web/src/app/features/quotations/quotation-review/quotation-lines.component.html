@@ -135,8 +135,10 @@
                     [readonly]="!isWriter || quotation.status === 'reviewed'"
                   />
                 </mat-form-field>
-                @if (isFieldCorrected('quotation_line', line.id, 'quantity')) {
+                @if (isFieldChanged('quotation_line', line.id, 'quantity')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation_line', line.id, 'quantity')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
                 }
                 @if (getFieldConfidence('quotation_line', line.id, 'quantity') < 0.85 && !isFieldCorrected('quotation_line', line.id, 'quantity')) {
                   <button
@@ -173,15 +175,17 @@
                   <mat-label>{{ 'quotations.review.lines.colUnitPrice' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="line.unit_price?.amount || '0.00'"
+                    [value]="(!isWriter || quotation.status === 'reviewed') ? formatUnitPrice(getEffectiveUnitPriceAmount(line)) : getEffectiveUnitPriceAmount(line)"
                     (change)="getFieldExtraction('quotation_line', line.id, 'unit_price') && correctionUpdated.emit({ feId: getFieldExtraction('quotation_line', line.id, 'unit_price')!.id, newValue: { amount: $any($event.target).value, currency: line.unit_price?.currency || effectiveCurrency } })"
-                    (blur)="fieldReviewed.emit({ entityType: 'quotation_line', entityId: line.id, fieldName: 'unit_price', reviewedValue: { amount: $any($event.target).value, currency: line.unit_price?.currency || effectiveCurrency } })"
+                    (blur)="onUnitPriceBlur(line, $any($event.target).value)"
                     [readonly]="!isWriter || quotation.status === 'reviewed'"
                   />
                   <span matTextSuffix class="currency-suffix">{{ (line.unit_price?.currency || effectiveCurrency) | currencySymbol }}</span>
                 </mat-form-field>
-                @if (isFieldCorrected('quotation_line', line.id, 'unit_price')) {
+                @if (isFieldChanged('quotation_line', line.id, 'unit_price')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation_line', line.id, 'unit_price')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
                 }
                 @if (getFieldConfidence('quotation_line', line.id, 'unit_price') < 0.85 && !isFieldCorrected('quotation_line', line.id, 'unit_price')) {
                   <button

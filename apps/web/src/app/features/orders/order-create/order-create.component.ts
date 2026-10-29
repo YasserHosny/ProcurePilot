@@ -1,8 +1,8 @@
-import { toIsoDate } from '../../../core/format/iso-date';
+import { parseIsoDateLocal, toIsoDate } from '../../../core/format/iso-date';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -15,8 +15,9 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { RequestsApiService } from '../../requests/requests-api';
+import { OrganisationApiService } from '../../settings/organisation-api';
 import { SessionService } from '../../../core/auth/session.service';
-import type { PurchaseRequest } from '../../../core/api/models';
+import type { Branch, PurchaseRequest } from '../../../core/api/models';
 import type { RequestAllocation } from '../orders-api';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, forkJoin, of } from 'rxjs';
@@ -70,11 +71,34 @@ export class OrderCreateComponent implements OnInit {
   private readonly ordersApi = inject(OrdersApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly requestsApi = inject(RequestsApiService);
+  private readonly organisationApi = inject(OrganisationApiService);
   private readonly session = inject(SessionService);
   readonly homeCurrency = this.session.homeCurrency() ?? 'USD';
 
   readonly suppliers = signal<Supplier[]>([]);
   readonly products = signal<Product[]>([]);
+  readonly branches = signal<Branch[]>([]);
+
+  readonly branchNameById = computed<Map<string, string>>(() => {
+    const byId = new Map<string, string>();
+    for (const b of this.branches()) {
+      byId.set(b.id, b.name);
+    }
+    return byId;
+  });
+
+  sourceSupplierName(): string {
+    return (
+      this.sourceRequest()?.source?.supplier_name ||
+      this.suppliers().find(s => s.id === this.form.controls.supplier_id.value)?.name ||
+      ''
+    );
+  }
+
+  sourceBranchName(): string {
+    const branchId = this.sourceRequest()?.branch_id;
+    return branchId ? this.branchNameById().get(branchId) || branchId : '';
+  }
 
   readonly isSubmitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -154,6 +178,7 @@ export class OrderCreateComponent implements OnInit {
     forkJoin({
       suppliers: this.api.suppliers({ limit: 100 }).pipe(catchError(() => of({ items: [], next_cursor: null }))),
       products: this.api.products({ status: 'all', limit: 100 }).pipe(catchError(() => of({ items: [], next_cursor: null }))),
+      branches: this.organisationApi.listBranches({ limit: 100 }).pipe(catchError(() => of({ items: [], next_cursor: null }))),
       request: sourceRequestId ? this.requestsApi.getRequest(sourceRequestId).pipe(catchError(() => of(null))) : of(null),
       allocations: sourceRequestId ? this.ordersApi.getAllocations(sourceRequestId).pipe(catchError(() => of(null))) : of(null),
       prefill: !editId && sourceRequestId && this.ordersApi.getRequestPrefill
@@ -163,7 +188,8 @@ export class OrderCreateComponent implements OnInit {
         ? this.ordersApi.getNextOrderNumber().pipe(catchError(() => of(null)))
         : of(null),
       orderToEdit: editId ? this.ordersApi.getOrder(editId).pipe(catchError(() => of(null))) : of(null),
-    }).subscribe(({ suppliers, products, request, allocations, prefill, nextNumber, orderToEdit }) => {
+    }).subscribe(({ suppliers, products, branches, request, allocations, prefill, nextNumber, orderToEdit }) => {
+      this.branches.set([...branches.items]);
       const supplierItems = [...suppliers.items];
       if (!orderToEdit && prefill?.supplier) {
         const prefillSupplier = prefill.supplier;
@@ -243,6 +269,9 @@ export class OrderCreateComponent implements OnInit {
       } else if (request && allocations) {
         this.sourceRequest.set(request);
         this.requestAllocations.set(allocations);
+        if (request.required_by_date && !this.form.controls.expected_delivery_date.value) {
+          this.form.controls.expected_delivery_date.setValue(parseIsoDateLocal(request.required_by_date));
+        }
         this.lines.clear();
 
         // Pre-filled prices are in the quote's currency, so the order currency follows it. A

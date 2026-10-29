@@ -16,11 +16,13 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
+import { SessionService } from '../../../core/auth/session.service';
 import type {
   ApiError,
   ApprovalDecisionInput,
@@ -45,6 +47,8 @@ const I18N = 'approvals';
 export interface ApprovalDecisionDialogData {
   readonly action: 'approve' | 'reject';
   readonly requestId: string;
+  readonly amount?: string;
+  readonly branchName?: string;
 }
 
 export interface ApprovalDecisionDialogResult {
@@ -66,10 +70,14 @@ export interface ApprovalDecisionDialogResult {
   template: `
     <h2 mat-dialog-title>
       {{
-        (data.action === 'approve'
-          ? 'approvals.decisionDialog.approveTitle'
-          : 'approvals.decisionDialog.rejectTitle'
-        ) | translate
+        (data.action === 'approve' && data.amount && data.branchName
+          ? ('approvals.decisionDialog.approveTitle' | translate: { amount: data.amount, branchName: data.branchName })
+          : data.action === 'approve' && data.branchName
+            ? ('approvals.decisionDialog.approveTitleBranchOnly' | translate: { branchName: data.branchName })
+            : data.action === 'approve'
+              ? ('approvals.decisionDialog.approveTitleDefault' | translate)
+              : ('approvals.decisionDialog.rejectTitle' | translate)
+        )
       }}
     </h2>
     <mat-dialog-content>
@@ -162,6 +170,8 @@ export class ApprovalQueueComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
+  private readonly session = inject(SessionService);
+  private readonly router = inject(Router);
 
   readonly isLoading = signal<boolean>(true);
   readonly pendingRequests = signal<PurchaseRequest[]>([]);
@@ -256,13 +266,23 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   openDecisionDialog(request: PurchaseRequest, action: 'approve' | 'reject'): void {
+    const branchName = this.branchNameById().get(request.branch_id);
+    const amount = request.estimated_total
+      ? this.formatService.formatCurrencyAmount(request.estimated_total)
+      : undefined;
+
     const dialogRef = this.dialog.open<
       ApprovalDecisionDialogComponent,
       ApprovalDecisionDialogData,
       ApprovalDecisionDialogResult
     >(ApprovalDecisionDialogComponent, {
       width: '480px',
-      data: { action, requestId: request.id },
+      data: {
+        action,
+        requestId: request.id,
+        amount,
+        branchName,
+      },
     });
 
     dialogRef.afterClosed().subscribe((result?: ApprovalDecisionDialogResult) => {
@@ -291,11 +311,24 @@ export class ApprovalQueueComponent implements OnInit {
       next: () => {
         this.processingRequestId.set(null);
         this.loadPendingApprovals();
-        const msgKey =
-          action === 'approve'
-            ? `${I18N}.approveSuccess`
-            : `${I18N}.rejectSuccess`;
-        this.snackBar.open(this.translate.instant(msgKey), undefined, { duration: 3500 });
+        if (action === 'approve') {
+          const msg = this.translate.instant(`${I18N}.approveSuccess`);
+          if (this.session.hasRole('owner', 'buyer')) {
+            const actionLabel = this.translate.instant(`${I18N}.createOrderAction`);
+            const snackRef = this.snackBar.open(msg, actionLabel, { duration: 6000 });
+            snackRef.onAction().subscribe(() => {
+              this.router.navigate(['/orders/new'], {
+                queryParams: { source_request_id: requestId },
+              });
+            });
+          } else {
+            this.snackBar.open(msg, undefined, { duration: 3500 });
+          }
+        } else {
+          this.snackBar.open(this.translate.instant(`${I18N}.rejectSuccess`), undefined, {
+            duration: 3500,
+          });
+        }
       },
       error: (err: unknown) => {
         this.processingRequestId.set(null);

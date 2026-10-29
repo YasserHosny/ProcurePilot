@@ -2,7 +2,7 @@
   <div class="page-header">
     <div>
       <h1>{{ 'orders.create.title' | translate }}</h1>
-      <p>{{ 'orders.create.subtitle' | translate }}</p>
+      <p>{{ (sourceRequest() ? 'orders.create.fromRequestSubtitle' : 'orders.create.subtitle') | translate }}</p>
     </div>
   </div>
 
@@ -17,10 +17,18 @@
 
   <form [formGroup]="form" (ngSubmit)="submit()">
     
-    @if (sourceRequest()) {
+    @if (sourceRequest(); as req) {
       <div class="source-request-banner">
         <mat-icon color="primary">info</mat-icon>
-        <span>{{ 'orders.create.creatingFromRequest' | translate }}: {{ sourceRequest()?.id }}</span>
+        <a [routerLink]="['/requests', req.id]" class="source-request-banner-link" data-testid="source-request-link">
+          <span dir="auto">
+            @if (sourceSupplierName() && sourceBranchName()) {
+              {{ 'orders.create.fromApprovedRequestBanner' | translate: { supplier: sourceSupplierName(), branch: sourceBranchName() } }}
+            } @else {
+              {{ 'orders.create.creatingFromRequest' | translate }}: {{ req.id }}
+            }
+          </span>
+        </a>
       </div>
     }
 
@@ -70,7 +78,7 @@
       <div class="form-row">
         <mat-form-field appearance="outline">
           <mat-label>{{ 'orders.create.currency' | translate }}</mat-label>
-          <input matInput formControlName="currency" [placeholder]="'orders.create.currencyPlaceholder' | translate: { currency: homeCurrency }" />
+          <input matInput formControlName="currency" [readonly]="!!sourceRequest()" [placeholder]="'orders.create.currencyPlaceholder' | translate: { currency: homeCurrency }" />
           @if (form.controls.currency.hasError('required')) {
             <mat-error>{{ 'orders.create.errors.required' | translate }}</mat-error>
           }

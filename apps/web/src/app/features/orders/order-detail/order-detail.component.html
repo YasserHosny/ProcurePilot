@@ -10,7 +10,19 @@
     <div class="page-header">
       <div>
         <span class="eyebrow">{{ 'orders.detail.eyebrow' | translate }}</span>
-        <h1>{{ data.order.order_number }}</h1>
+        <div class="header-title-row">
+          <h1>{{ data.order.order_number }}</h1>
+          @if (data.order.supplier_name; as supplier) {
+            <span class="header-supplier" dir="auto" data-testid="order-supplier">{{ supplier }}</span>
+          }
+        </div>
+        @if (data.order.source_request_id; as reqId) {
+          <p class="source-request-link-wrap">
+            <a [routerLink]="['/requests', reqId]" class="source-request-link" data-testid="from-request-link">
+              {{ 'orders.detail.fromRequest' | translate }}
+            </a>
+          </p>
+        }
         <p>{{ 'orders.detail.createdAt' | translate: { date: (data.order.created_at | formatDate) } }}</p>
       </div>
       <span class="status-chip" [attr.data-status]="data.lifecycle.status">{{ getStatusLabel(data.lifecycle.status) }}</span>
@@ -31,7 +43,7 @@
           @if (lineSummary(line.id); as summary) {
             <div class="line-row">
               <div class="line-description"><span class="line-number">#{{ line.line_number }}</span><strong>{{ lineDescription(line) }}</strong><span>{{ linePriceLabel(line) }}</span></div>
-              <div class="line-evidence"><span>{{ 'orders.detail.ordered' | translate }} <strong>{{ formatQuantity(summary.ordered_quantity) }}</strong></span><span class="evidence-value" [attr.data-state]="summary.confirmed.state">{{ 'orders.detail.confirmed' | translate }} <strong>{{ formatQuantity(summary.confirmed.quantity) }}</strong></span><span class="evidence-value" [attr.data-state]="summary.received.state">{{ 'orders.detail.received' | translate }} <strong>{{ formatQuantity(summary.received.quantity) }}</strong></span><span>{{ 'orders.detail.remaining' | translate }} <strong>{{ formatQuantity(summary.remaining_quantity) }}</strong></span></div>
+              <div class="line-evidence"><span>{{ 'orders.detail.ordered' | translate }} <strong>{{ formatQuantity(summary.ordered_quantity) }}</strong></span><span class="evidence-value" [attr.data-state]="summary.confirmed.state">{{ 'orders.detail.confirmed' | translate }} <strong>{{ formatQuantity(summary.confirmed.quantity) }}</strong></span><span class="evidence-value" [attr.data-state]="summary.received.state">{{ 'orders.detail.received' | translate }} <strong>{{ formatQuantity(summary.received.quantity) }}</strong></span><span class="line-remaining">{{ 'orders.detail.remaining' | translate }} <strong>{{ lineRemainingQuantity(summary) }}</strong></span></div>
             </div>
           }
         }

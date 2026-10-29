@@ -1,19 +1,26 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { signal } from '@angular/core';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Router } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { PurchaseRequest } from '../../../core/api/models';
+import type { PurchaseRequest, Role } from '../../../core/api/models';
+import { SessionService } from '../../../core/auth/session.service';
 import { RequestsApiService } from '../../requests/requests-api';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { ApprovalsApiService } from '../approvals-api';
-import { ApprovalQueueComponent } from './approval-queue.component';
+import {
+  ApprovalDecisionDialogComponent,
+  ApprovalQueueComponent,
+  type ApprovalDecisionDialogData,
+} from './approval-queue.component';
 
 const mockPendingRequests: PurchaseRequest[] = [
   {
@@ -76,8 +83,19 @@ describe('ApprovalQueueComponent', () => {
   let api: jasmine.SpyObj<ApiService>;
   let dialogSpy: jasmine.SpyObj<MatDialog>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
+  let routerSpy: jasmine.SpyObj<Router>;
+  const role = signal<Role | null>('buyer');
+  let sessionSpy: { hasRole: jasmine.Spy; role: typeof role };
 
   beforeEach(async () => {
+    role.set('buyer');
+    sessionSpy = {
+      hasRole: jasmine.createSpy('hasRole').and.callFake((...roles: readonly Role[]) => {
+        const current = role();
+        return current ? roles.includes(current) : false;
+      }),
+      role,
+    };
     approvalsApi = jasmine.createSpyObj('ApprovalsApiService', ['listPendingApprovals']);
     requestsApi = jasmine.createSpyObj('RequestsApiService', [
       'approveRequest',
@@ -90,6 +108,10 @@ describe('ApprovalQueueComponent', () => {
     api = jasmine.createSpyObj('ApiService', ['products']);
     dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
+    routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    snackBarSpy.open.and.returnValue({
+      onAction: () => of(undefined),
+    } as unknown as ReturnType<MatSnackBar['open']>);
 
     approvalsApi.listPendingApprovals.and.returnValue(
       of({ items: mockPendingRequests, next_cursor: null }),
@@ -153,6 +175,8 @@ describe('ApprovalQueueComponent', () => {
         { provide: RequestsApiService, useValue: requestsApi },
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: api },
+        { provide: SessionService, useValue: sessionSpy },
+        { provide: Router, useValue: routerSpy },
       ],
     })
       .overrideComponent(ApprovalQueueComponent, {
@@ -160,6 +184,8 @@ describe('ApprovalQueueComponent', () => {
           providers: [
             { provide: MatDialog, useValue: dialogSpy },
             { provide: MatSnackBar, useValue: snackBarSpy },
+            { provide: SessionService, useValue: sessionSpy },
+            { provide: Router, useValue: routerSpy },
           ],
         },
       })
@@ -197,6 +223,76 @@ describe('ApprovalQueueComponent', () => {
 
     expect(compiled.textContent).toContain('South Branch');
     expect(compiled.textContent).toContain('None (branch-level)');
+  });
+
+  it('displays the supplier name above/next to the estimated total when source.supplier_name is set', () => {
+    approvalsApi.listPendingApprovals.and.returnValue(
+      of({
+        items: [
+          {
+            ...mockPendingRequests[0],
+            source: {
+              rfq_id: 'rfq-1',
+              rfq_response_id: 'resp-1',
+              quotation_id: 'q-1',
+              supplier_id: 's-1',
+              supplier_name: 'الوفرة للمواد الغذائية',
+            },
+          },
+        ],
+        next_cursor: null,
+      }),
+    );
+    component.loadPendingApprovals();
+    fixture.detectChanges();
+
+    const supplierEl = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="approval-supplier"]',
+    );
+    expect(supplierEl).toBeTruthy();
+    expect(supplierEl?.textContent?.trim()).toBe('الوفرة للمواد الغذائية');
+    expect(supplierEl?.getAttribute('dir')).toBe('auto');
+  });
+
+  it('shows "Create purchase order" snackbar action on approve for owner/buyer and navigates to orders/new', () => {
+    role.set('buyer');
+    const actionSubject = new Subject<void>();
+    snackBarSpy.open.and.returnValue({
+      onAction: () => actionSubject.asObservable(),
+    } as unknown as ReturnType<MatSnackBar['open']>);
+
+    requestsApi.approveRequest.and.returnValue(
+      of({ ...mockPendingRequests[0], status: 'approved' } as PurchaseRequest),
+    );
+
+    component.submitDecision('req-001', 'approve');
+
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      'Request approved.',
+      'Create purchase order',
+      { duration: 6000 },
+    );
+
+    actionSubject.next();
+    expect(routerSpy.navigate).toHaveBeenCalledWith(['/orders/new'], {
+      queryParams: { source_request_id: 'req-001' },
+    });
+  });
+
+  it('does not offer "Create purchase order" action to non-buyer non-owner roles on approve', () => {
+    role.set('approver');
+    requestsApi.approveRequest.and.returnValue(
+      of({ ...mockPendingRequests[0], status: 'approved' } as PurchaseRequest),
+    );
+
+    component.submitDecision('req-001', 'approve');
+
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      'Request approved.',
+      undefined,
+      { duration: 3500 },
+    );
+    expect(routerSpy.navigate).not.toHaveBeenCalled();
   });
 
   it('should prefer requester_name over requester_email and fall back to short id only when both are null', () => {
@@ -406,9 +502,11 @@ describe('ApprovalQueueComponent', () => {
       comment: 'Budget approved',
     });
     expect(approvalsApi.listPendingApprovals).toHaveBeenCalledTimes(2);
-    expect(snackBarSpy.open).toHaveBeenCalledWith('Request approved.', undefined, {
-      duration: 3500,
-    });
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      'Request approved.',
+      'Create purchase order',
+      { duration: 6000 },
+    );
   });
 
   it('should open decision dialog for reject and call rejectRequest on confirm', () => {
@@ -598,5 +696,260 @@ describe('ApprovalQueueComponent', () => {
     expect(cell).toBeTruthy();
     expect(cell.classList.contains('date-cell')).toBeTrue();
     expect(getComputedStyle(cell).overflow).toBe('visible');
+  });
+
+  it('renders approve and reject buttons inside the actions cell and lines toggle in lines cell', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const actionsCell = compiled.querySelector('td.mat-column-actions');
+    expect(actionsCell).not.toBeNull();
+    expect(actionsCell?.querySelector('.approve-btn')).not.toBeNull();
+    expect(actionsCell?.querySelector('.reject-btn')).not.toBeNull();
+
+    const linesCell = compiled.querySelector('td.mat-column-lines');
+    expect(linesCell).not.toBeNull();
+    expect(linesCell?.querySelector('.approve-btn')).toBeNull();
+    expect(linesCell?.querySelector('.reject-btn')).toBeNull();
+  });
+
+  it('makes the whole N lines control one clickable button without tooltip whose accessible name contains visible text and flips aria-expanded', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const linesCell = compiled.querySelector('td.mat-column-lines');
+    const toggleBtn = linesCell?.querySelector<HTMLButtonElement>('.lines-toggle-btn');
+    expect(toggleBtn).not.toBeNull();
+    const visibleText = toggleBtn?.querySelector('.lines-count')?.textContent?.trim() ?? '';
+    expect(visibleText).toBe('2 lines');
+    expect(toggleBtn?.textContent).toContain(visibleText);
+    expect(toggleBtn?.getAttribute('aria-label')).toBeNull();
+    expect(toggleBtn?.getAttribute('aria-expanded')).toBe('false');
+    expect(toggleBtn?.hasAttribute('matTooltip')).toBeFalse();
+    expect(toggleBtn?.getAttribute('ng-reflect-message')).toBeNull();
+
+    // Clicking the toggle button expands lines
+    toggleBtn?.click();
+    fixture.detectChanges();
+    expect(component.isExpanded('req-001')).toBeTrue();
+    expect(toggleBtn?.getAttribute('aria-expanded')).toBe('true');
+
+    // Clicking again collapses lines
+    toggleBtn?.click();
+    fixture.detectChanges();
+    expect(component.isExpanded('req-001')).toBeFalse();
+    expect(toggleBtn?.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('renders "—" for empty optional line note instead of "Not available"', () => {
+    component.toggleExpand('req-001');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const noteCols = compiled.querySelectorAll('.note-col');
+    expect(noteCols.length).toBe(2);
+    expect(noteCols[0].textContent?.trim()).toBe('Latex-free boxes');
+    // Line 2 has note: null -> should be "—"
+    expect(noteCols[1].textContent?.trim()).toBe('—');
+  });
+
+  it('passes amount and branch name to decision dialog and restates what is approved in title', () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of({ confirmed: false }),
+    } as MatDialogRef<unknown, unknown>);
+
+    component.openDecisionDialog(mockPendingRequests[0], 'approve');
+
+    expect(dialogSpy.open).toHaveBeenCalledWith(
+      jasmine.anything(),
+      jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          action: 'approve',
+          requestId: 'req-001',
+          amount: 'SAR 1,250',
+          branchName: 'North Branch',
+        }),
+      }),
+    );
+  });
+
+  it('omits amount when estimated_total is null so branch-only title can take over', () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of({ confirmed: false }),
+    } as MatDialogRef<unknown, unknown>);
+
+    const reqWithoutTotal = {
+      ...mockPendingRequests[0],
+      estimated_total: null,
+    };
+
+    component.openDecisionDialog(reqWithoutTotal, 'approve');
+
+    const dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as ApprovalDecisionDialogData;
+    expect(dialogData.amount).toBeUndefined();
+  });
+
+  it('omits branchName when branch id is not in branchNameById so default title takes over', () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of({ confirmed: false }),
+    } as MatDialogRef<unknown, unknown>);
+
+    const reqWithUnknownBranch = {
+      ...mockPendingRequests[0],
+      branch_id: 'unknown-branch-uuid',
+    };
+
+    component.openDecisionDialog(reqWithUnknownBranch, 'approve');
+
+    const dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as ApprovalDecisionDialogData;
+    expect(dialogData.branchName).toBeUndefined();
+  });
+});
+
+describe('ApprovalDecisionDialogComponent', () => {
+  let dialogFixture: ComponentFixture<ApprovalDecisionDialogComponent>;
+
+  it('restates what is approved in the dialog title with amount and branch name in en and ar', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ApprovalDecisionDialogComponent],
+      providers: [
+        provideTranslateService(),
+        {
+          provide: MAT_DIALOG_DATA,
+          useValue: {
+            action: 'approve',
+            requestId: 'req-001',
+            amount: 'SAR 4,137',
+            branchName: 'فرع العليا',
+          },
+        },
+        {
+          provide: MatDialogRef,
+          useValue: jasmine.createSpyObj('MatDialogRef', ['close']),
+        },
+      ],
+    }).compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    translate.use('en');
+
+    dialogFixture = TestBed.createComponent(ApprovalDecisionDialogComponent);
+    dialogFixture.detectChanges();
+
+    const titleEl = dialogFixture.nativeElement.querySelector('[mat-dialog-title]');
+    expect(titleEl?.textContent?.trim()).toBe('Approve SAR 4,137 for فرع العليا?');
+
+    translate.use('ar');
+    dialogFixture.detectChanges();
+    expect(titleEl?.textContent?.trim()).toBe('اعتماد SAR 4,137 لـ فرع العليا؟');
+  });
+
+  it('shows branch-only title when amount is missing (estimated_total was null) in en and ar', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ApprovalDecisionDialogComponent],
+      providers: [
+        provideTranslateService(),
+        {
+          provide: MAT_DIALOG_DATA,
+          useValue: {
+            action: 'approve',
+            requestId: 'req-001',
+            branchName: 'North Branch',
+          },
+        },
+        {
+          provide: MatDialogRef,
+          useValue: jasmine.createSpyObj('MatDialogRef', ['close']),
+        },
+      ],
+    }).compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    translate.use('en');
+
+    dialogFixture = TestBed.createComponent(ApprovalDecisionDialogComponent);
+    dialogFixture.detectChanges();
+
+    const titleEl = dialogFixture.nativeElement.querySelector('[mat-dialog-title]');
+    expect(titleEl?.textContent?.trim()).toBe('Approve the request for North Branch?');
+
+    translate.use('ar');
+    dialogFixture.detectChanges();
+    expect(titleEl?.textContent?.trim()).toBe('اعتماد الطلب لـ North Branch؟');
+  });
+
+  it('shows default title when branchName is missing (unknown branch) in en and ar', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ApprovalDecisionDialogComponent],
+      providers: [
+        provideTranslateService(),
+        {
+          provide: MAT_DIALOG_DATA,
+          useValue: {
+            action: 'approve',
+            requestId: 'req-001',
+            amount: 'SAR 1,250',
+          },
+        },
+        {
+          provide: MatDialogRef,
+          useValue: jasmine.createSpyObj('MatDialogRef', ['close']),
+        },
+      ],
+    }).compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    translate.use('en');
+
+    dialogFixture = TestBed.createComponent(ApprovalDecisionDialogComponent);
+    dialogFixture.detectChanges();
+
+    const titleEl = dialogFixture.nativeElement.querySelector('[mat-dialog-title]');
+    expect(titleEl?.textContent?.trim()).toBe('Approve Purchase Request');
+
+    translate.use('ar');
+    dialogFixture.detectChanges();
+    expect(titleEl?.textContent?.trim()).toBe('اعتماد طلب الشراء');
+  });
+
+  it('shows default title when neither amount nor branchName is present in en and ar', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ApprovalDecisionDialogComponent],
+      providers: [
+        provideTranslateService(),
+        {
+          provide: MAT_DIALOG_DATA,
+          useValue: {
+            action: 'approve',
+            requestId: 'req-001',
+          },
+        },
+        {
+          provide: MatDialogRef,
+          useValue: jasmine.createSpyObj('MatDialogRef', ['close']),
+        },
+      ],
+    }).compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    translate.use('en');
+
+    dialogFixture = TestBed.createComponent(ApprovalDecisionDialogComponent);
+    dialogFixture.detectChanges();
+
+    const titleEl = dialogFixture.nativeElement.querySelector('[mat-dialog-title]');
+    expect(titleEl?.textContent?.trim()).toBe('Approve Purchase Request');
+
+    translate.use('ar');
+    dialogFixture.detectChanges();
+    expect(titleEl?.textContent?.trim()).toBe('اعتماد طلب الشراء');
   });
 });

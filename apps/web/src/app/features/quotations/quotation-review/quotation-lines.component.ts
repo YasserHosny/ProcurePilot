@@ -19,6 +19,7 @@ import type {
 } from '../../../core/api/models';
 import { CurrencySymbolPipe } from '../../../core/format/currency-symbol.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { sameReviewedValue } from './reviewed-value';
 
 @Component({
   selector: 'app-quotation-lines',
@@ -124,6 +125,79 @@ export class QuotationLinesComponent {
       this.pendingCorrections.has(fe.id) ||
       (fe.corrected_value !== null && fe.corrected_value !== undefined)
     );
+  }
+
+  isFieldChanged(
+    entityType: 'quotation' | 'quotation_line',
+    entityId: string,
+    fieldName: string,
+  ): boolean {
+    const fe = this.getFieldExtraction(entityType, entityId, fieldName);
+    if (!fe) return false;
+    const effective = this.pendingCorrections.has(fe.id)
+      ? this.pendingCorrections.get(fe.id)
+      : fe.corrected_value;
+    if (effective === null || effective === undefined) return false;
+    return !sameReviewedValue(effective, fe.extracted_value);
+  }
+
+  isFieldConfirmedAsIs(
+    entityType: 'quotation' | 'quotation_line',
+    entityId: string,
+    fieldName: string,
+  ): boolean {
+    const fe = this.getFieldExtraction(entityType, entityId, fieldName);
+    if (!fe) return false;
+    const hasCorrection =
+      this.pendingCorrections.has(fe.id) ||
+      (fe.corrected_value !== null && fe.corrected_value !== undefined);
+    if (!hasCorrection) return false;
+    const effective = this.pendingCorrections.has(fe.id)
+      ? this.pendingCorrections.get(fe.id)
+      : fe.corrected_value;
+    return sameReviewedValue(effective, fe.extracted_value);
+  }
+
+  formatUnitPrice(value: string | number | null | undefined): string {
+    if (value === null || value === undefined || value === '') return '0';
+    const num = typeof value === 'number' ? value : parseFloat(value);
+    if (isNaN(num)) return '0';
+    const rounded = Math.round(num * 100) / 100;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+  }
+
+  getEffectiveUnitPriceAmount(line: QuotationLine): string {
+    const fe = this.getFieldExtraction('quotation_line', line.id, 'unit_price');
+    if (fe && this.pendingCorrections.has(fe.id)) {
+      const pending = this.pendingCorrections.get(fe.id);
+      if (pending && typeof pending === 'object' && 'amount' in pending) {
+        return String((pending as { amount: unknown }).amount ?? '');
+      }
+      if (typeof pending === 'string') return pending;
+    }
+    if (fe?.corrected_value) {
+      if (typeof fe.corrected_value === 'object' && 'amount' in fe.corrected_value) {
+        return String((fe.corrected_value as { amount: unknown }).amount ?? '');
+      }
+      if (typeof fe.corrected_value === 'string') return fe.corrected_value;
+    }
+    return line.unit_price?.amount ?? '';
+  }
+
+  onUnitPriceBlur(line: QuotationLine, targetValue: string): void {
+    const original = line.unit_price?.amount ?? '';
+    if (targetValue === original) {
+      return;
+    }
+    this.fieldReviewed.emit({
+      entityType: 'quotation_line',
+      entityId: line.id,
+      fieldName: 'unit_price',
+      reviewedValue: {
+        amount: targetValue,
+        currency: line.unit_price?.currency || this.effectiveCurrency,
+      },
+    });
   }
 
   getFieldConfidence(

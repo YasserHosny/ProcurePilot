@@ -38,6 +38,7 @@ export interface PurchaseOrder {
   tenant_id: string;
   order_number: string;
   supplier_id: string;
+  supplier_name?: string | null;
   status: OrderStatus;
   order_date: string;
   expected_delivery_date: string | null;

@@ -313,3 +313,57 @@
 .flagged-field-row { display: flex; align-items: center; gap: .75rem; padding-block: .5rem; border-block-start: 1px solid var(--pp-border); }
 .flagged-value { unicode-bidi: plaintext; white-space: pre-line; overflow-wrap: anywhere; flex: 1; }
 .flagged-highlight { outline: 2px solid var(--pp-warning); background: var(--pp-warning-container); }
+
+.confirmed-tag {
+  font-size: 0.7rem;
+  color: var(--pp-success);
+  font-weight: 600;
+}
+
+.next-step-card {
+  margin-block-end: 1rem;
+  padding: 1rem 1.25rem;
+  border-inline-start: 4px solid var(--pp-primary);
+  background-color: var(--pp-surface-card);
+
+  .next-step-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .next-step-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    .next-step-icon {
+      color: var(--pp-primary);
+      font-size: 28px;
+      inline-size: 28px;
+      block-size: 28px;
+    }
+
+    .next-step-title {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--pp-text-strong);
+    }
+
+    .next-step-description {
+      margin: 0.25rem 0 0;
+      font-size: 0.875rem;
+      color: var(--pp-text-muted);
+    }
+  }
+
+  .next-step-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+}

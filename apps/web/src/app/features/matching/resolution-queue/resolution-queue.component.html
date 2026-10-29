@@ -175,6 +175,21 @@
       <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
       <span>{{ 'common.loading' | translate }}</span>
     </div>
+  } @else if (tasks().length === 0 && quotationId()) {
+    <div class="empty-state" data-testid="quotation-all-matched">
+      <mat-icon class="empty-icon" aria-hidden="true">done_all</mat-icon>
+      <h2 class="empty-title">{{ 'matching.queue.allLinesMatchedTitle' | translate }}</h2>
+      <div class="empty-actions">
+        <a mat-flat-button color="primary" routerLink="/rfq/history" class="compare-responses-btn">
+          <mat-icon aria-hidden="true">compare_arrows</mat-icon>
+          <span>{{ 'matching.queue.compareResponses' | translate }}</span>
+        </a>
+        <button mat-stroked-button type="button" (click)="clearFilters()" class="clear-filters-btn">
+          <mat-icon aria-hidden="true">clear</mat-icon>
+          <span>{{ 'matching.queue.clearFilters' | translate }}</span>
+        </button>
+      </div>
+    </div>
   } @else if (tasks().length === 0 && hasActiveFilters()) {
     <div class="empty-state">
       <mat-icon class="empty-icon" aria-hidden="true">filter_alt_off</mat-icon>

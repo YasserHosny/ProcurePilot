@@ -97,6 +97,7 @@ class RfqResponseLineComparison(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     workspace_product_id: UUID | None
+    original_text: str
     quoted_quantity: Decimal
     quoted_unit_price_amount: Decimal
     quoted_unit_price_currency: str
@@ -115,6 +116,7 @@ class RfqResponseComparison(BaseModel):
     id: UUID
     rfq_id: UUID
     supplier_id: UUID
+    quotation_id: UUID
     submitted_at: datetime
     quotation_status: QuotationStatus
     lines: list[RfqResponseLineComparison]

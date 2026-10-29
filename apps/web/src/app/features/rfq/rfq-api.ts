@@ -68,6 +68,7 @@ export interface RfqSendResponse {
 
 export interface RfqResponseLineComparison {
   workspace_product_id: string | null;
+  original_text: string;
   quoted_quantity: string;
   quoted_unit_price_amount: string;
   quoted_unit_price_currency: string;
@@ -78,6 +79,7 @@ export interface RfqResponseComparison {
   id: string;
   rfq_id: string;
   supplier_id: string;
+  quotation_id: string;
   submitted_at: string;
   quotation_status: QuotationStatus;
   lines: RfqResponseLineComparison[];

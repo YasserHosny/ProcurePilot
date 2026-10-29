@@ -121,8 +121,9 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
     await page.mouse.move(0, 0);
 
     await row.locator('.approve-btn').click();
-    const dialog = page.locator('mat-dialog-container', { hasText: 'Approve Purchase Request' });
+    const dialog = page.locator('mat-dialog-container', { hasText: 'Approve' });
     await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(request.branchName);
     await dialog.locator('textarea').fill('Approved from the E2E queue');
     await dialog.locator('.confirm-btn').click();
 

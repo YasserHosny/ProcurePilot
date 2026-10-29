@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { MatDatepicker } from '@angular/material/datepicker';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
@@ -572,6 +573,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     // the backend only sees supplier_id once this PATCH lands (regression guard: a supplier-only
     // change must not be silently skipped just because pendingCorrections is empty).
     apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
+    apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
     apiService.confirmQuotation.and.returnValue(of(confirmedQuotation));
 
     component.selectedSupplierId.set('sup-1');
@@ -599,6 +601,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       status: 'reviewed' as const,
       supplier_id: 'sup-1',
     };
+    apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
     apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
     apiService.confirmQuotation.and.returnValue(of(confirmedQuotation));
 
@@ -638,6 +641,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     const alreadyConfirmedSupplier = { ...mockQuotationDetail, supplier_id: 'sup-1' };
     component.quotation.set(alreadyConfirmedSupplier);
     const confirmedQuotation = { ...alreadyConfirmedSupplier, status: 'reviewed' as const };
+    apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
     apiService.confirmQuotation.and.returnValue(of(confirmedQuotation));
 
     component.selectedSupplierId.set('sup-1');
@@ -788,5 +792,228 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(valueEl).toBeTruthy();
     expect(valueEl.textContent?.trim()).not.toBe('2026-08-20');
     expect(valueEl.textContent?.trim()).toBe(formatService.formatDate(new Date(2026, 7, 20)));
+  });
+
+  it('shows success snackbar and "Next step" card with Match lines and Back to inbox after successful authorize', () => {
+    const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+    spyOn(snackBar, 'open');
+
+    const confirmedQuotation = {
+      ...mockQuotationDetail,
+      status: 'reviewed' as const,
+      supplier_id: 'sup-1',
+    };
+    component.quotation.set({ ...mockQuotationDetail, supplier_id: 'sup-1' });
+    component.selectedSupplierId.set('sup-1');
+    apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
+    apiService.confirmQuotation.and.returnValue(of(confirmedQuotation));
+    apiService.getQuotation.and.returnValue(of(confirmedQuotation));
+
+    component.confirmQuotation();
+    fixture.detectChanges();
+
+    expect(snackBar.open).toHaveBeenCalledWith(
+      enCatalog.quotations.review.actions.confirmSuccess,
+      undefined,
+      { duration: 4000 },
+    );
+
+    const nextStepCard = fixture.nativeElement.querySelector('[data-testid="next-step-card"]');
+    expect(nextStepCard).toBeTruthy();
+
+    const matchBtn = fixture.nativeElement.querySelector('[data-testid="next-step-match-lines"]');
+    expect(matchBtn).toBeTruthy();
+    expect(matchBtn.textContent.trim()).toBe('Match lines');
+
+    const inboxBtn = fixture.nativeElement.querySelector('[data-testid="next-step-back-inbox"]');
+    expect(inboxBtn).toBeTruthy();
+    expect(inboxBtn.textContent.trim()).toBe('Back to the inbox');
+  });
+
+  it('distinguishes between changed value (Corrected by Human) and confirmed-as-is (Confirmed)', () => {
+    const lowConfField = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-currency',
+      quotation_id: 'q-review-1',
+      entity_type: 'quotation' as const,
+      entity_id: 'q-review-1',
+      field_name: 'currency',
+      extracted_value: 'SAR',
+      corrected_value: null,
+      confidence: '0.6000',
+      corrected_by: null,
+      corrected_at: null,
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      field_extractions: [lowConfField],
+    });
+    fixture.detectChanges();
+
+    // 1. Initially neither changed nor confirmed
+    expect(component.isFieldChanged('quotation', 'q-review-1', 'currency')).toBeFalse();
+    expect(component.isFieldConfirmedAsIs('quotation', 'q-review-1', 'currency')).toBeFalse();
+
+    // 2. Confirmed as-is (value equals extracted_value)
+    component.confirmFieldAsIs('quotation', 'q-review-1', 'currency');
+    fixture.detectChanges();
+    expect(component.isFieldChanged('quotation', 'q-review-1', 'currency')).toBeFalse();
+    expect(component.isFieldConfirmedAsIs('quotation', 'q-review-1', 'currency')).toBeTrue();
+
+    const confirmedBadge = fixture.nativeElement.querySelector('[data-testid="confirmed-badge"]');
+    expect(confirmedBadge).toBeTruthy();
+    expect(confirmedBadge.textContent.trim()).toBe('Confirmed');
+    expect(fixture.nativeElement.querySelector('.corrected-tag')).toBeNull();
+
+    // 3. Changed value (different from extracted_value)
+    component.currencySelectionChanged('USD');
+    fixture.detectChanges();
+    expect(component.isFieldChanged('quotation', 'q-review-1', 'currency')).toBeTrue();
+    expect(component.isFieldConfirmedAsIs('quotation', 'q-review-1', 'currency')).toBeFalse();
+
+    const correctedTag = fixture.nativeElement.querySelector('.corrected-tag');
+    expect(correctedTag).toBeTruthy();
+    expect(correctedTag.textContent.trim()).toBe('Corrected by Human');
+  });
+
+  it('shows the corrected tag on the stated total field after a money correction differs from the extracted value', () => {
+    const statedTotal = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-stated-total',
+      field_name: 'stated_total',
+      extracted_value: { amount: '88.00', currency: 'GBP' },
+      confidence: '0.9500',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [statedTotal] });
+    fixture.detectChanges();
+
+    const input = fixture.nativeElement.querySelector('#field-fe-stated-total input') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    input.value = '75.00';
+    input.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const fieldBox = fixture.nativeElement.querySelector('#field-fe-stated-total') as HTMLElement;
+    expect(fieldBox.querySelector('.corrected-tag')).toBeTruthy();
+    expect(fieldBox.querySelector('.confirmed-tag')).toBeNull();
+  });
+
+  it('shows the confirmed tag on the stated total field when the money correction equals the extracted value', () => {
+    const statedTotal = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-stated-total',
+      field_name: 'stated_total',
+      extracted_value: { amount: '75.00', currency: 'GBP' },
+      confidence: '0.9500',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [statedTotal] });
+    fixture.detectChanges();
+
+    const input = fixture.nativeElement.querySelector('#field-fe-stated-total input') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    input.value = '75';
+    input.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const fieldBox = fixture.nativeElement.querySelector('#field-fe-stated-total') as HTMLElement;
+    expect(fieldBox.querySelector('.confirmed-tag')).toBeTruthy();
+    expect(fieldBox.querySelector('.corrected-tag')).toBeNull();
+  });
+
+  it('displays exact stored amount in editable unit price input while read-only display formats with 0 or 2 decimals (e.g. 85.0000 -> 85)', () => {
+    // 1. Read-only display of 85.0000 still shows "85"
+    component.quotation.set({
+      ...mockQuotationDetail,
+      status: 'reviewed',
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          unit_price: { amount: '85.0000', currency: 'SAR' },
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    const readOnlyInput = fixture.nativeElement.querySelector(
+      '#field-fe-line1-price input',
+    ) as HTMLInputElement | null;
+    expect(readOnlyInput).toBeTruthy();
+    expect(readOnlyInput?.value).toBe('85');
+
+    // 2. Editable input carries exact stored amount (85.0000)
+    component.quotation.set({
+      ...mockQuotationDetail,
+      status: 'extracted',
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          unit_price: { amount: '85.0000', currency: 'SAR' },
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    const editableInput = fixture.nativeElement.querySelector(
+      '#field-fe-line1-price input',
+    ) as HTMLInputElement | null;
+    expect(editableInput).toBeTruthy();
+    expect(editableInput?.value).toBe('85.0000');
+  });
+
+  it('preserves exact 4-decimal unit price on blur and save of unchanged low-confidence price without staging rounded correction', () => {
+    const lowConfPriceExtraction = {
+      ...mockQuotationDetail.field_extractions[1],
+      id: 'fe-line1-price',
+      field_name: 'unit_price',
+      extracted_value: { amount: '0.1234', currency: 'SAR' },
+      confidence: '0.5000',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      status: 'extracted',
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          unit_price: { amount: '0.1234', currency: 'SAR' },
+        },
+      ],
+      field_extractions: [
+        mockQuotationDetail.field_extractions[0],
+        lowConfPriceExtraction,
+      ],
+    });
+    fixture.detectChanges();
+
+    const unitPriceInput = fixture.nativeElement.querySelector(
+      '#field-fe-line1-price input',
+    ) as HTMLInputElement | null;
+    expect(unitPriceInput).toBeTruthy();
+    expect(unitPriceInput?.value).toBe('0.1234');
+
+    // Trigger blur on unedited field
+    unitPriceInput?.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    // Blur on an unedited field must not stage a correction at all (or, if staged, exactly 0.1234)
+    const staged = component.pendingCorrections().get('fe-line1-price');
+    if (staged) {
+      expect((staged as { amount: string }).amount).toBe('0.1234');
+    } else {
+      expect(component.pendingCorrections().has('fe-line1-price')).toBeFalse();
+    }
+
+    // Saving must not send a rounded 0.12 correction
+    apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+    component.saveCorrections();
+
+    if (apiService.patchQuotation.calls.count() > 0) {
+      const patchPayload = apiService.patchQuotation.calls.mostRecent().args[1];
+      const priceCorr = patchPayload.corrections?.find(
+        (c) => c.field_extraction_id === 'fe-line1-price',
+      );
+      if (priceCorr) {
+        expect((priceCorr.corrected_value as { amount: string }).amount).toBe('0.1234');
+      }
+    }
   });
 });

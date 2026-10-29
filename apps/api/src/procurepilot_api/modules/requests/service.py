@@ -59,6 +59,7 @@ from procurepilot_api.modules.requests.schemas import (
     QualityIssueCreate,
     QualityIssueList,
     QualityIssuePhoto,
+    RequestSource,
     ThresholdRule,
     ThresholdRuleCreate,
     ThresholdRuleList,
@@ -75,7 +76,8 @@ from procurepilot_api.shared.storage_keys import safe_object_name
 
 REQUEST_COLUMNS = (
     "id,tenant_id,branch_id,cost_centre_id,requested_by_membership_id,"
-    "required_by_date,status,source_rfq_response_id,estimated_total_amount,estimated_total_currency,"
+    "required_by_date,status,source_rfq_response_id,source_rfq_id,source_quotation_id,"
+    "source_supplier_id,estimated_total_amount,estimated_total_currency,"
     "has_incomplete_estimate,submitted_at,withdrawn_at,delivered_at,"
     "delivery_confirmed_by_membership_id,has_delivery_discrepancy,"
     "created_at,updated_at"
@@ -331,7 +333,7 @@ class RequestsService:
                 line_rows = conn.execute(
                     f"select {LINE_COLUMNS} from purchase_request_line "
                     "where tenant_id = %s and purchase_request_id = %s "
-                    "order by created_at, id",
+                    "order by position, created_at, id",
                     (member.tenant_id, request_id),
                 ).fetchall()
 
@@ -361,6 +363,22 @@ class RequestsService:
                         "order by e.created_at limit 1",
                         (member.tenant_id, request_id),
                     ).fetchone()
+
+                source_row = None
+                if request_row.get("source_supplier_id"):
+                    # The request's own snapshot (20261029060000): RFQ tables are not readable by
+                    # approvers or branch managers, the request and supplier tables are.
+                    supplier = conn.execute(
+                        "select name from supplier where tenant_id = %s and id = %s",
+                        (member.tenant_id, request_row["source_supplier_id"]),
+                    ).fetchone()
+                    source_row = {
+                        "rfq_id": request_row["source_rfq_id"],
+                        "rfq_response_id": request_row["source_rfq_response_id"],
+                        "quotation_id": request_row["source_quotation_id"],
+                        "supplier_id": request_row["source_supplier_id"],
+                        "supplier_name": supplier["name"] if supplier else None,
+                    }
         except (ConflictError, NotFoundError, UnprocessableEntityError):
             raise
         except psycopg.Error as exc:
@@ -376,6 +394,7 @@ class RequestsService:
                 if auto_prepared_row
                 else None
             ),
+            source=RequestSource.model_validate(source_row) if source_row else None,
         )
 
     def list_requests(
@@ -426,6 +445,7 @@ class RequestsService:
             client, visible, list(steps_by_request.values())
         )
         auto_prepared = self._fetch_auto_prepared_batch(client, visible)
+        sources = self._fetch_sources_batch(client, visible)
 
         items = []
         for row in visible:
@@ -445,6 +465,8 @@ class RequestsService:
                     requester_lookup=False,
                     auto_prepared=auto_prepared.get(str(row["id"])),
                     auto_prepared_lookup=False,
+                    source=sources.get(str(row["id"])),
+                    source_lookup=False,
                 )
             )
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
@@ -526,6 +548,7 @@ class RequestsService:
         steps_by_request = {str(step["purchase_request_id"]): step for step in visible_steps}
         membership_emails = self._fetch_membership_emails_batch(client, request_rows, visible_steps)
         auto_prepared = self._fetch_auto_prepared_batch(client, request_rows)
+        sources = self._fetch_sources_batch(client, request_rows)
 
         items = []
         for row in request_rows:
@@ -545,6 +568,8 @@ class RequestsService:
                     requester_lookup=False,
                     auto_prepared=auto_prepared.get(str(row["id"])),
                     auto_prepared_lookup=False,
+                    source=sources.get(str(row["id"])),
+                    source_lookup=False,
                 )
             )
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
@@ -1450,6 +1475,7 @@ class RequestsService:
                 "tenant_id": tenant_id,
                 "purchase_request_id": request_id,
                 "workspace_product_id": str(line.workspace_product_id),
+                "position": position,
                 "quantity": line.quantity,
                 "pack_base_quantity": pack_quantities.get(str(line.workspace_product_id)),
                 "note": line.note,
@@ -1465,7 +1491,7 @@ class RequestsService:
                     else None
                 ),
             }
-            for line, est in zip(payload_lines, estimates, strict=True)
+            for position, (line, est) in enumerate(zip(payload_lines, estimates, strict=True))
         ]
         try:
             response = client.table("purchase_request_line").insert(inserts).execute()
@@ -1616,6 +1642,7 @@ class RequestsService:
                 client.table("purchase_request_line")
                 .select(LINE_COLUMNS)
                 .in_("purchase_request_id", request_ids)
+                .order("position")
                 .order("created_at")
                 .order("id")
                 .execute()
@@ -2120,6 +2147,8 @@ class RequestsService:
         requester_lookup: bool = True,
         auto_prepared: AutoPreparedProvenance | None = None,
         auto_prepared_lookup: bool = True,
+        source: RequestSource | None = None,
+        source_lookup: bool = True,
     ) -> PurchaseRequest:
         if requester_lookup:
             membership_emails = self._fetch_membership_emails_batch(
@@ -2133,6 +2162,8 @@ class RequestsService:
             auto_prepared = self._fetch_auto_prepared_batch(client, [request_row]).get(
                 str(request_row["id"])
             )
+        if source_lookup:
+            source = self._fetch_sources_batch(client, [request_row]).get(str(request_row["id"]))
         return _purchase_request(
             request_row,
             line_rows,
@@ -2142,7 +2173,39 @@ class RequestsService:
             requester_email=requester_email,
             assigned_email=assigned_email,
             auto_prepared=auto_prepared,
+            source=source,
         )
+
+    def _fetch_sources_batch(
+        self, client: Client, request_rows: list[dict[str, object]]
+    ) -> dict[str, RequestSource]:
+        """RFQ, quotation and supplier per request prepared from an RFQ response (R1-H4).
+
+        Built from the request's own source snapshot (20261029060000) so approvers and branch
+        managers, who cannot read the RFQ tables, still see the supplier.
+        """
+        sourced = [row for row in request_rows if row.get("source_supplier_id")]
+        if not sourced:
+            return {}
+        supplier_ids = sorted({str(row["source_supplier_id"]) for row in sourced})
+        try:
+            suppliers = _rows(
+                client.table("supplier").select("id,name").in_("id", supplier_ids).execute().data
+            )
+        except APIError:
+            logger.warning("Request source supplier lookup failed", exc_info=True)
+            suppliers = []
+        supplier_names = {str(s["id"]): s.get("name") for s in suppliers}
+        return {
+            str(row["id"]): RequestSource(
+                rfq_id=row["source_rfq_id"],
+                rfq_response_id=row["source_rfq_response_id"],
+                quotation_id=row["source_quotation_id"],
+                supplier_id=row["source_supplier_id"],
+                supplier_name=supplier_names.get(str(row["source_supplier_id"])),
+            )
+            for row in sourced
+        }
 
     def _fetch_auto_prepared_batch(
         self, client: Client, request_rows: list[dict[str, object]]
@@ -2308,12 +2371,14 @@ def _purchase_request(
     requester_email: str | None = None,
     assigned_email: str | None = None,
     auto_prepared: AutoPreparedProvenance | None = None,
+    source: RequestSource | None = None,
 ) -> PurchaseRequest:
     return PurchaseRequest(
         id=UUID(str(row["id"])),
         source_rfq_response_id=(
             UUID(str(row["source_rfq_response_id"])) if row.get("source_rfq_response_id") else None
         ),
+        source=source,
         auto_prepared=auto_prepared,
         branch_id=UUID(str(row["branch_id"])),
         cost_centre_id=(UUID(str(row["cost_centre_id"])) if row.get("cost_centre_id") else None),

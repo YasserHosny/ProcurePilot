@@ -124,6 +124,7 @@ describe('DetailComponent (RFQ Details)', () => {
         id: 'resp-1',
         rfq_id: 'rfq-sent-1',
         supplier_id: 'sup-1',
+        quotation_id: 'quote-1',
         submitted_at: '2026-10-28T15:00:00Z',
         quotation_status: 'extracted',
         lines: [],
@@ -328,5 +329,61 @@ describe('DetailComponent (RFQ Details)', () => {
     expect(notFoundEl?.textContent).toContain('This RFQ was not found');
     const backLink = notFoundEl?.querySelector('a');
     expect(backLink?.getAttribute('routerLink') ?? backLink?.getAttribute('href')).toBe('/rfq/history');
+  });
+
+  it('renders responded banner with Compare responses button when status is responded', async () => {
+    const mockRespondedDetail: RfqDetail = {
+      ...mockSentDetail,
+      rfq: {
+        ...mockSentDetail.rfq,
+        status: 'responded',
+      },
+    };
+    rfqApiSpy.getRfq.and.returnValue(of(mockRespondedDetail));
+    rfqApiSpy.listResponses.and.returnValue(of({
+      items: [
+        {
+          id: 'resp-1',
+          rfq_id: 'rfq-sent-1',
+          supplier_id: 'sup-1',
+          quotation_id: 'quote-1',
+          submitted_at: '2026-10-28T15:00:00Z',
+          quotation_status: 'reviewed',
+          lines: [],
+        },
+        {
+          id: 'resp-2',
+          rfq_id: 'rfq-sent-1',
+          supplier_id: 'sup-2',
+          quotation_id: 'quote-2',
+          submitted_at: '2026-10-28T16:00:00Z',
+          quotation_status: 'reviewed',
+          lines: [],
+        },
+      ],
+    }));
+
+    component.loadRfq('rfq-sent-1');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const banner = compiled.querySelector('[data-testid="rfq-detail-responded-notice"]');
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain('2 responses received');
+
+    const compareBtn = banner?.querySelector<HTMLButtonElement>('[data-testid="rfq-detail-compare-responses-button"]');
+    expect(compareBtn).not.toBeNull();
+    expect(compareBtn?.textContent?.trim()).toBe('Compare responses');
+
+    compareBtn?.click();
+    fixture.detectChanges();
+    expect(component.selectedTabIndex()).toBe(3);
+    expect(router.navigate).toHaveBeenCalledWith([], {
+      relativeTo: jasmine.anything(),
+      queryParams: { tab: 'responses' },
+      replaceUrl: true,
+    });
   });
 });
