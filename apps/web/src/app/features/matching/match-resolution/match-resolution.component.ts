@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } 
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -22,6 +23,7 @@ import type {
   BaseUnit,
   LandedCost,
   MatchCandidate,
+  MatchCorrectionRequest,
   MatchDecision,
   MatchOutcome,
   MatchResolutionRequest,
@@ -36,6 +38,7 @@ import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { computeBaseQuantity } from '../../catalogue/normalisation';
 
 import { MatchResolutionCandidatesComponent } from './match-resolution-candidates.component';
+import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS } from './correct-match-dialog.component';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 
@@ -57,6 +60,7 @@ import { UnitLabelPipe } from '../../../core/format/unit-label';
     MatRadioModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
+    MatDialogModule,
     MatTooltipModule,
     TranslatePipe,
     FormatQuantityPipe,
@@ -77,6 +81,7 @@ export class MatchResolutionComponent implements OnInit {
   private readonly session = inject(SessionService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
+  private readonly dialog = inject(MatDialog);
 
   readonly isLoading = signal<boolean>(true);
   readonly isSubmitting = signal<boolean>(false);
@@ -98,8 +103,25 @@ export class MatchResolutionComponent implements OnInit {
 
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
+  readonly purchaseRequestConflict = signal<{ id: string; shortId: string } | null>(null);
+  readonly dependentLinesCount = signal<number>(0);
+  readonly aliasConflictNotice = signal<boolean>(false);
+  readonly isReloadable = signal<boolean>(false);
+  private correctionKey: string | null = null;
 
-  readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
+  isWriter(): boolean {
+    return this.session.hasRole('owner', 'buyer');
+  }
+
+  readonly matchedRfqPosition = computed<number | null>(() => {
+    const dec = this.decision();
+    if (!dec || !dec.selected_match_candidate_id) return null;
+    const cand = this.candidates().find((c) => c.id === dec.selected_match_candidate_id);
+    if (cand?.reasons?.rfq?.matched && cand.reasons.rfq.position != null) {
+      return cand.reasons.rfq.position;
+    }
+    return null;
+  });
 
   backQueryParams = computed<Record<string, string>>(() => {
     const qp = this.route.snapshot.queryParamMap;
@@ -217,13 +239,7 @@ export class MatchResolutionComponent implements OnInit {
     this.api.baseUnits().subscribe({
       next: (res) => this.baseUnits.set(res.items),
       error: () => {
-        this.baseUnits.set([
-          { code: 'litre', label_en: 'Litre (L)', label_ar: 'لتر (L)', dimension: 'volume' },
-          { code: 'millilitre', label_en: 'Millilitre (ml)', label_ar: 'مليلتر (ml)', dimension: 'volume' },
-          { code: 'kilogram', label_en: 'Kilogram (kg)', label_ar: 'كيلوغرام (kg)', dimension: 'mass' },
-          { code: 'gram', label_en: 'Gram (g)', label_ar: 'غرام (g)', dimension: 'mass' },
-          { code: 'each', label_en: 'Each (item)', label_ar: 'حبة / قطعة', dimension: 'count' },
-        ]);
+        this.baseUnits.set(FALLBACK_BASE_UNITS);
       },
     });
 
@@ -538,6 +554,107 @@ export class MatchResolutionComponent implements OnInit {
 
   localizedUnitLabel(unit: BaseUnit): string {
     return this.translate.getCurrentLang() === 'ar' ? unit.label_ar : unit.label_en;
+  }
+
+  openCorrectMatchDialog(): void {
+    const dec = this.decision();
+    const l = this.line();
+    if (!dec || !l || !this.isWriter()) return;
+
+    this.correctionKey = crypto.randomUUID();
+
+    const dialogRef = this.dialog.open(CorrectMatchDialogComponent, {
+      width: '640px',
+      data: {
+        line: l,
+        candidates: this.candidates(),
+        expectedCurrentDecisionId: dec.id,
+        currentCandidateId: dec.selected_match_candidate_id ?? null,
+        baseUnits: this.baseUnits(),
+        quotationSupplierId: this.task()?.quotation?.supplier_id ?? null,
+      },
+    });
+
+    dialogRef.afterClosed().subscribe((result: MatchCorrectionRequest | null | undefined) => {
+      if (result) {
+        this.executeCorrection(l.id, result);
+      }
+    });
+  }
+
+  executeCorrection(lineId: string, payload: MatchCorrectionRequest): void {
+    if (!this.isWriter()) return;
+
+    this.isSubmitting.set(true);
+    this.errorMessage.set(null);
+    this.errorTraceId.set(null);
+    this.purchaseRequestConflict.set(null);
+    this.dependentLinesCount.set(0);
+    this.aliasConflictNotice.set(false);
+    this.isReloadable.set(false);
+
+    this.correctionKey ??= crypto.randomUUID();
+    const key = this.correctionKey;
+
+    this.api.correctMatch(lineId, payload, key).subscribe({
+      next: (res) => {
+        this.isSubmitting.set(false);
+        this.correctionKey = null;
+        this.decision.set(res.decision);
+
+        this.snackBar.open(
+          this.translate.instant('matching.resolution.actions.correctSuccess'),
+          undefined,
+          { duration: 3500 },
+        );
+
+        this.loadTask(lineId);
+        this.decision.set(res.decision);
+
+        if (res.lines_matched_through_old_wording && res.lines_matched_through_old_wording.length > 0) {
+          this.dependentLinesCount.set(res.lines_matched_through_old_wording.length);
+        }
+
+        if (res.alias_conflict_product_id) {
+          this.aliasConflictNotice.set(true);
+        }
+      },
+      error: (err: unknown) => {
+        this.isSubmitting.set(false);
+        this.handleCorrectionError(err);
+      },
+    });
+  }
+
+  private handleCorrectionError(err: unknown): void {
+    if (err instanceof HttpErrorResponse) {
+      const apiError = err.error as ApiError | undefined;
+      this.errorTraceId.set(apiError?.trace_id ?? null);
+
+      if (err.status === 409) {
+        const details = (apiError?.details as Record<string, unknown> | undefined);
+        const reason = details?.['reason'];
+
+        if (reason === 'line_on_purchase_request') {
+          const prId = String(details?.['purchase_request_id'] ?? '');
+          const shortId = prId ? prId.slice(0, 8) : '';
+          this.purchaseRequestConflict.set({ id: prId, shortId });
+          this.errorMessage.set(
+            this.translate.instant('matching.resolution.errors.lineOnPurchaseRequest', { shortId }),
+          );
+          return;
+        }
+
+        if (reason === 'decision_changed') {
+          this.isReloadable.set(true);
+          this.errorMessage.set(
+            this.translate.instant('matching.resolution.errors.decisionChanged'),
+          );
+          return;
+        }
+      }
+    }
+    this.handleError(err);
   }
 
   private handleError(err: unknown): void {

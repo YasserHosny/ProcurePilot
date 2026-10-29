@@ -209,6 +209,12 @@ class Settings(BaseSettings):
     matching_trigram_threshold: float = Field(
         default=0.30, validation_alias="MATCHING_TRIGRAM_THRESHOLD", ge=0, le=1
     )
+    matching_rfq_fit_floor: float = Field(
+        default=0.30, validation_alias="MATCHING_RFQ_FIT_FLOOR", ge=0, le=1
+    )
+    matching_rfq_fit_margin: float = Field(
+        default=0.15, validation_alias="MATCHING_RFQ_FIT_MARGIN", ge=0, le=1
+    )
     matching_embedding_provider_mode: Literal["stub", "bedrock"] = Field(
         default="stub", validation_alias="MATCHING_EMBEDDING_PROVIDER_MODE"
     )

@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictStr, model_validator
 from procurepilot_api.modules.catalogue.models import ProductCreate
 from procurepilot_api.modules.quotations.schemas import Money, Pack
 
+# Synthetic corrections use resolved/corrected; auto_accepted filters include them too.
 MatchTaskStatus = Literal["open", "in_progress", "resolved", "auto_accepted"]
 MatchTaskStatusFilter = Literal["open", "in_progress", "resolved", "auto_accepted", "all"]
 MatchTaskPriority = Literal["low", "normal", "high"]
@@ -19,6 +20,8 @@ MatchTaskReason = Literal[
     "no_candidate",
     "alias_conflict",
     "auto_accepted",
+    "corrected",
+    "human_decided",
 ]
 QuotedExposureIssue = Literal["currency_mismatch"]
 MatchOutcome = Literal[
@@ -42,13 +45,31 @@ class FeatureScore(BaseModel):
     price_plausibility: str
 
 
+class RfqMatchReason(BaseModel):
+    rule_version: str | None = None
+    rfq_id: UUID
+    rfq_line_id: UUID | None = None
+    position: int | None = None
+    wording_score: str | None = None
+    pack_check: Literal["equal", "conflict", "unknown"] | None = None
+    quoted_pack_base_quantity: str | None = None
+    rfq_pack_base_quantity: str | None = None
+    quoted_pack_unit: str | None = None
+    rfq_pack_unit: str | None = None
+    fitting_rfq_line_ids: list[UUID] = Field(default_factory=list)
+    not_in_rfq: bool = False
+    matched: bool = False
+
+
 class MatchReason(BaseModel):
     alias_hit: bool
     gtin_match: bool
     supplier_code_match: bool
-    lexical_similarity: str
-    semantic_similarity: str
-    feature_score: FeatureScore
+    lexical_similarity: str | None = None
+    semantic_similarity: str | None = None
+    feature_score: FeatureScore | None = None
+    rfq: RfqMatchReason | None = None
+    measured: dict[str, str] | None = None
 
 
 class ProductSummary(BaseModel):
@@ -170,6 +191,30 @@ class MatchResolutionRequest(StrictApiModel):
         return self
 
 
+class MatchCorrectionRequest(StrictApiModel):
+    expected_current_decision_id: UUID
+    outcome: Literal["same_product", "no_match_new_product"]
+    selected_match_candidate_id: UUID | None = None
+    new_product: ProductCreate | None = None
+    learn_alias: bool = True
+
+    @model_validator(mode="after")
+    def _consistent_payload(self) -> MatchCorrectionRequest:
+        if self.outcome == "same_product":
+            if self.selected_match_candidate_id is None or self.new_product is not None:
+                raise ValueError("same_product requires only selected_match_candidate_id")
+        elif self.new_product is None or self.selected_match_candidate_id is not None:
+            raise ValueError("no_match_new_product requires only new_product")
+        return self
+
+
+class MatchCorrectionResponse(BaseModel):
+    decision: MatchDecision
+    superseded_decision_id: UUID
+    lines_matched_through_old_wording: list[UUID]
+    alias_conflict_product_id: UUID | None = None
+
+
 class ExactMatchSummary(BaseModel):
     count: int = Field(ge=0)
 
@@ -187,6 +232,7 @@ class MatchTaskList(BaseModel):
 class MatchQueueCandidateSummary(BaseModel):
     product_name: str
     confidence: str
+    rfq_position: int | None = None
 
 
 class MatchQueueItem(BaseModel):

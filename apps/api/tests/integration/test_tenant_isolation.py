@@ -1288,6 +1288,51 @@ def test_another_workspaces_request_groups_are_invisible_and_unwritable(
     assert visible == 0
 
 
+def test_live_request_lookup_never_answers_for_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """Spec 023 FR-005: match_decision_live_request is SECURITY DEFINER but pinned to the caller's
+    tenant, so beta's decision id answers null to alpha, as a decision with no request does."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, beta)
+        cur.execute(
+            "select id from match_decision where quotation_line_id = %s",
+            (beta.quotation_line_id,),
+        )
+        row = cur.fetchone()
+        assert row is not None
+        beta_decision = row[0]
+        branch_id, request_id = uuid4(), uuid4()
+        cur.execute("reset role")
+        cur.execute(
+            "insert into branch (id,tenant_id,name) values (%s,%s,'Beta branch')",
+            (branch_id, beta.tenant_id),
+        )
+        cur.execute("select id from membership where tenant_id = %s limit 1", (beta.tenant_id,))
+        requester = cur.fetchone()[0]
+        cur.execute(
+            "insert into purchase_request (id,tenant_id,branch_id,requested_by_membership_id,"
+            "required_by_date,status) values (%s,%s,%s,%s,current_date+7,'submitted')",
+            (request_id, beta.tenant_id, branch_id, requester),
+        )
+        cur.execute(
+            "insert into purchase_request_line (tenant_id,purchase_request_id,"
+            "workspace_product_id,quantity,estimated_unit_price_source_landed_cost_id) "
+            "select tenant_id, %s, (select matched_workspace_product_id from match_decision "
+            "where id = %s), 1, id from landed_cost where match_decision_id = %s",
+            (request_id, beta_decision, beta_decision),
+        )
+        act_as(cur, beta)
+        cur.execute("select match_decision_live_request(%s)", (beta_decision,))
+        own = cur.fetchone()[0]
+        act_as(cur, alpha)
+        cur.execute("select match_decision_live_request(%s)", (beta_decision,))
+        foreign = cur.fetchone()[0]
+    assert own is not None  # beta sees a live request (ours, or the fixture's own)
+    assert foreign is None
+
+
 def test_another_workspaces_landed_costs_are_invisible(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:

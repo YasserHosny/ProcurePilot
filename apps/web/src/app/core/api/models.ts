@@ -465,7 +465,9 @@ export type MatchTaskReason =
   | 'fuzzy_match_review'
   | 'no_candidate'
   | 'alias_conflict'
-  | 'auto_accepted';
+  | 'auto_accepted'
+  | 'corrected'
+  | 'human_decided';
 
 export interface ProductSummary {
   readonly id: string;
@@ -500,13 +502,31 @@ export interface FeatureScore {
   readonly price_plausibility: string;
 }
 
+export interface RfqMatchReason {
+  readonly rule_version?: string | null;
+  readonly rfq_id: string;
+  readonly rfq_line_id?: string | null;
+  readonly position?: number | null;
+  readonly wording_score?: string | null;
+  readonly pack_check?: 'equal' | 'conflict' | 'unknown' | null;
+  readonly quoted_pack_base_quantity?: string | null;
+  readonly quoted_pack_unit?: string | null;
+  readonly rfq_pack_base_quantity?: string | null;
+  readonly rfq_pack_unit?: string | null;
+  readonly fitting_rfq_line_ids?: readonly string[];
+  readonly not_in_rfq?: boolean;
+  readonly matched?: boolean;
+}
+
 export interface MatchReason {
   readonly alias_hit: boolean;
   readonly gtin_match: boolean;
   readonly supplier_code_match: boolean;
-  readonly lexical_similarity: string;
-  readonly semantic_similarity: string;
-  readonly feature_score: FeatureScore;
+  readonly lexical_similarity?: string | null;
+  readonly semantic_similarity?: string | null;
+  readonly feature_score?: FeatureScore | null;
+  readonly rfq?: RfqMatchReason | null;
+  readonly measured?: Record<string, string> | null;
 }
 
 export interface MatchCandidate {
@@ -532,6 +552,8 @@ export interface MatchDecision {
   readonly decided_at: string;
   readonly confidence: string;
   readonly alias_id?: string | null;
+  readonly supersedes_decision_id?: string | null;
+  readonly learned_from_decision_id?: string | null;
 }
 
 export interface QuotationMatchSummary {
@@ -568,6 +590,7 @@ export interface MatchTask {
 export interface MatchQueueCandidateSummary {
   readonly product_name: string;
   readonly confidence: string;
+  readonly rfq_position?: number | null;
 }
 
 export interface MatchQueueItem {
@@ -579,6 +602,8 @@ export interface MatchQueueItem {
   readonly priority: MatchTaskPriority;
   readonly reason: MatchTaskReason;
   readonly top_candidate?: MatchQueueCandidateSummary | null;
+  readonly decision?: MatchDecision | null;
+  readonly candidates?: readonly MatchCandidate[];
   readonly created_at: string;
   readonly resolved_at?: string | null;
   readonly supplier_name?: string | null;
@@ -632,6 +657,21 @@ export interface MatchResolutionRequest {
   readonly outcome: MatchOutcome;
   readonly selected_match_candidate_id?: string | null;
   readonly create_product?: ProductCreate | null;
+}
+
+export interface MatchCorrectionRequest {
+  readonly expected_current_decision_id: string;
+  readonly outcome: 'same_product' | 'no_match_new_product';
+  readonly selected_match_candidate_id?: string | null;
+  readonly new_product?: ProductCreate | null;
+  readonly learn_alias?: boolean;
+}
+
+export interface MatchCorrectionResponse {
+  readonly decision: MatchDecision;
+  readonly superseded_decision_id: string;
+  readonly lines_matched_through_old_wording: readonly string[];
+  readonly alias_conflict_product_id?: string | null;
 }
 
 export interface LandedCost {

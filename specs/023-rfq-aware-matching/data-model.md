@@ -50,6 +50,8 @@ because of `security_invoker`.
     "pack_check": "equal | conflict | unknown",
     "quoted_pack_base_quantity": "10.000000",
     "rfq_pack_base_quantity": "10.000000",
+    "quoted_pack_unit": "kilogram",
+    "rfq_pack_unit": "kilogram",
     "fitting_rfq_line_ids": ["…"]
   },
   "measured": {"lexical_similarity": "0.6400", "pack_unit_match": "1.0000"},
@@ -58,6 +60,13 @@ because of `security_invoker`.
   "supplier_code_match": false
 }
 ```
+
+`quoted_pack_unit` is the unit `quoted_pack_base_quantity` is in: the RFQ line's base unit when the quoted pack
+converts to it, the quoted unit when it cannot (a litre pack against a kilogram line is a `conflict` in litres).
+
+The review queue (`GET /match-tasks`) carries `top_candidate.rfq_position`. On an open task, it is the top
+candidate's RFQ line position. On a decided row, it is the position only when the decision's own selected candidate
+is an RFQ match; a match corrected away from an RFQ line has none.
 
 `measured` lists only signals computed for this line. When it is absent (legacy rows), the web
 treats the `feature_score` entries as unmeasured (research R4).

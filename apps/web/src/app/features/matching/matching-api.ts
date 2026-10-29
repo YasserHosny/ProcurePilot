@@ -12,11 +12,14 @@ export type {
   ProductSummary,
   QuotationLineSummary,
   FeatureScore,
+  RfqMatchReason,
   MatchReason,
   MatchCandidate,
   MatchDecision,
   MatchTask,
   MatchResolutionRequest,
+  MatchCorrectionRequest,
+  MatchCorrectionResponse,
   LandedCost,
   QuotationLineMatchState,
   QuotationMatches,
@@ -25,3 +28,16 @@ export type {
   Money,
   ApiError,
 } from '../../core/api/models';
+
+import type { Observable } from 'rxjs';
+import type { ApiService } from '../../core/api/api.service';
+import type { MatchCorrectionRequest, MatchCorrectionResponse } from '../../core/api/models';
+
+export function correctMatch(
+  api: ApiService,
+  lineId: string,
+  body: MatchCorrectionRequest,
+  idempotencyKey?: string,
+): Observable<MatchCorrectionResponse> {
+  return api.correctMatch(lineId, body, idempotencyKey);
+}

@@ -33,6 +33,7 @@ from procurepilot_api.modules.matching import service as matching_module
 from procurepilot_api.modules.matching.resolution_service import MatchResolutionService
 from procurepilot_api.modules.matching.schemas import MatchResolutionRequest
 from procurepilot_api.modules.matching.service import MatchingService
+from procurepilot_api.modules.rfq.read_api import rfq_lines_for_quotation_with_conn
 from procurepilot_api.shared.audit import AuditEventCreate
 from procurepilot_api.shared.logging import reset_trace_id, set_trace_id
 
@@ -88,6 +89,13 @@ def conn() -> object:
 def _local_side_effects(conn: object, monkeypatch: pytest.MonkeyPatch) -> None:
     """Audit through the test connection (no PostgREST) and skip the guardrail job queue."""
     writer = _PsycopgAuditWriter(conn)
+    monkeypatch.setattr(
+        matching_module,
+        "rfq_lines_for_quotation",
+        lambda _settings, _member, quotation_id: rfq_lines_for_quotation_with_conn(
+            conn, quotation_id
+        ),
+    )
     monkeypatch.setattr(matching_module, "get_audit_writer", lambda: writer)
     monkeypatch.setattr(resolution_module, "get_audit_writer", lambda: writer)
     monkeypatch.setattr(resolution_module, "enqueue_guardrail_evaluation", lambda *_a, **_k: None)

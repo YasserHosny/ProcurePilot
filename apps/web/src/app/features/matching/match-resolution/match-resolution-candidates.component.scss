@@ -99,6 +99,7 @@ kbd {
   &.high { background: var(--pp-success-container); color: var(--pp-success); }
   &.medium { background: var(--pp-warning-container); color: var(--pp-warning); }
   &.low { background: var(--pp-error-container); color: var(--pp-error); }
+  &.rfq-info { background: var(--pp-info-container); color: var(--pp-info); }
   .conf-score { font-size: 1rem; font-weight: 800; }
   .conf-label { font-size: 0.65rem; text-transform: uppercase; }
 }
@@ -129,16 +130,50 @@ kbd {
   flex-wrap: wrap;
   gap: 0.4rem;
 
-  .signal-badge.hit {
+  .signal-badge {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
+    padding-block: 0.2rem;
+    padding-inline: 0.5rem;
+    border-radius: var(--pp-radius-chip, 4px);
     font-size: 0.75rem;
     font-weight: 600;
-    background: var(--pp-info-container);
-    color: var(--pp-info);
+
+    mat-icon {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+    }
+
+    &.hit {
+      background: var(--pp-info-container);
+      color: var(--pp-info);
+    }
+
+    &.rfq-badge {
+      background: var(--pp-info-container);
+      color: var(--pp-info);
+      border: 1px solid var(--pp-info);
+    }
+
+    &.rfq-conflict-badge {
+      background: var(--pp-warning-container);
+      color: var(--pp-warning);
+      border: 1px solid var(--pp-warning);
+    }
+
+    &.rfq-neutral-badge {
+      background: var(--pp-surface-sunken);
+      color: var(--pp-text-muted);
+      border: 1px solid var(--pp-border-strong);
+    }
+
+    &.rfq-multi-badge {
+      background: var(--pp-surface-sunken);
+      color: var(--pp-info);
+      border: 1px dashed var(--pp-info);
+    }
   }
 }
 

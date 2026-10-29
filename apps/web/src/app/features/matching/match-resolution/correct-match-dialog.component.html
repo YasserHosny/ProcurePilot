@@ -1,0 +1,180 @@
+<div class="correct-dialog-container" role="dialog" [attr.aria-label]="'matching.resolution.correction.dialogTitle' | translate">
+  <h2 mat-dialog-title class="dialog-title">
+    <mat-icon aria-hidden="true">edit</mat-icon>
+    <span>{{ 'matching.resolution.correction.dialogTitle' | translate }}</span>
+  </h2>
+
+  <mat-dialog-content class="dialog-content">
+    <p class="dialog-subtitle">{{ 'matching.resolution.correction.dialogSubtitle' | translate }}</p>
+
+    <!-- Line being corrected -->
+    <div class="line-summary-banner">
+      <span class="line-badge">#{{ data.line.line_number }}</span>
+      <span class="line-text">{{ data.line.original_text }}</span>
+    </div>
+
+    <!-- Candidate choices -->
+    <section class="candidates-choice-section">
+      <h3 class="section-title">{{ 'matching.resolution.correction.candidatesTitle' | translate }}</h3>
+
+      <div class="candidates-list" role="radiogroup">
+        @for (cand of data.candidates; track cand.id) {
+          <label
+            class="dialog-candidate-item"
+            [class.selected]="selectedOutcome() === 'same_product' && selectedCandidateId() === cand.id"
+          >
+            <input
+              type="radio"
+              name="correct_candidate"
+              class="dialog-radio"
+              [value]="cand.id"
+              [checked]="selectedOutcome() === 'same_product' && selectedCandidateId() === cand.id"
+              (change)="selectCandidate(cand.id)"
+            />
+            <div class="cand-row-content">
+              <div class="cand-row-header">
+                <span class="cand-rank">#{{ cand.rank }}</span>
+                <strong class="cand-name">{{ cand.candidate_product.tenant_name }}</strong>
+                <div
+                  class="cand-score-badge"
+                  [class.high]="formatScore(cand.confidence) >= 90"
+                  [class.medium]="(formatScore(cand.confidence) >= 70 && formatScore(cand.confidence) < 90) || isRfqCandidate(cand)"
+                  [class.low]="formatScore(cand.confidence) < 70 && !isRfqCandidate(cand)"
+                  [class.rfq-info]="isRfqCandidate(cand)"
+                >
+                  {{ formatScore(cand.confidence) }}%
+                </div>
+              </div>
+
+              <!-- RFQ Badges -->
+              <div class="cand-rfq-badges">
+                @if (cand.reasons.rfq?.rfq_line_id && cand.reasons.rfq?.pack_check !== 'conflict') {
+                  <span class="dialog-badge rfq-badge">
+                    <mat-icon aria-hidden="true">receipt_long</mat-icon>
+                    {{ 'matching.resolution.candidates.signals.rfqLine' | translate: { position: cand.reasons.rfq?.position } }}
+                  </span>
+                }
+                @if (cand.reasons.rfq?.pack_check === 'conflict') {
+                  <span class="dialog-badge rfq-conflict-badge">
+                    <mat-icon aria-hidden="true">warning</mat-icon>
+                    {{ 'matching.resolution.candidates.signals.packConflict' | translate: {
+                      asked: (cand.reasons.rfq?.rfq_pack_base_quantity | formatQuantity) + ' ' + ((cand.reasons.rfq?.rfq_pack_unit || cand.candidate_product.base_unit) | unitLabel),
+                      quoted: (cand.reasons.rfq?.quoted_pack_base_quantity | formatQuantity) + ' ' + ((cand.reasons.rfq?.quoted_pack_unit || cand.candidate_product.base_unit) | unitLabel)
+                    } }}
+                  </span>
+                }
+                @if (cand.reasons.rfq?.not_in_rfq) {
+                  <span class="dialog-badge rfq-neutral-badge">
+                    <mat-icon aria-hidden="true">remove_circle_outline</mat-icon>
+                    {{ 'matching.resolution.candidates.signals.notInRfq' | translate }}
+                  </span>
+                }
+                @if (cand.reasons.rfq?.fitting_rfq_line_ids && cand.reasons.rfq!.fitting_rfq_line_ids!.length > 1) {
+                  <span class="dialog-badge rfq-multi-badge">
+                    <mat-icon aria-hidden="true">help_outline</mat-icon>
+                    {{ 'matching.resolution.candidates.signals.multiFittingRfqLines' | translate }}
+                  </span>
+                }
+              </div>
+            </div>
+          </label>
+        }
+
+        <!-- Create new product choice -->
+        <label
+          class="dialog-candidate-item new-product-choice"
+          [class.selected]="selectedOutcome() === 'no_match_new_product'"
+        >
+          <input
+            type="radio"
+            name="correct_candidate"
+            class="dialog-radio"
+            value="no_match_new_product"
+            [checked]="selectedOutcome() === 'no_match_new_product'"
+            (change)="selectOutcome('no_match_new_product')"
+          />
+          <div class="cand-row-content">
+            <div class="cand-row-header">
+              <mat-icon aria-hidden="true">add_circle_outline</mat-icon>
+              <strong>{{ 'matching.resolution.outcomes.no_match_new_product.label' | translate }}</strong>
+            </div>
+            <p class="cand-desc">{{ 'matching.resolution.outcomes.no_match_new_product.description' | translate }}</p>
+          </div>
+        </label>
+      </div>
+    </section>
+
+    <!-- New product form when selected -->
+    @if (selectedOutcome() === 'no_match_new_product') {
+      <form [formGroup]="productForm" class="new-product-form">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>{{ 'matching.resolution.newProduct.tenantNameLabel' | translate }}</mat-label>
+          <input matInput formControlName="tenant_name" required />
+        </mat-form-field>
+
+        <div class="form-row">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'matching.resolution.newProduct.brandLabel' | translate }}</mat-label>
+            <input matInput formControlName="brand" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'matching.resolution.newProduct.variantLabel' | translate }}</mat-label>
+            <input matInput formControlName="variant" />
+          </mat-form-field>
+        </div>
+
+        <div class="form-row">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'matching.resolution.newProduct.baseUnitLabel' | translate }}</mat-label>
+            <mat-select formControlName="base_unit" required>
+              @for (unit of data.baseUnits; track unit.code) {
+                <mat-option [value]="unit.code">{{ unit.code | unitLabel }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'matching.resolution.newProduct.packCountLabel' | translate }}</mat-label>
+            <input matInput type="number" formControlName="pack_count" min="1" required />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'matching.resolution.newProduct.unitSizeLabel' | translate }}</mat-label>
+            <input matInput formControlName="unit_size" required />
+          </mat-form-field>
+        </div>
+      </form>
+    }
+
+    <mat-divider class="dialog-divider"></mat-divider>
+
+    <!-- Learn alias checkbox (default checked) -->
+    <div class="learn-alias-row">
+      <mat-checkbox
+        [checked]="learnAlias()"
+        (change)="learnAlias.set($event.checked)"
+        color="primary"
+        class="learn-alias-checkbox"
+      >
+        <span>{{ 'matching.resolution.correction.learnAlias' | translate }}</span>
+      </mat-checkbox>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end" class="dialog-actions">
+    <button mat-stroked-button type="button" (click)="onCancel()" class="cancel-btn">
+      {{ 'matching.resolution.correction.cancel' | translate }}
+    </button>
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      class="confirm-correction-btn"
+      (click)="onConfirm()"
+      [disabled]="selectedOutcome() === 'same_product' && !selectedCandidateId()"
+    >
+      {{ 'matching.resolution.correction.submit' | translate }}
+    </button>
+  </mat-dialog-actions>
+</div>

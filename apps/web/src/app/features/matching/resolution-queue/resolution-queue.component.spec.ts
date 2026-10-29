@@ -7,7 +7,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { CatalogueRefreshReview, MatchTask, Role } from '../../../core/api/models';
+import type { CatalogueRefreshReview, MatchQueueItem, MatchTask, MatchTaskReason, Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { ResolutionQueueComponent } from './resolution-queue.component';
 
@@ -15,6 +15,14 @@ describe('ResolutionQueueComponent', () => {
   let component: ResolutionQueueComponent;
   let fixture: ComponentFixture<ResolutionQueueComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  let mockSession: {
+    hasRole: jasmine.Spy;
+    role: ReturnType<typeof signal<Role | null>>;
+    currentMember: ReturnType<typeof signal<unknown>>;
+    isAuthenticated: ReturnType<typeof signal<boolean>>;
+    tenant: ReturnType<typeof signal<unknown>>;
+    activeLocale: ReturnType<typeof signal<string>>;
+  };
 
   const mockTasks: MatchTask[] = [
     {
@@ -128,18 +136,24 @@ describe('ResolutionQueueComponent', () => {
   beforeEach(async () => {
     apiService = jasmine.createSpyObj('ApiService', [
       'getMatchTasks',
+      'getMatchTaskForLine',
+      'correctMatch',
       'getExactMatchCount',
       'confirmExactMatches',
       'listCatalogueRefreshReviews',
       'approveCatalogueRefreshReview',
       'rejectCatalogueRefreshReview',
+      'baseUnits',
     ]);
+    apiService.baseUnits.and.returnValue(
+      of({ items: [{ code: 'litre', label_en: 'Litre', label_ar: 'لتر', dimension: 'volume' }] }),
+    );
     apiService.getMatchTasks.and.returnValue(of({ items: mockTasks, next_cursor: 'cursor-123' }));
     apiService.listCatalogueRefreshReviews.and.returnValue(of({ items: [], next_cursor: null }));
     apiService.getExactMatchCount.and.returnValue(of({ count: 3 }));
     apiService.confirmExactMatches.and.returnValue(of({ confirmed: 3, skipped: 0 }));
 
-    const mockSession = {
+    mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
       role: signal<Role | null>('buyer'),
       currentMember: signal(null),
@@ -493,5 +507,222 @@ describe('ResolutionQueueComponent', () => {
     expect(component.isLoading()).toBeFalse();
     expect(component.errorMessage()).toBe('Failed to fetch tasks');
     expect(component.errorTraceId()).toBe('tr-err-1');
+  });
+
+  describe('RFQ-aware matching in queue (spec 023 US1)', () => {
+    it('shows "Correct match" button for auto-accepted line when isWriter, and hides it for non-writer', () => {
+      const autoTask: MatchTask = {
+        ...mockTasks[0],
+        id: 'task-auto-1',
+        status: 'auto_accepted',
+      };
+      component.tasks.set([autoTask]);
+      fixture.detectChanges();
+
+      let correctBtn = fixture.nativeElement.querySelector('.correct-match-btn') as HTMLButtonElement | null;
+      expect(correctBtn).toBeTruthy();
+      expect(correctBtn?.textContent).toContain('Correct match');
+
+      mockSession.hasRole.and.returnValue(false);
+      fixture.detectChanges();
+
+      correctBtn = fixture.nativeElement.querySelector('.correct-match-btn') as HTMLButtonElement | null;
+      expect(correctBtn).toBeNull();
+    });
+
+    it('displays "From your RFQ line {n}" when task has RFQ matched candidate', () => {
+      const rfqTask: MatchQueueItem = {
+        ...mockTasks[0],
+        id: 'task-auto-rfq',
+        status: 'auto_accepted',
+        candidates: undefined,
+        top_candidate: {
+          product_name: 'Organic Whole Milk 2L',
+          confidence: '0.8500',
+          rfq_position: 2,
+        },
+      };
+      component.tasks.set([rfqTask]);
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('From your RFQ line 2');
+    });
+
+    it('does not display RFQ chip when rfq_position is null', () => {
+      const nonRfqTask: MatchQueueItem = {
+        ...mockTasks[0],
+        id: 'task-non-rfq',
+        status: 'auto_accepted',
+        candidates: undefined,
+        top_candidate: {
+          product_name: 'Organic Whole Milk 2L',
+          confidence: '0.8500',
+          rfq_position: null,
+        },
+      };
+      component.tasks.set([nonRfqTask]);
+      fixture.detectChanges();
+
+      const chip = fixture.nativeElement.querySelector('.reason-chip.rfq-chip');
+      expect(chip).toBeNull();
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).not.toContain('From your RFQ line');
+    });
+
+    it('opens dialog and submits correction when Correct match is clicked', () => {
+      const autoTask: MatchTask = {
+        ...mockTasks[0],
+        id: 'task-auto-1',
+        status: 'auto_accepted',
+        decision: {
+          id: 'dec-1',
+          quotation_line_id: 'line-101',
+          matched_product: mockTasks[0].candidates[0].candidate_product,
+          outcome: 'same_product',
+          selected_match_candidate_id: 'cand-1',
+          decided_at: '2026-08-21T01:00:00Z',
+          decided_by: 'buyer@example.com',
+          is_automatic: true,
+          confidence: '0.8500',
+        },
+      };
+      apiService.getMatchTaskForLine.and.returnValue(of(autoTask));
+      apiService.correctMatch.and.returnValue(
+        of({
+          decision: { ...autoTask.decision!, id: 'dec-2' },
+          superseded_decision_id: 'dec-1',
+          lines_matched_through_old_wording: [],
+        }),
+      );
+
+      component.tasks.set([autoTask]);
+      fixture.detectChanges();
+
+      const dialogSpy = spyOn((component as unknown as { dialog: { open: jasmine.Spy } }).dialog, 'open').and.returnValue({
+        afterClosed: () => of({
+          expected_current_decision_id: 'dec-1',
+          outcome: 'same_product',
+          selected_match_candidate_id: 'cand-2',
+          learn_alias: true,
+        }),
+      } as never);
+
+      component.openCorrectMatchDialog(autoTask);
+
+      expect(apiService.getMatchTaskForLine).toHaveBeenCalledWith('line-101');
+      expect(dialogSpy).toHaveBeenCalled();
+      expect(apiService.correctMatch).toHaveBeenCalledWith(
+        'line-101',
+        jasmine.objectContaining({
+          expected_current_decision_id: 'dec-1',
+          selected_match_candidate_id: 'cand-2',
+        }),
+        jasmine.stringMatching(/^[0-9a-f-]{36}$/),
+      );
+    });
+
+    it('passes quotationSupplierId equal to quotation.supplier_id and non-empty baseUnits when opening Correct dialog', () => {
+      const autoTask: MatchTask = {
+        ...mockTasks[0],
+        id: 'task-auto-1',
+        status: 'auto_accepted',
+        quotation: {
+          ...mockTasks[0].quotation,
+          supplier_id: 'supplier-xyz-123',
+          supplier_name: 'Fresh Farms Dairy',
+        },
+        decision: {
+          id: 'dec-1',
+          quotation_line_id: 'line-101',
+          matched_product: mockTasks[0].candidates[0].candidate_product,
+          outcome: 'same_product',
+          selected_match_candidate_id: 'cand-1',
+          decided_at: '2026-08-21T01:00:00Z',
+          decided_by: 'buyer@example.com',
+          is_automatic: true,
+          confidence: '0.8500',
+        },
+      };
+      apiService.getMatchTaskForLine.and.returnValue(of(autoTask));
+
+      component.tasks.set([autoTask]);
+      fixture.detectChanges();
+
+      const dialogSpy = spyOn((component as unknown as { dialog: { open: jasmine.Spy } }).dialog, 'open').and.returnValue({
+        afterClosed: () => of(null),
+      } as never);
+
+      component.openCorrectMatchDialog(autoTask);
+
+      expect(dialogSpy).toHaveBeenCalled();
+      const openArgs = dialogSpy.calls.mostRecent().args;
+      const dialogData = openArgs[1]?.data;
+      expect(dialogData?.quotationSupplierId).toBe('supplier-xyz-123');
+      expect(dialogData?.quotationSupplierId).not.toBe('Fresh Farms Dairy');
+      expect(dialogData?.baseUnits).toBeDefined();
+      expect(dialogData?.baseUnits?.length).toBeGreaterThan(0);
+    });
+
+    it('renders "Corrected" and not raw translation key for task with reason corrected', () => {
+      const correctedTask: MatchTask = {
+        ...mockTasks[0],
+        id: 'task-corrected-1',
+        status: 'resolved',
+        reason: 'corrected' as MatchTaskReason,
+      };
+      component.tasks.set([correctedTask]);
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Corrected');
+      expect(text).not.toContain('matching.queue.reason.corrected');
+    });
+
+    it('handles 409 conflict when correcting match in queue', () => {
+      const autoTask: MatchTask = {
+        ...mockTasks[0],
+        id: 'task-auto-1',
+        status: 'auto_accepted',
+        decision: {
+          id: 'dec-1',
+          quotation_line_id: 'line-101',
+          matched_product: mockTasks[0].candidates[0].candidate_product,
+          outcome: 'same_product',
+          selected_match_candidate_id: 'cand-1',
+          decided_at: '2026-08-21T01:00:00Z',
+          decided_by: 'buyer@example.com',
+          is_automatic: true,
+          confidence: '0.8500',
+        },
+      };
+      const errorResponse = new HttpErrorResponse({
+        status: 409,
+        error: {
+          code: 'conflict',
+          message: 'Line is on a live purchase request',
+          details: {
+            reason: 'line_on_purchase_request',
+            purchase_request_id: '12345678-abcd-ef01-2345-6789abcdef01',
+          },
+        },
+      });
+
+      apiService.getMatchTaskForLine.and.returnValue(of(autoTask));
+      apiService.correctMatch.and.returnValue(throwError(() => errorResponse));
+
+      spyOn((component as unknown as { dialog: { open: jasmine.Spy } }).dialog, 'open').and.returnValue({
+        afterClosed: () => of({
+          expected_current_decision_id: 'dec-1',
+          outcome: 'same_product',
+          selected_match_candidate_id: 'cand-2',
+          learn_alias: true,
+        }),
+      } as never);
+
+      component.openCorrectMatchDialog(autoTask);
+
+      expect(component.errorMessage()).toContain('12345678');
+    });
   });
 });

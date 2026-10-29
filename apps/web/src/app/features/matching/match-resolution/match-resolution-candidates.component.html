@@ -40,7 +40,13 @@
               <span class="cand-rank-badge">#{{ cand.rank }}</span>
               <span class="cand-key-hint"><kbd>{{ cand.rank }}</kbd></span>
             </div>
-            <div class="cand-confidence-badge" [class.high]="formatScore(cand.confidence) >= 90" [class.medium]="formatScore(cand.confidence) >= 70 && formatScore(cand.confidence) < 90" [class.low]="formatScore(cand.confidence) < 70">
+            <div
+              class="cand-confidence-badge"
+              [class.high]="formatScore(cand.confidence) >= 90"
+              [class.medium]="(formatScore(cand.confidence) >= 70 && formatScore(cand.confidence) < 90) || isRfqCandidate(cand)"
+              [class.low]="formatScore(cand.confidence) < 70 && !isRfqCandidate(cand)"
+              [class.rfq-info]="isRfqCandidate(cand)"
+            >
               <span class="conf-score">{{ formatScore(cand.confidence) }}%</span>
               <span class="conf-label">{{ 'matching.resolution.candidates.confidence' | translate }}</span>
             </div>
@@ -77,6 +83,33 @@
             <div class="signals-title">{{ 'matching.resolution.candidates.signalsTitle' | translate }}</div>
 
             <div class="signal-badges">
+              @if (cand.reasons.rfq?.rfq_line_id && cand.reasons.rfq?.pack_check !== 'conflict') {
+                <span class="signal-badge rfq-badge">
+                  <mat-icon aria-hidden="true">receipt_long</mat-icon>
+                  {{ 'matching.resolution.candidates.signals.rfqLine' | translate: { position: cand.reasons.rfq?.position } }}
+                </span>
+              }
+              @if (cand.reasons.rfq?.pack_check === 'conflict') {
+                <span class="signal-badge rfq-conflict-badge">
+                  <mat-icon aria-hidden="true">warning</mat-icon>
+                  {{ 'matching.resolution.candidates.signals.packConflict' | translate: {
+                    asked: (cand.reasons.rfq?.rfq_pack_base_quantity | formatQuantity) + ' ' + ((cand.reasons.rfq?.rfq_pack_unit || cand.candidate_product.base_unit) | unitLabel),
+                    quoted: (cand.reasons.rfq?.quoted_pack_base_quantity | formatQuantity) + ' ' + ((cand.reasons.rfq?.quoted_pack_unit || cand.candidate_product.base_unit) | unitLabel)
+                  } }}
+                </span>
+              }
+              @if (cand.reasons.rfq?.not_in_rfq) {
+                <span class="signal-badge rfq-neutral-badge">
+                  <mat-icon aria-hidden="true">remove_circle_outline</mat-icon>
+                  {{ 'matching.resolution.candidates.signals.notInRfq' | translate }}
+                </span>
+              }
+              @if (cand.reasons.rfq?.fitting_rfq_line_ids && cand.reasons.rfq!.fitting_rfq_line_ids!.length > 1) {
+                <span class="signal-badge rfq-multi-badge">
+                  <mat-icon aria-hidden="true">help_outline</mat-icon>
+                  {{ 'matching.resolution.candidates.signals.multiFittingRfqLines' | translate }}
+                </span>
+              }
               @if (cand.reasons.alias_hit) {
                 <span class="signal-badge hit" [matTooltip]="'matching.resolution.candidates.signals.aliasHitDesc' | translate">
                   <mat-icon aria-hidden="true">check</mat-icon>
@@ -117,28 +150,30 @@
             </div>
 
             <!-- Feature Scores -->
-            <div class="feature-scores-grid">
-              <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.brandMatch' | translate">
-                <span class="feat-lbl">{{ 'matching.resolution.candidates.product.brand' | translate }}:</span>
-                <span class="feat-val">{{ formatScore(cand.reasons.feature_score.brand_match) }}%</span>
+            @if (cand.reasons.feature_score; as feat) {
+              <div class="feature-scores-grid">
+                <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.brandMatch' | translate">
+                  <span class="feat-lbl">{{ 'matching.resolution.candidates.product.brand' | translate }}:</span>
+                  <span class="feat-val">{{ formatScore(feat.brand_match) }}%</span>
+                </div>
+                <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.variantMatch' | translate">
+                  <span class="feat-lbl">{{ 'matching.resolution.candidates.product.variant' | translate }}:</span>
+                  <span class="feat-val">{{ formatScore(feat.variant_match) }}%</span>
+                </div>
+                <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.packUnitMatch' | translate">
+                  <span class="feat-lbl">{{ 'matching.resolution.candidates.signals.packUnitMatch' | translate }}:</span>
+                  <span class="feat-val">{{ formatScore(feat.pack_unit_match) }}%</span>
+                </div>
+                <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.packSizePlausibility' | translate">
+                  <span class="feat-lbl">{{ 'matching.resolution.candidates.signals.packSizePlausibility' | translate }}:</span>
+                  <span class="feat-val">{{ formatScore(feat.pack_size_plausibility) }}%</span>
+                </div>
+                <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.pricePlausibility' | translate">
+                  <span class="feat-lbl">{{ 'matching.resolution.candidates.signals.pricePlausibility' | translate }}:</span>
+                  <span class="feat-val">{{ formatScore(feat.price_plausibility) }}%</span>
+                </div>
               </div>
-              <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.variantMatch' | translate">
-                <span class="feat-lbl">{{ 'matching.resolution.candidates.product.variant' | translate }}:</span>
-                <span class="feat-val">{{ formatScore(cand.reasons.feature_score.variant_match) }}%</span>
-              </div>
-              <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.packUnitMatch' | translate">
-                <span class="feat-lbl">{{ 'matching.resolution.candidates.signals.packUnitMatch' | translate }}:</span>
-                <span class="feat-val">{{ formatScore(cand.reasons.feature_score.pack_unit_match) }}%</span>
-              </div>
-              <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.packSizePlausibility' | translate">
-                <span class="feat-lbl">{{ 'matching.resolution.candidates.signals.packSizePlausibility' | translate }}:</span>
-                <span class="feat-val">{{ formatScore(cand.reasons.feature_score.pack_size_plausibility) }}%</span>
-              </div>
-              <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.pricePlausibility' | translate">
-                <span class="feat-lbl">{{ 'matching.resolution.candidates.signals.pricePlausibility' | translate }}:</span>
-                <span class="feat-val">{{ formatScore(cand.reasons.feature_score.price_plausibility) }}%</span>
-              </div>
-            </div>
+            }
           </div>
 
           <!-- Select Radio / Check -->

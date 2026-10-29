@@ -1221,6 +1221,9 @@
         "fuzzy_match_review": "Close Match — Needs Confirmation",
         "no_candidate": "No Candidate",
         "alias_conflict": "Alias Conflict",
+        "auto_accepted": "Auto-matched",
+        "corrected": "Corrected",
+        "human_decided": "Decided by a buyer",
         "all": "All Reasons"
       },
       "columns": {
@@ -1246,8 +1249,10 @@
       },
       "actions": {
         "resolve": "Resolve Match",
-        "view": "View Details"
+        "view": "View Details",
+        "correctMatch": "Correct match"
       },
+      "fromRfqLine": "From your RFQ line {{position}}",
       "groupsLabel": "Quotation match tasks",
       "collapseGroup": "Collapse quotation group",
       "expandGroup": "Expand quotation group",
@@ -1331,6 +1336,10 @@
         "selectLabel": "Select candidate #{{rank}}: {{name}}",
         "signalsTitle": "Reason Breakdown",
         "signals": {
+          "rfqLine": "Your RFQ line {{position}}",
+          "packConflict": "Pack differs from your RFQ ({{asked}} asked, {{quoted}} quoted)",
+          "notInRfq": "Not in your RFQ",
+          "multiFittingRfqLines": "Could be more than one of your RFQ lines",
           "aliasHit": "Alias Hit",
           "aliasHitDesc": "Matches existing confirmed alias",
           "gtinMatch": "GTIN Match",
@@ -1446,7 +1455,8 @@
         "decidedAt": "Decided At:",
         "automatic": "Automatic Match",
         "human": "Human Resolution",
-        "confidence": "Match Score:"
+        "confidence": "Match Score:",
+        "fromRfqLine": "From your RFQ line {{position}}"
       },
       "actions": {
         "confirm": "Confirm Match Decision",
@@ -1455,9 +1465,27 @@
         "saveSuccess": "Match saved. Next time this wording matches automatically.",
         "queueCleared": "All match tasks resolved — queue cleared.",
         "candidateRequired": "Please select a candidate before confirming.",
-        "formInvalid": "Please correct the product creation errors before confirming."
+        "formInvalid": "Please correct the product creation errors before confirming.",
+        "correctMatch": "Correct match",
+        "correctSuccess": "Match corrected"
+      },
+      "correction": {
+        "dialogTitle": "Correct match",
+        "dialogSubtitle": "Select another candidate product or create a new catalogue product.",
+        "currentMatch": "Current match",
+        "candidatesTitle": "Available candidates",
+        "learnAlias": "Remember this wording for future matches",
+        "submit": "Save correction",
+        "cancel": "Cancel",
+        "dependentLinesNotice": "{{count}} other lines were matched through the old wording — review them",
+        "reviewQueue": "Review queue",
+        "aliasConflictNotice": "The wording already points to another product; it was not changed"
       },
       "errors": {
+        "lineOnPurchaseRequest": "This match prices request {{shortId}} — withdraw it first",
+        "decisionChanged": "Someone changed this match — reload",
+        "viewRequest": "View request",
+        "reload": "Reload",
         "aliasConflict": "Alias Conflict: This supplier wording is already assigned to a different product in your catalogue.",
         "notReviewed": "Quotation has not reached the reviewed state yet.",
         "invalidCandidate": "Selected candidate is not valid for this quotation line.",

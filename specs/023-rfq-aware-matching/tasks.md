@@ -24,8 +24,8 @@ implementation task.
 
 ## Phase 1: Setup
 
-- [ ] T001 Add settings `matching_rfq_fit_floor` (default 0.30, env `MATCHING_RFQ_FIT_FLOOR`) and `matching_rfq_fit_margin` (default 0.15, env `MATCHING_RFQ_FIT_MARGIN`), both `ge=0, le=1`, next to `matching_trigram_threshold` in `apps/api/src/procurepilot_api/config.py`. Document both in the root `.env.example`, next to `MATCHING_TRIGRAM_THRESHOLD`.
-- [ ] T002 Calibrate the fit rule read-only on hosted «مطاعم رواق» (never «مطاعم سند»).
+- [x] T001 Add settings `matching_rfq_fit_floor` (default 0.30, env `MATCHING_RFQ_FIT_FLOOR`) and `matching_rfq_fit_margin` (default 0.15, env `MATCHING_RFQ_FIT_MARGIN`), both `ge=0, le=1`, next to `matching_trigram_threshold` in `apps/api/src/procurepilot_api/config.py`. Document both in the root `.env.example`, next to `MATCHING_TRIGRAM_THRESHOLD`.
+- [x] T002 Calibrate the fit rule read-only on hosted «مطاعم رواق» (never «مطاعم سند»).
   - For RFQ `1b7cd76b` and its two replies (quotes `DH-26-1252`, `WF/2026/0781`), compute `pg_trgm.similarity(normalised original_text, product tenant_name)` for each of the 8 quoted lines against each of the 4 RFQ products.
   - Record the 8×4 matrix and the chosen floor and margin under research.md §R3 "Calibration" in `specs/023-rfq-aware-matching/research.md`.
   - If any right pair is below 0.30, or beats the runner-up by less than 0.15, adjust the defaults in T001 and record why.
@@ -76,7 +76,7 @@ tasks are left open.
 
 ### Tests (red first)
 
-- [ ] T011 [P] [US1] Write unit tests for the fit rule in `apps/api/tests/unit/test_rfq_fit.py`:
+- [x] T011 [P] [US1] Write unit tests for the fit rule in `apps/api/tests/unit/test_rfq_fit.py`:
   - round-1 texts against the 4 products: each fits exactly its own;
   - «زيت» against two oil products: no fit, both returned as fitting;
   - a 5 kg bag against 10 kg: `pack_check="conflict"`, no fit;
@@ -84,13 +84,13 @@ tasks are left open.
   - no pack on the quoted line: fit only with the doubled margin;
   - a position bonus cannot lift a below-floor line;
   - the output reasons carry `rule_version="rfq-fit-v1"`.
-- [ ] T012 [P] [US1] Write a round-1 replay integration test in `apps/api/tests/integration/test_rfq_aware_matching.py` (throwaway DB). It builds an RFQ with 4 products and 2 replies using the round-1 texts and packs, authorizes both, and asserts:
+- [x] T012 [P] [US1] Write a round-1 replay integration test in `apps/api/tests/integration/test_rfq_aware_matching.py` (throwaway DB). It builds an RFQ with 4 products and 2 replies using the round-1 texts and packs, authorizes both, and asserts:
   - 8 automatic decisions with `reasons.rfq`;
   - 0 open `match_task`;
   - one guardrail evaluation enqueued per quotation;
   - `GET /rfq/{id}/responses` lists the lines in RFQ order;
   - a quotation with no RFQ matches exactly as before.
-- [ ] T013 [P] [US1] Write correction integration tests in `apps/api/tests/integration/test_match_correction.py`:
+- [x] T013 [P] [US1] Write correction integration tests in `apps/api/tests/integration/test_match_correction.py`:
   - correcting the head creates a human decision with `supersedes_decision_id`, the view returns it, and a landed cost exists for it;
   - a stale `expected_current_decision_id` gives 409 `decision_changed`;
   - a line priced by a submitted request gives 409 `line_on_purchase_request` with `purchase_request_id`;
@@ -100,32 +100,32 @@ tasks are left open.
 
 ### Implementation
 
-- [ ] T014 [P] [US1] Implement the pure fit rule in a new `apps/api/src/procurepilot_api/modules/matching/rfq_fit.py`, per research R3.
+- [x] T014 [P] [US1] Implement the pure fit rule in a new `apps/api/src/procurepilot_api/modules/matching/rfq_fit.py`, per research R3.
   - Normalisation: NFKC, Arabic letter folding and digit folding, reusing the folding table from `services/extraction-worker/.../azure_di._normalise_header`, copied rather than imported across services.
   - Wording score: the max of trigram similarity against the product name and its aliases, and token containment.
   - Pack check: compare in base units within 0.5 %.
   - Floor and margin: from settings.
   - It returns `RfqFit(matched_rfq_line | None, fitting_lines, reasons)`.
   - T011 green.
-- [ ] T015 [US1] Integrate the RFQ stage into the per-line loop of `MatchingService` in `apps/api/src/procurepilot_api/modules/matching/service.py` (~500–557), before `find_deterministic_candidate`.
+- [x] T015 [US1] Integrate the RFQ stage into the per-line loop of `MatchingService` in `apps/api/src/procurepilot_api/modules/matching/service.py` (~500–557), before `find_deterministic_candidate`.
   - Load `rfq_lines_for_quotation` once per quotation.
   - On a single fit: persist one candidate (`scoring_version="rfq-fit-v1"`) and call `_create_automatic_decision`, with audit target `reason="rfq_fit"`, `rfq_id`, `rfq_line_id` and `rule_version`.
   - On fitting lines without a single fit: persist them as the top-ranked candidates, then the similarity candidates, and route to a task.
   - T012 green.
-- [ ] T016 [US1] Make sure automatic RFQ decisions never learn an alias (FR-004). Assert this in `apps/api/tests/integration/test_rfq_aware_matching.py`, and guard any alias write on `reasons.rfq` in `apps/api/src/procurepilot_api/modules/matching/resolution_service.py`.
-- [ ] T017 [US1] Implement correction in `apps/api/src/procurepilot_api/modules/matching/resolution_service.py`:
+- [x] T016 [US1] Make sure automatic RFQ decisions never learn an alias (FR-004). Assert this in `apps/api/tests/integration/test_rfq_aware_matching.py`, and guard any alias write on `reasons.rfq` in `apps/api/src/procurepilot_api/modules/matching/resolution_service.py`.
+- [x] T017 [US1] Implement correction in `apps/api/src/procurepilot_api/modules/matching/resolution_service.py`: — The lines_matched_through_old_wording list fills once US3 (T025) writes learned_from_decision_id.
   - add `MatchResolutionService.correct(line_id, payload, idempotency_key)`;
   - lock the line, compare `expected_current_decision_id` with the head, and check the purchase-request lock through `purchase_request_line.estimated_unit_price_source_landed_cost_id` (statuses not in withdrawn or rejected);
   - insert the superseding human decision, compute landed cost, enqueue the guardrail evaluation, write the audit, and optionally learn the alias;
   - return the lines with `learned_from_decision_id` = the superseded decision (FR-012).
-- [ ] T018 [US1] Add the route `POST /quotation-lines/{line_id}/match/corrections` with owner/buyer role, a required Idempotency-Key, and the request/response models from `contracts/matching-rfq.openapi.yaml`. Changes go in `apps/api/src/procurepilot_api/modules/matching/router.py` and `schemas.py`. T013 green.
-- [ ] T019 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/matching/match-resolution/match-resolution.component.{ts,html,scss,spec.ts}` and `matching-api.ts`, add:
+- [x] T018 [US1] Add the route `POST /quotation-lines/{line_id}/match/corrections` with owner/buyer role, a required Idempotency-Key, and the request/response models from `contracts/matching-rfq.openapi.yaml`. Changes go in `apps/api/src/procurepilot_api/modules/matching/router.py` and `schemas.py`. T013 green.
+- [x] T019 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/matching/match-resolution/match-resolution.component.{ts,html,scss,spec.ts}` and `matching-api.ts`, add:
   - "From your RFQ line N" on automatic matches;
   - "Not in your RFQ" and "Pack differs from your RFQ (X asked, Y quoted)" labels;
   - a "Correct match" action that calls the corrections endpoint, maps the 409 reasons to copy ("On request PR-…: withdraw it first"), and lists the lines matched through the old wording.
 
   Add i18n keys in `packages/i18n/{en,ar}.json`. Karma red → green.
-- [ ] T020 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/matching/resolution-queue/resolution-queue.component.{ts,html,spec.ts}`, the auto-accepted filter shows the RFQ label and a Correct link per row.
+- [x] T020 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/matching/resolution-queue/resolution-queue.component.{ts,html,spec.ts}`, the auto-accepted filter shows the RFQ label and a Correct link per row.
 
 **Checkpoint**: US1 works end to end on the throwaway DB, and the round-1 replay passes.
 

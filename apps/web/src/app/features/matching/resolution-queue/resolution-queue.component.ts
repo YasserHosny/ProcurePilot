@@ -5,11 +5,13 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSortModule, type Sort } from '@angular/material/sort';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -18,7 +20,9 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ApiService } from '../../../core/api/api.service';
 import type {
   ApiError,
+  BaseUnit,
   CatalogueRefreshReview,
+  MatchCorrectionRequest,
   MatchQueueItem,
   MatchTaskPriority,
   MatchTaskReason,
@@ -31,6 +35,7 @@ import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
+import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS } from '../match-resolution/correct-match-dialog.component';
 
 type MatchTaskSortBy = 'created_at' | 'priority' | 'status';
 type MatchTaskSortOrder = 'asc' | 'desc';
@@ -58,6 +63,8 @@ export interface QuotationTaskGroup {
     MatSortModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
+    MatDialogModule,
+    MatSnackBarModule,
     TranslatePipe,
     UnitLabelPipe,
     FormatDatePipe,
@@ -73,6 +80,8 @@ export class ResolutionQueueComponent implements OnInit {
   private readonly translate = inject(TranslateService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
 
   readonly isLoading = signal<boolean>(true);
   readonly isLoadingMore = signal<boolean>(false);
@@ -98,12 +107,15 @@ export class ResolutionQueueComponent implements OnInit {
   readonly isLoadingRefreshReviews = signal<boolean>(true);
   readonly refreshReviewDecisionId = signal<string | null>(null);
   readonly quotationId = signal<string | null>(null);
+  readonly baseUnits = signal<BaseUnit[]>([]);
   readonly collapsedGroupIds = signal<ReadonlySet<string>>(new Set<string>());
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
   private latestLoadRequestId = 0;
   private exactConfirmKey: string | null = null;
 
-  readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
+  isWriter(): boolean {
+    return this.session.hasRole('owner', 'buyer');
+  }
   readonly hasActiveFilters = computed<boolean>(
     () =>
       this.quotationId() !== null ||
@@ -154,9 +166,19 @@ export class ResolutionQueueComponent implements OnInit {
     if (sortOrder && ['asc', 'desc'].includes(sortOrder)) {
       this.sortOrder.set(sortOrder);
     }
+    this.loadBaseUnits();
     this.loadTasks();
     this.loadRefreshReviews();
     this.loadExactMatchCount();
+  }
+
+  private loadBaseUnits(): void {
+    this.api.baseUnits().subscribe({
+      next: (res) => this.baseUnits.set(res.items.length > 0 ? res.items : FALLBACK_BASE_UNITS),
+      error: () => {
+        this.baseUnits.set(FALLBACK_BASE_UNITS);
+      },
+    });
   }
 
   loadExactMatchCount(): void {
@@ -461,6 +483,84 @@ export class ResolutionQueueComponent implements OnInit {
   private sanitizedSearch(): string | undefined {
     const search = this.searchQuery().trim();
     return search ? search : undefined;
+  }
+
+  rfqPositionForTask(task: MatchQueueItem): number | null {
+    return task.top_candidate?.rfq_position ?? null;
+  }
+
+  openCorrectMatchDialog(task: MatchQueueItem): void {
+    if (!this.isWriter()) return;
+    this.api.getMatchTaskForLine(task.quotation_line.id).subscribe({
+      next: (fullTask) => {
+        const decisionId = fullTask.decision?.id ?? task.decision?.id;
+        if (!decisionId) {
+          this.errorMessage.set(this.translate.instant('matching.resolution.errors.decisionChanged'));
+          return;
+        }
+        const baseUnits = this.baseUnits().length > 0 ? this.baseUnits() : FALLBACK_BASE_UNITS;
+        const dialogRef = this.dialog.open(CorrectMatchDialogComponent, {
+          width: '640px',
+          data: {
+            line: fullTask.quotation_line,
+            candidates: fullTask.candidates,
+            expectedCurrentDecisionId: decisionId,
+            currentCandidateId: fullTask.decision?.selected_match_candidate_id,
+            baseUnits,
+            quotationSupplierId: fullTask.quotation?.supplier_id ?? null,
+          },
+        });
+        dialogRef.afterClosed().subscribe((request: MatchCorrectionRequest | null | undefined) => {
+          if (!request) return;
+          const key = crypto.randomUUID();
+          this.api.correctMatch(task.quotation_line.id, request, key).subscribe({
+            next: () => {
+              this.snackBar.open(
+                this.translate.instant('matching.resolution.actions.correctSuccess'),
+                undefined,
+                { duration: 4000 },
+              );
+              this.loadTasks();
+            },
+            error: (err: unknown) => {
+              this.handleCorrectionError(err);
+            },
+          });
+        });
+      },
+      error: (err: unknown) => {
+        this.handleError(err);
+      },
+    });
+  }
+
+  private handleCorrectionError(err: unknown): void {
+    if (err instanceof HttpErrorResponse) {
+      const apiError = err.error as ApiError | undefined;
+      this.errorTraceId.set(apiError?.trace_id ?? null);
+
+      if (err.status === 409) {
+        const details = apiError?.details as Record<string, unknown> | undefined;
+        const reason = details?.['reason'];
+
+        if (reason === 'line_on_purchase_request') {
+          const prId = String(details?.['purchase_request_id'] ?? '');
+          const shortId = prId ? prId.slice(0, 8) : '';
+          this.errorMessage.set(
+            this.translate.instant('matching.resolution.errors.lineOnPurchaseRequest', { shortId }),
+          );
+          return;
+        }
+
+        if (reason === 'decision_changed') {
+          this.errorMessage.set(
+            this.translate.instant('matching.resolution.errors.decisionChanged'),
+          );
+          return;
+        }
+      }
+    }
+    this.handleError(err);
   }
 
   private isSortableColumn(value: string): value is MatchTaskSortBy {

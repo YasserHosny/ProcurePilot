@@ -472,6 +472,7 @@ def test_matching_pipeline_passes_supplier_code_aliases_to_deterministic_matcher
     )()
     service = MatchingService()
 
+    monkeypatch.setattr(matching_service_module, "rfq_lines_for_quotation", lambda *_: None)
     monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
     monkeypatch.setattr(matching_service_module, "_decision_for_line", lambda _c, _lid: None)
     monkeypatch.setattr(matching_service_module, "_candidate_rows", lambda _c, _lid: [])
