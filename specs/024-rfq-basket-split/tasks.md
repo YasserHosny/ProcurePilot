@@ -60,7 +60,7 @@ moves it.
   - It factors out the `pg_advisory_xact_lock('rfq-prepare:…')`, the `converted` check and the `mark_rfq_converted` call from `prepare_request`.
   - Single-supplier `prepare_request` now uses it, and its existing tests stay green.
   - Add the read of `converted_purchase_request_ids` and `request_group_id` to the RFQ detail (rfq/service.py ~1010) and `modules/rfq/schemas.py`. Single-request RFQs return a one-item list.
-- [ ] T007 [P] Add `RequestGroupSummary` and `PurchaseRequest.request_group` (nullable, shape in data-model.md) to `modules/requests/schemas.py`. Populate it in one batched query in `_purchase_request_with_budget_status` and the list paths of `modules/requests/service.py`: position by `created_at, id` within the group, plus `sibling_request_ids`.
+- [x] T007 [P] Add `RequestGroupSummary` and `PurchaseRequest.request_group` (nullable, shape in data-model.md) to `modules/requests/schemas.py`. Populate it in one batched query in `_purchase_request_with_budget_status` and the list paths of `modules/requests/service.py`: position by `created_at, id` within the group, plus `sibling_request_ids`.
 - [ ] T008 [P] Add `BasketSplitJob.rfq_id: UUID | None` in `modules/offers/schemas.py` and read it in `modules/offers/basket_service.py`.
 
 **Checkpoint**: the schema and conversion interface are ready, and the existing RFQ, request and basket

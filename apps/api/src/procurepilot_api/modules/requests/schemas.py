@@ -86,8 +86,20 @@ class RequestSource(BaseModel):
     supplier_name: str | None = None
 
 
+class RequestGroupSummary(BaseModel):
+    id: UUID
+    rfq_id: UUID
+    position: int
+    size: int
+    combined_total: Money
+    best_single_total: Money | None
+    saving: Money | None
+    sibling_request_ids: list[UUID]
+
+
 class PurchaseRequest(BaseModel):
     id: UUID
+    request_group: RequestGroupSummary | None = None
     source_rfq_response_id: UUID | None = None
     source: RequestSource | None = None
     auto_prepared: AutoPreparedProvenance | None = None
