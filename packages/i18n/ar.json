@@ -1221,6 +1221,9 @@
         "fuzzy_match_review": "تطابق قريب — يحتاج إلى تأكيد",
         "no_candidate": "لا يوجد مرشح",
         "alias_conflict": "تعارض في الاسم المرادف",
+        "auto_accepted": "مطابق تلقائياً",
+        "corrected": "تم التصحيح",
+        "human_decided": "حدده المشتري",
         "all": "جميع الأسباب"
       },
       "columns": {

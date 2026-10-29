@@ -1221,6 +1221,9 @@
         "fuzzy_match_review": "Close Match — Needs Confirmation",
         "no_candidate": "No Candidate",
         "alias_conflict": "Alias Conflict",
+        "auto_accepted": "Auto-matched",
+        "corrected": "Corrected",
+        "human_decided": "Decided by a buyer",
         "all": "All Reasons"
       },
       "columns": {

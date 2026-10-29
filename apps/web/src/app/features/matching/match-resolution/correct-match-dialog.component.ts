@@ -31,6 +31,14 @@ export interface CorrectMatchDialogData {
   readonly quotationSupplierId?: string | null;
 }
 
+export const FALLBACK_BASE_UNITS: BaseUnit[] = [
+  { code: 'litre', label_en: 'Litre (L)', label_ar: 'لتر (L)', dimension: 'volume' },
+  { code: 'millilitre', label_en: 'Millilitre (ml)', label_ar: 'مليلتر (ml)', dimension: 'volume' },
+  { code: 'kilogram', label_en: 'Kilogram (kg)', label_ar: 'كيلوغرام (kg)', dimension: 'mass' },
+  { code: 'gram', label_en: 'Gram (g)', label_ar: 'غرام (g)', dimension: 'mass' },
+  { code: 'each', label_en: 'Each (item)', label_ar: 'حبة / قطعة', dimension: 'count' },
+];
+
 @Component({
   selector: 'app-correct-match-dialog',
   standalone: true,

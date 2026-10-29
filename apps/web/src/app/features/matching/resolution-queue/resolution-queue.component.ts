@@ -20,6 +20,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ApiService } from '../../../core/api/api.service';
 import type {
   ApiError,
+  BaseUnit,
   CatalogueRefreshReview,
   MatchCorrectionRequest,
   MatchQueueItem,
@@ -34,7 +35,7 @@ import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
-import { CorrectMatchDialogComponent } from '../match-resolution/correct-match-dialog.component';
+import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS } from '../match-resolution/correct-match-dialog.component';
 
 type MatchTaskSortBy = 'created_at' | 'priority' | 'status';
 type MatchTaskSortOrder = 'asc' | 'desc';
@@ -106,6 +107,7 @@ export class ResolutionQueueComponent implements OnInit {
   readonly isLoadingRefreshReviews = signal<boolean>(true);
   readonly refreshReviewDecisionId = signal<string | null>(null);
   readonly quotationId = signal<string | null>(null);
+  readonly baseUnits = signal<BaseUnit[]>([]);
   readonly collapsedGroupIds = signal<ReadonlySet<string>>(new Set<string>());
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
   private latestLoadRequestId = 0;
@@ -164,9 +166,19 @@ export class ResolutionQueueComponent implements OnInit {
     if (sortOrder && ['asc', 'desc'].includes(sortOrder)) {
       this.sortOrder.set(sortOrder);
     }
+    this.loadBaseUnits();
     this.loadTasks();
     this.loadRefreshReviews();
     this.loadExactMatchCount();
+  }
+
+  private loadBaseUnits(): void {
+    this.api.baseUnits().subscribe({
+      next: (res) => this.baseUnits.set(res.items.length > 0 ? res.items : FALLBACK_BASE_UNITS),
+      error: () => {
+        this.baseUnits.set(FALLBACK_BASE_UNITS);
+      },
+    });
   }
 
   loadExactMatchCount(): void {
@@ -489,6 +501,7 @@ export class ResolutionQueueComponent implements OnInit {
           this.errorMessage.set(this.translate.instant('matching.resolution.errors.decisionChanged'));
           return;
         }
+        const baseUnits = this.baseUnits().length > 0 ? this.baseUnits() : FALLBACK_BASE_UNITS;
         const dialogRef = this.dialog.open(CorrectMatchDialogComponent, {
           width: '640px',
           data: {
@@ -496,7 +509,8 @@ export class ResolutionQueueComponent implements OnInit {
             candidates: fullTask.candidates,
             expectedCurrentDecisionId: decisionId,
             currentCandidateId: fullTask.decision?.selected_match_candidate_id,
-            quotationSupplierId: fullTask.quotation?.supplier_name,
+            baseUnits,
+            quotationSupplierId: fullTask.quotation?.supplier_id ?? null,
           },
         });
         dialogRef.afterClosed().subscribe((request: MatchCorrectionRequest | null | undefined) => {
@@ -505,7 +519,7 @@ export class ResolutionQueueComponent implements OnInit {
           this.api.correctMatch(task.quotation_line.id, request, key).subscribe({
             next: () => {
               this.snackBar.open(
-                this.translate.instant('matching.actions.correctSuccess'),
+                this.translate.instant('matching.resolution.actions.correctSuccess'),
                 undefined,
                 { duration: 4000 },
               );

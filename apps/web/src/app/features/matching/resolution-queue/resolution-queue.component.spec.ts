@@ -7,7 +7,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { CatalogueRefreshReview, MatchTask, Role } from '../../../core/api/models';
+import type { CatalogueRefreshReview, MatchTask, MatchTaskReason, Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { ResolutionQueueComponent } from './resolution-queue.component';
 
@@ -143,7 +143,11 @@ describe('ResolutionQueueComponent', () => {
       'listCatalogueRefreshReviews',
       'approveCatalogueRefreshReview',
       'rejectCatalogueRefreshReview',
+      'baseUnits',
     ]);
+    apiService.baseUnits.and.returnValue(
+      of({ items: [{ code: 'litre', label_en: 'Litre', label_ar: 'لتر', dimension: 'volume' }] }),
+    );
     apiService.getMatchTasks.and.returnValue(of({ items: mockTasks, next_cursor: 'cursor-123' }));
     apiService.listCatalogueRefreshReviews.and.returnValue(of({ items: [], next_cursor: null }));
     apiService.getExactMatchCount.and.returnValue(of({ count: 3 }));
@@ -605,6 +609,63 @@ describe('ResolutionQueueComponent', () => {
         }),
         jasmine.stringMatching(/^[0-9a-f-]{36}$/),
       );
+    });
+
+    it('passes quotationSupplierId equal to quotation.supplier_id and non-empty baseUnits when opening Correct dialog', () => {
+      const autoTask: MatchTask = {
+        ...mockTasks[0],
+        id: 'task-auto-1',
+        status: 'auto_accepted',
+        quotation: {
+          ...mockTasks[0].quotation,
+          supplier_id: 'supplier-xyz-123',
+          supplier_name: 'Fresh Farms Dairy',
+        },
+        decision: {
+          id: 'dec-1',
+          quotation_line_id: 'line-101',
+          matched_product: mockTasks[0].candidates[0].candidate_product,
+          outcome: 'same_product',
+          selected_match_candidate_id: 'cand-1',
+          decided_at: '2026-08-21T01:00:00Z',
+          decided_by: 'buyer@example.com',
+          is_automatic: true,
+          confidence: '0.8500',
+        },
+      };
+      apiService.getMatchTaskForLine.and.returnValue(of(autoTask));
+
+      component.tasks.set([autoTask]);
+      fixture.detectChanges();
+
+      const dialogSpy = spyOn((component as unknown as { dialog: { open: jasmine.Spy } }).dialog, 'open').and.returnValue({
+        afterClosed: () => of(null),
+      } as never);
+
+      component.openCorrectMatchDialog(autoTask);
+
+      expect(dialogSpy).toHaveBeenCalled();
+      const openArgs = dialogSpy.calls.mostRecent().args;
+      const dialogData = openArgs[1]?.data;
+      expect(dialogData?.quotationSupplierId).toBe('supplier-xyz-123');
+      expect(dialogData?.quotationSupplierId).not.toBe('Fresh Farms Dairy');
+      expect(dialogData?.baseUnits).toBeDefined();
+      expect(dialogData?.baseUnits?.length).toBeGreaterThan(0);
+    });
+
+    it('renders "Corrected" and not raw translation key for task with reason corrected', () => {
+      const correctedTask: MatchTask = {
+        ...mockTasks[0],
+        id: 'task-corrected-1',
+        status: 'resolved',
+        reason: 'corrected' as MatchTaskReason,
+      };
+      component.tasks.set([correctedTask]);
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Corrected');
+      expect(text).not.toContain('matching.queue.reason.corrected');
     });
 
     it('handles 409 conflict when correcting match in queue', () => {

@@ -465,7 +465,9 @@ export type MatchTaskReason =
   | 'fuzzy_match_review'
   | 'no_candidate'
   | 'alias_conflict'
-  | 'auto_accepted';
+  | 'auto_accepted'
+  | 'corrected'
+  | 'human_decided';
 
 export interface ProductSummary {
   readonly id: string;

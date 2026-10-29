@@ -38,7 +38,7 @@ import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { computeBaseQuantity } from '../../catalogue/normalisation';
 
 import { MatchResolutionCandidatesComponent } from './match-resolution-candidates.component';
-import { CorrectMatchDialogComponent } from './correct-match-dialog.component';
+import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS } from './correct-match-dialog.component';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 
@@ -245,13 +245,7 @@ export class MatchResolutionComponent implements OnInit {
     this.api.baseUnits().subscribe({
       next: (res) => this.baseUnits.set(res.items),
       error: () => {
-        this.baseUnits.set([
-          { code: 'litre', label_en: 'Litre (L)', label_ar: 'لتر (L)', dimension: 'volume' },
-          { code: 'millilitre', label_en: 'Millilitre (ml)', label_ar: 'مليلتر (ml)', dimension: 'volume' },
-          { code: 'kilogram', label_en: 'Kilogram (kg)', label_ar: 'كيلوغرام (kg)', dimension: 'mass' },
-          { code: 'gram', label_en: 'Gram (g)', label_ar: 'غرام (g)', dimension: 'mass' },
-          { code: 'each', label_en: 'Each (item)', label_ar: 'حبة / قطعة', dimension: 'count' },
-        ]);
+        this.baseUnits.set(FALLBACK_BASE_UNITS);
       },
     });
 
