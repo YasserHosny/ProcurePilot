@@ -19,6 +19,7 @@ from integration.catalogue_helpers import (
     make_workspace,
     reset_role,
 )
+from integration.test_branch_scoped_visibility import _make_member
 
 psycopg = pytest.importorskip("psycopg")
 from psycopg import errors  # noqa: E402
@@ -213,3 +214,90 @@ def test_group_threshold_match_is_an_approval_step_source(conn: psycopg.Connecti
     with conn.cursor() as cur:
         cur.execute("select 'group_threshold_match'::approval_step_source")
         assert cur.fetchone()[0] == "group_threshold_match"
+
+
+def _group_in_new_branch(cur: psycopg.Cursor, ws: Workspace, name: str) -> tuple[UUID, UUID]:
+    """Another branch with its own RFQ, job and group, created by the workspace owner."""
+    reset_role(cur)
+    branch, rfq, job = uuid4(), uuid4(), uuid4()
+    cur.execute(
+        "insert into branch (id,tenant_id,name) values (%s,%s,%s)", (branch, ws.tenant_id, name)
+    )
+    cur.execute(
+        "insert into rfq (id,tenant_id,created_by_membership_id,status,needed_by_date,"
+        "idempotency_key) values (%s,%s,%s,'responded',current_date+7,%s)",
+        (rfq, ws.tenant_id, ws.membership_id, uuid4()),
+    )
+    cur.execute(
+        "insert into basket_split_job (id,tenant_id,requested_by,supplier_ids,items,status) "
+        "values (%s,%s,%s,array[gen_random_uuid(),gen_random_uuid()],'[]'::jsonb,'queued')",
+        (job, ws.tenant_id, ws.membership_id),
+    )
+    act_as(cur, ws)
+    return branch, _insert_group(cur, ws, branch, rfq, job)
+
+
+def test_a_branch_scoped_member_sees_only_their_branches_groups(
+    conn: psycopg.Connection,
+) -> None:
+    """Same visibility as purchase_request (data-model.md): owners, unassigned members, members
+    of the group's branch, and the group's creator."""
+    with conn.cursor() as cur:
+        owner, branch_a, rfq_a, job_a = _setup(cur, "group-schema-branches")
+        act_as(cur, owner)
+        group_a = _insert_group(cur, owner, branch_a, rfq_a, job_a)
+        _branch_b, group_b = _group_in_new_branch(cur, owner, "Al Malaz")
+        reset_role(cur)
+        scoped = _make_member(cur, owner.tenant_id, "group-schema-scoped", "buyer")
+        unscoped = _make_member(cur, owner.tenant_id, "group-schema-unscoped", "buyer")
+        cur.execute(
+            "insert into branch_role_assignment (id,tenant_id,membership_id,branch_id) "
+            "values (%s,%s,%s,%s)",
+            (uuid4(), owner.tenant_id, scoped.membership_id, branch_a),
+        )
+        visible: dict[str, set[UUID]] = {}
+        for label, member in (("owner", owner), ("scoped", scoped), ("unscoped", unscoped)):
+            act_as(cur, member)
+            cur.execute(
+                "select id from purchase_request_group where id = any(%s)", ([group_a, group_b],)
+            )
+            visible[label] = {row[0] for row in cur.fetchall()}
+            reset_role(cur)
+        assert visible == {
+            "owner": {group_a, group_b},
+            "scoped": {group_a},
+            "unscoped": {group_a, group_b},
+        }
+
+
+def test_a_scoped_member_always_sees_a_group_they_created(conn: psycopg.Connection) -> None:
+    with conn.cursor() as cur:
+        owner, branch_a, rfq_a, job_a = _setup(cur, "group-schema-creator")
+        branch_b, _ = _group_in_new_branch(cur, owner, "Al Malaz")
+        reset_role(cur)
+        scoped = _make_member(cur, owner.tenant_id, "group-schema-creator-buyer", "buyer")
+        cur.execute(
+            "insert into branch_role_assignment (id,tenant_id,membership_id,branch_id) "
+            "values (%s,%s,%s,%s)",
+            (uuid4(), owner.tenant_id, scoped.membership_id, branch_b),
+        )
+        act_as(cur, scoped)
+        group = _insert_group(cur, scoped, branch_a, rfq_a, job_a)
+        cur.execute("select count(*) from purchase_request_group where id = %s", (group,))
+        assert cur.fetchone()[0] == 1
+
+
+def test_a_group_is_filed_only_under_its_creators_own_membership(
+    conn: psycopg.Connection,
+) -> None:
+    with conn.cursor() as cur:
+        owner, branch, rfq, job = _setup(cur, "group-schema-attribution")
+        reset_role(cur)
+        buyer = _make_member(cur, owner.tenant_id, "group-schema-attribution-buyer", "buyer")
+        act_as(cur, buyer)
+        # The buyer names the owner as the creator: refused, the row would misattribute evidence
+        # that can never be corrected.
+        with pytest.raises(errors.InsufficientPrivilege):
+            with conn.transaction():
+                _insert_group(cur, owner, branch, rfq, job)
+        _insert_group(cur, buyer, branch, rfq, job)
