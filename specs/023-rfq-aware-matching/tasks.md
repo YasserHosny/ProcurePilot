@@ -166,12 +166,12 @@ placeholder, and the RFQ one leads with the RFQ line.
 
 **Independent test**: quickstart §6.
 
-- [ ] T027 [P] [US4] Generate the round-1 quote PDFs `DH-26-1252` and `WF/2026/0781` with `docs/gtm/gcc/setup/quotes/gen_quotes.py`, and add them plus their Azure DI JSON responses as fixtures under `services/extraction-worker/tests/fixtures/round1/`.
-- [ ] T028 [P] [US4] Write failing tests in `services/extraction-worker/tests/test_pack_column.py`:
+- [ ] T027 [P] [US4] Generate the round-1 quote PDFs `DH-26-1252` and `WF/2026/0781` with `docs/gtm/gcc/setup/quotes/gen_quotes.py`, and add them plus their Azure DI JSON responses as fixtures under `services/extraction-worker/tests/fixtures/round1/` — Open: the round-1 fixtures in tests/fixtures/azure_layout/ are hand-built from the template (no Azure DI keys locally); the recorded Azure responses are still owed.
+- [x] T028 [P] [US4] Write failing tests in `services/extraction-worker/tests/test_pack_column.py`:
   - `parse_pack_text` gives «كيس 10 كجم» → (1, 10, kg), «تنكة 18 لتر» → (1, 18, L), «كرتون 12 × 1 لتر» → (12, 1, L), "Carton 24x500g" → (24, 0.5, kg), and handles Arabic-Indic digits;
   - unparseable text yields a `pack_text` field with confidence 0.4;
   - the round-1 fixtures give pack fields on all 4 lines of each quote.
-- [ ] T029 [US4] In `services/extraction-worker/src/procurepilot_extraction_worker/azure_di.py`:
+- [x] T029 [US4] In `services/extraction-worker/src/procurepilot_extraction_worker/azure_di.py`:
   - add a `pack` role to `_header_role`: «العبوة», «التعبئة», «الحجم», "pack", "packing", "pack size", "packaging";
   - add `parse_pack_text()`;
   - emit `pack_count`/`unit_size`/`pack_unit` fields, or a low-confidence `pack_text` field.

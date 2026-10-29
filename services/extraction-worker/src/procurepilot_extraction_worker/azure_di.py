@@ -91,7 +91,7 @@ class ParsedPack(NamedTuple):
 
 
 def parse_pack_text(text: str) -> ParsedPack | None:
-    """Parse a printed size or count × size, keeping its explicit mass/volume unit."""
+    """Parse a printed size or count × size, in base units (grams to kg, millilitres to L)."""
     match = _PACK_TEXT_RE.fullmatch(_normalise_header(text).strip())
     if match is None:
         return None
@@ -102,6 +102,12 @@ def parse_pack_text(text: str) -> ParsedPack | None:
     size = parse_localised_decimal(match["size"])
     if count <= 0 or size <= 0:
         return None
+    if unit == "gram":
+        unit = "kilogram"
+        size = size / Decimal(1000)
+    elif unit == "millilitre":
+        unit = "litre"
+        size = size / Decimal(1000)
     return ParsedPack(count, size, unit)
 
 
