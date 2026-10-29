@@ -54,6 +54,8 @@ class RfqMatchReason(BaseModel):
     pack_check: Literal["equal", "conflict", "unknown"] | None = None
     quoted_pack_base_quantity: str | None = None
     rfq_pack_base_quantity: str | None = None
+    quoted_pack_unit: str | None = None
+    rfq_pack_unit: str | None = None
     fitting_rfq_line_ids: list[UUID] = Field(default_factory=list)
     not_in_rfq: bool = False
     matched: bool = False
@@ -230,6 +232,7 @@ class MatchTaskList(BaseModel):
 class MatchQueueCandidateSummary(BaseModel):
     product_name: str
     confidence: str
+    rfq_position: int | None = None
 
 
 class MatchQueueItem(BaseModel):

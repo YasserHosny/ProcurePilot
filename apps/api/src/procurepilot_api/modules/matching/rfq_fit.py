@@ -85,7 +85,7 @@ def _pack_check(
     unit_size: Decimal | None,
     pack_unit: str | None,
     line: RfqLineContext,
-) -> tuple[PackCheck, Decimal | None]:
+) -> tuple[PackCheck, Decimal | None, str | None]:
     if (
         pack_count is None
         or unit_size is None
@@ -93,19 +93,21 @@ def _pack_check(
         or line.pack_base_quantity is None
         or line.base_unit is None
     ):
-        return "unknown", None
+        return "unknown", None, None
     quantity = pack_count * unit_size
     quoted_unit = canonical_base_unit(pack_unit)
     base_unit = canonical_base_unit(line.base_unit)
     if quoted_unit != base_unit:
         source, target = _UNITS.get(quoted_unit), _UNITS.get(base_unit)
         if source is None or target is None or source[0] != target[0]:
-            return "conflict", quantity
+            return "conflict", quantity, quoted_unit
         quantity = quantity * source[1] / target[1]
     tolerance = abs(line.pack_base_quantity) * Decimal("0.005")
     return (
-        "equal" if abs(quantity - line.pack_base_quantity) <= tolerance else "conflict"
-    ), quantity
+        "equal" if abs(quantity - line.pack_base_quantity) <= tolerance else "conflict",
+        quantity,
+        base_unit,
+    )
 
 
 def fit_against_rfq(
@@ -142,7 +144,7 @@ def fit_against_rfq(
             *(trigram_similarity(text, normalise_text(alias)) for alias in line.aliases),
             Decimal("1") if containment else Decimal("0"),
         ).quantize(_QUANT)
-        pack, quantity = _pack_check(pack_count, unit_size, pack_unit, line)
+        pack, quantity, quantity_unit = _pack_check(pack_count, unit_size, pack_unit, line)
         bonus = Decimal(".05") if wording >= floor and position == rank else Decimal("0")
         score = min(Decimal("1"), wording + bonus).quantize(_QUANT)
         rfq: dict[str, object] = {
@@ -157,6 +159,8 @@ def fit_against_rfq(
         if quantity is not None and line.pack_base_quantity is not None:
             rfq["quoted_pack_base_quantity"] = format(quantity, ".6f")
             rfq["rfq_pack_base_quantity"] = format(line.pack_base_quantity, ".6f")
+            rfq["quoted_pack_unit"] = quantity_unit
+            rfq["rfq_pack_unit"] = canonical_base_unit(line.base_unit)
             measured["pack_unit_match"] = "1.0000" if pack == "equal" else "0.0000"
         scores.append(
             RfqLineScore(

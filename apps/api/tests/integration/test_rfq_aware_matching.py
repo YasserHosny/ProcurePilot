@@ -66,6 +66,7 @@ def wire(monkeypatch: pytest.MonkeyPatch, conn: psycopg.Connection) -> list[UUID
     from procurepilot_api.modules.rfq import service as rfq_service
 
     monkeypatch.setattr(rfq_service, "_authenticated_db", scoped)
+    monkeypatch.setattr(matching_module, "_authenticated_db", scoped)
     enqueued: list[UUID] = []
     monkeypatch.setattr(
         matching_module,
@@ -198,6 +199,13 @@ def test_round_one_two_replies_auto_match_without_learning_aliases(
             row.decision.is_automatic and row.decision.alias_id is None for row in result.lines
         )
         assert all(row.candidates[0].reasons.rfq.rfq_id == rfq for row in result.lines)
+        queue = service.list_match_tasks(
+            bearer_token="test", member=_member(ws), quotation_id=quote, status="auto_accepted"
+        )
+        queued = sorted(queue.items, key=lambda row: row.quotation_line.line_number)
+        assert len(queued) == 4
+        assert all(row.status == "auto_accepted" for row in queued)
+        assert [row.top_candidate.rfq_position for row in queued] == [1, 2, 3, 4]
     with conn.cursor() as cur:
         cur.execute("select count(*) from match_task where status in ('open','in_progress')")
         assert cur.fetchone()[0] == 0
@@ -316,32 +324,98 @@ def test_ambiguous_rfq_candidates_lead_and_never_auto_accept(
     )
 
 
-def test_pack_conflict_remains_visible_with_both_quantities(
+@pytest.mark.parametrize(
+    ("quoted_unit", "quoted_size", "pack_check", "quoted_quantity", "quoted_pack_unit"),
+    (
+        ("litre", 5, "conflict", "5.000000", "litre"),
+        ("each", 5, "conflict", "5.000000", "each"),
+        ("gram", 5000, "conflict", "5.000000", "kilogram"),
+        ("gram", 10000, "equal", "10.000000", "kilogram"),
+    ),
+)
+def test_pack_comparison_remains_visible_with_both_quantities_and_units(
     conn: psycopg.Connection,
     monkeypatch: pytest.MonkeyPatch,
+    quoted_unit: str,
+    quoted_size: int,
+    pack_check: str,
+    quoted_quantity: str,
+    quoted_pack_unit: str,
 ) -> None:
     wire(monkeypatch, conn)
     with conn.cursor() as cur:
         ensure_quotation_reference_data(cur)
         ws = make_workspace(cur, "rfq-pack-conflict")
-        product = make_workspace_product(cur, ws, name=NAMES[0])
+        product = round_one_product(cur, ws, 0)
         rfq = make_rfq(cur, ws, [product])
         quote = reply(cur, ws, rfq, (TEXTS[0],))
         cur.execute(
-            "update quotation_line set pack_count=1,unit_size=5,pack_unit='litre' "
+            "update quotation_line set pack_count=1,unit_size=%s,pack_unit=%s "
             "where quotation_id=%s",
-            (quote,),
+            (quoted_size, quoted_unit, quote),
         )
     result = MatchingService(settings()).quotation_matches(
         bearer_token="test", member=_member(ws), quotation_id=quote
     )
     line = result.lines[0]
-    assert line.decision is None
-    assert line.task.status == "open"
+    if pack_check == "conflict":
+        assert line.decision is None
+        assert line.task.status == "open"
     reason = line.candidates[0].reasons.rfq
-    assert reason.pack_check == "conflict"
-    assert reason.quoted_pack_base_quantity == "5.000000"
-    assert reason.rfq_pack_base_quantity == "30.000000"
+    assert reason.pack_check == pack_check
+    assert reason.quoted_pack_base_quantity == quoted_quantity
+    assert reason.rfq_pack_base_quantity == "10.000000"
+    assert reason.quoted_pack_unit == quoted_pack_unit
+    assert reason.rfq_pack_unit == "kilogram"
+
+
+@pytest.mark.parametrize("rfq_matched", (True, False, None))
+def test_open_queue_uses_only_the_top_candidates_matched_rfq_position(
+    conn: psycopg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+    rfq_matched: bool | None,
+) -> None:
+    wire(monkeypatch, conn)
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        ws = make_workspace(cur, "rfq-open-queue")
+        product = round_one_product(cur, ws, 0)
+        other = round_one_product(cur, ws, 1)
+        rfq = make_rfq(cur, ws, [product, other])
+        quote = reply(cur, ws, rfq, (TEXTS[0],))
+        cur.execute("select id from quotation_line where quotation_id=%s", (quote,))
+        line_id = cur.fetchone()[0]
+        # Queue projection must also support an RFQ proposal held for human review.
+        for rank in (1, 2):
+            reasons = {"rfq": {"rfq_id": str(rfq), "position": 7, "matched": True}}
+            if rank == 1:
+                if rfq_matched is None:
+                    reasons = {}
+                else:
+                    reasons["rfq"]["matched"] = rfq_matched
+            cur.execute(
+                "insert into match_candidate (tenant_id,quotation_line_id,"
+                "candidate_workspace_product_id,confidence,reasons,rank,scoring_version,"
+                "embedding_model) values (%s,%s,%s,0.9,%s,%s,'rfq-fit-v1','stub-hash-v1')",
+                (
+                    ws.tenant_id,
+                    line_id,
+                    product if rank == 1 else other,
+                    psycopg.types.json.Jsonb(reasons),
+                    rank,
+                ),
+            )
+        cur.execute(
+            "insert into match_task (tenant_id,quotation_line_id,status,priority,reason) "
+            "values (%s,%s,'open','normal','low_confidence')",
+            (ws.tenant_id, line_id),
+        )
+    queue = MatchingService(settings()).list_match_tasks(
+        bearer_token="test", member=_member(ws), quotation_id=quote, status="open"
+    )
+    assert len(queue.items) == 1
+    assert queue.items[0].status == "open"
+    assert queue.items[0].top_candidate.rfq_position == (7 if rfq_matched else None)
 
 
 def test_rfq_fit_runs_before_a_preexisting_alias_for_another_product(
@@ -414,10 +488,12 @@ def test_archived_rfq_product_is_not_proposed(
 
 
 @pytest.mark.parametrize("queue_status", ("all", "auto_accepted", "resolved"))
+@pytest.mark.parametrize("new_product", (False, True))
 def test_corrected_rfq_auto_match_stays_reachable_and_can_be_corrected_again(
     conn: psycopg.Connection,
     monkeypatch: pytest.MonkeyPatch,
     queue_status: str,
+    new_product: bool,
 ) -> None:
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
@@ -442,6 +518,21 @@ def test_corrected_rfq_auto_match_stays_reachable_and_can_be_corrected_again(
 
     monkeypatch.setattr(resolution_module, "_authenticated_db", scoped)
     monkeypatch.setattr(matching_module, "_authenticated_db", scoped)
+    if new_product:
+        from procurepilot_api.modules.catalogue import service as catalogue_module
+
+        monkeypatch.setattr(catalogue_module, "authenticated_client", lambda *_: client)
+        monkeypatch.setattr(
+            catalogue_module,
+            "create_client",
+            lambda *_: PsycopgSupabaseClient(conn, service_role=True),
+        )
+        monkeypatch.setattr(catalogue_module, "get_audit_writer", lambda: _PsycopgAuditWriter(conn))
+        monkeypatch.setattr(
+            catalogue_module.BillingService,
+            "ensure_can_add_active_product",
+            lambda *_, **__: None,
+        )
     with conn.cursor() as cur:
         ensure_quotation_reference_data(cur)
         ws = make_workspace(cur, "rfq-correct-reopen")
@@ -476,11 +567,26 @@ def test_corrected_rfq_auto_match_stays_reachable_and_can_be_corrected_again(
         bearer_token="test",
         member=_member(ws),
         line_id=line_id,
-        payload=MatchCorrectionRequest(
-            expected_current_decision_id=original.decision.id,
-            outcome="same_product",
-            selected_match_candidate_id=candidate_id,
-            learn_alias=False,
+        payload=MatchCorrectionRequest.model_validate(
+            {
+                "expected_current_decision_id": original.decision.id,
+                "learn_alias": False,
+                **(
+                    {
+                        "outcome": "no_match_new_product",
+                        "new_product": {
+                            "tenant_name": "New corrected product",
+                            "base_unit": "kilogram",
+                            "pack": {"pack_count": 1, "unit_size": "10"},
+                        },
+                    }
+                    if new_product
+                    else {
+                        "outcome": "same_product",
+                        "selected_match_candidate_id": candidate_id,
+                    }
+                ),
+            }
         ),
         idempotency_key=uuid4(),
     ).decision
@@ -510,6 +616,7 @@ def test_corrected_rfq_auto_match_stays_reachable_and_can_be_corrected_again(
         assert items[0]["quotation_line"]["id"] == str(line_id)
         assert items[0]["status"] == "resolved"
         assert items[0]["reason"] == "corrected"
+        assert items[0]["top_candidate"]["rfq_position"] is None
     # The legacy PostgREST queue reader must retain the same current head.
     tasks = matching.list_match_tasks(
         bearer_token="test",
@@ -537,6 +644,10 @@ def test_corrected_rfq_auto_match_stays_reachable_and_can_be_corrected_again(
     assert (
         matching.match_task_for_line(bearer_token="test", line_id=line_id).decision.id == second.id
     )
+    queue = matching.list_match_tasks(
+        bearer_token="test", member=_member(ws), quotation_id=quote, status=queue_status
+    )
+    assert queue.items[0].top_candidate.rfq_position == 1
 
 
 @pytest.mark.parametrize("learned_alias", (True, False))

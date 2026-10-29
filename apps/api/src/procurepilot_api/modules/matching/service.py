@@ -354,7 +354,8 @@ class MatchingService:
                     mt.created_at,
                     mt.resolved_at,
                     top_candidate.product_name as top_candidate_name,
-                    top_candidate.confidence as top_candidate_confidence
+                    top_candidate.confidence as top_candidate_confidence,
+                    top_candidate.rfq_position as top_candidate_rfq_position
                 from match_task mt
                 join quotation_line ql
                   on ql.tenant_id = mt.tenant_id and ql.id = mt.quotation_line_id
@@ -365,7 +366,10 @@ class MatchingService:
                 left join membership reviewer
                   on reviewer.tenant_id = mt.tenant_id and reviewer.id = q.reviewed_by
                 left join lateral (
-                    select wp.tenant_name as product_name, mc.confidence
+                    select wp.tenant_name as product_name, mc.confidence,
+                           case when mc.reasons->'rfq'->>'matched' = 'true'
+                                then (mc.reasons->'rfq'->>'position')::integer
+                           end as rfq_position
                     from match_candidate mc
                     join workspace_product wp
                       on wp.tenant_id = mc.tenant_id
@@ -414,7 +418,8 @@ class MatchingService:
                     coalesce(md.decided_at, md.created_at) as created_at,
                     coalesce(md.decided_at, md.created_at) as resolved_at,
                     top_candidate.product_name as top_candidate_name,
-                    coalesce(top_candidate.confidence, md.confidence) as top_candidate_confidence
+                    coalesce(top_candidate.confidence, md.confidence) as top_candidate_confidence,
+                    top_candidate.rfq_position as top_candidate_rfq_position
                 from current_match_decision md
                 join quotation_line ql
                   on ql.tenant_id = md.tenant_id and ql.id = md.quotation_line_id
@@ -425,7 +430,11 @@ class MatchingService:
                 left join membership reviewer
                   on reviewer.tenant_id = md.tenant_id and reviewer.id = q.reviewed_by
                 left join lateral (
-                    select wp.tenant_name as product_name, mc.confidence
+                    select wp.tenant_name as product_name, mc.confidence,
+                           case when mc.id = md.selected_match_candidate_id
+                                     and mc.reasons->'rfq'->>'matched' = 'true'
+                                then (mc.reasons->'rfq'->>'position')::integer
+                           end as rfq_position
                     from match_candidate mc
                     join workspace_product wp
                       on wp.tenant_id = mc.tenant_id
@@ -1849,6 +1858,7 @@ def _queue_item(row: dict[str, object]) -> MatchQueueItem:
         MatchQueueCandidateSummary(
             product_name=str(row["top_candidate_name"]),
             confidence=decimal_string(row["top_candidate_confidence"]),
+            rfq_position=row.get("top_candidate_rfq_position"),
         )
         if row.get("top_candidate_name")
         else None
