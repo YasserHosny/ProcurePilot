@@ -589,6 +589,45 @@ describe('MatchResolutionComponent (T039)', () => {
       expect(text).toContain('Pack differs from your RFQ (10 kg asked, 5 kg quoted)');
     });
 
+    it('shows differing units in pack conflict warning when rfq_pack_unit and quoted_pack_unit are present', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          candidates: [
+            {
+              ...mockTask.candidates[0],
+              candidate_product: {
+                ...mockTask.candidates[0].candidate_product,
+                base_unit: 'piece',
+              },
+              reasons: {
+                ...mockTask.candidates[0].reasons,
+                rfq: {
+                  rfq_id: 'rfq-1',
+                  rfq_line_id: 'rfq-line-1',
+                  position: 1,
+                  pack_check: 'conflict',
+                  rfq_pack_base_quantity: '16.000000',
+                  rfq_pack_unit: 'kilogram',
+                  quoted_pack_base_quantity: '18.000000',
+                  quoted_pack_unit: 'litre',
+                  fitting_rfq_line_ids: ['rfq-line-1'],
+                  not_in_rfq: false,
+                  matched: false,
+                },
+              },
+            },
+          ],
+        }),
+      );
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Pack differs from your RFQ (16 kg asked, 18 L quoted)');
+    });
+
     it('shows neutral chip "Not in your RFQ" when candidate has not_in_rfq', () => {
       apiService.getMatchTaskForLine.and.returnValue(
         of({
@@ -710,6 +749,90 @@ describe('MatchResolutionComponent (T039)', () => {
       const banner = fixture.nativeElement.querySelector('.decision-banner') as HTMLElement;
       expect(banner).toBeTruthy();
       expect(banner.textContent).toContain('From your RFQ line 3');
+    });
+
+    it('does not show RFQ tag in decision banner when corrected away from RFQ candidate to another candidate', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          decision: {
+            ...mockDecision,
+            selected_match_candidate_id: 'cand-2',
+          },
+          candidates: [
+            {
+              ...mockTask.candidates[0],
+              id: 'cand-1',
+              reasons: {
+                ...mockTask.candidates[0].reasons,
+                rfq: {
+                  rfq_id: 'rfq-1',
+                  rfq_line_id: 'rfq-line-1',
+                  position: 3,
+                  pack_check: 'equal',
+                  matched: true,
+                  fitting_rfq_line_ids: ['rfq-line-1'],
+                },
+              },
+            },
+            {
+              ...mockTask.candidates[0],
+              id: 'cand-2',
+              reasons: {
+                ...mockTask.candidates[0].reasons,
+                rfq: null,
+              },
+            },
+          ],
+        }),
+      );
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      const tag = fixture.nativeElement.querySelector('.rfq-matched-tag');
+      expect(tag).toBeNull();
+      const banner = fixture.nativeElement.querySelector('.decision-banner') as HTMLElement;
+      expect(banner?.textContent).not.toContain('From your RFQ line');
+    });
+
+    it('does not show RFQ tag in decision banner when corrected to new product (selected_match_candidate_id is null)', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          decision: {
+            ...mockDecision,
+            selected_match_candidate_id: null,
+          },
+          candidates: [
+            {
+              ...mockTask.candidates[0],
+              id: 'cand-1',
+              reasons: {
+                ...mockTask.candidates[0].reasons,
+                rfq: {
+                  rfq_id: 'rfq-1',
+                  rfq_line_id: 'rfq-line-1',
+                  position: 3,
+                  pack_check: 'equal',
+                  matched: true,
+                  fitting_rfq_line_ids: ['rfq-line-1'],
+                },
+              },
+            },
+          ],
+        }),
+      );
+
+      component.loadTask('line-99');
+      fixture.detectChanges();
+
+      const tag = fixture.nativeElement.querySelector('.rfq-matched-tag');
+      expect(tag).toBeNull();
+      const banner = fixture.nativeElement.querySelector('.decision-banner') as HTMLElement;
+      expect(banner?.textContent).not.toContain('From your RFQ line');
     });
 
     it('shows "Correct match" button for buyer/owner on decided line, and hides it for non-writer', () => {

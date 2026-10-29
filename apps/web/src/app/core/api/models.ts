@@ -510,7 +510,9 @@ export interface RfqMatchReason {
   readonly wording_score?: string | null;
   readonly pack_check?: 'equal' | 'conflict' | 'unknown' | null;
   readonly quoted_pack_base_quantity?: string | null;
+  readonly quoted_pack_unit?: string | null;
   readonly rfq_pack_base_quantity?: string | null;
+  readonly rfq_pack_unit?: string | null;
   readonly fitting_rfq_line_ids?: readonly string[];
   readonly not_in_rfq?: boolean;
   readonly matched?: boolean;
@@ -588,6 +590,7 @@ export interface MatchTask {
 export interface MatchQueueCandidateSummary {
   readonly product_name: string;
   readonly confidence: string;
+  readonly rfq_position?: number | null;
 }
 
 export interface MatchQueueItem {

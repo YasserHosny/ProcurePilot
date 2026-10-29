@@ -58,8 +58,8 @@
                   <span class="dialog-badge rfq-conflict-badge">
                     <mat-icon aria-hidden="true">warning</mat-icon>
                     {{ 'matching.resolution.candidates.signals.packConflict' | translate: {
-                      asked: (cand.reasons.rfq?.rfq_pack_base_quantity | formatQuantity) + ' ' + (cand.candidate_product.base_unit | unitLabel),
-                      quoted: (cand.reasons.rfq?.quoted_pack_base_quantity | formatQuantity) + ' ' + (cand.candidate_product.base_unit | unitLabel)
+                      asked: (cand.reasons.rfq?.rfq_pack_base_quantity | formatQuantity) + ' ' + ((cand.reasons.rfq?.rfq_pack_unit || cand.candidate_product.base_unit) | unitLabel),
+                      quoted: (cand.reasons.rfq?.quoted_pack_base_quantity | formatQuantity) + ' ' + ((cand.reasons.rfq?.quoted_pack_unit || cand.candidate_product.base_unit) | unitLabel)
                     } }}
                   </span>
                 }

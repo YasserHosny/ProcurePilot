@@ -7,7 +7,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { CatalogueRefreshReview, MatchTask, MatchTaskReason, Role } from '../../../core/api/models';
+import type { CatalogueRefreshReview, MatchQueueItem, MatchTask, MatchTaskReason, Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { ResolutionQueueComponent } from './resolution-queue.component';
 
@@ -531,32 +531,43 @@ describe('ResolutionQueueComponent', () => {
     });
 
     it('displays "From your RFQ line {n}" when task has RFQ matched candidate', () => {
-      const rfqTask: MatchTask = {
+      const rfqTask: MatchQueueItem = {
         ...mockTasks[0],
         id: 'task-auto-rfq',
         status: 'auto_accepted',
-        candidates: [
-          {
-            ...mockTasks[0].candidates[0],
-            reasons: {
-              ...mockTasks[0].candidates[0].reasons,
-              rfq: {
-                rfq_id: 'rfq-1',
-                rfq_line_id: 'rfq-line-1',
-                position: 2,
-                pack_check: 'equal',
-                matched: true,
-                fitting_rfq_line_ids: ['rfq-line-1'],
-              },
-            },
-          },
-        ],
+        candidates: undefined,
+        top_candidate: {
+          product_name: 'Organic Whole Milk 2L',
+          confidence: '0.8500',
+          rfq_position: 2,
+        },
       };
       component.tasks.set([rfqTask]);
       fixture.detectChanges();
 
       const text = fixture.nativeElement.textContent as string;
       expect(text).toContain('From your RFQ line 2');
+    });
+
+    it('does not display RFQ chip when rfq_position is null', () => {
+      const nonRfqTask: MatchQueueItem = {
+        ...mockTasks[0],
+        id: 'task-non-rfq',
+        status: 'auto_accepted',
+        candidates: undefined,
+        top_candidate: {
+          product_name: 'Organic Whole Milk 2L',
+          confidence: '0.8500',
+          rfq_position: null,
+        },
+      };
+      component.tasks.set([nonRfqTask]);
+      fixture.detectChanges();
+
+      const chip = fixture.nativeElement.querySelector('.reason-chip.rfq-chip');
+      expect(chip).toBeNull();
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).not.toContain('From your RFQ line');
     });
 
     it('opens dialog and submits correction when Correct match is clicked', () => {

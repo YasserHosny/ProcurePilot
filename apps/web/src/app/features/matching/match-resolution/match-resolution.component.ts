@@ -115,16 +115,10 @@ export class MatchResolutionComponent implements OnInit {
 
   readonly matchedRfqPosition = computed<number | null>(() => {
     const dec = this.decision();
-    if (!dec) return null;
-    if (dec.selected_match_candidate_id) {
-      const cand = this.candidates().find((c) => c.id === dec.selected_match_candidate_id);
-      if (cand?.reasons?.rfq?.matched && cand.reasons.rfq.position) {
-        return cand.reasons.rfq.position;
-      }
-    }
-    const matched = this.candidates().find((c) => c.reasons?.rfq?.matched);
-    if (matched?.reasons?.rfq?.position) {
-      return matched.reasons.rfq.position;
+    if (!dec || !dec.selected_match_candidate_id) return null;
+    const cand = this.candidates().find((c) => c.id === dec.selected_match_candidate_id);
+    if (cand?.reasons?.rfq?.matched && cand.reasons.rfq.position != null) {
+      return cand.reasons.rfq.position;
     }
     return null;
   });

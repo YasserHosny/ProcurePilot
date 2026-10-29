@@ -107,6 +107,39 @@ describe('CorrectMatchDialogComponent', () => {
       scoring_version: 'v1.0',
       created_at: '2026-08-20T00:00:00Z',
     },
+    {
+      id: 'cand-4',
+      quotation_line_id: 'line-1',
+      candidate_product: {
+        id: 'prod-4',
+        tenant_name: 'Bulk Cheese 16kg',
+        canonical_name: 'Bulk Cheese',
+        base_unit: 'piece',
+        status: 'active',
+      },
+      confidence: '0.5500',
+      reasons: {
+        alias_hit: false,
+        gtin_match: false,
+        supplier_code_match: false,
+        lexical_similarity: '0.5000',
+        semantic_similarity: '0.5000',
+        rfq: {
+          rfq_id: 'rfq-1',
+          rfq_line_id: 'rfq-line-4',
+          position: 4,
+          pack_check: 'conflict',
+          rfq_pack_base_quantity: '16.000000',
+          rfq_pack_unit: 'kilogram',
+          quoted_pack_base_quantity: '18.000000',
+          quoted_pack_unit: 'litre',
+          fitting_rfq_line_ids: ['rfq-line-4'],
+        },
+      },
+      rank: 4,
+      scoring_version: 'v1.0',
+      created_at: '2026-08-20T00:00:00Z',
+    },
   ];
 
   const mockDialogData: CorrectMatchDialogData = {
@@ -150,6 +183,7 @@ describe('CorrectMatchDialogComponent', () => {
     expect(text).toContain('Not in your RFQ');
     // RFQ label 3: pack conflict
     expect(text).toContain('Pack differs from your RFQ (2 L asked, 1 L quoted)');
+    expect(text).toContain('Pack differs from your RFQ (16 kg asked, 18 L quoted)');
     // RFQ label 4: multiple fitting lines
     expect(text).toContain('Could be more than one of your RFQ lines');
   });

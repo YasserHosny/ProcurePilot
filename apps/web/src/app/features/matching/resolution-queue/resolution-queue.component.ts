@@ -486,10 +486,7 @@ export class ResolutionQueueComponent implements OnInit {
   }
 
   rfqPositionForTask(task: MatchQueueItem): number | null {
-    const cand = task.candidates?.find(
-      (c) => c.reasons?.rfq?.matched && c.reasons?.rfq?.position != null,
-    );
-    return cand?.reasons?.rfq?.position ?? null;
+    return task.top_candidate?.rfq_position ?? null;
   }
 
   openCorrectMatchDialog(task: MatchQueueItem): void {
