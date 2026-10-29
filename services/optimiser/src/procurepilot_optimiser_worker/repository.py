@@ -34,7 +34,7 @@ def load_job(conn: psycopg.Connection, *, job_id: UUID, tenant_id: UUID) -> Bask
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
-            select id, tenant_id, supplier_ids, items
+            select id, tenant_id, supplier_ids, items, request_snapshot
             from basket_split_job
             where id = %s and tenant_id = %s
             """,
@@ -43,7 +43,10 @@ def load_job(conn: psycopg.Connection, *, job_id: UUID, tenant_id: UUID) -> Bask
         row = cur.fetchone()
     if row is None:
         raise RuntimeError("basket split job not found")
-    return BasketJob.model_validate(dict(row))
+    data = dict(row)
+    snapshot = data.pop("request_snapshot")
+    data["price_quotation_ids"] = _price_quotation_ids(snapshot)
+    return BasketJob.model_validate(data)
 
 
 def load_advanced_optimisation_input(
@@ -133,6 +136,7 @@ def read_current_offers(conn: psycopg.Connection, *, job: BasketJob) -> list[Off
               join supplier s on s.id = q.supplier_id
               where lc.tenant_id = %s
                 and q.supplier_id = any(%s::uuid[])
+                and (%s::uuid[] is null or q.id = any(%s::uuid[]))
                 and q.status = 'reviewed'
                 and s.status in ('active', 'preferred')
                 and (lc.valid_to is null or lc.valid_to >= now())
@@ -143,6 +147,8 @@ def read_current_offers(conn: psycopg.Connection, *, job: BasketJob) -> list[Off
                 Jsonb([item.model_dump(mode="json") for item in job.items]),
                 job.tenant_id,
                 [str(supplier_id) for supplier_id in job.supplier_ids],
+                job.price_quotation_ids,
+                job.price_quotation_ids,
             ),
         )
         rows = [dict(row) for row in cur.fetchall()]
@@ -190,6 +196,7 @@ def read_current_advanced_offers(
               where lc.tenant_id = %s
                 and wp.tenant_id = %s
                 and q.supplier_id = any(%s::uuid[])
+                and (%s::uuid[] is null or q.id = any(%s::uuid[]))
                 and q.status = 'reviewed'
                 and s.status in ('active', 'preferred')
                 and (lc.valid_to is null or lc.valid_to >= now())
@@ -201,6 +208,8 @@ def read_current_advanced_offers(
                 request.tenant_id,
                 request.tenant_id,
                 [str(supplier_id) for supplier_id in request.supplier_ids],
+                request.price_quotation_ids,
+                request.price_quotation_ids,
             ),
         )
         rows = [dict(row) for row in cur.fetchall()]
@@ -366,6 +375,7 @@ def _advanced_request_from_snapshot(
             UUID(str(value)) for value in snapshot.get("supplier_ids", row["supplier_ids"])
         ],
         items=[BasketItem.model_validate(item) for item in snapshot.get("items", row["items"])],
+        price_quotation_ids=_price_quotation_ids(snapshot),
         hard_constraints=hard_constraints,
         soft_weights=OptimisationSoftWeights.model_validate(snapshot.get("soft_weights") or {}),
         rule_version=str(snapshot["rule_version"]),
@@ -470,3 +480,14 @@ def _supplier_risk(row: dict[str, object]) -> SupplierRiskSignal:
         source_ids=[UUID(str(row["id"]))],
         rule_version=str(risk_score.get("rule_version", row["rule_version"])),
     )
+
+
+def _price_quotation_ids(snapshot: object) -> list[UUID] | None:
+    if not isinstance(snapshot, dict) or "rfq" not in snapshot:
+        return None
+    # An RFQ snapshot must be explicit; a missing or empty list must never fall back
+    # to unrelated quotations.
+    rfq = snapshot["rfq"]
+    if not isinstance(rfq, dict):
+        raise ValueError("invalid RFQ snapshot")
+    return [UUID(str(value)) for value in rfq["price_quotation_ids"]]

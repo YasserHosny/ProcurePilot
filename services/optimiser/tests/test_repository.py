@@ -13,7 +13,12 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_read_current_offers_projects_from_normalised_base_unit_not_pack_quantity() -> None:
+@pytest.mark.parametrize("advanced", [False, True])
+@pytest.mark.parametrize("rfq_filter", [False, True])
+def test_read_current_offers_prices_only_rfq_reply_when_filtered(
+    advanced: bool,
+    rfq_filter: bool,
+) -> None:
     psycopg = pytest.importorskip("psycopg")
     from psycopg.types.json import Jsonb
 
@@ -59,24 +64,29 @@ def test_read_current_offers_projects_from_normalised_base_unit_not_pack_quantit
                 (membership_id, tenant_id, user_id, email),
             )
             cur.execute(
-                "insert into supplier (id,tenant_id,name,status) values (%s,%s,'Supplier A','active')",
+                "insert into supplier (id,tenant_id,name,status) values (%s,%s,'Supplier "
+                "A','active')",
                 (supplier_a_id, tenant_id),
             )
             cur.execute(
-                "insert into supplier (id,tenant_id,name,status) values (%s,%s,'Supplier B','active')",
+                "insert into supplier (id,tenant_id,name,status) values (%s,%s,'Supplier "
+                "B','active')",
                 (supplier_b_id, tenant_id),
             )
             cur.execute(
-                "insert into canonical_product (id,name,base_unit) values (%s,'Cooking Oil 5L','litre')",
+                "insert into canonical_product (id,name,base_unit) values (%s,'Cooking Oil "
+                "5L','litre')",
                 (canonical_product_id,),
             )
             cur.execute(
-                "insert into workspace_product (id,tenant_id,canonical_product_id,tenant_name,status) "
+                "insert into workspace_product "
+                "(id,tenant_id,canonical_product_id,tenant_name,status) "
                 "values (%s,%s,%s,'Cooking Oil','active')",
                 (workspace_product_id, tenant_id, canonical_product_id),
             )
             cur.execute(
-                "insert into document (id,tenant_id,storage_bucket,storage_path,mime_type,created_by) "
+                "insert into document "
+                "(id,tenant_id,storage_bucket,storage_path,mime_type,created_by) "
                 "values (%s,%s,'quotations',%s,'application/pdf',%s)",
                 (document_id, tenant_id, f"tenants/{tenant_id}/quotations/q.pdf", membership_id),
             )
@@ -92,13 +102,15 @@ def test_read_current_offers_projects_from_normalised_base_unit_not_pack_quantit
             )
             cur.execute(
                 "insert into match_candidate "
-                "(id,tenant_id,quotation_line_id,candidate_workspace_product_id,confidence,reasons,rank,scoring_version) "
+                "(id,tenant_id,quotation_line_id,candidate_workspace_product_id,confidence,"
+                "reasons,rank,scoring_version) "
                 "values (%s,%s,%s,%s,0.95,%s,1,'v1')",
                 (match_candidate_id, tenant_id, quotation_line_id, workspace_product_id, Jsonb({})),
             )
             cur.execute(
                 "insert into match_decision "
-                "(id,tenant_id,quotation_line_id,matched_workspace_product_id,selected_match_candidate_id,"
+                "(id,tenant_id,quotation_line_id,matched_workspace_product_id,"
+                "selected_match_candidate_id,"
                 "outcome,is_automatic,confidence) "
                 "values (%s,%s,%s,%s,%s,'same_product',true,0.95)",
                 (
@@ -137,6 +149,51 @@ def test_read_current_offers_projects_from_normalised_base_unit_not_pack_quantit
                 """,
                 (landed_cost_id, tenant_id, quotation_line_id, match_decision_id, Jsonb({})),
             )
+            # The older quotation was learned/re-costed later, so latest-price selects it.
+            older_quote = uuid4()
+            missing_product, missing_canonical = uuid4(), uuid4()
+            cur.execute(
+                "insert into canonical_product (id,name,base_unit) values (%s,'Other oil','litre')",
+                (missing_canonical,),
+            )
+            cur.execute(
+                "insert into workspace_product (id,tenant_id,canonical_product_id,tenant_name) "
+                "values (%s,%s,%s,'Unquoted in reply')",
+                (missing_product, tenant_id, missing_canonical),
+            )
+            cur.execute(
+                "insert into quotation "
+                "(id,tenant_id,document_id,supplier_id,currency,status,created_at) "
+                "values (%s,%s,%s,%s,'GBP','reviewed',now()-interval '30 days')",
+                (older_quote, tenant_id, document_id, supplier_a_id),
+            )
+            for product, number in ((workspace_product_id, 1), (missing_product, 2)):
+                older_line, older_decision, older_cost = uuid4(), uuid4(), uuid4()
+                cur.execute(
+                    "insert into quotation_line "
+                    "(id,tenant_id,quotation_id,line_number,original_text) "
+                    "values (%s,%s,%s,%s,'Older cheap price')",
+                    (older_line, tenant_id, older_quote, number),
+                )
+                cur.execute(
+                    "insert into match_decision (id,tenant_id,quotation_line_id,"
+                    "matched_workspace_product_id,outcome,is_automatic,confidence) "
+                    "values (%s,%s,%s,%s,'no_match_new_product',true,1)",
+                    (older_decision, tenant_id, older_line, product),
+                )
+                cur.execute(
+                    """
+                    insert into landed_cost (id,tenant_id,quotation_line_id,match_decision_id,
+                      quantity,normalised_base_quantity,base_unit,unit_price_amount,unit_price_currency,
+                      vat_amount,vat_currency,delivery_fee_amount,delivery_fee_currency,discount_amount,
+                      discount_currency,other_charges_currency,total_amount,total_currency,raw_inputs,
+                      rule_version,valid_from,recorded_at)
+                    select %s,tenant_id,%s,%s,quantity,normalised_base_quantity,base_unit,20,'GBP',
+                      0,'GBP',0,'GBP',0,'GBP','GBP',20,'GBP',raw_inputs,rule_version,valid_from,
+                      now()+interval '1 minute' from landed_cost where id=%s
+                    """,
+                    (older_cost, older_line, older_decision, landed_cost_id),
+                )
         conn.commit()
 
     try:
@@ -149,15 +206,72 @@ def test_read_current_offers_projects_from_normalised_base_unit_not_pack_quantit
                 supplier_ids=[supplier_a_id, supplier_b_id],
                 items=[BasketItem(workspace_product_id=workspace_product_id, quantity="15.000000")],
             )
-            offers = read_current_offers(conn, job=job)
+            from psycopg.types.json import Jsonb
 
-        assert len(offers) == 1
-        offer = offers[0]
+            from procurepilot_optimiser_worker.repository import (
+                load_advanced_optimisation_input,
+                load_job,
+            )
+
+            snapshot = (
+                {
+                    "rule_version": "advanced-basket-v1",
+                    "rfq": {"price_quotation_ids": [str(quotation_id)]},
+                }
+                if rfq_filter
+                else {"rule_version": "advanced-basket-v1"}
+            )
+            job = job.model_copy(
+                update={
+                    "items": [
+                        *job.items,
+                        BasketItem(workspace_product_id=missing_product, quantity="15.000000"),
+                    ]
+                }
+            )
+            conn.execute(
+                "insert into basket_split_job (id,tenant_id,requested_by,supplier_ids,items,"
+                "request_snapshot,status) values (%s,%s,%s,%s,%s,%s,'queued')",
+                (
+                    job.id,
+                    tenant_id,
+                    membership_id,
+                    job.supplier_ids,
+                    Jsonb([item.model_dump(mode="json") for item in job.items]),
+                    Jsonb(snapshot),
+                ),
+            )
+            if advanced:
+                optimisation = load_advanced_optimisation_input(
+                    conn, job_id=job.id, tenant_id=tenant_id
+                )
+                offers = optimisation.offers
+                if rfq_filter:
+                    from procurepilot_optimiser_worker.solver import solve_advanced_basket
+
+                    result = solve_advanced_basket(input_payload=optimisation)
+                    baseline = next(
+                        b
+                        for b in result.single_supplier_baselines
+                        if b.supplier_id == supplier_a_id
+                    )
+                    assert not baseline.feasible
+                    assert baseline.total_landed_cost is None
+            else:
+                offers = read_current_offers(
+                    conn, job=load_job(conn, job_id=job.id, tenant_id=tenant_id)
+                )
+
+        offer = next(
+            offer for offer in offers if offer.workspace_product_id == workspace_product_id
+        )
         assert offer.workspace_product_id == workspace_product_id
         assert offer.supplier_id == supplier_a_id
         assert offer.quantity == "15.000000"
-        assert offer.total_landed_cost.amount == "30.0000"
+        assert offer.total_landed_cost.amount == ("30.0000" if rfq_filter else "10.0000")
         assert offer.total_landed_cost.currency == "GBP"
+        assert len(offers) == (1 if rfq_filter else 2)
+        assert any(o.workspace_product_id == missing_product for o in offers) is not rfq_filter
     finally:
         with psycopg.connect(database_url) as conn:
             with conn.cursor() as cur:
@@ -228,8 +342,7 @@ def test_read_current_offers_ignores_a_superseded_match_decision() -> None:
             for product_id, name in ((oil_id, "Cooking Oil"), (sugar_id, "Sugar")):
                 canonical_id = uuid4()
                 cur.execute(
-                    "insert into canonical_product (id,name,base_unit) "
-                    "values (%s,%s,'kilogram')",
+                    "insert into canonical_product (id,name,base_unit) values (%s,%s,'kilogram')",
                     (canonical_id, f"{name} {tenant_id.hex[:6]}"),
                 )
                 cur.execute(
@@ -275,8 +388,15 @@ def test_read_current_offers_ignores_a_superseded_match_decision() -> None:
                 "matched_workspace_product_id,selected_match_candidate_id,outcome,is_automatic,"
                 "decided_by,confidence,supersedes_decision_id) "
                 "values (%s,%s,%s,%s,%s,'same_product',false,%s,0.95,%s)",
-                (correction, tenant_id, line_id, sugar_id, sugar_candidate, membership_id,
-                 first_decision),
+                (
+                    correction,
+                    tenant_id,
+                    line_id,
+                    sugar_id,
+                    sugar_candidate,
+                    membership_id,
+                    first_decision,
+                ),
             )
             for decision_id in (first_decision, correction):
                 cur.execute(
