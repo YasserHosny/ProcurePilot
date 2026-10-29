@@ -1243,6 +1243,51 @@ def test_a_member_cannot_supersede_another_workspaces_match_decision(
                 )
 
 
+def test_another_workspaces_request_groups_are_invisible_and_unwritable(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """Spec 024: a split's request group is tenant-private and cannot be filed under another
+    workspace or against another workspace's RFQ."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        branch_id, rfq_id, job_id, group_id = uuid4(), uuid4(), uuid4(), uuid4()
+        cur.execute(
+            "insert into branch (id,tenant_id,name) values (%s,%s,'Beta branch')",
+            (branch_id, beta.tenant_id),
+        )
+        cur.execute("select id from membership where tenant_id = %s limit 1", (beta.tenant_id,))
+        beta_member = cur.fetchone()[0]
+        cur.execute(
+            "insert into rfq (id,tenant_id,created_by_membership_id,status,needed_by_date,"
+            "idempotency_key) values (%s,%s,%s,'responded',current_date+7,%s)",
+            (rfq_id, beta.tenant_id, beta_member, uuid4()),
+        )
+        cur.execute(
+            "insert into basket_split_job (id,tenant_id,requested_by,supplier_ids,items,status) "
+            "values (%s,%s,%s,array[gen_random_uuid(),gen_random_uuid()],'[]'::jsonb,'queued')",
+            (job_id, beta.tenant_id, beta_member),
+        )
+        cur.execute(
+            "insert into purchase_request_group (id,tenant_id,rfq_id,basket_split_job_id,"
+            "branch_id,combined_total_amount,combined_total_currency,idempotency_key,"
+            "created_by_membership_id) values (%s,%s,%s,%s,%s,10,'GBP',%s,%s)",
+            (group_id, beta.tenant_id, rfq_id, job_id, branch_id, uuid4(), beta_member),
+        )
+        act_as(cur, alpha)
+        cur.execute("select count(*) from purchase_request_group where id = %s", (group_id,))
+        visible = cur.fetchone()[0]
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            with conn.transaction():
+                cur.execute(
+                    "insert into purchase_request_group (tenant_id,rfq_id,basket_split_job_id,"
+                    "branch_id,combined_total_amount,combined_total_currency,idempotency_key,"
+                    "created_by_membership_id) values (%s,%s,%s,%s,10,'GBP',%s,%s)",
+                    (beta.tenant_id, rfq_id, job_id, branch_id, uuid4(), beta_member),
+                )
+    assert visible == 0
+
+
 def test_another_workspaces_landed_costs_are_invisible(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:

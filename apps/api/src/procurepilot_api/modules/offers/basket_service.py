@@ -609,6 +609,7 @@ def _job(row: dict[str, object]) -> BasketSplitJob:
             "created_at": row["created_at"],
             "started_at": row.get("started_at"),
             "completed_at": row.get("completed_at"),
+            "rfq_id": row.get("rfq_id"),
             "pack_snapshot": (
                 row["request_snapshot"].get("pack_snapshot")
                 if isinstance(row.get("request_snapshot"), dict)

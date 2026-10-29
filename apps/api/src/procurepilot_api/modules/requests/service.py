@@ -59,6 +59,7 @@ from procurepilot_api.modules.requests.schemas import (
     QualityIssueCreate,
     QualityIssueList,
     QualityIssuePhoto,
+    RequestGroupSummary,
     RequestSource,
     ThresholdRule,
     ThresholdRuleCreate,
@@ -76,7 +77,7 @@ from procurepilot_api.shared.storage_keys import safe_object_name
 
 REQUEST_COLUMNS = (
     "id,tenant_id,branch_id,cost_centre_id,requested_by_membership_id,"
-    "required_by_date,status,source_rfq_response_id,source_rfq_id,source_quotation_id,"
+    "required_by_date,status,request_group_id,source_rfq_response_id,source_rfq_id,source_quotation_id,"
     "source_supplier_id,estimated_total_amount,estimated_total_currency,"
     "has_incomplete_estimate,submitted_at,withdrawn_at,delivered_at,"
     "delivery_confirmed_by_membership_id,has_delivery_discrepancy,"
@@ -91,6 +92,10 @@ LINE_COLUMNS = (
 STEP_COLUMNS = (
     "id,purchase_request_id,assigned_membership_id,source,status,"
     "comment,decided_by_membership_id,decided_at"
+)
+GROUP_TOTAL_COLUMNS = (
+    "rfq_id,combined_total_amount,combined_total_currency,"
+    "best_single_total_amount,best_single_total_currency,saving_amount,saving_currency"
 )
 
 
@@ -294,6 +299,8 @@ class RequestsService:
         member: CurrentMember,
         request_id: UUID,
         require_approval: bool = False,
+        request_group: RequestGroupSummary | None = None,
+        request_group_lookup: bool = True,
     ) -> PurchaseRequest:
         claims = json.dumps(
             {
@@ -336,6 +343,11 @@ class RequestsService:
                     "order by position, created_at, id",
                     (member.tenant_id, request_id),
                 ).fetchall()
+
+                if request_group_lookup:
+                    request_group = self._fetch_request_groups_sql(
+                        conn, member=member, request_rows=[request_row]
+                    ).get(str(request_id))
 
                 assigned_email = None
                 if step_row:
@@ -395,6 +407,7 @@ class RequestsService:
                 else None
             ),
             source=RequestSource.model_validate(source_row) if source_row else None,
+            request_group=request_group,
         )
 
     def list_requests(
@@ -446,6 +459,7 @@ class RequestsService:
         )
         auto_prepared = self._fetch_auto_prepared_batch(client, visible)
         sources = self._fetch_sources_batch(client, visible)
+        request_groups = self._fetch_request_groups_batch(client, visible)
 
         items = []
         for row in visible:
@@ -467,6 +481,8 @@ class RequestsService:
                     auto_prepared_lookup=False,
                     source=sources.get(str(row["id"])),
                     source_lookup=False,
+                    request_group=request_groups.get(str(row["id"])),
+                    request_group_lookup=False,
                 )
             )
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
@@ -491,7 +507,8 @@ class RequestsService:
                 conn.execute("set local role authenticated")
                 conn.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
                 rows = conn.execute(
-                    "select pr.id from purchase_request pr join approval_step ast "
+                    "select pr.id, pr.request_group_id from purchase_request pr "
+                    "join approval_step ast "
                     "on ast.tenant_id = pr.tenant_id and ast.purchase_request_id = pr.id "
                     f"where pr.tenant_id = %s and {approved_step_predicate('ast')} "
                     f"and {orderable_request_predicate('pr')} "
@@ -501,11 +518,19 @@ class RequestsService:
                     "limit %s offset %s",
                     (member.tenant_id, capped + 1, offset),
                 ).fetchall()
+                request_groups = self._fetch_request_groups_sql(
+                    conn, member=member, request_rows=rows[:capped]
+                )
         except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         visible = rows[:capped]
         items = [
-            self._get_request_for_member(member=member, request_id=UUID(str(row["id"])))
+            self._get_request_for_member(
+                member=member,
+                request_id=UUID(str(row["id"])),
+                request_group=request_groups.get(str(row["id"])),
+                request_group_lookup=False,
+            )
             for row in visible
         ]
         next_cursor = _encode_cursor(offset + capped) if len(rows) > capped else None
@@ -549,6 +574,7 @@ class RequestsService:
         membership_emails = self._fetch_membership_emails_batch(client, request_rows, visible_steps)
         auto_prepared = self._fetch_auto_prepared_batch(client, request_rows)
         sources = self._fetch_sources_batch(client, request_rows)
+        request_groups = self._fetch_request_groups_batch(client, request_rows)
 
         items = []
         for row in request_rows:
@@ -570,6 +596,8 @@ class RequestsService:
                     auto_prepared_lookup=False,
                     source=sources.get(str(row["id"])),
                     source_lookup=False,
+                    request_group=request_groups.get(str(row["id"])),
+                    request_group_lookup=False,
                 )
             )
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
@@ -2149,6 +2177,8 @@ class RequestsService:
         auto_prepared_lookup: bool = True,
         source: RequestSource | None = None,
         source_lookup: bool = True,
+        request_group: RequestGroupSummary | None = None,
+        request_group_lookup: bool = True,
     ) -> PurchaseRequest:
         if requester_lookup:
             membership_emails = self._fetch_membership_emails_batch(
@@ -2164,6 +2194,10 @@ class RequestsService:
             )
         if source_lookup:
             source = self._fetch_sources_batch(client, [request_row]).get(str(request_row["id"]))
+        if request_group_lookup:
+            request_group = self._fetch_request_groups_batch(client, [request_row]).get(
+                str(request_row["id"])
+            )
         return _purchase_request(
             request_row,
             line_rows,
@@ -2174,6 +2208,72 @@ class RequestsService:
             assigned_email=assigned_email,
             auto_prepared=auto_prepared,
             source=source,
+            request_group=request_group,
+        )
+
+    def _fetch_request_groups_batch(
+        self, client: Client, request_rows: list[dict[str, object]]
+    ) -> dict[str, RequestGroupSummary]:
+        """One RLS read of every visible sibling, including those outside the current page.
+
+        Embed the group through the composite FK, so an invisible group is null. Start
+        from requests so branch RLS also controls the count, position and sibling links.
+        """
+        group_ids = sorted(
+            {str(r["request_group_id"]) for r in request_rows if r.get("request_group_id")}
+        )
+        if not group_ids:
+            return {}
+        tenant_ids = sorted({str(r["tenant_id"]) for r in request_rows})
+        try:
+            rows = _rows(
+                client.table("purchase_request")
+                .select(
+                    "id,request_group_id,created_at,"
+                    "request_group:purchase_request_group!purchase_request_request_group_fkey("
+                    f"id,{GROUP_TOTAL_COLUMNS})"
+                )
+                .in_("tenant_id", tenant_ids)
+                .in_("request_group_id", group_ids)
+                .execute()
+                .data
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        return _request_group_summaries(rows)
+
+    def _fetch_request_groups_sql(
+        self,
+        conn: psycopg.Connection,
+        *,
+        member: CurrentMember,
+        request_rows: list[dict[str, object]],
+    ) -> dict[str, RequestGroupSummary]:
+        """Same batch as PostgREST, on the existing authenticated SQL transaction."""
+        group_ids = sorted(
+            {str(r["request_group_id"]) for r in request_rows if r.get("request_group_id")}
+        )
+        if not group_ids:
+            return {}
+        columns = ", ".join(f"g.{c}" for c in GROUP_TOTAL_COLUMNS.split(","))
+        rows = conn.execute(
+            f"select pr.id, pr.request_group_id, pr.created_at, {columns} "
+            "from purchase_request pr join purchase_request_group g "
+            "on g.tenant_id = pr.tenant_id and g.id = pr.request_group_id "
+            "where pr.tenant_id = %s and pr.request_group_id = any(%s::uuid[])",
+            (member.tenant_id, group_ids),
+        ).fetchall()
+        return _request_group_summaries(
+            [
+                {
+                    **row,
+                    "request_group": {
+                        "id": row["request_group_id"],
+                        **{c: row[c] for c in GROUP_TOTAL_COLUMNS.split(",")},
+                    },
+                }
+                for row in rows
+            ]
         )
 
     def _fetch_sources_batch(
@@ -2360,6 +2460,40 @@ def _require_owner(member: CurrentMember) -> None:
         raise PermissionDeniedError(details={"reason": "owner_required"})
 
 
+def _request_group_summaries(
+    rows: list[dict[str, object]],
+) -> dict[str, RequestGroupSummary]:
+    groups: dict[str, list[dict[str, object]]] = {}
+    for row in rows:
+        if isinstance(row.get("request_group"), dict):
+            groups.setdefault(str(row["request_group_id"]), []).append(row)
+    summaries = {}
+    for siblings in groups.values():
+        siblings.sort(
+            key=lambda r: (
+                datetime.fromisoformat(str(r["created_at"]).replace("Z", "+00:00")),
+                str(r["id"]),
+            )
+        )
+        group = siblings[0]["request_group"]
+        for position, row in enumerate(siblings, 1):
+            summaries[str(row["id"])] = RequestGroupSummary(
+                id=group["id"],
+                rfq_id=group["rfq_id"],
+                position=position,
+                size=len(siblings),
+                combined_total=_money(
+                    group["combined_total_amount"], group["combined_total_currency"]
+                ),
+                best_single_total=_money(
+                    group["best_single_total_amount"], group["best_single_total_currency"]
+                ),
+                saving=_money(group["saving_amount"], group["saving_currency"]),
+                sibling_request_ids=[UUID(str(s["id"])) for s in siblings if s is not row],
+            )
+    return summaries
+
+
 def _purchase_request(
     row: dict[str, object],
     line_rows: list[dict[str, object]],
@@ -2372,6 +2506,7 @@ def _purchase_request(
     assigned_email: str | None = None,
     auto_prepared: AutoPreparedProvenance | None = None,
     source: RequestSource | None = None,
+    request_group: RequestGroupSummary | None = None,
 ) -> PurchaseRequest:
     return PurchaseRequest(
         id=UUID(str(row["id"])),
@@ -2379,6 +2514,7 @@ def _purchase_request(
             UUID(str(row["source_rfq_response_id"])) if row.get("source_rfq_response_id") else None
         ),
         source=source,
+        request_group=request_group,
         auto_prepared=auto_prepared,
         branch_id=UUID(str(row["branch_id"])),
         cost_centre_id=(UUID(str(row["cost_centre_id"])) if row.get("cost_centre_id") else None),
