@@ -700,15 +700,25 @@ describe('ApprovalQueueComponent', () => {
 
   it('renders approve and reject buttons inside the actions cell and lines toggle in lines cell', () => {
     const compiled = fixture.nativeElement as HTMLElement;
-    const actionsCell = compiled.querySelector('td.mat-column-actions');
+    const actionsCell = compiled.querySelector('td.mat-column-actions') as HTMLTableCellElement | null;
     expect(actionsCell).not.toBeNull();
     expect(actionsCell?.querySelector('.approve-btn')).not.toBeNull();
     expect(actionsCell?.querySelector('.reject-btn')).not.toBeNull();
 
-    const linesCell = compiled.querySelector('td.mat-column-lines');
+    const linesCell = compiled.querySelector('td.mat-column-lines') as HTMLTableCellElement | null;
     expect(linesCell).not.toBeNull();
     expect(linesCell?.querySelector('.approve-btn')).toBeNull();
     expect(linesCell?.querySelector('.reject-btn')).toBeNull();
+
+    const approveBtn = compiled.querySelector('.approve-btn') as HTMLButtonElement | null;
+    expect(approveBtn).not.toBeNull();
+    expect(approveBtn?.closest('td')).toBe(actionsCell);
+    expect(approveBtn?.closest('td')).not.toBe(linesCell);
+
+    if (linesCell && actionsCell) {
+      expect(getComputedStyle(linesCell).display).toBe('table-cell');
+      expect(getComputedStyle(actionsCell).display).toBe('table-cell');
+    }
   });
 
   it('makes the whole N lines control one clickable button without tooltip whose accessible name contains visible text and flips aria-expanded', () => {

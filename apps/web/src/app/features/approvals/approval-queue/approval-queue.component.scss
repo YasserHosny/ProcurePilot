@@ -218,6 +218,10 @@ td.date-cell {
 
 .lines-cell,
 .actions-cell {
+  white-space: nowrap;
+}
+
+.cell-inline {
   display: flex;
   align-items: center;
   gap: 0.375rem;
