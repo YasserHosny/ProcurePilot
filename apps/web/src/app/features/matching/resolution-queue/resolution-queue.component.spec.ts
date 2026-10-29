@@ -725,4 +725,68 @@ describe('ResolutionQueueComponent', () => {
       expect(component.errorMessage()).toContain('12345678');
     });
   });
+
+  describe('bulk confirm alias sweep feedback notices (US3 / T026)', () => {
+    let snackSpy: jasmine.Spy;
+
+    beforeEach(() => {
+      const snackBar = (component as unknown as { snackBar: { open: jasmine.Spy } }).snackBar;
+      snackSpy = spyOn(snackBar, 'open');
+      fixture.detectChanges();
+    });
+
+    it('bulk confirm with 3 swept lines adds "Also matched 3 more lines with the same wording"', () => {
+      apiService.confirmExactMatches.and.returnValue(
+        of({
+          confirmed: 3,
+          skipped: 0,
+          lines_matched_by_same_wording: ['swept-1', 'swept-2', 'swept-3'],
+        }),
+      );
+
+      component.confirmAllExact();
+
+      expect(snackSpy).toHaveBeenCalledWith(
+        jasmine.stringMatching(/Also matched 3 more lines/),
+        undefined,
+        { duration: 4000 },
+      );
+    });
+
+    it('bulk confirm with 1 swept line uses singular "Also matched 1 more line"', () => {
+      apiService.confirmExactMatches.and.returnValue(
+        of({
+          confirmed: 1,
+          skipped: 0,
+          lines_matched_by_same_wording: ['swept-1'],
+        }),
+      );
+
+      component.confirmAllExact();
+
+      expect(snackSpy).toHaveBeenCalledWith(
+        jasmine.stringMatching(/Also matched 1 more line/),
+        undefined,
+        { duration: 4000 },
+      );
+    });
+
+    it('bulk confirm with null/empty swept lines leaves snackbar text unchanged from today', () => {
+      apiService.confirmExactMatches.and.returnValue(
+        of({
+          confirmed: 3,
+          skipped: 0,
+          lines_matched_by_same_wording: null,
+        }),
+      );
+
+      component.confirmAllExact();
+
+      expect(snackSpy).toHaveBeenCalledWith(
+        '3 matches confirmed.',
+        undefined,
+        { duration: 4000 },
+      );
+    });
+  });
 });

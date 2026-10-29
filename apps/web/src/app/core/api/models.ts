@@ -554,6 +554,7 @@ export interface MatchDecision {
   readonly alias_id?: string | null;
   readonly supersedes_decision_id?: string | null;
   readonly learned_from_decision_id?: string | null;
+  readonly lines_matched_by_same_wording?: readonly string[] | null;
 }
 
 export interface QuotationMatchSummary {
@@ -672,6 +673,13 @@ export interface MatchCorrectionResponse {
   readonly superseded_decision_id: string;
   readonly lines_matched_through_old_wording: readonly string[];
   readonly alias_conflict_product_id?: string | null;
+  readonly lines_matched_by_same_wording?: readonly string[] | null;
+}
+
+export interface BulkConfirmResult {
+  readonly confirmed: number;
+  readonly skipped: number;
+  readonly lines_matched_by_same_wording?: readonly string[] | null;
 }
 
 export interface LandedCost {

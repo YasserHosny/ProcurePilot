@@ -36,6 +36,7 @@ import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-dat
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS } from '../match-resolution/correct-match-dialog.component';
+import { formatSweptLinesMessage, appendSweptMessage } from '../matching-api';
 
 type MatchTaskSortBy = 'created_at' | 'priority' | 'status';
 type MatchTaskSortOrder = 'asc' | 'desc';
@@ -207,6 +208,11 @@ export class ResolutionQueueComponent implements OnInit {
         this.exactSkippedCount.set(res.skipped);
         this.loadExactMatchCount();
         this.loadTasks();
+
+        const baseMsg = this.translate.instant('matching.queue.exact.confirmed', { count: res.confirmed });
+        const swept = formatSweptLinesMessage(this.translate, res.lines_matched_by_same_wording);
+        const msg = swept ? appendSweptMessage(baseMsg, swept) : baseMsg;
+        this.snackBar.open(msg, undefined, { duration: 4000 });
       },
       error: (err: unknown) => {
         this.isConfirmingExact.set(false);
@@ -514,9 +520,12 @@ export class ResolutionQueueComponent implements OnInit {
           if (!request) return;
           const key = crypto.randomUUID();
           this.api.correctMatch(task.quotation_line.id, request, key).subscribe({
-            next: () => {
+            next: (res) => {
+              const baseMsg = this.translate.instant('matching.resolution.actions.correctSuccess');
+              const swept = formatSweptLinesMessage(this.translate, res.lines_matched_by_same_wording);
+              const msg = swept ? appendSweptMessage(baseMsg, swept) : baseMsg;
               this.snackBar.open(
-                this.translate.instant('matching.resolution.actions.correctSuccess'),
+                msg,
                 undefined,
                 { duration: 4000 },
               );
