@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import cast
 from uuid import UUID, uuid4
 
@@ -8,6 +9,7 @@ import pytest
 
 from procurepilot_api.modules.matching import service as matching_service_module
 from procurepilot_api.modules.matching.service import MatchingService, _queue_item
+from procurepilot_api.shared import postgrest_pages
 
 
 class FakeQuery:
@@ -481,8 +483,12 @@ def test_matching_pipeline_passes_supplier_code_aliases_to_deterministic_matcher
 
     monkeypatch.setattr(matching_service_module, "rfq_lines_for_quotation", lambda *_: None)
     monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
-    monkeypatch.setattr(matching_service_module, "_decision_for_line", lambda _c, _lid: None)
-    monkeypatch.setattr(matching_service_module, "_candidate_rows", lambda _c, _lid: [])
+    monkeypatch.setattr(
+        matching_service_module._LineMatchState,  # noqa: SLF001
+        "read",
+        classmethod(lambda cls, _client, _lines: cls(candidates={}, decisions={}, tasks={})),
+    )
+    monkeypatch.setattr(matching_service_module, "_decision_for_line", lambda *_a: None)
     monkeypatch.setattr(
         matching_service_module,
         "_deterministic_products_for_line",
@@ -817,3 +823,52 @@ def test_list_match_tasks_search_finds_matches_beyond_first_page_before_paginati
     assert [task.id for task in result.items] == [second_task_id]
     assert task_calls == 1
     assert result.next_cursor is None
+
+
+class _CappedQuery:
+    """A PostgREST stand-in that returns at most `cap` rows per response, like `max_rows`."""
+
+    def __init__(self, tables: dict[str, list[dict[str, object]]], cap: int) -> None:
+        self._tables, self._cap = tables, cap
+        self._rows: list[dict[str, object]] = []
+        self._start, self._end = 0, None
+
+    def table(self, name: str) -> _CappedQuery:
+        query = _CappedQuery(self._tables, self._cap)
+        query._rows = self._tables.get(name, [])
+        return query
+
+    def select(self, _columns: str) -> _CappedQuery:
+        return self
+
+    def in_(self, _column: str, _values: list[str]) -> _CappedQuery:
+        return self
+
+    def order(self, _column: str, *, desc: bool = False) -> _CappedQuery:
+        return self
+
+    def range(self, start: int, end: int) -> _CappedQuery:
+        self._start, self._end = start, end
+        return self
+
+    def execute(self) -> SimpleNamespace:
+        end = len(self._rows) if self._end is None else self._end + 1
+        return SimpleNamespace(data=self._rows[self._start : min(end, self._start + self._cap)])
+
+
+def test_line_match_state_reads_every_candidate_past_the_row_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # PPS-133: PostgREST caps each response at max_rows; a batched read must page.
+    line_id = uuid4()
+    candidates = [
+        {"id": uuid4(), "quotation_line_id": line_id, "rank": rank} for rank in range(1, 6)
+    ]
+    tasks = [{"id": uuid4(), "quotation_line_id": line_id, "status": "resolved"} for _ in range(3)]
+    monkeypatch.setattr(postgrest_pages, "PAGE_ROWS", 2)
+    state = matching_service_module._LineMatchState.read(  # noqa: SLF001
+        _CappedQuery({"match_candidate": candidates, "match_task": tasks}, cap=2),
+        [{"id": line_id}],
+    )
+    assert state.candidates[str(line_id)] == candidates
+    assert state._tasks[str(line_id)] == tasks  # noqa: SLF001

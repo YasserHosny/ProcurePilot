@@ -50,6 +50,9 @@ class _NoopLandedCost:
     def get_landed_cost_or_none(self, **_kwargs: object) -> None:
         return None
 
+    def latest_for_decisions(self, **_kwargs: object) -> dict[object, object]:
+        return {}
+
 
 class _MatchingSettings:
     matching_embedding_model = "stub-hash-v1"
