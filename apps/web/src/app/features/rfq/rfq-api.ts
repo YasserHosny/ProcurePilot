@@ -45,6 +45,8 @@ export interface RfqDetail {
   rfq: Rfq;
   lines: RfqLine[];
   recipients: RfqRecipient[];
+  converted_purchase_request_ids?: string[];
+  request_group_id?: string | null;
 }
 
 export interface RfqCreatePayload {
@@ -133,6 +135,8 @@ export interface RfqSummary {
   recipient_count: number;
   response_count: number;
   converted_purchase_request_id: string | null;
+  converted_purchase_request_ids?: string[];
+  request_group_id?: string | null;
 }
 
 export interface RfqList {

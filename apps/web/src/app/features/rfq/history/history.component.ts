@@ -182,8 +182,18 @@ export class HistoryComponent implements OnInit {
     if (rfq.status === 'draft') {
       this.router.navigate(this.isCreator(rfq)
         ? ['/rfq', rfq.id, 'edit'] : ['/rfq', rfq.id]);
-    } else if (rfq.status === 'converted' && rfq.converted_purchase_request_id) {
-      this.router.navigate(['/requests', rfq.converted_purchase_request_id]);
+    } else if (rfq.status === 'converted') {
+      const ids = rfq.converted_purchase_request_ids;
+      if (ids && ids.length > 1) {
+        this.router.navigate(['/rfq', rfq.id]);
+      } else {
+        const singleId = ids && ids.length === 1 ? ids[0] : rfq.converted_purchase_request_id;
+        if (singleId) {
+          this.router.navigate(['/requests', singleId]);
+        } else {
+          this.router.navigate(['/rfq', rfq.id]);
+        }
+      }
     } else {
       this.router.navigate(['/rfq', rfq.id]);
     }

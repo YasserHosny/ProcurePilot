@@ -119,6 +119,54 @@
     display: flex;
     gap: 8px;
   }
+
+  &.converted-notice-card {
+    border-inline-start: 4px solid var(--pp-success);
+
+    .converted-heading {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .converted-requests-list {
+      margin-block-start: 8px;
+      margin-block-end: 0;
+      margin-inline: 0;
+      padding-inline-start: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .request-link {
+      color: var(--mat-sys-primary);
+      font-weight: 500;
+      text-decoration: underline;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
+    .group-line {
+      margin-block-start: 8px;
+      margin-block-end: 0;
+      margin-inline: 0;
+      font-size: 14px;
+      color: var(--pp-text-muted);
+
+      .group-link {
+        color: var(--mat-sys-primary);
+        text-decoration: underline;
+
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+    }
+  }
 }
 
 .details-card {

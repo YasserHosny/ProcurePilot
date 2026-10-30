@@ -3998,7 +3998,17 @@
       "loadError": "فشل تحميل تفاصيل طلب عرض الأسعار.",
       "recipientStatus_sent": "مرسل",
       "recipientStatus_failed": "فاشل",
-      "recipientStatus_draft": "لم يُرسل"
+      "recipientStatus_draft": "لم يُرسل",
+      "convertedIntoRequest": "تم التحويل إلى الطلب",
+      "convertedCount": {
+        "zero": "لم يتم التحويل إلى أي طلبات",
+        "one": "تم التحويل إلى طلب واحد",
+        "two": "تم التحويل إلى طلبين",
+        "few": "تم التحويل إلى {{count}} طلبات",
+        "many": "تم التحويل إلى {{count}} طلبًا",
+        "other": "تم التحويل إلى {{count}} طلب"
+      },
+      "approvedTogether": "تم اعتمادها معًا كمجموعة واحدة"
     },
     "guardrails": {
       "title": "إعدادات الضوابط",
