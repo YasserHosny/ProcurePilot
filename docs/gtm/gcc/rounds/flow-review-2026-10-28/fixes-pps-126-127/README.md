@@ -88,7 +88,22 @@ The layout mirrors correctly. Not changed here: the saving tile shows «١٨٠ �
 
 ## R15 (PPS-126)
 
+Before #356 (hosted with #344): new rows were already empty and the hint sat under its own field, but nothing
+stopped the same product being added twice.
+
 ![Standalone Basket Split on hosted with #344: the new row is empty and the hint sits under its field](08-basket-split-rows-hosted-after-344.jpg)
+
+After #356 was deployed (2026-10-30, Arabic and English): an empty row says «اختر منتجًا» / «Choose a product».
+With rice in row 1, row 2's list shows rice disabled (the other 19 products enabled), and «20 pack(s) × 10 kg =
+200 kg» sits under its own field.
+
+![Arabic: the new row says «اختر منتجًا»](11-rows-ar-placeholder.jpg)
+
+![Arabic: rice, already in row 1, is disabled in row 2's list](12-rows-ar-product-already-added-disabled.jpg)
+
+![English: «Choose a product»; the pack hint under its own field](13-rows-en-placeholder.jpg)
+
+Not changed: a row with a product and no quantity yet shows the hint with dashes («— pack(s) × 10 kg = — kg»).
 
 ## Notes
 

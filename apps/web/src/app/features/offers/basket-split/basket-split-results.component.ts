@@ -191,7 +191,7 @@ export class BasketSplitResultsComponent implements OnInit {
           this.loadRequests(res.requestIds);
         }
         this.staleError.set(false);
-        this.convertedRequestIds.set(null);
+        this.convertedRequestIds.set(res.requestIds ?? res.requests?.map((r) => r.id) ?? []);
         this.generalError.set(null);
       } else if (res.stale) {
         this.staleError.set(true);
@@ -233,6 +233,9 @@ export class BasketSplitResultsComponent implements OnInit {
     forkJoin(ids.map((id) => this.requestsApi.getRequest(id))).subscribe({
       next: (reqs) => {
         this.preparedRequests.set(reqs);
+      },
+      error: () => {
+        // Soft fail
       },
     });
   }

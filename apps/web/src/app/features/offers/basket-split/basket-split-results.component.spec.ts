@@ -6,13 +6,14 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Router, provideRouter } from '@angular/router';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { of, Subject } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 import ar from '../../../../../../../packages/i18n/ar.json';
 import en from '../../../../../../../packages/i18n/en.json';
 import type { Product, PurchaseRequest, Role, Supplier } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { RfqApi, type RfqDetail } from '../../rfq/rfq-api';
+import { RequestsApiService } from '../../requests/requests-api';
 import type { BasketSplitJob } from '../offers-api';
 import { BasketSplitResultsComponent } from './basket-split-results.component';
 import { PrepareSplitRequestsDialogComponent, type PrepareSplitRequestsDialogResult } from './prepare-split-requests-dialog.component';
@@ -775,6 +776,42 @@ describe('BasketSplitResultsComponent — packs and constraint copy', () => {
 
         expect(el.querySelector('[data-testid="prepare-requests-button"]')).toBeNull();
         expect(el.querySelector('[data-testid="prepared-requests-summary"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="already-converted-banner"]')).toBeNull();
+      });
+
+      it('when prepare succeeds with requestIds but loading requests fails, prepare button is hidden and converted links are shown', () => {
+        setupRfqResults();
+        fixture.detectChanges();
+
+        const requestsApi = TestBed.inject(RequestsApiService);
+        spyOn(requestsApi, 'getRequest').and.returnValue(
+          throwError(() => new Error('Failed to load request')),
+        );
+
+        const dialog = fixture.debugElement.injector.get(MatDialog);
+        const dialogSpy = spyOn(dialog, 'open');
+        const afterClosedSubject = new Subject<PrepareSplitRequestsDialogResult>();
+        dialogSpy.and.returnValue({
+          afterClosed: () => afterClosedSubject.asObservable(),
+        } as unknown as MatDialogRef<PrepareSplitRequestsDialogComponent, PrepareSplitRequestsDialogResult>);
+
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="prepare-requests-button"]')).not.toBeNull();
+
+        fixture.componentInstance.openPrepareDialog();
+        expect(dialogSpy).toHaveBeenCalled();
+
+        afterClosedSubject.next({
+          success: true,
+          requestIds: ['req-a', 'req-b'],
+        });
+        fixture.detectChanges();
+
+        expect(el.querySelector('[data-testid="prepare-requests-button"]')).toBeNull();
+        const links = el.querySelectorAll('[data-testid="converted-request-link"]');
+        expect(links.length).toBe(2);
+        expect(links[0].getAttribute('href')).toBe('/requests/req-a');
+        expect(links[1].getAttribute('href')).toBe('/requests/req-b');
       });
 
       it('after rfqAlreadyConverted, the button is gone and the banner is shown', () => {
