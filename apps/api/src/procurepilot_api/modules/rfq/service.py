@@ -600,16 +600,22 @@ class RfqService:
                 )
                 if snapshot is not None and snapshot.guardrails:
                     cur.execute(
-                        "select guardrail_id, rfq_response_id "
+                        "select guardrail_id, rfq_response_id, purchase_request_id "
                         "from auto_preparation_event "
                         "where tenant_id = %s and rfq_response_id = any(%s)",
                         (member.tenant_id, response_ids),
                     )
                     fired_by_response: dict[uuid.UUID, set[uuid.UUID]] = {}
+                    request_by_fired_guardrail: dict[
+                        tuple[uuid.UUID, uuid.UUID], uuid.UUID | None
+                    ] = {}
                     for event in cur.fetchall():
                         fired_by_response.setdefault(event["rfq_response_id"], set()).add(
                             event["guardrail_id"]
                         )
+                        request_by_fired_guardrail[
+                            (event["rfq_response_id"], event["guardrail_id"])
+                        ] = event["purchase_request_id"]
                     for response_id in response_ids:
                         explanations = explain_guardrail_evaluations(
                             guardrails=snapshot.guardrails,
@@ -626,6 +632,11 @@ class RfqService:
                                 guardrail_id=item.guardrail_id,
                                 fired=item.fired,
                                 reason=item.reason,
+                                purchase_request_id=(
+                                    request_by_fired_guardrail.get((response_id, item.guardrail_id))
+                                    if item.fired
+                                    else None
+                                ),
                             )
                             for item in explanations
                         ]

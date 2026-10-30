@@ -108,6 +108,7 @@ class RfqGuardrailEvaluation(BaseModel):
     guardrail_id: UUID
     fired: bool
     reason: str
+    purchase_request_id: UUID | None = None
 
 
 class RfqResponseComparison(BaseModel):

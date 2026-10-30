@@ -65,4 +65,11 @@ components:
             properties:
               guardrail_id: { type: string, format: uuid }
               fired: { type: boolean }
-              reason: { type: string }
+              reason:
+                type: string
+                description: Fired events use fired; otherwise converted RFQs use rfq_converted and other non-open statuses use rfq_not_open.
+              purchase_request_id:
+                type: [string, 'null']
+                format: uuid
+                default: null
+                description: Request prepared by this guardrail for this response; null when it has not fired.
