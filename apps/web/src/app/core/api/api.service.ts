@@ -90,6 +90,8 @@ import type {
   SavingRecord,
   SavingStatus,
   Session,
+  SplitPrepareRequest,
+  SplitPrepareResponse,
   Supplier,
   SupplierCommercialTerm,
   SupplierCommercialTermCreate,
@@ -786,6 +788,19 @@ export class ApiService {
 
   getBasketSplitJob(id: string): Observable<BasketSplitJob> {
     return this.http.get<BasketSplitJob>(`${this.base}/baskets/${id}`);
+  }
+
+  prepareSplitRequests(
+    basketId: string,
+    body: SplitPrepareRequest,
+    idempotencyKey?: string,
+  ): Observable<SplitPrepareResponse> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<SplitPrepareResponse>(
+      `${this.base}/baskets/${basketId}/prepare-requests`,
+      body,
+      headers ? { headers } : undefined,
+    );
   }
 
   getAlerts(params?: {

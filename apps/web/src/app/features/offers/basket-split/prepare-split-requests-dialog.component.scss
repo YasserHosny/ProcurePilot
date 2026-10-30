@@ -1,0 +1,91 @@
+.dialog-container {
+  display: flex;
+  flex-direction: column;
+  padding-block: 0.5rem;
+  padding-inline: 0.5rem;
+  min-inline-size: 320px;
+}
+
+.dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-block: 1rem;
+}
+
+.prepare-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.form-field {
+  width: 100%;
+}
+
+.expired-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-block: 0.75rem;
+  padding-inline: 1rem;
+  border-radius: var(--pp-radius-card, 6px);
+  background-color: var(--pp-warning-container, #fbebd3);
+  border: 1px solid var(--pp-warning, #f0b45a);
+}
+
+.expired-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  .warn-icon {
+    color: var(--pp-warning, #8a4b00);
+  }
+
+  .expired-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--pp-text-strong);
+  }
+}
+
+.expired-desc {
+  font-size: 0.85rem;
+  color: var(--pp-text);
+  margin: 0;
+}
+
+.expired-checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.expired-checkbox {
+  font-size: 0.85rem;
+}
+
+.dialog-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-block: 0.5rem;
+  padding-inline: 0.75rem;
+  border-radius: 4px;
+  background-color: var(--pp-error-container, #fbe4e1);
+  color: var(--pp-error, #a3231b);
+  font-size: 0.85rem;
+
+  mat-icon {
+    color: var(--pp-error, #a3231b);
+  }
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-block-start: 1rem;
+}

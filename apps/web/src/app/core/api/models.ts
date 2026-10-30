@@ -938,6 +938,18 @@ export interface BasketPackSnapshot {
   readonly base_unit: string;
 }
 
+export interface SplitPrepareRequest {
+  readonly branch_id: string;
+  readonly required_by_date: string;
+  readonly cost_centre_id?: string | null;
+  readonly confirm_expired_quotation_ids?: readonly string[];
+}
+
+export interface SplitPrepareResponse {
+  readonly request_group_id: string;
+  readonly purchase_request_ids: readonly string[];
+}
+
 // --- R2.4 Supplier IQ & Scorecards ---------------------------------------
 
 export type ScorecardConfidence = 'high' | 'medium' | 'low';
