@@ -15,7 +15,7 @@ import { TranslatePipe,
 TranslateService } from '@ngx-translate/core';
 import { SessionService } from '../../../core/auth/session.service';
 import { RoleDirective } from '../../../core/auth/role.directive';
-import { forkJoin, of } from 'rxjs';
+import { forkJoin, of, type Observable } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import type { ApiError, Branch, BranchList, PurchaseRequest, PurchaseRequestStatus } from '../../../core/api/models';
@@ -141,11 +141,26 @@ export class RequestListComponent implements OnInit {
   }
 
   withdrawRequest(request: PurchaseRequest): void {
+    const isGroup = !!request.request_group;
+    const size = request.request_group?.size ?? 1;
+
+    const titleKey = isGroup ? `${I18N}.split.withdrawConfirmTitle` : `${I18N}.withdrawConfirmTitle`;
+    const messageKey = isGroup
+      ? size === 2
+        ? `${I18N}.split.withdrawConfirmMessageBoth`
+        : `${I18N}.split.withdrawConfirmMessageAll`
+      : `${I18N}.withdrawConfirmMessage`;
+    const confirmKey = isGroup
+      ? size === 2
+        ? `${I18N}.split.withdrawBoth`
+        : `${I18N}.split.withdrawAll`
+      : `${I18N}.actions.withdraw`;
+
     this.dialog.open(CatalogueConfirmDialogComponent, {
       data: {
-        titleKey: `${I18N}.withdrawConfirmTitle`,
-        messageKey: `${I18N}.withdrawConfirmMessage`,
-        confirmKey: `${I18N}.actions.withdraw`,
+        titleKey,
+        messageKey,
+        confirmKey,
         isDestructive: true,
       },
     }).afterClosed().subscribe((confirmed: boolean) => {
@@ -154,7 +169,12 @@ export class RequestListComponent implements OnInit {
   }
 
   private performWithdrawal(request: PurchaseRequest): void {
-    this.requestsApi.withdrawRequest(request.id).subscribe({
+    const isGroup = !!request.request_group;
+    const withdrawObs$: Observable<unknown> = isGroup
+      ? this.requestsApi.withdrawGroup(request.request_group!.id, crypto.randomUUID())
+      : this.requestsApi.withdrawRequest(request.id);
+
+    withdrawObs$.subscribe({
       next: () => {
         this.loadRequests();
         this.snackBar.open(
@@ -163,7 +183,21 @@ export class RequestListComponent implements OnInit {
           { duration: 3500 },
         );
       },
-      error: (err: unknown) => this.handleError(err),
+      error: (err: unknown) => {
+        if (err instanceof HttpErrorResponse) {
+          const apiError = err.error as ApiError | undefined;
+          const details = apiError?.details as { reason?: string } | undefined;
+          if (err.status === 409 && details?.reason === 'part_of_split') {
+            this.snackBar.open(
+              this.translate.instant(`${I18N}.partOfSplitError`),
+              undefined,
+              { duration: 4000 },
+            );
+            return;
+          }
+        }
+        this.handleError(err);
+      },
     });
   }
 
@@ -191,6 +225,11 @@ export class RequestListComponent implements OnInit {
       const apiError = err.error as ApiError | undefined;
       if (apiError?.details?.['reason'] === 'purchase_order_exists') {
         this.errorMessage.set(this.translate.instant(`${I18N}.purchaseOrderExists`));
+        this.errorTraceId.set(apiError?.trace_id ?? null);
+        return;
+      }
+      if (apiError?.details?.['reason'] === 'part_of_split') {
+        this.errorMessage.set(this.translate.instant(`${I18N}.partOfSplitError`));
         this.errorTraceId.set(apiError?.trace_id ?? null);
         return;
       }

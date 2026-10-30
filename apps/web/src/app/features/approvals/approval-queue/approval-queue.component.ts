@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -34,7 +35,26 @@ import type {
   Product,
   PurchaseRequest,
   PurchaseRequestLine,
+  RequestGroupSummary,
 } from '../../../core/api/models';
+
+export interface SingleQueueItem {
+  readonly kind: 'single';
+  readonly id: string;
+  readonly request: PurchaseRequest;
+  readonly linesCount: number;
+}
+
+export interface GroupQueueItem {
+  readonly kind: 'group';
+  readonly id: string;
+  readonly groupId: string;
+  readonly group: RequestGroupSummary;
+  readonly requests: PurchaseRequest[];
+  readonly linesCount: number;
+}
+
+export type QueueItem = SingleQueueItem | GroupQueueItem;
 import { FormatService } from '../../../core/format/format.service';
 import { parseIsoDateLocal } from '../../../core/format/iso-date';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
@@ -82,15 +102,32 @@ export interface ApprovalDecisionDialogResult {
     </h2>
     <mat-dialog-content>
       <mat-form-field appearance="outline" class="decision-comment-field">
-        <mat-label>{{ 'approvals.decisionDialog.commentLabel' | translate }}</mat-label>
+        <mat-label>
+          {{
+            (data.action === 'reject'
+              ? 'approvals.decisionDialog.reasonLabel'
+              : 'approvals.decisionDialog.commentLabel'
+            ) | translate
+          }}
+        </mat-label>
         <textarea
           matInput
           [(ngModel)]="comment"
-          [placeholder]="'approvals.decisionDialog.commentPlaceholder' | translate"
+          [placeholder]="
+            (data.action === 'reject'
+              ? 'approvals.decisionDialog.reasonPlaceholder'
+              : 'approvals.decisionDialog.commentPlaceholder'
+            ) | translate
+          "
           rows="3"
           (keydown.ctrl.enter)="onConfirm()"
           (keydown.meta.enter)="onConfirm()"
         ></textarea>
+        @if (data.action === 'reject' && !comment.trim()) {
+          <mat-hint class="reason-required-hint">
+            {{ 'approvals.decisionDialog.reasonRequired' | translate }}
+          </mat-hint>
+        }
       </mat-form-field>
     </mat-dialog-content>
     <mat-dialog-actions align="end" class="dialog-actions">
@@ -103,6 +140,7 @@ export interface ApprovalDecisionDialogResult {
         type="button"
         (click)="onConfirm()"
         class="confirm-btn"
+        [disabled]="data.action === 'reject' && !comment.trim()"
       >
         {{ 'approvals.decisionDialog.confirmButton' | translate }}
       </button>
@@ -131,6 +169,9 @@ export class ApprovalDecisionDialogComponent {
   comment = '';
 
   onConfirm(): void {
+    if (this.data.action === 'reject' && !this.comment.trim()) {
+      return;
+    }
     this.dialogRef.close({
       confirmed: true,
       comment: this.comment.trim() || undefined,
@@ -146,6 +187,7 @@ export class ApprovalDecisionDialogComponent {
   selector: 'app-approval-queue',
   standalone: true,
   imports: [
+    NgTemplateOutlet,
     MatCardModule,
     MatTableModule,
     MatButtonModule,
@@ -217,6 +259,66 @@ export class ApprovalQueueComponent implements OnInit {
     }
     return byId;
   });
+
+  readonly queueItems = computed<QueueItem[]>(() => {
+    const reqs = this.pendingRequests();
+    const groupsMap = new Map<string, PurchaseRequest[]>();
+    const seenGroupIds = new Set<string>();
+    const items: QueueItem[] = [];
+
+    for (const req of reqs) {
+      if (req.request_group) {
+        const gid = req.request_group.id;
+        if (!groupsMap.has(gid)) {
+          groupsMap.set(gid, []);
+        }
+        groupsMap.get(gid)!.push(req);
+      }
+    }
+
+    for (const req of reqs) {
+      if (req.request_group) {
+        const gid = req.request_group.id;
+        if (!seenGroupIds.has(gid)) {
+          seenGroupIds.add(gid);
+          const requests = groupsMap.get(gid)!;
+          const linesCount = requests.reduce((sum, r) => sum + r.lines.length, 0);
+          items.push({
+            kind: 'group',
+            id: gid,
+            groupId: gid,
+            group: req.request_group,
+            requests,
+            linesCount,
+          });
+        }
+      } else {
+        items.push({
+          kind: 'single',
+          id: req.id,
+          request: req,
+          linesCount: req.lines.length,
+        });
+      }
+    }
+    return items;
+  });
+
+  private readonly idempotencyKeys = new Map<string, string>();
+
+  private getIdempotencyKey(action: string, targetId: string): string {
+    const keyId = `${action}:${targetId}`;
+    let key = this.idempotencyKeys.get(keyId);
+    if (!key) {
+      key = crypto.randomUUID();
+      this.idempotencyKeys.set(keyId, key);
+    }
+    return key;
+  }
+
+  private clearIdempotencyKey(action: string, targetId: string): void {
+    this.idempotencyKeys.delete(`${action}:${targetId}`);
+  }
 
   ngOnInit(): void {
     this.loadPendingApprovals();
@@ -334,6 +436,102 @@ export class ApprovalQueueComponent implements OnInit {
         this.processingRequestId.set(null);
         this.handleError(err);
       },
+    });
+  }
+
+  openGroupDecisionDialog(item: GroupQueueItem, action: 'approve' | 'reject'): void {
+    const branchName = this.branchNameById().get(item.requests[0]?.branch_id);
+    const amount = this.formatService.formatCurrencyAmount(item.group.combined_total);
+
+    const dialogRef = this.dialog.open<
+      ApprovalDecisionDialogComponent,
+      ApprovalDecisionDialogData,
+      ApprovalDecisionDialogResult
+    >(ApprovalDecisionDialogComponent, {
+      width: '480px',
+      data: {
+        action,
+        requestId: item.groupId,
+        amount,
+        branchName,
+      },
+    });
+
+    dialogRef.afterClosed().subscribe((result?: ApprovalDecisionDialogResult) => {
+      if (!result?.confirmed) {
+        return;
+      }
+      this.submitGroupDecision(item.groupId, action, result.comment);
+    });
+  }
+
+  submitGroupDecision(groupId: string, action: 'approve' | 'reject', comment?: string): void {
+    this.processingRequestId.set(groupId);
+    this.errorMessage.set(null);
+    this.errorTraceId.set(null);
+
+    const idempotencyKey = this.getIdempotencyKey(action, groupId);
+    const body: ApprovalDecisionInput = {
+      comment: comment?.trim() || undefined,
+    };
+
+    const action$ =
+      action === 'approve'
+        ? this.approvalsApi.approveGroup(groupId, body, idempotencyKey)
+        : this.approvalsApi.rejectGroup(groupId, body, idempotencyKey);
+
+    action$.subscribe({
+      next: () => {
+        this.clearIdempotencyKey(action, groupId);
+        this.processingRequestId.set(null);
+        this.loadPendingApprovals();
+        if (action === 'approve') {
+          const msg = this.translate.instant(`${I18N}.approveSuccess`);
+          this.snackBar.open(msg, undefined, { duration: 3500 });
+        } else {
+          this.snackBar.open(this.translate.instant(`${I18N}.rejectSuccess`), undefined, {
+            duration: 3500,
+          });
+        }
+      },
+      error: (err: unknown) => {
+        this.processingRequestId.set(null);
+        this.handleError(err);
+      },
+    });
+  }
+
+  isGroupRow(item: QueueItem): item is GroupQueueItem {
+    return item.kind === 'group';
+  }
+
+  getSplitGroupText(item: GroupQueueItem): string {
+    const rfqShort = item.group.rfq_id ? item.group.rfq_id.slice(0, 8) : '';
+    const requestsStr = this.requestCountLabel(item.group.size);
+    const totalStr = this.formatService.formatCurrencyAmount(item.group.combined_total);
+
+    if (item.group.saving) {
+      const savingStr = this.formatService.formatCurrencyAmount(item.group.saving);
+      return this.translate.instant('approvals.splitGroup.summary', {
+        short: rfqShort,
+        requests: requestsStr,
+        total: totalStr,
+        saving: savingStr,
+      });
+    }
+
+    return this.translate.instant('approvals.splitGroup.summaryNoSaving', {
+      short: rfqShort,
+      requests: requestsStr,
+      total: totalStr,
+    });
+  }
+
+  requestCountLabel(count: number): string {
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    return this.translate.instant(`approvals.requestCount.${category}`, {
+      count: this.formatService.formatNumber(count),
     });
   }
 
@@ -479,6 +677,11 @@ export class ApprovalQueueComponent implements OnInit {
   private handleError(err: unknown): void {
     if (err instanceof HttpErrorResponse) {
       const apiError = err.error as ApiError | undefined;
+      const details = apiError?.details as { reason?: string } | undefined;
+      if (err.status === 409 && details?.reason === 'part_of_split') {
+        this.errorMessage.set(this.translate.instant(`${I18N}.partOfSplitError`));
+        return;
+      }
       this.errorTraceId.set(apiError?.trace_id ?? null);
       this.errorMessage.set(
         apiError?.message ?? err.message ?? this.translate.instant(`${I18N}.genericError`),

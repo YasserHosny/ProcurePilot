@@ -24,20 +24,20 @@
         <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
         <span>{{ 'common.loading' | translate }}</span>
       </div>
-    } @else if (pendingRequests().length === 0) {
+    } @else if (queueItems().length === 0) {
       <div class="empty-state">
         <mat-icon class="empty-icon" aria-hidden="true">inbox</mat-icon>
         <p class="empty-message">{{ 'approvals.empty' | translate }}</p>
       </div>
     } @else {
       <div class="table-responsive">
-        <table mat-table [dataSource]="pendingRequests()" multiTemplateDataRows class="approvals-table">
+        <table mat-table [dataSource]="queueItems()" multiTemplateDataRows class="approvals-table">
           <ng-container matColumnDef="requiredByDate">
             <th mat-header-cell *matHeaderCellDef>
               {{ 'approvals.columns.requiredByDate' | translate }}
             </th>
-            <td mat-cell *matCellDef="let req" class="date-cell">
-              {{ formatRequiredBy(req.required_by_date) }}
+            <td mat-cell *matCellDef="let row" class="date-cell">
+              {{ formatRequiredBy(isGroupRow(row) ? row.requests[0]?.required_by_date : row.request.required_by_date) }}
             </td>
           </ng-container>
 
@@ -45,8 +45,8 @@
             <th mat-header-cell *matHeaderCellDef>
               {{ 'approvals.columns.requester' | translate }}
             </th>
-            <td mat-cell *matCellDef="let req" class="requester-cell">
-              {{ getRequesterDisplay(req) }}
+            <td mat-cell *matCellDef="let row" class="requester-cell">
+              {{ isGroupRow(row) ? getRequesterDisplay(row.requests[0]) : getRequesterDisplay(row.request) }}
             </td>
           </ng-container>
 
@@ -54,8 +54,8 @@
             <th mat-header-cell *matHeaderCellDef>
               {{ 'approvals.columns.branch' | translate }}
             </th>
-            <td mat-cell *matCellDef="let req" class="branch-cell">
-              {{ getBranchName(req.branch_id) }}
+            <td mat-cell *matCellDef="let row" class="branch-cell">
+              {{ getBranchName(isGroupRow(row) ? row.requests[0]?.branch_id : row.request.branch_id) }}
             </td>
           </ng-container>
 
@@ -63,8 +63,8 @@
             <th mat-header-cell *matHeaderCellDef>
               {{ 'approvals.columns.costCentre' | translate }}
             </th>
-            <td mat-cell *matCellDef="let req" class="cost-centre-cell">
-              {{ getCostCentreDisplay(req) }}
+            <td mat-cell *matCellDef="let row" class="cost-centre-cell">
+              {{ isGroupRow(row) ? getCostCentreDisplay(row.requests[0]) : getCostCentreDisplay(row.request) }}
             </td>
           </ng-container>
 
@@ -72,15 +72,21 @@
             <th mat-header-cell *matHeaderCellDef>
               {{ 'approvals.columns.estimatedTotal' | translate }}
             </th>
-            <td mat-cell *matCellDef="let req" class="pp-figures total-cell">
-              @if (req.source?.supplier_name; as supplier) {
-                <div class="supplier-name" dir="auto" data-testid="approval-supplier">{{ supplier }}</div>
-              }
-              <span class="total-amount">{{ formatMoney(req) }}</span>
-              @if (req.has_incomplete_estimate) {
-                <span class="incomplete-badge">
-                  {{ 'requests.incompleteEstimateBadge' | translate }}
-                </span>
+            <td mat-cell *matCellDef="let row" class="pp-figures total-cell">
+              @if (isGroupRow(row)) {
+                <div class="split-group-summary" data-testid="split-group-summary">
+                  <div class="split-group-text" dir="auto">{{ getSplitGroupText(row) }}</div>
+                </div>
+              } @else {
+                @if (row.request.source?.supplier_name; as supplier) {
+                  <div class="supplier-name" dir="auto" data-testid="approval-supplier">{{ supplier }}</div>
+                }
+                <span class="total-amount">{{ formatMoney(row.request) }}</span>
+                @if (row.request.has_incomplete_estimate) {
+                  <span class="incomplete-badge">
+                    {{ 'requests.incompleteEstimateBadge' | translate }}
+                  </span>
+                }
               }
             </td>
           </ng-container>
@@ -89,60 +95,20 @@
             <th mat-header-cell *matHeaderCellDef>
               {{ 'approvals.columns.budgetStatus' | translate }}
             </th>
-            <td mat-cell *matCellDef="let req" class="budget-cell">
-              @if (getBudgetStatusValue(req); as statusVal) {
-                @if (statusVal === 'over') {
-                  <div class="budget-warning-container">
-                    <span
-                      class="budget-warning-badge budget-status-over"
-                      [matTooltip]="'requests.budgetStatus.exceedsWarning' | translate"
-                    >
-                      <mat-icon class="warning-icon" aria-hidden="true">warning</mat-icon>
-                      <span>{{ getBudgetStatusLabel(req) }}</span>
-                    </span>
-                    @if (req.budget_status?.remaining_amount) {
-                      <span class="budget-remaining-subtext">
-                        {{ 'approvals.budgetRemaining' | translate }}:
-                        {{ formatBudgetRemaining(req) }}
-                      </span>
-                    }
-                  </div>
-                } @else if (statusVal === 'near') {
-                  <div class="budget-warning-container">
-                    <span class="budget-near-badge budget-status-near">
-                      <span>{{ getBudgetStatusLabel(req) }}</span>
-                    </span>
-                    @if (req.budget_status?.remaining_amount) {
-                      <span class="budget-remaining-subtext">
-                        {{ 'approvals.budgetRemaining' | translate }}:
-                        {{ formatBudgetRemaining(req) }}
-                      </span>
-                    }
-                  </div>
-                } @else if (statusVal === 'no_budget') {
-                  <div class="budget-warning-container">
-                    <span class="budget-no-budget-badge budget-status-no_budget">
-                      {{ getBudgetStatusLabel(req) }}
-                    </span>
-                    @if (getBudgetReasonText(req); as reasonText) {
-                      <span class="budget-reason-subtext">{{ reasonText }}</span>
-                    }
-                  </div>
-                } @else {
-                  <div class="budget-warning-container">
-                    <span class="budget-within-badge budget-status-within">
-                      {{ getBudgetStatusLabel(req) }}
-                    </span>
-                    @if (req.budget_status?.remaining_amount) {
-                      <span class="budget-remaining">
-                        {{ 'approvals.budgetRemaining' | translate }}:
-                        {{ formatBudgetRemaining(req) }}
-                      </span>
-                    }
-                  </div>
-                }
+            <td mat-cell *matCellDef="let row" class="budget-cell">
+              @if (isGroupRow(row)) {
+                <div class="group-budget-container">
+                  @for (req of row.requests; track req.id) {
+                    <div class="group-budget-entry">
+                      @if (req.source?.supplier_name; as supplier) {
+                        <span class="group-budget-supplier" dir="auto">{{ supplier }}:</span>
+                      }
+                      <ng-container *ngTemplateOutlet="budgetBadgeTmpl; context: { $implicit: req }"></ng-container>
+                    </div>
+                  }
+                </div>
               } @else {
-                <span class="muted-text">{{ 'approvals.notAvailable' | translate }}</span>
+                <ng-container *ngTemplateOutlet="budgetBadgeTmpl; context: { $implicit: row.request }"></ng-container>
               }
             </td>
           </ng-container>
@@ -151,16 +117,16 @@
             <th mat-header-cell *matHeaderCellDef>
               {{ 'approvals.columns.lines' | translate }}
             </th>
-            <td mat-cell *matCellDef="let req" class="lines-cell">
+            <td mat-cell *matCellDef="let row" class="lines-cell">
               <div class="cell-inline">
                 <button
                   type="button"
                   class="lines-toggle-btn expand-lines-btn"
-                  (click)="toggleExpand(req.id)"
-                  [attr.aria-expanded]="isExpanded(req.id)"
+                  (click)="toggleExpand(row.id)"
+                  [attr.aria-expanded]="isExpanded(row.id)"
                 >
-                  <span class="lines-count">{{ lineCountLabel(req.lines.length) }}</span>
-                  <mat-icon class="toggle-icon" aria-hidden="true">{{ isExpanded(req.id) ? 'expand_less' : 'expand_more' }}</mat-icon>
+                  <span class="lines-count">{{ lineCountLabel(row.linesCount) }}</span>
+                  <mat-icon class="toggle-icon" aria-hidden="true">{{ isExpanded(row.id) ? 'expand_less' : 'expand_more' }}</mat-icon>
                 </button>
               </div>
             </td>
@@ -170,15 +136,15 @@
             <th mat-header-cell *matHeaderCellDef>
               {{ 'approvals.columns.actions' | translate }}
             </th>
-            <td mat-cell *matCellDef="let req" class="actions-cell">
+            <td mat-cell *matCellDef="let row" class="actions-cell">
               <div class="cell-inline">
                 <button
                   mat-flat-button
                   color="primary"
                   type="button"
                   class="approve-btn"
-                  [disabled]="isProcessing(req.id)"
-                  (click)="openDecisionDialog(req, 'approve')"
+                  [disabled]="isProcessing(row.id)"
+                  (click)="isGroupRow(row) ? openGroupDecisionDialog(row, 'approve') : openDecisionDialog(row.request, 'approve')"
                 >
                   <mat-icon aria-hidden="true">check</mat-icon>
                   <span>{{ 'approvals.actions.approve' | translate }}</span>
@@ -187,8 +153,8 @@
                   mat-stroked-button
                   type="button"
                   class="reject-btn pp-danger"
-                  [disabled]="isProcessing(req.id)"
-                  (click)="openDecisionDialog(req, 'reject')"
+                  [disabled]="isProcessing(row.id)"
+                  (click)="isGroupRow(row) ? openGroupDecisionDialog(row, 'reject') : openDecisionDialog(row.request, 'reject')"
                 >
                   <mat-icon aria-hidden="true">close</mat-icon>
                   <span>{{ 'approvals.actions.reject' | translate }}</span>
@@ -198,43 +164,86 @@
           </ng-container>
 
           <ng-container matColumnDef="expandedDetail">
-            <td mat-cell *matCellDef="let req" [attr.colspan]="displayedColumns.length" class="detail-cell">
-              @if (isExpanded(req.id)) {
-                <div class="line-details-wrapper">
-                  <div class="line-details-header">
-                    <span class="line-details-title">
-                      {{ 'requests.form.linesTitle' | translate }} ({{ formatNumber(req.lines.length) }})
-                    </span>
-                  </div>
-                  @if (req.lines.length === 0) {
-                    <p class="no-lines-message">{{ 'approvals.noLines' | translate }}</p>
-                  } @else {
-                    <div class="nested-table-container">
-                      <table class="nested-lines-table">
-                        <thead>
-                          <tr>
-                            <th>{{ 'requests.form.productLabel' | translate }}</th>
-                            <th>{{ 'requests.form.quantityLabel' | translate }}</th>
-                            <th>{{ 'requests.form.estimatedUnitPriceLabel' | translate }}</th>
-                            <th>{{ 'requests.form.noteLabel' | translate }}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          @for (line of req.lines; track line.id) {
-                            <tr class="line-item-row">
-                              <td class="product-col">{{ getProductName(line.workspace_product_id) }}</td>
-                              <td class="pp-figures quantity-col">{{ line.quantity | formatQuantity }}</td>
-                              <td class="pp-figures price-col">{{ formatLinePrice(line) }}</td>
-                              <td class="note-col">
-                                {{ line.note || '—' }}
-                              </td>
-                            </tr>
+            <td mat-cell *matCellDef="let row" [attr.colspan]="displayedColumns.length" class="detail-cell">
+              @if (isExpanded(row.id)) {
+                @if (isGroupRow(row)) {
+                  <div class="group-details-wrapper">
+                    @for (req of row.requests; track req.id) {
+                      <div class="group-request-section">
+                        <div class="group-request-header">
+                          @if (req.source?.supplier_name; as supplier) {
+                            <span class="group-request-supplier" dir="auto">{{ supplier }}</span>
                           }
-                        </tbody>
-                      </table>
+                          <span class="group-request-total pp-figures">{{ formatMoney(req) }}</span>
+                        </div>
+                        @if (req.lines.length === 0) {
+                          <p class="no-lines-message">{{ 'approvals.noLines' | translate }}</p>
+                        } @else {
+                          <div class="nested-table-container">
+                            <table class="nested-lines-table">
+                              <thead>
+                                <tr>
+                                  <th>{{ 'requests.form.productLabel' | translate }}</th>
+                                  <th>{{ 'requests.form.quantityLabel' | translate }}</th>
+                                  <th>{{ 'requests.form.estimatedUnitPriceLabel' | translate }}</th>
+                                  <th>{{ 'requests.form.noteLabel' | translate }}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                @for (line of req.lines; track line.id) {
+                                  <tr class="line-item-row">
+                                    <td class="product-col">{{ getProductName(line.workspace_product_id) }}</td>
+                                    <td class="pp-figures quantity-col">{{ line.quantity | formatQuantity }}</td>
+                                    <td class="pp-figures price-col">{{ formatLinePrice(line) }}</td>
+                                    <td class="note-col">
+                                      {{ line.note || '—' }}
+                                    </td>
+                                  </tr>
+                                }
+                              </tbody>
+                            </table>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <div class="line-details-wrapper">
+                    <div class="line-details-header">
+                      <span class="line-details-title">
+                        {{ 'requests.form.linesTitle' | translate }} ({{ formatNumber(row.request.lines.length) }})
+                      </span>
                     </div>
-                  }
-                </div>
+                    @if (row.request.lines.length === 0) {
+                      <p class="no-lines-message">{{ 'approvals.noLines' | translate }}</p>
+                    } @else {
+                      <div class="nested-table-container">
+                        <table class="nested-lines-table">
+                          <thead>
+                            <tr>
+                              <th>{{ 'requests.form.productLabel' | translate }}</th>
+                              <th>{{ 'requests.form.quantityLabel' | translate }}</th>
+                              <th>{{ 'requests.form.estimatedUnitPriceLabel' | translate }}</th>
+                              <th>{{ 'requests.form.noteLabel' | translate }}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (line of row.request.lines; track line.id) {
+                              <tr class="line-item-row">
+                                <td class="product-col">{{ getProductName(line.workspace_product_id) }}</td>
+                                <td class="pp-figures quantity-col">{{ line.quantity | formatQuantity }}</td>
+                                <td class="pp-figures price-col">{{ formatLinePrice(line) }}</td>
+                                <td class="note-col">
+                                  {{ line.note || '—' }}
+                                </td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                    }
+                  </div>
+                }
               }
             </td>
           </ng-container>
@@ -251,4 +260,61 @@
       </div>
     }
   </mat-card>
+
+  <ng-template #budgetBadgeTmpl let-req>
+    @if (getBudgetStatusValue(req); as statusVal) {
+      @if (statusVal === 'over') {
+        <div class="budget-warning-container">
+          <span
+            class="budget-warning-badge budget-status-over"
+            [matTooltip]="'requests.budgetStatus.exceedsWarning' | translate"
+          >
+            <mat-icon class="warning-icon" aria-hidden="true">warning</mat-icon>
+            <span>{{ getBudgetStatusLabel(req) }}</span>
+          </span>
+          @if (req.budget_status?.remaining_amount) {
+            <span class="budget-remaining-subtext">
+              {{ 'approvals.budgetRemaining' | translate }}:
+              {{ formatBudgetRemaining(req) }}
+            </span>
+          }
+        </div>
+      } @else if (statusVal === 'near') {
+        <div class="budget-warning-container">
+          <span class="budget-near-badge budget-status-near">
+            <span>{{ getBudgetStatusLabel(req) }}</span>
+          </span>
+          @if (req.budget_status?.remaining_amount) {
+            <span class="budget-remaining-subtext">
+              {{ 'approvals.budgetRemaining' | translate }}:
+              {{ formatBudgetRemaining(req) }}
+            </span>
+          }
+        </div>
+      } @else if (statusVal === 'no_budget') {
+        <div class="budget-warning-container">
+          <span class="budget-no-budget-badge budget-status-no_budget">
+            {{ getBudgetStatusLabel(req) }}
+          </span>
+          @if (getBudgetReasonText(req); as reasonText) {
+            <span class="budget-reason-subtext">{{ reasonText }}</span>
+          }
+        </div>
+      } @else {
+        <div class="budget-warning-container">
+          <span class="budget-within-badge budget-status-within">
+            {{ getBudgetStatusLabel(req) }}
+          </span>
+          @if (req.budget_status?.remaining_amount) {
+            <span class="budget-remaining">
+              {{ 'approvals.budgetRemaining' | translate }}:
+              {{ formatBudgetRemaining(req) }}
+            </span>
+          }
+        </div>
+      }
+    } @else {
+      <span class="muted-text">{{ 'approvals.notAvailable' | translate }}</span>
+    }
+  </ng-template>
 </div>

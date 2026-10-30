@@ -10,6 +10,7 @@ import type {
   PurchaseRequestList,
   PurchaseRequestStatus,
   PurchaseRequestUpdate,
+  RequestGroupSummary,
   RequestSource,
 } from '../../core/api/models';
 
@@ -21,6 +22,7 @@ export type {
   PurchaseRequestList,
   PurchaseRequestStatus,
   PurchaseRequestUpdate,
+  RequestGroupSummary,
   RequestSource,
 };
 
@@ -57,8 +59,8 @@ export class RequestsApiService {
     return this.api.submitRequest(requestId, idempotencyKey);
   }
 
-  withdrawRequest(requestId: string): Observable<PurchaseRequest> {
-    return this.api.withdrawRequest(requestId);
+  withdrawRequest(requestId: string, idempotencyKey?: string): Observable<PurchaseRequest> {
+    return this.api.withdrawRequest(requestId, idempotencyKey);
   }
 
   approveRequest(requestId: string, body: ApprovalDecisionInput): Observable<PurchaseRequest> {
@@ -67,5 +69,29 @@ export class RequestsApiService {
 
   rejectRequest(requestId: string, body: ApprovalDecisionInput): Observable<PurchaseRequest> {
     return this.api.rejectRequest(requestId, body);
+  }
+
+  submitGroup(groupId: string, idempotencyKey?: string): Observable<PurchaseRequest[]> {
+    return this.api.submitGroup(groupId, idempotencyKey);
+  }
+
+  approveGroup(
+    groupId: string,
+    body?: ApprovalDecisionInput,
+    idempotencyKey?: string,
+  ): Observable<PurchaseRequest[]> {
+    return this.api.approveGroup(groupId, body, idempotencyKey);
+  }
+
+  rejectGroup(
+    groupId: string,
+    body: ApprovalDecisionInput,
+    idempotencyKey?: string,
+  ): Observable<PurchaseRequest[]> {
+    return this.api.rejectGroup(groupId, body, idempotencyKey);
+  }
+
+  withdrawGroup(groupId: string, idempotencyKey?: string): Observable<PurchaseRequest[]> {
+    return this.api.withdrawGroup(groupId, idempotencyKey);
   }
 }
