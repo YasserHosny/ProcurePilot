@@ -2204,6 +2204,8 @@
       "submitButton": "إرسال الطلب",
       "submittingButton": "جاري الإرسال...",
       "createOrderButton": "إنشاء أمر شراء",
+      "purchaseOrders": "أوامر الشراء",
+      "fullyOrdered": "تم طلب كل ما في هذا الطلب.",
       "atLeastOneLineRequired": "مطلوب بند واحد على الأقل."
     },
     "empty": "لا توجد طلبات شراء بعد. أنشئ أول طلب للبدء.",
@@ -3534,8 +3536,12 @@
         "nonNegativePrice": "يجب أن يكون >= 0",
         "maxQuantity": "لا يمكن تجاوز الكمية المتبقية",
         "orderNumberExists": "رقم الطلب موجود بالفعل. يُرجى استخدام رقم طلب مختلف.",
-        "idempotencyKeyExists": "تم إرسال هذا الطلب بالفعل أو لا يزال قيد المعالجة."
+        "idempotencyKeyExists": "تم إرسال هذا الطلب بالفعل أو لا يزال قيد المعالجة.",
+        "quantityExceedsAllocation": "تم طلب جزء من هذا الطلب بعد فتح هذا النموذج. أعِد تحميل الصفحة لمعرفة ما يتبقى لطلبه."
       },
+      "createdNotice": "تم إنشاء أمر الشراء {{orderNumber}}.",
+      "openOrder": "فتح الأمر",
+      "fullyOrderedNotice": "تم طلب كل ما في هذا الطلب.",
       "creatingFromRequest": "الإنشاء من الطلب",
       "estimateReference": "التقدير",
       "quotedMixedCurrencies": "بنود عرض المورّد في هذا الطلب بأكثر من عملة، لذلك لم تُعبّأ أسعار الوحدات تلقائيًا. أدخل الأسعار يدويًا.",

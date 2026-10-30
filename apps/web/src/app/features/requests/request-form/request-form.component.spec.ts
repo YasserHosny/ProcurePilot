@@ -12,6 +12,7 @@ import { ApiService } from '../../../core/api/api.service';
 import type { BranchList, Member, PurchaseRequest } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
+import { OrdersApiService } from '../../orders/orders-api';
 import { RequestFormComponent } from './request-form.component';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
@@ -39,6 +40,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
   let component: RequestFormComponent;
   let fixture: ComponentFixture<RequestFormComponent>;
   let requestsApi: jasmine.SpyObj<RequestsApiService>;
+  let ordersApi: jasmine.SpyObj<OrdersApiService>;
   let organisationApi: jasmine.SpyObj<OrganisationApiService>;
   let api: jasmine.SpyObj<ApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
@@ -53,6 +55,21 @@ describe('RequestFormComponent — create mode (T017)', () => {
       'withdrawGroup',
       'getRequest',
     ]);
+    ordersApi = jasmine.createSpyObj('OrdersApiService', ['getAllocations']);
+    ordersApi.getAllocations.and.returnValue(
+      of({
+        source_request_id: 'r1',
+        lines: [
+          {
+            source_request_line_id: 'l1',
+            requested_quantity: '10.000000',
+            allocated_quantity: '0',
+            remaining_quantity: '10.000000',
+          },
+        ],
+        orders: [],
+      }),
+    );
     organisationApi = jasmine.createSpyObj('OrganisationApiService', [
       'listBranches',
       'listCostCentres',
@@ -72,6 +89,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
         provideTranslateService(),
         provideRouter([]),
         { provide: RequestsApiService, useValue: requestsApi },
+        { provide: OrdersApiService, useValue: ordersApi },
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: api },
         {
@@ -212,6 +230,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
   let component: RequestFormComponent;
   let fixture: ComponentFixture<RequestFormComponent>;
   let requestsApi: jasmine.SpyObj<RequestsApiService>;
+  let ordersApi: jasmine.SpyObj<OrdersApiService>;
   let organisationApi: jasmine.SpyObj<OrganisationApiService>;
   let api: jasmine.SpyObj<ApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
@@ -226,6 +245,21 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       'withdrawGroup',
       'getRequest',
     ]);
+    ordersApi = jasmine.createSpyObj('OrdersApiService', ['getAllocations']);
+    ordersApi.getAllocations.and.returnValue(
+      of({
+        source_request_id: 'r1',
+        lines: [
+          {
+            source_request_line_id: 'l1',
+            requested_quantity: '10.000000',
+            allocated_quantity: '0',
+            remaining_quantity: '10.000000',
+          },
+        ],
+        orders: [],
+      }),
+    );
     organisationApi = jasmine.createSpyObj('OrganisationApiService', [
       'listBranches',
       'listCostCentres',
@@ -262,6 +296,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
         provideTranslateService(),
         provideRouter([]),
         { provide: RequestsApiService, useValue: requestsApi },
+        { provide: OrdersApiService, useValue: ordersApi },
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: api },
         {
@@ -919,6 +954,155 @@ describe('RequestFormComponent — edit mode (T017)', () => {
 
       expect(hostFixture.componentInstance.errorMessage()).toBeTruthy();
       expect(compiled.querySelector('.error-banner')?.textContent?.toLowerCase()).toContain('split');
+    });
+  });
+
+  describe('PPS-119: offer Create purchase order only while something is left', () => {
+    const baseApprovedRequest: PurchaseRequest = {
+      ...mockRequest,
+      status: 'approved',
+      approval_step: {
+        id: 'step1',
+        assigned_membership_id: 'm1',
+        source: 'owner_fallback',
+        status: 'approved',
+        decided_by_membership_id: 'm1',
+        decided_at: '2026-10-01T00:00:00Z',
+      },
+    };
+
+    it('approved request with (none ordered) → button, no PO row', () => {
+      requestsApi.getRequest.and.returnValue(of(baseApprovedRequest));
+      ordersApi.getAllocations.and.returnValue(
+        of({
+          source_request_id: 'r1',
+          lines: [
+            {
+              source_request_line_id: 'l1',
+              requested_quantity: '10',
+              allocated_quantity: '0',
+              remaining_quantity: '10',
+            },
+          ],
+          orders: [],
+        }),
+      );
+
+      const f = TestBed.createComponent(RequestFormComponent);
+      f.detectChanges();
+
+      const btn = f.nativeElement.querySelector('[data-testid="request-create-order-btn"]');
+      expect(btn).toBeTruthy();
+
+      const poRow = f.nativeElement.querySelector('[data-testid="request-purchase-orders-row"]');
+      expect(poRow).toBeNull();
+    });
+
+    it('(partly ordered) → button and PO-000005 link', () => {
+      requestsApi.getRequest.and.returnValue(of({ ...baseApprovedRequest, status: 'ordered' }));
+      ordersApi.getAllocations.and.returnValue(
+        of({
+          source_request_id: 'r1',
+          lines: [
+            {
+              source_request_line_id: 'l1',
+              requested_quantity: '10',
+              allocated_quantity: '4',
+              remaining_quantity: '6',
+            },
+          ],
+          orders: [
+            {
+              id: 'po-5',
+              order_number: 'PO-000005',
+              status: 'draft',
+            },
+          ],
+        }),
+      );
+
+      const f = TestBed.createComponent(RequestFormComponent);
+      f.detectChanges();
+
+      const btn = f.nativeElement.querySelector('[data-testid="request-create-order-btn"]');
+      expect(btn).toBeTruthy();
+
+      const poRow = f.nativeElement.querySelector('[data-testid="request-purchase-orders-row"]');
+      expect(poRow).toBeTruthy();
+
+      const link = Array.from((f.nativeElement as HTMLElement).querySelectorAll('a')).find((a) =>
+        a.textContent?.includes('PO-000005'),
+      );
+      expect(link).toBeTruthy();
+    });
+
+    it('(fully ordered) → no button, link, ordered text', () => {
+      requestsApi.getRequest.and.returnValue(of({ ...baseApprovedRequest, status: 'ordered' }));
+      ordersApi.getAllocations.and.returnValue(
+        of({
+          source_request_id: 'r1',
+          lines: [
+            {
+              source_request_line_id: 'l1',
+              requested_quantity: '10',
+              allocated_quantity: '10',
+              remaining_quantity: '0',
+            },
+          ],
+          orders: [
+            {
+              id: 'po-5',
+              order_number: 'PO-000005',
+              status: 'draft',
+            },
+          ],
+        }),
+      );
+
+      const f = TestBed.createComponent(RequestFormComponent);
+      f.detectChanges();
+
+      const btn = f.nativeElement.querySelector('[data-testid="request-create-order-btn"]');
+      expect(btn).toBeNull();
+
+      const poRow = f.nativeElement.querySelector('[data-testid="request-purchase-orders-row"]');
+      expect(poRow).toBeTruthy();
+
+      const link = Array.from((f.nativeElement as HTMLElement).querySelectorAll('a')).find((a) =>
+        a.textContent?.includes('PO-000005'),
+      );
+      expect(link).toBeTruthy();
+
+      const orderedText = f.nativeElement.querySelector('[data-testid="request-fully-ordered-text"]');
+      expect(orderedText).toBeTruthy();
+      expect(orderedText?.textContent).toContain('Everything on this request has been ordered.');
+    });
+
+    it('(allocation call fails) → button', () => {
+      requestsApi.getRequest.and.returnValue(of(baseApprovedRequest));
+      ordersApi.getAllocations.and.returnValue(throwError(() => new Error('Failed to load allocations')));
+
+      const f = TestBed.createComponent(RequestFormComponent);
+      f.detectChanges();
+
+      const btn = f.nativeElement.querySelector('[data-testid="request-create-order-btn"]');
+      expect(btn).toBeTruthy();
+    });
+
+    it('(status withdrawn with an approved step) → no button', () => {
+      requestsApi.getRequest.and.returnValue(
+        of({
+          ...baseApprovedRequest,
+          status: 'withdrawn',
+        }),
+      );
+
+      const f = TestBed.createComponent(RequestFormComponent);
+      f.detectChanges();
+
+      const btn = f.nativeElement.querySelector('[data-testid="request-create-order-btn"]');
+      expect(btn).toBeNull();
+      expect(ordersApi.getAllocations).not.toHaveBeenCalled();
     });
   });
 });

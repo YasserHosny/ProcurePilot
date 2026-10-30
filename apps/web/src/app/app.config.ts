@@ -7,11 +7,12 @@ import {
 } from '@angular/core';
 import { MatIconRegistry } from '@angular/material/icon';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withNavigationErrorHandler } from '@angular/router';
 import { MissingTranslationHandler, provideTranslateService } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
 
 import { routes } from './app.routes';
+import { chunkLoadErrorHandler } from './core/routing/chunk-load-recovery';
 import { provideErrorReporting } from './core/observability/sentry';
 import { authInterceptor } from './core/auth/auth.interceptor';
 import { restoreSessionOnStartup } from './core/auth/session-initializer';
@@ -29,7 +30,7 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(() => {
       inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-outlined');
     }),
-    provideRouter(routes),
+    provideRouter(routes, withNavigationErrorHandler(chunkLoadErrorHandler)),
     provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
     provideAnimationsAsync(),
     ...provideErrorReporting(),

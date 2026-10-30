@@ -2204,6 +2204,8 @@
       "submitButton": "Submit Request",
       "submittingButton": "Submitting...",
       "createOrderButton": "Create purchase order",
+      "purchaseOrders": "Purchase orders",
+      "fullyOrdered": "Everything on this request has been ordered.",
       "atLeastOneLineRequired": "At least one line item is required."
     },
     "empty": "No purchase requests yet. Create your first request to get started.",
@@ -3534,8 +3536,12 @@
         "nonNegativePrice": "Must be >= 0",
         "maxQuantity": "Cannot exceed remaining quantity",
         "orderNumberExists": "Order number already exists. Please use a different order number.",
-        "idempotencyKeyExists": "This order submission is already being processed or was already submitted."
+        "idempotencyKeyExists": "This order submission is already being processed or was already submitted.",
+        "quantityExceedsAllocation": "Part of this request was ordered after you opened this form. Reload the page to see what is still to order."
       },
+      "createdNotice": "{{orderNumber}} was created.",
+      "openOrder": "Open order",
+      "fullyOrderedNotice": "Everything on this request has already been ordered.",
       "creatingFromRequest": "Creating from Request",
       "estimateReference": "Estimate",
       "quotedMixedCurrencies": "This request's supplier quote lines are in more than one currency, so unit prices were not pre-filled. Enter the prices manually.",

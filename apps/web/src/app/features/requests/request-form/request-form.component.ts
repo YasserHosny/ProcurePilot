@@ -35,6 +35,11 @@ import type {
 } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
+import {
+  OrdersApiService,
+  type RequestAllocation,
+  type RequestAllocationOrder,
+} from '../../orders/orders-api';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 const I18N = 'requests';
@@ -79,6 +84,7 @@ export class RequestFormComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
+  private readonly ordersApi = inject(OrdersApiService);
 
   readonly isLoading = signal<boolean>(false);
   readonly isSaving = signal<boolean>(false);
@@ -94,6 +100,29 @@ export class RequestFormComponent implements OnInit {
   readonly existingRequest = signal<PurchaseRequest | null>(null);
   readonly isEditMode = signal<boolean>(false);
 
+  readonly allocations = signal<RequestAllocation | null>(null);
+  readonly isAllocationsLoading = signal<boolean>(false);
+  readonly allocationsFailed = signal<boolean>(false);
+
+  readonly allocatedOrders = computed<RequestAllocationOrder[]>(() => {
+    return this.allocations()?.orders ?? [];
+  });
+
+  readonly isFullyOrdered = computed<boolean>(() => {
+    const req = this.existingRequest();
+    if (!req || req.approval_step?.status !== 'approved' || (req.status !== 'approved' && req.status !== 'ordered')) {
+      return false;
+    }
+    if (this.isAllocationsLoading() || this.allocationsFailed()) {
+      return false;
+    }
+    const alloc = this.allocations();
+    if (!alloc) {
+      return false;
+    }
+    return alloc.lines.length > 0 && alloc.lines.every(l => parseFloat(l.remaining_quantity || '0') <= 0);
+  });
+
   private submitIdempotencyKey: string | null = null;
   private withdrawIdempotencyKey: string | null = null;
 
@@ -104,7 +133,20 @@ export class RequestFormComponent implements OnInit {
 
   readonly canCreateOrder = computed<boolean>(() => {
     const req = this.existingRequest();
-    return req !== null && req.approval_step?.status === 'approved';
+    if (!req || req.approval_step?.status !== 'approved' || (req.status !== 'approved' && req.status !== 'ordered')) {
+      return false;
+    }
+    if (this.isAllocationsLoading()) {
+      return false;
+    }
+    if (this.allocationsFailed()) {
+      return true;
+    }
+    const alloc = this.allocations();
+    if (!alloc) {
+      return false;
+    }
+    return alloc.lines.some(l => parseFloat(l.remaining_quantity || '0') > 0);
   });
 
   readonly canWithdraw = computed<boolean>(() => {
@@ -466,8 +508,33 @@ export class RequestFormComponent implements OnInit {
         if (isReadOnly) {
           this.form.disable();
         }
+
+        if (
+          req.approval_step?.status === 'approved' &&
+          (req.status === 'approved' || req.status === 'ordered')
+        ) {
+          this.loadAllocations(req.id);
+        }
       }),
     );
+  }
+
+  private loadAllocations(requestId: string): void {
+    this.isAllocationsLoading.set(true);
+    this.allocationsFailed.set(false);
+    this.ordersApi
+      .getAllocations(requestId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (alloc) => {
+          this.allocations.set(alloc);
+          this.isAllocationsLoading.set(false);
+        },
+        error: () => {
+          this.allocationsFailed.set(true);
+          this.isAllocationsLoading.set(false);
+        },
+      });
   }
 
   private handleError(err: unknown): void {

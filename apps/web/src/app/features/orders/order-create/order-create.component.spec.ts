@@ -1,6 +1,6 @@
 import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
@@ -10,6 +10,7 @@ import { of, throwError } from 'rxjs';
 import { signal } from '@angular/core';
 
 import { ApiService } from '../../../core/api/api.service';
+import type { PurchaseRequest } from '../../../core/api/models';
 import type { OrderEvidenceProjection } from '../orders-api';
 import { OrdersApiService } from '../orders-api';
 import { RequestsApiService } from '../../requests/requests-api';
@@ -607,5 +608,321 @@ describe('OrderCreateComponent', () => {
     // It's still invalid because required fields are empty
     component.submit();
     expect(ordersApiService.createOrder).not.toHaveBeenCalled();
+  });
+
+  describe('PPS-118: one purchase order per click and chunk load handling', () => {
+    beforeEach(() => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+    });
+
+    it('(a) create success: the button is disabled while navigate is still pending, and calling submit() again does not call createOrder a second time; navigate was called with [/orders, id]', fakeAsync(() => {
+      let resolveNavigate!: (val: boolean) => void;
+      const navigatePromise = new Promise<boolean>((resolve) => {
+        resolveNavigate = resolve;
+      });
+      (router.navigate as jasmine.Spy).and.returnValue(navigatePromise);
+
+      component.form.patchValue({
+        order_number: 'PO-TEST-1',
+        supplier_id: 's1',
+        order_date: new Date('2026-09-29T12:00:00Z'),
+        currency: 'USD',
+      });
+      component.lines.at(0).patchValue({
+        description: 'Test Item',
+        quantity: 2,
+        base_unit: 'EA',
+        unit_price: 10,
+        line_tax: 0,
+      });
+
+      const mockOrder = { id: 'order-123', order_number: 'PO-TEST-1' } as import('../orders-api').PurchaseOrder;
+      ordersApiService.createOrder.and.returnValue(of(mockOrder));
+
+      const submitButton = fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+      component.submit();
+      fixture.detectChanges();
+
+      expect(ordersApiService.createOrder).toHaveBeenCalledTimes(1);
+      expect(component.isSubmitting()).toBeTrue();
+      expect(submitButton.disabled).toBeTrue();
+
+      // Calling submit again and clicking button again
+      component.submit();
+      submitButton.click();
+      expect(ordersApiService.createOrder).toHaveBeenCalledTimes(1);
+      expect(router.navigate).toHaveBeenCalledWith(['/orders', 'order-123']);
+
+      resolveNavigate(true);
+      tick();
+      fixture.detectChanges();
+      expect(submitButton.disabled).toBeTrue();
+    }));
+
+    it('(b) navigate resolves false: the notice with the PO number and an Open order link shows, and the button stays disabled', fakeAsync(() => {
+      (router.navigate as jasmine.Spy).and.returnValue(Promise.resolve(false));
+
+      component.form.patchValue({
+        order_number: 'PO-000006',
+        supplier_id: 's1',
+        order_date: new Date('2026-09-29T12:00:00Z'),
+        currency: 'USD',
+      });
+      component.lines.at(0).patchValue({
+        description: 'Test Item',
+        quantity: 1,
+        base_unit: 'EA',
+        unit_price: 10,
+        line_tax: 0,
+      });
+
+      const mockOrder = { id: 'po-6-id', order_number: 'PO-000006' } as import('../orders-api').PurchaseOrder;
+      ordersApiService.createOrder.and.returnValue(of(mockOrder));
+
+      component.submit();
+      tick();
+      fixture.detectChanges();
+
+      const notice = fixture.nativeElement.querySelector('[role="status"]');
+      expect(notice).toBeTruthy();
+      expect(notice?.textContent).toContain('PO-000006');
+
+      const openLink = fixture.nativeElement.querySelector('a[href="/orders/po-6-id"]') ||
+        Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('a')).find((el) =>
+          el.getAttribute('ng-reflect-router-link')?.includes('po-6-id') || el.textContent?.includes('Open order'),
+        );
+      expect(openLink).toBeTruthy();
+
+      const submitButton = fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement;
+      expect(submitButton.disabled).toBeTrue();
+      expect(component.isSubmitting()).toBeTrue();
+    }));
+
+    it('(c) edit-draft path: editDraftOrder is called once; same disabled behaviour', fakeAsync(() => {
+      component.editOrderId.set('edit-po-1');
+      (router.navigate as jasmine.Spy).and.returnValue(Promise.resolve(true));
+
+      component.form.patchValue({
+        order_number: 'PO-EDIT-1',
+        supplier_id: 's1',
+        order_date: new Date('2026-09-29T12:00:00Z'),
+        currency: 'USD',
+      });
+      component.lines.at(0).patchValue({
+        description: 'Test Item',
+        quantity: 1,
+        base_unit: 'EA',
+        unit_price: 10,
+        line_tax: 0,
+      });
+
+      const mockOrder = { id: 'edit-po-1', order_number: 'PO-EDIT-1' } as import('../orders-api').PurchaseOrder;
+      ordersApiService.editDraftOrder.and.returnValue(of(mockOrder));
+
+      const submitButton = fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+      component.submit();
+      fixture.detectChanges();
+
+      expect(ordersApiService.editDraftOrder).toHaveBeenCalledTimes(1);
+      expect(component.isSubmitting()).toBeTrue();
+      expect(submitButton.disabled).toBeTrue();
+
+      component.submit();
+      expect(ordersApiService.editDraftOrder).toHaveBeenCalledTimes(1);
+
+      tick();
+      fixture.detectChanges();
+      expect(submitButton.disabled).toBeTrue();
+    }));
+
+    it('(d) 409 quantity_exceeds_allocation shows the translated message and re-enables the button', () => {
+      component.form.patchValue({
+        order_number: 'PO-1',
+        supplier_id: 's1',
+        order_date: new Date('2026-09-29T12:00:00Z'),
+        currency: 'USD',
+      });
+      component.lines.at(0).patchValue({
+        description: 'Test Item',
+        quantity: 1,
+        base_unit: 'EA',
+        unit_price: 10,
+        line_tax: 0,
+      });
+
+      ordersApiService.createOrder.and.returnValue(
+        throwError(() => new HttpErrorResponse({
+          status: 409,
+          error: {
+            code: 'CONFLICT',
+            message: 'Over allocated',
+            details: { reason: 'quantity_exceeds_allocation' },
+          },
+        })),
+      );
+
+      component.submit();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBe('Part of this request was ordered after you opened this form. Reload the page to see what is still to order.');
+      expect(component.isSubmitting()).toBeFalse();
+      const submitButton = fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement;
+      expect(submitButton.disabled).toBeFalse();
+    });
+
+    it('(e) a request with nothing left: no lines, notice plus link PO-000005, Create disabled', () => {
+      const mockReq = {
+        id: 'req-fully-ordered',
+        lines: [
+          {
+            id: 'rl-1',
+            product_name: 'Item 1',
+            quantity: '5.000000',
+            base_unit: 'EA',
+            estimated_unit_price: null,
+            quoted_unit_price: null,
+          },
+        ],
+      } as unknown as PurchaseRequest;
+
+      const mockAllocations = {
+        source_request_id: 'req-fully-ordered',
+        lines: [
+          {
+            source_request_line_id: 'rl-1',
+            requested_quantity: '5.000000',
+            allocated_quantity: '5.000000',
+            remaining_quantity: '0',
+          },
+        ],
+        orders: [
+          {
+            id: 'po-5',
+            order_number: 'PO-000005',
+            status: 'draft' as const,
+          },
+        ],
+      };
+
+      requestsApiService.getRequest.and.returnValue(of(mockReq));
+      ordersApiService.getAllocations.and.returnValue(of(mockAllocations));
+
+      routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-fully-ordered' });
+
+      const newFixture = TestBed.createComponent(OrderCreateComponent);
+      newFixture.detectChanges();
+      const comp = newFixture.componentInstance;
+
+      expect(comp.lines.length).toBe(0);
+
+      const notice = newFixture.nativeElement.querySelector('[role="status"]');
+      expect(notice).toBeTruthy();
+      expect(notice?.textContent).toContain('Everything on this request has already been ordered.');
+
+      const link = Array.from((newFixture.nativeElement as HTMLElement).querySelectorAll('a')).find((a) =>
+        a.textContent?.includes('PO-000005'),
+      );
+      expect(link).toBeTruthy();
+
+      const submitButton = newFixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement;
+      expect(submitButton.disabled).toBeTrue();
+    });
+
+    it('edit-draft of a PO whose request has all lines at remaining 0 → no fully-ordered-notice, lines present, Save enabled', () => {
+      routeSnapshot.paramMap = convertToParamMap({ id: 'po-draft-1' });
+      const order = {
+        id: 'po-draft-1',
+        order_number: 'PO-DRAFT-1',
+        supplier_id: 's1',
+        order_date: '2026-09-29T12:00:00Z',
+        expected_delivery_date: null,
+        total: { amount: '50.0000', currency: 'USD' },
+        tax: { amount: '0.0000', currency: 'USD' },
+        source_kind: 'manual',
+        source_reference: 'PO-DRAFT-1',
+        source_request_id: 'req-1',
+        lines: [
+          {
+            id: 'ol-1',
+            line_number: 1,
+            workspace_product_id: 'p1',
+            description: 'Product 1',
+            ordered_quantity: '5.000000',
+            base_unit: 'KG',
+            unit_price: { amount: '10.0000', currency: 'USD' },
+            tax: { amount: '0.0000', currency: 'USD' },
+            line_total: { amount: '50.0000', currency: 'USD' },
+            source_request_line_id: 'rl-1',
+          },
+        ],
+      } as import('../orders-api').PurchaseOrder;
+
+      ordersApiService.getOrder.and.returnValue(
+        of({
+          order,
+          confirmation: null,
+          receipts: [],
+          lifecycle: {
+            purchase_order_id: 'po-draft-1',
+            status: 'draft',
+            confirmation: 'unavailable',
+            receipt: 'unavailable',
+            lines: [],
+          },
+        } as unknown as OrderEvidenceProjection),
+      );
+      requestsApiService.getRequest.and.returnValue(
+        of({
+          id: 'req-1',
+          branch_id: 'b1',
+          requested_by_membership_id: 'm1',
+          required_by_date: '2026-10-01',
+          status: 'ordered',
+          lines: [
+            {
+              id: 'rl-1',
+              workspace_product_id: 'p1',
+              quantity: '5.000000',
+              estimated_unit_price: { amount: '10.0000', currency: 'USD' },
+            },
+          ],
+          has_incomplete_estimate: false,
+          created_at: '2026-09-29T00:00:00Z',
+        } as unknown as import('../../../core/api/models').PurchaseRequest),
+      );
+      ordersApiService.getAllocations.and.returnValue(
+        of({
+          source_request_id: 'req-1',
+          lines: [
+            {
+              source_request_line_id: 'rl-1',
+              requested_quantity: '5.000000',
+              allocated_quantity: '5.000000',
+              remaining_quantity: '0',
+            },
+          ],
+          orders: [
+            {
+              id: 'po-draft-1',
+              order_number: 'PO-DRAFT-1',
+              status: 'draft' as const,
+            },
+          ],
+        }),
+      );
+
+      const editFixture = TestBed.createComponent(OrderCreateComponent);
+      editFixture.detectChanges();
+      const comp = editFixture.componentInstance;
+
+      expect(editFixture.nativeElement.querySelector('[data-testid="fully-ordered-notice"]')).toBeNull();
+      expect(comp.lines.length).toBe(1);
+      const submitButton = editFixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement;
+      expect(submitButton.disabled).toBeFalse();
+    });
   });
 });
