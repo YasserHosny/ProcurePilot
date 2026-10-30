@@ -126,8 +126,8 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-72 | PPS-102 | P-73 | PPS-103 | P-74 | PPS-104 |
 | P-75 | PPS-105 | P-76 | PPS-106 | P-77 | PPS-107 |
 | P-78 | PPS-108 | P-79 | PPS-109 | P-80 | PPS-110 |
-| P-81 | PPS-112 | P-82 | PPS-113 | | |
-| P-86 | PPS-117 | | | | |
+| P-81 | PPS-112 | P-82 | PPS-113 | P-83 | PPS-114 |
+| P-84 | PPS-115 | P-85 | PPS-116 | P-86 | PPS-117 |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -353,4 +353,5 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-28 | Claude (orchestrator) | P-65/P-66 (PPS-95/96): `/speckit.tasks` for 023 (35 tasks: foundational supersession migration, view and reader move in-house; US1 RFQ fit and correction; US2 measured signals; US3 alias sweep; US4 pack column) and 024 (37 tasks: foundational group table, RLS and conversion lock in-house; US1 split from RFQ; US2 prepare N requests; US3 group approval by combined total, which must ship with US2; US4 standalone page). Tests are written first throughout. Next: implementation, 023 Phase 2 first. | |
 | 2026-10-29 | Claude (orchestrator) | P-80 (PPS-110): `test_supplier_iq` trace test failed from 00:00 to 03:00 Cairo time because it compared `date.today()` (local) with the scorecard's UTC `window_end`. The service stays on the UTC date (specs 011/019 name no time zone; `reporting_timezone` is for scheduled reports only). Fix: `supplier_iq._utc_now()` clock seam; the test reads today from it; a regression test freezes 00:30 Cairo (21:30 UTC the day before). Verified red then green on hosted (:5432) under TZ=Africa/Cairo and UTC. | |
 | 2026-10-30 | Claude (orchestrator) | P-81 (PPS-112): a purchase request created during a match correction can keep the superseded price (023 US1 review finding D2; needs the correction lock on request-line pricing). P-82 (PPS-113): deterministic (alias/GTIN/supplier-code) auto-matches offer no other candidate to correct to, and a keyed new-product retry cannot repair a missing pack. Both from the 023 US1 review (#331), backlog. | |
+| 2026-10-30 | Claude | Sales-skill assessment → three tasks. P-83 (PPS-114): status-quo battlecard `battlecards/whatsapp-excel.md` + `outreach/discovery-demo-call-script.md` (AR + EN, `sales-enablement`). P-84 (PPS-115): `community/g7-community-plan.md` for G-7 (`community-marketing`, installed 2026-10-30 from coreyhaines31/marketingskills). P-85 (PPS-116): `research/` call-notes template + synthesis method (`customer-research`); filled notes local in `research/calls/` (excluded); phase 2 synthesis blocked by G-9. Skipped: Apify OSM leads, social scraping, outbound-prospecting. | Owner: review the Arabic copy; pick the first 3 communities. |
 | | | | |

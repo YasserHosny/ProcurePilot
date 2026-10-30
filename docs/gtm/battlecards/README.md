@@ -1,6 +1,6 @@
 # Battlecards
 
-One card per competitor, for calls and DMs with Egyptian and GCC multi-branch F&B buyers.
+One card per competitor (plus one for the status quo), for calls and DMs with Egyptian and GCC multi-branch F&B buyers.
 Built from the [competitor profiles](../competitor-profiles/_summary.md) (PPS-106).
 
 | Card | Use it when the buyer says… |
@@ -8,6 +8,7 @@ Built from the [competitor profiles](../competitor-profiles/_summary.md) (PPS-10
 | [Supy](supy.md) | "We use Supy" / "We're looking at Supy" |
 | [Suplyd](suplyd.md) | "We order through Suplyd" |
 | [Foodics](foodics.md) | "Foodics already does purchasing" |
+| [WhatsApp + Excel](whatsapp-excel.md) | "We already use WhatsApp and Excel" (the status quo, no vendor) |
 
 **Rules for every card**
 - **No pilot evidence yet.** Every "where we win" line is a **hypothesis to test** on calls, not a proven claim. Log what you hear in the deal's Jira or SP ticket; after 5 or more conversations against one competitor, update the card.
