@@ -2,8 +2,10 @@ import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
+import { MatSelect } from '@angular/material/select';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import en from '../../../../../../../packages/i18n/en.json';
 import ar from '../../../../../../../packages/i18n/ar.json';
@@ -902,5 +904,125 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(el.querySelector('[data-testid="rfq-split-scope"]')).not.toBeNull();
       expect(el.querySelector('form')).toBeNull();
     }));
+  });
+
+  describe('PPS-126: Placeholder and duplicate product prevention', () => {
+    it('shows the "Choose a product" placeholder for empty rows on fresh page and after addItem()', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      const initialPlaceholder = el.querySelector('.item-product-field .mat-mdc-select-placeholder');
+      expect(initialPlaceholder).not.toBeNull();
+      expect(initialPlaceholder?.textContent?.trim()).toBe('Choose a product');
+
+      component.addItem();
+      fixture.detectChanges();
+
+      const placeholders = el.querySelectorAll('.item-product-field .mat-mdc-select-placeholder');
+      expect(placeholders.length).toBe(2);
+      expect(placeholders[0].textContent?.trim()).toBe('Choose a product');
+      expect(placeholders[1].textContent?.trim()).toBe('Choose a product');
+    });
+
+    it('disables products chosen in other rows while keeping current row product enabled', fakeAsync(() => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+
+      // Row 0 has product A ('prod-1'), row 1 is empty
+      component.items.set([
+        { workspace_product_id: 'prod-1', quantity: '10' },
+        { workspace_product_id: '', quantity: '5' },
+      ]);
+      fixture.detectChanges();
+      tick();
+
+      const productSelectDebugEls = fixture.debugElement.queryAll(By.css('.item-product-field mat-select'));
+      expect(productSelectDebugEls.length).toBe(2);
+
+      // Open row 1's select dropdown
+      const matSelect1 = productSelectDebugEls[1].componentInstance as MatSelect;
+      matSelect1.open();
+      fixture.detectChanges();
+      tick();
+
+      // In row 1 dropdown: product A ('prod-1') is disabled, product B ('prod-2') is enabled
+      const overlayOptionsRow1 = Array.from(document.querySelectorAll<HTMLElement>('mat-option'));
+      expect(overlayOptionsRow1.length).toBeGreaterThanOrEqual(2);
+
+      const optionAInRow1 = overlayOptionsRow1.find((opt) => opt.textContent?.includes('Product 1'));
+      const optionBInRow1 = overlayOptionsRow1.find((opt) => opt.textContent?.includes('Product 2'));
+
+      expect(optionAInRow1).toBeDefined();
+      expect(optionBInRow1).toBeDefined();
+      expect(
+        optionAInRow1?.getAttribute('aria-disabled') === 'true' ||
+        optionAInRow1?.classList.contains('mdc-list-item--disabled')
+      ).toBeTrue();
+      expect(
+        optionBInRow1?.getAttribute('aria-disabled') === 'true' ||
+        optionBInRow1?.classList.contains('mdc-list-item--disabled')
+      ).toBeFalse();
+
+      // Close row 1 dropdown
+      matSelect1.close();
+      fixture.detectChanges();
+      tick();
+
+      // Open row 0's select dropdown
+      const matSelect0 = productSelectDebugEls[0].componentInstance as MatSelect;
+      matSelect0.open();
+      fixture.detectChanges();
+      tick();
+
+      // In row 0 dropdown: product A ('prod-1') is row 0's own product, so it must stay enabled
+      const overlayOptionsRow0 = Array.from(document.querySelectorAll<HTMLElement>('mat-option'));
+      const optionAInRow0 = overlayOptionsRow0.find((opt) => opt.textContent?.includes('Product 1'));
+      expect(optionAInRow0).toBeDefined();
+      expect(
+        optionAInRow0?.getAttribute('aria-disabled') === 'true' ||
+        optionAInRow0?.classList.contains('mdc-list-item--disabled')
+      ).toBeFalse();
+
+      // Close row 0 dropdown
+      matSelect0.close();
+      fixture.detectChanges();
+      tick();
+    }));
+
+    it('marks form invalid, shows duplicate error on submit, and blocks optimise request when two rows have the same product', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+      apiService.optimiseBasket.and.returnValue(of(mockFeasibleJob));
+
+      // Both rows set to prod-1
+      component.items.set([
+        { workspace_product_id: 'prod-1', quantity: '10' },
+        { workspace_product_id: 'prod-1', quantity: '20' },
+      ]);
+      fixture.detectChanges();
+
+      expect(component.isFormValid()).toBeFalse();
+
+      const el: HTMLElement = fixture.nativeElement;
+      // Before submit, no error message displayed
+      expect(el.querySelector('.item-product-field mat-error')).toBeNull();
+
+      component.submitBasket();
+      fixture.detectChanges();
+
+      expect(apiService.optimiseBasket).not.toHaveBeenCalled();
+
+      // After submit, the duplicate error key renders
+      const errors = Array.from(el.querySelectorAll('.item-product-field mat-error'));
+      const duplicateError = errors.find((err) =>
+        err.textContent?.includes('This product is already in the basket.')
+      );
+      expect(duplicateError).toBeDefined();
+    });
   });
 });

@@ -143,6 +143,47 @@ export class BasketSplitComponent implements OnInit {
   readonly currentJob = signal<BasketSplitJob | null>(null);
   readonly errorMessage = signal<string | null>(null);
 
+  readonly otherProductIdsByRow = computed<Set<string>[]>(() => {
+    const currentItems = this.items();
+    return currentItems.map((_, index) => {
+      const ids = new Set<string>();
+      currentItems.forEach((item, i) => {
+        if (i !== index && item.workspace_product_id) {
+          ids.add(item.workspace_product_id);
+        }
+      });
+      return ids;
+    });
+  });
+
+  private readonly productErrorMatchers = new Map<number, ErrorStateMatcher>();
+
+  getProductErrorMatcher(index: number): ErrorStateMatcher {
+    let matcher = this.productErrorMatchers.get(index);
+    if (!matcher) {
+      matcher = {
+        isErrorState: (control: AbstractControl | null, form: FormGroupDirective | NgForm | null): boolean => {
+          const isSubmitted = Boolean(form?.submitted || this.hasAttemptedSubmit());
+          const isDuplicate = this.isItemProductDuplicate(index);
+          const isInvalid = Boolean((control && control.invalid) || isDuplicate);
+          return Boolean(isInvalid && (control?.touched || isSubmitted));
+        },
+      };
+      this.productErrorMatchers.set(index, matcher);
+    }
+    return matcher;
+  }
+
+  otherProductIds(index: number): Set<string> {
+    return this.otherProductIdsByRow()[index] ?? new Set<string>();
+  }
+
+  isItemProductDuplicate(index: number): boolean {
+    const item = this.items()[index];
+    if (!item?.workspace_product_id) return false;
+    return this.otherProductIds(index).has(item.workspace_product_id);
+  }
+
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
   readonly isRfqMode = computed<boolean>(() => Boolean(this.currentJob()?.rfq_id));
   readonly rfqShortId = computed<string>(() => this.currentJob()?.rfq_id?.slice(0, 8) ?? '');
@@ -307,6 +348,9 @@ export class BasketSplitComponent implements OnInit {
 
     const currentItems = this.items();
     if (currentItems.length === 0 || currentItems.length > 50) return false;
+
+    const productIds = currentItems.map((item) => item.workspace_product_id).filter(Boolean);
+    if (new Set(productIds).size !== productIds.length) return false;
 
     return currentItems.every((item) => {
       const q = parseFloat(item.quantity);

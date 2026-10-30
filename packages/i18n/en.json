@@ -1655,6 +1655,8 @@
       "addItem": "Add Item",
       "addSupplier": "Add Supplier ({{min}}–{{max}})",
       "removeItem": "Remove Item",
+      "selectProduct": "Choose a product",
+      "duplicateProduct": "This product is already in the basket.",
       "productRequired": "Select a product.",
       "quantityRequired": "Enter a quantity greater than zero.",
       "submitButton": "Optimise Basket Split",

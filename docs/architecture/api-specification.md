@@ -1390,6 +1390,10 @@ Request:
 - Requires bearer auth. Branch-scoped visibility as above.
 - Query parameters: optional `status`, optional `branch_id`, optional `cursor`, optional `limit`
   capped at 100 and defaulting to 50.
+- `has_quantity_to_order`: nullable boolean; for visible requests with an approved approval
+  step and status `approved` or `ordered`, indicates whether any line has quantity remaining
+  to order. Non-cancelled orders allocate ordered quantity; cancelled orders allocate only
+  received quantity. Other rows, or calls without member context, return `null`.
 - Returns `200` with `items` of `PurchaseRequest` and nullable `next_cursor`. Each request
   carries `request_group` (spec 024): a `RequestGroupSummary` (`id`, `rfq_id`, `position`,
   `size`, `combined_total`, `best_single_total`, `saving`, `sibling_request_ids`) when the

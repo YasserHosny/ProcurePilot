@@ -53,5 +53,18 @@ Notes:
 
   All three POs are drafts.
 - The language was switched to Arabic for screenshots 08 and 09, then back to English.
-- Still open, not part of this fix: the Purchase Requests list keeps its cart icon on fully ordered requests. It opens
-  the form in row 7, which offers nothing to order.
+- The Purchase Requests list's cart icon was fixed separately (PPS-132, below).
+
+## Follow-up: the Purchase Requests list (PPS-132, [#357](https://github.com/YasserHosny/ProcurePilot/pull/357))
+
+Checked on hosted after the deploy of `7c1d48be`. `GET /requests` now carries `has_quantity_to_order`. The list shows
+the «Create order» cart icon only for a request with an approved step, status approved or ordered, and something left
+to order. Seen live ([10](10-request-list-cart-icon-en.jpg)):
+
+- shown on the fresh request `b4d5c64f` (Nov 9, SAR 255, nothing ordered yet) and on a partly ordered request
+  (Nov 5, SAR 200);
+- gone from `f1203771` (SAR 1,216, PO-000007 and PO-000008), `34049121` (SAR 4,830, PO-000005), `3f054392`
+  (PO-000006) and the other fully ordered rows;
+- gone from the withdrawn request (Oct 30).
+
+Request `b4d5c64f` (approved, nothing ordered) was left on «مطاعم رواق» for this check.

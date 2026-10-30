@@ -1287,6 +1287,17 @@ def test_cancel_order(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
 
+def test_requests_with_quantity_to_order_empty_ids(monkeypatch: pytest.MonkeyPatch) -> None:
+    service = OrdersService.__new__(OrdersService)
+
+    def unexpected_transaction(_self: OrdersService, _member: CurrentMember) -> None:
+        pytest.fail("Empty request ids must not open a transaction or execute a query")
+
+    monkeypatch.setattr(OrdersService, "_transaction", unexpected_transaction)
+
+    assert service.requests_with_quantity_to_order(member=_member(), request_ids=[]) == set()
+
+
 def test_allocation_projection(monkeypatch: pytest.MonkeyPatch) -> None:
     req_id = UUID(int=7)
     line_id1 = UUID(int=8)
