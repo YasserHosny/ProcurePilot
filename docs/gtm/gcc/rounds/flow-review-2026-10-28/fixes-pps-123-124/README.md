@@ -1,6 +1,6 @@
 # Flow review 2026-10-28 — R10 and R11 fixes checked live (PPS-123, PPS-124)
 
-Checked on 2026-10-31 as `pp-sa-owner` of «مطاعم رواق», on RFQ `d8f7fb0c` (Responses tab), **before merge**:
+Checked on 2026-10-31 as `pp-sa-owner` of «مطاعم رواق», on RFQ `d8f7fb0c` (Responses tab), **before merge of [#373](https://github.com/YasserHosny/ProcurePilot/pull/373)**:
 - the branch `fix/pps-123-124-rfq-responses` ran locally (API on :8100, web build on :4300);
 - both read the hosted Supabase data;
 - nothing was prepared or split: the page was only read.
