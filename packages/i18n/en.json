@@ -4073,7 +4073,13 @@
       "loadError": "Failed to load RFQ details.",
       "recipientStatus_sent": "Sent",
       "recipientStatus_failed": "Failed",
-      "recipientStatus_draft": "Not sent"
+      "recipientStatus_draft": "Not sent",
+      "convertedIntoRequest": "Converted into request",
+      "convertedCount": {
+        "one": "Converted into 1 request",
+        "other": "Converted into {{count}} requests"
+      },
+      "approvedTogether": "Approved together as one group"
     },
     "guardrails": {
       "title": "Guardrail settings",

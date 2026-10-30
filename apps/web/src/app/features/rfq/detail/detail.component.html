@@ -65,6 +65,49 @@
             </mat-card>
           }
 
+          @if (detail.rfq.status === 'converted' && convertedRequestIds().length > 0) {
+            <mat-card class="draft-notice-card converted-notice-card" data-testid="rfq-detail-converted-notice">
+              <div class="draft-notice-content">
+                <div class="draft-notice-text">
+                  @if (convertedRequestIds().length === 1) {
+                    <h2 class="converted-heading">
+                      {{ 'rfq.detail.convertedIntoRequest' | translate }}
+                      <a
+                        [routerLink]="['/requests', convertedRequestIds()[0]]"
+                        class="request-link"
+                        dir="ltr"
+                        data-testid="converted-request-link"
+                      >{{ shortId(convertedRequestIds()[0]) }}</a>
+                    </h2>
+                  } @else {
+                    <h2 class="converted-heading">{{ convertedRequestsTitle() }}</h2>
+                    <ul class="converted-requests-list">
+                      @for (id of convertedRequestIds(); track id) {
+                        <li>
+                          <a
+                            [routerLink]="['/requests', id]"
+                            class="request-link"
+                            dir="ltr"
+                            data-testid="converted-request-link"
+                          >{{ shortId(id) }}</a>
+                        </li>
+                      }
+                    </ul>
+                  }
+                  @if (requestGroupId()) {
+                    <p class="group-line" data-testid="rfq-detail-group-line">
+                      <a
+                        [routerLink]="['/requests', convertedRequestIds()[0]]"
+                        class="group-link"
+                        data-testid="rfq-detail-group-link-anchor"
+                      >{{ 'rfq.detail.approvedTogether' | translate }}</a>
+                    </p>
+                  }
+                </div>
+              </div>
+            </mat-card>
+          }
+
           @if (detail.rfq.status === 'draft') {
             <mat-card class="draft-notice-card" data-testid="rfq-detail-draft-notice">
               <div class="draft-notice-content">
