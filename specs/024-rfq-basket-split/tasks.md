@@ -195,8 +195,8 @@ best single total of SAR 4,137 and a saving of SAR 74.
   - Approve and Reject on the group call the group endpoints, and the dialog title restates the combined amount and branch.
 
   Karma red → green.
-- [ ] T030 [P] [US3] Web, delegated to Agy: the split context on `apps/web/src/app/features/requests/request-form/request-form.component.{ts,html,spec.ts}` (the request page) and `request-list/request-list.component.{ts,html,spec.ts}`. Show "Part of a split · 1 of 2 · SAR 4,063" with sibling links. Submit and Withdraw on a grouped request call the group endpoints and say so ("Submits both requests of this split").
-- [ ] T031 [P] [US3] Mobile, Codex or Agy in the foreground: in `apps/mobile/lib/features/approvals/approval_queue_screen.dart` and `approval_decision_screen.dart`, one card per group, plus a group decision screen calling the group endpoints. Tests in `apps/mobile/test/features/approvals/approval_queue_screen_test.dart` and `approval_decision_screen_test.dart`. Run `flutter test` in the foreground.
+- [x] T030 [P] [US3] Web, delegated to Agy: the split context on `apps/web/src/app/features/requests/request-form/request-form.component.{ts,html,spec.ts}` (the request page) and `request-list/request-list.component.{ts,html,spec.ts}`. Show "Part of a split · 1 of 2 · SAR 4,063" with sibling links. Submit and Withdraw on a grouped request call the group endpoints and say so ("Submits both requests of this split"). — Done: #342 merged (2026-10-30).
+- [x] T031 [P] [US3] Mobile, Codex or Agy in the foreground: in `apps/mobile/lib/features/approvals/approval_queue_screen.dart` and `approval_decision_screen.dart`, one card per group, plus a group decision screen calling the group endpoints. Tests in `apps/mobile/test/features/approvals/approval_queue_screen_test.dart` and `approval_decision_screen_test.dart`. Run `flutter test` in the foreground. — Done: #351 merged (2026-10-30); a no-budget follow-up fixed in #368 (PPS-137).
 
 ---
 
@@ -216,8 +216,8 @@ best single total of SAR 4,137 and a saving of SAR 74.
 ## Phase 7: Polish & cross-cutting
 
 - [x] T033 [P] Write an e2e test in `apps/web/tests/e2e/rfq-split-requests.spec.ts`: RFQ Responses → Split → Prepare 2 requests → submit group → approve group, plus an Arabic RTL pass with zero axe violations. Prove it compiles with `npx playwright test --list`; the full run is in CI. — Done: #352 merged green (2026-10-31).
-- [ ] T034 [P] Update `docs/architecture/data-dictionary.md` (purchase_request_group, request_group_id, basket_split_job.rfq_id) and `docs/architecture/api-specification.md` (new endpoints, `part_of_split`).
-- [ ] T035 Before the PR, run `debate-review --local` and fix the real findings. Write the PR body with `mattpocock-skills:pr`.
+- [x] T034 [P] Update `docs/architecture/data-dictionary.md` (purchase_request_group, request_group_id, basket_split_job.rfq_id) and `docs/architecture/api-specification.md` (new endpoints, `part_of_split`). — Done: #334 merged (2026-10-30).
+- [ ] T035 Before the PR, run `debate-review --local` and fix the real findings. Write the PR body with `mattpocock-skills:pr`. — Open: every 024 PR body follows the `pr` template, but a local debate-review ran only for #330, #341, #337 and #346; none is recorded for #342, #344, #349, #351, #334 or #352.
 - [x] T036 After merge, run `pnpm db:migrate` on hosted and `pnpm db:check-privileges`, and confirm with `supabase migration list`. Deploy the API and optimiser, and confirm the optimiser image is new. — Done 2026-10-31: migrations 20261029000000–090000 on hosted; the live split priced only from this RFQ's replies, so the optimiser image is #341's.
 - [x] T037 Re-walk round 1 live on «مطاعم رواق»: split (SAR 4,063) → 2 requests → submit → approve as one (web, and mobile if built) → 2 POs, each naming its supplier. Save screenshots to the round-1 flow doc. Update Jira PPS-96 to Done with a Progress comment. — Done 2026-10-31: SAR 4,063 (saves 74) → 2 requests → submitted and approved as one (web queue one row; approved on the phone after the PPS-137 fix) → PO-000010 الذهبي 2,773, PO-000011 الوفرة 1,290; [`docs/gtm/demo-tenant/round-1-rewalk-2026-10-30/`](../../docs/gtm/demo-tenant/round-1-rewalk-2026-10-30/README.md).
 
