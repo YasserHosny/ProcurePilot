@@ -286,8 +286,8 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-94 | — | Approval Queue shows the requester's email (R12): find why `requester_name` is empty, give members a name, short fallback with tooltip | — | — | To Do (PPS-125) |
 | [ ] P-95 | — | Basket Split input (flow review R15): new rows start empty, no duplicate product in one basket, pack hint no longer overlaps the next row | — | — | To Do (PPS-126) |
 | [ ] P-96 | — | Basket Split from an RFQ and back (R16): start a split from RFQ Responses pre-filled; «Prepare requests» from the result (one draft per supplier, 024 request groups). Fold into the next 024 phase if already planned | — | — | To Do (PPS-127) |
-| [ ] P-97 | — | Record outcome (R17): no trailing zeros («675.000000», «1230.0000»); the «excl. tax» label follows the VAT basis decided in P-91 | — | — | To Do (PPS-128) |
-| [ ] P-98 | — | Savings baseline from a quoted price (R18): pack price × packs like the PO path, so 85 × 15 = 1,275.00 not 1,275.01 (`savings/baseline.py` ~159–162) | — | — | To Do (PPS-129) |
+| [ ] P-97 | — | Record outcome (R17): no trailing zeros («675.000000», «1230.0000»); the «excl. tax» label follows the VAT basis decided in P-91 | — | — | In Progress (PPS-128): trailing zeros in [#355](https://github.com/YasserHosny/ProcurePilot/pull/355); the label waits on P-91 |
+| [ ] P-98 | — | Savings baseline from a quoted price (R18): pack price × packs like the PO path, so 85 × 15 = 1,275.00 not 1,275.01 (`savings/baseline.py` ~159–162) | — | — | In Review (PPS-129, [#355](https://github.com/YasserHosny/ProcurePilot/pull/355)) |
 
 ### E — Pilot environment
 

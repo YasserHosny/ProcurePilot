@@ -650,7 +650,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 |---|---------|-------------|
 | 1 | **Baseline note** | Savings are measured against the last purchase-order price for each product, excluding this order. |
 | 2 | **Delivery Outcome** | Pre-selected from the order status (Ordered, Partially Delivered, or Delivered); change it if needed. |
-| 3 | **One line per order line** | Each line shows the pack conversion (e.g. "2 × pack of 30 piece = 60 piece"), with the quantity in base units and the total paid (excluding tax) pre-filled and editable. Untick a line to skip it. |
+| 3 | **One line per order line** | Each line shows the pack conversion (e.g. "2 × pack of 30 piece = 60 piece"), with the quantity in base units and the total paid (excluding tax) pre-filled without trailing zeros (e.g. «675», «1230») and editable; the value shown is the value saved. Untick a line to skip it. |
 | 4 | **Lines that cannot be recorded** | Lines not linked to a catalogue product, with nothing ordered, or already recorded are greyed out; an already-recorded line links to its saving. |
 | 5 | **Save outcomes** | Records one purchase outcome per selected line, each linked to its order line. A line can be recorded only once. |
 
@@ -665,7 +665,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | 3 | **Purchase Details** | The full purchase record as entered. |
 | 4 | **Calculation Snapshot** | The exact formula applied ("Baseline Value − Actual Paid = Net Saving") and the competing offers that were on the table at compare time — the full evidence chain from quotation → match → offer → purchase → saving. |
 
-**Key concept — the baseline:** the saving is measured against the **last purchase-order price** for the product: the newest submitted, confirmed, received, or closed order line in the same base unit, excluding the order being recorded. PO prices are per pack, so the baseline is scaled to the outcome's base units (a carton of 30 at 172 against 60 pieces gives a baseline of 344). Without an earlier purchase order, the baseline falls back to the **last quoted price**, then the 6-month quoted average; otherwise no baseline is available.
+**Key concept — the baseline:** the saving is measured against the **last purchase-order price** for the product: the newest submitted, confirmed, received, or closed order line in the same base unit, excluding the order being recorded. PO prices are per pack, so the baseline is scaled to the outcome's base units (a carton of 30 at 172 against 60 pieces gives a baseline of 344). Without an earlier purchase order, the baseline falls back to the **last quoted price**, scaled from the quote's landed total so a whole number of packs gives the quote's exact total (85 per 45 kg pack against 675 kg gives 1,275.00), then the 6-month quoted average; otherwise no baseline is available. The baseline unit price shown is rounded to 4 decimals, so unit price × quantity can differ from the baseline value in the last digits.
 
 **Key concept — Verified Savings:**
 - Verified savings are **immutable** — once verified, they cannot be edited or deleted. If a correction is needed, a new adjustment record is created.
