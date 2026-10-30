@@ -453,11 +453,11 @@ class MatchingService:
                 ) top_candidate on true
                 where md.tenant_id = %(tenant_id)s
                   and (md.is_automatic or md.supersedes_decision_id is not null)
-                  and (md.is_automatic or not exists (
+                  and not exists (
                       select 1 from match_task existing_task
                       where existing_task.tenant_id = md.tenant_id
                         and existing_task.quotation_line_id = md.quotation_line_id
-                  ))
+                  )
             )
             select *,
                    case priority
@@ -1226,10 +1226,7 @@ class MatchingService:
                 continue
             if reason is not None and synthetic_row["reason"] != reason:
                 continue
-            if (
-                dec.get("supersedes_decision_id") is not None
-                and _latest_task_for_line(client, UUID(str(dec["quotation_line_id"]))) is not None
-            ):
+            if _latest_task_for_line(client, UUID(str(dec["quotation_line_id"]))) is not None:
                 continue
             try:
                 task = self._task(client, synthetic_row, line_row=line)

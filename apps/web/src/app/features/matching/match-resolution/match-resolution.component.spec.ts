@@ -1066,6 +1066,27 @@ describe('MatchResolutionComponent (T039)', () => {
       );
     });
 
+    it('resolve-and-next with 2 swept lines and no next task includes both queue-cleared and swept message', () => {
+      const router = (component as unknown as { router: { navigate: (...args: unknown[]) => Promise<boolean> } }).router;
+      spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+      apiService.resolveMatch.and.returnValue(
+        of({
+          ...mockDecision,
+          lines_matched_by_same_wording: ['swept-1', 'swept-2'],
+        }),
+      );
+      apiService.getNextMatchTask.and.returnValue(of({ next_task_id: null, next_quotation_line_id: null }));
+
+      component.confirmResolution(true);
+
+      expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1');
+      expect(snackSpy).toHaveBeenCalledWith(
+        jasmine.stringMatching(/All match tasks resolved — queue cleared.*Also matched 2 more lines/),
+        undefined,
+        { duration: 3500 },
+      );
+    });
+
     it('correction with 3 swept lines adds "Also matched 3 more lines with the same wording"', () => {
       apiService.getMatchTaskForLine.and.returnValue(
         of({

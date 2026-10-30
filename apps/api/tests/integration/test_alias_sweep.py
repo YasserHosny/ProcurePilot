@@ -496,3 +496,72 @@ def test_bulk_sweep_guardrail_failure_is_logged_without_failing_confirmation(
     assert any(
         r.exc_info and "sweep guardrail unavailable" in str(r.exc_info[1]) for r in caplog.records
     )
+
+
+def test_queue_all_lists_swept_auto_accepted_and_corrected_lines_once(case: Case) -> None:
+    swept, _ = case.open_line()
+    with case.conn.cursor() as cur:
+        rfq = make_rfq(cur, case.ws, [case.other_product, case.product])
+        rfq_quote = reply(cur, case.ws, rfq, ("Other product", "دقيق"))
+    rfq_matches = MatchingService(settings()).quotation_matches(
+        bearer_token="test", member=_member(case.ws), quotation_id=rfq_quote
+    )
+    auto_to_correct = rfq_matches.lines[0].line.id
+    pure_auto = rfq_matches.lines[1].line.id
+    assert rfq_matches.lines[0].decision.is_automatic
+    assert rfq_matches.lines[1].decision.is_automatic
+    with case.conn.cursor() as cur:
+        correct_candidate = _candidate(cur, case.ws, auto_to_correct, case.product)
+        cur.execute(
+            "select count(*) from match_task where quotation_line_id in (%s, %s)",
+            (auto_to_correct, pure_auto),
+        )
+        assert cur.fetchone()[0] == 0
+
+    result = case.resolve()
+    assert result.lines_matched_by_same_wording == [swept]
+
+    correction_key = uuid4()
+    corrected_response = case.service.correct(
+        bearer_token="test",
+        member=_member(case.ws),
+        line_id=auto_to_correct,
+        payload=MatchCorrectionRequest(
+            expected_current_decision_id=rfq_matches.lines[0].decision.id,
+            outcome="same_product",
+            selected_match_candidate_id=correct_candidate,
+            learn_alias=False,
+        ),
+        idempotency_key=correction_key,
+    )
+    assert corrected_response.decision.supersedes_decision_id == rfq_matches.lines[0].decision.id
+
+    matching = MatchingService(settings())
+
+    # 1. SQL queue listing (with member)
+    sql_queue = matching.list_match_tasks(
+        bearer_token="test", member=_member(case.ws), status="all"
+    ).items
+    swept_sql = [it for it in sql_queue if it.quotation_line.id == swept]
+    auto_sql = [it for it in sql_queue if it.quotation_line.id == pure_auto]
+    corrected_sql = [it for it in sql_queue if it.quotation_line.id == auto_to_correct]
+    teacher_sql = [it for it in sql_queue if it.quotation_line.id == case.teacher]
+
+    assert len(swept_sql) == 1, f"Swept line listed {len(swept_sql)} times in SQL queue"
+    assert len(auto_sql) == 1, f"Auto-accepted line listed {len(auto_sql)} times in SQL queue"
+    assert len(corrected_sql) == 1, f"Corrected line listed {len(corrected_sql)} times in SQL queue"
+    assert len(teacher_sql) == 1, f"Teacher line listed {len(teacher_sql)} times in SQL queue"
+
+    # 2. PostgREST queue listing (without member)
+    pg_queue = matching.list_match_tasks(bearer_token="test", status="all").items
+    swept_pg = [it for it in pg_queue if it.quotation_line.id == swept]
+    auto_pg = [it for it in pg_queue if it.quotation_line.id == pure_auto]
+    corrected_pg = [it for it in pg_queue if it.quotation_line.id == auto_to_correct]
+    teacher_pg = [it for it in pg_queue if it.quotation_line.id == case.teacher]
+
+    assert len(swept_pg) == 1, f"Swept line listed {len(swept_pg)} times in PostgREST queue"
+    assert len(auto_pg) == 1, f"Auto-accepted line listed {len(auto_pg)} times in PostgREST queue"
+    assert len(corrected_pg) == 1, (
+        f"Corrected line listed {len(corrected_pg)} times in PostgREST queue"
+    )
+    assert len(teacher_pg) == 1, f"Teacher line listed {len(teacher_pg)} times in PostgREST queue"

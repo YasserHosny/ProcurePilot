@@ -16,6 +16,7 @@ class FakeQuery:
         self.filters: list[tuple[str, str, object]] = []
         self.orders: list[tuple[str, bool]] = []
         self.range_args: tuple[int, int] | None = None
+        self.limit_count: int | None = None
 
     def select(self, _cols: str) -> FakeQuery:
         return self
@@ -40,6 +41,10 @@ class FakeQuery:
         self.orders.append((column, desc))
         return self
 
+    def limit(self, count: int) -> FakeQuery:
+        self.limit_count = count
+        return self
+
     def range(self, start: int, end: int) -> FakeQuery:
         self.range_args = (start, end)
         return self
@@ -50,6 +55,8 @@ class FakeQuery:
                 self.data = data
 
         data = list(self._data)
+        if self.limit_count is not None:
+            data = data[: self.limit_count]
         if self.range_args is not None:
             start, end = self.range_args
             data = data[start : end + 1]

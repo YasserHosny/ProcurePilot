@@ -537,8 +537,11 @@ export class MatchResolutionComponent implements OnInit {
             void this.router.navigate(['/matching', res.next_quotation_line_id]);
             return;
           }
+          const queueClearedMsg = this.translate.instant('matching.resolution.actions.queueCleared');
+          const swept = formatSweptLinesMessage(this.translate, decision?.lines_matched_by_same_wording);
+          const msg = swept ? appendSweptMessage(queueClearedMsg, swept) : queueClearedMsg;
           this.snackBar.open(
-            this.translate.instant('matching.resolution.actions.queueCleared'),
+            msg,
             undefined,
             { duration: 3500 },
           );
