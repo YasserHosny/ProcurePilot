@@ -23,7 +23,8 @@ name: Docs screenshots drift
 # Runs on every PR so «Regenerate and diff» always reports and can be a required check (PPS-135):
 # a workflow-level `paths:` filter never starts on a docs-only PR, which would leave a required
 # check "Expected — waiting" forever. The `changes` job decides instead; on unrelated paths the
-# capture job ends `skipped`, which satisfies branch protection.
+# capture job ends `skipped`, and the `result` gate («Regenerate and diff») passes. The gate
+# fails if the path filter itself failed, so a broken filter cannot pass as a skip.
 
 on:
   pull_request:
@@ -61,8 +62,9 @@ jobs:
             screens:
               - 'apps/web/src/app/**'
               - 'apps/web/tests/e2e/user-documentation-screenshots.spec.ts'
-              - 'apps/web/tests/e2e/support/canonical-flow.ts'
+              - 'apps/web/tests/e2e/support/**'
               - 'apps/web/tests/e2e/global-setup.ts'
+              - 'apps/web/playwright.config.ts'
               - 'apps/web/playwright.docs.config.ts'
               - 'scripts/docs_screenshots_diff.py'
               - 'packages/i18n/**'
@@ -82,7 +84,7 @@ jobs:
           fi
 
   screenshots:
-    name: Regenerate and diff
+    name: Capture and compare screenshots
     needs: changes
     if: needs.changes.outputs.screens == 'true'
     runs-on: ubuntu-latest
@@ -223,3 +225,32 @@ jobs:
           name: regenerated-doc-screenshots
           path: docs/user/screenshots/
           retention-days: 14
+
+  # The check branch protection requires. A job skipped because its `needs` failed also counts
+  # as passing, so this gate fails unless the path filter itself succeeded and the capture either
+  # passed or was skipped because nothing relevant changed (the same pattern as `End-to-end` in
+  # ci.yml).
+  result:
+    name: Regenerate and diff
+    needs: [changes, screenshots]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the capture result
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SCREENS: ${{ needs.changes.outputs.screens }}
+          CAPTURE_RESULT: ${{ needs.screenshots.result }}
+        run: |
+          if [ "$CHANGES_RESULT" != success ]; then
+            echo "::error::Docs screenshot paths result: $CHANGES_RESULT"
+            exit 1
+          fi
+          if [ "$CAPTURE_RESULT" = success ]; then
+            exit 0
+          fi
+          if [ "$CAPTURE_RESULT" = skipped ] && [ "$SCREENS" != true ]; then
+            exit 0
+          fi
+          echo "::error::Capture and compare screenshots result: $CAPTURE_RESULT"
+          exit 1

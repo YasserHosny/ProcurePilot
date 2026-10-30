@@ -50,10 +50,15 @@ check name other tooling may rely on is unchanged.
 ## Docs screenshots drift always reports
 
 `docs-screenshots.yml` triggers on every PR, and its own `changes` job (`Docs screenshot paths`) decides whether
-«Regenerate and diff» runs: the web app source, the docs capture spec and its helpers, `packages/i18n/**`,
-`docs/user/screenshots/**` and the workflow file itself. On any other PR the job ends `skipped`, which satisfies a
-required check; the old workflow-level `on.paths` filter never started, so the check could not be made required
-(PPS-135). The weekly schedule and manual runs always capture.
+the capture job («Capture and compare screenshots») runs: the web app source, the docs capture spec,
+`apps/web/tests/e2e/support/**`, the Playwright configs and global setup, `packages/i18n/**`,
+`docs/user/screenshots/**` and the workflow file itself. On any other PR the capture ends `skipped`. The old
+workflow-level `on.paths` filter never started, so its check could not be made required (PPS-135). The weekly
+schedule and manual runs always capture.
+
+- **«Regenerate and diff» is a gate job**, the check to require. It passes when the capture passed, or was skipped
+  because nothing relevant changed, and fails if the path filter itself failed: a job skipped because its `needs`
+  failed also counts as passing, so requiring the capture job directly would let a broken filter through.
 
 - The `screens` filter is the list to extend when a new file starts to affect the captures.
 - The «Start Supabase» and «Start the extraction worker» steps did not fail in any of the 100 runs before
