@@ -24,6 +24,10 @@ import {
   type ChangeRoleDialogResult,
 } from './change-role-dialog/change-role-dialog.component';
 import { ConfirmDialogComponent } from './confirm-dialog/confirm-dialog.component';
+import {
+  EditNameDialogComponent,
+  type EditNameDialogResult,
+} from './edit-name-dialog/edit-name-dialog.component';
 import { InviteDialogComponent } from './invite-dialog/invite-dialog.component';
 
 @Component({
@@ -70,6 +74,7 @@ export class TeamComponent implements OnInit {
   readonly errorTraceId = signal<string | null>(null);
 
   readonly memberColumns: readonly string[] = [
+    'name',
     'email',
     'role',
     'status',
@@ -136,6 +141,36 @@ export class TeamComponent implements OnInit {
           duration: 3500,
         });
       }
+    });
+  }
+
+  openEditNameDialog(member: Member): void {
+    const dialogRef = this.dialog.open(EditNameDialogComponent, {
+      width: '420px',
+      data: { member },
+    });
+
+    dialogRef.afterClosed().subscribe((result: EditNameDialogResult | undefined) => {
+      if (result && result.displayName !== (member.display_name ?? '')) {
+        this.renameMember(member, result.displayName);
+      }
+    });
+  }
+
+  private renameMember(member: Member, newName: string): void {
+    this.errorMessage.set(null);
+    this.errorTraceId.set(null);
+
+    this.api.renameMember(member.id, newName).subscribe({
+      next: (updated) => {
+        this.members.update((items) => items.map((m) => (m.id === updated.id ? updated : m)));
+        this.snackBar.open(this.translate.instant('team.editNameSuccess'), undefined, {
+          duration: 3500,
+        });
+      },
+      error: (err: unknown) => {
+        this.handleError(err);
+      },
     });
   }
 

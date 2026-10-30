@@ -71,9 +71,46 @@ describe('InviteDialogComponent (T058)', () => {
     component.form.controls.role.setValue('buyer');
     component.onSubmit();
 
-    expect(apiService.invite).toHaveBeenCalledWith('newbie@example.com', 'buyer');
+    expect(apiService.invite).toHaveBeenCalledWith('newbie@example.com', 'buyer', null);
     expect(component.createdResult()?.token).toBe('example-invitation-token-not-a-secret');
     expect(component.createdResult()?.inviteUrl).toContain('/onboarding/accept-invitation?token=');
+  });
+
+  it('should pass trimmed display_name to api.invite when provided', () => {
+    apiService.invite.and.returnValue(of({
+      id: 'inv_124',
+      email: 'sara@example.com',
+      role: 'buyer',
+      status: 'pending',
+      expires_at: '2026-08-27T10:00:00Z',
+      token: 'example-token',
+      display_name: 'Sara Ahmed',
+    } as Invitation));
+
+    component.form.controls.name.setValue('  Sara Ahmed  ');
+    component.form.controls.email.setValue('sara@example.com');
+    component.form.controls.role.setValue('buyer');
+    component.onSubmit();
+
+    expect(apiService.invite).toHaveBeenCalledWith('sara@example.com', 'buyer', 'Sara Ahmed');
+  });
+
+  it('should omit display_name when blank or whitespace-only', () => {
+    apiService.invite.and.returnValue(of({
+      id: 'inv_125',
+      email: 'sara@example.com',
+      role: 'buyer',
+      status: 'pending',
+      expires_at: '2026-08-27T10:00:00Z',
+      token: 'example-token',
+    } as Invitation));
+
+    component.form.controls.name.setValue('   ');
+    component.form.controls.email.setValue('sara@example.com');
+    component.form.controls.role.setValue('buyer');
+    component.onSubmit();
+
+    expect(apiService.invite).toHaveBeenCalledWith('sara@example.com', 'buyer', null);
   });
 
   it('should handle 409 conflict error when email is already invited', () => {

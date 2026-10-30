@@ -123,7 +123,7 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
     supplierId = supplier.id;
   });
 
-  test('draft request edit + Submit persists cost centre, approval queue shows requester email, and approved request prefills PO supplier and order number @a11y', async ({
+  test('draft request edit + Submit persists cost centre, approval queue shows the requester (email local part), and approved request prefills PO supplier and order number @a11y', async ({
     page,
   }) => {
     const requiredByDate = new Date(Date.now() + 14 * 86_400_000)
@@ -169,7 +169,11 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
 
     const row = page.locator('tr.request-row', { hasText: branchName });
     await expect(row).toBeVisible();
-    await expect(row.locator('.requester-cell')).toContainText(workspace.ownerEmail);
+    await expect(row.locator('.requester-cell')).toContainText(workspace.ownerEmail.split('@')[0]);
+    await expect(row.locator('.requester-cell [aria-label]')).toHaveAttribute(
+      'aria-label',
+      workspace.ownerEmail,
+    );
     await expect(row.locator('.requester-cell')).not.toContainText(
       draft.requested_by_membership_id,
     );

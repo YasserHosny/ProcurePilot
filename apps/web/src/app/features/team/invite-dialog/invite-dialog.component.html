@@ -18,6 +18,18 @@
 
     <form [formGroup]="form" id="invite-form" (ngSubmit)="onSubmit()" class="dialog-form">
       <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'team.inviteDialog.nameLabel' | translate }}</mat-label>
+        <input
+          matInput
+          type="text"
+          formControlName="name"
+          [placeholder]="'team.inviteDialog.namePlaceholder' | translate"
+          autocomplete="name"
+        />
+        <mat-icon matPrefix aria-hidden="true">person</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
         <mat-label>{{ 'team.inviteDialog.emailLabel' | translate }}</mat-label>
         <input
           matInput

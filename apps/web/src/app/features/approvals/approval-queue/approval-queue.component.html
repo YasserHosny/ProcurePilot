@@ -46,7 +46,17 @@
               {{ 'approvals.columns.requester' | translate }}
             </th>
             <td mat-cell *matCellDef="let row" class="requester-cell">
-              {{ isGroupRow(row) ? getRequesterDisplay(row.requests[0]) : getRequesterDisplay(row.request) }}
+              @let reqInfo = getRequesterInfo(isGroupRow(row) ? row.requests[0] : row.request);
+              @if (reqInfo.tooltip) {
+                <span
+                  class="requester-email-truncate"
+                  [matTooltip]="reqInfo.tooltip"
+                  [attr.aria-label]="reqInfo.tooltip"
+                  [title]="reqInfo.tooltip"
+                >{{ reqInfo.text }}</span>
+              } @else {
+                {{ reqInfo.text }}
+              }
             </td>
           </ng-container>
 
