@@ -1,7 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, DestroyRef, Injectable, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
+import { AbstractControl, FormGroupDirective, FormsModule, NgForm } from '@angular/forms';
+import { ErrorStateMatcher } from '@angular/material/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -46,9 +47,21 @@ import {
 import { BasketSplitInfeasibleComponent } from './basket-split-infeasible.component';
 import { BasketSplitResultsComponent } from './basket-split-results.component';
 
+@Injectable()
+export class BasketSubmitErrorStateMatcher implements ErrorStateMatcher {
+  private readonly component = inject(BasketSplitComponent);
+  isErrorState(control: AbstractControl | null, form: FormGroupDirective | NgForm | null): boolean {
+    const isSubmitted = Boolean(form?.submitted || this.component.hasAttemptedSubmit());
+    return Boolean(control && control.invalid && (control.touched || isSubmitted));
+  }
+}
+
 @Component({
   selector: 'app-basket-split',
   standalone: true,
+  providers: [
+    { provide: ErrorStateMatcher, useClass: BasketSubmitErrorStateMatcher },
+  ],
   imports: [
     FormsModule,
     MatCardModule,
@@ -93,11 +106,15 @@ export class BasketSplitComponent implements OnInit {
   readonly isLoading = signal<boolean>(false);
   readonly isSubmitting = signal<boolean>(false);
 
+  readonly minSuppliers = 2;
+  readonly maxSuppliers = 10;
+  readonly hasAttemptedSubmit = signal<boolean>(false);
+
   readonly supplierId1 = signal<string>('');
   readonly supplierId2 = signal<string>('');
   readonly additionalSupplierIds = signal<string[]>([]);
   readonly items = signal<BasketSplitFormItem[]>([
-    { workspace_product_id: '', quantity: '10' },
+    { workspace_product_id: '', quantity: '' },
   ]);
 
   readonly showAdvancedConstraints = signal<boolean>(false);
@@ -194,9 +211,6 @@ export class BasketSplitComponent implements OnInit {
     this.api.products({ limit: 100, status: 'active' }).subscribe({
       next: (res) => {
         this.products.set(res.items);
-        if (res.items.length > 0 && this.items().length === 1 && !this.items()[0].workspace_product_id) {
-          this.items.set([{ workspace_product_id: res.items[0].id, quantity: '10' }]);
-        }
       },
       error: () => {
         // Fallback silently if products load fails
@@ -205,9 +219,7 @@ export class BasketSplitComponent implements OnInit {
   }
 
   addItem(): void {
-    const prods = this.products();
-    const defaultProdId = prods.length > 0 ? prods[0].id : '';
-    this.items.update((list) => [...list, { workspace_product_id: defaultProdId, quantity: '10' }]);
+    this.items.update((list) => [...list, { workspace_product_id: '', quantity: '' }]);
   }
 
   removeItem(index: number): void {
@@ -275,13 +287,23 @@ export class BasketSplitComponent implements OnInit {
     return String(Math.round(packs * this.packBaseQuantityFor(item.workspace_product_id) * 1e6) / 1e6);
   }
 
+  isItemProductInvalid(item: BasketSplitFormItem): boolean {
+    return this.hasAttemptedSubmit() && !item.workspace_product_id;
+  }
+
+  isItemQuantityInvalid(item: BasketSplitFormItem): boolean {
+    if (!this.hasAttemptedSubmit()) return false;
+    const q = parseFloat(item.quantity);
+    return isNaN(q) || q <= 0;
+  }
+
   isFormValid(): boolean {
     const s1 = this.supplierId1();
     const s2 = this.supplierId2();
     if (!s1 || !s2 || s1 === s2) return false;
 
     const all = this.allSelectedSupplierIds();
-    if (all.length < 2 || all.length > 10) return false;
+    if (all.length < this.minSuppliers || all.length > this.maxSuppliers) return false;
 
     const currentItems = this.items();
     if (currentItems.length === 0 || currentItems.length > 50) return false;
@@ -293,6 +315,7 @@ export class BasketSplitComponent implements OnInit {
   }
 
   submitBasket(): void {
+    this.hasAttemptedSubmit.set(true);
     if (!this.isFormValid() || !this.isWriter()) return;
 
     this.isSubmitting.set(true);
@@ -334,7 +357,7 @@ export class BasketSplitComponent implements OnInit {
   }
 
   addAdditionalSupplier(): void {
-    if (this.allSelectedSupplierIds().length < 10) {
+    if (this.allSelectedSupplierIds().length < this.maxSuppliers) {
       this.additionalSupplierIds.update((s) => [...s, '']);
     }
   }
@@ -444,6 +467,8 @@ export class BasketSplitComponent implements OnInit {
     this.pollSubscription = null;
     this.currentJob.set(null);
     this.errorMessage.set(null);
+    this.hasAttemptedSubmit.set(false);
+    this.items.set([{ workspace_product_id: '', quantity: '' }]);
     this.router.navigate(['/offers/basket-split']);
   }
 

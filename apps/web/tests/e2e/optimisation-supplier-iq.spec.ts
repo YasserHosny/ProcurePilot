@@ -38,7 +38,7 @@ test.describe('Optimisation & Supplier IQ E2E (T038)', () => {
   test('User Story 1: Advanced basket optimisation exposes constraint controls and advisory-only result', async ({ page }) => {
     await page.goto('/offers/basket-split');
 
-    await expect(page.locator('.page-title')).toContainText('Two-Supplier Basket Split');
+    await expect(page.locator('.page-title')).toContainText('Basket Split');
 
     // Verify presence of constraint controls expansion
     const toggleConstraintsBtn = page.locator('.toggle-constraints-btn');

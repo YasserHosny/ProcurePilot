@@ -59,7 +59,7 @@ test.describe('Optimisation & Supplier IQ Accessibility & RTL @a11y (T039)', () 
   test('Advanced Basket Split in English has zero WCAG 2.1 AA violations @a11y', async ({ page }) => {
     await signIn(page);
     await page.goto('/offers/basket-split');
-    await expect(page.locator('.page-title')).toContainText('Two-Supplier Basket Split');
+    await expect(page.locator('.page-title')).toContainText('Basket Split');
 
     const toggleConstraintsBtn = page.locator('.toggle-constraints-btn');
     if (await toggleConstraintsBtn.isVisible()) {
