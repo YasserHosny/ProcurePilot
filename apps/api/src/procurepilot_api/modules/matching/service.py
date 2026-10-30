@@ -56,6 +56,7 @@ from procurepilot_api.modules.quotations.schemas import decimal_string as quanti
 from procurepilot_api.modules.rfq.read_api import RfqContext, rfq_lines_for_quotation
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
+from procurepilot_api.shared.postgrest_pages import all_rows
 
 QUOTATION_COLUMNS = (
     "id,tenant_id,document_id,supplier_id,status,issue_date,reviewed_at,reviewed_by,deleted_at"
@@ -1830,35 +1831,42 @@ class _LineMatchState:
         decisions: dict[str, dict[str, object]] = {}
         tasks: dict[str, list[dict[str, object]]] = {}
         try:
+            # Each response is capped at max_rows, however few ids a chunk names: page them all.
             for chunk in _chunks(line_ids):
-                for row in _rows(
-                    client.table("match_candidate")
-                    .select(CANDIDATE_COLUMNS)
-                    .in_("quotation_line_id", chunk)
-                    .order("rank")
-                    .execute()
-                    .data
+                for row in all_rows(
+                    lambda chunk=chunk: (
+                        client.table("match_candidate")
+                        .select(CANDIDATE_COLUMNS)
+                        .in_("quotation_line_id", chunk)
+                        .order("rank")
+                        .order("id")
+                    ),
+                    _rows,
                 ):
                     candidates.setdefault(str(row["quotation_line_id"]), []).append(row)
-                for row in _rows(
-                    client.table("current_match_decision")
-                    .select(DECISION_COLUMNS)
-                    .in_("quotation_line_id", chunk)
-                    .execute()
-                    .data
+                for row in all_rows(
+                    lambda chunk=chunk: (
+                        client.table("current_match_decision")
+                        .select(DECISION_COLUMNS)
+                        .in_("quotation_line_id", chunk)
+                        .order("id")
+                    ),
+                    _rows,
                 ):
                     if str(row["quotation_line_id"]) in decisions:
                         raise ServiceUnavailableError(
                             details={"reason": "multiple_match_decisions"}
                         )
                     decisions[str(row["quotation_line_id"])] = row
-                for row in _rows(
-                    client.table("match_task")
-                    .select(TASK_COLUMNS)
-                    .in_("quotation_line_id", chunk)
-                    .order("created_at", desc=True)
-                    .execute()
-                    .data
+                for row in all_rows(
+                    lambda chunk=chunk: (
+                        client.table("match_task")
+                        .select(TASK_COLUMNS)
+                        .in_("quotation_line_id", chunk)
+                        .order("created_at", desc=True)
+                        .order("id", desc=True)
+                    ),
+                    _rows,
                 ):
                     tasks.setdefault(str(row["quotation_line_id"]), []).append(row)
         except APIError as exc:

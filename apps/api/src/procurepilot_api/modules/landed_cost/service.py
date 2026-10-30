@@ -18,6 +18,7 @@ from procurepilot_api.modules.landed_cost.rules import (
 )
 from procurepilot_api.modules.landed_cost.schemas import LandedCost, Money
 from procurepilot_api.modules.members.service import authenticated_client
+from procurepilot_api.shared.postgrest_pages import all_rows
 
 LINE_COLUMNS = (
     "id,tenant_id,quotation_id,quantity,pack_count,unit_size,unit_price_amount,"
@@ -66,18 +67,24 @@ class LandedCostService:
     def latest_for_decisions(
         self, *, client: object, decision_ids: list[UUID]
     ) -> dict[UUID, LandedCost]:
-        """The newest landed cost of each decision, in one read."""
-        if not decision_ids:
-            return {}
+        """The newest landed cost of each decision, read in batches rather than per decision."""
+        ids = sorted({str(decision_id) for decision_id in decision_ids})
+        rows: list[dict[str, object]] = []
         try:
-            rows = _rows(
-                client.table("landed_cost")
-                .select(LANDED_COLUMNS)
-                .in_("match_decision_id", [str(decision_id) for decision_id in decision_ids])
-                .order("recorded_at", desc=True)
-                .execute()
-                .data
-            )
+            # A decision keeps one row per rule version; page past the max_rows cap.
+            for start in range(0, len(ids), 100):
+                rows.extend(
+                    all_rows(
+                        lambda chunk=ids[start : start + 100]: (
+                            client.table("landed_cost")
+                            .select(LANDED_COLUMNS)
+                            .in_("match_decision_id", chunk)
+                            .order("recorded_at", desc=True)
+                            .order("id", desc=True)
+                        ),
+                        _rows,
+                    )
+                )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         latest: dict[UUID, LandedCost] = {}
