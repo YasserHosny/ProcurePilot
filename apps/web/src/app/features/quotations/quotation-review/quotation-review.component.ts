@@ -400,8 +400,11 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     window.removeEventListener('keydown', this.onKeyDownCapture, { capture: true });
   }
 
-  loadQuotation(id: string): void {
-    this.isLoading.set(true);
+  loadQuotation(id: string, options?: { silent?: boolean }): void {
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      this.isLoading.set(true);
+    }
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
 
@@ -416,21 +419,25 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
           this.selectedPreviousQuotationId.set(q.previous_quotation_id);
         }
 
-        // Set default active extraction if any flagged field exists
-        const flagged = this.flaggedFields();
-        if (flagged.length > 0) {
-          this.activeExtraction.set(flagged[0].extraction);
-        } else {
-          const defaultExtraction = this.defaultExtraction(q);
-          if (defaultExtraction) this.activeExtraction.set(defaultExtraction);
-        }
+        if (!silent) {
+          // Set default active extraction if any flagged field exists
+          const flagged = this.flaggedFields();
+          if (flagged.length > 0) {
+            this.activeExtraction.set(flagged[0].extraction);
+          } else {
+            const defaultExtraction = this.defaultExtraction(q);
+            if (defaultExtraction) this.activeExtraction.set(defaultExtraction);
+          }
 
-        this.isLoading.set(false);
+          this.isLoading.set(false);
+        }
         this.loadDocumentPreview(q.document.id);
         this.loadAuditTrail(q.id);
       },
       error: (err: unknown) => {
-        this.isLoading.set(false);
+        if (!silent) {
+          this.isLoading.set(false);
+        }
         this.handleError(err);
       },
     });
@@ -1226,7 +1233,17 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
         next: (confirmed) => {
           this.isConfirming.set(false);
           this.showNextStep.set(true);
-          this.loadQuotation(confirmed.id);
+          this.quotation.update((current) =>
+            current
+              ? {
+                  ...current,
+                  status: confirmed.status,
+                  reviewed_by: confirmed.reviewed_by,
+                  reviewed_at: confirmed.reviewed_at,
+                }
+              : null,
+          );
+          this.loadQuotation(confirmed.id, { silent: true });
           this.snackBar.open(
             this.translate.instant('quotations.review.actions.confirmSuccess'),
             undefined,

@@ -1105,7 +1105,8 @@
         "extracted": "تم الاستخراج (بانتظار المراجعة)",
         "in_review": "قيد المراجعة",
         "reviewed": "تمت المراجعة والاعتماد",
-        "refused": "مرفوض"
+        "refused": "مرفوض",
+        "authorizing": "جارٍ الاعتماد…"
       },
       "confirmBlocked": {
         "quotation_not_confirmable": "حالة عرض السعر لا تسمح بتأكيده حالياً.",

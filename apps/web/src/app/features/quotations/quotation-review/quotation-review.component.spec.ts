@@ -6,12 +6,12 @@ import { MatDatepicker } from '@angular/material/datepicker';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { QuotationDetail, Role, Supplier } from '../../../core/api/models';
+import type { Quotation, QuotationDetail, Role, Supplier } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { QuotationReviewComponent } from './quotation-review.component';
@@ -920,7 +920,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(fieldBox.querySelector('.corrected-tag')).toBeNull();
   });
 
-  it('displays exact stored amount in editable unit price input while read-only display formats with 0 or 2 decimals (e.g. 85.0000 -> 85)', () => {
+  it('displays exact stored amount with trailing decimal zeros removed in editable unit price input (PPS-121 B1)', () => {
     // 1. Read-only display of 85.0000 still shows "85"
     component.quotation.set({
       ...mockQuotationDetail,
@@ -940,24 +940,370 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(readOnlyInput).toBeTruthy();
     expect(readOnlyInput?.value).toBe('85');
 
-    // 2. Editable input carries exact stored amount (85.0000)
+    // 2. Editable input carries exact stored amount with trailing zeros trimmed (85.0000 -> 85, 86.5000 -> 86.5, 0.1234 -> 0.1234)
+    for (const status of ['extracted', 'in_review'] as const) {
+      component.quotation.set({
+        ...mockQuotationDetail,
+        status,
+        lines: [
+          {
+            ...mockQuotationDetail.lines[0],
+            unit_price: { amount: '85.0000', currency: 'SAR' },
+          },
+        ],
+      });
+      fixture.detectChanges();
+
+      const editableInput = fixture.nativeElement.querySelector(
+        '#field-fe-line1-price input',
+      ) as HTMLInputElement | null;
+      expect(editableInput).toBeTruthy();
+      expect(editableInput?.value).toBe('85');
+
+      // Case 86.5000 -> 86.5
+      component.quotation.set({
+        ...mockQuotationDetail,
+        status,
+        lines: [
+          {
+            ...mockQuotationDetail.lines[0],
+            unit_price: { amount: '86.5000', currency: 'SAR' },
+          },
+        ],
+      });
+      fixture.detectChanges();
+      expect(editableInput?.value).toBe('86.5');
+
+      // Case 0.1234 -> 0.1234
+      component.quotation.set({
+        ...mockQuotationDetail,
+        status,
+        lines: [
+          {
+            ...mockQuotationDetail.lines[0],
+            unit_price: { amount: '0.1234', currency: 'SAR' },
+          },
+        ],
+      });
+      fixture.detectChanges();
+      expect(editableInput?.value).toBe('0.1234');
+    }
+  });
+
+  it('PPS-121 (B2): blurring an unedited low-confidence 86.0000 unit price stages no correction, while typing 86.125 stages exactly 86.125', () => {
+    const lowConfPriceExtraction = {
+      ...mockQuotationDetail.field_extractions[1],
+      id: 'fe-line1-price',
+      field_name: 'unit_price',
+      extracted_value: { amount: '86.0000', currency: 'SAR' },
+      confidence: '0.5000',
+    };
     component.quotation.set({
       ...mockQuotationDetail,
       status: 'extracted',
       lines: [
         {
           ...mockQuotationDetail.lines[0],
-          unit_price: { amount: '85.0000', currency: 'SAR' },
+          unit_price: { amount: '86.0000', currency: 'SAR' },
         },
+      ],
+      field_extractions: [
+        mockQuotationDetail.field_extractions[0],
+        lowConfPriceExtraction,
       ],
     });
     fixture.detectChanges();
 
-    const editableInput = fixture.nativeElement.querySelector(
+    const unitPriceInput = fixture.nativeElement.querySelector(
       '#field-fe-line1-price input',
-    ) as HTMLInputElement | null;
-    expect(editableInput).toBeTruthy();
-    expect(editableInput?.value).toBe('85.0000');
+    ) as HTMLInputElement;
+    expect(unitPriceInput).toBeTruthy();
+    expect(unitPriceInput.value).toBe('86');
+
+    // Trigger blur on unedited field
+    unitPriceInput.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    // Blurring an unedited field must stage NO correction
+    expect(component.pendingCorrections().has('fe-line1-price')).toBeFalse();
+
+    // saveCorrections sends no unit_price correction
+    apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+    component.saveCorrections();
+    if (apiService.patchQuotation.calls.count() > 0) {
+      const patchPayload = apiService.patchQuotation.calls.mostRecent().args[1];
+      const priceCorr = patchPayload.corrections?.find(
+        (c) => c.field_extraction_id === 'fe-line1-price',
+      );
+      expect(priceCorr).toBeUndefined();
+    }
+
+    // Now type 86.125 and trigger blur/change
+    unitPriceInput.value = '86.125';
+    unitPriceInput.dispatchEvent(new Event('change'));
+    unitPriceInput.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    const staged = component.pendingCorrections().get('fe-line1-price');
+    expect(staged).toBeDefined();
+    expect((staged as { amount: string }).amount).toBe('86.125');
+  });
+
+  it('PPS-121 (Delta): typing 0 on a line with null unit_price stages a correction with amount 0', () => {
+    const missingPriceExtraction = {
+      ...mockQuotationDetail.field_extractions[1],
+      id: 'fe-line1-price',
+      field_name: 'unit_price',
+      extracted_value: null,
+      confidence: '0.5000',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      status: 'extracted',
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          unit_price: null,
+        },
+      ],
+      field_extractions: [
+        mockQuotationDetail.field_extractions[0],
+        missingPriceExtraction,
+      ],
+    });
+    fixture.detectChanges();
+
+    const unitPriceInput = fixture.nativeElement.querySelector(
+      '#field-fe-line1-price input',
+    ) as HTMLInputElement;
+    expect(unitPriceInput).toBeTruthy();
+    expect(unitPriceInput.value).toBe('');
+
+    unitPriceInput.value = '0';
+    unitPriceInput.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const staged = component.pendingCorrections().get('fe-line1-price');
+    expect(staged).toBeDefined();
+    expect((staged as { amount: string }).amount).toBe('0');
+  });
+
+  it('PPS-121 (B3): Line Total input shows formatted amount without currency code in English and Arabic', () => {
+    const priceExtraction = {
+      ...mockQuotationDetail.field_extractions[1],
+      id: 'fe-line1-price',
+      field_name: 'unit_price',
+      extracted_value: { amount: '86.0000', currency: 'SAR' },
+      confidence: '0.9500',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          quantity: '20',
+          unit_price: { amount: '86.0000', currency: 'SAR' },
+          vat_rate: '0',
+          delivery_fee: null,
+          discount: null,
+        },
+      ],
+      field_extractions: [
+        mockQuotationDetail.field_extractions[0],
+        priceExtraction,
+      ],
+    });
+    fixture.detectChanges();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.use('en');
+    fixture.detectChanges();
+
+    const lineTotalInput = fixture.nativeElement.querySelector(
+      '.line-total-field input',
+    ) as HTMLInputElement;
+    expect(lineTotalInput).toBeTruthy();
+    // 20 * 86 = 1720 -> "1,720"
+    expect(lineTotalInput.value).toBe('1,720');
+
+    // Arabic-Indic form in Arabic
+    translate.use('ar');
+    fixture.detectChanges();
+    expect(lineTotalInput.value).toBe('١٬٧٢٠');
+
+    // Non-whole total: 1720.50
+    const nonWholePriceExtraction = {
+      ...mockQuotationDetail.field_extractions[1],
+      id: 'fe-line1-price',
+      field_name: 'unit_price',
+      extracted_value: { amount: '1720.50', currency: 'SAR' },
+      confidence: '0.9500',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          quantity: '1',
+          unit_price: { amount: '1720.50', currency: 'SAR' },
+          vat_rate: '0',
+          delivery_fee: null,
+          discount: null,
+        },
+      ],
+      field_extractions: [
+        mockQuotationDetail.field_extractions[0],
+        nonWholePriceExtraction,
+      ],
+    });
+    translate.use('en');
+    fixture.detectChanges();
+    expect(lineTotalInput.value).toBe('1,720.50');
+
+    translate.use('ar');
+    fixture.detectChanges();
+    expect(lineTotalInput.value).toBe('١٬٧٢٠٫٥٠');
+  });
+
+  it('PPS-120 (A1): busy state while authorizing disables actions, shows spinner in status pill, and avoids blank flash', () => {
+    const confirmSubject = new Subject<Quotation>();
+    apiService.confirmQuotation.and.returnValue(confirmSubject.asObservable());
+
+    component.quotation.set({
+      ...mockQuotationDetail,
+      supplier_id: 'sup-1',
+      status: 'in_review',
+    });
+    component.selectedSupplierId.set('sup-1');
+    fixture.detectChanges();
+
+    const isLoadingSpy = spyOn(component.isLoading, 'set').and.callThrough();
+
+    component.confirmQuotation();
+    fixture.detectChanges();
+
+    expect(component.isConfirming()).toBeTrue();
+
+    // Buttons must be disabled
+    const refuseBtn = fixture.nativeElement.querySelector('.refuse-btn') as HTMLButtonElement;
+    const saveBtn = fixture.nativeElement.querySelector('.save-btn') as HTMLButtonElement;
+    const confirmBtn = fixture.nativeElement.querySelector('.confirm-btn') as HTMLButtonElement;
+    const allHeaderBtns = Array.from(fixture.nativeElement.querySelectorAll('.header-actions button') as NodeListOf<HTMLButtonElement>);
+    const retryBtn = allHeaderBtns.find((b) => b.textContent?.includes('Retry Extraction'));
+    const requoteBtn = allHeaderBtns.find((b) => b.textContent?.includes('Create Re-Quote'));
+    const archiveBtn = allHeaderBtns.find((b) => b.textContent?.includes('Archive'));
+    const addLineBtn = fixture.nativeElement.querySelector('.add-line-btn') as HTMLButtonElement;
+
+    expect(refuseBtn?.disabled).toBeTrue();
+    expect(saveBtn?.disabled).toBeTrue();
+    expect(confirmBtn?.disabled).toBeTrue();
+    expect(retryBtn?.disabled).toBeTrue();
+    expect(requoteBtn?.disabled).toBeTrue();
+    expect(archiveBtn?.disabled).toBeTrue();
+    expect(addLineBtn?.disabled).toBeTrue();
+
+    // Status pill
+    const statusPill = fixture.nativeElement.querySelector('.page-header .status-pill') as HTMLElement;
+    expect(statusPill).toBeTruthy();
+    expect(statusPill.getAttribute('role')).toBe('status');
+    expect(statusPill.getAttribute('aria-live')).toBe('polite');
+    expect(statusPill.querySelector('mat-spinner')).toBeTruthy();
+    expect(statusPill.textContent).toContain(enCatalog.quotations.review.status.authorizing);
+
+    // Review section aria-busy
+    const reviewSection = fixture.nativeElement.querySelector('.data-panel') as HTMLElement;
+    expect(reviewSection.getAttribute('aria-busy')).toBe('true');
+
+    // Emit reviewed quotation
+    isLoadingSpy.calls.reset();
+    const confirmedQuotation = {
+      ...mockQuotationDetail,
+      status: 'reviewed' as const,
+      supplier_id: 'sup-1',
+      reviewed_by: 'reviewer-1',
+      reviewed_at: '2026-10-30T12:00:00Z',
+    };
+    apiService.getQuotation.and.returnValue(of(confirmedQuotation));
+    confirmSubject.next(confirmedQuotation);
+    confirmSubject.complete();
+    fixture.detectChanges();
+
+    expect(component.quotation()?.status).toBe('reviewed');
+    expect(statusPill.textContent).toContain(enCatalog.quotations.review.status.reviewed);
+    expect(isLoadingSpy).not.toHaveBeenCalledWith(true);
+  });
+
+  it('PPS-120 (A2): busy state holds during PATCH-first path when staged changes exist', () => {
+    const patchSubject = new Subject<QuotationDetail>();
+    apiService.patchQuotation.and.returnValue(patchSubject.asObservable());
+
+    component.quotation.set({
+      ...mockQuotationDetail,
+      supplier_id: 'sup-1',
+      status: 'in_review',
+    });
+    component.selectedSupplierId.set('sup-1');
+    component.reviewerNotes.set('Staged change to notes');
+    fixture.detectChanges();
+
+    component.confirmQuotation();
+    fixture.detectChanges();
+
+    expect(component.isConfirming()).toBeTrue();
+
+    const refuseBtn = fixture.nativeElement.querySelector('.refuse-btn') as HTMLButtonElement;
+    const saveBtn = fixture.nativeElement.querySelector('.save-btn') as HTMLButtonElement;
+    const confirmBtn = fixture.nativeElement.querySelector('.confirm-btn') as HTMLButtonElement;
+    const allHeaderBtns = Array.from(fixture.nativeElement.querySelectorAll('.header-actions button') as NodeListOf<HTMLButtonElement>);
+    const retryBtn = allHeaderBtns.find((b) => b.textContent?.includes('Retry Extraction'));
+    const requoteBtn = allHeaderBtns.find((b) => b.textContent?.includes('Create Re-Quote'));
+    const archiveBtn = allHeaderBtns.find((b) => b.textContent?.includes('Archive'));
+    const addLineBtn = fixture.nativeElement.querySelector('.add-line-btn') as HTMLButtonElement;
+
+    expect(refuseBtn?.disabled).toBeTrue();
+    expect(saveBtn?.disabled).toBeTrue();
+    expect(confirmBtn?.disabled).toBeTrue();
+    expect(retryBtn?.disabled).toBeTrue();
+    expect(requoteBtn?.disabled).toBeTrue();
+    expect(archiveBtn?.disabled).toBeTrue();
+    expect(addLineBtn?.disabled).toBeTrue();
+
+    const statusPill = fixture.nativeElement.querySelector('.page-header .status-pill') as HTMLElement;
+    expect(statusPill.querySelector('mat-spinner')).toBeTruthy();
+    expect(statusPill.textContent).toContain(enCatalog.quotations.review.status.authorizing);
+  });
+
+  it('PPS-120 (A3): on a 409 from /confirm, isConfirming becomes false and buttons are re-enabled', () => {
+    apiService.confirmQuotation.and.returnValue(
+      throwError(() => new HttpErrorResponse({
+        status: 409,
+        error: { details: { reason: 'quotation_not_confirmable' } },
+      })),
+    );
+
+    component.quotation.set({
+      ...mockQuotationDetail,
+      supplier_id: 'sup-1',
+      status: 'in_review',
+    });
+    component.selectedSupplierId.set('sup-1');
+    fixture.detectChanges();
+
+    component.confirmQuotation();
+    fixture.detectChanges();
+
+    expect(component.isConfirming()).toBeFalse();
+
+    const allHeaderBtns = Array.from(fixture.nativeElement.querySelectorAll('.header-actions button') as NodeListOf<HTMLButtonElement>);
+    const retryBtn = allHeaderBtns.find((b) => b.textContent?.includes('Retry Extraction'));
+    const requoteBtn = allHeaderBtns.find((b) => b.textContent?.includes('Create Re-Quote'));
+    const archiveBtn = allHeaderBtns.find((b) => b.textContent?.includes('Archive'));
+    const addLineBtn = fixture.nativeElement.querySelector('.add-line-btn') as HTMLButtonElement;
+
+    expect(retryBtn?.disabled).toBeFalse();
+    expect(requoteBtn?.disabled).toBeFalse();
+    expect(archiveBtn?.disabled).toBeFalse();
+    expect(addLineBtn?.disabled).toBeFalse();
   });
 
   it('preserves exact 4-decimal unit price on blur and save of unchanged low-confidence price without staging rounded correction', () => {
