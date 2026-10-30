@@ -235,3 +235,50 @@ def test_members_still_read_the_whole_workspace(workspace: Workspace) -> None:
     act_as(cur, tenant_id, viewer_user, "viewer")
     cur.execute("select count(*) from membership")
     assert cur.fetchone()[0] == 3
+
+
+# --- display names (PPS-125) -------------------------------------------------------------------
+
+
+def _name_of(cur: psycopg.Cursor, membership_id: UUID) -> str | None:
+    cur.execute("reset role")
+    cur.execute("select display_name from membership where id = %s", (membership_id,))
+    return cur.fetchone()[0]
+
+
+def test_a_member_can_set_their_own_display_name(workspace: Workspace) -> None:
+    cur, tenant_id, members = workspace
+    viewer_id, viewer_user = members["viewer"]
+    act_as(cur, tenant_id, viewer_user, "viewer")
+    cur.execute("update membership set display_name = 'سارة' where id = %s", (viewer_id,))
+    assert cur.rowcount == 1
+    assert _name_of(cur, viewer_id) == "سارة"
+
+
+def test_an_owner_can_set_another_members_display_name(workspace: Workspace) -> None:
+    cur, tenant_id, members = workspace
+    buyer_id, _ = members["buyer"]
+    _, owner_user = members["owner"]
+    act_as(cur, tenant_id, owner_user, "owner")
+    cur.execute("update membership set display_name = 'المشتري' where id = %s", (buyer_id,))
+    assert cur.rowcount == 1
+    assert _name_of(cur, buyer_id) == "المشتري"
+
+
+def test_a_buyer_cannot_rename_another_member(workspace: Workspace) -> None:
+    cur, tenant_id, members = workspace
+    viewer_id, _ = members["viewer"]
+    _, buyer_user = members["buyer"]
+    act_as(cur, tenant_id, buyer_user, "owner")
+    cur.execute("update membership set display_name = 'x' where id = %s", (viewer_id,))
+    assert cur.rowcount == 0
+    assert _name_of(cur, viewer_id) is None
+
+
+@pytest.mark.parametrize("bad", ["", "   ", " padded ", "x" * 101])
+def test_a_display_name_must_be_trimmed_non_blank_and_short(workspace: Workspace, bad: str) -> None:
+    cur, tenant_id, members = workspace
+    viewer_id, viewer_user = members["viewer"]
+    act_as(cur, tenant_id, viewer_user, "viewer")
+    with pytest.raises(psycopg.errors.CheckViolation):
+        cur.execute("update membership set display_name = %s where id = %s", (bad, viewer_id))
