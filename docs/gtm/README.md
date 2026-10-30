@@ -13,6 +13,7 @@ Jira keys, and the handoff log.
 | [`one-pager/ProcurePilot-one-pager.pdf`](one-pager/ProcurePilot-one-pager.pdf) | Approved one-pager, 2 × A4 (Arabic, English) — PP-8 |
 | [`demo-tenant/`](demo-tenant/) | Demo tenants (PP-5 / G-1): plan, restaurant dataset «مطاعم سند» on hosted, findings from building it live, lookups review |
 | [`demo-tenant/round-1/`](demo-tenant/round-1/) | Round 1 walkthrough with live screenshots: RFQ → supplier quotes → compare → request → approval → PO-000001 on the demo tenant |
+| [`demo-tenant/round-1-rewalk-2026-10-30/`](demo-tenant/round-1-rewalk-2026-10-30/README.md) | Round 1 re-walked on «مطاعم رواق» after specs 023 and 024: RFQ replies matched automatically, split SAR 4,063 (saves 74), approved as one on the phone, PO-000010 + PO-000011 |
 | [`demo-tenant/pps50-quote-expiry/`](demo-tenant/pps50-quote-expiry/) | PPS-50 hosted check with screenshots: the round-7 الأمانة photo quote, expiry confirmed as-is → Smart Compare shows «صالح حتى 2026/11/03» (EN + AR); UTC-timezone date-shift finding |
 | [`demo-tenant/pps62-landing-gallery/`](demo-tenant/pps62-landing-gallery/) | PPS-62 landing gallery before/after: snap rail → guided steps, EN + AR, desktop and 375px |
 | [`video/production-tracker.md`](video/production-tracker.md) | Demo video production tracker: what is left before recording (product flow, demo data, production), owners, status, user inputs |

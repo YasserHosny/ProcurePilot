@@ -134,7 +134,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-96 | PPS-127 | P-97 | PPS-128 | P-98 | PPS-129 |
 | P-99 | PPS-130 | P-100 | PPS-131 | P-101 | PPS-132 |
 | P-102 | PPS-133 | | | | |
-| P-104 | PPS-135 | P-105 | PPS-136 | | |
+| P-104 | PPS-135 | P-105 | PPS-136 | P-106 | PPS-137 |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -297,6 +297,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-102 | — | `GET /quotations/{id}/matches` takes 3–6 s on a prepared 4-line quote: one round trip per line, candidate and task, and preparation re-run on every read (`matching/service.py` `quotation_matches`). Batch the reads and skip preparation once settled; confirm-side background prep stays with PPS-130 | — | — | In Review (PPS-133) |
 | [ ] P-104 | — | Make «Docs screenshots drift» a required check: the workflow runs on every PR, its `changes` job skips the capture on unrelated paths, and a «Regenerate and diff» gate passes on a rightful skip but fails if the filter fails (a workflow-level `paths:` filter never reports, so a required check would wait forever on docs-only PRs); then add it to main's required checks once it has reported on a docs-only and a web PR | Orch (Claude) | — | In Progress (PPS-135) |
 | [ ] P-105 | — | «End-to-end» passed when the `changes` path filter failed: `e2e-shard` was skipped on the failed dependency and a skip counted as a pass, so no end-to-end test ran. The gate now fails unless `changes` succeeded, and accepts a skipped matrix only when there is no code change | Orch (Claude) | — | In Review (PPS-136) |
+| [ ] P-106 | — | The phone's approval list was empty whenever a pending request had no budget: since #112 the API sends `budget_status.remaining_amount = null` («no budget»), and the app's `BudgetStatus.fromJson` threw on it, so nothing could be approved on the phone on a workspace without budgets. Found in the 023/024 round-1 re-walk; the amount is now optional and the screens show «No budget configured» | Orch (Codex) | — | In Review (PPS-137) |
 
 ### E — Pilot environment
 
