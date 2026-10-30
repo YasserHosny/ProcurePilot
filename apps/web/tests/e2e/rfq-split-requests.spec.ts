@@ -342,7 +342,12 @@ test.describe.serial('RFQ basket split & group approval flow (024, T033)', () =>
     await expect(submitBtn).toBeEnabled({ timeout: 10000 });
     await submitBtn.click();
     await groupSubmitPromise;
-    await expect(page.locator('[data-testid="request-status-chip"]')).toContainText(/Submitted/i);
+    // Submitting returns to the request list, where both requests of the split are submitted
+    await page.waitForURL('**/requests');
+    const splitRows = page.locator('tr').filter({ has: page.locator('[data-testid="split-badge"]') });
+    await expect(splitRows).toHaveCount(2, { timeout: 15000 });
+    await expect(splitRows.filter({ hasText: supplier1Name })).toContainText(/Submitted/i);
+    await expect(splitRows.filter({ hasText: supplier2Name })).toContainText(/Submitted/i);
 
     // 5. Sign in as approver/owner → approval queue shows ONE row for split → Approve
     const pendingApprovalsPromise = page.waitForResponse(
