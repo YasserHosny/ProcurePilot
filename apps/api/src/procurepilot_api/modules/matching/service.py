@@ -584,7 +584,9 @@ class MatchingService:
             sorted(lines, key=lambda row: int(row["line_number"])), start=1
         ):
             line_id = str(line["id"])
-            if line_id in snapshot.decisions:
+            # The snapshot predates the RFQ read, backfill and earlier lines' searches; a buyer
+            # may have decided this line since, so re-check before routing it.
+            if line_id in snapshot.decisions or _decision_for_line(client, UUID(line_id)):
                 continue
             existing_candidates = snapshot.candidates.get(line_id, [])
             if existing_candidates:

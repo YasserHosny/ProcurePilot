@@ -486,6 +486,7 @@ def test_matching_pipeline_passes_supplier_code_aliases_to_deterministic_matcher
         "read",
         classmethod(lambda cls, _client, _lines: cls(candidates={}, decisions={}, tasks={})),
     )
+    monkeypatch.setattr(matching_service_module, "_decision_for_line", lambda *_a: None)
     monkeypatch.setattr(
         matching_service_module,
         "_deterministic_products_for_line",
