@@ -29,6 +29,7 @@ class BasketItem(StrictModel):
 
 
 class BasketJob(StrictModel):
+    price_quotation_ids: list[UUID] | None = None
     id: UUID
     tenant_id: UUID
     supplier_ids: list[UUID] = Field(min_length=2, max_length=2)
@@ -145,6 +146,7 @@ class SupplierRiskSignal(StrictModel):
 
 
 class AdvancedBasketRequest(StrictModel):
+    price_quotation_ids: list[UUID] | None = None
     id: UUID
     tenant_id: UUID
     supplier_ids: list[UUID] = Field(min_length=2, max_length=10)

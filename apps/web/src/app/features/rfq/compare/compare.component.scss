@@ -169,7 +169,33 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
+  gap: 6px;
+}
+
+.prepare-buttons-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.split-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  .btn-spinner {
+    display: inline-block;
+  }
+}
+
+.split-disabled-reason {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--pp-text-muted);
 }
 
 .disabled-reason {

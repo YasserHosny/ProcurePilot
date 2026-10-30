@@ -5,7 +5,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import type { Product, Supplier } from '../../../core/api/models';
+import type { Money, Product, SingleSupplierBaseline, Supplier } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
@@ -52,6 +52,34 @@ export class BasketSplitResultsComponent {
     savingsAmount?: string;
     currency?: string;
   };
+
+  get isRfqMode(): boolean {
+    return Boolean(this.currentJob?.rfq_id);
+  }
+
+  get singleSupplierBaselines(): readonly SingleSupplierBaseline[] {
+    return this.currentJob?.result?.single_supplier_baselines ?? [];
+  }
+
+  get bestSingleSupplierBaseline(): SingleSupplierBaseline | null {
+    const baselines = this.singleSupplierBaselines.filter((b) => b.feasible && b.total_landed_cost);
+    if (baselines.length === 0) return null;
+    const sorted = [...baselines].sort(
+      (a, b) => parseFloat(a.total_landed_cost!.amount) - parseFloat(b.total_landed_cost!.amount),
+    );
+    return sorted[0];
+  }
+
+  get splitSaving(): Money | null {
+    const best = this.bestSingleSupplierBaseline?.total_landed_cost;
+    const split = this.currentJob?.result?.total_landed_cost;
+    if (!best || !split) return null;
+    const diff = Math.max(0, parseFloat(best.amount) - parseFloat(split.amount));
+    return {
+      amount: diff.toFixed(2),
+      currency: split.currency,
+    };
+  }
 
   translateRiskNote(note: string): string {
     const key = `advancedBasket.riskNotes.${note}`;

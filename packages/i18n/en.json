@@ -1630,6 +1630,10 @@
     "title": "Two-Supplier Basket Split",
     "subtitle": "Optimise purchasing across exactly two suppliers for minimum total landed cost.",
     "readOnlyNotice": "You have view-only access. Workspace owners and buyers can configure and submit basket splits.",
+    "fromRfq": "From RFQ {{id}} (sent {{date}})",
+    "rfqScope": "RFQ items & suppliers",
+    "rfqSuppliers": "Suppliers",
+    "rfqItems": "Requested items",
     "form": {
       "suppliersSectionTitle": "Select Two Suppliers",
       "supplier1": "First Supplier",
@@ -1687,7 +1691,11 @@
       "solverVersion": "Solver Version: {{version}}",
       "computedAt": "Computed at {{time}}",
       "packQuantity": "{{count}} × {{size}} {{unit}}",
-      "baseEquivalent": "{{total}} {{unit}} in total"
+      "baseEquivalent": "{{total}} {{unit}} in total",
+      "splitTotal": "Split total",
+      "saving": "Saving against single supplier",
+      "singleSupplierTotal": "Single supplier total",
+      "infeasible": "Infeasible"
     },
     "actions": {
       "newSplit": "Start New Basket Split",
@@ -3938,7 +3946,12 @@
       "editDraft": "Edit",
       "sendDraft": "Send",
       "refused": "Refused",
-      "refusedExplanation": "The quotation from this reply was refused and cannot be used to prepare a request."
+      "refusedExplanation": "The quotation from this reply was refused and cannot be used to prepare a request.",
+      "splitBetweenSuppliers": "Split between suppliers",
+      "needsTwoMatched": "Needs two matched replies",
+      "differentCurrencies": "Replies are in different currencies",
+      "alreadyConverted": "RFQ is already converted",
+      "splitError": "Failed to start split. Please try again."
     },
     "history": {
       "title": "RFQ History",

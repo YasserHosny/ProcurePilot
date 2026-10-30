@@ -27,7 +27,7 @@ moves it.
 
 ## Phase 1: Setup
 
-- [ ] T001 Write a fixture builder `apps/api/tests/integration/fixtures/round1_rfq.py`. It creates, in one tenant:
+- [x] T001 Write a fixture builder `apps/api/tests/integration/fixtures/round1_rfq.py`. It creates, in one tenant:
   - 4 products (rice, flour, oil, sugar) with packs;
   - suppliers الذهبي and الوفرة;
   - an RFQ at the round-1 quantities;
@@ -41,27 +41,30 @@ moves it.
 
 ## Phase 2: Foundational (blocks every story)
 
-- [ ] T003 Write a failing migration test in `apps/api/tests/integration/test_request_group_schema.py` (throwaway DB) covering:
+- [x] T003 Write a failing migration test in `apps/api/tests/integration/test_request_group_schema.py` (throwaway DB) covering:
   1. insert of a `purchase_request_group` for another tenant's RFQ is refused (RLS WITH CHECK);
   2. a second group for the same RFQ raises a unique violation;
   3. `UPDATE`/`DELETE` on `purchase_request_group` as `authenticated` is denied;
   4. `purchase_request.request_group_id` → a group in another tenant fails the composite FK;
   5. each amount without its currency (or the reverse) fails its check;
   6. `basket_split_job.rfq_id` composite FK.
-- [ ] T004 Create `supabase/migrations/20261029100000_rfq_split_request_group.sql` per data-model.md:
+- [x] T004 Create `supabase/migrations/20261029100000_rfq_split_request_group.sql` per data-model.md:
   - `basket_split_job.rfq_id`;
   - the `purchase_request_group` table: tenant_id, ENABLE + FORCE RLS, select/insert policies with USING and WITH CHECK, no update or delete grants, `unique (tenant_id, rfq_id)`, `unique (tenant_id, idempotency_key)`, composite FKs, money-with-currency checks;
   - `purchase_request.request_group_id` with a composite FK;
   - `approval_step.source` accepts `group_threshold_match` (extend the check or enum, whichever the column uses).
 
-  Done when T003 is green on `pp-x-db`.
-- [ ] T005 Add group coverage to `apps/api/tests/integration/test_tenant_isolation.py`: a cross-tenant group id is "not found" on read and refused on insert. Run `pnpm test:isolation` on the throwaway DB.
-- [ ] T006 Add `lock_and_convert(conn, member, rfq_id, purchase_request_id)` to `modules/rfq/service.py`.
+  Shipped in Phase 2 as `20261029080000_rfq_split_request_group.sql`, plus
+  `20261029090000_request_group_rls_scope.sql` (the planned filename above differs).
+  T003 is green on the throwaway DB (:54398 for this worktree).
+- [x] T005 Add group coverage to `apps/api/tests/integration/test_tenant_isolation.py`: a cross-tenant group id is "not found" on read and refused on insert. Run `pnpm test:isolation` on the throwaway DB.
+- [x] T006 Add `lock_and_convert(conn, member, rfq_id, purchase_request_id)` to `modules/rfq/service.py`.
+  - Shipped in Phase 2 as `lock_rfq_for_preparation` and `mark_converted`.
   - It factors out the `pg_advisory_xact_lock('rfq-prepare:…')`, the `converted` check and the `mark_rfq_converted` call from `prepare_request`.
   - Single-supplier `prepare_request` now uses it, and its existing tests stay green.
   - Add the read of `converted_purchase_request_ids` and `request_group_id` to the RFQ detail (rfq/service.py ~1010) and `modules/rfq/schemas.py`. Single-request RFQs return a one-item list.
 - [x] T007 [P] Add `RequestGroupSummary` and `PurchaseRequest.request_group` (nullable, shape in data-model.md) to `modules/requests/schemas.py`. Populate it in one batched query in `_purchase_request_with_budget_status` and the list paths of `modules/requests/service.py`: position by `created_at, id` within the group, plus `sibling_request_ids`.
-- [ ] T008 [P] Add `BasketSplitJob.rfq_id: UUID | None` in `modules/offers/schemas.py` and read it in `modules/offers/basket_service.py`.
+- [x] T008 [P] Add `BasketSplitJob.rfq_id: UUID | None` in `modules/offers/schemas.py` and read it in `modules/offers/basket_service.py`.
 
 **Checkpoint**: the schema and conversion interface are ready, and the existing RFQ, request and basket
 suites are green.
@@ -75,22 +78,22 @@ best single total of SAR 4,137 and a saving of SAR 74.
 
 ### Tests (red first)
 
-- [ ] T009 [P] [US1] Optimiser test in `services/optimiser/tests/test_repository.py`: the same supplier and product have an RFQ-reply quotation and an older, cheaper quotation. A job with `request_snapshot.rfq.price_quotation_ids=[reply]` prices from the reply, and a job without it keeps the latest-price behaviour. Also add a product not quoted by one supplier, which is infeasible for that supplier.
-- [ ] T010 [P] [US1] Unit tests in `apps/api/tests/unit/test_rfq_split.py`:
+- [x] T009 [P] [US1] Optimiser test in `services/optimiser/tests/test_repository.py`: the same supplier and product have an RFQ-reply quotation and an older, cheaper quotation. A job with `request_snapshot.rfq.price_quotation_ids=[reply]` prices from the reply, and a job without it keeps the latest-price behaviour. Also add a product not quoted by one supplier, which is infeasible for that supplier.
+- [x] T010 [P] [US1] Unit tests in `apps/api/tests/unit/test_rfq_split.py`:
   - pack→base conversion: `quantity × pack base_quantity`;
   - eligibility: at least 2 non-refused, reviewed, fully matched replies in one currency;
   - the reasons `not_enough_replies` (with unmatched quotation ids), `mixed_currency` and `rfq_already_converted`.
-- [ ] T011 [P] [US1] Integration test in `apps/api/tests/integration/test_rfq_split.py`, using T001: `POST /rfq/{id}/split` queues an advanced job with `rfq_id`, base-unit items, the replying suppliers and `price_quotation_ids`. Run the solver in-process, as the existing advanced-basket tests do, and the result total is SAR 4,063 with a saving of 74 against SAR 4,137.
+- [x] T011 [P] [US1] Integration test in `apps/api/tests/integration/test_rfq_split.py`, using T001: `POST /rfq/{id}/split` queues an advanced job with `rfq_id`, base-unit items, the replying suppliers and `price_quotation_ids`. Run the solver in-process, as the existing advanced-basket tests do, and the result total is SAR 4,063 with a saving of 74 against SAR 4,137.
 
 ### Implementation
 
-- [ ] T012 [US1] Add the `price_quotation_ids` filter to both offer queries in `services/optimiser/src/procurepilot_optimiser_worker/repository.py`, read from `request_snapshot.rfq` (research R2). T009 green.
-- [ ] T013 [US1] Create `modules/offers/rfq_split.py` with:
+- [x] T012 [US1] Add the `price_quotation_ids` filter to both offer queries in `services/optimiser/src/procurepilot_optimiser_worker/repository.py`, read from `request_snapshot.rfq` (research R2). T009 green.
+- [x] T013 [US1] Create `modules/offers/rfq_split.py` with:
   - `build_rfq_split_request(conn, member, rfq_id)`, which handles eligibility (FR-001), builds base-unit items from `rfq_line` × `pack_definition.base_quantity`, takes suppliers and quotation ids from the eligible replies, and builds the snapshot `rfq` block;
   - `start_rfq_split(...)`, which creates the job through `BasketService` and writes the audit `offers.rfq_split_started`.
 
   T010 green.
-- [ ] T014 [US1] Add the route `POST /rfq/{rfq_id}/split` (owner/buyer, Idempotency-Key, 202) in `modules/rfq/router.py`, delegating to `offers.rfq_split.start_rfq_split`. T011 green.
+- [x] T014 [US1] Add the route `POST /rfq/{rfq_id}/split` (owner/buyer, Idempotency-Key, 202) in `modules/rfq/router.py`, delegating to `offers.rfq_split.start_rfq_split`. T011 green.
 - [ ] T015 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/rfq/compare/compare.component.{ts,html,scss,spec.ts}` and `rfq-api.ts`, add a "Split between suppliers" button next to Prepare Request.
   - When disabled, it shows the reason: "Needs two matched replies" plus a "Match N lines" link, or "Replies are in different currencies".
   - On click it calls `POST /rfq/{id}/split` and navigates to `/offers/basket-split/{job_id}`.

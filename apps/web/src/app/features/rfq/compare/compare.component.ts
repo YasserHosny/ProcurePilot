@@ -82,6 +82,62 @@ export class CompareComponent implements OnInit, OnChanges {
   readonly errorMessage = signal<string | null>(null);
   readonly guardrails = signal<readonly RfqGuardrail[]>([]);
   readonly currentMembershipId = signal<string | null>(null);
+  readonly isSplitting = signal<boolean>(false);
+  private splitIdempotencyKey: string | null = null;
+
+  readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
+  readonly isConverted = computed<boolean>(() => this.rfqDetail()?.rfq.status === 'converted');
+
+  readonly splitEligibility = computed<{
+    canSplit: boolean;
+    reason: 'needs_two_matched' | 'mixed_currency' | null;
+    unmatchedCount: number;
+    unmatchedQuotationIds: string[];
+  }>(() => {
+    const responses = this.responses();
+    const nonRefused = responses.filter((r) => r.quotation_status !== 'refused');
+    const eligibleReplies = nonRefused.filter(
+      (r) => r.quotation_status === 'reviewed' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
+    );
+
+    let totalUnmatched = 0;
+    const unmatchedQuoteIds: string[] = [];
+    for (const r of nonRefused) {
+      const pendingLines = r.lines.filter((l) => l.pending_match);
+      if (pendingLines.length > 0) {
+        totalUnmatched += pendingLines.length;
+        if (!unmatchedQuoteIds.includes(r.quotation_id)) {
+          unmatchedQuoteIds.push(r.quotation_id);
+        }
+      }
+    }
+
+    if (eligibleReplies.length < 2) {
+      return {
+        canSplit: false,
+        reason: 'needs_two_matched',
+        unmatchedCount: totalUnmatched,
+        unmatchedQuotationIds: unmatchedQuoteIds,
+      };
+    }
+
+    const currencies = new Set(eligibleReplies.map((r) => this.responseCurrency(r)).filter(Boolean));
+    if (currencies.size > 1) {
+      return {
+        canSplit: false,
+        reason: 'mixed_currency',
+        unmatchedCount: 0,
+        unmatchedQuotationIds: [],
+      };
+    }
+
+    return {
+      canSplit: true,
+      reason: null,
+      unmatchedCount: 0,
+      unmatchedQuotationIds: [],
+    };
+  });
 
   formatQuantity(value: string | number): string { return this.formatService.formatExactQuantity(value); }
 
@@ -425,6 +481,62 @@ export class CompareComponent implements OnInit, OnChanges {
           this.translate.instant('rfq.history.dismiss'),
           { duration: 5000 },
         );
+      },
+    });
+  }
+
+  splitRfq(): void {
+    if (!this.splitEligibility().canSplit || !this.isWriter() || this.isSplitting()) return;
+    const id = this.rfqId();
+    if (!id) return;
+
+    this.isSplitting.set(true);
+    if (!this.splitIdempotencyKey) {
+      this.splitIdempotencyKey = crypto.randomUUID();
+    }
+
+    this.rfqApi.splitRfq(id, this.splitIdempotencyKey).subscribe({
+      next: (job) => {
+        this.isSplitting.set(false);
+        this.splitIdempotencyKey = null;
+        this.router.navigate(['/offers/basket-split', job.id]);
+      },
+      error: (err: unknown) => {
+        this.isSplitting.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 409) {
+          const reason = (err.error as ApiError | undefined)?.details?.['reason'];
+          if (reason === 'rfq_already_converted') {
+            this.snackBar.open(
+              this.translate.instant('rfq.compare.alreadyConverted'),
+              this.translate.instant('rfq.history.dismiss'),
+              { duration: 5000 },
+            );
+          } else if (reason === 'mixed_currency') {
+            this.snackBar.open(
+              this.translate.instant('rfq.compare.differentCurrencies'),
+              this.translate.instant('rfq.history.dismiss'),
+              { duration: 5000 },
+            );
+          } else if (reason === 'not_enough_replies') {
+            this.snackBar.open(
+              this.translate.instant('rfq.compare.needsTwoMatched'),
+              this.translate.instant('rfq.history.dismiss'),
+              { duration: 5000 },
+            );
+          } else {
+            this.snackBar.open(
+              (err.error as ApiError | undefined)?.message || this.translate.instant('rfq.compare.splitError'),
+              this.translate.instant('rfq.history.dismiss'),
+              { duration: 5000 },
+            );
+          }
+        } else {
+          this.snackBar.open(
+            this.translate.instant('rfq.compare.splitError'),
+            this.translate.instant('rfq.history.dismiss'),
+            { duration: 5000 },
+          );
+        }
       },
     });
   }

@@ -174,4 +174,62 @@ describe('BasketSplitResultsComponent — packs and constraint copy', () => {
     expect(isUserFacingConstraint({ kind: 'urgency', description: 'Requested basket urgency.' })).toBeTrue();
     expect(isUserFacingConstraint({ kind: 'delivery_fee', description: 'tie-break' })).toBeTrue();
   });
+
+  describe('RFQ mode (T016)', () => {
+    const rfqJob: BasketSplitJob = {
+      ...job,
+      rfq_id: 'rfq-abcdef12-3456',
+      result: {
+        ...job.result!,
+        total_landed_cost: { amount: '4063.00', currency: 'SAR' },
+        single_supplier_baselines: [
+          {
+            supplier_id: 's1',
+            feasible: true,
+            total_landed_cost: { amount: '4137.00', currency: 'SAR' },
+          },
+          {
+            supplier_id: 's2',
+            feasible: true,
+            total_landed_cost: { amount: '4500.00', currency: 'SAR' },
+          },
+        ],
+      },
+    };
+
+    const s2 = { id: 's2', name: 'Al Wafra' } as unknown as Supplier;
+
+    it('shows split total, each single-supplier total, and saving with currency in RFQ mode', () => {
+      fixture.componentRef.setInput('currentJob', rfqJob);
+      fixture.componentRef.setInput('suppliers', [supplier, s2]);
+      fixture.componentRef.setInput('products', [rice, loose]);
+      fixture.componentRef.setInput('solverConfidence', 'high');
+      fixture.componentRef.setInput('validUntil', null);
+      fixture.componentRef.setInput('appliedConstraints', []);
+      fixture.componentRef.setInput('violatedConstraints', []);
+      fixture.componentRef.setInput('riskNotes', []);
+      fixture.componentRef.setInput('singleSupplierSavings', { type: 'neither_feasible' });
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      const rfqSummary = el.querySelector('[data-testid="rfq-savings-summary"]');
+      expect(rfqSummary).not.toBeNull();
+      const text = rfqSummary?.textContent ?? '';
+
+      // Split total: SAR 4,063
+      expect(text).toContain('SAR 4,063');
+      // Single supplier totals: Al Nour (4,137) and Al Wafra (4,500)
+      expect(text).toContain('Al Nour');
+      expect(text).toContain('SAR 4,137');
+      expect(text).toContain('Al Wafra');
+      expect(text).toContain('SAR 4,500');
+      // Saving: 4,137 - 4,063 = 74
+      expect(text).toContain('SAR 74');
+    });
+
+    it('does NOT render RFQ summary when job has no rfq_id', () => {
+      const el = render([]);
+      expect(el.querySelector('[data-testid="rfq-savings-summary"]')).toBeNull();
+    });
+  });
 });

@@ -3,6 +3,13 @@
     <div class="header-content">
       <h1 class="page-title">{{ 'basketSplit.title' | translate }}</h1>
       <p class="page-subtitle">{{ 'basketSplit.subtitle' | translate }}</p>
+      @if (currentJob()?.rfq_id) {
+        <div class="rfq-source-header" data-testid="rfq-source-header">
+          <a [routerLink]="['/rfq', currentJob()!.rfq_id]" class="rfq-source-link">
+            {{ 'basketSplit.fromRfq' | translate: { id: rfqShortId(), date: (rfqSentDate() | formatDate) } }}
+          </a>
+        </div>
+      }
     </div>
 
     @if (currentJob()) {
@@ -354,6 +361,41 @@
           </button>
         </div>
       </form>
+    </mat-card>
+  }
+
+  <!-- RFQ Scope View (Read-only suppliers and items in RFQ mode) -->
+  @if (isRfqMode()) {
+    <mat-card class="rfq-scope-card" data-testid="rfq-split-scope">
+      <div class="rfq-scope-header">
+        <h2 class="rfq-scope-title">{{ 'basketSplit.rfqScope' | translate }}</h2>
+      </div>
+      <div class="rfq-scope-content">
+        <div class="rfq-scope-section">
+          <span class="rfq-section-label">{{ 'basketSplit.rfqSuppliers' | translate }}:</span>
+          <mat-chip-set class="rfq-suppliers-list" [attr.aria-label]="'basketSplit.rfqSuppliers' | translate">
+            @for (supplierId of currentJob()?.supplier_ids ?? []; track supplierId) {
+              <mat-chip class="rfq-supplier-chip">{{ getSupplierName(supplierId) }}</mat-chip>
+            }
+          </mat-chip-set>
+        </div>
+        <div class="rfq-scope-section">
+          <span class="rfq-section-label">{{ 'basketSplit.rfqItems' | translate }}:</span>
+          <div class="rfq-items-list">
+            @for (item of currentJob()?.items ?? []; track item.workspace_product_id) {
+              <div class="rfq-item-row">
+                <span class="rfq-item-name">{{ getProductName(item.workspace_product_id) }}</span>
+                <span class="rfq-item-qty">
+                  {{ getItemPackQuantity(item) | formatQuantity }}
+                  @if (baseUnitFor(item.workspace_product_id)) {
+                    {{ baseUnitFor(item.workspace_product_id) | unitLabel }}
+                  }
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
     </mat-card>
   }
 

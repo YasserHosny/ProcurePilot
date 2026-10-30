@@ -113,3 +113,22 @@ def test_preparations_of_one_rfq_are_serialised() -> None:
         with second.cursor(row_factory=dict_row) as cur:
             assert lock_rfq_for_preparation(cur, tenant_id=tenant_id, rfq_id=rfq_id) == "responded"
         second.rollback()
+
+
+def test_round1_fixture_reproduces_authoritative_pack_totals() -> None:
+    from decimal import Decimal
+
+    from integration.fixtures.round1_rfq import round1_rfq
+
+    with round1_rfq() as fixture:
+        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+            rows = conn.execute(
+                "select q.supplier_id, sum(ql.quantity * ql.unit_price_amount) "
+                "from quotation q join quotation_line ql on ql.quotation_id = q.id "
+                "where q.id = any(%s) group by q.supplier_id",
+                (fixture.quotation_ids,),
+            ).fetchall()
+        assert dict(rows) == dict(
+            zip(fixture.supplier_ids, [Decimal("4147"), Decimal("4137")], strict=True)
+        )
+        assert fixture.split_total == Decimal("4063")
