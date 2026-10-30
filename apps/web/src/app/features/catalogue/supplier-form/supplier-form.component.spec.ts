@@ -1,13 +1,15 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { signal } from "@angular/core";
+import { WritableSignal, signal } from "@angular/core";
+import { MatSelect } from "@angular/material/select";
 import { MatSnackBar } from "@angular/material/snack-bar";
+import { By } from "@angular/platform-browser";
 import { ActivatedRoute, provideRouter } from "@angular/router";
 import { TranslateService, provideTranslateService } from "@ngx-translate/core";
 import { of } from "rxjs";
 
 import enCatalog from "../../../../../../../packages/i18n/en.json";
 import { ApiService } from "../../../core/api/api.service";
-import type { Role } from "../../../core/api/models";
+import type { Me, Role, Supplier, Tenant } from "../../../core/api/models";
 import { SessionService } from "../../../core/auth/session.service";
 import { SupplierFormComponent } from "./supplier-form.component";
 
@@ -16,6 +18,16 @@ describe("SupplierFormComponent (T025)", () => {
   let fixture: ComponentFixture<SupplierFormComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
+  let translate: TranslateService;
+  let mockSession: {
+    hasRole: jasmine.Spy;
+    role: WritableSignal<Role | null>;
+    currentMember: WritableSignal<Me | null>;
+    isAuthenticated: WritableSignal<boolean>;
+    tenant: WritableSignal<Tenant | null>;
+    homeCurrency: WritableSignal<string | undefined>;
+    activeLocale: WritableSignal<string>;
+  };
 
   beforeEach(async () => {
     apiService = jasmine.createSpyObj("ApiService", [
@@ -37,14 +49,17 @@ describe("SupplierFormComponent (T025)", () => {
       }),
     );
 
-    const mockSession = {
-      hasRole: jasmine.createSpy("hasRole").and.returnValue(true),
+    mockSession = {
+      hasRole: jasmine.createSpy("hasRole").and.callFake((...roles: Role[]) => {
+        const current = mockSession.role();
+        return current !== null && roles.includes(current);
+      }),
       role: signal<Role | null>("buyer"),
-      currentMember: signal(null),
-      isAuthenticated: signal(true),
-      tenant: signal(null),
+      currentMember: signal<Me | null>(null),
+      isAuthenticated: signal<boolean>(true),
+      tenant: signal<Tenant | null>(null),
       homeCurrency: signal<string | undefined>("EGP"),
-      activeLocale: signal("en"),
+      activeLocale: signal<string>("en"),
     };
 
     await TestBed.configureTestingModule({
@@ -73,7 +88,7 @@ describe("SupplierFormComponent (T025)", () => {
       })
       .compileComponents();
 
-    const translate = TestBed.inject(TranslateService);
+    translate = TestBed.inject(TranslateService);
     translate.setTranslation("en", enCatalog);
     translate.use("en");
 
@@ -149,7 +164,188 @@ describe("SupplierFormComponent (T025)", () => {
       minimum_order_value: { amount: "150.00", currency: "GBP" },
       delivery_fee: null,
       contact_email: null,
+      preferred_locale: null,
     });
     expect(snackBarSpy.open).toHaveBeenCalled();
+  });
+
+  describe("PPS-134: Supplier Email Language (preferred_locale)", () => {
+    it("create mode: choosing Arabic sends preferred_locale: 'ar' in createSupplier", () => {
+      apiService.createSupplier.and.returnValue(
+        of({
+          id: "s-created",
+          name: "Test Supplier",
+          status: "active" as const,
+          created_at: "2026-08-20T10:00:00Z",
+          preferred_locale: "ar",
+        }),
+      );
+
+      component.form.patchValue({
+        name: "Test Supplier",
+        preferred_locale: "ar",
+      });
+
+      component.onSubmit();
+
+      expect(apiService.createSupplier).toHaveBeenCalledWith(
+        jasmine.objectContaining({
+          name: "Test Supplier",
+          preferred_locale: "ar",
+        }),
+      );
+    });
+
+    it("create mode: leaving the default sends preferred_locale: null in createSupplier", () => {
+      apiService.createSupplier.and.returnValue(
+        of({
+          id: "s-created",
+          name: "Test Supplier",
+          status: "active" as const,
+          created_at: "2026-08-20T10:00:00Z",
+          preferred_locale: null,
+        }),
+      );
+
+      component.form.patchValue({
+        name: "Test Supplier",
+      });
+
+      component.onSubmit();
+
+      expect(apiService.createSupplier).toHaveBeenCalledWith(
+        jasmine.objectContaining({
+          name: "Test Supplier",
+          preferred_locale: null,
+        }),
+      );
+    });
+
+    it("edit mode: a supplier with preferred_locale: 'en' pre-fills 'en'", () => {
+      const mockSupplier: Supplier = {
+        id: "s-edit-1",
+        name: "Supplier English",
+        status: "active",
+        created_at: "2026-08-20T10:00:00Z",
+        preferred_locale: "en",
+      };
+      apiService.supplier.and.returnValue(of(mockSupplier));
+
+      component.isEditMode.set(true);
+      component.supplierId.set("s-edit-1");
+      component["checkModeAndLoad"]();
+      fixture.detectChanges();
+
+      expect(component.form.get("preferred_locale")?.value).toBe("en");
+    });
+
+    it("edit mode: a supplier without preferred_locale pre-fills the default option", () => {
+      const mockSupplier: Supplier = {
+        id: "s-edit-2",
+        name: "Supplier Default",
+        status: "active",
+        created_at: "2026-08-20T10:00:00Z",
+        preferred_locale: null,
+      };
+      apiService.supplier.and.returnValue(of(mockSupplier));
+
+      component.isEditMode.set(true);
+      component.supplierId.set("s-edit-2");
+      component["checkModeAndLoad"]();
+      fixture.detectChanges();
+
+      expect(component.form.get("preferred_locale")?.value).toBeNull();
+    });
+
+    it("edit mode: switching to the default sends preferred_locale: null in updateSupplier", () => {
+      const mockSupplier: Supplier = {
+        id: "s-edit-3",
+        name: "Supplier Edit Switching",
+        status: "active",
+        created_at: "2026-08-20T10:00:00Z",
+        preferred_locale: "en",
+      };
+      apiService.supplier.and.returnValue(of(mockSupplier));
+      apiService.updateSupplier.and.returnValue(
+        of({ ...mockSupplier, preferred_locale: null }),
+      );
+
+      component.isEditMode.set(true);
+      component.supplierId.set("s-edit-3");
+      component["checkModeAndLoad"]();
+      fixture.detectChanges();
+
+      expect(component.form.get("preferred_locale")?.value).toBe("en");
+
+      component.form.patchValue({ preferred_locale: null });
+      component.onSubmit();
+
+      expect(apiService.updateSupplier).toHaveBeenCalledWith(
+        "s-edit-3",
+        jasmine.objectContaining({
+          name: "Supplier Edit Switching",
+          preferred_locale: null,
+        }),
+      );
+    });
+
+    it("the default option's label names the workspace language when tenant default_locale is 'ar'", () => {
+      mockSession.tenant.set({
+        id: "t-1",
+        name: "Tenant 1",
+        slug: "t1",
+        region: "EG",
+        currency: "EGP",
+        tax_model: "standard",
+        default_locale: "ar",
+        created_at: "2026-08-20T10:00:00Z",
+      });
+      fixture.detectChanges();
+
+      const selectDebugEl = fixture.debugElement.query(
+        By.css('mat-select[formControlName="preferred_locale"]'),
+      );
+      const matSelect = selectDebugEl.componentInstance as MatSelect;
+      matSelect.open();
+      fixture.detectChanges();
+
+      const options = Array.from(document.querySelectorAll<HTMLElement>("mat-option"));
+      const defaultOption = options[0];
+      const arabicName = translate.instant("catalogue.suppliers.form.languageArabic");
+      expect(defaultOption?.textContent).toContain(arabicName);
+      expect(component.workspaceLanguageKey()).toBe("catalogue.suppliers.form.languageArabic");
+
+      matSelect.close();
+      fixture.detectChanges();
+    });
+
+    it("the default option's label falls back to plain workspace default when tenant default_locale is missing", () => {
+      mockSession.tenant.set(null);
+      fixture.detectChanges();
+
+      const selectDebugEl = fixture.debugElement.query(
+        By.css('mat-select[formControlName="preferred_locale"]'),
+      );
+      const matSelect = selectDebugEl.componentInstance as MatSelect;
+      matSelect.open();
+      fixture.detectChanges();
+
+      const options = Array.from(document.querySelectorAll<HTMLElement>("mat-option"));
+      const defaultOption = options[0];
+      const plainText = translate.instant("catalogue.suppliers.form.emailLanguageDefaultPlain");
+      expect(defaultOption?.textContent?.trim()).toBe(plainText);
+      expect(component.workspaceLanguageKey()).toBeNull();
+
+      matSelect.close();
+      fixture.detectChanges();
+    });
+
+    it("disables preferred_locale for read-only members", () => {
+      mockSession.role.set("viewer");
+      component["checkModeAndLoad"]();
+      fixture.detectChanges();
+
+      expect(component.form.get("preferred_locale")?.disabled).toBeTrue();
+    });
   });
 });

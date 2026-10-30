@@ -153,6 +153,7 @@ export interface Supplier {
   readonly contact_email?: string | null;
   readonly status: 'active' | 'preferred' | 'blocked' | 'archived';
   readonly created_at: string;
+  readonly preferred_locale?: 'en' | 'ar' | null;
 }
 
 export interface SupplierCreate {
@@ -162,6 +163,7 @@ export interface SupplierCreate {
   readonly minimum_order_value?: Money | null;
   readonly delivery_fee?: Money | null;
   readonly contact_email?: string | null;
+  readonly preferred_locale?: 'en' | 'ar' | null;
 }
 
 export interface SupplierUpdate {
@@ -172,6 +174,7 @@ export interface SupplierUpdate {
   readonly delivery_fee?: Money | null;
   readonly contact_email?: string | null;
   readonly status?: 'active' | 'preferred' | 'blocked' | 'archived';
+  readonly preferred_locale?: 'en' | 'ar' | null;
 }
 
 export type RefreshScheduleStatus = 'active' | 'paused' | 'due';
