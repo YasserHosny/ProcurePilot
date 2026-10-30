@@ -472,7 +472,7 @@ export async function findProductByName(
   tenantName: string,
 ): Promise<{ id: string; tenant_name: string; base_unit: string }> {
   const res = await call<{
-    items: Array<{ id: string; tenant_name: string; base_unit: string }>;
+    items: { id: string; tenant_name: string; base_unit: string }[];
   }>('/products?limit=100&status=active', {
     method: 'GET',
     headers: { Authorization: `Bearer ${token}` },
