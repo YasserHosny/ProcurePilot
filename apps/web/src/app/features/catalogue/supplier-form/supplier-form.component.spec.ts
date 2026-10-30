@@ -11,7 +11,10 @@ import enCatalog from "../../../../../../../packages/i18n/en.json";
 import { ApiService } from "../../../core/api/api.service";
 import type { Me, Role, Supplier, Tenant } from "../../../core/api/models";
 import { SessionService } from "../../../core/auth/session.service";
-import { SupplierFormComponent } from "./supplier-form.component";
+import {
+  SupplierFormComponent,
+  WORKSPACE_DEFAULT_LOCALE,
+} from "./supplier-form.component";
 
 describe("SupplierFormComponent (T025)", () => {
   let component: SupplierFormComponent;
@@ -170,6 +173,45 @@ describe("SupplierFormComponent (T025)", () => {
   });
 
   describe("PPS-134: Supplier Email Language (preferred_locale)", () => {
+    it("create mode: displays Workspace default (Arabic) without opening the select", async () => {
+      mockSession.tenant.set({
+        id: "t-1", name: "Tenant 1", slug: "t1", region: "EG", currency: "EGP",
+        tax_model: "standard", default_locale: "ar", created_at: "2026-08-20T10:00:00Z",
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const select = fixture.debugElement.query(
+        By.css('mat-select[formControlName="preferred_locale"]'),
+      ).componentInstance as MatSelect;
+      expect(select.panelOpen).toBeFalse();
+      expect(select.triggerValue).toBe("Workspace default (Arabic)");
+    });
+
+    it("edit mode: displays Workspace default (Arabic) for a missing preferred_locale without opening the select", async () => {
+      mockSession.tenant.set({
+        id: "t-1", name: "Tenant 1", slug: "t1", region: "EG", currency: "EGP",
+        tax_model: "standard", default_locale: "ar", created_at: "2026-08-20T10:00:00Z",
+      });
+      apiService.supplier.and.returnValue(of({
+        id: "s-default", name: "Supplier Default", status: "active",
+        created_at: "2026-08-20T10:00:00Z",
+      }));
+      component.isEditMode.set(true);
+      component.supplierId.set("s-default");
+      component["checkModeAndLoad"]();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const select = fixture.debugElement.query(
+        By.css('mat-select[formControlName="preferred_locale"]'),
+      ).componentInstance as MatSelect;
+      expect(select.panelOpen).toBeFalse();
+      expect(select.triggerValue).toBe("Workspace default (Arabic)");
+    });
+
     it("create mode: choosing Arabic sends preferred_locale: 'ar' in createSupplier", () => {
       apiService.createSupplier.and.returnValue(
         of({
@@ -254,7 +296,7 @@ describe("SupplierFormComponent (T025)", () => {
       component["checkModeAndLoad"]();
       fixture.detectChanges();
 
-      expect(component.form.get("preferred_locale")?.value).toBeNull();
+      expect(component.form.get("preferred_locale")?.value).toBe(WORKSPACE_DEFAULT_LOCALE);
     });
 
     it("edit mode: switching to the default sends preferred_locale: null in updateSupplier", () => {

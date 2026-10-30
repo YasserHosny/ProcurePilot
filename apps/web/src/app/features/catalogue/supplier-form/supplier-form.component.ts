@@ -31,6 +31,9 @@ import type {
 import { SessionService } from "../../../core/auth/session.service";
 import { I18nService } from "../../../core/i18n/i18n.service";
 
+/** Form-only sentinel for "workspace default"; API payloads map this (and null) to null. */
+export const WORKSPACE_DEFAULT_LOCALE = "workspace" as const;
+
 /** Money validator: amount and currency must either both be present or both empty (Constitution VII). */
 function moneyGroupValidator(amountKey: string, currencyKey: string) {
   return (group: AbstractControl): ValidationErrors | null => {
@@ -82,6 +85,9 @@ export class SupplierFormComponent implements OnInit {
   private readonly translate = inject(TranslateService);
   readonly i18n = inject(I18nService);
 
+  /** Exposed for the template's default mat-option value. */
+  readonly workspaceDefaultLocale = WORKSPACE_DEFAULT_LOCALE;
+
   readonly isEditMode = signal<boolean>(false);
   readonly supplierId = signal<string | null>(null);
   readonly isLoading = signal<boolean>(true);
@@ -124,7 +130,7 @@ export class SupplierFormComponent implements OnInit {
       delivery_fee_currency: [this.session.homeCurrency() ?? "USD"],
       contact_email: ["", [Validators.email]],
       status: ["active"],
-      preferred_locale: [null],
+      preferred_locale: [WORKSPACE_DEFAULT_LOCALE],
     },
     {
       validators: [
@@ -194,7 +200,7 @@ export class SupplierFormComponent implements OnInit {
       delivery_fee_currency: sup.delivery_fee ? sup.delivery_fee.currency : "",
       contact_email: sup.contact_email || "",
       status: sup.status || "active",
-      preferred_locale: sup.preferred_locale ?? null,
+      preferred_locale: sup.preferred_locale ?? WORKSPACE_DEFAULT_LOCALE,
     });
   }
 
@@ -221,6 +227,7 @@ export class SupplierFormComponent implements OnInit {
         : null;
 
     const leadTime = fv.lead_time_days != null && fv.lead_time_days !== "" ? Number(fv.lead_time_days) : null;
+    // Sentinel or legacy null both mean workspace default → API null.
     const preferredLocale =
       fv.preferred_locale === "en" || fv.preferred_locale === "ar" ? fv.preferred_locale : null;
 

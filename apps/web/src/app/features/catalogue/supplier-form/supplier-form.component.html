@@ -82,7 +82,7 @@
             <mat-form-field appearance="outline" class="form-field" [class.full-width]="!isEditMode()">
               <mat-label>{{ 'catalogue.suppliers.form.emailLanguageLabel' | translate }}</mat-label>
               <mat-select formControlName="preferred_locale">
-                <mat-option [value]="null">
+                <mat-option [value]="workspaceDefaultLocale">
                   @if (workspaceLanguageKey(); as key) {
                     {{ 'catalogue.suppliers.form.emailLanguageDefault' | translate: { language: (key | translate) } }}
                   } @else {
