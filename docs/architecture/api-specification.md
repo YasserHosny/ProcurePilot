@@ -1384,12 +1384,17 @@ Request:
 - Requires bearer auth. Branch-scoped visibility as above.
 - Query parameters: optional `status`, optional `branch_id`, optional `cursor`, optional `limit`
   capped at 100 and defaulting to 50.
-- Returns `200` with `items` of `PurchaseRequest` and nullable `next_cursor`.
+- Returns `200` with `items` of `PurchaseRequest` and nullable `next_cursor`. Each request
+  carries `request_group` (spec 024): a `RequestGroupSummary` (`id`, `rfq_id`, `position`,
+  `size`, `combined_total`, `best_single_total`, `saving`, `sibling_request_ids`) when the
+  request belongs to an RFQ split, `null` for an ordinary request.
 
 ### `GET /requests/{request_id}`
 
 - Requires bearer auth. Returns `200` with the `PurchaseRequest`, including `approval_step`
-  (once submitted) and `budget_status` (when an applicable budget exists — see below).
+  (once submitted), `budget_status` (when an applicable budget exists — see below), and
+  `request_group` (spec 024) — a `RequestGroupSummary` for a request that belongs to an RFQ
+  split, `null` for an ordinary request.
 - Returns `404` when the request is outside the caller's workspace or branch-scoped visibility.
 
 ### `PATCH /requests/{request_id}`
@@ -1413,6 +1418,9 @@ Request:
   source is `owner_fallback`.
 - Returns `200` with the `PurchaseRequest` (`status: "submitted"`, `approval_step` populated).
 - Returns `409` (`not_draft`) if the request is not in `draft`.
+- Returns `409` (`part_of_split`, `details.request_group_id`) when the request belongs to a
+  split group — grouped requests are submitted together via
+  `POST /request-groups/{group_id}/submit` (spec 024).
 - Returns `422` (`no_lines`) if the request has no lines (FR-003).
 
 ### `POST /requests/{request_id}/withdraw`
@@ -1427,6 +1435,9 @@ Request:
   after acquiring that lock.
 - Returns `200` with the updated request; `403` (`not_requester`) for another member;
   `404` for an invisible request; `409` (`already_decided_or_withdrawn`) for other states.
+- Returns `409` (`part_of_split`, `details.request_group_id`) when the request belongs to a
+  split group — grouped requests are withdrawn together via
+  `POST /request-groups/{group_id}/withdraw` (spec 024).
 
 ### `GET /approvals/pending`
 
@@ -1435,8 +1446,9 @@ Request:
 - Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50.
 - Returns `200` with `items` of `PurchaseRequest`, each embedding the full decision context
   (requester, branch, cost centre, lines, required-by date, `approval_step`, and `budget_status`
-  when applicable) so the approver never has to navigate elsewhere (FR-005). A decided request
-  no longer appears here.
+  when applicable) so the approver never has to navigate elsewhere (FR-005). Each request also
+  carries `request_group` (spec 024) — a `RequestGroupSummary` for a request that belongs to an
+  RFQ split, `null` for an ordinary request. A decided request no longer appears here.
 
 ### `POST /requests/{request_id}/approve` · `POST /requests/{request_id}/reject`
 
@@ -1455,6 +1467,9 @@ Request:
 - Returns `403` (`not_assigned_approver`) when the caller is neither the assignee nor an owner.
 - Returns `409` (`not_submitted` or `no_pending_approval`) when the request has already left
   `submitted` or the step is no longer pending.
+- Returns `409` (`part_of_split`, `details.request_group_id`) when the request belongs to a
+  split group — grouped requests are approved or rejected together via
+  `POST /request-groups/{group_id}/approve|reject` (spec 024).
 
 Request:
 ```json
@@ -2863,6 +2878,9 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
   workspace (`rfq_select` RLS policy); another workspace's RFQ returns `404`.
 - Returns the `Rfq` with its lines and recipients (`RfqDetail`), so a saved draft can be reopened
   for editing.
+- Also carries `converted_purchase_request_ids` (every purchase request prepared from this RFQ —
+  one per supplier in a split) and `request_group_id` (the split's group, once prepared)
+  (spec 024; rolling out).
 
 ### `PUT /rfq/{rfq_id}`
 
@@ -2918,7 +2936,9 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
 
 - Lists every RFQ visible to the caller, cursor-paginated (`limit` capped at 100), each with its
   recipient count, response count, and — once `status = converted` — the id of the purchase
-  request it produced.
+  request it produced. Each `RfqSummary` also carries `converted_purchase_request_ids` (every
+  purchase request prepared from the RFQ — one per supplier in a split) and `request_group_id`
+  (the split's group, once prepared) (spec 024).
 - Optional `status` filter.
 - Scoped per FR-016, same creator-plus-owner/buyer pattern as every list endpoint in this release.
 - Returns `200` with an `RfqList`.
@@ -2965,3 +2985,64 @@ plus a dedicated `rfq.auto_prepared` audit event distinct from the manual path's
 response that fails even one condition is left for the manual `POST /rfq/{rfq_id}/prepare-request`
 path with no special treatment. Disabling or tightening a guardrail only affects responses
 evaluated after the change (FR-014) — an already-fired event is never retroactively altered.
+
+## RFQ split and request groups (spec 024)
+
+A split of an RFQ becomes one group of purchase requests: one draft request per eligible
+supplier's reply, all sharing the split's branch, submitted, approved, rejected, and withdrawn
+only together, and routed to a single approver by the group's combined total. The group is
+immutable evidence (`purchase_request_group` in the data dictionary): which split, which branch,
+and the totals and saving as computed when it was prepared. Every mutation requires
+`Idempotency-Key`; tenant comes from the JWT, and a cross-tenant id answers `404`. Full
+contract: `specs/024-rfq-basket-split/contracts/rfq-split.openapi.yaml`.
+
+### `POST /rfq/{rfq_id}/split` (spec 024; rolling out)
+
+- Owner or buyer. Accepts `Idempotency-Key` (required).
+- Starts a basket split for the RFQ from its eligible replies: items (pack → base units) and
+  suppliers are built server-side from the RFQ's responses.
+- Returns `202` with the queued advanced basket job (the existing `BasketSplitJob` shape plus
+  `rfq_id`).
+- Returns `409` with `details.reason` one of: `rfq_already_converted`, `not_enough_replies`
+  (`details.eligible`, `details.unmatched_quotation_ids`), `mixed_currency`.
+
+### `POST /baskets/{basket_id}/prepare-requests` (spec 024; rolling out)
+
+- Accepts `Idempotency-Key` (required).
+- Turns a completed RFQ split into one draft request per supplier, all in one request group.
+- Request fields: required `branch_id`, required `required_by_date`; optional `cost_centre_id`;
+  optional `confirm_expired_quotation_ids` (replies past their expiry date that the buyer
+  confirmed).
+- Returns `201` with `request_group_id` and `purchase_request_ids`; a replay with the same key
+  returns `200` with the same body.
+- Returns `409` with `details.reason` one of: `not_rfq_split`, `split_not_completed`,
+  `split_stale`, `rfq_already_converted` (`details.purchase_request_ids`),
+  `allocation_not_whole_packs`, `expired_quotation_unconfirmed` (`details.quotation_ids`).
+
+### `POST /request-groups/{group_id}/submit` (spec 024; rolling out)
+
+- Accepts `Idempotency-Key` (required).
+- Submits every request of the split at once and routes them to the approver for the group's
+  combined total (`approval_step.source = group_threshold_match`).
+- Returns `200` with the group's requests (a `PurchaseRequest` list, each with `request_group`).
+- Returns `409` (`not_draft`).
+
+### `POST /request-groups/{group_id}/approve` (spec 024; rolling out)
+
+- Accepts `Idempotency-Key` (required). Request fields: optional `comment`.
+- Approves every request of the split at once.
+- Returns `200` with the group's requests, all approved.
+- Returns `403` when the caller is not the assigned approver (or owner).
+- Returns `409` (`not_submitted`).
+
+### `POST /request-groups/{group_id}/reject` (spec 024; rolling out)
+
+- Accepts `Idempotency-Key` (required). Request fields: required `comment`.
+- Rejects every request of the split with one reason.
+- Returns `200` with the group's requests, all rejected.
+
+### `POST /request-groups/{group_id}/withdraw` (spec 024; rolling out)
+
+- Accepts `Idempotency-Key` (required).
+- Withdraws every request of the split.
+- Returns `200` with the group's requests, all withdrawn.

@@ -636,6 +636,7 @@ truth.
 | `id` | uuid | PK, default `gen_random_uuid()` |
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `requested_by` | uuid | Required FK -> Membership that submitted the solve |
+| `rfq_id` | uuid | Optional; composite FK -> Rfq `(tenant_id, id)`; the RFQ a split was started from (spec 024); null for a standalone split |
 | `supplier_ids` | uuid[] | Required exactly two distinct supplier ids |
 | `items` | jsonb | Required request snapshot: array of `{workspace_product_id, quantity}`; `quantity` is denominated in the product's normalised base unit, never a count of the supplier's original pack/case (same convention as `Offer.requested_quantity`) |
 | `status` | enum | `queued`, `running`, `completed`, or `failed`; default `queued` |
@@ -1083,6 +1084,7 @@ R2.0 branch/cost-centre/budget pattern. Full contract:
 | `branch_id` | uuid | Required; composite FK -> Branch `(tenant_id, id)` |
 | `cost_centre_id` | uuid | Optional; composite FK -> CostCentre `(tenant_id, id)` |
 | `requested_by_membership_id` | uuid | Required; composite FK -> Membership `(tenant_id, id)` |
+| `request_group_id` | uuid | Optional; composite FK -> PurchaseRequestGroup `(tenant_id, id)`; the group a request belongs to when it was prepared from an RFQ split (spec 024) |
 | `required_by_date` | date | Required |
 | `status` | enum | `draft` \| `submitted` \| `approved` \| `rejected` \| `withdrawn` \| `ordered` \| `delivered`; default `draft` |
 | `estimated_total_amount` | numeric(18,4) | Sum of line estimates; null when lines span >1 currency or no line has an estimate |
@@ -1110,7 +1112,10 @@ estimates are recomputed live while the request is `draft` and frozen on submit 
 stamped, never updated again — research.md R2). `purchase_request_scoped_visibility` is a
 RESTRICTIVE SELECT-only policy adding the requester-always-sees-own clause to R2.0's shape;
 `purchase_request_tenant_isolation` is the permissive `ENABLE`+`FORCE` `for all` policy with
-`USING` and `WITH CHECK`.
+`USING` and `WITH CHECK`. The API additionally exposes a computed `request_group` on each
+request (spec 024): a `RequestGroupSummary` (`id`, `rfq_id`, `position`, `size`,
+`combined_total`, `best_single_total`, `saving`, `sibling_request_ids`) when the request
+belongs to a split group, `null` for an ordinary request.
 
 ## `PurchaseRequestLine`
 
@@ -1147,7 +1152,7 @@ duplicating `branch_id` onto this table. `T002` added `unique (tenant_id, id)` t
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `purchase_request_id` | uuid | Required; composite FK -> PurchaseRequest `(tenant_id, id)`, `on delete cascade`. `unique (tenant_id, purchase_request_id)` — one step per request |
 | `assigned_membership_id` | uuid | Composite FK -> Membership `(tenant_id, id)`; who the request routed to |
-| `source` | enum | `threshold_match` \| `delegate` \| `owner_fallback` — how `assigned_membership_id` was resolved (informational) |
+| `source` | enum | `threshold_match` \| `delegate` \| `owner_fallback` \| `group_threshold_match` — how `assigned_membership_id` was resolved (informational) |
 | `status` | enum | `pending` \| `approved` \| `rejected`; default `pending` |
 | `comment` | text | Optional decision comment |
 | `decided_by_membership_id` | uuid | Composite FK -> Membership `(tenant_id, id)`; null while pending |
@@ -1163,8 +1168,52 @@ differ from `assigned_membership_id` — FR-007 lets an owner decide as a standi
 Produced by `resolve_approver()` at submission time and never silently re-resolved; the one
 exception is member removal, which re-routes a still-`pending` step to the owner
 (`source = 'owner_fallback'`, audited `requests.approval_step_escalated`, FR-009).
+`group_threshold_match` (spec 024) applies when the step is created on a group submission and
+the approver was resolved from the group's combined total rather than a single request's;
+`owner_fallback` still applies.
 `approval_step_scoped_visibility` (RESTRICTIVE, SELECT-only): owner sees all; the assignee sees
 their own step; the requester sees the step on their own request.
+
+## `purchase_request_group`
+
+A split of an RFQ becomes one group of purchase requests (spec 024). The group is immutable
+evidence of the single act of turning one RFQ's split into requests: which split, which branch,
+and the totals and saving as computed when it was prepared. Its state is the state of its
+requests — nothing is stored twice.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key. `unique (tenant_id, id)` for composite FKs |
+| `rfq_id` | uuid | Required; composite FK -> Rfq `(tenant_id, id)` |
+| `basket_split_job_id` | uuid | Required; composite FK -> BasketSplitJob `(tenant_id, id)` |
+| `branch_id` | uuid | Required; composite FK -> Branch `(tenant_id, id)`; every request in the group uses it |
+| `combined_total_amount` / `combined_total_currency` | numeric(18,4) / text | Required; sum of the requests' estimated totals at preparation; `check >= 0`; currency FK -> `supported_currency(code)` |
+| `best_single_total_amount` / `best_single_total_currency` | numeric(18,4) / text | Optional, null together (check); from the job result; `check >= 0` |
+| `saving_amount` / `saving_currency` | numeric(18,4) / text | Optional, null together (check); best single − combined; `check >= 0` |
+| `idempotency_key` | uuid | Required; replay key for the preparation |
+| `created_by_membership_id` | uuid | Required; composite FK -> Membership `(tenant_id, id)` |
+| `created_at` | timestamptz | Audit field; default `now()` |
+
+Constraints:
+
+- `unique (tenant_id, rfq_id)`: one group per RFQ — an RFQ converts once.
+- `unique (tenant_id, idempotency_key)`: one group per idempotency key.
+- All references are composite `(tenant_id, id)` FKs (Rfq, BasketSplitJob, Branch, Membership).
+- Every amount has a currency column next to it, null together (Constitution VII).
+- Index on `tenant_id`.
+
+`purchase_request_group` is tenant-scoped with RLS `ENABLE` + `FORCE`. SELECT is scoped like
+`purchase_request`: owners, members with no branch assignment, members assigned to the group's
+branch, and the group's creator (the requester-sees-own clause). INSERT is pinned to the caller
+as the group's creator — `created_by_membership_id = current_membership_id()` with a live role
+lookup, owner or buyer only. There is no client update or delete: the group is immutable
+evidence, and its state is the state of its requests.
+
+Group state is derived from its requests: `draft -> submitted -> (approved | rejected |
+withdrawn)`. All requests of a group share one status; they are submitted, approved, rejected,
+and withdrawn only together, routed by the group's combined total. A single-request transition
+on a grouped request is refused with `409 part_of_split`.
 
 ## `PurchaseOrder`
 
