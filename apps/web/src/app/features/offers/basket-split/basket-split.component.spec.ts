@@ -218,6 +218,10 @@ describe('BasketSplitComponent (US3, T045)', () => {
   });
 
   it('should validate form and prevent submission with same supplier or invalid quantities', () => {
+    // Fresh page item is empty, so form is invalid until filled
+    expect(component.isFormValid()).toBeFalse();
+    component.onProductSelect(0, 'prod-1');
+    component.onQuantityChange(0, '10');
     expect(component.isFormValid()).toBeTrue();
 
     // Select same supplier
@@ -233,6 +237,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
   });
 
   it('should submit basket and handle queued to feasible completed job', () => {
+    component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
     const queuedJob: BasketSplitJob = {
       ...mockFeasibleJob,
       status: 'queued',
@@ -258,6 +263,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
   });
 
   it('renders the basket pack hint in English and Arabic', () => {
+    component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', en);
     translate.setTranslation('ar', ar);
@@ -308,11 +314,12 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(component.items()[0].quantity).toBe('50');
     });
 
-    it('should add a new item with the first available product as default', () => {
+    it('should add a new empty item with addItem()', () => {
       const initialCount = component.items().length;
       component.addItem();
       expect(component.items().length).toBe(initialCount + 1);
-      expect(component.items()[initialCount].workspace_product_id).toBe('prod-1');
+      expect(component.items()[initialCount].workspace_product_id).toBe('');
+      expect(component.items()[initialCount].quantity).toBe('');
     });
 
     it('should remove an item by index', () => {
@@ -391,6 +398,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
     });
 
     it('should start polling when submitBasket is called with a queued response', fakeAsync(() => {
+      component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
       const queuedJob: BasketSplitJob = {
         ...mockFeasibleJob,
         id: 'job-poll',
@@ -651,6 +659,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
     });
 
     it('should pass advanced constraint fields in submitBasket request body', () => {
+      component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
       apiService.optimiseBasket.and.returnValue(of(mockFeasibleJob));
 
       component.riskTolerance.set('low');
@@ -676,6 +685,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
     });
 
     it('should re-trigger optimisation via rerunOptimisation', () => {
+      component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
       apiService.optimiseBasket.and.returnValue(of(mockFeasibleJob));
       component.currentJob.set(mockFeasibleJob);
 
@@ -804,6 +814,93 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(el.querySelector('[data-testid="rfq-source-header"]')).toBeNull();
       expect(el.querySelector('[data-testid="rfq-split-scope"]')).toBeNull();
       expect(mockRfqApi.getRfq).not.toHaveBeenCalled();
+    }));
+  });
+
+  describe('Basket Split standalone clarity (T032, US4)', () => {
+    it('the subtitle reflects the limits', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+      fixture.detectChanges();
+      const subtitle = (fixture.nativeElement as HTMLElement).querySelector('.page-subtitle');
+      expect(subtitle?.textContent).toContain(`${component.minSuppliers}`);
+      expect(subtitle?.textContent).toContain(`${component.maxSuppliers}`);
+      expect(subtitle?.textContent).not.toContain('exactly two');
+    });
+
+    it('addItem() appends an empty row', () => {
+      const initialCount = component.items().length;
+      component.addItem();
+      expect(component.items().length).toBe(initialCount + 1);
+      const lastItem = component.items()[component.items().length - 1];
+      expect(lastItem.workspace_product_id).toBe('');
+      expect(lastItem.quantity).toBe('');
+    });
+
+    it('a fresh page has one empty row', () => {
+      expect(component.items().length).toBe(1);
+      expect(component.items()[0]).toEqual({ workspace_product_id: '', quantity: '' });
+    });
+
+    it('the empty row shows a validation message on submit, not before', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      // Before submit: no error message on the row
+      expect(el.querySelector('.item-row mat-error')).toBeNull();
+
+      // On submit:
+      component.submitBasket();
+      fixture.detectChanges();
+
+      const error = el.querySelector('.item-row mat-error');
+      expect(error).not.toBeNull();
+      expect(error?.textContent?.trim().length).toBeGreaterThan(0);
+    });
+
+    it('the hint element is not absolutely positioned and sits after its input in DOM order', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+      component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
+      fixture.detectChanges();
+
+      const input = (fixture.nativeElement as HTMLElement).querySelector('.item-qty-field input');
+      const hint = (fixture.nativeElement as HTMLElement).querySelector('.item-qty-field mat-hint');
+      expect(input).not.toBeNull();
+      expect(hint).not.toBeNull();
+
+      const pos = window.getComputedStyle(hint!).position;
+      expect(pos).not.toBe('absolute');
+
+      const positionComparison = input!.compareDocumentPosition(hint!);
+      expect(positionComparison & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('RFQ mode is unchanged with a job that has rfq_id', fakeAsync(() => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+
+      const rfqJob: BasketSplitJob = {
+        ...mockFeasibleJob,
+        id: 'job-rfq-standalone',
+        rfq_id: 'rfq-stand-1234',
+      };
+      apiService.getBasketSplitJob.and.returnValue(of(rfqJob));
+      component.fetchJob('job-rfq-standalone');
+      tick();
+      fixture.detectChanges();
+
+      expect(component.isRfqMode()).toBeTrue();
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('[data-testid="rfq-source-header"]')).not.toBeNull();
+      expect(el.querySelector('[data-testid="rfq-split-scope"]')).not.toBeNull();
+      expect(el.querySelector('form')).toBeNull();
     }));
   });
 });

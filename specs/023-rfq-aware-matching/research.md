@@ -240,3 +240,22 @@ what a request actually used. They stay as they are.
 
 Re-authorizing re-runs `_ensure_pipeline`, which already skips decided lines. RFQ matching inherits
 that behaviour, and confirmed decisions are never touched (spec edge case).
+
+## R9. Quotes that answer no RFQ are matched as before (SC-006, T031)
+
+Measured on 2026-10-30, before (`5e124ef9`) and after (`324d80b7`, #331) US1 merged.
+
+- **`ml/evals/product_matching/run_eval.py`.** The output is identical on both commits:
+  `placeholder_only: true`, `gate_status: not_validated_no_held_out_benchmark`. The harness scores a recorded
+  benchmark file; it does not run the matcher. `ml/benchmarks/product_matching/heldout.jsonl` does not exist, so
+  precision and recall cannot be measured yet, on either side (CLAUDE.md: calibration needs 500+ labelled pairs).
+- **The pre-US1 matching tests on the post-US1 code.** These are the 24 files `test_match*`, `test_matching*` and
+  `test_quotation_confirmation_matching` at `5e124ef9`, run against `324d80b7`'s `src`, with
+  `rfq_lines_for_quotation` returning `None` (what a quote that answers no RFQ gets): **161 of 164 pass
+  unchanged**. The 3 failures are unit stubs that pass `quote={}` with no `id`, which no real quotation lacks.
+  #331 gave those stubs an `id` and changed no assertion. Without the stub, 5 more fail, but only on settings or
+  member test doubles that lack `database_url` or `user_id`.
+- **Cost on the no-RFQ path.** One RFQ lookup per quotation (`_ensure_pipeline`), not per line.
+
+Conclusion: no behaviour change for quotes that answer no RFQ, as far as the existing tests specify it. The
+precision/recall half of SC-006 stays unmeasurable until a held-out benchmark exists.

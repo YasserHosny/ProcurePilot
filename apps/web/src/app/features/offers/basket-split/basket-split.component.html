@@ -2,7 +2,7 @@
   <div class="page-header">
     <div class="header-content">
       <h1 class="page-title">{{ 'basketSplit.title' | translate }}</h1>
-      <p class="page-subtitle">{{ 'basketSplit.subtitle' | translate }}</p>
+      <p class="page-subtitle">{{ 'basketSplit.subtitle' | translate: { min: minSuppliers, max: maxSuppliers } }}</p>
       @if (currentJob()?.rfq_id) {
         <div class="rfq-source-header" data-testid="rfq-source-header">
           <a [routerLink]="['/rfq', currentJob()!.rfq_id]" class="rfq-source-link">
@@ -111,7 +111,7 @@
             </div>
           }
 
-          @if (allSelectedSupplierIds().length < 10) {
+          @if (allSelectedSupplierIds().length < maxSuppliers) {
             <div class="add-supplier-action">
               <button
                 mat-stroked-button
@@ -121,7 +121,7 @@
                 class="add-supplier-btn"
               >
                 <mat-icon aria-hidden="true">add</mat-icon>
-                <span>{{ 'basketSplit.form.addSupplier' | translate }}</span>
+                <span>{{ 'basketSplit.form.addSupplier' | translate: { min: minSuppliers, max: maxSuppliers } }}</span>
               </button>
             </div>
           }
@@ -282,7 +282,8 @@
                 <mat-form-field appearance="outline" class="item-product-field">
                   <mat-label>{{ 'basketSplit.form.product' | translate }}</mat-label>
                   <mat-select
-                    [value]="item.workspace_product_id"
+                    [name]="'product_' + i"
+                    [(ngModel)]="item.workspace_product_id"
                     (selectionChange)="onProductSelect(i, $event.value)"
                     required
                   >
@@ -293,6 +294,7 @@
                       </mat-option>
                     }
                   </mat-select>
+                  <mat-error>{{ 'basketSplit.form.productRequired' | translate }}</mat-error>
                 </mat-form-field>
 
                 <!-- Quantity Input -->
@@ -303,10 +305,12 @@
                     type="number"
                     min="1"
                     step="1"
-                    [value]="item.quantity"
+                    [name]="'quantity_' + i"
+                    [(ngModel)]="item.quantity"
                     (input)="onQuantityChange(i, $any($event.target).value)"
                     required
                   />
+                  <mat-error>{{ 'basketSplit.form.quantityRequired' | translate }}</mat-error>
                   @if (baseUnitFor(item.workspace_product_id)) {
                     <mat-hint>{{ 'basketSplit.form.packHint' | translate: packHintParams(item) }}</mat-hint>
                   }
@@ -342,7 +346,7 @@
             mat-flat-button
             color="primary"
             type="submit"
-            [disabled]="!isFormValid() || !isWriter() || isSubmitting()"
+            [disabled]="!isWriter() || isSubmitting()"
             class="submit-btn"
           >
             @if (isSubmitting()) {

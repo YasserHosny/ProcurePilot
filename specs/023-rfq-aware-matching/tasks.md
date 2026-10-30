@@ -183,8 +183,8 @@ placeholder, and the RFQ one leads with the RFQ line.
 
 ## Phase 7: Polish & cross-cutting
 
-- [ ] T031 [P] Run `ml/evals/product_matching` on `main` and on the branch, and record both in `specs/023-rfq-aware-matching/research.md`. Precision and recall must be unchanged for quotes that answer no RFQ (SC-006).
-- [ ] T032 [P] Write an e2e test in `apps/web/tests/e2e/rfq-aware-matching.spec.ts`: an RFQ with 2 replies, authorize both, and the Match Resolution queue for those quotes is empty; correct one match. Prove it compiles with `npx playwright test --list`; the full run is in CI.
+- [x] T031 [P] Run `ml/evals/product_matching` on `main` and on the branch, and record both in `specs/023-rfq-aware-matching/research.md`. Precision and recall must be unchanged for quotes that answer no RFQ (SC-006).
+- [x] T032 [P] Write an e2e test in `apps/web/tests/e2e/rfq-aware-matching.spec.ts`: an RFQ with 2 replies, authorize both, and the Match Resolution queue for those quotes is empty; correct one match. Prove it compiles with `npx playwright test --list`; the full run is in CI.
 - [ ] T033 Before the PR, run `debate-review --local` and fix the real findings. Write the PR body with `mattpocock-skills:pr`.
 - [ ] T034 After merge, run `pnpm db:migrate` on hosted (it ends with `pnpm db:check-privileges`) and confirm with `supabase migration list`. Deploy the API, optimiser and extraction worker. Prove the worker image is new with a retry-extraction (memory: extraction deploy can stay stale).
 - [ ] T035 Re-walk round 1 live on «مطاعم رواق»: a new RFQ, two Gmail replies, authorize, and no manual matching. Save screenshots to the round-1 flow doc under `docs/gtm/demo-tenant/`, with the owner email redacted. Update Jira PPS-95 to Done with a Progress comment.

@@ -61,6 +61,103 @@ export function seedRfqQuotationResponse(
   }
 }
 
+export interface SeededRfqReplyLine {
+  description: string;
+  quantity: string;
+  packCount: number;
+  unitSize: string;
+  packUnit: string;
+  unitPrice: string;
+}
+
+/**
+ * Seeds a quotation in 'extracted' status answering an RFQ recipient, with lines matching
+ * the RFQ products and packs, ready for review and human confirmation in the UI.
+ */
+export function seedRfqReplyQuotationForReview(
+  ownerEmail: string,
+  rfqId: string,
+  supplierId: string,
+  lines: SeededRfqReplyLine[],
+): { quotationId: string } {
+  if (lines.length === 0) {
+    throw new Error('seedRfqReplyQuotationForReview requires at least one line');
+  }
+  for (const l of lines) {
+    if (!/^\d+(\.\d{1,6})?$/.test(l.quantity) || Number(l.quantity) <= 0) {
+      throw new Error(`seedRfqReplyQuotationForReview: invalid quantity "${l.quantity}"`);
+    }
+    if (!/^\d+(\.\d{1,4})?$/.test(l.unitPrice) || Number(l.unitPrice) <= 0) {
+      throw new Error(`seedRfqReplyQuotationForReview: invalid unitPrice "${l.unitPrice}"`);
+    }
+  }
+
+  const lineValues = lines
+    .map(
+      (l, idx) =>
+        `(${idx + 1}, ${sqlLiteral(l.description)}, ${Number(l.quantity)}, ${Number(l.packCount)}, ${Number(l.unitSize)}, ${sqlLiteral(l.packUnit)}, ${Number(l.unitPrice)}, 'GBP')`,
+    )
+    .join(', ');
+
+  const statedTotal = lines
+    .reduce((sum, l) => sum + Number(l.quantity) * Number(l.unitPrice), 0)
+    .toFixed(2);
+
+  const sql = [
+    'with owner as (',
+    '  select m.tenant_id, m.id as membership_id from membership m',
+    `  where lower(m.email) = lower(${sqlLiteral(ownerEmail)}) and m.status = 'active' limit 1`,
+    '),',
+    'doc as (',
+    '  insert into document (id, tenant_id, storage_bucket, storage_path, mime_type, source_channel, status, created_by)',
+    `  select gen_random_uuid(), owner.tenant_id, 'quotations', 'tenants/' || owner.tenant_id || '/quotations/' || gen_random_uuid(), 'application/pdf', 'upload', 'uploaded', owner.membership_id`,
+    '  from owner returning id, tenant_id',
+    '),',
+    'quote as (',
+    '  insert into quotation (id, tenant_id, document_id, supplier_id, currency, stated_total_amount, stated_total_currency, arithmetic_status, issue_date, status)',
+    `  select gen_random_uuid(), doc.tenant_id, doc.id, ${sqlLiteral(supplierId)}::uuid, 'GBP', ${statedTotal}, 'GBP', 'reconciled', current_date, 'extracted'`,
+    '  from doc returning id, tenant_id',
+    '),',
+    'task as (',
+    '  insert into review_task (id, tenant_id, quotation_id, status, priority, reason)',
+    `  select gen_random_uuid(), quote.tenant_id, quote.id, 'open', 'normal', 'review_required'`,
+    '  from quote returning id',
+    '),',
+    'line_data (line_number, original_text, quantity, pack_count, unit_size, pack_unit, unit_price_amount, unit_price_currency) as (',
+    `  values ${lineValues}`,
+    '),',
+    'lines as (',
+    '  insert into quotation_line (id, tenant_id, quotation_id, line_number, original_text, quantity, pack_count, unit_size, pack_unit, unit_price_amount, unit_price_currency)',
+    '  select gen_random_uuid(), quote.tenant_id, quote.id, ld.line_number, ld.original_text, ld.quantity, ld.pack_count, ld.unit_size, ld.pack_unit, ld.unit_price_amount, ld.unit_price_currency',
+    '  from quote cross join line_data ld returning id',
+    '),',
+    'response as (',
+    '  insert into rfq_response (tenant_id, rfq_recipient_id, quotation_id)',
+    `  select owner.tenant_id, rr.id, quote.id`,
+    `  from owner join rfq r on r.id = ${sqlLiteral(rfqId)}::uuid and r.tenant_id = owner.tenant_id`,
+    `  join rfq_recipient rr on rr.rfq_id = r.id and rr.supplier_id = ${sqlLiteral(supplierId)}::uuid and rr.tenant_id = owner.tenant_id`,
+    '  cross join quote returning id',
+    ')',
+    'select quote.id from quote',
+  ].join(' ');
+
+  const url = process.env['E2E_DATABASE_URL'];
+  const psqlArgs = url
+    ? [url, '-t', '-A', '-c', sql]
+    : ['-U', 'postgres', '-t', '-A', '-c', sql];
+  const stdout = execFileSync('docker', ['exec', DB_CONTAINER, 'psql', ...psqlArgs], {
+    encoding: 'utf-8',
+  }).trim();
+
+  const quotationId = stdout.split('\n')[0]?.trim();
+  if (!quotationId || quotationId.length < 32) {
+    throw new Error(
+      `seedRfqReplyQuotationForReview failed to insert quotation; got: ${stdout || 'none'}`,
+    );
+  }
+  return { quotationId };
+}
+
 export interface CreatedCostCentre {
   id: string;
 }
