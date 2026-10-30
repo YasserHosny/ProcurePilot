@@ -1,0 +1,44 @@
+<h2 mat-dialog-title>{{ 'team.editNameDialog.title' | translate }}</h2>
+
+<mat-dialog-content>
+  <p class="dialog-description">
+    {{ 'team.editNameDialog.description' | translate }}
+  </p>
+  <p class="dialog-description">
+    <strong dir="ltr">{{ data.member.email }}</strong>
+  </p>
+
+  <form [formGroup]="form" id="edit-name-form" (ngSubmit)="onConfirm()">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'team.editNameDialog.nameLabel' | translate }}</mat-label>
+      <input
+        matInput
+        formControlName="display_name"
+        [placeholder]="'team.editNameDialog.namePlaceholder' | translate"
+        autocomplete="name"
+      />
+      <mat-icon matPrefix aria-hidden="true">person</mat-icon>
+      @if (form.controls.display_name.hasError('required') || form.controls.display_name.hasError('whitespace')) {
+        <mat-error>{{ 'team.editNameDialog.nameRequired' | translate }}</mat-error>
+      }
+      @if (form.controls.display_name.hasError('maxlength')) {
+        <mat-error>{{ 'team.editNameDialog.nameMaxLength' | translate }}</mat-error>
+      }
+    </mat-form-field>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="onCancel()">
+    {{ 'team.editNameDialog.cancelButton' | translate }}
+  </button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="submit"
+    form="edit-name-form"
+    [disabled]="form.invalid"
+  >
+    {{ 'team.editNameDialog.saveButton' | translate }}
+  </button>
+</mat-dialog-actions>

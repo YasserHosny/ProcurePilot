@@ -79,6 +79,7 @@ export function seedRfqReplyQuotationForReview(
   rfqId: string,
   supplierId: string,
   lines: SeededRfqReplyLine[],
+  currency = 'GBP',
 ): { quotationId: string } {
   if (lines.length === 0) {
     throw new Error('seedRfqReplyQuotationForReview requires at least one line');
@@ -95,7 +96,7 @@ export function seedRfqReplyQuotationForReview(
   const lineValues = lines
     .map(
       (l, idx) =>
-        `(${idx + 1}, ${sqlLiteral(l.description)}, ${Number(l.quantity)}, ${Number(l.packCount)}, ${Number(l.unitSize)}, ${sqlLiteral(l.packUnit)}, ${Number(l.unitPrice)}, 'GBP')`,
+        `(${idx + 1}, ${sqlLiteral(l.description)}, ${Number(l.quantity)}, ${Number(l.packCount)}, ${Number(l.unitSize)}, ${sqlLiteral(l.packUnit)}, ${Number(l.unitPrice)}, ${sqlLiteral(currency)})`,
     )
     .join(', ');
 
@@ -115,7 +116,7 @@ export function seedRfqReplyQuotationForReview(
     '),',
     'quote as (',
     '  insert into quotation (id, tenant_id, document_id, supplier_id, currency, stated_total_amount, stated_total_currency, arithmetic_status, issue_date, status)',
-    `  select gen_random_uuid(), doc.tenant_id, doc.id, ${sqlLiteral(supplierId)}::uuid, 'GBP', ${statedTotal}, 'GBP', 'reconciled', current_date, 'extracted'`,
+    `  select gen_random_uuid(), doc.tenant_id, doc.id, ${sqlLiteral(supplierId)}::uuid, ${sqlLiteral(currency)}, ${statedTotal}, ${sqlLiteral(currency)}, 'reconciled', current_date, 'extracted'`,
     '  from doc returning id, tenant_id',
     '),',
     'task as (',

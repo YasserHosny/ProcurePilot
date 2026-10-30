@@ -64,9 +64,21 @@
           } @else {
             <div class="table-responsive">
               <table mat-table [dataSource]="members()" class="members-table">
+                <!-- Name Column -->
+                <ng-container matColumnDef="name">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.name' | translate }}</th>
+                  <td mat-cell *matCellDef="let member" class="name-cell">
+                    @if (member.display_name?.trim()) {
+                      <span class="member-name">{{ member.display_name.trim() }}</span>
+                    } @else {
+                      <span class="muted-text">{{ 'team.noName' | translate }}</span>
+                    }
+                  </td>
+                </ng-container>
+
                 <!-- Email / Identity Column -->
                 <ng-container matColumnDef="email">
-                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.member' | translate }}</th>
+                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.email' | translate }}</th>
                   <td mat-cell *matCellDef="let member">
                     <div class="member-identity">
                       <div class="member-avatar">
@@ -139,6 +151,10 @@
                         </button>
 
                         <mat-menu #actionMenu="matMenu" xPosition="before">
+                          <button mat-menu-item (click)="openEditNameDialog(member)">
+                            <mat-icon aria-hidden="true">edit</mat-icon>
+                            <span>{{ 'team.actions.editName' | translate }}</span>
+                          </button>
                           <button mat-menu-item (click)="openChangeRoleDialog(member)">
                             <mat-icon aria-hidden="true">admin_panel_settings</mat-icon>
                             <span>{{ 'team.actions.changeRole' | translate }}</span>

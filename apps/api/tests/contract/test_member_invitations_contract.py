@@ -17,12 +17,19 @@ class InvitationService:
     invitation_id = uuid4()
 
     def issue(
-        self, *, bearer_token: str, member: CurrentMember, email: str, role: MemberRole
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        email: str,
+        role: MemberRole,
+        display_name: str | None = None,
     ) -> MemberInvitation:
         assert bearer_token == "owner-token"
         return MemberInvitation(
             id=self.invitation_id,
             email=email,
+            display_name=display_name,
             role=role,
             status="pending",
             expires_at=datetime.now(UTC),
@@ -72,6 +79,22 @@ def test_issue_and_resend_contract(app: FastAPI) -> None:
             assert response.status_code == status, response.text
             assert response.json()["token"] == "example-invitation-token"
             assert response.json()["email_delivery"] == "sent"
+
+
+def test_issue_carries_the_invitees_name(app: FastAPI) -> None:
+    """PPS-125: the owner may name the invitee; blank names are refused."""
+    with TestClient(app, raise_server_exceptions=False) as client:
+        named = client.post(
+            "/api/v1/invitations",
+            json={"email": "buyer@example.test", "role": "buyer", "display_name": " المشتري "},
+        )
+        blank = client.post(
+            "/api/v1/invitations",
+            json={"email": "buyer@example.test", "role": "buyer", "display_name": "  "},
+        )
+    assert named.status_code == 201, named.text
+    assert named.json()["display_name"] == "المشتري"
+    assert blank.status_code == 422
 
 
 @pytest.mark.parametrize(

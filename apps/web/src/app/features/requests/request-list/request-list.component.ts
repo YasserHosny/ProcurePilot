@@ -126,7 +126,11 @@ export class RequestListComponent implements OnInit {
   }
 
   canCreateOrder(request: PurchaseRequest): boolean {
-    return request.approval_step?.status === 'approved';
+    return (
+      request.approval_step?.status === 'approved' &&
+      (request.status === 'approved' || request.status === 'ordered') &&
+      request.has_quantity_to_order !== false
+    );
   }
 
   navigateToDetail(request: PurchaseRequest): void {

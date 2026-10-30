@@ -26,7 +26,9 @@
       <!-- Required-By Date (Required) -->
       <mat-form-field appearance="outline" class="form-field full-width">
         <mat-label>{{ 'basketSplit.prepareRequests.dialog.requiredByLabel' | translate }}</mat-label>
-        <input matInput type="date" formControlName="required_by_date" required />
+        <input matInput [matDatepicker]="requiredByPicker" formControlName="required_by_date" required />
+        <mat-datepicker-toggle matIconSuffix [for]="requiredByPicker"></mat-datepicker-toggle>
+        <mat-datepicker #requiredByPicker></mat-datepicker>
         @if (form.controls.required_by_date.touched && form.controls.required_by_date.hasError('required')) {
           <mat-error>{{ 'basketSplit.prepareRequests.dialog.requiredByRequired' | translate }}</mat-error>
         }

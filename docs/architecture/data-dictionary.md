@@ -35,6 +35,7 @@ verified JWT tenant claim.
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `user_id` | uuid | Required FK -> `auth.users.id`; Supabase Auth identity |
 | `email` | text | Required denormalised email for display and invitation matching |
+| `display_name` | text | Optional name shown to colleagues (Approval Queue, Team Management); trimmed, 1–100 characters. Set at sign-up or from the invitation, editable by the member or an owner (PPS-125) |
 | `role` | enum | owner, buyer, branch_manager, approver, viewer |
 | `mfa_enabled` | boolean | MFA status |
 | `preferred_locale` | text | Optional user locale override; `en` or `ar` |
@@ -79,6 +80,7 @@ Indexes and checks:
 | `id` | uuid | PK, default `gen_random_uuid()` |
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `email` | text | Required invited address |
+| `display_name` | text | Optional name the owner gave; copied to `membership.display_name` on acceptance (PPS-125) |
 | `role` | enum | Required role assigned on acceptance |
 | `token_hash` | text | Required, unique; only the token hash is stored |
 | `invited_by` | uuid | Required FK -> `membership.id` |
@@ -838,14 +840,14 @@ of the purchase evidence row.
 | `baseline_source_po_line_ids` | uuid[] | Optional source `purchase_order_line` rows of a `last_po_price` baseline (pack price / `pack_base_quantity`, ADR-020); null for quote-based policies |
 | `baseline_unit_price_amount` | numeric(18,4) | Optional normalised unit baseline amount |
 | `baseline_unit_price_currency` | text | Optional FK -> `supported_currency.code`; required with `baseline_unit_price_amount` |
-| `baseline_value_amount` | numeric(18,4) | Optional baseline unit price multiplied by recorded quantity |
+| `baseline_value_amount` | numeric(18,4) | Optional baseline for the recorded quantity. `last_po_price`: the PO pack price × the packs the quantity represents (ADR-020). `last_paid` (v3): the source landed cost's total × quantity ÷ its base quantity, rounded once to 4 dp. `rolling_average_6m` (v3): mean of the unrounded per-base-unit landed prices × quantity, rounded once. v1/v2 rows multiplied the 4-dp unit price, so they can differ in the last digits |
 | `baseline_value_currency` | text | Optional FK -> `supported_currency.code`; required with `baseline_value_amount` |
 | `actual_value_amount` | numeric(18,4) | Required copied `purchase_record.total_paid_amount` |
 | `actual_value_currency` | text | Required FK -> `supported_currency.code` |
 | `delta_amount` | numeric(18,4) | Optional signed saving, `baseline_value - actual_value`; positive, zero, and negative values are valid |
 | `delta_currency` | text | Optional FK -> `supported_currency.code`; required with `delta_amount` |
-| `calculation_version` | text | Required calculation identifier, for example `saving-baseline-v2` (v2 adds `last_po_price`) |
-| `calculation_inputs` | jsonb | Required replay snapshot: quantity, selected policy, source point ids, window months, and actual total |
+| `calculation_version` | text | Required calculation identifier, for example `saving-baseline-v3` (v2 adds `last_po_price`; v3 computes a quoted baseline from the landed total instead of a rounded per-unit price) |
+| `calculation_inputs` | jsonb | Required replay snapshot: quantity, actual value, selected metric, and source point ids (landed costs or PO lines); `last_po_price` adds the PO pack price and pack size; `last_paid` (v3) adds the source landed cost's `landed_total`, `landed_quantity` and `landed_base_quantity` |
 | `recorded_by` | uuid | Required FK -> Membership; copied from the purchase record |
 | `recorded_at` | timestamptz | Required time the baseline, actual, and delta were captured |
 | `verified_by` | uuid | Optional FK -> Membership; set only by explicit verification |

@@ -29,6 +29,7 @@ describe('TeamComponent (T057)', () => {
       status: 'active',
       mfa_enabled: true,
       created_at: '2026-08-20T10:00:00Z',
+      display_name: 'Alice Owner',
     },
     {
       id: 'm2',
@@ -37,6 +38,7 @@ describe('TeamComponent (T057)', () => {
       status: 'active',
       mfa_enabled: false,
       created_at: '2026-08-20T11:00:00Z',
+      display_name: null,
     },
   ];
 
@@ -55,6 +57,7 @@ describe('TeamComponent (T057)', () => {
       'members',
       'invitations',
       'changeMemberRole',
+      'renameMember',
       'createBranchRoleAssignment',
       'removeMember',
       'revokeInvitation',
@@ -101,6 +104,49 @@ describe('TeamComponent (T057)', () => {
     expect(apiService.invitations).toHaveBeenCalled();
     expect(component.members().length).toBe(2);
     expect(component.invitations().length).toBe(1);
+  });
+
+  it('should render display_name or No name placeholder in the Name column', () => {
+    const nameCells = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.name-cell'),
+    ).map((el) => el.textContent?.trim());
+    expect(nameCells).toEqual(['Alice Owner', 'No name']);
+  });
+
+  it('should rename member and update row in place when edit name succeeds', () => {
+    const updatedMember: Member = { ...mockMembers[1], display_name: 'Bob Buyer' };
+    apiService.renameMember.and.returnValue(of(updatedMember));
+
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of({ displayName: 'Bob Buyer' }),
+    } as MatDialogRef<unknown, unknown>);
+
+    component.openEditNameDialog(mockMembers[1]);
+
+    expect(apiService.renameMember).toHaveBeenCalledWith('m2', 'Bob Buyer');
+    expect(component.members().find((m) => m.id === 'm2')?.display_name).toBe('Bob Buyer');
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      enCatalog.team.editNameSuccess,
+      undefined,
+      { duration: 3500 },
+    );
+  });
+
+  it('should surface error message when renameMember fails', () => {
+    const error500 = new HttpErrorResponse({
+      status: 500,
+      error: { code: 'server_error', message: 'Failed to rename', trace_id: 'tr_name_err' },
+    });
+    apiService.renameMember.and.returnValue(throwError(() => error500));
+
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of({ displayName: 'Bob Buyer' }),
+    } as MatDialogRef<unknown, unknown>);
+
+    component.openEditNameDialog(mockMembers[1]);
+
+    expect(component.errorMessage()).toBe('Failed to rename');
+    expect(component.errorTraceId()).toBe('tr_name_err');
   });
 
   it('should update member role when changed successfully', () => {

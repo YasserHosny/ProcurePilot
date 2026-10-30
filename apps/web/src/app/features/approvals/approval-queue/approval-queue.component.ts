@@ -535,19 +535,28 @@ export class ApprovalQueueComponent implements OnInit {
     });
   }
 
-  getRequesterDisplay(request: PurchaseRequest): string {
+  getRequesterInfo(request?: PurchaseRequest | null): { text: string; tooltip: string | null } {
+    if (!request) {
+      return { text: this.translate.instant(`${I18N}.notAvailable`), tooltip: null };
+    }
     const name = request.requester_name?.trim();
     if (name) {
-      return name;
+      return { text: name, tooltip: null };
     }
     const email = request.requester_email?.trim();
     if (email) {
-      return email;
+      const atIdx = email.indexOf('@');
+      const localPart = atIdx !== -1 ? email.slice(0, atIdx) : email;
+      return { text: localPart, tooltip: email };
     }
     if (request.requested_by_membership_id) {
-      return request.requested_by_membership_id.slice(0, 8);
+      return { text: request.requested_by_membership_id.slice(0, 8), tooltip: null };
     }
-    return this.translate.instant(`${I18N}.notAvailable`);
+    return { text: this.translate.instant(`${I18N}.notAvailable`), tooltip: null };
+  }
+
+  getRequesterDisplay(request: PurchaseRequest): string {
+    return this.getRequesterInfo(request).text;
   }
 
   getCostCentreDisplay(request: PurchaseRequest): string {

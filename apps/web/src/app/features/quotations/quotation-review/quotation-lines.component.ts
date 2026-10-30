@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -19,7 +19,15 @@ import type {
 } from '../../../core/api/models';
 import { CurrencySymbolPipe } from '../../../core/format/currency-symbol.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { FormatService } from '../../../core/format/format.service';
 import { sameReviewedValue } from './reviewed-value';
+
+export function trimDecimalZeros(value: string): string {
+  if (typeof value !== 'string') return '';
+  if (!/^-?\d+(?:\.\d+)?$/.test(value)) return value;
+  if (!value.includes('.')) return value;
+  return value.replace(/0+$/, '').replace(/\.$/, '');
+}
 
 @Component({
   selector: 'app-quotation-lines',
@@ -43,10 +51,14 @@ import { sameReviewedValue } from './reviewed-value';
   styleUrl: './quotation-lines.component.scss',
 })
 export class QuotationLinesComponent {
+  private readonly formatService = inject(FormatService);
+  readonly trimDecimalZeros = trimDecimalZeros;
+
   @Input({ required: true }) quotation!: QuotationDetail;
   @Input({ required: true }) effectiveCurrency = 'USD';
   @Input({ required: true }) activeExtraction: FieldExtraction | null = null;
   @Input({ required: true }) isWriter = false;
+  @Input() isConfirming = false;
   @Input({ required: true }) pendingRemoveLineIds = new Set<string>();
   @Input({ required: true }) pendingCorrections = new Map<string, unknown>();
   @Input({ required: true }) pendingNewLines: NewQuotationLine[] = [];
@@ -184,11 +196,58 @@ export class QuotationLinesComponent {
     return line.unit_price?.amount ?? '';
   }
 
-  onUnitPriceBlur(line: QuotationLine, targetValue: string): void {
-    const original = line.unit_price?.amount ?? '';
-    if (targetValue === original) {
+  private isNumericEqual(a: string, b: string): boolean {
+    const trimmedA = a.trim();
+    const trimmedB = b.trim();
+    if (!trimmedA && !trimmedB) {
+      return true;
+    }
+    if (!trimmedA || !trimmedB) {
+      return false;
+    }
+    const na = Number(trimmedA);
+    const nb = Number(trimmedB);
+    return !isNaN(na) && !isNaN(nb) && na === nb;
+  }
+
+  onUnitPriceChange(line: QuotationLine, targetValue: string): void {
+    const effective = this.getEffectiveUnitPriceAmount(line);
+    const trimmedTarget = trimDecimalZeros(targetValue.trim());
+    const trimmedEffective = trimDecimalZeros(effective.trim());
+
+    if (
+      targetValue === effective ||
+      trimmedTarget === trimmedEffective ||
+      this.isNumericEqual(targetValue, effective)
+    ) {
       return;
     }
+
+    const fe = this.getFieldExtraction('quotation_line', line.id, 'unit_price');
+    if (fe) {
+      this.correctionUpdated.emit({
+        feId: fe.id,
+        newValue: {
+          amount: targetValue,
+          currency: line.unit_price?.currency || this.effectiveCurrency,
+        },
+      });
+    }
+  }
+
+  onUnitPriceBlur(line: QuotationLine, targetValue: string): void {
+    const effective = this.getEffectiveUnitPriceAmount(line);
+    const trimmedTarget = trimDecimalZeros(targetValue.trim());
+    const trimmedEffective = trimDecimalZeros(effective.trim());
+
+    if (
+      targetValue === effective ||
+      trimmedTarget === trimmedEffective ||
+      this.isNumericEqual(targetValue, effective)
+    ) {
+      return;
+    }
+
     this.fieldReviewed.emit({
       entityType: 'quotation_line',
       entityId: line.id,
@@ -197,6 +256,27 @@ export class QuotationLinesComponent {
         amount: targetValue,
         currency: line.unit_price?.currency || this.effectiveCurrency,
       },
+    });
+  }
+
+  formatLineTotalDisplay(line: QuotationLine): string {
+    const rawTotal = this.computeLineTotal(line);
+    if (rawTotal === null || rawTotal === undefined || rawTotal === '') {
+      return '—';
+    }
+    const num = parseFloat(rawTotal);
+    if (isNaN(num)) return '—';
+
+    const isZero = Math.abs(num) < 0.005;
+    const normalized = isZero ? 0 : num;
+    const rounded = isZero
+      ? 0
+      : (Math.sign(normalized) * Math.round(Math.abs(normalized) * 100)) / 100;
+    const fractionDigits = Number.isInteger(rounded) ? 0 : 2;
+
+    return this.formatService.formatNumber(normalized, {
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
     });
   }
 

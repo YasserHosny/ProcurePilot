@@ -893,12 +893,15 @@ describe('CompareComponent (RFQ)', () => {
       fixture.detectChanges();
 
       const compiled = fixture.nativeElement as HTMLElement;
-      const splitBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      const splitBtns = compiled.querySelectorAll<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitBtns.length).toBe(1);
+      const splitBtn = splitBtns[0];
       expect(splitBtn).not.toBeNull();
       expect(splitBtn?.disabled).toBeTrue();
 
-      const reason = compiled.querySelector('[data-testid="split-disabled-reason"]');
-      expect(reason).not.toBeNull();
+      const reasons = compiled.querySelectorAll('[data-testid="split-disabled-reason"]');
+      expect(reasons.length).toBe(1);
+      const reason = reasons[0];
       expect(reason?.textContent).toContain('Needs two matched replies');
       const matchLink = reason?.querySelector<HTMLAnchorElement>('a.match-lines-link');
       expect(matchLink).not.toBeNull();
@@ -951,7 +954,9 @@ describe('CompareComponent (RFQ)', () => {
       fixture.detectChanges();
 
       const compiled = fixture.nativeElement as HTMLElement;
-      const splitBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      const splitBtns = compiled.querySelectorAll<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitBtns.length).toBe(1);
+      const splitBtn = splitBtns[0];
       expect(splitBtn?.disabled).toBeFalse();
       expect(compiled.querySelector('[data-testid="split-disabled-reason"]')).toBeNull();
     });

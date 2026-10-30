@@ -92,4 +92,71 @@ describe('SignupComponent', () => {
     expect(privacyLink.nativeElement.getAttribute('rel')).toContain('noopener');
     expect(privacyLink.nativeElement.textContent.trim()).toBe('Privacy Policy');
   });
+
+  it('requires display_name and is invalid without it', () => {
+    component.form.patchValue({
+      invitation_token: 'valid-invitation-token-123456789012',
+      business_name: 'Acme Corp',
+      email: 'owner@example.com',
+      password: 'password123456',
+      region: 'EG',
+      currency: 'EGP',
+      tax_model: 'standard',
+    });
+
+    // display_name is empty by default
+    expect(component.form.controls.display_name.valid).toBeFalse();
+    expect(component.form.valid).toBeFalse();
+
+    component.form.patchValue({ display_name: 'Alice Owner' });
+    expect(component.form.controls.display_name.valid).toBeTrue();
+    expect(component.form.valid).toBeTrue();
+  });
+
+  it('submits trimmed display_name in signup request body', () => {
+    component.form.patchValue({
+      invitation_token: 'valid-invitation-token-123456789012',
+      business_name: 'Acme Corp',
+      display_name: '  Alice Owner  ',
+      email: 'owner@example.com',
+      password: 'password123456',
+      region: 'EG',
+      currency: 'EGP',
+      tax_model: 'standard',
+    });
+
+    apiService.signup.and.returnValue(
+      of({
+        access_token: 'access-1',
+        refresh_token: 'refresh-1',
+        expires_in: 3600,
+        user: {
+          id: 'u1',
+          email: 'owner@example.com',
+          role: 'owner',
+          preferred_locale: 'en',
+          mfa_enabled: false,
+          tenant: {
+            id: 't1',
+            name: 'Acme Corp',
+            slug: 'acme-corp',
+            region: 'EG',
+            currency: 'EGP',
+            tax_model: 'standard',
+            default_locale: 'en',
+            created_at: '2026-08-20T10:00:00Z',
+          },
+          display_name: 'Alice Owner',
+        },
+      }),
+    );
+
+    component.onSubmit();
+
+    expect(apiService.signup).toHaveBeenCalledWith(
+      jasmine.objectContaining({
+        display_name: 'Alice Owner',
+      }),
+    );
+  });
 });

@@ -483,3 +483,42 @@ export async function findProductByName(
   }
   return found;
 }
+
+export interface BasketSplitJobSummary {
+  id: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  rfq_id?: string | null;
+  result?: {
+    total_landed_cost?: { amount: string; currency: string } | null;
+    allocation?: {
+      supplier_id: string;
+      total_landed_cost?: { amount: string; currency: string } | null;
+    }[];
+    single_supplier_baselines?: {
+      supplier_id: string;
+      feasible: boolean;
+      total_landed_cost?: { amount: string; currency: string } | null;
+    }[];
+  } | null;
+  error?: string | null;
+}
+
+/**
+ * Polls the basket split job endpoint until the solver reaches a terminal state (completed or failed).
+ */
+export async function pollBasketSplitJob(
+  token: string,
+  jobId: string,
+  timeoutMs = 30000,
+): Promise<BasketSplitJobSummary> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const job = await apiAsUser<BasketSplitJobSummary>(token, 'GET', `/baskets/${jobId}`);
+    if (job.status === 'completed' || job.status === 'failed') {
+      return job;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`Timed out after ${timeoutMs}ms waiting for basket split job ${jobId} to finish`);
+}
+
