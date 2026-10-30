@@ -163,6 +163,20 @@ class AzureDocumentIntelligenceProvider:
 
 
 def _parse_invoice_result(result: object, model_version: str) -> ExtractionResult:
+    from dataclasses import replace
+
+    text = _all_document_text(result)
+    cell_text = "\n".join(
+        str(_get(cell, "content", "") or "")
+        for table in (_get(result, "tables", []) or [])
+        for cell in (_get(table, "cells", []) or [])
+    )
+    return replace(
+        _parse_invoice_fields(result, model_version), source_text=text + "\n" + cell_text
+    )
+
+
+def _parse_invoice_fields(result: object, model_version: str) -> ExtractionResult:
     header: dict[str, ExtractedField] = {}
     lines: list[ExtractedLine] = []
     stated_total: ExtractedField | None = None

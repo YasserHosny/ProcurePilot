@@ -41,7 +41,7 @@ QUOTATION_COLUMNS = (
     "id,document_id,supplier_id,suggested_supplier_id,supplier_match_confidence,currency,"
     "issue_date,expiry_date,status,previous_quotation_id,stated_total_amount,"
     "stated_total_currency,arithmetic_status,created_at,reviewed_by,reviewed_at,deleted_at,"
-    "reviewer_notes,archive_idempotency_key"
+    "reviewer_notes,archive_idempotency_key,prices_include_vat"
 )
 LINE_COLUMNS = (
     "id,line_number,original_text,quantity,pack_count,unit_size,pack_unit,unit_price_amount,"
@@ -146,6 +146,8 @@ class QuotationService:
         )
         return QuotationDetail(
             **_quotation(quote).model_dump(),
+            prices_include_vat=bool(quote.get("prices_include_vat", False)),
+            vat_rate=_document_vat_rate(fields, lines),
             document=document,
             lines=[_line(row) for row in lines],
             field_extractions=[_field(row) for row in fields],
@@ -1246,3 +1248,22 @@ def _mark_extraction_enqueue_failed(
         client.table("quotation").update(updates).eq("id", str(quotation_id)).execute()
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+
+def _document_vat_rate(
+    fields: list[dict[str, object]], lines: list[dict[str, object]]
+) -> str | None:
+    for field in fields:
+        if field.get("entity_type") == "quotation" and field.get("field_name") == "vat_rate":
+            value = (
+                field.get("corrected_value")
+                if field.get("corrected_by") is not None
+                else field.get("extracted_value")
+            )
+            return decimal_string(value, scale=4)
+    rates = {
+        decimal_string(line.get("vat_rate"), scale=4)
+        for line in lines
+        if line.get("unit_price_amount") is not None
+    }
+    return rates.pop() if len(rates) == 1 else None

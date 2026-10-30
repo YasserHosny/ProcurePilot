@@ -58,7 +58,8 @@ from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 
 QUOTATION_COLUMNS = (
-    "id,tenant_id,document_id,supplier_id,status,issue_date,reviewed_at,reviewed_by,deleted_at"
+    "id,tenant_id,document_id,supplier_id,status,issue_date,reviewed_at,reviewed_by,"
+    "deleted_at,prices_include_vat"
 )
 LINE_COLUMNS = (
     "id,tenant_id,quotation_id,line_number,original_text,quantity,pack_count,unit_size,pack_unit,"
@@ -1535,6 +1536,11 @@ def _with_line_extracted_fields(
 ) -> list[dict[str, object]]:
     if not lines:
         return lines
+    quotes = {
+        str(line["quotation_id"]): _quotation_row(client, UUID(str(line["quotation_id"])))
+        for line in lines
+        if line.get("quotation_id")
+    }
     line_ids = [UUID(str(line["id"])) for line in lines]
     try:
         response = (
@@ -1562,6 +1568,9 @@ def _with_line_extracted_fields(
     return [
         {
             **line,
+            "prices_include_vat": bool(
+                quotes.get(str(line.get("quotation_id")), {}).get("prices_include_vat", False)
+            ),
             "extracted_fields": extracted_by_line.get(str(line["id"]), {}),
         }
         for line in lines
@@ -1869,6 +1878,7 @@ def _line(row: dict[str, object]) -> QuotationLineSummary:
     delivery_fee = _money(row, "delivery_fee")
     discount = _money(row, "discount")
     exposure = quoted_exposure(
+        prices_include_vat=bool(row.get("prices_include_vat", False)),
         quantity=quantity,
         unit_price=unit_price,
         vat_rate=vat_rate,

@@ -46,3 +46,34 @@ def test_offer_projection_uses_row_data_and_never_fabricates_stock_signal() -> N
     assert offer.requested_quantity == "30.000000"
     assert offer.match_confidence == "0.9500"
     assert offer.stock_signal is None
+
+
+def test_latest_offer_window_is_per_supplier_across_rule_versions() -> None:
+    import re
+
+    from procurepilot_api.modules.offers.service import OFFER_READ_SQL
+
+    partition = re.search(r"partition by (.*?)\s+order by", OFFER_READ_SQL, re.S)
+    assert partition is not None
+    assert partition.group(1).strip() == "md.matched_workspace_product_id, q.supplier_id"
+
+
+def test_offer_projection_replays_v2_inclusive() -> None:
+    from procurepilot_api.modules.offers.projection import project_landed_cost
+
+    result = project_landed_cost(
+        raw_inputs={
+            "quantity": "350",
+            "normalised_base_quantity": "350",
+            "base_unit": "each",
+            "unit_price": {"amount": "13.80", "currency": "SAR"},
+            "vat_rate": "0.15",
+            "delivery_fee": {"amount": "0", "currency": "SAR"},
+            "discount": {"amount": "0", "currency": "SAR"},
+            "prices_include_vat": True,
+        },
+        rule_version="landed-cost-v2",
+        requested_quantity=Decimal("100"),
+        pack_base_quantity=Decimal("1"),
+    )
+    assert result.total.amount == "1380.0000"

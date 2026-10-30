@@ -64,7 +64,7 @@ ranked as (
     s.reliability_score,
     pd.base_quantity as pack_base_quantity,
     row_number() over (
-      partition by md.matched_workspace_product_id, q.supplier_id, lc.rule_version
+      partition by md.matched_workspace_product_id, q.supplier_id
       order by lc.recorded_at desc, lc.id desc
     ) as rn
   from product p

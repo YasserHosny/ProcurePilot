@@ -17,7 +17,7 @@ from procurepilot_api.modules.savings.schemas import Money
 
 MONEY_QUANT = Decimal("0.0001")
 QUANTITY_QUANT = Decimal("0.000001")
-CALCULATION_VERSION = "saving-baseline-v3"
+CALCULATION_VERSION = "saving-baseline-v4"
 
 # Statuses of a purchase order a human has authorised and sent. Draft and cancelled orders are
 # never a price that was paid.
@@ -56,6 +56,7 @@ select
   lc.valid_from,
   lc.valid_to,
   lc.total_amount,
+  lc.vat_amount,
   lc.total_currency,
   lc.normalised_base_quantity,
   lc.quantity,
@@ -178,6 +179,10 @@ def capture_baseline(
                 amount=Decimal(str(source["total_amount"])),
                 currency=str(source["total_currency"]),
             ).model_dump(mode="json"),
+            landed_vat=Money(
+                amount=Decimal(str(source.get("vat_amount") or "0")),
+                currency=str(source["total_currency"]),
+            ).model_dump(mode="json"),
             landed_quantity=_quantity_string(Decimal(str(source["quantity"]))),
             landed_base_quantity=_quantity_string(Decimal(str(source["normalised_base_quantity"]))),
         )
@@ -197,17 +202,14 @@ def _quoted_baseline_value(
     """Scale selected landed costs without multiplying a rounded display price."""
     if average:
         prices = [
-            Decimal(str(row["total_amount"])) / Decimal(str(row["normalised_base_quantity"]))
-            for row in rows
+            _net_landed_total(row) / Decimal(str(row["normalised_base_quantity"])) for row in rows
         ]
         value = sum(prices) / Decimal(len(prices)) * quantity
     else:
         source = rows[0]
         # Multiply before dividing so whole packs retain the exact landed total.
         value = (
-            Decimal(str(source["total_amount"]))
-            * quantity
-            / Decimal(str(source["normalised_base_quantity"]))
+            _net_landed_total(source) * quantity / Decimal(str(source["normalised_base_quantity"]))
         )
     return value.quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
 
@@ -312,7 +314,7 @@ def _price_history_points(
 
 
 def _history_point(row: dict[str, object]) -> PriceHistoryPoint:
-    unit = normalised_unit_price(row["total_amount"], row["normalised_base_quantity"])
+    unit = normalised_unit_price(_net_landed_total(row), row["normalised_base_quantity"])
     currency = str(row["total_currency"])
     return PriceHistoryPoint(
         landed_cost_id=UUID(str(row["landed_cost_id"])),
@@ -323,7 +325,9 @@ def _history_point(row: dict[str, object]) -> PriceHistoryPoint:
         valid_from=row["valid_from"],
         valid_to=row.get("valid_to"),
         normalised_unit_price=OfferMoney(amount=format(unit, "f"), currency=currency),
-        landed_cost_total=OfferMoney(amount=_money_string(row["total_amount"]), currency=currency),
+        landed_cost_total=OfferMoney(
+            amount=_money_string(_net_landed_total(row)), currency=currency
+        ),
         quantity=_quantity_string(Decimal(str(row["quantity"]))),
         base_unit=str(row["base_unit"]),
     )
@@ -355,3 +359,7 @@ def _days_in_month(year: int, month: int) -> int:
     if month in {4, 6, 9, 11}:
         return 30
     return 31
+
+
+def _net_landed_total(row: dict[str, object]) -> Decimal:
+    return Decimal(str(row["total_amount"])) - Decimal(str(row.get("vat_amount") or "0"))

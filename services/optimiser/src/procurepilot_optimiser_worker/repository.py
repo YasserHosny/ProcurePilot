@@ -124,7 +124,7 @@ def read_current_offers(conn: psycopg.Connection, *, job: BasketJob) -> list[Off
                 -- project from normalised_base_quantity rather than the raw pack quantity.
                 (lc.total_amount / lc.normalised_base_quantity * req.quantity) as projected_total,
                 row_number() over (
-                  partition by md.matched_workspace_product_id, q.supplier_id, lc.rule_version
+                  partition by md.matched_workspace_product_id, q.supplier_id
                   order by lc.recorded_at desc, lc.id desc
                 ) as rn
               from requested req
@@ -182,7 +182,7 @@ def read_current_advanced_offers(
                   or wp.preferred_supplier_id = q.supplier_id) as preferred,
                 s.lead_time_days,
                 row_number() over (
-                  partition by md.matched_workspace_product_id, q.supplier_id, lc.rule_version
+                  partition by md.matched_workspace_product_id, q.supplier_id
                   order by lc.recorded_at desc, lc.id desc
                 ) as rn
               from requested req
