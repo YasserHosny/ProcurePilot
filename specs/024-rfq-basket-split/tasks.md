@@ -94,15 +94,19 @@ best single total of SAR 4,137 and a saving of SAR 74.
 
   T010 green.
 - [x] T014 [US1] Add the route `POST /rfq/{rfq_id}/split` (owner/buyer, Idempotency-Key, 202) in `modules/rfq/router.py`, delegating to `offers.rfq_split.start_rfq_split`. T011 green.
-- [ ] T015 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/rfq/compare/compare.component.{ts,html,scss,spec.ts}` and `rfq-api.ts`, add a "Split between suppliers" button next to Prepare Request.
+- [x] T015 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/rfq/compare/compare.component.{ts,html,scss,spec.ts}` and `rfq-api.ts`, add a "Split between suppliers" button next to Prepare Request.
   - When disabled, it shows the reason: "Needs two matched replies" plus a "Match N lines" link, or "Replies are in different currencies".
   - On click it calls `POST /rfq/{id}/split` and navigates to `/offers/basket-split/{job_id}`.
   - i18n en and ar; Karma red → green.
-- [ ] T016 [P] [US1] Web, delegated to Agy: RFQ mode in `apps/web/src/app/features/offers/basket-split/basket-split.component.{ts,html,spec.ts}` and `basket-split-results.component.{ts,html,spec.ts}`.
+
+  Shipped in #341. Checked live on 2026-10-30 (PPS-127, RFQ b7be0e00).
+- [x] T016 [P] [US1] Web, delegated to Agy: RFQ mode in `apps/web/src/app/features/offers/basket-split/basket-split.component.{ts,html,spec.ts}` and `basket-split-results.component.{ts,html,spec.ts}`.
   - When the job has `rfq_id`, show "From RFQ … (sent Oct 28)" with a link.
   - Items and suppliers are read-only and quantities are shown in packs.
   - The result shows the split total, each single-supplier total and the saving, with money in the shared format.
   - Karma red → green.
+
+  Shipped in #341. PPS-127 fixes the requested items, which showed the pack count with the base unit («60 kg»); they now read «60 × 10 kg, 600 kg in total».
 
 ---
 
@@ -147,12 +151,16 @@ best single total of SAR 4,137 and a saving of SAR 74.
 
   T017 and T018 green.
 - [x] T021 [US2] Add the route `POST /baskets/{basket_id}/prepare-requests` (owner/buyer, Idempotency-Key; 201, or 200 on replay; 409 reasons per the contract) in `modules/offers/router.py`.
-- [ ] T022 [P] [US2] Web, delegated to Agy: "Prepare N requests" on the RFQ-mode result in `apps/web/src/app/features/offers/basket-split/basket-split-results.component.{ts,html,spec.ts}`.
+- [x] T022 [P] [US2] Web, delegated to Agy: "Prepare N requests" on the RFQ-mode result in `apps/web/src/app/features/offers/basket-split/basket-split-results.component.{ts,html,spec.ts}`.
   - A dialog asks for branch (remembered as on RFQ Responses), required-by (defaults to the RFQ's needed-by) and cost centre. It lists expired replies with a confirm checkbox.
   - The `split_stale` reason shows a "Rerun split" action.
   - On success it shows a summary page or panel listing each request with its supplier, total and budget status, with links.
   - Karma red → green.
-- [ ] T023 [P] [US2] Web, delegated to Agy: RFQ Details shows "Converted into 2 requests" with links when `converted_purchase_request_ids.length > 1`. This goes in `apps/web/src/app/features/rfq/detail/detail.component.{ts,html,spec.ts}`.
+
+  Shipped in #349. PPS-127 shows «Prepare» only while the RFQ is unconverted and puts the required-by date on the app's datepicker. Checked live: two drafts, SAR 5,460 + 8,850.
+- [x] T023 [P] [US2] Web, delegated to Agy: RFQ Details shows "Converted into 2 requests" with links when `converted_purchase_request_ids.length > 1`. This goes in `apps/web/src/app/features/rfq/detail/detail.component.{ts,html,spec.ts}`.
+
+  Shipped in #346. Checked live: «Converted into 2 requests».
 
 ---
 
@@ -194,12 +202,14 @@ best single total of SAR 4,137 and a saving of SAR 74.
 
 ## Phase 6: User Story 4 — Basket Split used on its own is clearer (P3)
 
-- [ ] T032 [P] [US4] Web, delegated to Agy, in `apps/web/src/app/features/offers/basket-split/basket-split.component.{ts,html,scss,spec.ts}`:
+- [x] T032 [P] [US4] Web, delegated to Agy, in `apps/web/src/app/features/offers/basket-split/basket-split.component.{ts,html,scss,spec.ts}`:
   - the title and subtitle agree with the 2–10 supplier control;
   - `addItem()` adds an empty row (no rice × 10);
   - the pack hint is laid out in flow so it doesn't overlap the next row's label in LTR, RTL, or at ≤ 600 px.
 
   Karma red → green, with en and ar copy.
+
+  Shipped in #344. PPS-126 (#356) adds the «Choose a product» placeholder and stops a product being added twice.
 
 ---
 

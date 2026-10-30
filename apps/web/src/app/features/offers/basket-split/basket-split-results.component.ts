@@ -1,5 +1,5 @@
 import { CommonModule, NgClass } from '@angular/common';
-import { Component, Input, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, Input, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -20,7 +20,6 @@ import type {
 import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
-import { unitLabel } from '../../../core/format/unit-label';
 import { SessionService } from '../../../core/auth/session.service';
 import { RfqApi, type RfqDetail } from '../../rfq/rfq-api';
 import { RequestsApiService } from '../../requests/requests-api';
@@ -30,6 +29,7 @@ import type {
   ViolatedOptimisationConstraint,
 } from '../offers-api';
 import { constraintText, isUserFacingConstraint } from './constraint-text';
+import { formatQuantityDisplay } from './quantity-display';
 import {
   PrepareSplitRequestsDialogComponent,
   type PrepareSplitRequestsDialogResult,
@@ -78,7 +78,19 @@ export class BasketSplitResultsComponent implements OnInit {
     savingsAmount?: string;
     currency?: string;
   };
-  @Input() rfqDetail?: RfqDetail | null = null;
+  readonly rfqDetailSignal = signal<RfqDetail | null>(null);
+
+  @Input()
+  set rfqDetail(value: RfqDetail | null | undefined) {
+    const detail = value ?? null;
+    this.rfqDetailSignal.set(detail);
+    if (detail?.rfq?.status === 'converted') {
+      this.convertedRequestIds.set(detail.converted_purchase_request_ids ?? []);
+    }
+  }
+  get rfqDetail(): RfqDetail | null {
+    return this.rfqDetailSignal();
+  }
 
   readonly preparedRequests = signal<PurchaseRequest[] | null>(null);
   readonly staleError = signal<boolean>(false);
@@ -87,8 +99,27 @@ export class BasketSplitResultsComponent implements OnInit {
   readonly isRerunningSplit = signal<boolean>(false);
   private rerunIdempotencyKey: string | null = null;
 
+  readonly effectiveConvertedRequestIds = computed<readonly string[] | null>(() => {
+    const fromSignal = this.convertedRequestIds();
+    if (fromSignal !== null) {
+      return fromSignal;
+    }
+    const rfq = this.rfqDetailSignal();
+    if (rfq?.rfq?.status === 'converted') {
+      return rfq.converted_purchase_request_ids ?? [];
+    }
+    return null;
+  });
+
+  readonly isAlreadyConverted = computed<boolean>(() => {
+    return (
+      this.convertedRequestIds() !== null ||
+      this.rfqDetailSignal()?.rfq?.status === 'converted'
+    );
+  });
+
   ngOnInit(): void {
-    if (this.currentJob?.rfq_id && !this.rfqDetail) {
+    if (this.currentJob?.rfq_id && !this.rfqDetailSignal()) {
       this.rfqApi.getRfq(this.currentJob.rfq_id).subscribe({
         next: (detail) => {
           this.rfqDetail = detail;
@@ -128,7 +159,9 @@ export class BasketSplitResultsComponent implements OnInit {
       this.currentJob?.status === 'completed' &&
       Boolean(this.currentJob?.result?.feasible) &&
       this.isWriter &&
-      this.allocatedSuppliersCount > 0
+      this.allocatedSuppliersCount > 0 &&
+      !this.preparedRequests() &&
+      !this.isAlreadyConverted()
     );
   }
 
@@ -158,7 +191,7 @@ export class BasketSplitResultsComponent implements OnInit {
           this.loadRequests(res.requestIds);
         }
         this.staleError.set(false);
-        this.convertedRequestIds.set(null);
+        this.convertedRequestIds.set(res.requestIds ?? res.requests?.map((r) => r.id) ?? []);
         this.generalError.set(null);
       } else if (res.stale) {
         this.staleError.set(true);
@@ -200,6 +233,9 @@ export class BasketSplitResultsComponent implements OnInit {
     forkJoin(ids.map((id) => this.requestsApi.getRequest(id))).subscribe({
       next: (reqs) => {
         this.preparedRequests.set(reqs);
+      },
+      error: () => {
+        // Soft fail
       },
     });
   }
@@ -294,39 +330,13 @@ export class BasketSplitResultsComponent implements OnInit {
     primary: string;
     secondary: string | null;
   } {
-    const product = this.products.find((p) => p.id === line.workspace_product_id);
-    const base = parseFloat(line.quantity);
-    const rawUnit =
-      this.currentJob?.pack_snapshot?.[line.workspace_product_id]?.base_unit ??
-      product?.base_unit ??
-      '';
-    const unit = unitLabel(this.translate, rawUnit);
-    const fmt = (n: number): string =>
-      this.format.formatNumber(n, { maximumFractionDigits: 6 });
-    // Prefer the pack definition captured at submission: the catalogue may have changed since.
-    const snapshot = this.currentJob?.pack_snapshot?.[line.workspace_product_id];
-    const pack = product?.pack;
-    const size = snapshot
-      ? parseFloat(snapshot.base_quantity)
-      : pack
-        ? parseFloat(pack.base_quantity ?? String(pack.pack_count * parseFloat(pack.unit_size)))
-        : 0;
-    // Only a pack of exactly one base unit is "loose goods"; a 0.5 kg pack is still a pack.
-    if (!Number.isFinite(base) || !Number.isFinite(size) || size <= 0 || size === 1) {
-      return { primary: `${Number.isFinite(base) ? fmt(base) : line.quantity} ${unit}`.trim(), secondary: null };
-    }
-    const packs = base / size;
-    return {
-      primary: this.translate.instant('basketSplit.result.packQuantity', {
-        count: fmt(packs),
-        size: fmt(size),
-        unit,
-      }),
-      secondary: this.translate.instant('basketSplit.result.baseEquivalent', {
-        total: fmt(base),
-        unit,
-      }),
-    };
+    return formatQuantityDisplay({
+      line,
+      product: this.products.find((p) => p.id === line.workspace_product_id),
+      packSnapshot: this.currentJob?.pack_snapshot,
+      translate: this.translate,
+      format: this.format,
+    });
   }
 
   getSupplierName(supplierId: string): string {

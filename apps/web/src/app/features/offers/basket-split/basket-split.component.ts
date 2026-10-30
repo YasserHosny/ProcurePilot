@@ -25,8 +25,7 @@ import type { ApiError, Product, Supplier } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
-import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
-import { UnitLabelPipe, unitLabel } from '../../../core/format/unit-label';
+import { unitLabel } from '../../../core/format/unit-label';
 import { RfqApi, type RfqDetail } from '../../rfq/rfq-api';
 import type {
   BasketItemRequest,
@@ -43,6 +42,7 @@ import {
   type BasketSplitUIState,
   determineBasketSplitUIState,
 } from './basket-split-state';
+import { formatQuantityDisplay, type QuantityDisplayResult } from './quantity-display';
 
 import { BasketSplitInfeasibleComponent } from './basket-split-infeasible.component';
 import { BasketSplitResultsComponent } from './basket-split-results.component';
@@ -80,8 +80,6 @@ export class BasketSubmitErrorStateMatcher implements ErrorStateMatcher {
     TranslatePipe,
     RouterModule,
     FormatDatePipe,
-    FormatQuantityPipe,
-    UnitLabelPipe,
     BasketSplitResultsComponent,
     BasketSplitInfeasibleComponent,
   ],
@@ -290,17 +288,14 @@ export class BasketSplitComponent implements OnInit {
     );
   }
 
-  getItemPackQuantity(item: { workspace_product_id: string; quantity: string }): number {
-    const base = parseFloat(item.quantity);
-    const snapshot = this.currentJob()?.pack_snapshot?.[item.workspace_product_id];
-    const pack = this.products().find((p) => p.id === item.workspace_product_id)?.pack;
-    const size = snapshot
-      ? parseFloat(snapshot.base_quantity)
-      : pack
-        ? parseFloat(pack.base_quantity ?? String(pack.pack_count * parseFloat(pack.unit_size)))
-        : 1;
-    const packSize = Number.isFinite(size) && size > 0 ? size : 1;
-    return Number.isFinite(base) ? base / packSize : 0;
+  quantityDisplay(item: { workspace_product_id: string; quantity: string }): QuantityDisplayResult {
+    return formatQuantityDisplay({
+      line: item,
+      product: this.products().find((p) => p.id === item.workspace_product_id),
+      packSnapshot: this.currentJob()?.pack_snapshot,
+      translate: this.translate,
+      format: this.format,
+    });
   }
 
   /** Base units (litre/kg) in one purchasing pack of the product; 1 when it has no pack info. */

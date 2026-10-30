@@ -1,11 +1,15 @@
 """Two Arabic PDF quotes (SAR, 15% VAT included) for the 2026-10-28 flow review on «مطاعم رواق».
 
-usage: python gen_quotes_review.py <out dir> <DD/MM/YYYY>
+usage: python gen_quotes_review.py <out dir> <DD/MM/YYYY> [<qty scale> <quote no. suffix>]
 Then: NODE_PATH=<web node_modules> node render_quotes_review.cjs <out dir>   (prints the two PDFs)
 
 The round-1 shape on Saudi data: four dry-goods lines to الذهبي and الوفرة, both replying with a PDF. الوفرة is
 cheaper on oil and sugar, الذهبي on rice and flour, so basket split has something to split. Names, numbers
 and VAT registration numbers are fictional; the template is gen_quotes.py's PDF one.
+
+The optional scale multiplies every quantity, and the suffix makes the quote numbers new. PPS-127's live run
+(2026-10-30) used scale 3 and suffix «-B». Each reply is then over SAR 10,000, so the workspace's
+auto-preparation guardrail (limit SAR 10,000, one response) does not convert the RFQ before it can be split.
 """
 
 import pathlib
@@ -28,16 +32,18 @@ QUOTES = {  # supplier: (quote no, per-pack prices incl. VAT)
 }
 
 
-def build(out: pathlib.Path, date: dt.date) -> None:
+def build(out: pathlib.Path, date: dt.date, scale: int = 1, suffix: str = "") -> None:
     out.mkdir(parents=True, exist_ok=True)
+    qty = {item: q * scale for item, q in QTY.items()}
     for sup, (no, prices) in QUOTES.items():
+        no += suffix
         name, addr, phone, vat, valid_days = SUPPLIERS[sup]
         rows, total = [], 0.0
         for i, (item, price) in enumerate(prices.items(), 1):
             item_name, pack = ITEMS[item]
-            line = price * QTY[item]
+            line = price * qty[item]
             total += line
-            rows.append(f"<tr><td>{i}</td><td class='n'>{item_name}</td><td>{pack}</td><td>{QTY[item]}</td>"
+            rows.append(f"<tr><td>{i}</td><td class='n'>{item_name}</td><td>{pack}</td><td>{qty[item]}</td>"
                         f"<td>{money(price)}</td><td>{money(line)}</td></tr>")
         d = date.strftime("%d/%m/%Y")
         valid = (date + dt.timedelta(days=valid_days)).strftime("%d/%m/%Y")
@@ -57,4 +63,9 @@ def build(out: pathlib.Path, date: dt.date) -> None:
 
 
 if __name__ == "__main__":
-    build(pathlib.Path(sys.argv[1]), dt.datetime.strptime(sys.argv[2], "%d/%m/%Y").date())
+    build(
+        pathlib.Path(sys.argv[1]),
+        dt.datetime.strptime(sys.argv[2], "%d/%m/%Y").date(),
+        int(sys.argv[3]) if len(sys.argv) > 3 else 1,
+        sys.argv[4] if len(sys.argv) > 4 else "",
+    )

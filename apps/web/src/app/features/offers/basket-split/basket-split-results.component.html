@@ -167,7 +167,7 @@
     }
 
     <!-- RFQ Already Converted Banner -->
-    @if (convertedRequestIds(); as cIds) {
+    @if (!preparedRequests() && effectiveConvertedRequestIds(); as cIds) {
       <div class="info-banner already-converted-banner" data-testid="already-converted-banner" role="status">
         <mat-icon class="banner-icon" aria-hidden="true">info</mat-icon>
         <div class="banner-body">

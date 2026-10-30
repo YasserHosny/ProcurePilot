@@ -904,6 +904,35 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(el.querySelector('[data-testid="rfq-split-scope"]')).not.toBeNull();
       expect(el.querySelector('form')).toBeNull();
     }));
+
+    it('PPS-127: RFQ-mode requested items renders pack quantity and base equivalent from pack_snapshot', fakeAsync(() => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+
+      const rfqJob: BasketSplitJob = {
+        ...mockFeasibleJob,
+        id: 'job-rfq-pack-display',
+        rfq_id: 'rfq-pack-1234',
+        items: [
+          { workspace_product_id: 'prod-rice', quantity: '600' },
+        ],
+        pack_snapshot: {
+          'prod-rice': { base_quantity: '10', base_unit: 'kilogram' },
+        },
+      };
+      apiService.getBasketSplitJob.and.returnValue(of(rfqJob));
+      component.fetchJob('job-rfq-pack-display');
+      tick();
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      const row = el.querySelector('.rfq-items-list .rfq-item-row');
+      expect(row).not.toBeNull();
+      expect(row?.textContent).toContain('60 × 10');
+      expect(row?.textContent).toContain('600');
+      expect(row?.querySelector('.rfq-item-qty')?.textContent?.trim()).not.toBe('60 kg');
+    }));
   });
 
   describe('PPS-126: Placeholder and duplicate product prevention', () => {
