@@ -11,6 +11,49 @@ import '../../features/approvals/split_approval_fixtures.dart';
 void main() {
   const apiBaseUrl = 'https://api.procurepilot.test/api/v1';
 
+  test('pending approvals parse a split request with no budget', () {
+    final item = splitApprovalRequests().first.toJson();
+    item['budget_status'] = {
+      'remaining_amount': null,
+      'exceeds': false,
+      'status': 'no_budget',
+      'reason_code': 'no_budget_at_cost_centre_level',
+    };
+
+    final result = PendingApprovalsList.fromJson({
+      'items': [item],
+      'next_cursor': null,
+    });
+
+    expect(result.items, hasLength(1));
+    expect(result.items.single.requestGroup!.id, splitGroupId);
+    final budget = result.items.single.budgetStatus!;
+    expect(budget.remainingAmount, isNull);
+    expect(budget.status, 'no_budget');
+    expect(budget.reasonCode, 'no_budget_at_cost_centre_level');
+    expect(budget.toJson(), {
+      'exceeds': false,
+      'status': 'no_budget',
+      'reason_code': 'no_budget_at_cost_centre_level',
+    });
+  });
+
+  test('budget status retains money with optional metadata absent', () {
+    final json = {
+      'remaining_amount': {'amount': '40.00', 'currency': 'USD'},
+      'exceeds': true,
+    };
+    final budget = BudgetStatus.fromJson(json);
+    expect(budget.remainingAmount!.toJson(), json['remaining_amount']);
+    expect(budget.exceeds, isTrue);
+    expect(budget.status, isNull);
+    expect(budget.reasonCode, isNull);
+    expect(budget.toJson(), json);
+    expect(const BudgetStatus(remainingAmount: null, exceeds: false).toJson(), {
+      'exceeds': false,
+    });
+  });
+
   test(
     'pending approvals retain split money, siblings and supplier context',
     () async {

@@ -143,3 +143,5 @@ The round-1 flow run again on «مطاعم رواق» (RFQ `d8f7fb0c` → PO-000
 outcomes), with findings R1–R18 and the owner's O1–O6: [`flow-review-2026-10-28/`](flow-review-2026-10-28/README.md).
 
 Fixes from the 2026-10-28 RFQ flow review, checked live after #314: [`flow-review-2026-10-28/fixes-pps-88/`](flow-review-2026-10-28/fixes-pps-88/README.md) (PPS-88).
+
+The round-1 flow re-walked after specs 023 and 024 (RFQ-aware matching, RFQ basket split), 2026-10-30/31: [`../../demo-tenant/round-1-rewalk-2026-10-30/`](../../demo-tenant/round-1-rewalk-2026-10-30/README.md).

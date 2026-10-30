@@ -102,6 +102,15 @@
   align-items: center;
 }
 
+.rfq-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-block-end: 16px;
+}
+
 .responses-grid {
   display: flex;
   flex-direction: column;

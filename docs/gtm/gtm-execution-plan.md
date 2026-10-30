@@ -133,6 +133,9 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-93 | PPS-124 | P-94 | PPS-125 | P-95 | PPS-126 |
 | P-96 | PPS-127 | P-97 | PPS-128 | P-98 | PPS-129 |
 | P-99 | PPS-130 | P-100 | PPS-131 | P-101 | PPS-132 |
+| P-102 | PPS-133 | | | | |
+| P-104 | PPS-135 | P-105 | PPS-136 | P-106 | PPS-137 |
+| P-107 | PPS-138 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -287,11 +290,16 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-94 | — | Approval Queue shows the requester's email (R12): find why `requester_name` is empty, give members a name, short fallback with tooltip | — | — | To Do (PPS-125) |
 | [ ] P-95 | — | Basket Split input (flow review R15): new rows start empty, no duplicate product in one basket, pack hint no longer overlaps the next row | — | — | To Do (PPS-126) |
 | [ ] P-96 | — | Basket Split from an RFQ and back (R16): start a split from RFQ Responses pre-filled; «Prepare requests» from the result (one draft per supplier, 024 request groups). Fold into the next 024 phase if already planned | — | — | To Do (PPS-127) |
-| [ ] P-97 | — | Record outcome (R17): no trailing zeros («675.000000», «1230.0000»); the «excl. tax» label follows the VAT basis decided in P-91 | — | — | In Progress (PPS-128): trailing zeros in [#355](https://github.com/YasserHosny/ProcurePilot/pull/355); the label waits on P-91 |
-| [ ] P-98 | — | Savings baseline from a quoted price (R18): pack price × packs like the PO path, so 85 × 15 = 1,275.00 not 1,275.01 (`savings/baseline.py` ~159–162) | — | — | In Review (PPS-129, [#355](https://github.com/YasserHosny/ProcurePilot/pull/355)) |
+| [ ] P-97 | — | Record outcome (R17): no trailing zeros («675.000000», «1230.0000»); the «excl. tax» label follows the VAT basis decided in P-91 | — | — | In Progress (PPS-128): trailing zeros fixed in #355 (checked live, `fixes-pps-128-129/`); the label follows the P-91 VAT decision, built separately |
+| [x] P-98 | — | Savings baseline from a quoted price (R18): pack price × packs like the PO path, so 85 × 15 = 1,275.00 not 1,275.01 (`savings/baseline.py` ~159–162) | Orch (Codex API) | — | Done (PPS-129), #355; checked live 2026-10-30 on PO-000009, `fixes-pps-128-129/` |
 | [ ] P-99 | — | Confirm & Authorize returns before preparing matching (follow-up to P-89 / R7): `POST /confirm` 6.0 s on hosted, ~4 s of it the synchronous `quotation_matches`; prepare it in the background (RQ) and keep a confirmed quote's matching prepared even if nobody opens it | — | — | To Do (PPS-130) |
 | [x] P-100 | — | «Docs screenshots drift» failed on every web PR since #344: the capture submitted an empty Basket Split form. It now fills row 1 first; screenshots 11 and 11b re-rendered | Orch (Agy) | — | Done (PPS-131), #353 merged with the drift job green |
 | [x] P-101 | — | The Purchase Requests list showed the «Create order» cart icon on fully ordered and withdrawn requests (PPS-119 follow-up): `GET /requests` carries `has_quantity_to_order`, and the icon shows only while something is left to order | Orch (Codex API, Agy web, Claude in Chrome) | — | Done (PPS-132), #357; checked live 2026-10-30, `fixes-pps-118-119/` 10 |
+| [ ] P-102 | — | `GET /quotations/{id}/matches` takes 3–6 s on a prepared 4-line quote: one round trip per line, candidate and task, and preparation re-run on every read (`matching/service.py` `quotation_matches`). Batch the reads and skip preparation once settled; confirm-side background prep stays with PPS-130 | — | — | In Review (PPS-133) |
+| [ ] P-104 | — | Make «Docs screenshots drift» a required check: the workflow runs on every PR, its `changes` job skips the capture on unrelated paths, and a «Regenerate and diff» gate passes on a rightful skip but fails if the filter fails (a workflow-level `paths:` filter never reports, so a required check would wait forever on docs-only PRs); then add it to main's required checks once it has reported on a docs-only and a web PR | Orch (Claude) | — | In Progress (PPS-135) |
+| [ ] P-105 | — | «End-to-end» passed when the `changes` path filter failed: `e2e-shard` was skipped on the failed dependency and a skip counted as a pass, so no end-to-end test ran. The gate now fails unless `changes` succeeded, and accepts a skipped matrix only when there is no code change | Orch (Claude) | — | In Review (PPS-136) |
+| [x] P-106 | — | The phone's approval list was empty whenever a pending request had no budget: since #112 the API sends `budget_status.remaining_amount = null` («no budget»), and the app's `BudgetStatus.fromJson` threw on it, so nothing could be approved on the phone on a workspace without budgets. Found in the 023/024 round-1 re-walk; the amount is now optional and the screens show «No budget configured» | Orch (Codex) | — | Done (PPS-137), #368; proven live in the round-1 re-walk |
+| [ ] P-107 | — | «Dependency audit» failed on main and every PR: new advisories CVE-2026-119194..119197 on `pyasn1 0.6.4` (transitive via python-jose and rsa, `apps/api` only). `pyasn1>=0.6.5` added as a uv constraint, lock regenerated; no new `--ignore-vuln` | Orch (Claude) | — | In Review (PPS-138) |
 
 ### E — Pilot environment
 

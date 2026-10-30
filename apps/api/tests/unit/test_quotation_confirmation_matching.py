@@ -221,6 +221,18 @@ def test_matching_preparation_never_routes_a_partial_candidate_set(
     monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
     monkeypatch.setattr(matching_module, "_decision_for_line", lambda *_a: None)
     monkeypatch.setattr(matching_module, "_candidate_rows", lambda *_a: list(visible))
+    # The competing GET reads every line's candidates in one statement.
+    monkeypatch.setattr(
+        matching_module._LineMatchState,  # noqa: SLF001
+        "read",
+        classmethod(
+            lambda cls, _client, _lines: cls(
+                candidates={str(line["id"]): list(visible)} if visible else {},
+                decisions={},
+                tasks={},
+            )
+        ),
+    )
     monkeypatch.setattr(
         service, "_create_automatic_decision", lambda *_a, **_k: decisions.append(True)
     )
@@ -268,8 +280,12 @@ def test_matching_deterministic_preparation_preserves_below_threshold_auto_accep
     decisions: list[object] = []
     task_reasons: list[object] = []
     monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
+    monkeypatch.setattr(
+        matching_module._LineMatchState,  # noqa: SLF001
+        "read",
+        classmethod(lambda cls, _client, _lines: cls(candidates={}, decisions={}, tasks={})),
+    )
     monkeypatch.setattr(matching_module, "_decision_for_line", lambda *_a: None)
-    monkeypatch.setattr(matching_module, "_candidate_rows", lambda *_a: [])
     for name in (
         "_deterministic_products_for_line",
         "_aliases_for_line",
@@ -301,3 +317,40 @@ def test_matching_deterministic_preparation_preserves_below_threshold_auto_accep
     else:
         assert decisions == []
         assert task_reasons == ["low_confidence"]
+
+
+def test_matching_preparation_skips_a_line_decided_after_the_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # PPS-133: the batched snapshot is read before the RFQ read, embedding backfill and other
+    # lines' searches. A buyer may decide a line in that window; it must not get a new task.
+    service = MatchingService(get_settings())
+    member = _member()
+    line = {"id": uuid4(), "quotation_id": uuid4(), "line_number": 1}
+    candidate = {
+        "id": uuid4(),
+        "candidate_workspace_product_id": uuid4(),
+        "confidence": "0.40",
+        "reasons": {},
+    }
+    routed: list[object] = []
+    monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
+    monkeypatch.setattr(
+        matching_module._LineMatchState,  # noqa: SLF001
+        "read",
+        classmethod(
+            lambda cls, _client, _lines: cls(
+                candidates={str(line["id"]): [candidate]}, decisions={}, tasks={}
+            )
+        ),
+    )
+    monkeypatch.setattr(matching_module, "_decision_for_line", lambda *_a: {"id": uuid4()})
+    monkeypatch.setattr(service, "_route_or_accept", lambda *_a, **_k: routed.append(True))
+    service._ensure_pipeline(  # noqa: SLF001
+        client=object(),
+        member=member,
+        quote={"id": line["quotation_id"]},
+        lines=[line],
+        bearer_token="caller-token",
+    )
+    assert routed == []
