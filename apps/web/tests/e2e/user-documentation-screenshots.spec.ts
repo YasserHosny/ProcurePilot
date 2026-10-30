@@ -196,6 +196,23 @@ test.describe('User documentation screenshots', () => {
     await page.goto('/offers/basket-split');
     await expect(page.locator('.page-title')).toContainText('Basket Split');
     await waitForNoVisibleLoading(page);
+
+    const supplier1Select = page.locator('.suppliers-grid .supplier-field mat-select').nth(0);
+    const supplier2Select = page.locator('.suppliers-grid .supplier-field mat-select').nth(1);
+    if ((await supplier1Select.locator('.mat-mdc-select-value-text').count()) === 0) {
+      await openAsyncSelect(page, supplier1Select);
+      await page.locator('mat-option:not([aria-disabled="true"])').first().click();
+    }
+    if ((await supplier2Select.locator('.mat-mdc-select-value-text').count()) === 0) {
+      await openAsyncSelect(page, supplier2Select);
+      await page.locator('mat-option:not([aria-disabled="true"])').first().click();
+    }
+
+    const firstRow = page.locator('.items-list .item-row').first();
+    await openAsyncSelect(page, firstRow.locator('.item-product-field mat-select'));
+    await page.locator('mat-option').first().click();
+    await firstRow.locator('.item-qty-field input').fill('10');
+
     const submitBasket = page.locator('.submit-btn');
     if ((await submitBasket.count()) > 0 && await submitBasket.isEnabled()) {
       await submitBasket.click();
