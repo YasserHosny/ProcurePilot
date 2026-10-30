@@ -321,9 +321,19 @@ class _ApprovalGroupSection extends StatelessWidget {
                     ),
                   ),
                   if (request.budgetStatus != null) ...[
-                    Text(
-                      '${i18n.t('requests.budgetStatus.remainingLabel')}: ${money(request.budgetStatus!.remainingAmount)}',
-                    ),
+                    if (request.budgetStatus!.remainingAmount != null)
+                      Text(
+                        '${i18n.t('requests.budgetStatus.remainingLabel')}: ${money(request.budgetStatus!.remainingAmount!)}',
+                      )
+                    else ...[
+                      Text(i18n.t('approvals.budgetStatus.no_budget')),
+                      if (request.budgetStatus!.reasonCode != null)
+                        Text(
+                          i18n.t(
+                            'approvals.budgetStatus.reasons.${request.budgetStatus!.reasonCode}',
+                          ),
+                        ),
+                    ],
                     if (request.budgetStatus!.exceeds)
                       Text(
                         i18n.t('approvals.budgetExceeded'),

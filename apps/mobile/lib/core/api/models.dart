@@ -340,23 +340,34 @@ class ApprovalStep {
 /// Budget status for a purchase request.
 @immutable
 class BudgetStatus {
-  const BudgetStatus({required this.remainingAmount, required this.exceeds});
+  const BudgetStatus({
+    required this.remainingAmount,
+    required this.exceeds,
+    this.status,
+    this.reasonCode,
+  });
 
-  final Money remainingAmount;
+  final Money? remainingAmount;
   final bool exceeds;
+  final String? status;
+  final String? reasonCode;
 
   factory BudgetStatus.fromJson(Map<String, dynamic> json) {
     return BudgetStatus(
-      remainingAmount: Money.fromJson(
-        json['remaining_amount'] as Map<String, dynamic>,
-      ),
+      remainingAmount: json['remaining_amount'] == null
+          ? null
+          : Money.fromJson(json['remaining_amount'] as Map<String, dynamic>),
       exceeds: json['exceeds'] as bool,
+      status: json['status'] as String?,
+      reasonCode: json['reason_code'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'remaining_amount': remainingAmount.toJson(),
+        if (remainingAmount != null) 'remaining_amount': remainingAmount!.toJson(),
         'exceeds': exceeds,
+        if (status != null) 'status': status,
+        if (reasonCode != null) 'reason_code': reasonCode,
       };
 }
 
