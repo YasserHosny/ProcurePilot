@@ -453,7 +453,7 @@ Tracks a purchase order's lifecycle — submitted, confirmed by the supplier, de
 
 **Route:** `/orders/new` (Owner/Buyer), or `/orders/:id/edit` to edit an existing draft
 
-Reached from **Create Order** on the order list (blank), **From approved request** on the order list (pick an approved request from the menu), the **Create Order** icon on a request whose approval decision is Approved — such a request is listed with status `ordered` in Purchase Requests (§18), not `approved`, or **Create purchase order** on an approved request's own page (§19), shown only while some line still has quantity left to order. All of them open this form; none places an order without it.
+Reached from **Create Order** on the order list (blank), **From approved request** on the order list (pick an approved request from the menu), the **Create Order** icon on a request whose approval decision is Approved and that still has something left to order — such a request is listed with status `ordered` in Purchase Requests (§18), not `approved`, or **Create purchase order** on an approved request's own page (§19), shown only while some line still has quantity left to order. All of them open this form; none places an order without it.
 
 | # | Element | Description |
 |---|---------|-------------|
