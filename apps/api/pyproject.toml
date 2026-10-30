@@ -46,6 +46,11 @@ dev = [
     "ruff",
 ]
 
+[tool.uv]
+# Transitive floors, not direct dependencies: pyasn1 arrives via python-jose and rsa.
+# 0.6.5 fixes CVE-2026-119194..119197 (PPS-138).
+constraint-dependencies = ["pyasn1>=0.6.5"]
+
 [tool.uv.sources]
 procurepilot-logging = { path = "../../packages/py-logging", editable = true }
 
