@@ -94,15 +94,40 @@ export class RequestFormComponent implements OnInit {
   readonly existingRequest = signal<PurchaseRequest | null>(null);
   readonly isEditMode = signal<boolean>(false);
 
+  private submitIdempotencyKey: string | null = null;
+  private withdrawIdempotencyKey: string | null = null;
+
   readonly isReadOnly = computed<boolean>(() => {
     const req = this.existingRequest();
-    return req !== null && req.status !== 'draft';
+    return req !== null && (req.status !== 'draft' || !!req.request_group);
   });
 
   readonly canCreateOrder = computed<boolean>(() => {
     const req = this.existingRequest();
     return req !== null && req.approval_step?.status === 'approved';
   });
+
+  readonly canWithdraw = computed<boolean>(() => {
+    const req = this.existingRequest();
+    return req !== null && (req.status === 'draft' || req.status === 'submitted');
+  });
+
+  getGroupSubmitLabel(size: number): string {
+    if (this.isSubmitting()) {
+      return this.translate.instant(`${I18N}.form.submittingButton`);
+    }
+    if (size === 2) {
+      return this.translate.instant(`${I18N}.split.submitBoth`);
+    }
+    return this.translate.instant(`${I18N}.split.submitAll`, { count: size });
+  }
+
+  getGroupWithdrawLabel(size: number): string {
+    if (size === 2) {
+      return this.translate.instant(`${I18N}.split.withdrawBoth`);
+    }
+    return this.translate.instant(`${I18N}.split.withdrawAll`, { count: size });
+  }
 
   readonly memberEmailById = computed<Map<string, string>>(() => {
     const byId = new Map<string, string>();
@@ -191,6 +216,11 @@ export class RequestFormComponent implements OnInit {
   }
 
   saveDraft(): void {
+    const existing = this.existingRequest();
+    if (existing?.request_group) {
+      return;
+    }
+
     if (this.form.invalid || this.lines.length === 0) {
       this.form.markAllAsTouched();
       return;
@@ -201,7 +231,6 @@ export class RequestFormComponent implements OnInit {
 
     const body = this.buildRequestPayload();
 
-    const existing = this.existingRequest();
     const obs = existing
       ? this.requestsApi.updateRequest(existing.id, body)
       : this.requestsApi.createRequest(body);
@@ -230,7 +259,7 @@ export class RequestFormComponent implements OnInit {
       return;
     }
 
-    if (this.form.invalid || this.lines.length === 0) {
+    if (!existing.request_group && (this.form.invalid || this.lines.length === 0)) {
       this.form.markAllAsTouched();
       this.errorMessage.set(this.getValidationErrorMessage());
       return;
@@ -239,30 +268,63 @@ export class RequestFormComponent implements OnInit {
     this.isSubmitting.set(true);
     this.errorMessage.set(null);
 
-    const body = this.buildRequestPayload();
+    if (!this.submitIdempotencyKey) {
+      this.submitIdempotencyKey = crypto.randomUUID();
+    }
+    const key = this.submitIdempotencyKey;
 
-    this.requestsApi
-      .updateRequest(existing.id, body)
-      .pipe(
-        tap((saved) => {
-          this.existingRequest.set(saved);
-          this.form.markAsPristine();
-        }),
-        switchMap((saved) => this.requestsApi.submitRequest(saved.id)),
-      )
-      .subscribe({
-        next: () => {
-          this.isSubmitting.set(false);
-          this.snackBar.open(this.translate.instant(`${I18N}.submitSuccess`), undefined, {
-            duration: 3500,
-          });
-          this.router.navigate(['/requests']);
-        },
-        error: (err: unknown) => {
-          this.isSubmitting.set(false);
-          this.handleError(err);
-        },
-      });
+    const submitObs$: Observable<unknown> = existing.request_group
+      ? this.requestsApi.submitGroup(existing.request_group.id, key)
+      : this.requestsApi.updateRequest(existing.id, this.buildRequestPayload()).pipe(
+          tap((saved) => {
+            this.existingRequest.set(saved);
+            this.form.markAsPristine();
+          }),
+          switchMap((saved) => this.requestsApi.submitRequest(saved.id)),
+        );
+
+    submitObs$.subscribe({
+      next: () => {
+        this.submitIdempotencyKey = null;
+        this.isSubmitting.set(false);
+        this.snackBar.open(this.translate.instant(`${I18N}.submitSuccess`), undefined, {
+          duration: 3500,
+        });
+        this.router.navigate(['/requests']);
+      },
+      error: (err: unknown) => {
+        this.isSubmitting.set(false);
+        this.handleError(err);
+      },
+    });
+  }
+
+  withdrawRequest(): void {
+    const req = this.existingRequest();
+    if (!req) {
+      return;
+    }
+    const isGroup = !!req.request_group;
+
+    if (!this.withdrawIdempotencyKey) {
+      this.withdrawIdempotencyKey = crypto.randomUUID();
+    }
+    const key = this.withdrawIdempotencyKey;
+
+    const withdrawObs$: Observable<unknown> = isGroup
+      ? this.requestsApi.withdrawGroup(req.request_group!.id, key)
+      : this.requestsApi.withdrawRequest(req.id, key);
+
+    withdrawObs$.subscribe({
+      next: () => {
+        this.withdrawIdempotencyKey = null;
+        this.snackBar.open(this.translate.instant(`${I18N}.withdrawSuccess`), undefined, {
+          duration: 3500,
+        });
+        this.router.navigate(['/requests']);
+      },
+      error: (err: unknown) => this.handleError(err),
+    });
   }
 
   navigateToCreateOrder(): void {
@@ -383,7 +445,7 @@ export class RequestFormComponent implements OnInit {
           required_by_date: parseIsoDateLocal(req.required_by_date),
         });
 
-        const isReadOnly = req.status !== 'draft';
+        const isReadOnly = req.status !== 'draft' || !!req.request_group;
         this.lines.clear();
         for (const line of req.lines) {
           const displayQty = isReadOnly ? this.formatQuantity(line.quantity) : trimDecimal(line.quantity);
@@ -411,6 +473,11 @@ export class RequestFormComponent implements OnInit {
   private handleError(err: unknown): void {
     if (err instanceof HttpErrorResponse) {
       const apiError = err.error as ApiError | undefined;
+      const details = apiError?.details as { reason?: string } | undefined;
+      if (err.status === 409 && details?.reason === 'part_of_split') {
+        this.errorMessage.set(this.translate.instant(`${I18N}.partOfSplitError`));
+        return;
+      }
       this.errorMessage.set(
         apiError?.message ?? err.message ?? this.translate.instant(`${I18N}.genericError`),
       );

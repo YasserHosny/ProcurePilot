@@ -228,6 +228,37 @@ td.date-cell {
   white-space: nowrap;
 }
 
+.split-group-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+
+  .split-group-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--pp-text-strong);
+    line-height: 1.4;
+  }
+}
+
+.group-budget-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.group-budget-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+
+  .group-budget-supplier {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--pp-text-muted);
+  }
+}
+
 .lines-toggle-btn {
   display: inline-flex;
   align-items: center;
@@ -286,6 +317,41 @@ td.date-cell {
   padding-block: 1rem;
   background-color: var(--pp-surface-page);
   border-inline-start: 4px solid var(--pp-info);
+}
+
+.group-details-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-inline: 1.5rem;
+  padding-block: 1rem;
+  background-color: var(--pp-surface-page);
+  border-inline-start: 4px solid var(--pp-info);
+}
+
+.group-request-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.group-request-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+
+  .group-request-supplier {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--pp-text-strong);
+  }
+
+  .group-request-total {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--pp-text-strong);
+  }
 }
 
 .line-details-title {
