@@ -41,6 +41,7 @@ import { MatchResolutionCandidatesComponent } from './match-resolution-candidate
 import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS } from './correct-match-dialog.component';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
+import { formatSweptLinesMessage, appendSweptMessage } from '../matching-api';
 
 @Component({
   selector: 'app-match-resolution',
@@ -498,11 +499,14 @@ export class MatchResolutionComponent implements OnInit {
         this.isSubmitting.set(false);
         this.decision.set(decision);
         if (resolveNext) {
-          this.navigateToNextTask(l.id);
+          this.navigateToNextTask(l.id, decision);
           return;
         }
+        const baseMsg = this.translate.instant('matching.resolution.actions.saveSuccess');
+        const swept = formatSweptLinesMessage(this.translate, decision.lines_matched_by_same_wording);
+        const msg = swept ? appendSweptMessage(baseMsg, swept) : baseMsg;
         this.snackBar.open(
-          this.translate.instant('matching.resolution.actions.saveSuccess'),
+          msg,
           undefined,
           { duration: 3500 },
         );
@@ -516,22 +520,28 @@ export class MatchResolutionComponent implements OnInit {
     });
   }
 
-  private navigateToNextTask(resolvedLineId: string): void {
+  private navigateToNextTask(resolvedLineId: string, decision?: MatchDecision): void {
     const excludeTaskId = this.task()?.id ?? resolvedLineId;
     if (this.api.getNextMatchTask) {
       this.api.getNextMatchTask(excludeTaskId).subscribe({
         next: (res) => {
           if (res.next_quotation_line_id) {
+            const baseMsg = this.translate.instant('matching.resolution.actions.saveSuccess');
+            const swept = formatSweptLinesMessage(this.translate, decision?.lines_matched_by_same_wording);
+            const msg = swept ? appendSweptMessage(baseMsg, swept) : baseMsg;
             this.snackBar.open(
-              this.translate.instant('matching.resolution.actions.saveSuccess'),
+              msg,
               undefined,
               { duration: 3500 },
             );
             void this.router.navigate(['/matching', res.next_quotation_line_id]);
             return;
           }
+          const queueClearedMsg = this.translate.instant('matching.resolution.actions.queueCleared');
+          const swept = formatSweptLinesMessage(this.translate, decision?.lines_matched_by_same_wording);
+          const msg = swept ? appendSweptMessage(queueClearedMsg, swept) : queueClearedMsg;
           this.snackBar.open(
-            this.translate.instant('matching.resolution.actions.queueCleared'),
+            msg,
             undefined,
             { duration: 3500 },
           );
@@ -602,8 +612,11 @@ export class MatchResolutionComponent implements OnInit {
         this.correctionKey = null;
         this.decision.set(res.decision);
 
+        const baseMsg = this.translate.instant('matching.resolution.actions.correctSuccess');
+        const swept = formatSweptLinesMessage(this.translate, res.lines_matched_by_same_wording);
+        const msg = swept ? appendSweptMessage(baseMsg, swept) : baseMsg;
         this.snackBar.open(
-          this.translate.instant('matching.resolution.actions.correctSuccess'),
+          msg,
           undefined,
           { duration: 3500 },
         );

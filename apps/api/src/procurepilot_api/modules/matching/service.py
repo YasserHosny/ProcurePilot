@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -25,6 +26,7 @@ from procurepilot_api.modules.matching.embeddings import (
     get_embedding_provider,
     vector_literal,
 )
+from procurepilot_api.modules.matching.exact import normalise_name
 from procurepilot_api.modules.matching.quoted_exposure import quoted_exposure
 from procurepilot_api.modules.matching.rfq_fit import RULE_VERSION as RFQ_FIT_VERSION
 from procurepilot_api.modules.matching.rfq_fit import RfqFit, fit_against_rfq
@@ -77,6 +79,11 @@ DECISION_COLUMNS = (
     "is_automatic,decided_by,decided_at,confidence,alias_id,created_at,"
     "supersedes_decision_id,learned_from_decision_id"
 )
+logger = logging.getLogger(__name__)
+ALIAS_SWEEP_LIMIT = 200
+ALIAS_SWEEP_SCAN_LIMIT = 1000
+ALIAS_SWEEP_BATCH = 100
+
 ALIAS_COLUMNS = "id,workspace_product_id,supplier_id,alias_text,created_by,created_at"
 
 
@@ -446,11 +453,11 @@ class MatchingService:
                 ) top_candidate on true
                 where md.tenant_id = %(tenant_id)s
                   and (md.is_automatic or md.supersedes_decision_id is not null)
-                  and (md.is_automatic or not exists (
+                  and not exists (
                       select 1 from match_task existing_task
                       where existing_task.tenant_id = md.tenant_id
                         and existing_task.quotation_line_id = md.quotation_line_id
-                  ))
+                  )
             )
             select *,
                    case priority
@@ -828,6 +835,139 @@ class MatchingService:
             fuzzy_auto_accept_withheld=fuzzy_auto_accept_withheld,
         )
 
+    def sweep_open_lines_for_alias(
+        self,
+        client: object,
+        member: CurrentMember,
+        alias_row: dict[str, object],
+        learned_from_decision_id: UUID,
+        bearer_token: str,
+        *,
+        defer_guardrail: Callable[[UUID], None] | None = None,
+    ) -> list[UUID]:
+        """Inspect the newest 1,000 open tasks; match at most 200 lines per alias.
+
+        Batched member-client reads retain RLS, including current-decision reads. Scanning
+        is bounded separately so unrelated wording cannot make a request unbounded.
+        Existing candidates are immutable evidence: reuse the product row or append a rank.
+        """
+        swept: list[UUID] = []
+        quotations: set[UUID] = set()
+        try:
+            text = normalise_name(alias_row["alias_text"])
+            if not text:
+                return swept
+            deterministic = find_deterministic_candidate(
+                line={"original_text": alias_row["alias_text"]},
+                products=[],
+                aliases=[alias_row],
+                supplier_code_aliases=[],
+            )
+            assert deterministic is not None  # Comparing the alias with its own text always hits.
+            tasks = _rows(
+                client.table("match_task")
+                .select(TASK_COLUMNS)
+                .in_("status", ["open", "in_progress"])
+                .order("created_at", desc=True)
+                .order("id", desc=True)
+                .limit(ALIAS_SWEEP_SCAN_LIMIT)
+                .execute()
+                .data
+            )
+            for offset in range(0, len(tasks), ALIAS_SWEEP_BATCH):
+                ids = [
+                    str(task["quotation_line_id"])
+                    for task in tasks[offset : offset + ALIAS_SWEEP_BATCH]
+                ]
+                lines = {
+                    str(row["id"]): row
+                    for row in _rows(
+                        client.table("quotation_line")
+                        .select(LINE_COLUMNS)
+                        .in_("id", ids)
+                        .execute()
+                        .data
+                    )
+                }
+                decided = {
+                    str(row["quotation_line_id"])
+                    for row in _rows(
+                        client.table("current_match_decision")
+                        .select("quotation_line_id")
+                        .in_("quotation_line_id", ids)
+                        .execute()
+                        .data
+                    )
+                }
+                for line_id in ids:
+                    line = lines.get(line_id)
+                    if (
+                        line is None
+                        or line_id in decided
+                        or normalise_name(line["original_text"]) != text
+                    ):
+                        continue
+                    if len(swept) >= ALIAS_SWEEP_LIMIT:
+                        return swept
+                    candidates = _candidate_rows(client, UUID(line_id))
+                    candidate = next(
+                        (
+                            row
+                            for row in candidates
+                            if str(row["candidate_workspace_product_id"])
+                            == str(alias_row["workspace_product_id"])
+                        ),
+                        None,
+                    )
+                    if candidate is None:
+                        candidate = _one_row(
+                            client.table("match_candidate")
+                            .insert(
+                                {
+                                    "tenant_id": str(member.tenant_id),
+                                    "quotation_line_id": line_id,
+                                    "candidate_workspace_product_id": str(
+                                        alias_row["workspace_product_id"]
+                                    ),
+                                    "confidence": decimal_string(deterministic.confidence),
+                                    "reasons": deterministic.reasons,
+                                    "rank": max((int(row["rank"]) for row in candidates), default=0)
+                                    + 1,
+                                    "scoring_version": SCORING_VERSION,
+                                    "embedding_model": self._embeddings.model,
+                                }
+                            )
+                            .execute()
+                            .data,
+                            resource="match_candidate",
+                        )
+                    decision = self._create_automatic_decision(
+                        client,
+                        member,
+                        line,
+                        {**candidate, "confidence": decimal_string(deterministic.confidence)},
+                        bearer_token=bearer_token,
+                        defer_guardrail=quotations.add,
+                        alias_id=UUID(str(alias_row["id"])),
+                        learned_from_decision_id=learned_from_decision_id,
+                    )
+                    if decision is not None:
+                        swept.append(UUID(line_id))
+        except Exception:
+            logger.exception("Alias sweep failed for alias %s", alias_row.get("id"))
+        finally:
+            for quotation_id in sorted(quotations):
+                try:
+                    if defer_guardrail is None:
+                        enqueue_guardrail_evaluation(
+                            self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
+                        )
+                    else:
+                        defer_guardrail(quotation_id)
+                except Exception:
+                    logger.exception("Alias sweep guardrail enqueue failed for %s", quotation_id)
+        return swept
+
     def _create_automatic_decision(
         self,
         client: object,
@@ -837,7 +977,9 @@ class MatchingService:
         *,
         bearer_token: str | None = None,
         defer_guardrail: Callable[[UUID], None] | None = None,
-    ) -> dict[str, object]:
+        alias_id: UUID | None = None,
+        learned_from_decision_id: UUID | None = None,
+    ) -> dict[str, object] | None:
         try:
             response = (
                 client.table("match_decision")
@@ -851,6 +993,11 @@ class MatchingService:
                         "selected_match_candidate_id": str(candidate["id"]),
                         "outcome": "same_product",
                         "is_automatic": True,
+                        "decided_by": None,
+                        "alias_id": str(alias_id) if alias_id else None,
+                        "learned_from_decision_id": str(learned_from_decision_id)
+                        if learned_from_decision_id
+                        else None,
                         "confidence": decimal_string(candidate["confidence"]),
                     }
                 )
@@ -858,11 +1005,19 @@ class MatchingService:
             )
         except APIError as exc:
             if exc.code == "23505":
+                if learned_from_decision_id is not None:
+                    return None  # A concurrent human or automatic runner decided first.
                 existing = _decision_for_line(client, UUID(str(line["id"])))
                 if existing is not None:
                     return existing
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         decision = _one_row(response.data, resource="match_decision")
+        if learned_from_decision_id is not None:
+            client.table("match_task").update(
+                {"status": "resolved", "resolved_at": datetime.now(UTC).isoformat()}
+            ).eq("quotation_line_id", str(line["id"])).in_(
+                "status", ["open", "in_progress"]
+            ).execute()
         quotation_id = UUID(str(line["quotation_id"]))
         if defer_guardrail is None:
             enqueue_guardrail_evaluation(
@@ -874,8 +1029,17 @@ class MatchingService:
             self._record(
                 bearer_token=bearer_token,
                 member=member,
-                action="matching.auto_accepted",
+                action="matching.alias_sweep_matched"
+                if learned_from_decision_id
+                else "matching.auto_accepted",
                 target={
+                    "alias_id": str(alias_id),
+                    "learned_from_decision_id": str(learned_from_decision_id),
+                    "decision_id": str(decision["id"]),
+                    "quotation_line_id": str(line["id"]),
+                }
+                if learned_from_decision_id
+                else {
                     "quotation_id": str(line["quotation_id"]),
                     "quotation_line_id": str(line["id"]),
                     "decision_id": str(decision["id"]),
@@ -1062,10 +1226,7 @@ class MatchingService:
                 continue
             if reason is not None and synthetic_row["reason"] != reason:
                 continue
-            if (
-                dec.get("supersedes_decision_id") is not None
-                and _latest_task_for_line(client, UUID(str(dec["quotation_line_id"]))) is not None
-            ):
+            if _latest_task_for_line(client, UUID(str(dec["quotation_line_id"]))) is not None:
                 continue
             try:
                 task = self._task(client, synthetic_row, line_row=line)

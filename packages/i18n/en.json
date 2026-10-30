@@ -1299,6 +1299,13 @@
         "skipped": "{{count}} could not be confirmed (alias conflict or already resolved). Open them individually to resolve."
       }
     },
+    "sweptLines": {
+      "one": "Also matched 1 more line with the same wording",
+      "two": "Also matched {{count}} more lines with the same wording",
+      "few": "Also matched {{count}} more lines with the same wording",
+      "many": "Also matched {{count}} more lines with the same wording",
+      "other": "Also matched {{count}} more lines with the same wording"
+    },
     "resolution": {
       "title": "Match Resolution",
       "subtitle": "Review candidate matches, evaluate signal evidence, and resolve the quotation line.",

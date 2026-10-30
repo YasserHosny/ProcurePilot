@@ -6,6 +6,7 @@ import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import { ApiService } from '../../../core/api/api.service';
 import type {
   LandedCost,
@@ -1003,6 +1004,215 @@ describe('MatchResolutionComponent (T039)', () => {
 
       const text = fixture.nativeElement.textContent as string;
       expect(text).toContain('Someone changed this match — reload');
+    });
+  });
+
+  describe('alias sweep feedback notices (US3 / T026)', () => {
+    let snackSpy: jasmine.Spy;
+
+    beforeEach(() => {
+      const snackBar = (component as unknown as { snackBar: { open: jasmine.Spy } }).snackBar;
+      snackSpy = spyOn(snackBar, 'open');
+    });
+
+    it('resolution with 3 swept lines adds "Also matched 3 more lines with the same wording"', () => {
+      apiService.resolveMatch.and.returnValue(
+        of({
+          ...mockDecision,
+          lines_matched_by_same_wording: ['swept-1', 'swept-2', 'swept-3'],
+        }),
+      );
+
+      component.confirmResolution();
+
+      expect(snackSpy).toHaveBeenCalledWith(
+        jasmine.stringMatching(/Also matched 3 more lines/),
+        undefined,
+        { duration: 3500 },
+      );
+    });
+
+    it('resolution with 1 swept line uses singular "Also matched 1 more line"', () => {
+      apiService.resolveMatch.and.returnValue(
+        of({
+          ...mockDecision,
+          lines_matched_by_same_wording: ['swept-1'],
+        }),
+      );
+
+      component.confirmResolution();
+
+      expect(snackSpy).toHaveBeenCalledWith(
+        jasmine.stringMatching(/Also matched 1 more line/),
+        undefined,
+        { duration: 3500 },
+      );
+    });
+
+    it('resolution with null/empty swept lines leaves snackbar text unchanged from today', () => {
+      apiService.resolveMatch.and.returnValue(
+        of({
+          ...mockDecision,
+          lines_matched_by_same_wording: null,
+        }),
+      );
+
+      component.confirmResolution();
+
+      expect(snackSpy).toHaveBeenCalledWith(
+        enCatalog.matching.resolution.actions.saveSuccess,
+        undefined,
+        { duration: 3500 },
+      );
+    });
+
+    it('resolve-and-next with 2 swept lines and no next task includes both queue-cleared and swept message', () => {
+      const router = (component as unknown as { router: { navigate: (...args: unknown[]) => Promise<boolean> } }).router;
+      spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+      apiService.resolveMatch.and.returnValue(
+        of({
+          ...mockDecision,
+          lines_matched_by_same_wording: ['swept-1', 'swept-2'],
+        }),
+      );
+      apiService.getNextMatchTask.and.returnValue(of({ next_task_id: null, next_quotation_line_id: null }));
+
+      component.confirmResolution(true);
+
+      expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1');
+      expect(snackSpy).toHaveBeenCalledWith(
+        jasmine.stringMatching(/All match tasks resolved — queue cleared.*Also matched 2 more lines/),
+        undefined,
+        { duration: 3500 },
+      );
+    });
+
+    it('correction with 3 swept lines adds "Also matched 3 more lines with the same wording"', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          decision: mockDecision,
+        }),
+      );
+      apiService.correctMatch.and.returnValue(
+        of({
+          decision: { ...mockDecision, id: 'dec-corrected-3' },
+          superseded_decision_id: mockDecision.id,
+          lines_matched_through_old_wording: [],
+          lines_matched_by_same_wording: ['swept-1', 'swept-2', 'swept-3'],
+        }),
+      );
+
+      component.executeCorrection('line-99', {
+        expected_current_decision_id: mockDecision.id,
+        outcome: 'same_product',
+        selected_match_candidate_id: 'cand-2',
+        learn_alias: true,
+      });
+
+      expect(snackSpy).toHaveBeenCalledWith(
+        jasmine.stringMatching(/Also matched 3 more lines/),
+        undefined,
+        { duration: 3500 },
+      );
+    });
+
+    it('correction with 1 swept line uses singular "Also matched 1 more line"', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          decision: mockDecision,
+        }),
+      );
+      apiService.correctMatch.and.returnValue(
+        of({
+          decision: { ...mockDecision, id: 'dec-corrected-1' },
+          superseded_decision_id: mockDecision.id,
+          lines_matched_through_old_wording: [],
+          lines_matched_by_same_wording: ['swept-1'],
+        }),
+      );
+
+      component.executeCorrection('line-99', {
+        expected_current_decision_id: mockDecision.id,
+        outcome: 'same_product',
+        selected_match_candidate_id: 'cand-2',
+        learn_alias: true,
+      });
+
+      expect(snackSpy).toHaveBeenCalledWith(
+        jasmine.stringMatching(/Also matched 1 more line/),
+        undefined,
+        { duration: 3500 },
+      );
+    });
+
+    it('correction with null/empty swept lines leaves snackbar text unchanged from today', () => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          decision: mockDecision,
+        }),
+      );
+      apiService.correctMatch.and.returnValue(
+        of({
+          decision: { ...mockDecision, id: 'dec-corrected-0' },
+          superseded_decision_id: mockDecision.id,
+          lines_matched_through_old_wording: [],
+          lines_matched_by_same_wording: [],
+        }),
+      );
+
+      component.executeCorrection('line-99', {
+        expected_current_decision_id: mockDecision.id,
+        outcome: 'same_product',
+        selected_match_candidate_id: 'cand-2',
+        learn_alias: true,
+      });
+
+      expect(snackSpy).toHaveBeenCalledWith(
+        enCatalog.matching.resolution.actions.correctSuccess,
+        undefined,
+        { duration: 3500 },
+      );
+    });
+
+    it('supports Arabic plural forms for swept lines feedback', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog);
+      translate.use('ar');
+
+      // 1 swept line (singular / one)
+      apiService.resolveMatch.and.returnValue(
+        of({
+          ...mockDecision,
+          lines_matched_by_same_wording: ['swept-1'],
+        }),
+      );
+      component.confirmResolution();
+      expect(snackSpy).toHaveBeenCalledWith(
+        jasmine.stringMatching(/تمت أيضًا مطابقة بند إضافي واحد بنفس الصياغة/),
+        undefined,
+        { duration: 3500 },
+      );
+
+      // 3 swept lines (few)
+      snackSpy.calls.reset();
+      apiService.resolveMatch.and.returnValue(
+        of({
+          ...mockDecision,
+          lines_matched_by_same_wording: ['swept-1', 'swept-2', 'swept-3'],
+        }),
+      );
+      component.confirmResolution();
+      expect(snackSpy).toHaveBeenCalledWith(
+        jasmine.stringMatching(/تمت أيضًا مطابقة 3 بنود إضافية بنفس الصياغة/),
+        undefined,
+        { duration: 3500 },
+      );
     });
   });
 });

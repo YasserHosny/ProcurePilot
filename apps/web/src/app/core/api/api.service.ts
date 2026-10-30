@@ -28,6 +28,7 @@ import type {
   BudgetCreated,
   BudgetList,
   BudgetScope,
+  BulkConfirmResult,
   ConfigOptions,
   CatalogueRefreshReview,
   CatalogueRefreshReviewDecision,
@@ -635,8 +636,8 @@ export class ApiService {
     return this.http.get<{ count: number }>(`${this.base}/match-tasks/exact-matches`);
   }
 
-  confirmExactMatches(idempotencyKey: string): Observable<{ confirmed: number; skipped: number }> {
-    return this.http.post<{ confirmed: number; skipped: number }>(
+  confirmExactMatches(idempotencyKey: string): Observable<BulkConfirmResult> {
+    return this.http.post<BulkConfirmResult>(
       `${this.base}/match-tasks/confirm-exact`,
       {},
       { headers: { 'Idempotency-Key': idempotencyKey } },

@@ -304,6 +304,7 @@ class PsycopgTableQuery:
         self._where: list[tuple[str, str, object]] = []
         self._limit: int | None = None
         self._offset: int | None = None
+        self._order: list[tuple[str, bool]] = []
 
     def select(self, _columns: str = "*") -> PsycopgTableQuery:
         self._operation = "select"
@@ -366,8 +367,8 @@ class PsycopgTableQuery:
         self._limit = end - start + 1
         return self
 
-    def order(self, _column: str, *, desc: bool = False) -> PsycopgTableQuery:
-        del desc
+    def order(self, column: str, *, desc: bool = False) -> PsycopgTableQuery:
+        self._order.append((column, desc))
         return self
 
     def execute(self) -> object:
@@ -405,6 +406,11 @@ class PsycopgTableQuery:
         params.extend(where_params)
         if where_sql is not None:
             query += sql.SQL(" where ") + where_sql
+        if self._order:
+            query += sql.SQL(" order by ") + sql.SQL(",").join(
+                sql.SQL("{} {}").format(sql.Identifier(column), sql.SQL("desc" if desc else "asc"))
+                for column, desc in self._order
+            )
         if self._limit is not None:
             query += sql.SQL(" limit %s")
             params.append(self._limit)

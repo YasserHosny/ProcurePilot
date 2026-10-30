@@ -115,6 +115,7 @@ class MatchCandidate(BaseModel):
 
 
 class MatchDecision(BaseModel):
+    lines_matched_by_same_wording: list[UUID] | None = None
     id: UUID
     quotation_line_id: UUID
     matched_product: ProductSummary
@@ -209,6 +210,7 @@ class MatchCorrectionRequest(StrictApiModel):
 
 
 class MatchCorrectionResponse(BaseModel):
+    lines_matched_by_same_wording: list[UUID] | None = None
     decision: MatchDecision
     superseded_decision_id: UUID
     lines_matched_through_old_wording: list[UUID]
@@ -220,6 +222,7 @@ class ExactMatchSummary(BaseModel):
 
 
 class BulkConfirmResult(BaseModel):
+    lines_matched_by_same_wording: list[UUID] | None = None
     confirmed: int = Field(ge=0)
     skipped: int = Field(ge=0)
 
