@@ -60,9 +60,10 @@ the capture job («Capture and compare screenshots») runs: the web app source, 
 workflow-level `on.paths` filter never started, so its check could not be made required (PPS-135). The weekly
 schedule and manual runs always capture.
 
-- **«Regenerate and diff» is a gate job**, the check to require. It passes when the capture passed, or was skipped
-  because nothing relevant changed, and fails if the path filter itself failed: a job skipped because its `needs`
-  failed also counts as passing, so requiring the capture job directly would let a broken filter through.
+- **«Regenerate and diff» is a gate job**, and it is the one required on main since 2026-10-31 (the capture job
+  is not). It passes when the capture passed, or was skipped because nothing relevant changed, and fails if the
+  path filter itself failed: a job skipped because its `needs` failed also counts as passing, so requiring the
+  capture job directly would let a broken filter through.
 
 - The `screens` filter is the list to extend when a new file starts to affect the captures.
 - The «Start Supabase» and «Start the extraction worker» steps did not fail in any of the 100 runs before
