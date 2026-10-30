@@ -130,7 +130,8 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-84 | PPS-115 | P-85 | PPS-116 | P-86 | PPS-117 |
 | P-87 | PPS-118 | P-88 | PPS-119 | P-89 | PPS-120 |
 | P-90 | PPS-121 | P-91 | PPS-122 | P-92 | PPS-123 |
-| P-93 | PPS-124 | P-94 | PPS-125 | | |
+| P-93 | PPS-124 | P-94 | PPS-125 | P-95 | PPS-126 |
+| P-96 | PPS-127 | P-97 | PPS-128 | P-98 | PPS-129 |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -283,6 +284,10 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-92 | — | RFQ Responses compares totals only (R10): mark the cheapest supplier per line and show the split saving with a link to Basket Split (coordinate with 024 / PPS-96) | — | — | To Do (PPS-123) |
 | [ ] P-93 | — | RFQ Responses guardrail outcome (R11): fired outcome not styled as an error, link to the draft it prepared, Prepare Request disabled once the RFQ is converted, «not open» explained | — | — | To Do (PPS-124) |
 | [ ] P-94 | — | Approval Queue shows the requester's email (R12): find why `requester_name` is empty, give members a name, short fallback with tooltip | — | — | To Do (PPS-125) |
+| [ ] P-95 | — | Basket Split input (flow review R15): new rows start empty, no duplicate product in one basket, pack hint no longer overlaps the next row | — | — | To Do (PPS-126) |
+| [ ] P-96 | — | Basket Split from an RFQ and back (R16): start a split from RFQ Responses pre-filled; «Prepare requests» from the result (one draft per supplier, 024 request groups). Fold into the next 024 phase if already planned | — | — | To Do (PPS-127) |
+| [ ] P-97 | — | Record outcome (R17): no trailing zeros («675.000000», «1230.0000»); the «excl. tax» label follows the VAT basis decided in P-91 | — | — | To Do (PPS-128) |
+| [ ] P-98 | — | Savings baseline from a quoted price (R18): pack price × packs like the PO path, so 85 × 15 = 1,275.00 not 1,275.01 (`savings/baseline.py` ~159–162) | — | — | To Do (PPS-129) |
 
 ### E — Pilot environment
 
