@@ -179,6 +179,32 @@ test.describe('RFQ-aware matching & match correction (023, US1, T032)', () => {
       /All lines of this quote are matched/i,
     );
 
+    // Also assert quote 2 is auto-matched with no open tasks
+    const queue2TasksRes = page.waitForResponse(
+      (resp) =>
+        resp.request().method() === 'GET' &&
+        resp.url().includes('/matching/tasks') &&
+        resp.ok(),
+    );
+    await page.goto(`/matching?quotation_id=${quote2.quotationId}`);
+    await queue2TasksRes;
+
+    await expect(emptyState).toBeVisible({ timeout: 15000 });
+    await expect(emptyState.locator('.empty-title')).toHaveText(
+      /All lines of this quote are matched/i,
+    );
+
+    // Return to quote 1 to inspect auto-matched lines and perform correction
+    const quote1ReturnRes = page.waitForResponse(
+      (resp) =>
+        resp.request().method() === 'GET' &&
+        resp.url().includes('/matching/tasks') &&
+        resp.ok(),
+    );
+    await page.goto(`/matching?quotation_id=${quote1.quotationId}`);
+    await quote1ReturnRes;
+    await expect(emptyState).toBeVisible({ timeout: 15000 });
+
     // Filter by the auto-matched status
     const statusSelect = page.locator('.filter-card mat-select').first();
     await openAsyncSelect(page, statusSelect);
@@ -230,27 +256,16 @@ test.describe('RFQ-aware matching & match correction (023, US1, T032)', () => {
     const dialog = page.locator('mat-dialog-container');
     await expect(dialog).toBeVisible();
 
-    // Pick rank 2 in the candidate list (or create new product)
+    // Pick rank 2 in the candidate list
     const candidateChoices = dialog.locator('.dialog-candidate-item:not(.new-product-choice)');
     const candCount = await candidateChoices.count();
-    let expectedProductName = '';
+    expect(candCount).toBeGreaterThanOrEqual(2);
 
-    if (candCount >= 2) {
-      const rank2 = candidateChoices.nth(1);
-      expectedProductName = (await rank2.locator('.cand-name').textContent())?.trim() ?? '';
-      await rank2.click();
-      await expect(rank2).toHaveClass(/selected/);
-    } else {
-      expectedProductName = `Replacement Product ${stamp}`;
-      const newProductChoice = dialog.locator('.new-product-choice');
-      await newProductChoice.click();
-      await expect(newProductChoice).toHaveClass(/selected/);
-      await dialog.locator('input[formControlName="tenant_name"]').fill(expectedProductName);
-      await openAsyncSelect(page, dialog.locator('mat-select[formControlName="base_unit"]'));
-      await page.locator('mat-option', { hasText: /kilogram/i }).click();
-      await dialog.locator('input[formControlName="pack_count"]').fill('1');
-      await dialog.locator('input[formControlName="unit_size"]').fill('10');
-    }
+    const rank2 = candidateChoices.nth(1);
+    const expectedProductName = (await rank2.locator('.cand-name').textContent())?.trim() ?? '';
+    expect(expectedProductName.length).toBeGreaterThan(0);
+    await rank2.click();
+    await expect(rank2).toHaveClass(/selected/);
 
     // Submit correction and wait on API response
     const correctionApiRes = page.waitForResponse(
@@ -277,8 +292,9 @@ test.describe('RFQ-aware matching & match correction (023, US1, T032)', () => {
     await page.locator('a.back-btn').click();
     await backQueueRes;
 
-    const correctedLine = page.locator('.match-line', { hasText: expectedProductName });
+    const correctedLine = page.locator('.match-line', { hasText: product1Name });
     await expect(correctedLine).toHaveCount(1, { timeout: 15000 });
+    await expect(correctedLine.locator('.candidate-preview')).toContainText(expectedProductName);
     await expect(correctedLine.locator('.reason-chip.reason-corrected')).toHaveText(/Corrected/i);
   });
 });
