@@ -160,6 +160,18 @@
   }
 }
 
+.name-cell {
+  font-weight: 500;
+  color: var(--pp-text-strong);
+  white-space: nowrap;
+
+  .muted-text {
+    color: var(--pp-text-muted);
+    font-style: italic;
+    font-weight: 400;
+  }
+}
+
 .member-identity {
   display: flex;
   align-items: center;

@@ -57,7 +57,7 @@ class PurchaseRequestLineInput(StrictApiModel):
 class ApprovalStep(BaseModel):
     id: UUID
     assigned_membership_id: UUID
-    assigned_name: str | None = None  # Reserved until membership has a display name.
+    assigned_name: str | None = None
     assigned_email: str | None = None
     source: ApprovalStepSource
     status: ApprovalStepStatus

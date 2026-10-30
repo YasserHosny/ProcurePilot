@@ -66,6 +66,17 @@ export class SignupComponent implements OnInit {
   readonly form = this.fb.nonNullable.group({
     invitation_token: ['', [Validators.required, Validators.minLength(32)]],
     business_name: ['', [Validators.required, Validators.maxLength(200)]],
+    display_name: [
+      '',
+      [
+        Validators.required,
+        Validators.maxLength(100),
+        (control: { value: unknown }) =>
+          typeof control.value === 'string' && control.value.trim().length === 0
+            ? { whitespace: true }
+            : null,
+      ],
+    ],
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(12)]],
     region: ['', [Validators.required]],
@@ -121,6 +132,7 @@ export class SignupComponent implements OnInit {
       .signup({
         invitation_token: formVal.invitation_token.trim(),
         business_name: formVal.business_name.trim(),
+        display_name: formVal.display_name.trim(),
         email: formVal.email.trim(),
         password: formVal.password,
         region: formVal.region,

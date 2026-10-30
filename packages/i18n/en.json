@@ -106,6 +106,10 @@
       "tokenHint": "Requires a valid 32+ character platform invitation token",
       "tokenRequired": "Invitation token is required",
       "tokenMinLength": "Token must be at least 32 characters",
+      "nameLabel": "Your name",
+      "namePlaceholder": "e.g. Sara Ahmed",
+      "nameRequired": "Your name is required",
+      "nameMaxLength": "Name cannot exceed 100 characters",
       "businessNameLabel": "Business Name",
       "businessNamePlaceholder": "Acme Supplies Ltd",
       "businessNameRequired": "Business name is required",
@@ -430,6 +434,7 @@
     "membersSectionTitle": "Workspace Members",
     "invitationsSectionTitle": "Pending Invitations",
     "columns": {
+      "name": "Name",
       "member": "Member",
       "email": "Email Address",
       "role": "Role",
@@ -439,6 +444,7 @@
       "expires": "Expires",
       "actions": "Actions"
     },
+    "noName": "No name",
     "status": {
       "active": "Active",
       "removed": "Removed",
@@ -448,6 +454,7 @@
       "expired": "Expired"
     },
     "actions": {
+      "editName": "Edit name",
       "changeRole": "Change role",
       "removeMember": "Remove member",
       "revokeInvitation": "Revoke invitation",
@@ -458,14 +465,28 @@
     "inviteSuccess": "Invitation created successfully.",
     "revokeSuccess": "Invitation revoked successfully.",
     "roleChangeSuccess": "Member role updated successfully.",
+    "editNameSuccess": "Member name updated successfully.",
     "removeSuccess": "Member removed successfully.",
     "lastOwnerErrorTitle": "Action Refused",
     "lastOwnerErrorMessage": "A workspace must retain at least one active owner. Demoting or removing the only owner is refused by the server.",
     "resendTooSoon": "This invitation was just sent. Wait a minute before resending it.",
     "genericError": "An unexpected error occurred. Please try again.",
+    "editNameDialog": {
+      "title": "Edit name",
+      "description": "The name colleagues see in approvals and the team list.",
+      "nameLabel": "Name",
+      "namePlaceholder": "Enter name",
+      "nameRequired": "Name is required",
+      "nameMaxLength": "Name cannot exceed 100 characters",
+      "cancelButton": "Cancel",
+      "saveButton": "Save"
+    },
     "inviteDialog": {
       "title": "Invite a Colleague",
       "subtitle": "Create an invitation for a team member to join this workspace with a specified role.",
+      "nameLabel": "Name (optional)",
+      "nameMaxLength": "Name cannot exceed 100 characters",
+      "namePlaceholder": "e.g. Sara Ahmed",
       "emailLabel": "Work Email Address",
       "emailPlaceholder": "colleague@company.com",
       "emailRequired": "Email is required",

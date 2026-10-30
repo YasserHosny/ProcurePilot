@@ -106,6 +106,10 @@
       "tokenHint": "يتطلب رمز دعوة صالح للمنصة مكون من 32 حرفاً على الأقل",
       "tokenRequired": "رمز الدعوة مطلوب",
       "tokenMinLength": "يجب أن يتكون الرمز من 32 حرفاً على الأقل",
+      "nameLabel": "اسمك",
+      "namePlaceholder": "مثال: سارة أحمد",
+      "nameRequired": "اسمك مطلوب",
+      "nameMaxLength": "لا يمكن أن يتجاوز الاسم 100 حرف",
       "businessNameLabel": "اسم المنشأة",
       "businessNamePlaceholder": "شركة التوريدات المحدودة",
       "businessNameRequired": "اسم المنشأة مطلوب",
@@ -430,6 +434,7 @@
     "membersSectionTitle": "أعضاء مساحة العمل",
     "invitationsSectionTitle": "الدعوات المعلقة",
     "columns": {
+      "name": "الاسم",
       "member": "العضو",
       "email": "البريد الإلكتروني",
       "role": "الدور",
@@ -439,6 +444,7 @@
       "expires": "تاريخ الانتهاء",
       "actions": "الإجراءات"
     },
+    "noName": "بلا اسم",
     "status": {
       "active": "نشط",
       "removed": "تمت الإزالة",
@@ -448,6 +454,7 @@
       "expired": "منتهية الصلاحية"
     },
     "actions": {
+      "editName": "تعديل الاسم",
       "changeRole": "تغيير الدور",
       "removeMember": "إزالة العضو",
       "revokeInvitation": "إلغاء الدعوة",
@@ -458,14 +465,28 @@
     "inviteSuccess": "تم إنشاء الدعوة بنجاح.",
     "revokeSuccess": "تم إلغاء الدعوة بنجاح.",
     "roleChangeSuccess": "تم تحديث دور العضو بنجاح.",
+    "editNameSuccess": "تم تحديث اسم العضو بنجاح.",
     "removeSuccess": "تمت إزالة العضو بنجاح.",
     "lastOwnerErrorTitle": "تم رفض الإجراء",
     "lastOwnerErrorMessage": "يجب أن تحتفظ مساحة العمل بمالك نشط واحد على الأقل. يرفض الخادم إزالة المالك الوحيد أو تخفيض صلاحياته.",
     "resendTooSoon": "أُرسلت هذه الدعوة للتو. انتظر دقيقة قبل إعادة إرسالها.",
     "genericError": "حدث خطأ غير متوقع. يُرجى المحاولة مرة أخرى.",
+    "editNameDialog": {
+      "title": "تعديل الاسم",
+      "description": "الاسم الذي يراه زملاؤك في الموافقات وقائمة الفريق.",
+      "nameLabel": "الاسم",
+      "namePlaceholder": "أدخل الاسم",
+      "nameRequired": "الاسم مطلوب",
+      "nameMaxLength": "لا يمكن أن يتجاوز الاسم 100 حرف",
+      "cancelButton": "إلغاء",
+      "saveButton": "حفظ"
+    },
     "inviteDialog": {
       "title": "دعوة زميل عمل",
       "subtitle": "إنشاء دعوة لعضو فريق للانضمام إلى مساحة العمل هذه مع تحديد الدور.",
+      "nameLabel": "الاسم (اختياري)",
+      "nameMaxLength": "لا يمكن أن يتجاوز الاسم 100 حرف",
+      "namePlaceholder": "مثال: سارة أحمد",
       "emailLabel": "بريد العمل الإلكتروني",
       "emailPlaceholder": "colleague@company.com",
       "emailRequired": "البريد الإلكتروني مطلوب",

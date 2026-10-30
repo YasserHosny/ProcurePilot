@@ -35,6 +35,7 @@ verified JWT tenant claim.
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `user_id` | uuid | Required FK -> `auth.users.id`; Supabase Auth identity |
 | `email` | text | Required denormalised email for display and invitation matching |
+| `display_name` | text | Optional name shown to colleagues (Approval Queue, Team Management); trimmed, 1–100 characters. Set at sign-up or from the invitation, editable by the member or an owner (PPS-125) |
 | `role` | enum | owner, buyer, branch_manager, approver, viewer |
 | `mfa_enabled` | boolean | MFA status |
 | `preferred_locale` | text | Optional user locale override; `en` or `ar` |
@@ -79,6 +80,7 @@ Indexes and checks:
 | `id` | uuid | PK, default `gen_random_uuid()` |
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `email` | text | Required invited address |
+| `display_name` | text | Optional name the owner gave; copied to `membership.display_name` on acceptance (PPS-125) |
 | `role` | enum | Required role assigned on acceptance |
 | `token_hash` | text | Required, unique; only the token hash is stored |
 | `invited_by` | uuid | Required FK -> `membership.id` |

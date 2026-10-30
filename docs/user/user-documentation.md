@@ -99,7 +99,7 @@ The email's link opens **Choose a new password** (`/auth/update-password`). Ente
 
 ![Create Workspace](screenshots/01c-workspace-signup.jpg)
 
-Workspace creation is invitation-gated during the pilot programme. The form captures the platform invitation token, business name, owner email, password, operating region, primary currency, tax model, and default locale; successful completion creates the isolated tenant and first owner account, then takes you to a **Plan Confirmation** screen (`/onboarding/plan`) before entering the workspace.
+Workspace creation is invitation-gated during the pilot programme. The form captures the platform invitation token, business name, the owner's name (shown to colleagues, for example in the Approval Queue), owner email, password, operating region, primary currency, tax model, and default locale; successful completion creates the isolated tenant and first owner account, then takes you to a **Plan Confirmation** screen (`/onboarding/plan`) before entering the workspace.
 
 Under the **Create Workspace & Sign In** button, a notice says that creating an account means agreeing to the **Terms of Service** (`/terms`) and acknowledging the **Privacy Policy** (`/privacy`). Both links open in a new tab and need no sign-in.
 
@@ -754,7 +754,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you — directly, or via an active delegation (section 22) — based on threshold approval rules appear here. |
-| 2 | **Approvals table** | One row per pending request: required-by date, requester (name or email), branch, cost centre, estimated total (with an "incomplete estimate" badge when some lines lack pricing), budget status, and line count. Budget status uses the most specific budget that applies: the cost centre's, otherwise the branch's, otherwise an organisation-wide budget; only when none of the three exists does it show **No budget configured** and say why. |
+| 2 | **Approvals table** | One row per pending request: required-by date, requester (their name; a member with no name shows the part of their email before the @ on one line, with the full address on hover), branch, cost centre, estimated total (with an "incomplete estimate" badge when some lines lack pricing), budget status, and line count. Budget status uses the most specific budget that applies: the cost centre's, otherwise the branch's, otherwise an organisation-wide budget; only when none of the three exists does it show **No budget configured** and say why. |
 | 3 | **Budget Status column** | Shows the remaining budget after this request, or an amber "Budget Exceeded" badge with a tooltip and the remaining-budget figure when the request would exceed the applicable budget. When no cost-centre, branch or organisation budget applies it shows **No budget configured** with the reason; it is blank only when the request cannot be valued (no budget status). |
 | 4 | **Lines column + expand toggle** | Shows the line count; the expand icon reveals a nested table underneath the row with each line's product, quantity, unit price, and note — so you can review the full request without leaving the queue. |
 | 5 | **Approve / Reject buttons** | Each row has both actions. Either opens a confirmation dialog with an optional comment field before committing the decision. |
@@ -778,18 +778,18 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title — "Team Management"** | Manage workspace members, invite colleagues, and configure role-based access. |
-| 2 | **Invite Member button** | Opens a dialog to invite a colleague by email. You assign them a role (Owner, Buyer, Branch Manager, Approver, Viewer) at invitation time. |
-| 3 | **Members tab** | Lists all current members with columns: member, role (colour-coded pill), status (Active/Removed), MFA status, and join date. |
+| 2 | **Invite Member button** | Opens a dialog to invite a colleague by email, optionally with their name. You assign them a role (Owner, Buyer, Branch Manager, Approver, Viewer) at invitation time. |
+| 3 | **Members tab** | Lists all current members with columns: name (or «No name»), email address, role (colour-coded pill), status (Active/Removed), MFA status, and join date. |
 | 4 | **Pending Invitations tab** | Lists all sent invitations with email, assigned role, status (Pending/Accepted/Revoked/Expired), and expiry date. |
-| 5 | **Actions menu** (per member) | Options: Change Role, Remove Member. The workspace owner cannot be removed. |
+| 5 | **Actions menu** (per member) | Options: Edit name, Change Role, Remove Member. The name is what colleagues see in approvals and the team list. The workspace owner cannot be removed. |
 
 **Invitation flow:**
-1. Click **Invite Member** → enter email and select role → send.
+1. Click **Invite Member** → enter their name (optional), email and role → send.
 2. When Mailgun is configured, the invitee receives an email in the workspace language with a link to accept. The dialog confirms “Invitation emailed to” their address. If email is not configured or sending fails, a distinct warning explains that the email was not sent and asks you to copy the link below.
 3. The copy-link fallback is always available. Keep or share it before closing the dialog: the token is shown once.
 4. Use **Resend invitation** next to Revoke on a pending invitation to create and email a new link. The old link stops working immediately and the expiry restarts. A second resend within about a minute is refused with a message. The result dialog shows delivery status and the new copy-link fallback.
 5. They can create a new account or sign in with an existing one.
-6. Once accepted, they appear in the Members tab with their assigned role.
+6. Once accepted, they appear in the Members tab with their assigned role and the name you gave them.
 
 **Business value:** Team Management lets the owner delegate procurement work while preserving accountability. Each role creates a clear operating boundary, so buyers can move quickly and sensitive controls stay with the right people.
 

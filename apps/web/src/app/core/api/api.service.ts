@@ -128,6 +128,7 @@ export class ApiService {
     currency: string;
     tax_model: string;
     default_locale?: 'en' | 'ar';
+    display_name?: string;
   }): Observable<Session> {
     return this.http.post<Session>(`${this.base}/auth/signup`, body);
   }
@@ -214,6 +215,12 @@ export class ApiService {
     return this.http.patch<Member>(`${this.base}/members/${memberId}`, { role });
   }
 
+  renameMember(memberId: string, displayName: string): Observable<Member> {
+    return this.http.patch<Member>(`${this.base}/members/${memberId}`, {
+      display_name: displayName,
+    });
+  }
+
   removeMember(memberId: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/members/${memberId}`);
   }
@@ -222,8 +229,13 @@ export class ApiService {
     return this.http.get<{ items: Invitation[] }>(`${this.base}/invitations`);
   }
 
-  invite(email: string, role: Role): Observable<Invitation> {
-    return this.http.post<Invitation>(`${this.base}/invitations`, { email, role });
+  invite(email: string, role: Role, displayName?: string | null): Observable<Invitation> {
+    const body: { email: string; role: Role; display_name?: string } = { email, role };
+    const trimmed = displayName?.trim();
+    if (trimmed) {
+      body.display_name = trimmed;
+    }
+    return this.http.post<Invitation>(`${this.base}/invitations`, body);
   }
 
   resendInvitation(id: string): Observable<Invitation> {
