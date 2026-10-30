@@ -139,4 +139,7 @@ toggle first. Smart Compare now ties at ١٬٥٢٠ ر.س, so the video keeps the
 
 ## Flow review 2026-10-28
 
+The round-1 flow run again on «مطاعم رواق» (RFQ `d8f7fb0c` → PO-000005, SAR 4,830; basket split SAR 4,770; four savings
+outcomes), with findings R1–R18 and the owner's O1–O6: [`flow-review-2026-10-28/`](flow-review-2026-10-28/README.md).
+
 Fixes from the 2026-10-28 RFQ flow review, checked live after #314: [`flow-review-2026-10-28/fixes-pps-88/`](flow-review-2026-10-28/fixes-pps-88/README.md) (PPS-88).
