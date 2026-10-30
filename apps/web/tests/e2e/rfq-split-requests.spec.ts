@@ -268,12 +268,12 @@ test.describe.serial('RFQ basket split & group approval flow (024, T033)', () =>
     const savingsSummary = page.locator('[data-testid="rfq-savings-summary"]');
     await expect(savingsSummary).toBeVisible({ timeout: 15000 });
 
-    await expect(savingsSummary.locator('.split-card .total-figure')).toContainText('170.00');
-    await expect(savingsSummary.locator('.saving-card .total-figure')).toContainText('50.00');
+    await expect(savingsSummary.locator('.split-card .total-figure')).toContainText('GBP 170');
+    await expect(savingsSummary.locator('.saving-card .total-figure')).toContainText('GBP 50');
 
     const baselineCards = savingsSummary.locator('.baseline-card');
-    await expect(baselineCards.filter({ hasText: supplier1Name })).toContainText('290.00');
-    await expect(baselineCards.filter({ hasText: supplier2Name })).toContainText('220.00');
+    await expect(baselineCards.filter({ hasText: supplier1Name })).toContainText('GBP 290');
+    await expect(baselineCards.filter({ hasText: supplier2Name })).toContainText('GBP 220');
 
     // 3. "Prepare 2 requests" → fill the dialog (branch, required-by) → submit
     const prepareBtn = page.locator('[data-testid="prepare-requests-button"]');
