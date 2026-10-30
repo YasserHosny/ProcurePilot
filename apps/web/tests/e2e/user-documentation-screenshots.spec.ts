@@ -190,14 +190,16 @@ test.describe('User documentation screenshots', () => {
 
     await captureRoute(page, '/offers/basket-split', '11-basket-split.jpg', async () => {
       await expect(page.locator('.page-title')).toContainText('Basket Split');
+      await fillFirstBasketItem(page);
       await expect(page.locator('.form-card, .result-summary-card, .infeasible-card')).toBeVisible();
     });
 
     await page.goto('/offers/basket-split');
     await expect(page.locator('.page-title')).toContainText('Basket Split');
     await waitForNoVisibleLoading(page);
+    await fillFirstBasketItem(page);
     const submitBasket = page.locator('.submit-btn');
-    if ((await submitBasket.count()) > 0 && await submitBasket.isEnabled()) {
+    if ((await submitBasket.count()) > 0) {
       await submitBasket.click();
       await expect(
         page.locator('.job-progress-card, .result-summary-card, .infeasible-card, .error-banner').first(),
@@ -743,6 +745,13 @@ async function signInAsOwner(page: Page, creds: Credentials): Promise<void> {
   await page.click('button[type="submit"]');
   await page.waitForURL('**/home');
   await waitForNoVisibleLoading(page);
+}
+
+async function fillFirstBasketItem(page: Page): Promise<void> {
+  const firstRow = page.locator('.item-row').first();
+  await openAsyncSelect(page, firstRow.locator('.item-product-field mat-select'));
+  await page.locator('mat-option').first().click();
+  await firstRow.locator('.item-qty-field input').fill('10');
 }
 
 async function captureRoute(

@@ -131,10 +131,12 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
           'rejectTitle': 'Reject Purchase Request',
           'commentLabel': 'Comment (optional)',
           'commentPlaceholder': 'Add a comment for the requester...',
+          'reasonRequired': 'A reason is required to reject.',
           'confirmButton': 'Confirm',
           'cancelButton': 'Cancel',
         },
         'approveSuccess': 'Request approved.',
+        'notAssigned': 'You are not the assigned approver for this request.',
         'rejectSuccess': 'Request rejected.',
         'genericError': 'Unable to record the decision. Please try again.',
         'alreadyDecided':
@@ -144,8 +146,28 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'unknownRequester': 'Unknown requester',
         'unknownApprover': 'Unknown approver',
         'unknownProduct': 'Unknown product',
+        'budgetExceeded': 'Exceeds budget',
+        'partOfSplitError':
+            'This request is part of a split and must be decided as a group.',
+        'splitGroup': {
+          'summary': 'Split from RFQ {{short}} · {{requests}} · {{total}} · saves {{saving}}',
+          'summaryNoSaving':
+              'Split from RFQ {{short}} · {{requests}} · {{total}}',
+        },
+        'requestCount': {
+          'zero': '{{count}} requests',
+          'one': '{{count}} request',
+          'two': '2 requests',
+          'few': '{{count}} requests',
+          'many': '{{count}} requests',
+          'other': '{{count}} requests',
+        },
+      },
+      'basketSplit': {
+        'result': {'splitTotal': 'Split total'},
       },
       'rfq': {
+        'history': {'unknownSupplier': 'Unknown supplier'},
         'email': {
           'units': {
             'litre': 'L',
@@ -157,6 +179,7 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         },
       },
       'requests': {
+        'split': {'siblingLink': 'Request {{id}}'},
         'autoPrepared': {
           'title':
               "Prepared automatically by a guardrail",
@@ -296,19 +319,46 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
       },
       'approvals': {
         'title': 'قائمة الموافقات',
-        'columns': {
-          'requester': 'مقدم الطلب',
-          'requiredByDate': 'مطلوب قبل',
-        },
+        'columns': {'requester': 'مقدم الطلب', 'requiredByDate': 'مطلوب قبل'},
         'actions': {'approve': 'اعتماد', 'reject': 'رفض'},
         'unknownRequester': 'مقدم طلب غير معروف',
         'unknownApprover': 'معتمد غير معروف',
         'unknownProduct': 'منتج غير معروف',
         'approveSuccess': 'تم اعتماد الطلب.',
+        'notAssigned': 'لست المعتمد المعيّن لهذا الطلب.',
         'rejectSuccess': 'تم رفض الطلب.',
+        'decisionDialog': {
+          'commentLabel': 'تعليق (اختياري)',
+          'commentPlaceholder': 'أضف تعليقًا لمقدم الطلب...',
+          'cancelButton': 'إلغاء',
+          'reasonRequired': 'سبب الرفض مطلوب.',
+        },
+        'notAvailable': 'غير متاح',
+        'budgetExceeded': 'يتجاوز الميزانية',
+        'genericError': 'تعذر تسجيل القرار. يرجى المحاولة مرة أخرى.',
+        'alreadyDecided': 'تم اتخاذ قرار بشأن هذا الطلب بالفعل من قبل شخص آخر.',
+        'partOfSplitError':
+            'هذا الطلب جزء من تقسيم ويجب اعتماده أو رفضه كطلب مجمع.',
+        'splitGroup': {
+          'summary': 'تقسيم من طلب تسعير {{short}} · {{requests}} · {{total}} · يوفر {{saving}}',
+          'summaryNoSaving':
+              'تقسيم من طلب تسعير {{short}} · {{requests}} · {{total}}',
+        },
+        'requestCount': {
+          'zero': 'لا توجد طلبات',
+          'one': 'طلب واحد',
+          'two': 'طلبان',
+          'few': '{{count}} طلبات',
+          'many': '{{count}} طلبًا',
+          'other': '{{count}} طلب',
+        },
         'empty': 'لا توجد طلبات تنتظر قرارك حالياً.',
       },
+      'basketSplit': {
+        'result': {'splitTotal': 'إجمالي التقسيم'},
+      },
       'rfq': {
+        'history': {'unknownSupplier': 'مورد غير معروف'},
         'email': {
           'units': {
             'litre': 'لتر',
@@ -320,6 +370,7 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         },
       },
       'requests': {
+        'split': {'siblingLink': 'طلب {{id}}'},
         'autoPrepared': {
           'title':
               "أعدّته الضوابط تلقائيًا",
@@ -331,10 +382,11 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
               "المورّد الفائز",
         },
         'title': 'طلبات الشراء',
-        'columns': {
-          'requiredByDate': 'مطلوب قبل',
-          'status': 'الحالة',
+        'budgetStatus': {
+          'remainingLabel': 'الميزانية المتبقية',
+          'exceedsWarning': 'سيتجاوز هذا الطلب الميزانية المتبقية لنطاقه.',
         },
+        'columns': {'requiredByDate': 'مطلوب قبل', 'status': 'الحالة'},
         'approval': {
           'sectionTitle': 'الاعتماد',
           'assignedTo': 'معيّن إلى',
@@ -810,6 +862,33 @@ class FakeApprovalsApiClient extends ApprovalsApiClient {
 
   List<PurchaseRequest> pendingResults = [];
   Exception? pendingError;
+  final approveGroupCalls = <String>[];
+  final approveGroupComments = <String?>[];
+  final rejectGroupCalls = <String>[];
+  final rejectGroupComments = <String>[];
+  Exception? groupDecisionError;
+
+  @override
+  Future<List<PurchaseRequest>> approveGroup(
+    String groupId, {
+    String? comment,
+  }) async {
+    approveGroupCalls.add(groupId);
+    approveGroupComments.add(comment);
+    if (groupDecisionError != null) throw groupDecisionError!;
+    return pendingResults;
+  }
+
+  @override
+  Future<List<PurchaseRequest>> rejectGroup(
+    String groupId, {
+    required String comment,
+  }) async {
+    rejectGroupCalls.add(groupId);
+    rejectGroupComments.add(comment);
+    if (groupDecisionError != null) throw groupDecisionError!;
+    return pendingResults;
+  }
 
   @override
   Future<PendingApprovalsList> listPendingApprovals({

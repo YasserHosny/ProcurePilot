@@ -1656,6 +1656,8 @@
       "addItem": "Add Item",
       "addSupplier": "Add Supplier ({{min}}–{{max}})",
       "removeItem": "Remove Item",
+      "selectProduct": "Choose a product",
+      "duplicateProduct": "This product is already in the basket.",
       "productRequired": "Select a product.",
       "quantityRequired": "Enter a quantity greater than zero.",
       "submitButton": "Optimise Basket Split",
@@ -2393,6 +2395,7 @@
       "other": "{{count}} requests"
     },
     "partOfSplitError": "This request is part of a split and must be decided as a group.",
+    "notAssigned": "You are not the assigned approver for this request.",
     "approveSuccess": "Request approved.",
     "rejectSuccess": "Request rejected.",
     "genericError": "Unable to record the decision. Please try again.",

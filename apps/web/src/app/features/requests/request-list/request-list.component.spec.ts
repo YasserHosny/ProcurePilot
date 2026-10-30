@@ -245,6 +245,102 @@ describe('RequestListComponent (T017)', () => {
     expect(component.canCreateOrder({ ...mockRequests[1], status: 'ordered' })).toBeFalse();
   });
 
+  describe('create-order action button / shopping_cart icon visibility (PPS-132)', () => {
+    const approvedStep = {
+      id: 'step-1',
+      assigned_membership_id: 'm1',
+      source: 'owner_fallback' as const,
+      status: 'approved' as const,
+      decided_by_membership_id: 'm1',
+      decided_at: '2026-09-30T00:00:00Z',
+    };
+
+    const pendingStep = {
+      id: 'step-2',
+      assigned_membership_id: 'm1',
+      source: 'owner_fallback' as const,
+      status: 'pending' as const,
+    };
+
+    const getCartButton = (): HTMLButtonElement | null =>
+      fixture.nativeElement.querySelector('button[aria-label="Create Order"]');
+
+    const getCartIcon = (): HTMLElement | null => {
+      const root = fixture.nativeElement as HTMLElement;
+      const icons = Array.from(root.querySelectorAll<HTMLElement>('mat-icon'));
+      return icons.find((el) => el.textContent?.trim() === 'shopping_cart') ?? null;
+    };
+
+    it('shows the cart icon when step is approved, status is ordered, and has_quantity_to_order is true', () => {
+      const req: PurchaseRequest = {
+        ...mockRequests[0],
+        status: 'ordered',
+        approval_step: approvedStep,
+        has_quantity_to_order: true,
+      };
+      component.requests.set([req]);
+      fixture.detectChanges();
+
+      expect(component.canCreateOrder(req)).toBeTrue();
+      expect(getCartButton()).toBeTruthy();
+      expect(getCartIcon()?.textContent?.trim()).toBe('shopping_cart');
+    });
+
+    it('hides the cart icon when step is approved, status is ordered, and has_quantity_to_order is false', () => {
+      const req: PurchaseRequest = {
+        ...mockRequests[0],
+        status: 'ordered',
+        approval_step: approvedStep,
+        has_quantity_to_order: false,
+      };
+      component.requests.set([req]);
+      fixture.detectChanges();
+
+      expect(component.canCreateOrder(req)).toBeFalse();
+      expect(getCartButton()).toBeNull();
+    });
+
+    it('shows the cart icon when step is approved, status is ordered, and has_quantity_to_order is missing', () => {
+      const req: PurchaseRequest = {
+        ...mockRequests[0],
+        status: 'ordered',
+        approval_step: approvedStep,
+      };
+      component.requests.set([req]);
+      fixture.detectChanges();
+
+      expect(component.canCreateOrder(req)).toBeTrue();
+      expect(getCartButton()).toBeTruthy();
+      expect(getCartIcon()?.textContent?.trim()).toBe('shopping_cart');
+    });
+
+    it('hides the cart icon when status is withdrawn even with an approved step', () => {
+      const req: PurchaseRequest = {
+        ...mockRequests[0],
+        status: 'withdrawn',
+        approval_step: approvedStep,
+      };
+      component.requests.set([req]);
+      fixture.detectChanges();
+
+      expect(component.canCreateOrder(req)).toBeFalse();
+      expect(getCartButton()).toBeNull();
+    });
+
+    it('hides the cart icon when approval step is pending', () => {
+      const req: PurchaseRequest = {
+        ...mockRequests[0],
+        status: 'submitted',
+        approval_step: pendingStep,
+      };
+      component.requests.set([req]);
+      fixture.detectChanges();
+
+      expect(component.canCreateOrder(req)).toBeFalse();
+      expect(getCartButton()).toBeNull();
+    });
+  });
+
   it('shows Withdraw on an ordered request and hides it on terminal requests', () => {
     for (const status of ['ordered', 'withdrawn', 'rejected', 'approved'] as const) {
       component.requests.set([{ ...mockRequests[0], status }]);

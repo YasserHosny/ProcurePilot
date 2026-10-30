@@ -487,6 +487,21 @@ class RequestsService:
                     request_group_lookup=False,
                 )
             )
+        if member is not None:
+            from procurepilot_api.modules.orders.service import OrdersService
+
+            orderable = [
+                item
+                for item in items
+                if item.status in ("approved", "ordered")
+                and item.approval_step is not None
+                and item.approval_step.status == "approved"
+            ]
+            remaining = OrdersService(self._settings).requests_with_quantity_to_order(
+                member=member, request_ids=[item.id for item in orderable]
+            )
+            for item in orderable:
+                item.has_quantity_to_order = item.id in remaining
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
 
     def list_requests_eligible_for_order(
