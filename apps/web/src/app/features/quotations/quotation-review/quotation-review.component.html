@@ -149,7 +149,7 @@
                 <span>{{ 'quotations.review.flagged.chooseSupplier' | translate }}</span>
               }
               <button mat-button type="button" (click)="goToFlaggedField(field)">{{ 'quotations.review.flagged.goToField' | translate }}</button>
-            } @else if (['currency', 'issue_date', 'expiry_date', 'stated_total', 'quantity', 'unit_price'].includes(field.fieldName)) {
+            } @else if (['currency', 'issue_date', 'expiry_date', 'stated_total', 'quantity', 'unit_price', 'prices_include_vat', 'vat_rate'].includes(field.fieldName)) {
               <button mat-button type="button" (click)="goToFlaggedField(field)">{{ 'quotations.review.flagged.goToField' | translate }}</button>
             }
             <button mat-stroked-button type="button" (click)="confirmFieldAsIs(field.entityType, field.entityId, field.fieldName)">{{ 'quotations.review.flagged.confirmAsIs' | translate }}</button>
@@ -540,6 +540,104 @@
                   </button>
                 }
               </div>
+
+              <!-- Prices Include VAT -->
+              <div
+                class="field-box vat-inclusive-field"
+                [class.field-needs-review]="getFieldConfidence('quotation', q.id, 'prices_include_vat') < 0.85 && !isFieldCorrected('quotation', q.id, 'prices_include_vat')"
+                [id]="'field-' + (getFieldExtraction('quotation', q.id, 'prices_include_vat')?.id || 'prices_include_vat')"
+                tabindex="0"
+                role="button"
+                (click)="selectField('quotation', q.id, 'prices_include_vat')"
+                (keydown.enter)="selectField('quotation', q.id, 'prices_include_vat')"
+                (keydown.space)="selectField('quotation', q.id, 'prices_include_vat')"
+              >
+                <div class="checkbox-control-wrapper">
+                  <mat-checkbox
+                    [checked]="effectivePricesIncludeVat(q)"
+                    (change)="pricesIncludeVatToggled($event.checked)"
+                    (blur)="reviewFieldValue('quotation', q.id, 'prices_include_vat', effectivePricesIncludeVat(q))"
+                    [disabled]="!isWriter() || q.status === 'reviewed'"
+                  >
+                    {{ 'quotations.review.header.pricesIncludeVatLabel' | translate }}
+                  </mat-checkbox>
+                </div>
+                @if (isFieldChanged('quotation', q.id, 'prices_include_vat')) {
+                  <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation', q.id, 'prices_include_vat')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
+                }
+                @if (getFieldExtraction('quotation', q.id, 'prices_include_vat'); as fe) {
+                  <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'prices_include_vat') < 0.85">
+                    {{ formatConfidence(fe.confidence) }}%
+                  </span>
+                }
+                @if (getFieldConfidence('quotation', q.id, 'prices_include_vat') < 0.85 && !isFieldCorrected('quotation', q.id, 'prices_include_vat')) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="confirmFieldAsIs('quotation', q.id, 'prices_include_vat'); $event.stopPropagation()"
+                    [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    class="confirm-as-is-btn"
+                  >
+                    <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  </button>
+                }
+              </div>
+
+              <!-- VAT Rate (%) -->
+              <div
+                class="field-box"
+                [id]="'field-' + (getFieldExtraction('quotation', q.id, 'vat_rate')?.id || 'vat_rate')"
+                [class.field-needs-review]="getFieldConfidence('quotation', q.id, 'vat_rate') < 0.85 && !isFieldCorrected('quotation', q.id, 'vat_rate')"
+                tabindex="0"
+                role="button"
+                (click)="selectField('quotation', q.id, 'vat_rate')"
+                (keydown.enter)="selectField('quotation', q.id, 'vat_rate')"
+                (keydown.space)="selectField('quotation', q.id, 'vat_rate')"
+              >
+                <mat-form-field appearance="outline" class="field-control">
+                  <mat-label>{{ 'quotations.review.header.vatRateLabel' | translate }}</mat-label>
+                  <input
+                    matInput
+                    #vatRateInput
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    [value]="formatVatRatePercent(effectiveVatRate(q))"
+                    (input)="vatRateInputChanged(vatRateInput.value)"
+                    (change)="vatRateInputChanged(vatRateInput.value)"
+                    (blur)="reviewFieldValue('quotation', q.id, 'vat_rate', effectiveVatRate(q))"
+                    [readonly]="!isWriter() || q.status === 'reviewed'"
+                  />
+                  <span matTextSuffix class="percent-suffix">%</span>
+                  @if (invalidVatRate()) {
+                    <mat-hint>{{ 'quotations.review.header.invalidVatRate' | translate }}</mat-hint>
+                  }
+                </mat-form-field>
+                @if (isFieldChanged('quotation', q.id, 'vat_rate')) {
+                  <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation', q.id, 'vat_rate')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
+                }
+                @if (getFieldExtraction('quotation', q.id, 'vat_rate'); as fe) {
+                  <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'vat_rate') < 0.85">
+                    {{ formatConfidence(fe.confidence) }}%
+                  </span>
+                }
+                @if (getFieldConfidence('quotation', q.id, 'vat_rate') < 0.85 && !isFieldCorrected('quotation', q.id, 'vat_rate')) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="confirmFieldAsIs('quotation', q.id, 'vat_rate'); $event.stopPropagation()"
+                    [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    class="confirm-as-is-btn"
+                  >
+                    <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  </button>
+                }
+              </div>
             </div>
 
             <!-- Re-Quote Versioning Controls (US4) -->
@@ -671,7 +769,7 @@
               mat-stroked-button
               type="button"
               (click)="saveCorrections()"
-              [disabled]="isSaving() || isConfirming() || !hasPendingReviewChanges()"
+              [disabled]="isSaving() || isConfirming() || invalidVatRate() || !hasPendingReviewChanges()"
               class="save-btn"
             >
               @if (isSaving()) {
@@ -691,7 +789,7 @@
               color="primary"
               type="button"
               (click)="requestConfirm()"
-              [disabled]="isConfirming() || isSaving() || !selectedSupplierId() || (hasArithmeticMismatch() && !mismatchAcknowledged())"
+              [disabled]="isConfirming() || isSaving() || invalidVatRate() || !selectedSupplierId() || (hasArithmeticMismatch() && !mismatchAcknowledged())"
               class="confirm-btn"
             >
               @if (isConfirming()) {

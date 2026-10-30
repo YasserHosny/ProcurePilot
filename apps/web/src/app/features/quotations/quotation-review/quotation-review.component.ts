@@ -31,6 +31,7 @@ import type {
   Money,
   NewQuotationLine,
   QuotationDetail,
+  QuotationReviewPatch,
   Supplier,
 } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
@@ -160,6 +161,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   readonly selectedSupplierId = signal<string | null>(null);
   readonly pendingQuotationCurrency = signal<string | undefined>(undefined);
+  readonly pendingPricesIncludeVat = signal<boolean | undefined>(undefined);
+  readonly pendingVatRate = signal<string | null | undefined>(undefined);
   readonly effectiveQuotationCurrency = computed(() => {
     const q = this.quotation();
     return this.pendingQuotationCurrency() ?? (q?.currency || q?.lines[0]?.unit_price?.currency ||
@@ -375,6 +378,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     return (
       this.pendingCorrections().size > 0 ||
       this.pendingQuotationCurrency() !== undefined ||
+      this.pendingPricesIncludeVat() !== undefined ||
+      this.pendingVatRate() !== undefined ||
       this.reviewerNotes() !== (q?.reviewer_notes || '') ||
       this.pendingNewLines().length > 0 ||
       this.pendingRemoveLineIds().size > 0
@@ -592,6 +597,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       issue_date: 'Issue Date',
       expiry_date: 'Expiry Date',
       stated_total: 'Stated Total',
+      prices_include_vat: this.translate.instant('quotations.review.header.pricesIncludeVatLabel'),
       quantity: 'Quantity',
       unit_price: 'Unit Price',
       discount: 'Discount',
@@ -711,6 +717,86 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     if (field) this.updateCorrection(field.id, currency);
     else this.pendingQuotationCurrency.set(currency);
   }
+
+  effectivePricesIncludeVat(q: QuotationDetail | null): boolean {
+    if (!q) return false;
+    if (this.pendingPricesIncludeVat() !== undefined) {
+      return this.pendingPricesIncludeVat()!;
+    }
+    const fe = this.getFieldExtraction('quotation', q.id, 'prices_include_vat');
+    if (fe) {
+      if (this.pendingCorrections().has(fe.id)) {
+        return Boolean(this.pendingCorrections().get(fe.id));
+      }
+      if (fe.corrected_value !== null && fe.corrected_value !== undefined) {
+        return Boolean(fe.corrected_value);
+      }
+      if (fe.extracted_value !== null && fe.extracted_value !== undefined) {
+        return Boolean(fe.extracted_value);
+      }
+    }
+    return Boolean(q.prices_include_vat);
+  }
+
+  effectiveVatRate(q: QuotationDetail | null): string | null {
+    if (!q) return null;
+    if (this.pendingVatRate() !== undefined) {
+      return this.pendingVatRate()!;
+    }
+    const fe = this.getFieldExtraction('quotation', q.id, 'vat_rate');
+    if (fe) {
+      if (this.pendingCorrections().has(fe.id)) {
+        const val = this.pendingCorrections().get(fe.id);
+        return val !== null && val !== undefined ? String(val) : null;
+      }
+      if (fe.corrected_value !== null && fe.corrected_value !== undefined) {
+        return String(fe.corrected_value);
+      }
+      if (fe.extracted_value !== null && fe.extracted_value !== undefined) {
+        return String(fe.extracted_value);
+      }
+    }
+    return q.vat_rate ?? null;
+  }
+
+  formatVatRatePercent(rateFraction: string | null): string {
+    if (!rateFraction) return '';
+    const num = parseFloat(rateFraction);
+    if (isNaN(num)) return '';
+    return String(Math.round(num * 10000) / 100);
+  }
+
+  pricesIncludeVatToggled(checked: boolean): void {
+    const q = this.quotation();
+    this.pendingPricesIncludeVat.set(checked);
+    if (q) {
+      const fe = this.getFieldExtraction('quotation', q.id, 'prices_include_vat');
+      if (fe) {
+        this.updateCorrection(fe.id, checked);
+      }
+    }
+  }
+
+  vatRateInputChanged(val: string): void {
+    const q = this.quotation();
+    const trimmed = val.trim();
+    let fraction: string | null = null;
+    if (trimmed !== '') {
+      const num = Number(trimmed);
+      if (Number.isFinite(num) && num >= 0 && num <= 100) {
+        fraction = (num / 100).toString();
+      }
+    }
+    this.pendingVatRate.set(fraction);
+    if (q) {
+      const fe = this.getFieldExtraction('quotation', q.id, 'vat_rate');
+      if (fe && fraction !== null) {
+        this.updateCorrection(fe.id, fraction);
+      }
+    }
+  }
+
+  readonly invalidVatRate = computed(() => this.pendingVatRate() === null);
 
   reviewFieldValue(
     entityType: 'quotation' | 'quotation_line',
@@ -859,9 +945,41 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.reviewerNotes.set(value);
   }
 
+  private buildReviewPatch(corrections: FieldCorrection[]): QuotationReviewPatch {
+    const q = this.quotation();
+    const patch: Record<string, unknown> = {
+      supplier_id: this.selectedSupplierId(),
+      reviewer_notes: this.reviewerNotes() || null,
+      corrections,
+      add_lines: this.pendingNewLines(),
+      remove_line_ids: Array.from(this.pendingRemoveLineIds()),
+    };
+    if (this.pendingQuotationCurrency() !== undefined) {
+      patch['currency'] = this.pendingQuotationCurrency();
+    }
+    if (this.pendingPricesIncludeVat() !== undefined) {
+      patch['prices_include_vat'] = this.pendingPricesIncludeVat();
+    } else {
+      const fe = q ? this.getFieldExtraction('quotation', q.id, 'prices_include_vat') : null;
+      if (fe && this.pendingCorrections().has(fe.id)) {
+        patch['prices_include_vat'] = Boolean(this.pendingCorrections().get(fe.id));
+      }
+    }
+    if (this.pendingVatRate() !== undefined && this.pendingVatRate() !== null) {
+      patch['vat_rate'] = this.pendingVatRate();
+    } else {
+      const fe = q ? this.getFieldExtraction('quotation', q.id, 'vat_rate') : null;
+      if (fe && this.pendingCorrections().has(fe.id)) {
+        const value = this.pendingCorrections().get(fe.id);
+        if (typeof value === 'string') patch['vat_rate'] = value;
+      }
+    }
+    return patch as QuotationReviewPatch;
+  }
+
   saveCorrections(): void {
     const q = this.quotation();
-    if (!q) return;
+    if (!q || this.invalidVatRate()) return;
 
     this.isSaving.set(true);
     this.errorMessage.set(null);
@@ -873,21 +991,14 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     }
 
     this.api
-      .patchQuotation(q.id, {
-        supplier_id: this.selectedSupplierId(),
-        ...(this.pendingQuotationCurrency() !== undefined
-          ? { currency: this.pendingQuotationCurrency() }
-          : {}),
-        reviewer_notes: this.reviewerNotes() || null,
-        corrections,
-        add_lines: this.pendingNewLines(),
-        remove_line_ids: Array.from(this.pendingRemoveLineIds()),
-      })
+      .patchQuotation(q.id, this.buildReviewPatch(corrections))
       .subscribe({
         next: (updated) => {
           this.quotation.set(updated);
           this.pendingCorrections.set(new Map());
           this.pendingQuotationCurrency.set(undefined);
+          this.pendingPricesIncludeVat.set(undefined);
+          this.pendingVatRate.set(undefined);
           this.pendingNewLines.set([]);
           this.pendingRemoveLineIds.set(new Set());
           this.isSaving.set(false);
@@ -906,6 +1017,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   }
 
   requestConfirm(): void {
+    if (this.invalidVatRate()) return;
     if (!this.selectedSupplierId()) {
       this.confirmBlockedReason.set(
         this.translate.instant('quotations.review.actions.confirmBlockedMissingSupplier'),
@@ -921,7 +1033,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   confirmQuotation(): void {
     const q = this.quotation();
-    if (!q) return;
+    if (!q || this.invalidVatRate()) return;
 
     this.confirmDialogVisible.set(false);
     this.isConfirming.set(true);
@@ -933,12 +1045,16 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const lineChangesNeedSaving =
       this.pendingNewLines().length > 0 || this.pendingRemoveLineIds().size > 0;
     const currencyNeedsSaving = this.pendingQuotationCurrency() !== undefined;
+    const vatInclusiveNeedsSaving = this.pendingPricesIncludeVat() !== undefined;
+    const vatRateNeedsSaving = this.pendingVatRate() !== undefined;
     if (
       this.pendingCorrections().size > 0 ||
       currencyNeedsSaving ||
       supplierNeedsSaving ||
       notesNeedSaving ||
-      lineChangesNeedSaving
+      lineChangesNeedSaving ||
+      vatInclusiveNeedsSaving ||
+      vatRateNeedsSaving
     ) {
       const corrections: FieldCorrection[] = [];
       for (const [field_extraction_id, corrected_value] of this.pendingCorrections().entries()) {
@@ -946,21 +1062,14 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       }
 
       this.api
-        .patchQuotation(q.id, {
-          supplier_id: this.selectedSupplierId(),
-          ...(this.pendingQuotationCurrency() !== undefined
-            ? { currency: this.pendingQuotationCurrency() }
-            : {}),
-          reviewer_notes: this.reviewerNotes() || null,
-          corrections,
-          add_lines: this.pendingNewLines(),
-          remove_line_ids: Array.from(this.pendingRemoveLineIds()),
-        })
+        .patchQuotation(q.id, this.buildReviewPatch(corrections))
         .subscribe({
           next: (updated) => {
             this.quotation.set(updated);
             this.pendingCorrections.set(new Map());
             this.pendingQuotationCurrency.set(undefined);
+            this.pendingPricesIncludeVat.set(undefined);
+            this.pendingVatRate.set(undefined);
             this.pendingNewLines.set([]);
             this.pendingRemoveLineIds.set(new Set());
             this.executeConfirm(q.id);

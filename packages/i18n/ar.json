@@ -978,6 +978,9 @@
         "pickDateToConfirm": "اختر تاريخًا لتأكيد هذه القيمة.",
         "statedTotalLabel": "إجمالي المبلغ المذكور",
         "statedTotalCurrency": "عملة المبلغ المذكور",
+        "pricesIncludeVatLabel": "الأسعار شاملة ضريبة القيمة المضافة",
+        "vatRateLabel": "نسبة الضريبة (%)",
+        "invalidVatRate": "أدخل نسبة ضريبة بين ٠ و١٠٠٪.",
         "statusLabel": "الحالة"
       },
       "supplierMatch": {
@@ -998,6 +1001,7 @@
         "colPack": "تفاصيل العبوة",
         "colUnitPrice": "سعر الوحدة",
         "colVat": "ضريبة القيمة المضافة %",
+        "vatInclusiveSuffix": "(شامل)",
         "colDeliveryFee": "رسوم التوصيل",
         "colDiscount": "الخصم",
         "colConfidence": "مستوى الثقة",
@@ -1160,6 +1164,7 @@
         "confirmAsIs": "تأكيد القيمة كما هي"
       },
       "fieldLabels": {
+        "prices_include_vat": "الأسعار شاملة ضريبة القيمة المضافة",
         "supplier_name": "اسم المورد",
         "issue_date": "تاريخ الإصدار",
         "expiry_date": "تاريخ الانتهاء",
@@ -1973,6 +1978,7 @@
       "quantityLabel": "الكمية ({{unit}})",
       "totalLabel": "إجمالي المدفوع دون الضريبة ({{currency}})",
       "unitPriceHint": "{{price}} لكل {{unit}}",
+      "taxExcludedHint": "لا يشمل الضريبة {{tax}}",
       "submit": "حفظ {{count}} من النتائج",
       "success": "تم تسجيل {{count}} من نتائج الشراء.",
       "loadError": "تعذّر تحميل هذا الأمر.",
@@ -3626,6 +3632,7 @@
       "quotedCurrencyMismatch": "عملة أمر الشراء ({{order}}) تختلف عن عملة عرض المورّد ({{quoted}}). استخدم {{quoted}} أو عدّل الأسعار.",
       "packUnit": "عبوة {{size}} {{unit}}",
       "baseUnitPrice": "لكل {{unit}}",
+      "vatInclusiveHint": "صافي بعد خصم ضريبة القيمة المضافة {{rate}}% · سعر العرض {{gross}} شامل الضريبة",
       "remainingQuantity": "المتبقي للطلب"
     },
     "status": {

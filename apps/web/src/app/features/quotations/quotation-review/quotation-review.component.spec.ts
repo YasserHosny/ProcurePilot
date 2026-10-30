@@ -11,7 +11,7 @@ import { Subject, of, throwError } from 'rxjs';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { Quotation, QuotationDetail, Role, Supplier } from '../../../core/api/models';
+import type { FieldExtraction, Quotation, QuotationDetail, Role, Supplier } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { QuotationReviewComponent } from './quotation-review.component';
@@ -23,6 +23,8 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
   const homeCurrency = signal<string | undefined>('EGP');
 
   const mockQuotationDetail: QuotationDetail = {
+    prices_include_vat: false,
+    vat_rate: null,
     id: 'q-review-1',
     document_id: 'doc-1',
     supplier_id: null,
@@ -1404,5 +1406,208 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
         expect((priceCorr.corrected_value as { amount: string }).amount).toBe('0.1234');
       }
     }
+  });
+
+  describe('VAT-inclusive quote review (PPS-122)', () => {
+    it('rejects a VAT rate outside 0–100 percent instead of patching an invalid fraction', () => {
+      component.quotation.set({ ...mockQuotationDetail, field_extractions: [] });
+      apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+      component.vatRateInputChanged('101');
+      component.saveCorrections();
+      expect(apiService.patchQuotation).not.toHaveBeenCalled();
+    });
+
+    it('confirms flagged VAT values as-is and sends both header values and corrections', () => {
+      const extractions = [
+        { id: 'fe-vat-inc', field_name: 'prices_include_vat', extracted_value: true },
+        { id: 'fe-vat-rate', field_name: 'vat_rate', extracted_value: '0.15' },
+      ].map(field => ({ ...field, quotation_id: mockQuotationDetail.id, entity_type: 'quotation' as const,
+        entity_id: mockQuotationDetail.id, confidence: '0.8000', extraction_method: 'bedrock' as const,
+        model_version: 'v1', corrected_value: null, corrected_by: null, corrected_at: null }));
+      component.quotation.set({ ...mockQuotationDetail, prices_include_vat: true, vat_rate: '0.15', field_extractions: extractions });
+      fixture.detectChanges();
+      expect(component.flaggedFields().length).toBe(2);
+      const host = fixture.nativeElement as HTMLElement;
+      host.querySelector<HTMLButtonElement>('#field-fe-vat-inc .confirm-as-is-btn')!.click();
+      host.querySelector<HTMLButtonElement>('#field-fe-vat-rate .confirm-as-is-btn')!.click();
+      fixture.detectChanges();
+      expect(component.flaggedFields().length).toBe(0);
+      expect(host.querySelectorAll('[data-testid="confirmed-badge"]').length).toBe(2);
+      apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+      component.saveCorrections();
+      expect(apiService.patchQuotation.calls.mostRecent().args[1]).toEqual(jasmine.objectContaining({
+        prices_include_vat: true, vat_rate: '0.15',
+        corrections: jasmine.arrayContaining([
+          { field_extraction_id: 'fe-vat-inc', corrected_value: true },
+          { field_extraction_id: 'fe-vat-rate', corrected_value: '0.15' },
+        ]),
+      }));
+    });
+
+    it('enables saving when only VAT fields without extraction rows change', () => {
+      component.quotation.set({ ...mockQuotationDetail, prices_include_vat: false, vat_rate: null, field_extractions: [] });
+      component.reviewerNotes.set(mockQuotationDetail.reviewer_notes || '');
+      expect(component.hasPendingReviewChanges()).toBeFalse();
+      component.pricesIncludeVatToggled(true);
+      expect(component.hasPendingReviewChanges()).toBeTrue();
+      component.pendingPricesIncludeVat.set(undefined);
+      component.vatRateInputChanged('15');
+      expect(component.hasPendingReviewChanges()).toBeTrue();
+    });
+
+    it('(a) an extracted inclusive quote shows the checkbox checked, rate 15, flagged with the low-confidence pill and a «Confirm as is» button', () => {
+      const vatIncExtraction: FieldExtraction = {
+        id: 'fe-vat-inc',
+        quotation_id: 'q-review-1',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'prices_include_vat',
+        extracted_value: true,
+        confidence: '0.8000',
+        extraction_method: 'bedrock',
+        model_version: 'v1',
+        corrected_value: null,
+        corrected_by: null,
+        corrected_at: null,
+      };
+      const vatRateExtraction: FieldExtraction = {
+        id: 'fe-vat-rate',
+        quotation_id: 'q-review-1',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'vat_rate',
+        extracted_value: '0.15',
+        confidence: '0.8000',
+        extraction_method: 'bedrock',
+        model_version: 'v1',
+        corrected_value: null,
+        corrected_by: null,
+        corrected_at: null,
+      };
+      component.quotation.set({
+        ...mockQuotationDetail,
+        prices_include_vat: true,
+        vat_rate: '0.1500',
+        field_extractions: [vatIncExtraction, vatRateExtraction],
+      });
+      fixture.detectChanges();
+
+      const vatIncBox = fixture.nativeElement.querySelector('#field-fe-vat-inc');
+      expect(vatIncBox).toBeTruthy();
+      const checkbox = vatIncBox.querySelector('mat-checkbox input[type="checkbox"]') as HTMLInputElement;
+      expect(checkbox).toBeTruthy();
+      expect(checkbox.checked).toBeTrue();
+
+      const vatRateBox = fixture.nativeElement.querySelector('#field-fe-vat-rate');
+      expect(vatRateBox).toBeTruthy();
+      const vatRateInput = vatRateBox.querySelector('input') as HTMLInputElement;
+      expect(vatRateInput).toBeTruthy();
+      expect(vatRateInput.value).toBe('15');
+
+      const vatIncPill = vatIncBox.querySelector('.confidence-pill');
+      expect(vatIncPill?.classList.contains('low-conf')).toBeTrue();
+      expect(vatIncPill?.textContent?.trim()).toContain('80%');
+
+      const vatRatePill = vatRateBox.querySelector('.confidence-pill');
+      expect(vatRatePill?.classList.contains('low-conf')).toBeTrue();
+      expect(vatRatePill?.textContent?.trim()).toContain('80%');
+
+      const vatIncConfirmBtn = vatIncBox.querySelector('.confirm-as-is-btn');
+      expect(vatIncConfirmBtn).toBeTruthy();
+
+      const vatRateConfirmBtn = vatRateBox.querySelector('.confirm-as-is-btn');
+      expect(vatRateConfirmBtn).toBeTruthy();
+
+      expect(component.flaggedFields().map(f => f.fieldName)).toContain('prices_include_vat');
+      expect(component.flaggedFields().map(f => f.fieldName)).toContain('vat_rate');
+    });
+
+    it('(b) confirming/changing sends the expected correction/patch (prices_include_vat: false / vat_rate: "0.05")', () => {
+      const vatIncExtraction: FieldExtraction = {
+        id: 'fe-vat-inc',
+        quotation_id: 'q-review-1',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'prices_include_vat',
+        extracted_value: true,
+        confidence: '0.8000',
+        extraction_method: 'bedrock',
+        model_version: 'v1',
+        corrected_value: null,
+        corrected_by: null,
+        corrected_at: null,
+      };
+      const vatRateExtraction: FieldExtraction = {
+        id: 'fe-vat-rate',
+        quotation_id: 'q-review-1',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'vat_rate',
+        extracted_value: '0.15',
+        confidence: '0.8000',
+        extraction_method: 'bedrock',
+        model_version: 'v1',
+        corrected_value: null,
+        corrected_by: null,
+        corrected_at: null,
+      };
+      component.quotation.set({
+        ...mockQuotationDetail,
+        prices_include_vat: true,
+        vat_rate: '0.1500',
+        field_extractions: [vatIncExtraction, vatRateExtraction],
+      });
+      component.selectedSupplierId.set('sup-1');
+      fixture.detectChanges();
+
+      component.pricesIncludeVatToggled(false);
+      component.vatRateInputChanged('5');
+
+      apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+      component.saveCorrections();
+
+      expect(apiService.patchQuotation).toHaveBeenCalledWith(
+        'q-review-1',
+        jasmine.objectContaining({
+          prices_include_vat: false,
+          vat_rate: '0.05',
+          corrections: jasmine.arrayContaining([
+            { field_extraction_id: 'fe-vat-inc', corrected_value: false },
+            { field_extraction_id: 'fe-vat-rate', corrected_value: '0.05' },
+          ]),
+        }),
+      );
+    });
+
+    it('(c) a quote without the extracted rows shows the field unflagged and unchecked, and toggling it sends prices_include_vat: true in the patch', () => {
+      component.quotation.set({
+        ...mockQuotationDetail,
+        prices_include_vat: false,
+        vat_rate: null,
+        field_extractions: [],
+      });
+      component.selectedSupplierId.set('sup-1');
+      fixture.detectChanges();
+
+      const vatIncBox = fixture.nativeElement.querySelector('#field-prices_include_vat');
+      expect(vatIncBox).toBeTruthy();
+      const checkbox = vatIncBox.querySelector('mat-checkbox input[type="checkbox"]') as HTMLInputElement;
+      expect(checkbox.checked).toBeFalse();
+      expect(vatIncBox.querySelector('.confidence-pill')).toBeFalsy();
+      expect(vatIncBox.querySelector('.confirm-as-is-btn')).toBeFalsy();
+      expect(component.flaggedFields().map(f => f.fieldName)).not.toContain('prices_include_vat');
+
+      component.pricesIncludeVatToggled(true);
+
+      apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+      component.saveCorrections();
+
+      expect(apiService.patchQuotation).toHaveBeenCalledWith(
+        'q-review-1',
+        jasmine.objectContaining({
+          prices_include_vat: true,
+        }),
+      );
+    });
   });
 });
