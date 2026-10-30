@@ -844,7 +844,7 @@ of the purchase evidence row.
 | `actual_value_currency` | text | Required FK -> `supported_currency.code` |
 | `delta_amount` | numeric(18,4) | Optional signed saving, `baseline_value - actual_value`; positive, zero, and negative values are valid |
 | `delta_currency` | text | Optional FK -> `supported_currency.code`; required with `delta_amount` |
-| `calculation_version` | text | Required calculation identifier, for example `saving-baseline-v2` (v2 adds `last_po_price`) |
+| `calculation_version` | text | Required calculation identifier, for example `saving-baseline-v3` (v2 adds `last_po_price`; v3 computes a quoted baseline from the landed total instead of a rounded per-unit price) |
 | `calculation_inputs` | jsonb | Required replay snapshot: quantity, selected policy, source point ids, window months, and actual total |
 | `recorded_by` | uuid | Required FK -> Membership; copied from the purchase record |
 | `recorded_at` | timestamptz | Required time the baseline, actual, and delta were captured |

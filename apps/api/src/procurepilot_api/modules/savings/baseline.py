@@ -17,7 +17,7 @@ from procurepilot_api.modules.savings.schemas import Money
 
 MONEY_QUANT = Decimal("0.0001")
 QUANTITY_QUANT = Decimal("0.000001")
-CALCULATION_VERSION = "saving-baseline-v2"
+CALCULATION_VERSION = "saving-baseline-v3"
 
 # Statuses of a purchase order a human has authorised and sent. Draft and cancelled orders are
 # never a price that was paid.
@@ -119,7 +119,7 @@ def capture_baseline(
             actual=actual,
             exclude_purchase_order_id=exclude_purchase_order_id,
         )
-    points = _price_history_points(conn, product_id)
+    points, rows = _price_history_points(conn, product_id)
     summary = price_history_summary(
         points,
         window_start=_subtract_calendar_months(datetime.now(UTC), 6),
@@ -158,22 +158,58 @@ def capture_baseline(
             },
         )
     unit_price = Decimal(metric.value.amount)
-    baseline_value = (unit_price * quantity).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    rows_by_id = {UUID(str(row["landed_cost_id"])): row for row in rows}
+    source_rows = [rows_by_id[item] for item in metric.source_landed_cost_ids]
+    baseline_value = _quoted_baseline_value(
+        source_rows, quantity, average=policy == "rolling_average_6m"
+    )
     delta = (baseline_value - actual.amount).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    inputs: dict[str, object] = {
+        "quantity": _quantity_string(quantity),
+        "actual_value": actual.model_dump(mode="json"),
+        "selected_metric": policy,
+        "source_landed_cost_ids": [str(item) for item in metric.source_landed_cost_ids],
+        "price_history_point_count": len(points),
+    }
+    if policy == "last_paid":
+        source = source_rows[0]
+        inputs.update(
+            landed_total=Money(
+                amount=Decimal(str(source["total_amount"])),
+                currency=str(source["total_currency"]),
+            ).model_dump(mode="json"),
+            landed_quantity=_quantity_string(Decimal(str(source["quantity"]))),
+            landed_base_quantity=_quantity_string(Decimal(str(source["normalised_base_quantity"]))),
+        )
     return BaselineCapture(
         policy=policy,
         source_landed_cost_ids=metric.source_landed_cost_ids,
         unit_price=Money(amount=unit_price, currency=metric.value.currency),
         value=Money(amount=baseline_value, currency=metric.value.currency),
         delta=Money(amount=delta, currency=metric.value.currency),
-        calculation_inputs={
-            "quantity": _quantity_string(quantity),
-            "actual_value": actual.model_dump(mode="json"),
-            "selected_metric": policy,
-            "source_landed_cost_ids": [str(item) for item in metric.source_landed_cost_ids],
-            "price_history_point_count": len(points),
-        },
+        calculation_inputs=inputs,
     )
+
+
+def _quoted_baseline_value(
+    rows: list[dict[str, object]], quantity: Decimal, *, average: bool = False
+) -> Decimal:
+    """Scale selected landed costs without multiplying a rounded display price."""
+    if average:
+        prices = [
+            Decimal(str(row["total_amount"])) / Decimal(str(row["normalised_base_quantity"]))
+            for row in rows
+        ]
+        value = sum(prices) / Decimal(len(prices)) * quantity
+    else:
+        source = rows[0]
+        # Multiply before dividing so whole packs retain the exact landed total.
+        value = (
+            Decimal(str(source["total_amount"]))
+            * quantity
+            / Decimal(str(source["normalised_base_quantity"]))
+        )
+    return value.quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
 
 
 def _po_baseline(
@@ -266,11 +302,13 @@ def _last_po_price(
     return None
 
 
-def _price_history_points(conn: object, product_id: UUID) -> list[PriceHistoryPoint]:
+def _price_history_points(
+    conn: object, product_id: UUID
+) -> tuple[list[PriceHistoryPoint], list[dict[str, object]]]:
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(PRICE_HISTORY_SQL, {"product_id": product_id})
         rows = [dict(row) for row in cur.fetchall()]
-    return [_history_point(row) for row in rows]
+    return [_history_point(row) for row in rows], rows
 
 
 def _history_point(row: dict[str, object]) -> PriceHistoryPoint:
