@@ -355,6 +355,13 @@ class RequestLineAllocation(StrictModel):
     remaining_quantity: Decimal
 
 
+class RequestAllocationOrder(StrictModel):
+    id: UUID
+    order_number: str
+    status: OrderStatus
+
+
 class RequestAllocation(StrictModel):
     source_request_id: UUID
     lines: tuple[RequestLineAllocation, ...]
+    orders: tuple[RequestAllocationOrder, ...] = ()

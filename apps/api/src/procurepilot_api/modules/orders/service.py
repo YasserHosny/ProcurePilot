@@ -37,6 +37,7 @@ from procurepilot_api.modules.orders.schemas import (
     PurchaseOrderLine,
     PurchaseOrderList,
     RequestAllocation,
+    RequestAllocationOrder,
     RequestLineAllocation,
     SupplierConfirmation,
     SupplierConfirmationCreate,
@@ -559,6 +560,18 @@ class OrdersService:
             allocations = {
                 str(r["source_request_line_id"]): r["allocated_quantity"] for r in cur.fetchall()
             }
+            cur.execute(
+                "select po.id, po.order_number, po.status "
+                "from purchase_order po "
+                "where po.tenant_id = %s and po.status != 'cancelled' "
+                "and (po.source_request_id = %s or exists ("
+                "select 1 from purchase_order_line pol "
+                "where pol.tenant_id = po.tenant_id and pol.purchase_order_id = po.id "
+                "and pol.source_request_line_id = any(%s))) "
+                "order by po.created_at, po.order_number",
+                (member.tenant_id, source_request_id, req_line_ids),
+            )
+            orders = tuple(RequestAllocationOrder.model_validate(row) for row in cur.fetchall())
 
         line_allocations = []
         for line in request.lines:
@@ -577,6 +590,7 @@ class OrdersService:
         return RequestAllocation(
             source_request_id=source_request_id,
             lines=tuple(line_allocations),
+            orders=orders,
         )
 
     @staticmethod
