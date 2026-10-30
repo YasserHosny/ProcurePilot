@@ -1630,6 +1630,10 @@
     "title": "تقسيم السلة بين موردين",
     "subtitle": "تحسين المشتريات عبر موردين اثنين للحصول على أدنى إجمالي تكلفة واصلة.",
     "readOnlyNotice": "لديك صلاحية عرض فقط. يمكن لمالكي ومشتري مساحة العمل إعداد وإرسال طلبات تقسيم السلة.",
+    "fromRfq": "من طلب عروض الأسعار {{id}} (أُرسل في {{date}})",
+    "rfqScope": "أصناف ومورّدو طلب عروض الأسعار",
+    "rfqSuppliers": "المورّدون",
+    "rfqItems": "الأصناف المطلوبة",
     "form": {
       "suppliersSectionTitle": "اختر موردين اثنين",
       "supplier1": "المورد الأول",
@@ -1687,7 +1691,11 @@
       "solverVersion": "إصدار نظام التحسين: {{version}}",
       "computedAt": "تم الحساب في {{time}}",
       "packQuantity": "{{count}} × {{size}} {{unit}}",
-      "baseEquivalent": "الإجمالي {{total}} {{unit}}"
+      "baseEquivalent": "الإجمالي {{total}} {{unit}}",
+      "splitTotal": "إجمالي التقسيم",
+      "saving": "التوفير مقارنةً بمورّد واحد",
+      "singleSupplierTotal": "إجمالي المورّد الواحد",
+      "infeasible": "غير قابل للتنفيذ"
     },
     "actions": {
       "newSplit": "بدء تقسيم سلة جديد",
@@ -3938,7 +3946,12 @@
       "editDraft": "تعديل",
       "sendDraft": "إرسال",
       "refused": "مرفوض",
-      "refusedExplanation": "رُفض عرض السعر الوارد في هذا الرد، ولا يمكن استخدامه لإعداد طلب شراء."
+      "refusedExplanation": "رُفض عرض السعر الوارد في هذا الرد، ولا يمكن استخدامه لإعداد طلب شراء.",
+      "splitBetweenSuppliers": "تقسيم بين المورّدين",
+      "needsTwoMatched": "يتطلب ردّين مطابقين",
+      "differentCurrencies": "الردود بعملات مختلفة",
+      "alreadyConverted": "تم تحويل طلب عروض الأسعار بالفعل",
+      "splitError": "فشل بدء التقسيم. يُرجى المحاولة مرة أخرى."
     },
     "history": {
       "title": "سجل طلبات عروض الأسعار",

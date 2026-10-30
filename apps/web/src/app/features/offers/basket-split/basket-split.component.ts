@@ -15,7 +15,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Subscription, interval, switchMap } from 'rxjs';
 
@@ -23,7 +23,10 @@ import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Product, Supplier } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatService } from '../../../core/format/format.service';
-import { unitLabel } from '../../../core/format/unit-label';
+import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
+import { UnitLabelPipe, unitLabel } from '../../../core/format/unit-label';
+import { RfqApi, type RfqDetail } from '../../rfq/rfq-api';
 import type {
   BasketItemRequest,
   BasketOptimiseRequest,
@@ -62,6 +65,10 @@ import { BasketSplitResultsComponent } from './basket-split-results.component';
     MatSnackBarModule,
     MatTooltipModule,
     TranslatePipe,
+    RouterModule,
+    FormatDatePipe,
+    FormatQuantityPipe,
+    UnitLabelPipe,
     BasketSplitResultsComponent,
     BasketSplitInfeasibleComponent,
   ],
@@ -78,7 +85,9 @@ export class BasketSplitComponent implements OnInit {
   private readonly translate = inject(TranslateService);
   private readonly format = inject(FormatService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly rfqApi = inject(RfqApi);
 
+  readonly rfqDetail = signal<RfqDetail | null>(null);
   readonly suppliers = signal<Supplier[]>([]);
   readonly products = signal<Product[]>([]);
   readonly isLoading = signal<boolean>(false);
@@ -118,6 +127,12 @@ export class BasketSplitComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
+  readonly isRfqMode = computed<boolean>(() => Boolean(this.currentJob()?.rfq_id));
+  readonly rfqShortId = computed<string>(() => this.currentJob()?.rfq_id?.slice(0, 8) ?? '');
+  readonly rfqSentDate = computed<string>(() => {
+    const detail = this.rfqDetail();
+    return detail?.rfq.sent_at || detail?.rfq.created_at || '';
+  });
 
   readonly uiState = computed<BasketSplitUIState>(() => {
     return determineBasketSplitUIState(this.currentJob(), this.isSubmitting());
@@ -216,7 +231,23 @@ export class BasketSplitComponent implements OnInit {
   }
 
   baseUnitFor(workspaceProductId: string): string | undefined {
-    return this.products().find((product) => product.id === workspaceProductId)?.base_unit;
+    return (
+      this.currentJob()?.pack_snapshot?.[workspaceProductId]?.base_unit ??
+      this.products().find((product) => product.id === workspaceProductId)?.base_unit
+    );
+  }
+
+  getItemPackQuantity(item: { workspace_product_id: string; quantity: string }): number {
+    const base = parseFloat(item.quantity);
+    const snapshot = this.currentJob()?.pack_snapshot?.[item.workspace_product_id];
+    const pack = this.products().find((p) => p.id === item.workspace_product_id)?.pack;
+    const size = snapshot
+      ? parseFloat(snapshot.base_quantity)
+      : pack
+        ? parseFloat(pack.base_quantity ?? String(pack.pack_count * parseFloat(pack.unit_size)))
+        : 1;
+    const packSize = Number.isFinite(size) && size > 0 ? size : 1;
+    return Number.isFinite(base) ? base / packSize : 0;
   }
 
   /** Base units (litre/kg) in one purchasing pack of the product; 1 when it has no pack info. */
@@ -328,6 +359,25 @@ export class BasketSplitComponent implements OnInit {
   }
 
   rerunOptimisation(): void {
+    const rfqId = this.currentJob()?.rfq_id;
+    if (rfqId) {
+      if (!this.isWriter() || this.isSubmitting()) return;
+      this.isSubmitting.set(true);
+      this.errorMessage.set(null);
+      this.rfqApi.splitRfq(rfqId).subscribe({
+        next: (job) => {
+          this.isSubmitting.set(false);
+          this.currentJob.set(job);
+          this.router.navigate(['/offers/basket-split', job.id]);
+          this.pollJob(job.id);
+        },
+        error: (err: unknown) => {
+          this.isSubmitting.set(false);
+          this.handleError(err);
+        },
+      });
+      return;
+    }
     this.submitBasket();
   }
 
@@ -340,6 +390,14 @@ export class BasketSplitComponent implements OnInit {
         next: (job) => {
           this.currentJob.set(job);
           this.isLoading.set(false);
+          if (job.rfq_id) {
+            this.rfqApi.getRfq(job.rfq_id).subscribe({
+              next: (detail) => this.rfqDetail.set(detail),
+              error: () => this.rfqDetail.set(null),
+            });
+          } else {
+            this.rfqDetail.set(null);
+          }
           if (job.status === 'queued' || job.status === 'running') {
             this.pollJob(job.id);
           }
@@ -362,6 +420,12 @@ export class BasketSplitComponent implements OnInit {
       .subscribe({
         next: (job) => {
           this.currentJob.set(job);
+          if (job.rfq_id && !this.rfqDetail()) {
+            this.rfqApi.getRfq(job.rfq_id).subscribe({
+              next: (detail) => this.rfqDetail.set(detail),
+              error: () => this.rfqDetail.set(null),
+            });
+          }
           if (job.status === 'completed' || job.status === 'failed') {
             this.pollSubscription?.unsubscribe();
             this.pollSubscription = null;

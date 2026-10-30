@@ -10,6 +10,7 @@ import ar from '../../../../../../../packages/i18n/ar.json';
 import { of } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
+import { RfqApi } from '../../rfq/rfq-api';
 import type { Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import type { BasketSplitJob } from '../offers-api';
@@ -19,6 +20,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
   let component: BasketSplitComponent;
   let fixture: ComponentFixture<BasketSplitComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  let mockRfqApi: jasmine.SpyObj<RfqApi>;
 
   const mockFeasibleJob: BasketSplitJob = {
     id: 'job-1',
@@ -123,6 +125,25 @@ describe('BasketSplitComponent (US3, T045)', () => {
       'getBasketSplitJob',
     ]);
 
+    mockRfqApi = jasmine.createSpyObj<RfqApi>('RfqApi', ['getRfq']);
+    mockRfqApi.getRfq.and.returnValue(
+      of({
+        rfq: {
+          id: 'rfq-abcdef12-3456',
+          tenant_id: 'tenant-1',
+          created_by_membership_id: 'member-1',
+          status: 'responded',
+          needed_by_date: '2026-10-30',
+          tenant_terms: null,
+          idempotency_key: 'key-1',
+          created_at: '2026-10-28T08:00:00Z',
+          sent_at: '2026-10-28T09:00:00Z',
+        },
+        lines: [],
+        recipients: [],
+      }),
+    );
+
     const mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
       role: signal<Role | null>('buyer'),
@@ -176,6 +197,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
+        { provide: RfqApi, useValue: mockRfqApi },
         { provide: SessionService, useValue: mockSession },
       ],
     }).compileComponents();
@@ -703,5 +725,85 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(el.textContent).not.toContain('requires a GBP 250.00');
       expect(el.textContent).toContain('Supplier Alpha has moderate lead time risk.');
     });
+  });
+
+  describe('RFQ mode (T016)', () => {
+    const rfqJob: BasketSplitJob = {
+      ...mockFeasibleJob,
+      id: 'job-rfq-1',
+      rfq_id: 'rfq-abcdef12-3456',
+      items: [
+        { workspace_product_id: 'prod-1', quantity: '100.000000' },
+        { workspace_product_id: 'prod-2', quantity: '50.000000' },
+      ],
+      pack_snapshot: {
+        'prod-1': { base_quantity: '10', base_unit: 'EA' },
+        'prod-2': { base_quantity: '25', base_unit: 'EA' },
+      },
+    };
+
+    it('renders header line with short id, sent date, and link to RFQ', fakeAsync(() => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+
+      apiService.getBasketSplitJob.and.returnValue(of(rfqJob));
+      component.fetchJob('job-rfq-1');
+      tick();
+      fixture.detectChanges();
+
+      expect(mockRfqApi.getRfq).toHaveBeenCalledWith('rfq-abcdef12-3456');
+
+      const el: HTMLElement = fixture.nativeElement;
+      const headerLine = el.querySelector('[data-testid="rfq-source-header"]');
+      expect(headerLine).not.toBeNull();
+      const text = headerLine?.textContent ?? '';
+      expect(text).toContain('From RFQ rfq-abcd');
+      expect(text).toContain('sent');
+
+      const link = headerLine?.querySelector<HTMLAnchorElement>('a');
+      expect(link).not.toBeNull();
+      expect(link?.getAttribute('href')).toContain('/rfq/rfq-abcdef12-3456');
+    }));
+
+    it('displays items and suppliers read-only with quantities shown in packs (base / pack_base)', fakeAsync(() => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+
+      apiService.getBasketSplitJob.and.returnValue(of(rfqJob));
+      component.fetchJob('job-rfq-1');
+      tick();
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      const scopeCard = el.querySelector('[data-testid="rfq-split-scope"]');
+      expect(scopeCard).not.toBeNull();
+
+      // Read-only suppliers listed
+      expect(scopeCard?.textContent).toContain('Supplier Alpha');
+      expect(scopeCard?.textContent).toContain('Supplier Beta');
+      // No editable supplier selects or buttons in scope
+      expect(scopeCard?.querySelector('mat-select')).toBeNull();
+      expect(scopeCard?.querySelector('button')).toBeNull();
+
+      // Quantities shown in packs: prod-1: 100 base / 10 = 10 packs; prod-2: 50 base / 25 = 2 packs
+      expect(scopeCard?.textContent).toContain('Product 1');
+      expect(scopeCard?.textContent).toContain('10');
+      expect(scopeCard?.textContent).toContain('Product 2');
+      expect(scopeCard?.textContent).toContain('2');
+    }));
+
+    it('behaves as standard basket split without RFQ header or scope when job has no rfq_id', fakeAsync(() => {
+      apiService.getBasketSplitJob.and.returnValue(of(mockFeasibleJob));
+      component.fetchJob('job-1');
+      tick();
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('[data-testid="rfq-source-header"]')).toBeNull();
+      expect(el.querySelector('[data-testid="rfq-split-scope"]')).toBeNull();
+      expect(mockRfqApi.getRfq).not.toHaveBeenCalled();
+    }));
   });
 });

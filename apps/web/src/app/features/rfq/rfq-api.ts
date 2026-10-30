@@ -2,7 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-import type { QuotationStatus } from '../../core/api/models';
+import type { QuotationStatus, BasketSplitJob } from '../../core/api/models';
 import { environment } from '../../../environments/environment';
 
 export interface Rfq {
@@ -14,6 +14,7 @@ export interface Rfq {
   tenant_terms: string | null;
   idempotency_key: string;
   created_at: string;
+  sent_at?: string | null;
 }
 
 export interface RfqLine {
@@ -192,6 +193,13 @@ export class RfqApi {
     return this.http.post<PrepareRequestResponse>(
       `${this.baseUrl}/${rfqId}/prepare-request`, payload, { headers },
     );
+  }
+
+  splitRfq(rfqId: string, idempotencyKey?: string): Observable<BasketSplitJob> {
+    const headers = new HttpHeaders({
+      'Idempotency-Key': idempotencyKey || crypto.randomUUID(),
+    });
+    return this.http.post<BasketSplitJob>(`${this.baseUrl}/${rfqId}/split`, {}, { headers });
   }
 
   listRfqs(status?: string, cursor?: string, limit?: number): Observable<RfqList> {

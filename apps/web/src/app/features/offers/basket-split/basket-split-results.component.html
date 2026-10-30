@@ -28,8 +28,38 @@
         }
       </div>
 
+      <!-- RFQ Mode: Split total, each single-supplier total, and saving (T016) -->
+      @if (isRfqMode) {
+        <div class="rfq-savings-summary" data-testid="rfq-savings-summary">
+          <div class="rfq-totals-grid">
+            <div class="rfq-total-card split-card">
+              <span class="total-title">{{ 'basketSplit.result.splitTotal' | translate }}</span>
+              <span class="total-figure pp-figures">{{ res.total_landed_cost | formatMoney }}</span>
+            </div>
+            @for (base of singleSupplierBaselines; track base.supplier_id) {
+              <div class="rfq-total-card baseline-card">
+                <span class="total-title">{{ getSupplierName(base.supplier_id) }}</span>
+                <span class="total-figure pp-figures">
+                  @if (base.feasible && base.total_landed_cost) {
+                    {{ base.total_landed_cost | formatMoney }}
+                  } @else {
+                    {{ 'basketSplit.result.infeasible' | translate }}
+                  }
+                </span>
+              </div>
+            }
+            @if (splitSaving; as saving) {
+              <div class="rfq-total-card saving-card">
+                <span class="total-title">{{ 'basketSplit.result.saving' | translate }}</span>
+                <span class="total-figure pp-figures saving-value">{{ saving | formatMoney }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
       <!-- Single-Supplier Baseline Comparison (FR-008, US3 Scenario 2) -->
-      @if (singleSupplierSavings; as baselineInfo) {
+      @if (!isRfqMode && singleSupplierSavings; as baselineInfo) {
         @if (baselineInfo.type !== 'neither_feasible') {
           <div class="baseline-comparison-box" [ngClass]="baselineInfo.type">
             <mat-icon aria-hidden="true">

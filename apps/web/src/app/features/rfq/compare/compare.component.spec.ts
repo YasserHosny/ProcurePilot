@@ -12,12 +12,13 @@ import {
 } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { ActivatedRoute, Router, UrlTree } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { Branch, Member, Supplier, Product } from '../../../core/api/models';
+import { Branch, Member, Supplier, Product, BasketSplitJob } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 
@@ -117,6 +118,7 @@ describe('CompareComponent (RFQ)', () => {
       'sendRfq',
       'listResponses',
       'prepareRequest',
+      'splitRfq',
     ]);
     mockRfqApi.getRfq.and.returnValue(of(sentDetail));
     mockRfqApi.listResponses.and.returnValue(of(dummyResponses));
@@ -881,6 +883,172 @@ describe('CompareComponent (RFQ)', () => {
     expect(reasons.length).toBe(2);
     expect(reasons[0].classList.contains('fired')).toBeFalse();
     expect(reasons[1].classList.contains('fired')).toBeTrue();
+  });
+
+  describe('Split between suppliers (T015)', () => {
+    it('disables split button with "Needs two matched replies" and "Match 1 line" link when only 1 reply is matched', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const splitBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitBtn).not.toBeNull();
+      expect(splitBtn?.disabled).toBeTrue();
+
+      const reason = compiled.querySelector('[data-testid="split-disabled-reason"]');
+      expect(reason).not.toBeNull();
+      expect(reason?.textContent).toContain('Needs two matched replies');
+      const matchLink = reason?.querySelector<HTMLAnchorElement>('a.match-lines-link');
+      expect(matchLink).not.toBeNull();
+      expect(matchLink?.textContent?.trim()).toBe('Match 1 line');
+      expect(matchLink?.getAttribute('href')).toContain('quotation_id=quote-2');
+    });
+
+    it('disables split button with "Replies are in different currencies" when currencies differ', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const respUsd = dummyResponses.items[0];
+      const respSar = {
+        ...dummyResponses.items[0],
+        id: 'resp-sar',
+        supplier_id: 'supp-sar',
+        quotation_id: 'quote-sar',
+        lines: [
+          {
+            ...dummyResponses.items[0].lines[0],
+            quoted_unit_price_currency: 'SAR',
+          },
+        ],
+      };
+      component.responses.set([respUsd, respSar]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const splitBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitBtn?.disabled).toBeTrue();
+
+      const reason = compiled.querySelector('[data-testid="split-disabled-reason"]');
+      expect(reason?.textContent).toContain('Replies are in different currencies');
+    });
+
+    it('enables split button when at least 2 replies are reviewed, fully matched, and in same currency', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const resp1 = dummyResponses.items[0];
+      const resp2 = {
+        ...dummyResponses.items[0],
+        id: 'resp-usd-2',
+        supplier_id: 'supp-2',
+        quotation_id: 'quote-2',
+      };
+      component.responses.set([resp1, resp2]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const splitBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitBtn?.disabled).toBeFalse();
+      expect(compiled.querySelector('[data-testid="split-disabled-reason"]')).toBeNull();
+    });
+
+    it('hides the split button when RFQ is converted', () => {
+      component.rfqDetail.set({
+        ...sentDetail,
+        rfq: { ...sentDetail.rfq, status: 'converted' },
+      });
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('[data-testid="rfq-compare-split-button"]')).toBeNull();
+    });
+
+    it('calls splitRfq API on click and navigates to /offers/basket-split/:jobId', () => {
+      const resp1 = dummyResponses.items[0];
+      const resp2 = {
+        ...dummyResponses.items[0],
+        id: 'resp-usd-2',
+        supplier_id: 'supp-2',
+        quotation_id: 'quote-2',
+      };
+      component.responses.set([resp1, resp2]);
+      fixture.detectChanges();
+
+      mockRfqApi.splitRfq.and.returnValue(
+        of({ id: 'job-999', rfq_id: 'rfq-1' } as unknown as BasketSplitJob),
+      );
+
+      const splitBtn = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+        '[data-testid="rfq-compare-split-button"]',
+      );
+      splitBtn?.click();
+
+      expect(mockRfqApi.splitRfq).toHaveBeenCalledWith('rfq-1', jasmine.any(String));
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/offers/basket-split', 'job-999']);
+    });
+
+    it('disables split button while request is in flight', () => {
+      const resp1 = dummyResponses.items[0];
+      const resp2 = { ...dummyResponses.items[0], id: 'resp-usd-2', supplier_id: 'supp-2', quotation_id: 'quote-2' };
+      component.responses.set([resp1, resp2]);
+      fixture.detectChanges();
+
+      component.isSplitting.set(true);
+      fixture.detectChanges();
+
+      const splitBtn = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+        '[data-testid="rfq-compare-split-button"]',
+      );
+      expect(splitBtn?.disabled).toBeTrue();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.btn-spinner')).not.toBeNull();
+    });
+
+    it('maps 409 conflict reasons to specific messages and reuses idempotency key on retry', () => {
+      const resp1 = dummyResponses.items[0];
+      const resp2 = { ...dummyResponses.items[0], id: 'resp-usd-2', supplier_id: 'supp-2', quotation_id: 'quote-2' };
+      component.responses.set([resp1, resp2]);
+      fixture.detectChanges();
+
+      // Test rfq_already_converted
+      mockRfqApi.splitRfq.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 409, error: { details: { reason: 'rfq_already_converted' } } })),
+      );
+      component.splitRfq();
+      expect(mockSnackBar.open).toHaveBeenCalledWith('rfq.compare.alreadyConverted', 'rfq.history.dismiss', { duration: 5000 });
+      const firstKey = mockRfqApi.splitRfq.calls.mostRecent().args[1];
+
+      // Test mixed_currency
+      mockRfqApi.splitRfq.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 409, error: { details: { reason: 'mixed_currency' } } })),
+      );
+      component.splitRfq();
+      expect(mockSnackBar.open).toHaveBeenCalledWith('rfq.compare.differentCurrencies', 'rfq.history.dismiss', { duration: 5000 });
+      const secondKey = mockRfqApi.splitRfq.calls.mostRecent().args[1];
+      // Key should be reused across retries of the same click attempt
+      expect(secondKey).toBe(firstKey);
+
+      // Test not_enough_replies
+      mockRfqApi.splitRfq.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 409, error: { details: { reason: 'not_enough_replies' } } })),
+      );
+      component.splitRfq();
+      expect(mockSnackBar.open).toHaveBeenCalledWith('rfq.compare.needsTwoMatched', 'rfq.history.dismiss', { duration: 5000 });
+    });
+
+    it('has English and Arabic translation keys for split reasons and button', () => {
+      for (const catalog of [enCatalog, arCatalog]) {
+        const compare = catalog.rfq.compare as Record<string, string>;
+        expect(compare['splitBetweenSuppliers']).toBeTruthy();
+        expect(compare['needsTwoMatched']).toBeTruthy();
+        expect(compare['differentCurrencies']).toBeTruthy();
+        expect(compare['alreadyConverted']).toBeTruthy();
+        expect(compare['splitError']).toBeTruthy();
+      }
+    });
   });
 });
 
