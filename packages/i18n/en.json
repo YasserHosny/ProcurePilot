@@ -4076,7 +4076,11 @@
       "recipientStatus_draft": "Not sent",
       "convertedIntoRequest": "Converted into request",
       "convertedCount": {
+        "zero": "Converted into {{count}} requests",
         "one": "Converted into 1 request",
+        "two": "Converted into {{count}} requests",
+        "few": "Converted into {{count}} requests",
+        "many": "Converted into {{count}} requests",
         "other": "Converted into {{count}} requests"
       },
       "approvedTogether": "Approved together as one group"
