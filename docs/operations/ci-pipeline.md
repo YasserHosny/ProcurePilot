@@ -1,6 +1,6 @@
 # CI pipeline notes
 
-Last updated: 2026-10-18. Source of truth is `.github/workflows/ci.yml`; this page records *why* it is shaped the way it is.
+Last updated: 2026-10-30. Source of truth is `.github/workflows/ci.yml`; this page records *why* it is shaped the way it is.
 
 ## Docs-only pull requests skip the heavy jobs
 
@@ -46,6 +46,19 @@ check name other tooling may rely on is unchanged.
   measured) and are never dropped. The matrix size and the planner's `--total 5` must change together. The `lint`
   job runs the planner's unit tests plus `check`, so a new spec cannot be silently left out. Regenerate the manifest
   from downloaded CI list-reporter logs with `e2e_shard.py from-logs`.
+
+## Docs screenshots drift always reports
+
+`docs-screenshots.yml` triggers on every PR, and its own `changes` job (`Docs screenshot paths`) decides whether
+«Regenerate and diff» runs: the web app source, the docs capture spec and its helpers, `packages/i18n/**`,
+`docs/user/screenshots/**` and the workflow file itself. On any other PR the job ends `skipped`, which satisfies a
+required check; the old workflow-level `on.paths` filter never started, so the check could not be made required
+(PPS-135). The weekly schedule and manual runs always capture.
+
+- The `screens` filter is the list to extend when a new file starts to affect the captures.
+- The «Start Supabase» and «Start the extraction worker» steps did not fail in any of the 100 runs before
+  2026-10-30 (the five non-successes were cancelled runs); the `supabase start failed after 5 attempts` text in
+  every log is GitHub echoing the step's script, not an error.
 
 ## Docker layer cache (deploy workflows)
 

@@ -19,17 +19,14 @@ name: Docs screenshots drift
 # capture uploads the regenerated screenshots as an artifact so a reviewer can see exactly what
 # changed; the fix is to commit the artifact's images (CI-rendered, so they match the runner's
 # fonts) or regenerate locally.
+#
+# Runs on every PR so «Regenerate and diff» always reports and can be a required check (PPS-135):
+# a workflow-level `paths:` filter never starts on a docs-only PR, which would leave a required
+# check "Expected — waiting" forever. The `changes` job decides instead; on unrelated paths the
+# capture job ends `skipped`, which satisfies branch protection.
 
 on:
   pull_request:
-    paths:
-      - 'apps/web/src/app/**'
-      - 'apps/web/tests/e2e/user-documentation-screenshots.spec.ts'
-      - 'apps/web/tests/e2e/support/canonical-flow.ts'
-      - 'apps/web/tests/e2e/global-setup.ts'
-      - 'apps/web/playwright.docs.config.ts'
-      - 'scripts/docs_screenshots_diff.py'
-      - 'packages/i18n/**'
   workflow_dispatch: {}
   schedule:
     # Safety net for drift a path filter can't see (a dependency bump changing font rendering,
@@ -46,8 +43,48 @@ env:
   NODE_VERSION: '24'
 
 jobs:
+  changes:
+    name: Docs screenshot paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      screens: ${{ steps.screens-output.outputs.screens }}
+    steps:
+      - name: Filter changed paths
+        id: paths
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            screens:
+              - 'apps/web/src/app/**'
+              - 'apps/web/tests/e2e/user-documentation-screenshots.spec.ts'
+              - 'apps/web/tests/e2e/support/canonical-flow.ts'
+              - 'apps/web/tests/e2e/global-setup.ts'
+              - 'apps/web/playwright.docs.config.ts'
+              - 'scripts/docs_screenshots_diff.py'
+              - 'packages/i18n/**'
+              - 'docs/user/screenshots/**'
+              - '.github/workflows/docs-screenshots.yml'
+      - name: Set screenshot-change output
+        id: screens-output
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCREEN_PATHS: ${{ steps.paths.outputs.screens }}
+        run: |
+          # The weekly schedule and manual runs always capture; only a PR is path-filtered.
+          if [ "$EVENT_NAME" = pull_request ]; then
+            echo "screens=$SCREEN_PATHS" >> "$GITHUB_OUTPUT"
+          else
+            echo 'screens=true' >> "$GITHUB_OUTPUT"
+          fi
+
   screenshots:
     name: Regenerate and diff
+    needs: changes
+    if: needs.changes.outputs.screens == 'true'
     runs-on: ubuntu-latest
     services:
       redis:
