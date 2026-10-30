@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from procurepilot_api.modules.offers import price_history
+from procurepilot_api.modules.savings import baseline
 from procurepilot_api.modules.savings.baseline import capture_baseline
 from procurepilot_api.modules.savings.schemas import Money
 
@@ -68,7 +69,13 @@ class _Connection:
         return _Cursor(self)
 
 
-def _quote_row(product_id: object, amount: str, quantity: str = "10.000000") -> dict[str, object]:
+def _quote_row(
+    product_id: object,
+    amount: str,
+    quantity: str = "10.000000",
+    *,
+    packs: str | None = None,
+) -> dict[str, object]:
     now = datetime.now(UTC)
     return {
         "landed_cost_id": uuid4(),
@@ -81,9 +88,65 @@ def _quote_row(product_id: object, amount: str, quantity: str = "10.000000") -> 
         "total_amount": Decimal(amount),
         "total_currency": "EGP",
         "normalised_base_quantity": Decimal(quantity),
-        "quantity": Decimal(quantity),
+        "quantity": Decimal(quantity if packs is None else packs),
         "base_unit": "each",
     }
+
+
+def test_quoted_pack_price_baseline_has_no_rounding_noise() -> None:
+    product_id = uuid4()
+    row = _quote_row(product_id, "1275.0000", "675.000000", packs="15.000000")
+    row.update(total_currency="SAR", base_unit="kilogram")
+    capture = capture_baseline(
+        _Connection([row]),
+        product_id=product_id,
+        quantity=Decimal("675.000000"),
+        actual=Money(amount=Decimal("1230.0000"), currency="SAR"),
+        base_unit="kilogram",
+    )
+
+    assert capture.policy == "last_paid"
+    assert capture.value == Money(amount=Decimal("1275.0000"), currency="SAR")
+    assert capture.delta == Money(amount=Decimal("45.0000"), currency="SAR")
+    assert capture.unit_price == Money(amount=Decimal("1.8889"), currency="SAR")
+    assert capture.calculation_inputs["landed_total"] == {
+        "amount": "1275.0000",
+        "currency": "SAR",
+    }
+    assert capture.calculation_inputs["landed_quantity"] == "15.000000"
+    assert capture.calculation_inputs["landed_base_quantity"] == "675.000000"
+
+
+def test_quoted_partial_pack_baseline_rounds_only_the_final_value() -> None:
+    product_id = uuid4()
+    row = _quote_row(product_id, "1275.0000", "675.000000", packs="15.000000")
+    row.update(total_currency="SAR", base_unit="kilogram")
+    capture = capture_baseline(
+        _Connection([row]),
+        product_id=product_id,
+        quantity=Decimal("30.000000"),
+        actual=Money(amount=Decimal("50.0000"), currency="SAR"),
+        base_unit="kilogram",
+    )
+
+    assert capture.policy == "last_paid"
+    assert capture.value == Money(amount=Decimal("56.6667"), currency="SAR")
+    assert capture.delta == Money(amount=Decimal("6.6667"), currency="SAR")
+    assert capture.unit_price == Money(amount=Decimal("1.8889"), currency="SAR")
+
+
+def test_quoted_average_baseline_has_no_rounding_noise() -> None:
+    product_id = uuid4()
+    rows = [
+        _quote_row(product_id, "85.0000", "45.000000", packs="1.000000"),
+        _quote_row(product_id, "85.0000", "45.000000", packs="1.000000"),
+    ]
+    for row in rows:
+        row.update(total_currency="SAR", base_unit="kilogram")
+
+    value = baseline._quoted_baseline_value(rows, Decimal("675.000000"), average=True)
+
+    assert Money(amount=value, currency="SAR") == Money(amount=Decimal("1275.0000"), currency="SAR")
 
 
 def _po_row(
