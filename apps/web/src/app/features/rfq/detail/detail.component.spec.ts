@@ -455,7 +455,7 @@ describe('DetailComponent (RFQ Details)', () => {
 
     const groupLine = banner?.querySelector('[data-testid="rfq-detail-group-line"]');
     expect(groupLine).not.toBeNull();
-    expect(groupLine?.textContent).toContain('Approved together as one group');
+    expect(groupLine?.textContent).toContain('These requests are submitted and approved together');
     const groupLink = groupLine?.querySelector<HTMLAnchorElement>('a');
     expect(groupLink?.getAttribute('href')).toBe('/requests/pr-201');
   });
@@ -486,7 +486,7 @@ describe('DetailComponent (RFQ Details)', () => {
     expect(banner).not.toBeNull();
     // Dual form in Arabic: "تم التحويل إلى طلبين"
     expect(banner?.textContent).toContain('تم التحويل إلى طلبين');
-    // Group line in Arabic: "تم اعتمادها معًا كمجموعة واحدة"
-    expect(banner?.textContent).toContain('تم اعتمادها معًا كمجموعة واحدة');
+    // Group line in Arabic: "تُقدَّم هذه الطلبات وتُعتمد معًا"
+    expect(banner?.textContent).toContain('تُقدَّم هذه الطلبات وتُعتمد معًا');
   });
 });

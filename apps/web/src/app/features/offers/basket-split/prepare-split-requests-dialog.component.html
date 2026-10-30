@@ -1,0 +1,102 @@
+<div class="dialog-container">
+  <h2 mat-dialog-title>{{ 'basketSplit.prepareRequests.dialog.title' | translate }}</h2>
+
+  <mat-dialog-content class="dialog-content">
+    <form [formGroup]="form" class="prepare-form">
+      <!-- Branch (Required) -->
+      <mat-form-field appearance="outline" class="form-field full-width">
+        <mat-label>{{ 'basketSplit.prepareRequests.dialog.branchLabel' | translate }}</mat-label>
+        <mat-select
+          formControlName="branch_id"
+          [placeholder]="'basketSplit.prepareRequests.dialog.branchPlaceholder' | translate"
+          (selectionChange)="onBranchChange($event.value)"
+          required
+        >
+          @for (branch of branches(); track branch.id) {
+            <mat-option [value]="branch.id">
+              {{ branch.name }}
+            </mat-option>
+          }
+        </mat-select>
+        @if (form.controls.branch_id.touched && form.controls.branch_id.hasError('required')) {
+          <mat-error>{{ 'basketSplit.prepareRequests.dialog.branchRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <!-- Required-By Date (Required) -->
+      <mat-form-field appearance="outline" class="form-field full-width">
+        <mat-label>{{ 'basketSplit.prepareRequests.dialog.requiredByLabel' | translate }}</mat-label>
+        <input matInput type="date" formControlName="required_by_date" required />
+        @if (form.controls.required_by_date.touched && form.controls.required_by_date.hasError('required')) {
+          <mat-error>{{ 'basketSplit.prepareRequests.dialog.requiredByRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <!-- Cost Centre (Optional) -->
+      <mat-form-field appearance="outline" class="form-field full-width">
+        <mat-label>{{ 'basketSplit.prepareRequests.dialog.costCentreLabel' | translate }}</mat-label>
+        <mat-select
+          formControlName="cost_centre_id"
+          [placeholder]="'basketSplit.prepareRequests.dialog.costCentrePlaceholder' | translate"
+        >
+          <mat-option [value]="null">—</mat-option>
+          @for (cc of costCentres(); track cc.id) {
+            <mat-option [value]="cc.id">
+              {{ cc.code }} - {{ cc.name }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Expired Quotations Confirmation Section -->
+      @if (expiredQuotations().length > 0) {
+        <div class="expired-section" data-testid="expired-quotations-section">
+          <div class="expired-header">
+            <mat-icon class="warn-icon" aria-hidden="true">warning</mat-icon>
+            <h4 class="expired-title">{{ 'basketSplit.prepareRequests.dialog.expiredSectionTitle' | translate }}</h4>
+          </div>
+          <p class="expired-desc">{{ 'basketSplit.prepareRequests.dialog.expiredDescription' | translate }}</p>
+          <div class="expired-checkbox-list">
+            @for (eq of expiredQuotations(); track eq.id) {
+              <mat-checkbox
+                [checked]="eq.confirmed"
+                (change)="toggleExpiredQuotation(eq.id, $event.checked)"
+                data-testid="confirm-expired-checkbox"
+                class="expired-checkbox"
+              >
+                {{ 'basketSplit.prepareRequests.dialog.confirmExpired' | translate: { supplier: eq.supplier_name || eq.id } }}
+              </mat-checkbox>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Error Message -->
+      @if (errorMessage(); as error) {
+        <div class="dialog-error" role="alert">
+          <mat-icon aria-hidden="true">error</mat-icon>
+          <span>{{ error }}</span>
+        </div>
+      }
+    </form>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end" class="dialog-actions">
+    <button mat-button type="button" [disabled]="isSubmitting()" (click)="cancel()">
+      {{ 'basketSplit.prepareRequests.dialog.cancel' | translate }}
+    </button>
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      [disabled]="isSubmitting()"
+      (click)="onSubmit()"
+    >
+      @if (isSubmitting()) {
+        {{ 'basketSplit.prepareRequests.dialog.submitting' | translate }}
+      } @else {
+        {{ 'basketSplit.prepareRequests.dialog.submit' | translate }}
+      }
+    </button>
+  </mat-dialog-actions>
+</div>

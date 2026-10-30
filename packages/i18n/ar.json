@@ -1700,6 +1700,57 @@
     "actions": {
       "newSplit": "بدء تقسيم سلة جديد",
       "viewCompare": "مقارنة عروض المنتج"
+    },
+    "prepareRequests": {
+      "button": {
+        "zero": "إعداد طلبات الشراء",
+        "one": "إعداد طلب واحد",
+        "two": "إعداد طلبين",
+        "few": "إعداد {{count}} طلبات",
+        "many": "إعداد {{count}} طلباً",
+        "other": "إعداد {{count}} طلب"
+      },
+      "dialog": {
+        "title": "إعداد طلبات الشراء",
+        "branchLabel": "الفرع",
+        "branchPlaceholder": "اختر فرعاً",
+        "branchRequired": "الفرع مطلوب",
+        "requiredByLabel": "تاريخ الحاجة للطلب",
+        "requiredByRequired": "تاريخ الحاجة مطلوب",
+        "costCentreLabel": "مركز التكلفة (اختياري)",
+        "costCentrePlaceholder": "اختر مركز تكلفة",
+        "expiredSectionTitle": "عروض أسعار منتهية الصلاحية",
+        "expiredDescription": "تحتوي الردود التالية على عروض أسعار منتهية الصلاحية. يرجى تأكيد المتابعة بها:",
+        "confirmExpired": "تأكيد استخدام عرض السعر المنتهي من {{supplier}}",
+        "confirmExpiredGeneric": "تأكيد استخدام عرض السعر المنتهي ({{id}})",
+        "cancel": "إلغاء",
+        "submit": "إعداد الطلبات",
+        "submitting": "جارٍ إعداد الطلبات..."
+      },
+      "summary": {
+        "title": "طلبات الشراء المعدّة",
+        "description": "تم إنشاء {{count}} طلبات شراء مسودة من هذا التقسيم.",
+        "supplierColumn": "المورد",
+        "totalColumn": "الإجمالي التقديري",
+        "budgetStatusColumn": "حالة الميزانية",
+        "viewRequest": "عرض الطلب",
+        "budgetWithin": "ضمن الميزانية",
+        "budgetOver": "تجاوز الميزانية",
+        "budgetNone": "لا توجد ميزانية محددة"
+      },
+      "errors": {
+        "splitStale": "نتيجة التقسيم قديمة نظراً لتغير أسعار عروض الأسعار أو الردود المؤهلة.",
+        "rerunSplit": "إعادة تشغيل التقسيم",
+        "rfqAlreadyConverted": "تم بالفعل تحويل طلب التسعير هذا إلى طلبات شراء.",
+        "viewExistingRequest": "عرض الطلب {{id}}",
+        "expiredUnconfirmed": "انتهت صلاحية عرض سعر واحد أو أكثر. يرجى تأكيدها للمتابعة.",
+        "notRfqSplit": "هذا التقسيم غير مرتبط بطلب تسعير.",
+        "splitNotCompleted": "لم تكتمل عملية تحسين التقسيم بعد.",
+        "allocationNotWholePacks": "يحتوي التوزيع على كميات لا يمكن تحويلها إلى عبوات كاملة.",
+        "packDefinitionRequired": "تعريف العبوة مطلوب للبنود الموزعة.",
+        "idempotencyKeyReused": "تم استخدام مفتاح التكرار هذا بمعاملات مختلفة مسبقاً.",
+        "generic": "تعذر إعداد طلبات الشراء."
+      }
     }
   },
   "alerts": {
@@ -4083,7 +4134,7 @@
         "many": "تم التحويل إلى {{count}} طلبًا",
         "other": "تم التحويل إلى {{count}} طلب"
       },
-      "approvedTogether": "تم اعتمادها معًا كمجموعة واحدة"
+      "approvedTogether": "تُقدَّم هذه الطلبات وتُعتمد معًا"
     },
     "guardrails": {
       "title": "إعدادات الضوابط",

@@ -55,6 +55,22 @@
               </div>
             }
           </div>
+
+          @if (canPrepareRequests) {
+            <div class="rfq-prepare-actions" data-testid="rfq-prepare-actions">
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                class="prepare-requests-btn"
+                data-testid="prepare-requests-button"
+                (click)="openPrepareDialog()"
+              >
+                <mat-icon aria-hidden="true">assignment_turned_in</mat-icon>
+                {{ prepareButtonLabel }}
+              </button>
+            </div>
+          }
         </div>
       }
 
@@ -127,6 +143,97 @@
         </div>
       }
     </mat-card>
+
+    <!-- Stale Error Banner with Rerun split action -->
+    @if (staleError()) {
+      <div class="error-banner split-stale-banner" data-testid="split-stale-banner" role="alert">
+        <mat-icon class="banner-icon" aria-hidden="true">warning</mat-icon>
+        <div class="banner-body">
+          <p class="banner-message">{{ 'basketSplit.prepareRequests.errors.splitStale' | translate }}</p>
+          <button
+            mat-flat-button
+            color="warn"
+            type="button"
+            class="rerun-split-btn"
+            data-testid="rerun-split-button"
+            [disabled]="isRerunningSplit()"
+            (click)="rerunSplit()"
+          >
+            <mat-icon aria-hidden="true">refresh</mat-icon>
+            {{ 'basketSplit.prepareRequests.errors.rerunSplit' | translate }}
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- RFQ Already Converted Banner -->
+    @if (convertedRequestIds(); as cIds) {
+      <div class="info-banner already-converted-banner" data-testid="already-converted-banner" role="status">
+        <mat-icon class="banner-icon" aria-hidden="true">info</mat-icon>
+        <div class="banner-body">
+          <p class="banner-message">{{ 'basketSplit.prepareRequests.errors.rfqAlreadyConverted' | translate }}</p>
+          <div class="converted-links">
+            @for (cId of cIds; track cId) {
+              <a
+                mat-button
+                class="converted-request-link"
+                [routerLink]="['/requests', cId]"
+                data-testid="converted-request-link"
+              >
+                {{ 'basketSplit.prepareRequests.errors.viewExistingRequest' | translate: { id: cId.slice(0, 8) } }}
+              </a>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- General Error Banner -->
+    @if (generalError(); as gErr) {
+      <div class="error-banner" data-testid="prepare-error-banner" role="alert">
+        <mat-icon class="banner-icon" aria-hidden="true">error</mat-icon>
+        <span>{{ gErr }}</span>
+      </div>
+    }
+
+    <!-- Prepared Requests Success Summary Panel -->
+    @if (preparedRequests(); as reqs) {
+      <mat-card class="prepared-summary-card" data-testid="prepared-requests-summary">
+        <div class="summary-card-header">
+          <div class="summary-icon-title">
+            <mat-icon class="success-icon" aria-hidden="true">check_circle</mat-icon>
+            <h3 class="summary-title">{{ 'basketSplit.prepareRequests.summary.title' | translate }}</h3>
+          </div>
+          <p class="summary-desc">
+            {{ 'basketSplit.prepareRequests.summary.description' | translate: { count: reqs.length } }}
+          </p>
+        </div>
+        <div class="prepared-requests-list">
+          @for (req of reqs; track req.id) {
+            <div class="prepared-request-item" data-testid="prepared-request-item">
+              <div class="req-main-info">
+                <span class="req-supplier-name">{{ getRequestSupplierName(req) }}</span>
+                <span class="req-total pp-figures">{{ req.estimated_total | formatMoney }}</span>
+              </div>
+              <div class="req-secondary-info">
+                <span class="budget-badge" [ngClass]="getBudgetStatusClass(req)">
+                  {{ getBudgetStatusLabel(req) }}
+                </span>
+                <a
+                  mat-button
+                  class="view-request-link"
+                  [routerLink]="['/requests', req.id]"
+                  data-testid="view-request-link"
+                >
+                  {{ 'basketSplit.prepareRequests.summary.viewRequest' | translate }}
+                  <mat-icon aria-hidden="true">arrow_forward</mat-icon>
+                </a>
+              </div>
+            </div>
+          }
+        </div>
+      </mat-card>
+    }
 
     <!-- Per-Supplier Allocations Grid -->
     <div class="allocations-grid">

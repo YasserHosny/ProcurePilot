@@ -250,3 +250,210 @@
     }
   }
 }
+
+.rfq-prepare-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: 1rem;
+  padding-block-start: 0.75rem;
+  border-block-start: 1px solid var(--pp-border);
+
+  .prepare-requests-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+  }
+}
+
+.error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-block: 0.75rem;
+  padding-inline: 1rem;
+  border-radius: var(--pp-radius-card, 6px);
+  background-color: var(--pp-error-container, #fbe4e1);
+  color: var(--pp-error, #a3231b);
+  border: 1px solid var(--pp-error, #a3231b);
+
+  .banner-icon {
+    color: var(--pp-error, #a3231b);
+    flex-shrink: 0;
+  }
+
+  .banner-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
+
+    .banner-message {
+      margin: 0;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+  }
+
+  &.split-stale-banner {
+    background-color: var(--pp-warning-container, #fbebd3);
+    color: var(--pp-warning, #8a4b00);
+    border-color: var(--pp-warning, #f0b45a);
+
+    .banner-icon {
+      color: var(--pp-warning, #8a4b00);
+    }
+
+    .rerun-split-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-weight: 600;
+    }
+  }
+}
+
+.info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-block: 0.75rem;
+  padding-inline: 1rem;
+  border-radius: var(--pp-radius-card, 6px);
+  background-color: var(--pp-info-container, #e0eafb);
+  color: var(--pp-info, #1d4ed8);
+  border: 1px solid var(--pp-info, #1d4ed8);
+
+  .banner-icon {
+    color: var(--pp-info, #1d4ed8);
+    flex-shrink: 0;
+  }
+
+  .banner-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    .banner-message {
+      margin: 0;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .converted-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+  }
+}
+
+.prepared-summary-card {
+  padding-block: 1.25rem;
+  padding-inline: 1.5rem;
+  border-radius: var(--pp-radius-card, 8px);
+  background-color: var(--pp-surface-card);
+  border: 1px solid var(--pp-border);
+  border-inline-start: 4px solid var(--pp-success, #15803d);
+
+  .summary-card-header {
+    margin-block-end: 1rem;
+
+    .summary-icon-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+
+      .success-icon {
+        color: var(--pp-success, #15803d);
+      }
+
+      .summary-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin: 0;
+        color: var(--pp-text-strong);
+      }
+    }
+
+    .summary-desc {
+      font-size: 0.875rem;
+      color: var(--pp-text-muted);
+      margin-block-start: 0.25rem;
+      margin-block-end: 0;
+    }
+  }
+
+  .prepared-requests-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .prepared-request-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding-block: 0.75rem;
+    padding-inline: 1rem;
+    border-radius: 6px;
+    background-color: var(--pp-surface-page);
+    border: 1px solid var(--pp-border);
+
+    .req-main-info {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+
+      .req-supplier-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: var(--pp-text-strong);
+      }
+
+      .req-total {
+        font-weight: 700;
+        font-size: 1rem;
+      }
+    }
+
+    .req-secondary-info {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+
+      .budget-badge {
+        padding-block: 0.2rem;
+        padding-inline: 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+
+        &.status-within {
+          background-color: var(--pp-success-container, #dcf2e3);
+          color: var(--pp-success, #15803d);
+        }
+
+        &.status-over {
+          background-color: var(--pp-error-container, #fbe4e1);
+          color: var(--pp-error, #a3231b);
+        }
+
+        &.status-none {
+          background-color: var(--pp-surface-sunken);
+          color: var(--pp-text-muted);
+        }
+      }
+
+      .view-request-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+    }
+  }
+}

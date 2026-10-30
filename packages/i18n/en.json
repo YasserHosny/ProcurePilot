@@ -1700,6 +1700,57 @@
     "actions": {
       "newSplit": "Start New Basket Split",
       "viewCompare": "Compare Product Offers"
+    },
+    "prepareRequests": {
+      "button": {
+        "zero": "Prepare {{count}} requests",
+        "one": "Prepare 1 request",
+        "two": "Prepare 2 requests",
+        "few": "Prepare {{count}} requests",
+        "many": "Prepare {{count}} requests",
+        "other": "Prepare {{count}} requests"
+      },
+      "dialog": {
+        "title": "Prepare purchase requests",
+        "branchLabel": "Branch",
+        "branchPlaceholder": "Select a branch",
+        "branchRequired": "Branch is required",
+        "requiredByLabel": "Required-by date",
+        "requiredByRequired": "Required-by date is required",
+        "costCentreLabel": "Cost centre (optional)",
+        "costCentrePlaceholder": "Select a cost centre",
+        "expiredSectionTitle": "Expired quotations",
+        "expiredDescription": "The following replies have expired quotations. Please confirm that you want to proceed with them:",
+        "confirmExpired": "Confirm using expired quote from {{supplier}}",
+        "confirmExpiredGeneric": "Confirm using expired quote ({{id}})",
+        "cancel": "Cancel",
+        "submit": "Prepare requests",
+        "submitting": "Preparing requests..."
+      },
+      "summary": {
+        "title": "Prepared purchase requests",
+        "description": "Created {{count}} draft requests from this split.",
+        "supplierColumn": "Supplier",
+        "totalColumn": "Estimated Total",
+        "budgetStatusColumn": "Budget Status",
+        "viewRequest": "View request",
+        "budgetWithin": "Within budget",
+        "budgetOver": "Exceeds budget",
+        "budgetNone": "No budget configured"
+      },
+      "errors": {
+        "splitStale": "The RFQ split is stale because quotation prices or eligible replies have changed.",
+        "rerunSplit": "Rerun split",
+        "rfqAlreadyConverted": "This RFQ has already been converted into purchase requests.",
+        "viewExistingRequest": "View request {{id}}",
+        "expiredUnconfirmed": "One or more quotations have expired. Please confirm them to proceed.",
+        "notRfqSplit": "This basket split is not linked to an RFQ.",
+        "splitNotCompleted": "The split optimisation is not completed.",
+        "allocationNotWholePacks": "The allocation contains quantities that cannot be converted to whole packs.",
+        "packDefinitionRequired": "Pack definition is required for the allocated items.",
+        "idempotencyKeyReused": "This idempotency key has already been used with different parameters.",
+        "generic": "Failed to prepare requests."
+      }
     }
   },
   "alerts": {
@@ -4079,7 +4130,7 @@
         "one": "Converted into 1 request",
         "other": "Converted into {{count}} requests"
       },
-      "approvedTogether": "Approved together as one group"
+      "approvedTogether": "These requests are submitted and approved together"
     },
     "guardrails": {
       "title": "Guardrail settings",
