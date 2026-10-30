@@ -224,3 +224,86 @@
 }
 
 .rerun-btn { margin-inline-end: 0.5rem; }
+
+.rfq-source-header {
+  margin-block-start: 0.35rem;
+  font-size: 0.9rem;
+
+  .rfq-source-link {
+    color: var(--pp-primary);
+    text-decoration: underline;
+    font-weight: 500;
+  }
+}
+
+.rfq-scope-card {
+  padding: 1.25rem 1.5rem;
+  border-radius: 8px;
+  background-color: var(--pp-surface-card);
+
+  .rfq-scope-header {
+    margin-block-end: 1rem;
+
+    .rfq-scope-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--pp-text-strong);
+      margin: 0;
+    }
+  }
+
+  .rfq-scope-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .rfq-scope-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    .rfq-section-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--pp-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  }
+
+  .rfq-suppliers-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .rfq-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    .rfq-item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-block: 0.35rem;
+      border-block-end: 1px solid var(--pp-border-subtle);
+
+      &:last-child {
+        border-block-end: none;
+      }
+
+      .rfq-item-name {
+        font-weight: 500;
+        color: var(--pp-text);
+      }
+
+      .rfq-item-qty {
+        font-weight: 600;
+        color: var(--pp-text-strong);
+      }
+    }
+  }
+}
+

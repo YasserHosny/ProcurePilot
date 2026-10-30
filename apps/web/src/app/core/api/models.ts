@@ -871,6 +871,7 @@ export type BasketSplitJobStatus = 'queued' | 'running' | 'completed' | 'failed'
 
 export interface BasketSplitJob {
   readonly id: string;
+  readonly rfq_id?: string | null;
   readonly supplier_ids: readonly string[];
   readonly items: readonly BasketItemRequest[];
   readonly status: BasketSplitJobStatus;
