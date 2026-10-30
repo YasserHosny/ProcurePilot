@@ -277,24 +277,34 @@
 
           <div class="items-list">
             @for (item of items(); track $index; let i = $index) {
+              @let otherIds = otherProductIds(i);
               <div class="item-row">
                 <!-- Product Selector -->
-                <mat-form-field appearance="outline" class="item-product-field">
+                <mat-form-field appearance="outline" class="item-product-field" floatLabel="always">
                   <mat-label>{{ 'basketSplit.form.product' | translate }}</mat-label>
                   <mat-select
                     [name]="'product_' + i"
                     [(ngModel)]="item.workspace_product_id"
+                    [placeholder]="'basketSplit.form.selectProduct' | translate"
+                    [errorStateMatcher]="getProductErrorMatcher(i)"
                     (selectionChange)="onProductSelect(i, $event.value)"
                     required
                   >
                     @for (prod of products(); track prod.id) {
-                      <mat-option [value]="prod.id">
+                      <mat-option
+                        [value]="prod.id"
+                        [disabled]="prod.id !== item.workspace_product_id && otherIds.has(prod.id)"
+                      >
                         {{ prod.tenant_name }}
                         @if (prod.variant) { ({{ prod.variant }}) }
                       </mat-option>
                     }
                   </mat-select>
-                  <mat-error>{{ 'basketSplit.form.productRequired' | translate }}</mat-error>
+                  @if (isItemProductDuplicate(i)) {
+                    <mat-error>{{ 'basketSplit.form.duplicateProduct' | translate }}</mat-error>
+                  } @else {
+                    <mat-error>{{ 'basketSplit.form.productRequired' | translate }}</mat-error>
+                  }
                 </mat-form-field>
 
                 <!-- Quantity Input -->
@@ -390,9 +400,10 @@
               <div class="rfq-item-row">
                 <span class="rfq-item-name">{{ getProductName(item.workspace_product_id) }}</span>
                 <span class="rfq-item-qty">
-                  {{ getItemPackQuantity(item) | formatQuantity }}
-                  @if (baseUnitFor(item.workspace_product_id)) {
-                    {{ baseUnitFor(item.workspace_product_id) | unitLabel }}
+                  @let q = quantityDisplay(item);
+                  <span class="qty-primary">{{ q.primary }}</span>
+                  @if (q.secondary) {
+                    <small class="qty-secondary">{{ q.secondary }}</small>
                   }
                 </span>
               </div>

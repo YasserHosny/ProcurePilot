@@ -320,6 +320,12 @@ describe('ApprovalQueueComponent', () => {
         requester_email: null,
         requested_by_membership_id: 'abcdef12-3456-7890-abcd-ef1234567890',
       },
+      {
+        ...mockPendingRequests[0],
+        id: 'req-plus-email',
+        requester_name: null,
+        requester_email: 'someone+pp-sa-owner@gmail.com',
+      },
     ];
     approvalsApi.listPendingApprovals.and.returnValue(
       of({ items: requestsWithRequesterInfo, next_cursor: null }),
@@ -327,10 +333,22 @@ describe('ApprovalQueueComponent', () => {
     component.loadPendingApprovals();
     fixture.detectChanges();
 
-    const cells = Array.from(
+    const cellElements = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('.requester-cell'),
-    ).map((el) => el.textContent?.trim());
-    expect(cells).toEqual(['Nadia Mansour', 'buyer@example.com', 'abcdef12']);
+    );
+    const cells = cellElements.map((el) => el.textContent?.trim());
+    expect(cells).toEqual(['Nadia Mansour', 'buyer', 'abcdef12', 'someone+pp-sa-owner']);
+
+    // Name present has no tooltip or aria-label with email
+    const nameEl = cellElements[0].querySelector('[matTooltip], [title], [aria-label]');
+    expect(nameEl).toBeNull();
+
+    // Plus-address renders local part in an element whose tooltip and aria-label is the full address
+    const plusEl = cellElements[3].querySelector('[matTooltip], [title], [aria-label]');
+    expect(plusEl).toBeTruthy();
+    expect(plusEl?.textContent?.trim()).toBe('someone+pp-sa-owner');
+    expect(plusEl?.getAttribute('aria-label')).toBe('someone+pp-sa-owner@gmail.com');
+    expect(plusEl?.getAttribute('title')).toBe('someone+pp-sa-owner@gmail.com');
   });
 
   it('should render incomplete estimate badge and budget warning when applicable', () => {

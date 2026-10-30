@@ -45,8 +45,6 @@ export const CHUNK_LOAD_PAGE_RELOAD = new InjectionToken<(url: string) => void>(
   },
 );
 
-const fallbackReloadAttempted = new Set<string>();
-
 export function chunkLoadErrorHandler(error: NavigationError): void {
   const cause = error.error ?? error;
   if (!isChunkLoadError(cause)) {
@@ -67,11 +65,9 @@ export function chunkLoadErrorHandler(error: NavigationError): void {
       }
     }
     sessionStorage.setItem(storageKey, now.toString());
-    reload(url);
   } catch {
-    if (!fallbackReloadAttempted.has(url)) {
-      fallbackReloadAttempted.add(url);
-      reload(url);
-    }
+    return;
   }
+
+  reload(url);
 }

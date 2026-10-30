@@ -217,8 +217,18 @@ td.date-cell {
 }
 
 .lines-cell,
-.actions-cell {
+.actions-cell,
+.requester-cell {
   white-space: nowrap;
+}
+
+.requester-email-truncate {
+  display: inline-block;
+  max-inline-size: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .cell-inline {

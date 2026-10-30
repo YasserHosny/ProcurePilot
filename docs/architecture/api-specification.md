@@ -886,11 +886,16 @@ Response:
     "baseline_value": { "amount": "100.0000", "currency": "GBP" },
     "actual_value": { "amount": "88.0000", "currency": "GBP" },
     "delta": { "amount": "12.0000", "currency": "GBP" },
-    "calculation_version": "saving-baseline-v1",
+    "calculation_version": "saving-baseline-v3",
     "calculation_inputs": {
       "quantity": "10.000000",
-      "selected_policy": "last_paid",
-      "window_months": 6
+      "actual_value": { "amount": "88.0000", "currency": "GBP" },
+      "selected_metric": "last_paid",
+      "source_landed_cost_ids": ["00000000-0000-4000-8000-000000000090"],
+      "price_history_point_count": 1,
+      "landed_total": { "amount": "100.0000", "currency": "GBP" },
+      "landed_quantity": "10.000000",
+      "landed_base_quantity": "10.000000"
     },
     "recorded_by": "00000000-0000-4000-8000-000000000070",
     "recorded_at": "2026-08-21T09:05:00Z",
@@ -923,7 +928,8 @@ Response:
   `baseline_unit_price`, nullable `baseline_value`, `actual_value`, nullable `delta`,
   `calculation_version`, `calculation_inputs`, `recorded_by`, `recorded_at`, nullable
   `verified_by`, and nullable `verified_at`.
-- `baseline_policy` is `last_paid`, `rolling_average_6m`, or `none_available`. When no baseline
+- `baseline_policy` is `last_po_price`, `last_paid`, `rolling_average_6m`, or `none_available`, tried
+  in that order. When no baseline
   exists, `baseline_unit_price`, `baseline_value`, and `delta` are null.
 - Returns `404` when the saving record is not in the caller's workspace.
 
@@ -953,8 +959,8 @@ Response:
     "baseline_value": { "amount": "100.0000", "currency": "GBP" },
     "actual_value": { "amount": "88.0000", "currency": "GBP" },
     "delta": { "amount": "12.0000", "currency": "GBP" },
-    "calculation_version": "saving-baseline-v1",
-    "calculation_inputs": { "selected_policy": "last_paid" },
+    "calculation_version": "saving-baseline-v3",
+    "calculation_inputs": { "selected_metric": "last_paid", "quantity": "10.000000" },
     "recorded_by": "00000000-0000-4000-8000-000000000070",
     "recorded_at": "2026-08-21T09:05:00Z",
     "verified_by": "00000000-0000-4000-8000-000000000070",
@@ -993,7 +999,7 @@ Response:
     "actual_value": { "amount": "88.0000", "currency": "GBP" },
     "delta": { "amount": "12.0000", "currency": "GBP" },
     "source_landed_cost_ids": ["00000000-0000-4000-8000-000000000090"],
-    "calculation_inputs": { "selected_policy": "last_paid" }
+    "calculation_inputs": { "selected_metric": "last_paid", "quantity": "10.000000" }
   }
 }
 ```
@@ -1384,6 +1390,10 @@ Request:
 - Requires bearer auth. Branch-scoped visibility as above.
 - Query parameters: optional `status`, optional `branch_id`, optional `cursor`, optional `limit`
   capped at 100 and defaulting to 50.
+- `has_quantity_to_order`: nullable boolean; for visible requests with an approved approval
+  step and status `approved` or `ordered`, indicates whether any line has quantity remaining
+  to order. Non-cancelled orders allocate ordered quantity; cancelled orders allocate only
+  received quantity. Other rows, or calls without member context, return `null`.
 - Returns `200` with `items` of `PurchaseRequest` and nullable `next_cursor`. Each request
   carries `request_group` (spec 024): a `RequestGroupSummary` (`id`, `rfq_id`, `position`,
   `size`, `combined_total`, `best_single_total`, `saving`, `sibling_request_ids`) when the

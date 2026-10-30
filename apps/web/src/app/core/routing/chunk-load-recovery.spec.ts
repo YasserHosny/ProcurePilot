@@ -105,4 +105,24 @@ describe('chunkLoadRecovery', () => {
 
     expect(reloadSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('does not reload when sessionStorage.getItem throws', async () => {
+    spyOn(Storage.prototype, 'getItem').and.throwError('Storage blocked');
+    try {
+      await router.navigateByUrl('/orders/po-1');
+    } catch {
+      // navigation rejection is expected
+    }
+    expect(reloadSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not reload when sessionStorage.setItem throws', async () => {
+    spyOn(Storage.prototype, 'setItem').and.throwError('QuotaExceededError');
+    try {
+      await router.navigateByUrl('/orders/po-2');
+    } catch {
+      // navigation rejection is expected
+    }
+    expect(reloadSpy).not.toHaveBeenCalled();
+  });
 });

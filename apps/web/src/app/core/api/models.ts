@@ -36,6 +36,7 @@ export interface Me {
   readonly preferred_locale: Locale | null;
   readonly mfa_enabled: boolean;
   readonly tenant: Tenant;
+  readonly display_name?: string | null;
 }
 
 export interface Session {
@@ -59,6 +60,7 @@ export interface Member {
   readonly status: 'active' | 'removed';
   readonly mfa_enabled: boolean;
   readonly created_at: string;
+  readonly display_name?: string | null;
 }
 
 export interface Invitation {
@@ -69,6 +71,7 @@ export interface Invitation {
   readonly role: Role;
   readonly status: 'pending' | 'accepted' | 'revoked' | 'expired';
   readonly expires_at: string;
+  readonly display_name?: string | null;
 }
 
 export interface ReferenceOption {
@@ -1521,6 +1524,7 @@ export interface PurchaseRequest {
   readonly lines: readonly PurchaseRequestLine[];
   readonly estimated_total?: Money | null;
   readonly has_incomplete_estimate: boolean;
+  readonly has_quantity_to_order?: boolean | null;
   readonly budget_status?: BudgetStatus | null;
   readonly approval_step?: ApprovalStep | null;
   readonly submitted_at?: string | null;
