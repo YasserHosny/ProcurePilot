@@ -395,7 +395,96 @@ class AutoPreparedProvenance {
       };
 }
 
-/// A purchase request, as returned by the 008 Requests + Approvals contract.
+/// The RFQ response and supplier a request was prepared from.
+@immutable
+class RequestSource {
+  const RequestSource({
+    required this.rfqId,
+    required this.rfqResponseId,
+    required this.quotationId,
+    required this.supplierId,
+    this.supplierName,
+  });
+
+  final String rfqId;
+  final String rfqResponseId;
+  final String quotationId;
+  final String supplierId;
+  final String? supplierName;
+
+  factory RequestSource.fromJson(Map<String, dynamic> json) => RequestSource(
+    rfqId: json['rfq_id'] as String,
+    rfqResponseId: json['rfq_response_id'] as String,
+    quotationId: json['quotation_id'] as String,
+    supplierId: json['supplier_id'] as String,
+    supplierName: json['supplier_name'] as String?,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'rfq_id': rfqId,
+    'rfq_response_id': rfqResponseId,
+    'quotation_id': quotationId,
+    'supplier_id': supplierId,
+    if (supplierName != null) 'supplier_name': supplierName,
+  };
+}
+
+/// Split context supplied on each request, with currency on every amount.
+@immutable
+class RequestGroupSummary {
+  const RequestGroupSummary({
+    required this.id,
+    required this.rfqId,
+    required this.position,
+    required this.size,
+    required this.combinedTotal,
+    this.bestSingleTotal,
+    this.saving,
+    required this.siblingRequestIds,
+  });
+
+  final String id;
+  final String rfqId;
+  final int position;
+  final int size;
+  final Money combinedTotal;
+  final Money? bestSingleTotal;
+  final Money? saving;
+  final List<String> siblingRequestIds;
+
+  factory RequestGroupSummary.fromJson(Map<String, dynamic> json) =>
+      RequestGroupSummary(
+        id: json['id'] as String,
+        rfqId: json['rfq_id'] as String,
+        position: json['position'] as int,
+        size: json['size'] as int,
+        combinedTotal: Money.fromJson(
+          json['combined_total'] as Map<String, dynamic>,
+        ),
+        bestSingleTotal: json['best_single_total'] == null
+            ? null
+            : Money.fromJson(json['best_single_total'] as Map<String, dynamic>),
+        saving: json['saving'] == null
+            ? null
+            : Money.fromJson(json['saving'] as Map<String, dynamic>),
+        siblingRequestIds: (json['sibling_request_ids'] as List<dynamic>)
+            .map((id) => id as String)
+            .toList(growable: false),
+      );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'rfq_id': rfqId,
+    'position': position,
+    'size': size,
+    'combined_total': combinedTotal.toJson(),
+    'best_single_total': bestSingleTotal?.toJson(),
+    'saving': saving?.toJson(),
+    'sibling_request_ids': siblingRequestIds,
+  };
+}
+
+/// A purchase request, as returned by the Requests + Approvals contract.
 @immutable
 class PurchaseRequest {
   const PurchaseRequest({
@@ -420,6 +509,8 @@ class PurchaseRequest {
     this.deliveryConfirmedByMembershipId,
     this.hasDeliveryDiscrepancy = false,
     this.autoPrepared,
+    this.requestGroup,
+    this.source,
   });
 
   final String id;
@@ -449,6 +540,8 @@ class PurchaseRequest {
 
   /// Non-null when a guardrail prepared this request from an RFQ response.
   final AutoPreparedProvenance? autoPrepared;
+  final RequestGroupSummary? requestGroup;
+  final RequestSource? source;
 
   String requesterDisplayName(I18nLoader i18n) {
     if (requesterName != null && requesterName!.trim().isNotEmpty) {
@@ -505,6 +598,14 @@ class PurchaseRequest {
           ? null
           : AutoPreparedProvenance.fromJson(
               json['auto_prepared'] as Map<String, dynamic>),
+      requestGroup: json['request_group'] == null
+          ? null
+          : RequestGroupSummary.fromJson(
+              json['request_group'] as Map<String, dynamic>,
+            ),
+      source: json['source'] == null
+          ? null
+          : RequestSource.fromJson(json['source'] as Map<String, dynamic>),
     );
   }
 
@@ -531,6 +632,8 @@ class PurchaseRequest {
           'delivery_confirmed_by_membership_id': deliveryConfirmedByMembershipId,
         'has_delivery_discrepancy': hasDeliveryDiscrepancy,
         if (autoPrepared != null) 'auto_prepared': autoPrepared!.toJson(),
+        if (requestGroup != null) 'request_group': requestGroup!.toJson(),
+        if (source != null) 'source': source!.toJson(),
       };
 }
 

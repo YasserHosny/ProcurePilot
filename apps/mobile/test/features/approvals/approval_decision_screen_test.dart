@@ -1,11 +1,17 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:procurepilot_mobile/core/api/approvals_api_client.dart';
 import 'package:procurepilot_mobile/core/api/models.dart';
 import 'package:procurepilot_mobile/features/approvals/approval_decision_screen.dart';
+import 'package:procurepilot_mobile/features/approvals/approval_group.dart';
 
 import '../../test_helpers.dart';
+import 'split_approval_fixtures.dart';
 
 class DelayingRequestsApiClient extends FakeRequestsApiClient {
   Completer<PurchaseRequest>? inFlightCompleter;
@@ -34,15 +40,18 @@ class DelayingRequestsApiClient extends FakeRequestsApiClient {
 void main() {
   group('ApprovalDecisionScreen', () {
     late DelayingRequestsApiClient fakeClient;
+    late FakeApprovalsApiClient fakeApprovalsClient;
 
     setUp(() {
       fakeClient = DelayingRequestsApiClient();
+      fakeApprovalsClient = FakeApprovalsApiClient();
     });
 
     Future<void> pumpDecision(
       WidgetTester tester,
-      PurchaseRequest request, {
+      Object request, {
       String locale = 'en',
+      ApprovalsApiClient? approvalsApiClient,
     }) async {
       await pumpWithServices(
         tester,
@@ -61,6 +70,7 @@ void main() {
           ),
         ),
         requestsApiClient: fakeClient,
+        approvalsApiClient: approvalsApiClient ?? fakeApprovalsClient,
       );
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
@@ -73,6 +83,192 @@ void main() {
       );
       await tester.pumpAndSettle();
     }
+
+    ApprovalGroup splitGroup() {
+      final requests = splitApprovalRequests();
+      return ApprovalGroup(
+        summary: requests.first.requestGroup!,
+        requests: requests,
+      );
+    }
+
+    Future<void> tapDecision(WidgetTester tester, String action) async {
+      final button = find.byKey(Key('approvalDecision${action}Button'));
+      await tester.ensureVisible(button);
+      await tester.pumpAndSettle();
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+      'approves the group once with an Idempotency-Key and no single decisions',
+      (tester) async {
+        final calls = <http.Request>[];
+        final response = Completer<http.Response>();
+        final client = ApprovalsApiClient(
+          apiBaseUrl: 'https://test.api/api/v1',
+          httpClient: MockClient((request) async {
+            calls.add(request);
+            return response.future;
+          }),
+        )..accessToken = 'test-token';
+        await pumpDecision(tester, splitGroup(), approvalsApiClient: client);
+        final button = find.byKey(const Key('approvalDecisionApproveButton'));
+        await tester.ensureVisible(button);
+        await tester.pumpAndSettle();
+        await tester.tap(button);
+        await tester.pump();
+
+        expect(find.byType(ApprovalDecisionScreen), findsOneWidget);
+        expect(tester.widget<FilledButton>(button).onPressed, isNull);
+
+        response.complete(
+          http.Response.bytes(
+            utf8.encode(
+              jsonEncode(
+                splitApprovalRequests().map((r) => r.toJson()).toList(),
+              ),
+            ),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(calls, hasLength(1));
+        expect(calls.single.method, 'POST');
+        expect(
+          calls.single.url.path,
+          '/api/v1/request-groups/$splitGroupId/approve',
+        );
+        expect(calls.single.headers['Authorization'], 'Bearer test-token');
+        expect(calls.single.headers['Content-Type'], 'application/json');
+        expect(
+          calls.single.headers['Idempotency-Key'],
+          matches(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+          ),
+        );
+        expect(jsonDecode(calls.single.body), isEmpty);
+        expect(fakeClient.approveCalls, isEmpty);
+        expect(fakeClient.rejectCalls, isEmpty);
+        expect(find.byType(ApprovalDecisionScreen), findsNothing);
+        expect(find.text('Open'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'rejecting a group without a reason is blocked, including whitespace',
+      (tester) async {
+        await pumpDecision(tester, splitGroup());
+        await tapDecision(tester, 'Reject');
+        expect(find.text('A reason is required to reject.'), findsOneWidget);
+        expect(fakeApprovalsClient.rejectGroupCalls, isEmpty);
+
+        await enterComment(tester, '   ');
+        await tapDecision(tester, 'Reject');
+        expect(fakeApprovalsClient.rejectGroupCalls, isEmpty);
+        expect(fakeClient.rejectCalls, isEmpty);
+      },
+    );
+
+    testWidgets('rejects the whole group once with the reason', (tester) async {
+      await pumpDecision(tester, splitGroup());
+      await enterComment(tester, 'Too expensive');
+      await tapDecision(tester, 'Reject');
+
+      expect(fakeApprovalsClient.rejectGroupCalls, [splitGroupId]);
+      expect(fakeApprovalsClient.rejectGroupComments, ['Too expensive']);
+      expect(fakeClient.rejectCalls, isEmpty);
+      expect(find.byType(ApprovalDecisionScreen), findsNothing);
+    });
+
+    testWidgets('a grouped request route loads its sibling and uses group approval', (
+      tester,
+    ) async {
+      final requests = splitApprovalRequests();
+      fakeClient.getRequestResults[requests.last.id] = requests.last;
+      await pumpDecision(tester, requests.first);
+
+      expect(fakeClient.getRequestCalls, [requests.last.id]);
+      expect(find.text('الذهبي'), findsOneWidget);
+      expect(find.text('الوفرة'), findsOneWidget);
+      await tapDecision(tester, 'Approve');
+      expect(fakeApprovalsClient.approveGroupCalls, [splitGroupId]);
+      expect(fakeClient.approveCalls, isEmpty);
+    });
+
+    testWidgets('expands each supplier request to its lines and budget evidence', (
+      tester,
+    ) async {
+      await pumpDecision(tester, splitGroup());
+      expect(find.text('Exceeds budget'), findsOneWidget);
+      expect(find.text('Rice'), findsNothing);
+      await tester.tap(find.text('الذهبي'));
+      await tester.pumpAndSettle();
+      expect(find.text('Rice'), findsOneWidget);
+      expect(find.byKey(const Key('requestBudgetExceeded')), findsOneWidget);
+    });
+
+    testWidgets('403 shows the not-assigned message for a group', (
+      tester,
+    ) async {
+      fakeApprovalsClient.groupDecisionError = const ApiException(
+        statusCode: 403,
+        code: 'forbidden',
+        message: 'Not assigned',
+        traceId: 'trace-group',
+      );
+      await pumpDecision(tester, splitGroup());
+      await tapDecision(tester, 'Approve');
+
+      expect(
+        find.text('You are not the assigned approver for this request.'),
+        findsOneWidget,
+      );
+      expect(find.byType(ApprovalDecisionScreen), findsOneWidget);
+      expect(fakeClient.approveCalls, isEmpty);
+    });
+
+    testWidgets(
+      '409 not_submitted shows the already-decided message for a group',
+      (tester) async {
+        fakeApprovalsClient.groupDecisionError = const ApiException(
+          statusCode: 409,
+          code: 'conflict',
+          message: 'Not submitted',
+          details: {'reason': 'not_submitted'},
+          traceId: 'trace-group',
+        );
+        await pumpDecision(tester, splitGroup());
+        await tapDecision(tester, 'Approve');
+        expect(
+          find.text('This request has already been decided by someone else.'),
+          findsOneWidget,
+        );
+        expect(find.byType(ApprovalDecisionScreen), findsOneWidget);
+      },
+    );
+
+    testWidgets('renders the group and its combined total in Arabic RTL', (
+      tester,
+    ) async {
+      await pumpDecision(tester, splitGroup(), locale: 'ar');
+
+      expect(
+        find.textContaining('تقسيم من طلب تسعير rfq-1234 · طلبان'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('يوفر \u2068٧٤ ر.س\u2069'), findsOneWidget);
+      expect(find.text('\u2068٤٬٠٦٣ ر.س\u2069'), findsOneWidget);
+      expect(find.text('الذهبي'), findsOneWidget);
+      expect(find.text('الوفرة'), findsOneWidget);
+      expect(
+        Directionality.of(tester.element(find.byType(ApprovalDecisionScreen))),
+        TextDirection.rtl,
+      );
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets(
       'renders requester name, product name, and formatted quantity, never raw UUIDs',
@@ -168,29 +364,43 @@ void main() {
       expect(find.textContaining('٢ × ١٨ لتر'), findsOneWidget);
     });
 
-    testWidgets('approve button disables controls while in flight and pops on success', (
-      tester,
-    ) async {
-      fakeClient.inFlightCompleter = Completer<PurchaseRequest>();
-      await pumpDecision(tester, decisionRequest());
-      await enterComment(tester, 'Budget approved');
+    testWidgets(
+      'approve button disables controls while in flight and pops on success',
+      (tester) async {
+        fakeClient.inFlightCompleter = Completer<PurchaseRequest>();
+        await pumpDecision(tester, decisionRequest());
+        await enterComment(tester, 'Budget approved');
 
-      await tester.tap(find.byKey(const Key('approvalDecisionApproveButton')));
-      await tester.pump();
+        await tester.tap(
+          find.byKey(const Key('approvalDecisionApproveButton')),
+        );
+        await tester.pump();
 
-      // Controls must be disabled while in flight
-      expect(
-        tester.widget<FilledButton>(find.byKey(const Key('approvalDecisionApproveButton'))).onPressed,
-        isNull,
-      );
-      expect(
-        tester.widget<FilledButton>(find.byKey(const Key('approvalDecisionRejectButton'))).onPressed,
-        isNull,
-      );
-      expect(
-        tester.widget<OutlinedButton>(find.byKey(const Key('approvalDecisionCancelButton'))).onPressed,
-        isNull,
-      );
+        // Controls must be disabled while in flight
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const Key('approvalDecisionApproveButton')),
+              )
+              .onPressed,
+          isNull,
+        );
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const Key('approvalDecisionRejectButton')),
+              )
+              .onPressed,
+          isNull,
+        );
+        expect(
+          tester
+              .widget<OutlinedButton>(
+                find.byKey(const Key('approvalDecisionCancelButton')),
+              )
+              .onPressed,
+          isNull,
+        );
 
       // Complete the call
       fakeClient.inFlightCompleter!.complete(decisionRequest());
@@ -199,17 +409,18 @@ void main() {
       expect(fakeClient.approveCalls, ['req-1']);
       expect(fakeClient.approveComments, ['Budget approved']);
 
-      // Popped back to caller screen
-      expect(find.byType(ApprovalDecisionScreen), findsNothing);
-      expect(find.text('Open'), findsOneWidget);
-    });
+        // Popped back to caller screen
+        expect(find.byType(ApprovalDecisionScreen), findsNothing);
+        expect(find.text('Open'), findsOneWidget);
+      },
+    );
 
-    testWidgets('reject button disables controls while in flight and pops on success', (
-      tester,
-    ) async {
-      fakeClient.inFlightCompleter = Completer<PurchaseRequest>();
-      await pumpDecision(tester, decisionRequest());
-      await enterComment(tester, 'Too expensive');
+    testWidgets(
+      'reject button disables controls while in flight and pops on success',
+      (tester) async {
+        fakeClient.inFlightCompleter = Completer<PurchaseRequest>();
+        await pumpDecision(tester, decisionRequest());
+        await enterComment(tester, 'Too expensive');
 
       await tester.ensureVisible(
         find.byKey(const Key('approvalDecisionRejectButton')),
@@ -218,15 +429,23 @@ void main() {
       await tester.tap(find.byKey(const Key('approvalDecisionRejectButton')));
       await tester.pump();
 
-      // Controls must be disabled while in flight
-      expect(
-        tester.widget<FilledButton>(find.byKey(const Key('approvalDecisionApproveButton'))).onPressed,
-        isNull,
-      );
-      expect(
-        tester.widget<FilledButton>(find.byKey(const Key('approvalDecisionRejectButton'))).onPressed,
-        isNull,
-      );
+        // Controls must be disabled while in flight
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const Key('approvalDecisionApproveButton')),
+              )
+              .onPressed,
+          isNull,
+        );
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const Key('approvalDecisionRejectButton')),
+              )
+              .onPressed,
+          isNull,
+        );
 
       fakeClient.inFlightCompleter!.complete(decisionRequest());
       await tester.pumpAndSettle();
@@ -234,10 +453,11 @@ void main() {
       expect(fakeClient.rejectCalls, ['req-1']);
       expect(fakeClient.rejectComments, ['Too expensive']);
 
-      // Popped back to caller screen
-      expect(find.byType(ApprovalDecisionScreen), findsNothing);
-      expect(find.text('Open'), findsOneWidget);
-    });
+        // Popped back to caller screen
+        expect(find.byType(ApprovalDecisionScreen), findsNothing);
+        expect(find.text('Open'), findsOneWidget);
+      },
+    );
 
     testWidgets('409 no_pending_approval shows already-decided message', (
       tester,
@@ -283,7 +503,10 @@ void main() {
           find.byKey(const Key('requestAutoPreparedBanner')),
           findsOneWidget,
         );
-        expect(find.text('Prepared automatically by a guardrail'), findsOneWidget);
+        expect(
+          find.text('Prepared automatically by a guardrail'),
+          findsOneWidget,
+        );
         expect(
           find.text(
             "This request was prepared automatically by a guardrail from Nile Bakery's quote.",
