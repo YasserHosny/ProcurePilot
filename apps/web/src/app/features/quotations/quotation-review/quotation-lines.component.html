@@ -41,11 +41,11 @@
                 (ngModelChange)="newLinePriceAmountChange.emit($event)"
               />
             </mat-form-field>
-            <button mat-flat-button color="primary" type="button" (click)="addNewLine.emit()" [disabled]="!newLineText">
+            <button mat-flat-button color="primary" type="button" (click)="addNewLine.emit()" [disabled]="!newLineText || isConfirming">
               <mat-icon aria-hidden="true">check</mat-icon>
               {{ 'quotations.review.lines.confirmAdd' | translate }}
             </button>
-            <button mat-button type="button" (click)="cancelAddLine.emit()" class="cancel-add-line-btn">
+            <button mat-button type="button" (click)="cancelAddLine.emit()" [disabled]="isConfirming" class="cancel-add-line-btn">
               {{ 'common.cancel' | translate }}
             </button>
           </div>
@@ -54,6 +54,7 @@
             mat-stroked-button
             type="button"
             (click)="showAddLine.emit()"
+            [disabled]="isConfirming"
             class="add-line-btn"
           >
             <mat-icon aria-hidden="true">add</mat-icon>
@@ -87,6 +88,7 @@
                     (click)="lineMarkedForRemoval.emit(line.id); $event.stopPropagation()"
                     [matTooltip]="'quotations.review.lines.removeLine' | translate"
                     [attr.aria-label]="'quotations.review.lines.removeLine' | translate"
+                    [disabled]="isConfirming"
                     class="remove-line-btn"
                   >
                     <mat-icon aria-hidden="true">delete_outline</mat-icon>
@@ -100,6 +102,7 @@
                     (click)="lineUnmarkedForRemoval.emit(line.id); $event.stopPropagation()"
                     [matTooltip]="'quotations.review.lines.undoRemove' | translate"
                     [attr.aria-label]="'quotations.review.lines.undoRemove' | translate"
+                    [disabled]="isConfirming"
                     class="undo-remove-btn"
                   >
                     <mat-icon aria-hidden="true">undo</mat-icon>
@@ -175,8 +178,8 @@
                   <mat-label>{{ 'quotations.review.lines.colUnitPrice' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="(!isWriter || quotation.status === 'reviewed') ? formatUnitPrice(getEffectiveUnitPriceAmount(line)) : getEffectiveUnitPriceAmount(line)"
-                    (change)="getFieldExtraction('quotation_line', line.id, 'unit_price') && correctionUpdated.emit({ feId: getFieldExtraction('quotation_line', line.id, 'unit_price')!.id, newValue: { amount: $any($event.target).value, currency: line.unit_price?.currency || effectiveCurrency } })"
+                    [value]="(!isWriter || quotation.status === 'reviewed') ? formatUnitPrice(getEffectiveUnitPriceAmount(line)) : trimDecimalZeros(getEffectiveUnitPriceAmount(line))"
+                    (change)="onUnitPriceChange(line, $any($event.target).value)"
                     (blur)="onUnitPriceBlur(line, $any($event.target).value)"
                     [readonly]="!isWriter || quotation.status === 'reviewed'"
                   />
@@ -248,7 +251,7 @@
                   <mat-label>{{ 'quotations.review.lines.colLineTotal' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="computeLineTotal(line) || '—'"
+                    [value]="formatLineTotalDisplay(line)"
                     readonly
                   />
                   @if (line.unit_price; as up) {
@@ -305,11 +308,11 @@
                 (ngModelChange)="newLinePriceAmountChange.emit($event)"
               />
             </mat-form-field>
-            <button mat-flat-button color="primary" type="button" (click)="addNewLine.emit()" [disabled]="!newLineText">
+            <button mat-flat-button color="primary" type="button" (click)="addNewLine.emit()" [disabled]="!newLineText || isConfirming">
               <mat-icon aria-hidden="true">check</mat-icon>
               {{ 'quotations.review.lines.confirmAdd' | translate }}
             </button>
-            <button mat-button type="button" (click)="cancelAddLine.emit()" class="cancel-add-line-btn">
+            <button mat-button type="button" (click)="cancelAddLine.emit()" [disabled]="isConfirming" class="cancel-add-line-btn">
               {{ 'common.cancel' | translate }}
             </button>
           </div>
@@ -318,6 +321,7 @@
             mat-stroked-button
             type="button"
             (click)="showAddLine.emit()"
+            [disabled]="isConfirming"
             class="add-line-btn"
           >
             <mat-icon aria-hidden="true">add</mat-icon>

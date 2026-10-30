@@ -50,8 +50,17 @@
       <div class="header-titles">
         <div class="title-row">
           <h1 class="page-title">{{ 'quotations.review.title' | translate }}</h1>
-          <span class="status-pill status-{{ q.status }}">
-            {{ 'quotations.review.status.' + q.status | translate }}
+          <span
+            class="status-pill status-{{ q.status }}"
+            role="status"
+            aria-live="polite"
+          >
+            @if (isConfirming()) {
+              <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="14"></mat-spinner>
+              <span>{{ 'quotations.review.status.authorizing' | translate }}</span>
+            } @else {
+              {{ 'quotations.review.status.' + q.status | translate }}
+            }
           </span>
         </div>
         <p class="page-subtitle">{{ 'quotations.review.subtitle' | translate }}</p>
@@ -72,7 +81,7 @@
             mat-stroked-button
             type="button"
             (click)="retryExtraction()"
-            [disabled]="isRetryingExtraction()"
+            [disabled]="isRetryingExtraction() || isConfirming()"
           >
             <mat-icon aria-hidden="true">refresh</mat-icon>
             <span>{{ 'quotations.review.actions.retryExtraction' | translate }}</span>
@@ -83,6 +92,7 @@
             mat-stroked-button
             type="button"
             (click)="createRequote()"
+            [disabled]="isConfirming()"
           >
             <mat-icon aria-hidden="true">content_copy</mat-icon>
             <span>{{ 'quotations.review.actions.createRequote' | translate }}</span>
@@ -94,7 +104,7 @@
             color="warn" class="pp-danger"
             type="button"
             (click)="archiveQuotation()"
-            [disabled]="isArchiving()"
+            [disabled]="isArchiving() || isConfirming()"
           >
             <mat-icon aria-hidden="true">archive</mat-icon>
             <span>{{ 'quotations.review.actions.archive' | translate }}</span>
@@ -157,13 +167,17 @@
         [documentFileName]="documentFileName()"
         [activeExtraction]="activeExtraction()"
         [isWriter]="isWriter()"
-        [isReplacingDocument]="isReplacingDocument()"
+        [isReplacingDocument]="isReplacingDocument() || isConfirming()"
         (replaceDocumentSelected)="onReplaceDocumentSelected($event)"
         (download)="downloadDocument()"
       ></app-quotation-doc-preview>
 
       <!-- Right Panel: Extracted Commercial Data -->
-      <section class="data-panel" [attr.aria-label]="'quotations.review.panels.extractedData' | translate">
+      <section
+        class="data-panel review-section"
+        [attr.aria-label]="'quotations.review.panels.extractedData' | translate"
+        [attr.aria-busy]="isConfirming() ? 'true' : null"
+      >
         <mat-card class="panel-card information-card">
           <mat-card-header>
             <mat-card-title class="panel-title">
@@ -577,6 +591,7 @@
           [effectiveCurrency]="effectiveQuotationCurrency()"
           [activeExtraction]="activeExtraction()"
           [isWriter]="isWriter()"
+          [isConfirming]="isConfirming()"
           [pendingRemoveLineIds]="pendingRemoveLineIds()"
           [pendingCorrections]="pendingCorrections()"
           [pendingNewLines]="pendingNewLines()"
