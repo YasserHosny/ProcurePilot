@@ -266,6 +266,17 @@
               }
             </section>
           }
+
+          @if (allocatedOrders().length > 0) {
+            <div class="purchase-orders-row" data-testid="request-purchase-orders-row">
+              <span class="purchase-orders-label">{{ 'requests.form.purchaseOrders' | translate }}</span>
+              <div class="purchase-orders-links">
+                @for (po of allocatedOrders(); track po.id) {
+                  <a [routerLink]="['/orders', po.id]" class="po-link">{{ po.order_number }}</a>
+                }
+              </div>
+            </div>
+          }
         }
 
         <div class="form-actions">
@@ -285,6 +296,10 @@
               <mat-icon aria-hidden="true">shopping_cart</mat-icon>
               {{ 'requests.form.createOrderButton' | translate }}
             </button>
+          } @else if (isFullyOrdered()) {
+            <span class="fully-ordered-text" data-testid="request-fully-ordered-text" role="status">
+              {{ 'requests.form.fullyOrdered' | translate }}
+            </span>
           }
 
           @if (!isReadOnly()) {

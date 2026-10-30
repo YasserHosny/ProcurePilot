@@ -2641,6 +2641,8 @@ different response that confirms existence.
 - Requires bearer auth.
 - Returns `RequestAllocation` with one item per request line: `source_request_line_id`,
   `requested_quantity`, `allocated_quantity`, and `remaining_quantity`.
+- `orders` lists the request's non-cancelled purchase orders (`id`, `order_number`, `status`),
+  oldest first by `created_at`, then `order_number`.
 - Allocation is computed from all PO lines linked to the request line. Non-cancelled orders count
   ordered quantity; cancelled orders count received quantity only.
 

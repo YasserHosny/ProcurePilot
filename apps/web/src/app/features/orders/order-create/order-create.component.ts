@@ -24,7 +24,12 @@ import { catchError, forkJoin, of } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { Product, Supplier } from '../../../core/api/models';
-import { OrdersApiService, type PurchaseOrderCreate } from '../orders-api';
+import {
+  OrdersApiService,
+  type PurchaseOrder,
+  type PurchaseOrderCreate,
+  type RequestAllocationOrder,
+} from '../orders-api';
 import { packLabel } from '../pack-label';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
@@ -101,6 +106,8 @@ export class OrderCreateComponent implements OnInit {
   }
 
   readonly isSubmitting = signal(false);
+  readonly savedOrder = signal<PurchaseOrder | null>(null);
+  readonly navigationFailed = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
   readonly sourceRequest = signal<PurchaseRequest | null>(null);
   // Currency of the supplier quote the unit prices were pre-filled from; the order must use it.
@@ -135,6 +142,18 @@ export class OrderCreateComponent implements OnInit {
 
   readonly requestAllocations = signal<RequestAllocation | null>(null);
   readonly editOrderId = signal<string | null>(null);
+
+  readonly allocatedOrders = computed<RequestAllocationOrder[]>(() => {
+    return this.requestAllocations()?.orders ?? [];
+  });
+
+  readonly isFullyOrdered = computed<boolean>(() => {
+    if (this.editOrderId()) return false;
+    const req = this.sourceRequest();
+    const alloc = this.requestAllocations();
+    if (!req || !alloc) return false;
+    return alloc.lines.length > 0 && alloc.lines.every(l => parseFloat(l.remaining_quantity || '0') <= 0);
+  });
 
   readonly form = new FormGroup({
     order_number: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
@@ -320,10 +339,6 @@ export class OrderCreateComponent implements OnInit {
             );
           }
         });
-        
-        if (this.lines.length === 0) {
-          this.addLine();
-        }
       } else {
         this.addLine();
       }
@@ -363,7 +378,7 @@ export class OrderCreateComponent implements OnInit {
   }
 
   submit(): void {
-    if (this.form.invalid || this.lines.length === 0) return;
+    if (this.isSubmitting() || this.savedOrder() !== null || this.form.invalid || this.lines.length === 0) return;
 
     this.isSubmitting.set(true);
     this.errorMessage.set(null);
@@ -428,9 +443,19 @@ export class OrderCreateComponent implements OnInit {
 
     request$.subscribe({
       next: (order) => {
-        this.isSubmitting.set(false);
+        this.savedOrder.set(order);
         this.snackBar.open(this.translate.instant('orders.create.success'), undefined, { duration: 3500 });
-        this.router.navigate(['/orders', order.id]);
+        const navPromise = this.router.navigate(['/orders', order.id]);
+        Promise.resolve(navPromise).then(
+          (navigated) => {
+            if (!navigated) {
+              this.navigationFailed.set(true);
+            }
+          },
+          () => {
+            this.navigationFailed.set(true);
+          },
+        );
       },
       error: (err: unknown) => {
         this.isSubmitting.set(false);
@@ -443,6 +468,10 @@ export class OrderCreateComponent implements OnInit {
           }
           if (reason === 'idempotency_key_exists') {
             this.errorMessage.set(this.translate.instant('orders.create.errors.idempotencyKeyExists'));
+            return;
+          }
+          if (reason === 'quantity_exceeds_allocation') {
+            this.errorMessage.set(this.translate.instant('orders.create.errors.quantityExceedsAllocation'));
             return;
           }
         }

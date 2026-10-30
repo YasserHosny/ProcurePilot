@@ -1312,6 +1312,8 @@ def test_allocation_projection(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Return mock allocation rows from the SQL query
     def mock_fetchall() -> list[dict[str, object]]:
+        if "allocated_quantity" not in cursor.executed[-1][0]:
+            return []
         return [
             {"source_request_line_id": str(line_id1), "allocated_quantity": Decimal("4.5")},
             # line 2 has no allocation returned
@@ -1340,6 +1342,38 @@ def test_allocation_projection(monkeypatch: pytest.MonkeyPatch) -> None:
     assert l2.requested_quantity == Decimal("5.0")
     assert l2.allocated_quantity == Decimal("0")
     assert l2.remaining_quantity == Decimal("5.0")
+
+
+def test_allocation_projection_populates_orders(monkeypatch: pytest.MonkeyPatch) -> None:
+    from procurepilot_api.modules.requests.service import RequestsService
+
+    req_id = UUID(int=7)
+    line_id = UUID(int=8)
+    cursor = _FakeCursor()
+    transaction = _RollbackContext(cursor)
+    service = OrdersService.__new__(OrdersService)
+    service._settings = None
+    monkeypatch.setattr(OrdersService, "_transaction", lambda _self, _member: transaction)
+    mock_request = SimpleNamespace(lines=[SimpleNamespace(id=line_id, quantity=Decimal("10"))])
+    monkeypatch.setattr(RequestsService, "get_request", lambda *a, **k: mock_request)
+    order_rows: list[dict[str, object]] = [
+        {"id": str(ORDER), "order_number": "PO-000005", "status": "draft"},
+        {"id": str(UUID(int=10)), "order_number": "PO-000006", "status": "submitted"},
+    ]
+
+    def mock_fetchall() -> list[dict[str, object]]:
+        if "allocated_quantity" in cursor.executed[-1][0]:
+            return [{"source_request_line_id": str(line_id), "allocated_quantity": Decimal("10")}]
+        return order_rows
+
+    cursor.fetchall = mock_fetchall  # type: ignore[method-assign]
+
+    result = service.get_request_allocation(
+        bearer_token="token", member=_member(), source_request_id=req_id
+    )
+
+    assert result.model_dump(mode="json")["orders"] == order_rows
+    assert result.lines[0].remaining_quantity == Decimal("0")
 
 
 @pytest.mark.parametrize("edit", [False, True])

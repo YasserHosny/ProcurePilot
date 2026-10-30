@@ -303,6 +303,60 @@ def test_idempotent_draft_editing_and_allocation(
         ), "Should reject over-allocation"
 
 
+def test_allocations_list_the_requests_purchase_orders(monkeypatch: pytest.MonkeyPatch) -> None:
+    with committed_smart_context("order-allocation-list") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+
+        allocation_url = f"/api/v1/orders/allocations?source_request_id={req_id}"
+        initial = client.get(allocation_url)
+        assert initial.status_code == 200, initial.text
+        assert initial.json()["orders"] == []
+        assert Decimal(initial.json()["lines"][0]["remaining_quantity"]) == Decimal("10")
+
+        expected_orders: list[dict[str, str]] = []
+        for quantity, remaining in (("4", "6"), ("6", "0")):
+            payload = _base_order_payload(
+                context.supplier_ids[0], req_id, line_id, context.product_id, qty=quantity
+            )
+            created = client.post(
+                "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+            )
+            assert created.status_code == 201, created.text
+            order = created.json()
+            expected_orders.append(
+                {"id": order["id"], "order_number": order["order_number"], "status": "draft"}
+            )
+            allocation = client.get(allocation_url)
+            assert allocation.status_code == 200, allocation.text
+            assert allocation.json()["orders"] == expected_orders
+            assert Decimal(allocation.json()["lines"][0]["remaining_quantity"]) == Decimal(
+                remaining
+            )
+
+        over = client.post(
+            "/api/v1/orders",
+            json=_base_order_payload(
+                context.supplier_ids[0], req_id, line_id, context.product_id, qty="1"
+            ),
+            headers={"Idempotency-Key": str(uuid4())},
+        )
+        assert over.status_code == 409, over.text
+        assert over.json()["details"]["reason"] == "quantity_exceeds_allocation"
+
+        cancelled = client.post(
+            f"/api/v1/orders/{expected_orders[0]['id']}/cancel",
+            headers={"Idempotency-Key": str(uuid4())},
+        )
+        assert cancelled.status_code == 200, cancelled.text
+        allocation = client.get(allocation_url)
+        assert allocation.status_code == 200, allocation.text
+        assert allocation.json()["orders"] == expected_orders[1:]
+
+
 def test_stale_edit_idempotency_retry_does_not_overwrite_newer_edit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

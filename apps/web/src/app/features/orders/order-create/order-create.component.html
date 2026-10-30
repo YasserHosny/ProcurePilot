@@ -15,6 +15,36 @@
     </mat-card>
   }
 
+  @if (savedOrder(); as saved) {
+    @if (navigationFailed()) {
+      <div class="banner success created-notice" role="status" data-testid="order-created-notice">
+        <mat-icon aria-hidden="true">check_circle</mat-icon>
+        <div class="banner-body">
+          <b>{{ 'orders.create.createdNotice' | translate: { orderNumber: saved.order_number } }}</b>
+        </div>
+        <a [routerLink]="['/orders', saved.id]" class="open-order-link" data-testid="open-order-link">
+          {{ 'orders.create.openOrder' | translate }}
+        </a>
+      </div>
+    }
+  }
+
+  @if (isFullyOrdered()) {
+    <div class="banner info fully-ordered-notice" role="status" data-testid="fully-ordered-notice">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      <div class="banner-body">
+        <p>{{ 'orders.create.fullyOrderedNotice' | translate }}</p>
+        @if (allocatedOrders().length > 0) {
+          <div class="order-links-row">
+            @for (ord of allocatedOrders(); track ord.id) {
+              <a [routerLink]="['/orders', ord.id]" class="po-link">{{ ord.order_number }}</a>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+
   <form [formGroup]="form" (ngSubmit)="submit()">
     
     @if (sourceRequest(); as req) {
@@ -212,11 +242,11 @@
       </mat-card>
 
       <div class="actions">
-        <button mat-button type="button" routerLink="/orders" [disabled]="isSubmitting()">
+        <button mat-button type="button" routerLink="/orders" [disabled]="isSubmitting() || !!savedOrder()">
           {{ 'common.cancel' | translate }}
         </button>
-        <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || lines.length === 0 || isSubmitting()">
-          @if (isSubmitting()) {
+        <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || lines.length === 0 || isSubmitting() || !!savedOrder()">
+          @if (isSubmitting() || savedOrder()) {
             {{ 'orders.create.submitting' | translate }}
           } @else {
             {{ 'orders.create.submit' | translate }}
