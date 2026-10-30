@@ -183,6 +183,7 @@ def test_reviewed_typo_line_persists_ranked_similarity_candidates_and_routes_to_
             "lexical_similarity",
             "semantic_similarity",
             "feature_score",
+            "measured",
         }
         assert reasons["alias_hit"] is False
         assert reasons["gtin_match"] is False
