@@ -4,7 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Router, provideRouter } from '@angular/router';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, Subject } from 'rxjs';
 
@@ -15,7 +15,7 @@ import { SessionService } from '../../../core/auth/session.service';
 import { RfqApi, type RfqDetail } from '../../rfq/rfq-api';
 import type { BasketSplitJob } from '../offers-api';
 import { BasketSplitResultsComponent } from './basket-split-results.component';
-import { PrepareSplitRequestsDialogComponent } from './prepare-split-requests-dialog.component';
+import { PrepareSplitRequestsDialogComponent, type PrepareSplitRequestsDialogResult } from './prepare-split-requests-dialog.component';
 import { isUserFacingConstraint } from './constraint-text';
 
 const money = (amount: string) => ({ amount, currency: 'EGP' });
@@ -386,7 +386,7 @@ describe('BasketSplitResultsComponent — packs and constraint copy', () => {
     it("the dialog defaults required-by to the RFQ's date", () => {
       const dialogFixture = TestBed.createComponent(PrepareSplitRequestsDialogComponent);
       const dialogComp = dialogFixture.componentInstance;
-      expect(dialogComp.form.get('required_by_date')?.value).toBe('2026-11-20');
+      expect(dialogComp.form.get('required_by_date')?.value).toEqual(new Date(2026, 10, 20));
     });
 
     it('POST sends the body and reuses the key on retry', () => {
@@ -697,6 +697,201 @@ describe('BasketSplitResultsComponent — packs and constraint copy', () => {
       expect(links.length).toBe(2);
       expect(links[0].getAttribute('href')).toBe('/requests/pr-exist-1');
       expect(links[1].getAttribute('href')).toBe('/requests/pr-exist-2');
+    });
+
+    describe('PPS-127: Prepare button visibility and converted banner', () => {
+      const convertedRfqDetail: RfqDetail = {
+        rfq: {
+          id: 'rfq-abcdef12-3456',
+          tenant_id: 't1',
+          created_by_membership_id: 'm1',
+          status: 'converted',
+          needed_by_date: '2026-11-06',
+          tenant_terms: null,
+          idempotency_key: 'idemp-1',
+          created_at: '2026-10-20T00:00:00Z',
+        },
+        lines: [],
+        recipients: [],
+        converted_purchase_request_ids: ['pr-exist-1', 'pr-exist-2'],
+      };
+
+      function setupRfqResults() {
+        mockSession.hasRole.and.returnValue(true);
+        fixture.componentRef.setInput('currentJob', rfqCompletedJob);
+        fixture.componentRef.setInput('suppliers', [supplier, s2]);
+        fixture.componentRef.setInput('products', [rice, loose]);
+        fixture.componentRef.setInput('solverConfidence', 'high');
+        fixture.componentRef.setInput('validUntil', null);
+        fixture.componentRef.setInput('appliedConstraints', []);
+        fixture.componentRef.setInput('violatedConstraints', []);
+        fixture.componentRef.setInput('riskNotes', []);
+        fixture.componentRef.setInput('singleSupplierSavings', { type: 'neither_feasible' });
+      }
+
+      it('after a successful prepare (dialog closes with success: true), [data-testid=prepare-requests-button] is gone and the summary is shown', () => {
+        setupRfqResults();
+        fixture.detectChanges();
+
+        const dialog = fixture.debugElement.injector.get(MatDialog);
+        const dialogSpy = spyOn(dialog, 'open');
+        const afterClosedSubject = new Subject<PrepareSplitRequestsDialogResult>();
+        dialogSpy.and.returnValue({
+          afterClosed: () => afterClosedSubject.asObservable(),
+        } as unknown as MatDialogRef<PrepareSplitRequestsDialogComponent, PrepareSplitRequestsDialogResult>);
+
+        const el = fixture.nativeElement as HTMLElement;
+        const prepareBtn = el.querySelector('[data-testid="prepare-requests-button"]') as HTMLButtonElement;
+        expect(prepareBtn).not.toBeNull();
+
+        fixture.componentInstance.openPrepareDialog();
+        expect(dialogSpy).toHaveBeenCalled();
+
+        afterClosedSubject.next({
+          success: true,
+          requests: [
+            {
+              id: 'pr-1',
+              branch_id: 'b1',
+              required_by_date: '2026-11-06',
+              status: 'draft',
+              lines: [],
+              requested_by_membership_id: 'm1',
+              created_at: '2026-10-30T00:00:00Z',
+              has_incomplete_estimate: false,
+              estimated_total: { amount: '2773.00', currency: 'SAR' },
+              source: {
+                rfq_id: 'rfq-abcdef12-3456',
+                rfq_response_id: 'resp-1',
+                quotation_id: 'q-1',
+                supplier_id: 's1',
+                supplier_name: 'Al Nour',
+              },
+              budget_status: { exceeds: false, status: 'within' },
+            },
+          ],
+        });
+        fixture.detectChanges();
+
+        expect(el.querySelector('[data-testid="prepare-requests-button"]')).toBeNull();
+        expect(el.querySelector('[data-testid="prepared-requests-summary"]')).not.toBeNull();
+      });
+
+      it('after rfqAlreadyConverted, the button is gone and the banner is shown', () => {
+        setupRfqResults();
+        fixture.detectChanges();
+
+        const dialog = fixture.debugElement.injector.get(MatDialog);
+        const dialogSpy = spyOn(dialog, 'open');
+        const afterClosedSubject = new Subject<PrepareSplitRequestsDialogResult>();
+        dialogSpy.and.returnValue({
+          afterClosed: () => afterClosedSubject.asObservable(),
+        } as unknown as MatDialogRef<PrepareSplitRequestsDialogComponent, PrepareSplitRequestsDialogResult>);
+
+        const el = fixture.nativeElement as HTMLElement;
+        const prepareBtn = el.querySelector('[data-testid="prepare-requests-button"]') as HTMLButtonElement;
+        expect(prepareBtn).not.toBeNull();
+
+        fixture.componentInstance.openPrepareDialog();
+        expect(dialogSpy).toHaveBeenCalled();
+
+        afterClosedSubject.next({
+          rfqAlreadyConverted: true,
+          purchaseRequestIds: ['pr-exist-1', 'pr-exist-2'],
+        });
+        fixture.detectChanges();
+
+        expect(el.querySelector('[data-testid="prepare-requests-button"]')).toBeNull();
+        const banner = el.querySelector('[data-testid="already-converted-banner"]');
+        expect(banner).not.toBeNull();
+        const links = el.querySelectorAll('[data-testid="converted-request-link"]');
+        expect(links.length).toBe(2);
+      });
+
+      it('with rfqDetail set to a converted RFQ (two ids) on first render, no button and two [data-testid=converted-request-link]', () => {
+        setupRfqResults();
+        fixture.componentRef.setInput('rfqDetail', convertedRfqDetail);
+        fixture.detectChanges();
+
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="prepare-requests-button"]')).toBeNull();
+        const banner = el.querySelector('[data-testid="already-converted-banner"]');
+        expect(banner).not.toBeNull();
+        const links = el.querySelectorAll('[data-testid="converted-request-link"]');
+        expect(links.length).toBe(2);
+        expect(links[0].getAttribute('href')).toBe('/requests/pr-exist-1');
+        expect(links[1].getAttribute('href')).toBe('/requests/pr-exist-2');
+      });
+
+      it('the same when rfqDetail is set only after the first detectChanges()', () => {
+        setupRfqResults();
+        fixture.detectChanges();
+
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="prepare-requests-button"]')).not.toBeNull();
+
+        fixture.componentRef.setInput('rfqDetail', convertedRfqDetail);
+        fixture.detectChanges();
+
+        expect(el.querySelector('[data-testid="prepare-requests-button"]')).toBeNull();
+        const banner = el.querySelector('[data-testid="already-converted-banner"]');
+        expect(banner).not.toBeNull();
+        const links = el.querySelectorAll('[data-testid="converted-request-link"]');
+        expect(links.length).toBe(2);
+        expect(links[0].getAttribute('href')).toBe('/requests/pr-exist-1');
+        expect(links[1].getAttribute('href')).toBe('/requests/pr-exist-2');
+      });
+
+    describe('Dialog datepicker', () => {
+      beforeEach(() => {
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({
+          imports: [PrepareSplitRequestsDialogComponent],
+          providers: [
+            provideHttpClient(),
+            provideHttpClientTesting(),
+            provideNoopAnimations(),
+            provideTranslateService(),
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: {
+                basketId: 'basket-date-test',
+                rfqId: 'rfq-abcdef12-3456',
+                rfqNeededByDate: '2026-11-06',
+                suppliers: [supplier, s2],
+              },
+            },
+            { provide: MatDialogRef, useValue: { close: jasmine.createSpy('close') } },
+          ],
+        });
+      });
+
+      it('Dialog: the required-by field is a datepicker input showing 06/11/2026 for needed_by 2026-11-06, and the request payload carries the same required_by_date string as before', () => {
+        const httpTesting = TestBed.inject(HttpTestingController);
+        const dialogFixture = TestBed.createComponent(PrepareSplitRequestsDialogComponent);
+        const dialogComp = dialogFixture.componentInstance;
+        dialogFixture.detectChanges();
+
+        const branchReq = httpTesting.expectOne('/api/v1/organisation/branches?is_active=true&limit=100');
+        branchReq.flush({ items: [{ id: 'b1', name: 'Branch 1', is_active: true }], next_cursor: null });
+        const ccReq = httpTesting.expectOne('/api/v1/organisation/cost-centres?is_archived=false&limit=100');
+        ccReq.flush({ items: [], next_cursor: null });
+
+        const input = dialogFixture.nativeElement.querySelector(
+          'input[formcontrolname="required_by_date"]',
+        ) as HTMLInputElement;
+        expect(input).not.toBeNull();
+        expect(dialogFixture.nativeElement.querySelector('mat-datepicker-toggle')).not.toBeNull();
+        expect(input.value).toBe('06/11/2026');
+
+        dialogComp.form.patchValue({ branch_id: 'b1' });
+        dialogComp.onSubmit();
+
+        const req = httpTesting.expectOne('/api/v1/baskets/basket-date-test/prepare-requests');
+        expect(req.request.method).toBe('POST');
+        expect(req.request.body.required_by_date).toBe('2026-11-06');
+      });
+    });
     });
   });
 });

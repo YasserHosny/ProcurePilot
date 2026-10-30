@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, ChangeDetectionStrategy, inject, signal, OnInit } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import {
   MAT_DIALOG_DATA,
   MatDialogModule,
@@ -19,6 +20,8 @@ import { forkJoin } from 'rxjs';
 import type { Branch, CostCentre, PurchaseRequest, SplitPrepareRequest, Supplier } from '../../../core/api/models';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
+import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 import { OffersApiService } from '../offers-api';
 import { RequestsApiService } from '../../requests/requests-api';
 
@@ -45,12 +48,14 @@ export const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
 @Component({
   selector: 'app-prepare-split-requests-dialog',
   standalone: true,
+  providers: [provideAppDateAdapter()],
   imports: [
     CommonModule,
     ReactiveFormsModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
+    MatDatepickerModule,
     MatSelectModule,
     MatCheckboxModule,
     MatButtonModule,
@@ -81,7 +86,10 @@ export class PrepareSplitRequestsDialogComponent implements OnInit {
 
   readonly form = this.fb.group({
     branch_id: [this.data.branchId ?? '', [Validators.required]],
-    required_by_date: [this.data.rfqNeededByDate ?? '', [Validators.required]],
+    required_by_date: new FormControl<Date | string | null>(
+      this.data.rfqNeededByDate ? parseIsoDateLocal(this.data.rfqNeededByDate) : null,
+      [Validators.required],
+    ),
     cost_centre_id: [null as string | null],
   });
 
@@ -166,7 +174,16 @@ export class PrepareSplitRequestsDialogComponent implements OnInit {
   }
 
   onSubmit(): void {
-    if (this.form.invalid) {
+    const rawDate = this.form.value.required_by_date;
+    const requiredByDateStr =
+      rawDate instanceof Date && isNaN(rawDate.getTime())
+        ? null
+        : toIsoDateOrNull(rawDate as Date | string | null);
+
+    if (this.form.invalid || !requiredByDateStr) {
+      if (!requiredByDateStr) {
+        this.form.controls.required_by_date.setErrors({ required: true });
+      }
       this.form.markAllAsTouched();
       return;
     }
@@ -184,7 +201,7 @@ export class PrepareSplitRequestsDialogComponent implements OnInit {
 
     const payload: SplitPrepareRequest = {
       branch_id: branchId,
-      required_by_date: this.form.value.required_by_date!,
+      required_by_date: requiredByDateStr,
       cost_centre_id: this.form.value.cost_centre_id || undefined,
       confirm_expired_quotation_ids: confirmedExpiredIds,
     };
