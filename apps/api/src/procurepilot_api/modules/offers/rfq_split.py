@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import psycopg
 from psycopg.rows import dict_row
@@ -258,6 +258,8 @@ def prepare_requests_from_split(
                 (rfq_id,),
             )
             replies = cur.fetchall()
+            # Expired evidence still belongs to this split; confirmation below gates its use.
+            # Draft valuation also checks that each source cost has not been replaced.
             cur.execute(
                 """
                 select distinct on (rec.supplier_id,md.matched_workspace_product_id)
@@ -268,12 +270,16 @@ def prepare_requests_from_split(
                 join quotation_line ql on ql.quotation_id=r.quotation_id
                 join current_match_decision md on md.quotation_line_id=ql.id
                 left join landed_cost lc on lc.match_decision_id=md.id
-                  and (lc.valid_to is null or lc.valid_to>=now())
+                  and lc.id=any(%s::uuid[])
                 where rec.rfq_id=%s and r.id=any(%s::uuid[])
                 order by rec.supplier_id,md.matched_workspace_product_id,
                          lc.recorded_at desc nulls last,lc.id desc
                 """,
-                (rfq_id, [reply["response_id"] for reply in replies]),
+                (
+                    result["source_landed_cost_ids"],
+                    rfq_id,
+                    [reply["response_id"] for reply in replies],
+                ),
             )
             costs = {
                 (str(row["supplier_id"]), str(row["product_id"])): row for row in cur.fetchall()
@@ -377,31 +383,20 @@ def prepare_requests_from_split(
             ]
             best = min(baselines) if baselines else None
             saving = max(Decimal(0), best - Decimal(total["amount"])) if best is not None else None
-            cur.execute(
-                """
-                insert into purchase_request_group
-                  (tenant_id,rfq_id,basket_split_job_id,branch_id,combined_total_amount,
-                   combined_total_currency,best_single_total_amount,best_single_total_currency,
-                   saving_amount,saving_currency,idempotency_key,created_by_membership_id)
-                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning *
-                """,
-                (
-                    member.tenant_id,
-                    rfq_id,
-                    basket_id,
-                    payload.branch_id,
-                    total["amount"],
-                    total["currency"],
-                    best,
-                    total["currency"] if best is not None else None,
-                    saving,
-                    total["currency"] if saving is not None else None,
-                    idempotency_key,
-                    member.membership_id,
-                ),
-            )
-            group = cur.fetchone()
-            request_ids = create_requests_for_group(conn, member, group, allocations)
+            group = {
+                "id": uuid4(),
+                "rfq_id": rfq_id,
+                "basket_split_job_id": basket_id,
+                "branch_id": payload.branch_id,
+                "combined_total_currency": total["currency"],
+                "best_single_total_amount": best,
+                "best_single_total_currency": total["currency"] if best is not None else None,
+                "saving_amount": saving,
+                "saving_currency": total["currency"] if saving is not None else None,
+                "idempotency_key": idempotency_key,
+            }
+            request_ids, combined = create_requests_for_group(conn, member, group, allocations)
+            total = {"amount": str(combined), "currency": total["currency"]}
             rfq_service.mark_converted(cur, rfq_id=rfq_id, purchase_request_id=request_ids[0])
             # Match replay's stable ordering, independent of the solver's supplier ordering.
             request_ids = sorted(request_ids)

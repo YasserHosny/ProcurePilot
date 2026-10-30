@@ -3411,11 +3411,13 @@ def create_requests_for_group(
     member: CurrentMember,
     group_row: dict[str, object],
     allocations: list[dict[str, object]],
-) -> list[UUID]:
-    """Create drafts and RFQ-ordered pack lines in two batched writes, on the caller's transaction.
+) -> tuple[list[UUID], Decimal]:
+    """Insert the group, drafts and RFQ-ordered pack lines on the caller's transaction.
 
     The source-snapshot trigger (#325) captures RFQ, quotation and supplier on INSERT.
     Allocations carry the frozen RFQ pack sizes and destination chosen by the buyer.
+    The group's approval total is the sum of these draft estimates; solver totals may
+    differ through pack-price rounding, quantity tiers and supplier delivery fees.
     """
     requests: list[dict[str, object]] = []
     lines: list[dict[str, object]] = []
@@ -3473,9 +3475,30 @@ def create_requests_for_group(
                 "estimated_total_currency": group_row["combined_total_currency"],
             }
         )
-    # Never persist evidence that disagrees with the actual drafts (e.g. changed prices).
-    if combined != Decimal(str(group_row["combined_total_amount"])):
-        raise ConflictError(details={"reason": "split_stale"})
+    conn.execute(
+        """
+        insert into purchase_request_group
+          (id,tenant_id,rfq_id,basket_split_job_id,branch_id,combined_total_amount,
+           combined_total_currency,best_single_total_amount,best_single_total_currency,
+           saving_amount,saving_currency,idempotency_key,created_by_membership_id)
+        values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        (
+            group_row["id"],
+            member.tenant_id,
+            group_row["rfq_id"],
+            group_row["basket_split_job_id"],
+            group_row["branch_id"],
+            combined,
+            group_row["combined_total_currency"],
+            group_row["best_single_total_amount"],
+            group_row["best_single_total_currency"],
+            group_row["saving_amount"],
+            group_row["saving_currency"],
+            group_row["idempotency_key"],
+            member.membership_id,
+        ),
+    )
     _insert_group_requests(conn, requests)
     conn.execute(
         """
@@ -3492,7 +3515,7 @@ def create_requests_for_group(
         """,
         (Jsonb(lines),),
     )
-    return request_ids
+    return request_ids, combined
 
 
 def validate_group_destination(

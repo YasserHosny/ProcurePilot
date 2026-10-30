@@ -217,6 +217,96 @@ def test_round1_prepare_prices_snapshots_detail_and_replay(
         )
 
 
+@pytest.mark.parametrize("pricing", ["rounded_pack_price", "delivery_fee"])
+def test_prepare_and_submit_use_draft_totals_and_solver_saving(
+    monkeypatch: pytest.MonkeyPatch, queue: list, pricing: str
+) -> None:
+    with round1_rfq() as fixture:
+        _authenticate(monkeypatch, fixture)
+        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+            if pricing == "rounded_pack_price":
+                # Three sugar packs cost 100 SAR: the draft's per-pack price is 33.3333.
+                conn.execute(
+                    "update rfq_line set quantity=3 where rfq_id=%s and workspace_product_id=%s",
+                    (fixture.rfq_id, fixture.product_ids[2]),
+                )
+                conn.execute(
+                    "update landed_cost set quantity=3,normalised_base_quantity=30,"
+                    "total_amount=100 where quotation_line_id in "
+                    "(select ql.id from quotation_line ql join current_match_decision md "
+                    "on md.quotation_line_id=ql.id where ql.quotation_id=%s "
+                    "and md.matched_workspace_product_id=%s)",
+                    (fixture.quotation_ids[1], fixture.product_ids[2]),
+                )
+            else:
+                conn.execute(
+                    "insert into supplier_commercial_term "
+                    "(tenant_id,supplier_id,delivery_fee_amount,delivery_fee_currency,"
+                    "created_by_membership_id) values (%s,%s,10,'SAR',%s)",
+                    (
+                        fixture.member.tenant_id,
+                        fixture.supplier_ids[0],
+                        fixture.member.membership_id,
+                    ),
+                )
+        job_id = _complete(fixture)
+        with psycopg.connect(
+            TEST_DATABASE_URL or "", prepare_threshold=None, row_factory=dict_row
+        ) as conn:
+            result = conn.execute(
+                "select result from basket_split_job where id=%s", (job_id,)
+            ).fetchone()["result"]
+        solver_total = Decimal(result["total_landed_cost"]["amount"])
+        best_single = min(
+            Decimal(b["total_landed_cost"]["amount"])
+            for b in result["single_supplier_baselines"]
+            if b["feasible"] and b["total_landed_cost"]
+        )
+        if pricing == "delivery_fee":
+            assert solver_total == Decimal("4073.00")
+            assert any(c["kind"] == "delivery_fee" for c in result["applied_constraints"])
+        response = _prepare(fixture, job_id)
+        assert response.status_code == 201, response.text
+        group_id = UUID(response.json()["request_group_id"])
+        with psycopg.connect(
+            TEST_DATABASE_URL or "", prepare_threshold=None, row_factory=dict_row
+        ) as conn:
+            group = conn.execute(
+                "select * from purchase_request_group where id=%s", (group_id,)
+            ).fetchone()
+            drafts_total = conn.execute(
+                "select sum(estimated_total_amount) as total from purchase_request "
+                "where request_group_id=%s",
+                (group_id,),
+            ).fetchone()["total"]
+            assert drafts_total == Decimal(
+                "3742.9999" if pricing == "rounded_pack_price" else "4063.00"
+            )
+            assert drafts_total != solver_total
+            assert group["combined_total_amount"] == drafts_total
+            assert group["combined_total_currency"] == "SAR"
+            assert group["best_single_total_amount"] == best_single
+            assert group["best_single_total_currency"] == "SAR"
+            assert group["saving_amount"] == max(Decimal(0), best_single - solver_total)
+            assert group["saving_currency"] == "SAR"
+            target = conn.execute(
+                "select target from audit_event where tenant_id=%s "
+                "and action='requests.group_prepared'",
+                (fixture.member.tenant_id,),
+            ).fetchone()["target"]
+            assert Decimal(target["combined_total"]["amount"]) == drafts_total
+            assert target["combined_total"]["currency"] == "SAR"
+        submitted = RequestsService().submit_group(
+            bearer_token="test-token",
+            member=fixture.member,
+            group_id=group_id,
+            idempotency_key=uuid4(),
+        )
+        assert {str(r.id) for r in submitted} == set(response.json()["purchase_request_ids"])
+        assert {r.status for r in submitted} == {"submitted"}
+        assert all(r.request_group.combined_total.amount == str(drafts_total) for r in submitted)
+
+
 @pytest.mark.parametrize(
     "change",
     [
@@ -227,6 +317,7 @@ def test_round1_prepare_prices_snapshots_detail_and_replay(
         "unmatched",
         "rereviewed",
         "corrected_match",
+        "replaced_cost",
         "fractional",
         "expired",
         "not_completed",
@@ -283,18 +374,20 @@ def test_preparation_conflicts(monkeypatch: pytest.MonkeyPatch, queue: list, cha
 
                 with conn.cursor() as cur:
                     make_line(cur, fixture.workspace, fixture.quotation_ids[0])
-            elif change in ("rereviewed", "corrected_match"):
-                conn.execute(
-                    """
-                    insert into match_decision
-                      (tenant_id,quotation_line_id,matched_workspace_product_id,outcome,
-                       is_automatic,confidence,supersedes_decision_id)
-                    select tenant_id,quotation_line_id,matched_workspace_product_id,outcome,
-                           is_automatic,confidence,id from current_match_decision where tenant_id=%s
-                    """,
-                    (fixture.member.tenant_id,),
-                )
-                if change == "rereviewed":
+            elif change in ("rereviewed", "corrected_match", "replaced_cost"):
+                if change != "replaced_cost":
+                    conn.execute(
+                        """
+                        insert into match_decision
+                          (tenant_id,quotation_line_id,matched_workspace_product_id,outcome,
+                           is_automatic,confidence,supersedes_decision_id)
+                        select tenant_id,quotation_line_id,matched_workspace_product_id,outcome,
+                               is_automatic,confidence,id from current_match_decision
+                        where tenant_id=%s
+                        """,
+                        (fixture.member.tenant_id,),
+                    )
+                if change in ("rereviewed", "replaced_cost"):
                     conn.execute(
                         """
                         insert into landed_cost
@@ -309,17 +402,26 @@ def test_preparation_conflicts(monkeypatch: pytest.MonkeyPatch, queue: list, cha
                                unit_price_currency,vat_amount,vat_currency,delivery_fee_amount,
                                delivery_fee_currency,discount_amount,discount_currency,
                                other_charges_amount,other_charges_currency,total_amount,
-                               total_currency,raw_inputs,rule_version,valid_from,
+                               total_currency,raw_inputs,rule_version||%s,valid_from,
                                now()+interval '1 second'
                         from landed_cost lc join current_match_decision md
-                          on md.supersedes_decision_id=lc.match_decision_id
+                          on md.quotation_line_id=lc.quotation_line_id
                         where lc.tenant_id=%s
                         """,
-                        (fixture.member.tenant_id,),
+                        (
+                            "-replacement" if change == "replaced_cost" else "",
+                            fixture.member.tenant_id,
+                        ),
                     )
             elif change == "expired":
                 conn.execute(
                     "update quotation set issue_date=null,expiry_date=current_date-1 where id=%s",
+                    (fixture.quotation_ids[0],),
+                )
+                conn.execute(
+                    "update landed_cost set valid_from=now()-interval '2 days',"
+                    "valid_to=now()-interval '1 day' where quotation_line_id in "
+                    "(select id from quotation_line where quotation_id=%s)",
                     (fixture.quotation_ids[0],),
                 )
             else:
