@@ -76,6 +76,7 @@ class _Repository:
         role: MemberRole,
         token_hash: str,
         expires_at: datetime,
+        display_name: str | None = None,
     ) -> MemberInvitationRecord:
         del bearer_token
         for invitation in self.invitations.values():
@@ -95,6 +96,7 @@ class _Repository:
             expires_at=expires_at,
             status="pending",
             created_at=datetime.now(UTC),
+            display_name=display_name,
         )
         self.invitations[invitation.id] = invitation
         return invitation
@@ -209,6 +211,24 @@ def test_issue_invitation_hashes_token_and_sets_ttl(
     assert stored.token_hash != invitation.token
     assert stored.status == "pending"
     assert 6 <= (stored.expires_at - datetime.now(UTC)).days <= 7
+
+
+def test_issue_invitation_keeps_the_name_the_owner_gave(
+    service: MemberInvitationService,
+    repository: _Repository,
+) -> None:
+    invitation = service.issue(
+        bearer_token="owner-token",
+        member=_owner(),
+        email="buyer@example.test",
+        role=MemberRole.buyer,
+        display_name="المشتري",
+    )
+
+    assert invitation.display_name == "المشتري"
+    assert repository.invitations[invitation.id].display_name == "المشتري"
+    listed = service.list_pending(bearer_token="owner-token")
+    assert [i.display_name for i in listed] == ["المشتري"]
 
 
 def test_accept_invitation_creates_membership(

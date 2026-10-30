@@ -33,7 +33,9 @@ from procurepilot_api.shared.mailer import Mailer, MailgunMailer
 
 logger = logging.getLogger(__name__)
 
-INVITATION_COLUMNS = "id,tenant_id,email,role,token_hash,invited_by,expires_at,status,created_at"
+INVITATION_COLUMNS = (
+    "id,tenant_id,email,display_name,role,token_hash,invited_by,expires_at,status,created_at"
+)
 
 
 class MemberInvitationRecord(MemberInvitation):
@@ -73,6 +75,7 @@ class MemberInvitationRepository(Protocol):
         role: MemberRole,
         token_hash: str,
         expires_at: datetime,
+        display_name: str | None = None,
     ) -> MemberInvitationRecord:
         pass
 
@@ -180,11 +183,13 @@ class SupabaseMemberInvitationRepository:
         role: MemberRole,
         token_hash: str,
         expires_at: datetime,
+        display_name: str | None = None,
     ) -> MemberInvitationRecord:
         client = authenticated_client(self._settings, bearer_token)
         payload = {
             "tenant_id": str(tenant_id),
             "email": email,
+            "display_name": display_name,
             "role": role.value,
             "token_hash": token_hash,
             "invited_by": str(invited_by),
@@ -317,6 +322,14 @@ class SupabaseMemberInvitationRepository:
                     "select accept_member_invitation(%s, %s::uuid, %s)",
                     (token_hash, str(user_id), email),
                 ).fetchone()
+                if row and row[0] and invitation.display_name:
+                    # The name the owner gave when inviting (PPS-125). Same connection, after the
+                    # RPC created the row; a name the member has already set is kept.
+                    conn.execute(
+                        "update membership set display_name = %s "
+                        "where id = %s and tenant_id = %s and display_name is null",
+                        (invitation.display_name, row[0], str(invitation.tenant_id)),
+                    )
         except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -381,6 +394,7 @@ class MemberInvitationService:
         member: CurrentMember,
         email: str,
         role: MemberRole,
+        display_name: str | None = None,
     ) -> MemberInvitation:
         token = generate_member_invitation_token()
         invitation = self._repository.issue(
@@ -389,6 +403,7 @@ class MemberInvitationService:
             invited_by=member.membership_id,
             email=email,
             role=role,
+            display_name=display_name,
             token_hash=hash_member_invitation_token(token),
             expires_at=(
                 datetime.now(UTC) + timedelta(days=self._settings.member_invitation_ttl_days)
@@ -415,6 +430,7 @@ class MemberInvitationService:
         return MemberInvitation(
             id=invitation.id,
             email=invitation.email,
+            display_name=invitation.display_name,
             role=invitation.role,
             status=invitation.status,
             expires_at=invitation.expires_at,
@@ -486,6 +502,7 @@ class MemberInvitationService:
         return MemberInvitation(
             id=invitation.id,
             email=invitation.email,
+            display_name=invitation.display_name,
             role=invitation.role,
             status=invitation.status,
             expires_at=invitation.expires_at,
