@@ -347,7 +347,8 @@ journey
 - `/orders` -> **Create Order** (Owner/Buyer) -> `/orders/new` -> fill supplier, dates, currency, lines -> **Create Purchase Order** -> `/orders/:id`
 - `/requests` -> **Create Order** action on an `approved` request (Owner/Buyer) -> `/orders/new?source_request_id=...` -> form pre-filled from the request, quantity capped at what's still unallocated, estimated price shown as a reference-only badge -> **Create Purchase Order** -> `/orders/:id`
 - `/orders` -> **From approved request** (Owner/Buyer) -> pick an approved request from the menu -> `/orders/new?source_request_id=...` -> same pre-filled form; supplier pre-filled when the request came from an RFQ response
-- `/requests/:id` (approved) -> **Create purchase order** -> same pre-filled form
+- `/requests/:id` (approved, something still to order) -> **Create purchase order** -> same pre-filled form -> **Create Purchase Order** (stays disabled after one click) -> `/orders/:id`
+- `/requests/:id` (everything ordered) -> "Everything on this request has been ordered." -> **Purchase orders** link (e.g. PO-000005) -> `/orders/:id`
 - `/orders/:id` (Draft only) -> **Submit order** -> status becomes Submitted
 - `/orders/:id` (Draft only) -> **Edit Draft** -> `/orders/:id/edit` -> same form, pre-filled from the order -> save
 - `/orders/:id` (Draft only) -> **Cancel Order** -> confirmation dialog -> status becomes Cancelled
