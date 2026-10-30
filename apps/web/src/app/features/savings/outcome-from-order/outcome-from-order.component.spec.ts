@@ -106,6 +106,54 @@ describe('OutcomeFromOrderComponent', () => {
     expect(component.unitPrice(component.lines()[0])).toBe('5.5000');
   });
 
+  it('pre-fills inputs without trailing zeros', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const host = fixture.nativeElement as HTMLElement;
+    const qtyInput = host.querySelector<HTMLInputElement>('[data-testid="line-quantity"]');
+    const totalInput = host.querySelector<HTMLInputElement>('[data-testid="line-total"]');
+    expect(qtyInput?.value).toBe('60');
+    expect(totalInput?.value).toBe('330');
+    expect(component.lines()[0].quantity).toBe('60');
+    expect(component.lines()[0].total).toBe('330');
+  });
+
+  it('sends trimmed values when saving unedited pre-filled line', () => {
+    const router = TestBed.inject(Router);
+    spyOn(router, 'navigate').and.resolveTo(true);
+
+    component.submit();
+
+    expect(api.recordPurchase).toHaveBeenCalledTimes(1);
+    const [body] = api.recordPurchase.calls.mostRecent().args;
+    expect(body.quantity).toBe('60');
+    expect(body.total_paid).toEqual({ amount: '330', currency: 'EGP' });
+  });
+
+  it('keeps full precision on save when unedited', () => {
+    const precisionPrefill: PurchaseOutcomePrefill = {
+      ...prefill,
+      lines: [
+        {
+          ...prefill.lines[0],
+          quantity: '12.345678',
+          total_paid: { amount: '1230.5000', currency: 'EGP' },
+        },
+      ],
+    };
+    api.getPurchasePrefill.and.returnValue(of(precisionPrefill));
+    component.load();
+
+    const router = TestBed.inject(Router);
+    spyOn(router, 'navigate').and.resolveTo(true);
+    component.submit();
+
+    expect(api.recordPurchase).toHaveBeenCalledTimes(1);
+    const [body] = api.recordPurchase.calls.mostRecent().args;
+    expect(body.quantity).toBe('12.345678');
+    expect(body.total_paid.amount).toBe('1230.5');
+  });
+
   it('records the selected lines linked to their PO line, with edits, then opens the ledger', () => {
     const router = TestBed.inject(Router);
     spyOn(router, 'navigate').and.resolveTo(true);
