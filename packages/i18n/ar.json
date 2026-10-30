@@ -2195,7 +2195,21 @@
     },
     "withdrawConfirmTitle": "سحب طلب الشراء؟",
     "withdrawConfirmMessage": "هل تريد سحب هذا الطلب؟ سيُحرَّر المبلغ الملتزم به من الميزانية. لا يمكن سحب طلب مرتبط بأمر شراء غير ملغى.",
-    "purchaseOrderExists": "ألغِ أمر الشراء المرتبط قبل سحب هذا الطلب."
+    "purchaseOrderExists": "ألغِ أمر الشراء المرتبط قبل سحب هذا الطلب.",
+    "split": {
+      "partOfSplit": "جزء من تقسيم · {{position}} من {{size}} · {{total}}",
+      "marker": "تقسيم {{position}} من {{size}}",
+      "siblingsLabel": "الطلبات الأخرى في هذا التقسيم",
+      "siblingLink": "طلب {{id}}",
+      "readOnlyReason": "جزء من تقسيم: يتم إرسال هذه الطلبات واعتمادها معًا",
+      "submitBoth": "إرسال كلا طلبي هذا التقسيم",
+      "submitAll": "إرسال جميع الطلبات الـ {{count}} لهذا التقسيم",
+      "withdrawBoth": "سحب كلا طلبي هذا التقسيم",
+      "withdrawAll": "سحب جميع الطلبات الـ {{count}} لهذا التقسيم",
+      "withdrawConfirmMessageBoth": "سحب كلا طلبي هذا التقسيم؟ سيتم تحرير أي ميزانية محجوزة.",
+      "withdrawConfirmMessageAll": "سحب جميع الطلبات الـ {{count}} لهذا التقسيم؟ سيتم تحرير أي ميزانية محجوزة."
+    },
+    "partOfSplitError": "هذا الطلب جزء من تقسيم. يرجى استخدام إجراء التقسيم لإرسال كافة الطلبات أو اعتمادها أو سحبها معًا."
   },
   "delivery": {
     "title": "تأكيد الاستلام",
@@ -2257,9 +2271,27 @@
       "rejectTitle": "رفض طلب الشراء",
       "commentLabel": "تعليق (اختياري)",
       "commentPlaceholder": "أضف تعليقًا لمقدم الطلب...",
+      "reasonLabel": "سبب الرفض",
+      "reasonPlaceholder": "وضح سبب رفض هذا الطلب...",
+      "reasonRequired": "سبب الرفض مطلوب.",
       "confirmButton": "تأكيد",
       "cancelButton": "إلغاء"
     },
+    "splitGroup": {
+      "summary": "تقسيم من طلب تسعير {{short}} · {{requests}} · {{total}} · يوفر {{saving}}",
+      "summaryNoSaving": "تقسيم من طلب تسعير {{short}} · {{requests}} · {{total}}",
+      "splitFromRfq": "تقسيم من طلب تسعير {{short}}",
+      "saves": "يوفر {{saving}}"
+    },
+    "requestCount": {
+      "zero": "لا توجد طلبات",
+      "one": "طلب واحد",
+      "two": "طلبان",
+      "few": "{{count}} طلبات",
+      "many": "{{count}} طلبًا",
+      "other": "{{count}} طلب"
+    },
+    "partOfSplitError": "هذا الطلب جزء من تقسيم ويجب اعتماده أو رفضه كطلب مجمع.",
     "approveSuccess": "تم اعتماد الطلب.",
     "rejectSuccess": "تم رفض الطلب.",
     "genericError": "تعذر تسجيل القرار. يرجى المحاولة مرة أخرى.",

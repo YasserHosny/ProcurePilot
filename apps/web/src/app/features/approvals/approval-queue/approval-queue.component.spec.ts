@@ -96,7 +96,11 @@ describe('ApprovalQueueComponent', () => {
       }),
       role,
     };
-    approvalsApi = jasmine.createSpyObj('ApprovalsApiService', ['listPendingApprovals']);
+    approvalsApi = jasmine.createSpyObj('ApprovalsApiService', [
+      'listPendingApprovals',
+      'approveGroup',
+      'rejectGroup',
+    ]);
     requestsApi = jasmine.createSpyObj('RequestsApiService', [
       'approveRequest',
       'rejectRequest',
@@ -800,6 +804,245 @@ describe('ApprovalQueueComponent', () => {
     const dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as ApprovalDecisionDialogData;
     expect(dialogData.branchName).toBeUndefined();
   });
+
+  describe('Spec 024 User Story 3 (T029) — Split approval queue', () => {
+    const mockGroupedRequests: PurchaseRequest[] = [
+      {
+        id: 'req-group-1',
+        branch_id: 'branch-north',
+        cost_centre_id: 'cc-ops',
+        requested_by_membership_id: 'mem-requester-1',
+        required_by_date: '2026-09-20',
+        status: 'submitted',
+        has_incomplete_estimate: false,
+        estimated_total: { amount: '2773.00', currency: 'SAR' },
+        source: {
+          rfq_id: 'rfq-split-001',
+          rfq_response_id: 'resp-1',
+          quotation_id: 'q-1',
+          supplier_id: 'sup-1',
+          supplier_name: 'الذهبي',
+        },
+        request_group: {
+          id: 'grp-001',
+          rfq_id: 'rfq-split-001',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '4063.00', currency: 'SAR' },
+          best_single_total: { amount: '4137.00', currency: 'SAR' },
+          saving: { amount: '74.00', currency: 'SAR' },
+          sibling_request_ids: ['req-group-2'],
+        },
+        budget_status: {
+          remaining_amount: { amount: '5000.00', currency: 'SAR' },
+          exceeds: false,
+          status: 'within',
+        },
+        lines: [
+          {
+            id: 'line-g1',
+            workspace_product_id: 'prod-gloves',
+            quantity: '50',
+            estimated_unit_price: { amount: '15.00', currency: 'SAR' },
+            note: 'Rice & flour',
+          },
+        ],
+        created_at: '2026-09-10T10:00:00Z',
+        submitted_at: '2026-09-10T10:05:00Z',
+      },
+      {
+        id: 'req-group-2',
+        branch_id: 'branch-north',
+        cost_centre_id: 'cc-ops',
+        requested_by_membership_id: 'mem-requester-1',
+        required_by_date: '2026-09-20',
+        status: 'submitted',
+        has_incomplete_estimate: false,
+        estimated_total: { amount: '1290.00', currency: 'SAR' },
+        source: {
+          rfq_id: 'rfq-split-001',
+          rfq_response_id: 'resp-2',
+          quotation_id: 'q-2',
+          supplier_id: 'sup-2',
+          supplier_name: 'الوفرة',
+        },
+        request_group: {
+          id: 'grp-001',
+          rfq_id: 'rfq-split-001',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '4063.00', currency: 'SAR' },
+          best_single_total: { amount: '4137.00', currency: 'SAR' },
+          saving: { amount: '74.00', currency: 'SAR' },
+          sibling_request_ids: ['req-group-1'],
+        },
+        budget_status: {
+          remaining_amount: { amount: '3710.00', currency: 'SAR' },
+          exceeds: false,
+          status: 'within',
+        },
+        lines: [
+          {
+            id: 'line-g2',
+            workspace_product_id: 'prod-masks',
+            quantity: '100',
+            estimated_unit_price: { amount: '5.00', currency: 'SAR' },
+            note: 'Oil & sugar',
+          },
+        ],
+        created_at: '2026-09-10T10:01:00Z',
+        submitted_at: '2026-09-10T10:05:00Z',
+      },
+    ];
+
+    it('two pending requests in one group render as one row with the combined total and the saving', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockGroupedRequests, next_cursor: null }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const rows = fixture.nativeElement.querySelectorAll('tr.request-row');
+      expect(rows.length).toBe(1);
+
+      const rowText = rows[0].textContent;
+      expect(rowText).toContain('4,063');
+      expect(rowText).toContain('74');
+      expect(rowText).toContain('Split from RFQ');
+      expect(rowText).toContain('2 requests');
+    });
+
+    it('Approve calls /request-groups/{id}/approve once (not two single approves)', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockGroupedRequests, next_cursor: null }),
+      );
+      approvalsApi.approveGroup.and.returnValue(of(mockGroupedRequests));
+      dialogSpy.open.and.returnValue({
+        afterClosed: () => of({ confirmed: true, comment: 'Looks good' }),
+      } as unknown as ReturnType<MatDialog['open']>);
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const approveBtn = fixture.nativeElement.querySelector('.approve-btn');
+      expect(approveBtn).toBeTruthy();
+      approveBtn.click();
+      fixture.detectChanges();
+
+      expect(dialogSpy.open).toHaveBeenCalled();
+      const dialogConfig = dialogSpy.open.calls.mostRecent().args[1] as {
+        data: { action: string; amount?: string; branchName?: string; requestId: string };
+      };
+      expect(dialogConfig.data.action).toBe('approve');
+      expect(dialogConfig.data.amount).toContain('4,063');
+      expect(dialogConfig.data.branchName).toBe('North Branch');
+
+      expect(approvalsApi.approveGroup).toHaveBeenCalledTimes(1);
+      const approveCallArgs = approvalsApi.approveGroup.calls.mostRecent().args;
+      expect(approveCallArgs[0]).toBe('grp-001');
+      expect(approveCallArgs[1]?.comment).toBe('Looks good');
+      expect(approveCallArgs[2]).toBeTruthy(); // idempotency key
+
+      expect(requestsApi.approveRequest).not.toHaveBeenCalled();
+    });
+
+    it('an ungrouped request is unchanged', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [mockPendingRequests[0]], next_cursor: null }),
+      );
+      requestsApi.approveRequest.and.returnValue(of(mockPendingRequests[0]));
+      dialogSpy.open.and.returnValue({
+        afterClosed: () => of({ confirmed: true }),
+      } as unknown as ReturnType<MatDialog['open']>);
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const rows = fixture.nativeElement.querySelectorAll('tr.request-row');
+      expect(rows.length).toBe(1);
+      expect(rows[0].textContent).toContain('1,250');
+      expect(rows[0].textContent).not.toContain('Split from RFQ');
+
+      const approveBtn = fixture.nativeElement.querySelector('.approve-btn');
+      approveBtn.click();
+      fixture.detectChanges();
+
+      expect(requestsApi.approveRequest).toHaveBeenCalledTimes(1);
+      expect(requestsApi.approveRequest.calls.mostRecent().args[0]).toBe('req-001');
+      expect(approvalsApi.approveGroup).not.toHaveBeenCalled();
+    });
+
+    it('Reject calls /request-groups/{id}/reject once with comment', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockGroupedRequests, next_cursor: null }),
+      );
+      approvalsApi.rejectGroup.and.returnValue(of(mockGroupedRequests));
+      dialogSpy.open.and.returnValue({
+        afterClosed: () => of({ confirmed: true, comment: 'Over budget' }),
+      } as unknown as ReturnType<MatDialog['open']>);
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const rejectBtn = fixture.nativeElement.querySelector('.reject-btn');
+      expect(rejectBtn).toBeTruthy();
+      rejectBtn.click();
+      fixture.detectChanges();
+
+      expect(dialogSpy.open).toHaveBeenCalled();
+      expect(approvalsApi.rejectGroup).toHaveBeenCalledTimes(1);
+      expect(approvalsApi.rejectGroup.calls.mostRecent().args[0]).toBe('grp-001');
+      expect(approvalsApi.rejectGroup.calls.mostRecent().args[1]).toEqual({ comment: 'Over budget' });
+      expect(approvalsApi.rejectGroup.calls.mostRecent().args[2]).toBeTruthy(); // idempotency key
+
+      expect(requestsApi.rejectRequest).not.toHaveBeenCalled();
+    });
+
+    it('expanding group row shows each request supplier, lines and total', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockGroupedRequests, next_cursor: null }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const toggleBtn = fixture.nativeElement.querySelector('.lines-toggle-btn');
+      expect(toggleBtn).toBeTruthy();
+      toggleBtn.click();
+      fixture.detectChanges();
+
+      expect(component.isExpanded('grp-001')).toBeTrue();
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.textContent).toContain('الذهبي');
+      expect(compiled.textContent).toContain('الوفرة');
+      expect(compiled.textContent).toContain('2,773');
+      expect(compiled.textContent).toContain('1,290');
+    });
+
+    it('part_of_split shows the message pointing to the group action', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [mockPendingRequests[0]], next_cursor: null }),
+      );
+      const errorResp = new HttpErrorResponse({
+        error: { code: 'conflict', message: 'Conflict', details: { reason: 'part_of_split' } },
+        status: 409,
+        statusText: 'Conflict',
+      });
+      requestsApi.approveRequest.and.returnValue(throwError(() => errorResp));
+      dialogSpy.open.and.returnValue({
+        afterClosed: () => of({ confirmed: true }),
+      } as unknown as ReturnType<MatDialog['open']>);
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const approveBtn = fixture.nativeElement.querySelector('.approve-btn');
+      approveBtn.click();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBeTruthy();
+      expect(component.errorMessage()?.toLowerCase()).toContain('split');
+    });
+  });
 });
 
 describe('ApprovalDecisionDialogComponent', () => {
@@ -951,5 +1194,37 @@ describe('ApprovalDecisionDialogComponent', () => {
     translate.use('ar');
     dialogFixture.detectChanges();
     expect(titleEl?.textContent?.trim()).toBe('اعتماد طلب الشراء');
+  });
+
+  it('disables confirm button on reject when comment is empty, and enables when provided', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ApprovalDecisionDialogComponent],
+      providers: [
+        provideTranslateService(),
+        {
+          provide: MAT_DIALOG_DATA,
+          useValue: { action: 'reject', requestId: 'req-001' },
+        },
+        {
+          provide: MatDialogRef,
+          useValue: jasmine.createSpyObj('MatDialogRef', ['close']),
+        },
+      ],
+    }).compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.use('en');
+
+    dialogFixture = TestBed.createComponent(ApprovalDecisionDialogComponent);
+    dialogFixture.detectChanges();
+
+    const confirmBtn = dialogFixture.nativeElement.querySelector('.confirm-btn') as HTMLButtonElement;
+    expect(confirmBtn.disabled).toBeTrue();
+
+    dialogFixture.componentInstance.comment = 'Price too high';
+    dialogFixture.detectChanges();
+    expect(confirmBtn.disabled).toBeFalse();
   });
 });

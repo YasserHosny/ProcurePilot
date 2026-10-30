@@ -2195,7 +2195,21 @@
     },
     "withdrawConfirmTitle": "Withdraw purchase request?",
     "withdrawConfirmMessage": "Withdraw this request? Any committed budget will be released. Requests linked to an active purchase order cannot be withdrawn.",
-    "purchaseOrderExists": "Cancel the linked purchase order before withdrawing this request."
+    "purchaseOrderExists": "Cancel the linked purchase order before withdrawing this request.",
+    "split": {
+      "partOfSplit": "Part of a split · {{position}} of {{size}} · {{total}}",
+      "marker": "Split {{position}} of {{size}}",
+      "siblingsLabel": "Other requests in this split",
+      "siblingLink": "Request {{id}}",
+      "readOnlyReason": "Part of a split: these requests are submitted and approved together",
+      "submitBoth": "Submits both requests of this split",
+      "submitAll": "Submits all {{count}} requests of this split",
+      "withdrawBoth": "Withdraws both requests of this split",
+      "withdrawAll": "Withdraws all {{count}} requests of this split",
+      "withdrawConfirmMessageBoth": "Withdraws both requests of this split? Any committed budget will be released.",
+      "withdrawConfirmMessageAll": "Withdraws all {{count}} requests of this split? Any committed budget will be released."
+    },
+    "partOfSplitError": "This request is part of a split. Please use the split action to submit, decide, or withdraw all requests together."
   },
   "delivery": {
     "title": "Confirm Delivery",
@@ -2257,9 +2271,27 @@
       "rejectTitle": "Reject Purchase Request",
       "commentLabel": "Comment (optional)",
       "commentPlaceholder": "Add a comment for the requester...",
+      "reasonLabel": "Reason for rejection",
+      "reasonPlaceholder": "Explain why this request is being rejected...",
+      "reasonRequired": "A reason is required to reject.",
       "confirmButton": "Confirm",
       "cancelButton": "Cancel"
     },
+    "splitGroup": {
+      "summary": "Split from RFQ {{short}} · {{requests}} · {{total}} · saves {{saving}}",
+      "summaryNoSaving": "Split from RFQ {{short}} · {{requests}} · {{total}}",
+      "splitFromRfq": "Split from RFQ {{short}}",
+      "saves": "saves {{saving}}"
+    },
+    "requestCount": {
+      "zero": "{{count}} requests",
+      "one": "{{count}} request",
+      "two": "2 requests",
+      "few": "{{count}} requests",
+      "many": "{{count}} requests",
+      "other": "{{count}} requests"
+    },
+    "partOfSplitError": "This request is part of a split and must be decided as a group.",
     "approveSuccess": "Request approved.",
     "rejectSuccess": "Request rejected.",
     "genericError": "Unable to record the decision. Please try again.",

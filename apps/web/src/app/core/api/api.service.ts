@@ -1019,8 +1019,13 @@ export class ApiService {
     );
   }
 
-  withdrawRequest(requestId: string): Observable<PurchaseRequest> {
-    return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/withdraw`, null);
+  withdrawRequest(requestId: string, idempotencyKey?: string): Observable<PurchaseRequest> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest>(
+      `${this.base}/requests/${requestId}/withdraw`,
+      null,
+      headers ? { headers } : undefined,
+    );
   }
 
   approveRequest(
@@ -1035,6 +1040,50 @@ export class ApiService {
     body: ApprovalDecisionInput,
   ): Observable<PurchaseRequest> {
     return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/reject`, body);
+  }
+
+  submitGroup(groupId: string, idempotencyKey?: string): Observable<PurchaseRequest[]> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest[]>(
+      `${this.base}/request-groups/${groupId}/submit`,
+      null,
+      { headers },
+    );
+  }
+
+  approveGroup(
+    groupId: string,
+    body?: ApprovalDecisionInput,
+    idempotencyKey?: string,
+  ): Observable<PurchaseRequest[]> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest[]>(
+      `${this.base}/request-groups/${groupId}/approve`,
+      body ?? {},
+      { headers },
+    );
+  }
+
+  rejectGroup(
+    groupId: string,
+    body: ApprovalDecisionInput,
+    idempotencyKey?: string,
+  ): Observable<PurchaseRequest[]> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest[]>(
+      `${this.base}/request-groups/${groupId}/reject`,
+      body,
+      { headers },
+    );
+  }
+
+  withdrawGroup(groupId: string, idempotencyKey?: string): Observable<PurchaseRequest[]> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest[]>(
+      `${this.base}/request-groups/${groupId}/withdraw`,
+      null,
+      { headers },
+    );
   }
 
   listPendingApprovals(params?: {

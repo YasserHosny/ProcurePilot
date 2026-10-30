@@ -30,6 +30,33 @@
     </div>
   }
 
+  @if (existingRequest()?.request_group; as group) {
+    <div class="split-info-line" data-testid="split-info-line">
+      <div class="split-info-row">
+        <span class="split-context-text">
+          {{
+            'requests.split.partOfSplit'
+              | translate: { position: group.position, size: group.size, total: formatMoney(group.combined_total) }
+          }}
+        </span>
+        @if (group.sibling_request_ids.length > 0) {
+          <span class="split-siblings">
+            · {{ 'requests.split.siblingsLabel' | translate }}:
+            @for (siblingId of group.sibling_request_ids; track siblingId; let last = $last) {
+              <a [routerLink]="['/requests', siblingId]" class="sibling-link">
+                {{ 'requests.split.siblingLink' | translate: { id: siblingId.slice(0, 8) } }}
+              </a>
+              @if (!last) { , }
+            }
+          </span>
+        }
+      </div>
+      <div class="split-readonly-reason" data-testid="split-readonly-reason">
+        {{ 'requests.split.readOnlyReason' | translate }}
+      </div>
+    </div>
+  }
+
   @if (existingRequest()?.auto_prepared; as auto) {
     <div class="auto-prepared-banner" role="status" data-testid="auto-prepared-banner">
       <mat-icon class="auto-prepared-icon" aria-hidden="true">smart_toy</mat-icon>
@@ -260,7 +287,7 @@
             </button>
           }
 
-          @if (!form.disabled) {
+          @if (!isReadOnly()) {
             <button
               mat-flat-button
               color="primary"
@@ -269,8 +296,10 @@
             >
               {{ 'requests.form.saveDraftButton' | translate }}
             </button>
+          }
 
-            @if (existingRequest()) {
+          @if (existingRequest(); as existingReq) {
+            @if (existingReq.status === 'draft') {
               <button
                 mat-flat-button
                 color="primary"
@@ -280,11 +309,27 @@
                 [disabled]="isSubmitting()"
               >
                 {{
-                  (isSubmitting() ? 'requests.form.submittingButton' : 'requests.form.submitButton')
-                    | translate
+                  existingReq.request_group
+                    ? getGroupSubmitLabel(existingReq.request_group.size)
+                    : ((isSubmitting() ? 'requests.form.submittingButton' : 'requests.form.submitButton') | translate)
                 }}
               </button>
             }
+          }
+
+          @if (canWithdraw() && existingRequest()?.status === 'submitted') {
+            <button
+              mat-stroked-button
+              type="button"
+              class="withdraw-request-btn pp-danger"
+              (click)="withdrawRequest()"
+            >
+              {{
+                existingRequest()?.request_group
+                  ? getGroupWithdrawLabel(existingRequest()!.request_group!.size)
+                  : ('requests.actions.withdraw' | translate)
+              }}
+            </button>
           }
         </div>
       </form>

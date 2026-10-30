@@ -49,6 +49,8 @@ describe('RequestFormComponent — create mode (T017)', () => {
       'createRequest',
       'updateRequest',
       'submitRequest',
+      'submitGroup',
+      'withdrawGroup',
       'getRequest',
     ]);
     organisationApi = jasmine.createSpyObj('OrganisationApiService', [
@@ -220,6 +222,8 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       'createRequest',
       'updateRequest',
       'submitRequest',
+      'submitGroup',
+      'withdrawGroup',
       'getRequest',
     ]);
     organisationApi = jasmine.createSpyObj('OrganisationApiService', [
@@ -766,5 +770,155 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       (dir.injector.get(RouterLink) as unknown as Record<string, () => unknown>)['routerLinkInput']();
     expect(getLinkInput(linkDirectives[0])).toEqual(['/rfq', 'rfq-123']);
     expect(getLinkInput(linkDirectives[1])).toEqual(['/quotations', 'quote-789', 'review']);
+  });
+
+  describe('Spec 024 User Story 3 (T030) — Grouped request', () => {
+    const groupedRequest: PurchaseRequest = {
+      ...mockRequest,
+      status: 'draft',
+      request_group: {
+        id: 'grp-001',
+        rfq_id: 'rfq-split-001',
+        position: 1,
+        size: 2,
+        combined_total: { amount: '4063.00', currency: 'SAR' },
+        best_single_total: { amount: '4137.00', currency: 'SAR' },
+        saving: { amount: '74.00', currency: 'SAR' },
+        sibling_request_ids: ['r2'],
+      },
+    };
+
+    it('shows 1 of 2 and links to sibling request', () => {
+      requestsApi.getRequest.and.returnValue(of(groupedRequest));
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const compiled = hostFixture.nativeElement as HTMLElement;
+      expect(compiled.textContent).toContain('1 of 2');
+      expect(compiled.textContent).toContain('Part of a split');
+      expect(compiled.textContent).toContain('4,063');
+
+      const siblingLinks = compiled.querySelectorAll('a.sibling-link');
+      expect(siblingLinks.length).toBe(1);
+    });
+
+    it('a grouped draft renders read-only with no Save and explains why', () => {
+      requestsApi.getRequest.and.returnValue(of(groupedRequest));
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const comp = hostFixture.componentInstance;
+      const compiled = hostFixture.nativeElement as HTMLElement;
+
+      expect(comp.isReadOnly()).toBeTrue();
+      expect(comp.form.disabled).toBeTrue();
+      expect(compiled.querySelector('button[type="submit"]')).toBeNull();
+      expect(compiled.textContent).toContain(
+        'Part of a split: these requests are submitted and approved together',
+      );
+      expect(compiled.querySelector('.submit-request-btn')).toBeTruthy();
+    });
+
+    it('Submit calls submitGroup once directly and never updateRequest', () => {
+      requestsApi.getRequest.and.returnValue(of(groupedRequest));
+      requestsApi.submitGroup.and.returnValue(of([groupedRequest]));
+
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const compiled = hostFixture.nativeElement as HTMLElement;
+      const submitBtn = compiled.querySelector('.submit-request-btn') as HTMLButtonElement;
+      expect(submitBtn).toBeTruthy();
+      expect(submitBtn.textContent).toContain('Submits both requests of this split');
+
+      submitBtn.click();
+      hostFixture.detectChanges();
+
+      expect(requestsApi.submitGroup).toHaveBeenCalledTimes(1);
+      expect(requestsApi.submitGroup.calls.mostRecent().args[0]).toBe('grp-001');
+      expect(requestsApi.submitGroup.calls.mostRecent().args[1]).toEqual(jasmine.any(String));
+      expect(requestsApi.updateRequest).not.toHaveBeenCalled();
+      expect(requestsApi.submitRequest).not.toHaveBeenCalled();
+    });
+
+    it('a retry after an error reuses the same key', () => {
+      requestsApi.getRequest.and.returnValue(of(groupedRequest));
+      requestsApi.submitGroup.and.returnValue(throwError(() => new Error('Network error')));
+
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const compiled = hostFixture.nativeElement as HTMLElement;
+      const submitBtn = compiled.querySelector('.submit-request-btn') as HTMLButtonElement;
+
+      // First click -> error
+      submitBtn.click();
+      hostFixture.detectChanges();
+
+      expect(requestsApi.submitGroup).toHaveBeenCalledTimes(1);
+      const firstKey = requestsApi.submitGroup.calls.mostRecent().args[1];
+      expect(firstKey).toBeTruthy();
+
+      // Retry click -> reuses key
+      requestsApi.submitGroup.and.returnValue(of([groupedRequest]));
+      submitBtn.click();
+      hostFixture.detectChanges();
+
+      expect(requestsApi.submitGroup).toHaveBeenCalledTimes(2);
+      const retryKey = requestsApi.submitGroup.calls.mostRecent().args[1];
+      expect(retryKey).toBe(firstKey);
+    });
+
+    it('withdraw retry after an error reuses the same key', () => {
+      const submittedGrouped = { ...groupedRequest, status: 'submitted' as const };
+      requestsApi.getRequest.and.returnValue(of(submittedGrouped));
+      requestsApi.withdrawGroup.and.returnValue(throwError(() => new Error('Server error')));
+
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const compiled = hostFixture.nativeElement as HTMLElement;
+      const withdrawBtn = compiled.querySelector('.withdraw-request-btn') as HTMLButtonElement;
+      expect(withdrawBtn).toBeTruthy();
+
+      // First click -> error
+      withdrawBtn.click();
+      hostFixture.detectChanges();
+
+      expect(requestsApi.withdrawGroup).toHaveBeenCalledTimes(1);
+      const firstKey = requestsApi.withdrawGroup.calls.mostRecent().args[1];
+      expect(firstKey).toBeTruthy();
+
+      // Retry click -> reuses key
+      requestsApi.withdrawGroup.and.returnValue(of([submittedGrouped]));
+      withdrawBtn.click();
+      hostFixture.detectChanges();
+
+      expect(requestsApi.withdrawGroup).toHaveBeenCalledTimes(2);
+      const retryKey = requestsApi.withdrawGroup.calls.mostRecent().args[1];
+      expect(retryKey).toBe(firstKey);
+    });
+
+    it('part_of_split shows the message pointing to the group action', () => {
+      requestsApi.getRequest.and.returnValue(of(mockRequest));
+      requestsApi.updateRequest.and.returnValue(of(mockRequest));
+      const errorResp = new HttpErrorResponse({
+        error: { code: 'conflict', message: 'Conflict', details: { reason: 'part_of_split' } },
+        status: 409,
+        statusText: 'Conflict',
+      });
+      requestsApi.submitRequest.and.returnValue(throwError(() => errorResp));
+
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const compiled = hostFixture.nativeElement as HTMLElement;
+      const submitBtn = compiled.querySelector('.submit-request-btn') as HTMLButtonElement;
+      submitBtn.click();
+      hostFixture.detectChanges();
+
+      expect(hostFixture.componentInstance.errorMessage()).toBeTruthy();
+      expect(compiled.querySelector('.error-banner')?.textContent?.toLowerCase()).toContain('split');
+    });
   });
 });

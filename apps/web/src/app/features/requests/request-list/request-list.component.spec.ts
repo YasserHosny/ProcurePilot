@@ -57,6 +57,7 @@ describe('RequestListComponent (T017)', () => {
     requestsApi = jasmine.createSpyObj('RequestsApiService', [
       'listRequests',
       'withdrawRequest',
+      'withdrawGroup',
     ]);
     organisationApi = jasmine.createSpyObj('OrganisationApiService', ['listBranches']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
@@ -366,5 +367,71 @@ describe('RequestListComponent (T017)', () => {
     expect(cell).toBeTruthy();
     expect(cell.classList.contains('date-cell')).toBeTrue();
     expect(getComputedStyle(cell).overflow).toBe('visible');
+  });
+
+  describe('Spec 024 User Story 3 (T030) — Grouped requests in list', () => {
+    const groupedListRequest: PurchaseRequest = {
+      ...mockRequests[0],
+      request_group: {
+        id: 'grp-001',
+        rfq_id: 'rfq-split-001',
+        position: 1,
+        size: 2,
+        combined_total: { amount: '4063.00', currency: 'SAR' },
+        best_single_total: { amount: '4137.00', currency: 'SAR' },
+        saving: { amount: '74.00', currency: 'SAR' },
+        sibling_request_ids: ['r2'],
+      },
+    };
+
+    it('shows a small "Split 1 of 2" marker on grouped rows', () => {
+      requestsApi.listRequests.and.returnValue(of({ items: [groupedListRequest], next_cursor: null }));
+      component.loadRequests();
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const marker = compiled.querySelector('.split-badge, [data-testid="split-badge"]');
+      expect(marker).toBeTruthy();
+      expect(marker?.textContent).toContain('Split 1 of 2');
+    });
+
+    it('Withdraw on a grouped request calls withdrawGroup and says "Withdraws both requests of this split"', () => {
+      requestsApi.listRequests.and.returnValue(of({ items: [groupedListRequest], next_cursor: null }));
+      requestsApi.withdrawGroup.and.returnValue(of([groupedListRequest]));
+      component.loadRequests();
+      fixture.detectChanges();
+
+      component.withdrawRequest(groupedListRequest);
+
+      expect(dialogSpy.open).toHaveBeenCalled();
+      const dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as {
+        titleKey?: string;
+        messageKey?: string;
+        confirmKey?: string;
+      };
+      expect(dialogData?.confirmKey).toBe('requests.split.withdrawBoth');
+      // Dialog message or confirmation references withdrawing both requests
+      expect(requestsApi.withdrawGroup).toHaveBeenCalledWith('grp-001', jasmine.any(String));
+      expect(requestsApi.withdrawRequest).not.toHaveBeenCalled();
+    });
+
+    it('part_of_split shows the message pointing to the group action', () => {
+      requestsApi.listRequests.and.returnValue(of({ items: [mockRequests[0]], next_cursor: null }));
+      const errorResp = new HttpErrorResponse({
+        error: { code: 'conflict', message: 'Conflict', details: { reason: 'part_of_split' } },
+        status: 409,
+        statusText: 'Conflict',
+      });
+      requestsApi.withdrawRequest.and.returnValue(throwError(() => errorResp));
+
+      component.loadRequests();
+      fixture.detectChanges();
+
+      component.withdrawRequest(mockRequests[0]);
+
+      expect(snackBarSpy.open).toHaveBeenCalled();
+      const snackMsg = snackBarSpy.open.calls.mostRecent().args[0];
+      expect(snackMsg.toLowerCase()).toContain('split');
+    });
   });
 });
