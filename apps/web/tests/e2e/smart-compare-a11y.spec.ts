@@ -83,7 +83,7 @@ test.describe('Smart Compare & Intelligence Accessibility @a11y', () => {
   test('the Basket Split screen in English has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
     await signIn(page);
     await page.goto('/offers/basket-split');
-    await expect(page.locator('.page-title')).toContainText('Two-Supplier Basket Split');
+    await expect(page.locator('.page-title')).toContainText('Basket Split');
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);
   });

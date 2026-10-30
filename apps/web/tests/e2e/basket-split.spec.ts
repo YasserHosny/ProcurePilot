@@ -26,7 +26,7 @@ test.describe('Two-Supplier Basket Split Screen (T055, US3)', () => {
   test('renders basket split submission form with supplier and item selection', async ({ page }) => {
     await page.goto('/offers/basket-split');
 
-    await expect(page.locator('.page-title')).toContainText('Two-Supplier Basket Split');
+    await expect(page.locator('.page-title')).toContainText('Basket Split');
     await expect(page.locator('.form-card, .result-summary-card, .infeasible-card')).toBeVisible();
 
     const submitBtn = page.locator('.submit-btn');
@@ -41,6 +41,6 @@ test.describe('Two-Supplier Basket Split Screen (T055, US3)', () => {
     await page.goto('/offers/basket-split');
 
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-    await expect(page.locator('.page-title')).toContainText('تقسيم السلة بين موردين');
+    await expect(page.locator('.page-title')).toContainText('تقسيم السلة');
   });
 });

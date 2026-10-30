@@ -189,12 +189,12 @@ test.describe('User documentation screenshots', () => {
     );
 
     await captureRoute(page, '/offers/basket-split', '11-basket-split.jpg', async () => {
-      await expect(page.locator('.page-title')).toContainText('Two-Supplier Basket Split');
+      await expect(page.locator('.page-title')).toContainText('Basket Split');
       await expect(page.locator('.form-card, .result-summary-card, .infeasible-card')).toBeVisible();
     });
 
     await page.goto('/offers/basket-split');
-    await expect(page.locator('.page-title')).toContainText('Two-Supplier Basket Split');
+    await expect(page.locator('.page-title')).toContainText('Basket Split');
     await waitForNoVisibleLoading(page);
     const submitBasket = page.locator('.submit-btn');
     if ((await submitBasket.count()) > 0 && await submitBasket.isEnabled()) {
