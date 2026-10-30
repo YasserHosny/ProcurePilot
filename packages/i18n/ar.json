@@ -1655,6 +1655,8 @@
       "addItem": "إضافة منتج",
       "addSupplier": "إضافة مورد ({{min}}–{{max}})",
       "removeItem": "حذف المنتج",
+      "selectProduct": "اختر منتجًا",
+      "duplicateProduct": "هذا المنتج مضاف إلى السلة بالفعل.",
       "productRequired": "اختر منتجاً.",
       "quantityRequired": "أدخل كمية أكبر من صفر.",
       "submitButton": "تحسين تقسيم السلة",
