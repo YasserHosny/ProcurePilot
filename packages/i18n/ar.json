@@ -485,6 +485,7 @@
       "title": "دعوة زميل عمل",
       "subtitle": "إنشاء دعوة لعضو فريق للانضمام إلى مساحة العمل هذه مع تحديد الدور.",
       "nameLabel": "الاسم (اختياري)",
+      "nameMaxLength": "لا يمكن أن يتجاوز الاسم 100 حرف",
       "namePlaceholder": "مثال: سارة أحمد",
       "emailLabel": "بريد العمل الإلكتروني",
       "emailPlaceholder": "colleague@company.com",

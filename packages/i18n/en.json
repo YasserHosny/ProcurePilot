@@ -485,6 +485,7 @@
       "title": "Invite a Colleague",
       "subtitle": "Create an invitation for a team member to join this workspace with a specified role.",
       "nameLabel": "Name (optional)",
+      "nameMaxLength": "Name cannot exceed 100 characters",
       "namePlaceholder": "e.g. Sara Ahmed",
       "emailLabel": "Work Email Address",
       "emailPlaceholder": "colleague@company.com",

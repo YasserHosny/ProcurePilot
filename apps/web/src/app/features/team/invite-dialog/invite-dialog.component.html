@@ -27,6 +27,9 @@
           autocomplete="name"
         />
         <mat-icon matPrefix aria-hidden="true">person</mat-icon>
+        @if (form.controls.name.hasError('maxlength')) {
+          <mat-error>{{ 'team.inviteDialog.nameMaxLength' | translate }}</mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="full-width">

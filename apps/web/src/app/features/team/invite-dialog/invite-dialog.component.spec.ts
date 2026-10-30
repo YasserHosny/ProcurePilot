@@ -51,6 +51,17 @@ describe('InviteDialogComponent (T058)', () => {
     expect(component.form.valid).toBeTrue();
   });
 
+  it('should explain why a name over 100 characters cannot be sent (PPS-125)', () => {
+    component.form.controls.name.setValue('a'.repeat(101));
+    component.form.controls.name.markAsTouched();
+    fixture.detectChanges();
+
+    const errors = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('mat-error'),
+    ).map((el) => el.textContent?.trim());
+    expect(errors).toContain(enCatalog.team.inviteDialog.nameMaxLength);
+  });
+
   it('should call api.invite and display created token on success', () => {
     const mockInvitation = {
       id: 'inv_123',
