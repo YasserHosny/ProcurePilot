@@ -18,7 +18,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
-import { RfqApi, RfqDetail, RfqGuardrail, RfqResponseComparison } from '../rfq-api';
+import { RfqApi, RfqDetail, RfqGuardrail, RfqResponseComparison, RfqResponseLineComparison } from '../rfq-api';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -153,17 +153,26 @@ export class CompareComponent implements OnInit, OnChanges {
     return response.lines[0]?.quoted_unit_price_currency || '';
   }
 
-  readonly lowestTotalResponseIds = computed<Set<string>>(() => {
+  readonly convertedPurchaseRequestId = computed<string | null>(() => {
+    const ids = this.rfqDetail()?.converted_purchase_request_ids;
+    return ids && ids.length === 1 ? ids[0] : null;
+  });
+
+  private readonly comparableResponses = computed<{
+    eligible: RfqResponseComparison[];
+    productQuantities: Map<string, number>;
+    currency: string;
+  } | null>(() => {
     const all = this.responses();
     const eligible = all.filter(
       (r) => r.quotation_status !== 'refused' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
     );
     if (eligible.length < 2) {
-      return new Set<string>();
+      return null;
     }
-    const currencies = new Set(eligible.map((r) => this.responseCurrency(r)));
+    const currencies = new Set(eligible.map((r) => this.responseCurrency(r)).filter(Boolean));
     if (currencies.size !== 1) {
-      return new Set<string>();
+      return null;
     }
 
     const getProductQuantities = (response: RfqResponseComparison): Map<string, number> | null => {
@@ -182,28 +191,42 @@ export class CompareComponent implements OnInit, OnChanges {
     };
 
     const baselineMap = getProductQuantities(eligible[0]);
-    if (!baselineMap) {
-      return new Set<string>();
+    if (!baselineMap || baselineMap.size === 0) {
+      return null;
     }
 
     for (let i = 1; i < eligible.length; i++) {
       const currentMap = getProductQuantities(eligible[i]);
       if (!currentMap || currentMap.size !== baselineMap.size) {
-        return new Set<string>();
+        return null;
       }
       for (const [productId, baselineQty] of baselineMap.entries()) {
         const currentQty = currentMap.get(productId);
         if (currentQty === undefined || Math.abs(currentQty - baselineQty) > 1e-9) {
-          return new Set<string>();
+          return null;
         }
       }
     }
 
-    const totals = eligible.map((r) => ({ id: r.id, total: this.responseTotal(r) }));
+    const currency = this.responseCurrency(eligible[0]);
+    return {
+      eligible,
+      productQuantities: baselineMap,
+      currency,
+    };
+  });
+
+  readonly lowestTotalResponseIds = computed<Set<string>>(() => {
+    const comp = this.comparableResponses();
+    if (!comp) {
+      return new Set<string>();
+    }
+
+    const totals = comp.eligible.map((r) => ({ id: r.id, total: this.responseTotal(r) }));
     const minTotal = Math.min(...totals.map((t) => t.total));
     const ids = new Set<string>();
     for (const t of totals) {
-      if (t.total === minTotal) {
+      if (Math.abs(t.total - minTotal) < 1e-9) {
         ids.add(t.id);
       }
     }
@@ -213,6 +236,118 @@ export class CompareComponent implements OnInit, OnChanges {
   hasLowestTotal(response: RfqResponseComparison): boolean {
     return this.lowestTotalResponseIds().has(response.id);
   }
+
+  readonly lowestLinePriceKeys = computed<Set<string>>(() => {
+    const comp = this.comparableResponses();
+    if (!comp) {
+      return new Set<string>();
+    }
+
+    const keys = new Set<string>();
+
+    for (const productId of comp.productQuantities.keys()) {
+      const prices: number[] = [];
+      for (const reply of comp.eligible) {
+        for (const line of reply.lines) {
+          if (line.workspace_product_id === productId) {
+            const p = Number(line.quoted_unit_price_amount);
+            if (!Number.isNaN(p)) {
+              prices.push(p);
+            }
+          }
+        }
+      }
+
+      if (prices.length === 0) {
+        continue;
+      }
+
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+
+      if (Math.abs(maxPrice - minPrice) < 1e-9) {
+        continue;
+      }
+
+      for (const reply of comp.eligible) {
+        for (const line of reply.lines) {
+          if (line.workspace_product_id === productId) {
+            const p = Number(line.quoted_unit_price_amount);
+            if (Math.abs(p - minPrice) < 1e-9) {
+              keys.add(`${reply.id}:${productId}`);
+            }
+          }
+        }
+      }
+    }
+
+    return keys;
+  });
+
+  isLowestLinePrice(response: RfqResponseComparison, line: RfqResponseLineComparison): boolean {
+    if (!line.workspace_product_id) {
+      return false;
+    }
+    return this.lowestLinePriceKeys().has(`${response.id}:${line.workspace_product_id}`);
+  }
+
+  readonly splitSaving = computed<{ amount: number; currency: string } | null>(() => {
+    const comp = this.comparableResponses();
+    if (!comp) {
+      return null;
+    }
+
+    const MULTIPLIER = 10000;
+
+    let lowestTotalMinor = Infinity;
+    for (const reply of comp.eligible) {
+      let replyTotalMinor = 0;
+      for (const line of reply.lines) {
+        const qty = Number(line.quoted_quantity) || 0;
+        const price = Number(line.quoted_unit_price_amount) || 0;
+        replyTotalMinor += Math.round(qty * price * MULTIPLIER);
+      }
+      if (replyTotalMinor < lowestTotalMinor) {
+        lowestTotalMinor = replyTotalMinor;
+      }
+    }
+
+    let splitTotalMinor = 0;
+    for (const [productId, qty] of comp.productQuantities.entries()) {
+      let minProductPrice = Infinity;
+      for (const reply of comp.eligible) {
+        for (const line of reply.lines) {
+          if (line.workspace_product_id === productId) {
+            const p = Number(line.quoted_unit_price_amount);
+            if (!Number.isNaN(p) && p < minProductPrice) {
+              minProductPrice = p;
+            }
+          }
+        }
+      }
+
+      if (minProductPrice === Infinity) {
+        return null;
+      }
+
+      splitTotalMinor += Math.round(qty * minProductPrice * MULTIPLIER);
+    }
+
+    const savingMinor = lowestTotalMinor - splitTotalMinor;
+    if (savingMinor > 0) {
+      return {
+        amount: savingMinor / MULTIPLIER,
+        currency: comp.currency,
+      };
+    }
+
+    return null;
+  });
+
+  readonly splitSavingMoney = computed<string>(() => {
+    const saving = this.splitSaving();
+    return saving ? this.formatService.formatMoney(saving) : '';
+  });
 
   unmatchedCount(response: RfqResponseComparison): number {
     return response.lines.filter((l) => l.pending_match).length;
@@ -413,10 +548,16 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   canPrepare(response: RfqResponseComparison): boolean {
-    return this.isEligible(response) && Boolean(this.selectedBranchId()) && Boolean(this.requiredByDate());
+    return (
+      !this.isConverted() &&
+      this.isEligible(response) &&
+      Boolean(this.selectedBranchId()) &&
+      Boolean(this.requiredByDate())
+    );
   }
 
   prepareRequest(response: RfqResponseComparison): void {
+    if (this.isConverted()) return;
     if (response.quotation_status === 'refused') return;
     if (!this.isEligible(response)) {
       this.snackBar.open(
@@ -471,6 +612,21 @@ export class CompareComponent implements OnInit, OnChanges {
         navigateToDraft();
       },
       error: (err: unknown) => {
+        if (err instanceof HttpErrorResponse && err.status === 409) {
+          const reason = (err.error as ApiError | undefined)?.details?.['reason'];
+          if (reason === 'rfq_already_converted') {
+            this.snackBar.open(
+              this.translate.instant('rfq.compare.alreadyConverted'),
+              this.translate.instant('rfq.history.dismiss'),
+              { duration: 5000 },
+            );
+            const id = this.rfqId();
+            if (id) {
+              this.loadData(id);
+            }
+            return;
+          }
+        }
         const message =
           err instanceof HttpErrorResponse
             ? ((err.error as ApiError | undefined)?.message ??

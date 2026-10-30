@@ -93,6 +93,7 @@ export interface RfqGuardrailEvaluation {
   guardrail_id: string;
   fired: boolean;
   reason: string;
+  purchase_request_id?: string | null;
 }
 
 export interface RfqGuardrail {
