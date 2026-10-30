@@ -166,7 +166,7 @@ test.describe('RFQ-aware matching & match correction (023, US1, T032)', () => {
     const queueTasksRes = page.waitForResponse(
       (resp) =>
         resp.request().method() === 'GET' &&
-        resp.url().includes('/matching/tasks') &&
+        resp.url().includes('/match-tasks') &&
         resp.ok(),
     );
     await page.goto(`/matching?quotation_id=${quote1.quotationId}`);
@@ -183,7 +183,7 @@ test.describe('RFQ-aware matching & match correction (023, US1, T032)', () => {
     const queue2TasksRes = page.waitForResponse(
       (resp) =>
         resp.request().method() === 'GET' &&
-        resp.url().includes('/matching/tasks') &&
+        resp.url().includes('/match-tasks') &&
         resp.ok(),
     );
     await page.goto(`/matching?quotation_id=${quote2.quotationId}`);
@@ -198,7 +198,7 @@ test.describe('RFQ-aware matching & match correction (023, US1, T032)', () => {
     const quote1ReturnRes = page.waitForResponse(
       (resp) =>
         resp.request().method() === 'GET' &&
-        resp.url().includes('/matching/tasks') &&
+        resp.url().includes('/match-tasks') &&
         resp.ok(),
     );
     await page.goto(`/matching?quotation_id=${quote1.quotationId}`);
@@ -211,7 +211,7 @@ test.describe('RFQ-aware matching & match correction (023, US1, T032)', () => {
     const autoTasksRes = page.waitForResponse(
       (resp) =>
         resp.request().method() === 'GET' &&
-        resp.url().includes('/matching/tasks') &&
+        resp.url().includes('/match-tasks') &&
         resp.url().includes('status=auto_accepted') &&
         resp.ok(),
     );
@@ -286,7 +286,7 @@ test.describe('RFQ-aware matching & match correction (023, US1, T032)', () => {
     const backQueueRes = page.waitForResponse(
       (resp) =>
         resp.request().method() === 'GET' &&
-        resp.url().includes('/matching/tasks') &&
+        resp.url().includes('/match-tasks') &&
         resp.ok(),
     );
     await page.locator('a.back-btn').click();
