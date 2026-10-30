@@ -481,8 +481,11 @@ def test_matching_pipeline_passes_supplier_code_aliases_to_deterministic_matcher
 
     monkeypatch.setattr(matching_service_module, "rfq_lines_for_quotation", lambda *_: None)
     monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
-    monkeypatch.setattr(matching_service_module, "_decision_for_line", lambda _c, _lid: None)
-    monkeypatch.setattr(matching_service_module, "_candidate_rows", lambda _c, _lid: [])
+    monkeypatch.setattr(
+        matching_service_module._LineMatchState,  # noqa: SLF001
+        "read",
+        classmethod(lambda cls, _client, _lines: cls(candidates={}, decisions={}, tasks={})),
+    )
     monkeypatch.setattr(
         matching_service_module,
         "_deterministic_products_for_line",

@@ -219,8 +219,19 @@ def test_matching_preparation_never_routes_a_partial_candidate_set(
             return SimpleNamespace(data=list(reversed(committed)))
 
     monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
-    monkeypatch.setattr(matching_module, "_decision_for_line", lambda *_a: None)
     monkeypatch.setattr(matching_module, "_candidate_rows", lambda *_a: list(visible))
+    # The competing GET reads every line's candidates in one statement.
+    monkeypatch.setattr(
+        matching_module._LineMatchState,  # noqa: SLF001
+        "read",
+        classmethod(
+            lambda cls, _client, _lines: cls(
+                candidates={str(line["id"]): list(visible)} if visible else {},
+                decisions={},
+                tasks={},
+            )
+        ),
+    )
     monkeypatch.setattr(
         service, "_create_automatic_decision", lambda *_a, **_k: decisions.append(True)
     )
@@ -268,8 +279,11 @@ def test_matching_deterministic_preparation_preserves_below_threshold_auto_accep
     decisions: list[object] = []
     task_reasons: list[object] = []
     monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
-    monkeypatch.setattr(matching_module, "_decision_for_line", lambda *_a: None)
-    monkeypatch.setattr(matching_module, "_candidate_rows", lambda *_a: [])
+    monkeypatch.setattr(
+        matching_module._LineMatchState,  # noqa: SLF001
+        "read",
+        classmethod(lambda cls, _client, _lines: cls(candidates={}, decisions={}, tasks={})),
+    )
     for name in (
         "_deterministic_products_for_line",
         "_aliases_for_line",

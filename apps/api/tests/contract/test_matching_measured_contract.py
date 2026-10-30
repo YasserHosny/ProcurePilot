@@ -75,6 +75,19 @@ def test_candidate_measured_map_survives_detail_endpoint(
     monkeypatch.setattr(matching, "_decision_for_line", lambda *_: None)
     monkeypatch.setattr(matching, "_candidate_rows", lambda *_: [candidate])
     monkeypatch.setattr(matching, "_product_summary", lambda *_: product)
+    # The quotation endpoint reads the same rows in batches.
+    monkeypatch.setattr(
+        matching._LineMatchState,  # noqa: SLF001
+        "read",
+        classmethod(
+            lambda cls, *_: cls(
+                candidates={str(line_id): [candidate]},
+                decisions={},
+                tasks={str(line_id): [task]},
+            )
+        ),
+    )
+    monkeypatch.setattr(matching, "_product_summaries", lambda *_: {str(product_id): product})
     service = matching.MatchingService()
     monkeypatch.setattr(service, "_ensure_pipeline", lambda **_: None)
     app = create_app()

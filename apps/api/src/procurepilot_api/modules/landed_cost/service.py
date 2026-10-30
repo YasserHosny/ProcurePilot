@@ -63,6 +63,28 @@ class LandedCostService:
         row = self._latest_landed_cost(client, UUID(str(decision["id"])))
         return _landed_cost(row) if row else None
 
+    def latest_for_decisions(
+        self, *, client: object, decision_ids: list[UUID]
+    ) -> dict[UUID, LandedCost]:
+        """The newest landed cost of each decision, in one read."""
+        if not decision_ids:
+            return {}
+        try:
+            rows = _rows(
+                client.table("landed_cost")
+                .select(LANDED_COLUMNS)
+                .in_("match_decision_id", [str(decision_id) for decision_id in decision_ids])
+                .order("recorded_at", desc=True)
+                .execute()
+                .data
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        latest: dict[UUID, LandedCost] = {}
+        for row in rows:
+            latest.setdefault(UUID(str(row["match_decision_id"])), _landed_cost(row))
+        return latest
+
     def compute_for_line_with_client(
         self,
         *,
