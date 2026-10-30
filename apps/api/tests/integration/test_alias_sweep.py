@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from decimal import Decimal
 from unittest.mock import Mock
 from uuid import UUID, uuid4
 
@@ -11,6 +12,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from postgrest.exceptions import APIError
+from psycopg.types.json import Jsonb
 
 from integration.catalogue_helpers import (
     TEST_DATABASE_URL,
@@ -253,10 +255,42 @@ def test_rfq_automatic_decision_does_not_sweep(case: Case, monkeypatch: pytest.M
         assert cur.fetchone()[0] == 0
 
 
-def test_correcting_teacher_lists_swept_lines_and_correction_teaches(case: Case) -> None:
+def test_correcting_teacher_lists_lines_matched_through_old_wording(case: Case) -> None:
     swept, _ = case.open_line()
     teacher = case.resolve()
     later, _ = case.open_line()
+    other_candidate = uuid4()
+    with case.conn.cursor() as cur:
+        act_as(cur, case.ws)
+        cur.execute(
+            "insert into match_candidate ("
+            "id, tenant_id, quotation_line_id, candidate_workspace_product_id,"
+            "confidence, reasons, rank, scoring_version, embedding_model"
+            ") values (%s, %s, %s, %s, %s, %s, 2, 'matching-score-v2', 'stub-hash-v1')",
+            (
+                other_candidate,
+                case.ws.tenant_id,
+                case.teacher,
+                case.other_product,
+                Decimal("0.7000"),
+                Jsonb(
+                    {
+                        "alias_hit": False,
+                        "gtin_match": False,
+                        "supplier_code_match": False,
+                        "lexical_similarity": "0.7000",
+                        "semantic_similarity": "0.0000",
+                        "feature_score": {
+                            "brand_match": "0.5000",
+                            "variant_match": "0.5000",
+                            "pack_unit_match": "0.5000",
+                            "pack_size_plausibility": "0.5000",
+                            "price_plausibility": "0.5000",
+                        },
+                    }
+                ),
+            ),
+        )
     key = uuid4()
     response = case.service.correct(
         bearer_token="test",
@@ -265,19 +299,14 @@ def test_correcting_teacher_lists_swept_lines_and_correction_teaches(case: Case)
         payload=MatchCorrectionRequest(
             expected_current_decision_id=teacher.id,
             outcome="same_product",
-            selected_match_candidate_id=case.candidate,
+            selected_match_candidate_id=other_candidate,
         ),
         idempotency_key=key,
     )
     assert response.lines_matched_through_old_wording == [swept]
-    assert response.lines_matched_by_same_wording == [later]
-    with case.conn.cursor() as cur:
-        cur.execute(
-            "select learned_from_decision_id from current_match_decision "
-            "where quotation_line_id=%s",
-            (later,),
-        )
-        assert cur.fetchone()[0] == response.decision.id
+    assert response.lines_matched_by_same_wording == []
+    assert response.alias_conflict_product_id == case.product
+    assert case.heads(later) == []
 
 
 def test_bulk_sweeps_once_per_alias_after_all_human_confirmations(
