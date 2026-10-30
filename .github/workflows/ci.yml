@@ -585,6 +585,19 @@ jobs:
             echo "::error::extraction worker did not start or exited immediately"; exit 1;
           }
 
+      - name: Start the optimiser worker
+        # Consumes the basket-split RQ queue over the redis service above. Defaults for
+        # redis_url and queue_name match the API's enqueue settings in this job;
+        # DATABASE_URL comes from GITHUB_ENV via "Export Supabase credentials".
+        # RFQ split specs need the optimiser to finish before preparing requests; without
+        # this worker every basket split job stays queued and the result poll times out.
+        run: |
+          uv run --project services/optimiser python -m procurepilot_optimiser_worker &
+          sleep 5
+          pgrep -f procurepilot_optimiser_worker >/dev/null || {
+            echo "::error::optimiser worker did not start or exited immediately"; exit 1;
+          }
+
       - name: Wait for the web app
         run: |
           for i in $(seq 1 90); do
