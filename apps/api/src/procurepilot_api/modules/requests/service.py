@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 import psycopg
 from postgrest.exceptions import APIError
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 from supabase import Client
 
 from procurepilot_api import db
@@ -73,6 +74,7 @@ from procurepilot_api.modules.requests.valuation import (
     quoted_prices_from_source_response,
 )
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.logging import get_trace_id
 from procurepilot_api.shared.storage_keys import safe_object_name
 
 REQUEST_COLUMNS = (
@@ -825,6 +827,466 @@ class RequestsService:
             client, request_row, new_line_rows, step_row
         )
 
+    def submit_group(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        group_id: UUID,
+        idempotency_key: UUID,
+    ) -> list[PurchaseRequest]:
+        return self._transition_group(
+            member=member, group_id=group_id, idempotency_key=idempotency_key, action="submitted"
+        )
+
+    def approve_group(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        group_id: UUID,
+        idempotency_key: UUID,
+        payload: ApprovalDecisionInput,
+    ) -> list[PurchaseRequest]:
+        return self._transition_group(
+            member=member,
+            group_id=group_id,
+            idempotency_key=idempotency_key,
+            action="approved",
+            comment=payload.comment,
+        )
+
+    def reject_group(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        group_id: UUID,
+        idempotency_key: UUID,
+        payload: ApprovalDecisionInput,
+    ) -> list[PurchaseRequest]:
+        return self._transition_group(
+            member=member,
+            group_id=group_id,
+            idempotency_key=idempotency_key,
+            action="rejected",
+            comment=payload.comment,
+        )
+
+    def withdraw_group(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        group_id: UUID,
+        idempotency_key: UUID,
+    ) -> list[PurchaseRequest]:
+        return self._transition_group(
+            member=member, group_id=group_id, idempotency_key=idempotency_key, action="withdrawn"
+        )
+
+    def _transition_group(
+        self,
+        *,
+        member: CurrentMember,
+        group_id: UUID,
+        idempotency_key: UUID,
+        action: str,
+        comment: str | None = None,
+    ) -> list[PurchaseRequest]:
+        """Serialize the split, then commit requests, steps, audit/replay and outbox together.
+
+        All domain reads/writes use the member's RLS. The service-role windows are limited to
+        the private replay journal and notification outbox, after group visibility is checked.
+        The append-only audit target holds the response so replay survives later transitions
+        without requiring another table or mutating the group's preparation evidence.
+        """
+        claims = json.dumps(
+            {
+                "sub": str(member.user_id),
+                "tenant_id": str(member.tenant_id),
+                "role": "authenticated",
+                "member_role": member.role.value,
+            }
+        )
+        audit_action = f"requests.group_{action}"
+        notification_id = None
+        try:
+            with db.connect(
+                self._settings.database_url.get_secret_value(), row_factory=dict_row
+            ) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("set local role authenticated")
+                    cur.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
+                    cur.execute(
+                        "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                        (f"request-group:{member.tenant_id}:{group_id}",),
+                    )
+                    cur.execute("select * from purchase_request_group where id=%s", (group_id,))
+                    group = cur.fetchone()
+                    if group is None:
+                        raise NotFoundError(details={"resource": "purchase_request_group"})
+                    # Actor-scoped replay cannot disclose a prior decider's response to a
+                    # different member. Neither a different key nor action is a replay.
+                    cur.execute("set local role service_role")
+                    cur.execute(
+                        "select target from audit_event where tenant_id=%s and "
+                        "actor_membership_id=%s "
+                        "and action=%s and outcome='success' and target->>'request_group_id'=%s "
+                        "and target->>'idempotency_key'=%s order by id limit 1",
+                        (
+                            member.tenant_id,
+                            member.membership_id,
+                            audit_action,
+                            str(group_id),
+                            str(idempotency_key),
+                        ),
+                    )
+                    replay = cur.fetchone()
+                    cur.execute("set local role authenticated")
+                    if replay is not None:
+                        return [
+                            PurchaseRequest.model_validate(item)
+                            for item in replay["target"]["response"]
+                        ]
+
+                    cur.execute(
+                        "select id from purchase_request where request_group_id=%s order by id",
+                        (group_id,),
+                    )
+                    ids = [row["id"] for row in cur.fetchall()]
+                    # Same locks/order as single withdrawal and PO creation: advisory locks
+                    # precede row locks, so a PO cannot slip past the live-order check.
+                    cur.execute(
+                        "select pg_advisory_xact_lock(lock_id) from unnest(%s::bigint[]) as "
+                        "locks(lock_id)",
+                        ([(member.tenant_id.int ^ id_.int) & 0x7FFFFFFFFFFFFFFF for id_ in ids],),
+                    )
+                    cur.execute(
+                        f"select {REQUEST_COLUMNS} from purchase_request where request_group_id=%s "
+                        "order by id for update",
+                        (group_id,),
+                    )
+                    rows = cur.fetchall()
+                    statuses = {str(row["status"]) for row in rows}
+                    expected = "draft" if action == "submitted" else "submitted"
+                    if action != "withdrawn" and statuses != {expected}:
+                        raise ConflictError(details={"reason": f"not_{expected}"})
+                    if action == "withdrawn" and (
+                        len(statuses) != 1 or not statuses <= {"draft", "submitted", "ordered"}
+                    ):
+                        raise ConflictError(details={"reason": "already_decided_or_withdrawn"})
+                    if (
+                        not rows
+                        or any(row["branch_id"] != group["branch_id"] for row in rows)
+                        or len({row["requested_by_membership_id"] for row in rows}) != 1
+                    ):
+                        raise ConflictError(details={"reason": "invalid_group"})
+                    if action in ("submitted", "withdrawn"):
+                        for row in rows:
+                            if action == "submitted" or member.role is not MemberRole.owner:
+                                _require_requester(row, member)
+                    if (
+                        action in ("approved", "rejected")
+                        and comment is not None
+                        and len(comment) > 2000
+                    ):
+                        raise UnprocessableEntityError(details={"reason": "comment_too_long"})
+                    if action == "rejected" and (comment is None or not comment.strip()):
+                        raise UnprocessableEntityError(details={"reason": "comment_required"})
+                    now = _now_iso()
+                    if action == "submitted":
+                        total = sum(
+                            (
+                                Decimal(str(row["estimated_total_amount"]))
+                                for row in rows
+                                if row["estimated_total_amount"] is not None
+                            ),
+                            Decimal("0"),
+                        )
+                        if (
+                            any(
+                                row["estimated_total_amount"] is None
+                                or row["estimated_total_currency"]
+                                != group["combined_total_currency"]
+                                or row["has_incomplete_estimate"]
+                                for row in rows
+                            )
+                            or total != group["combined_total_amount"]
+                        ):
+                            raise ConflictError(details={"reason": "invalid_group"})
+                        cur.execute("select * from threshold_rule")
+                        rules = [_threshold_rule_row(row) for row in cur.fetchall()]
+                        as_of = datetime.now(UTC).date()
+                        cur.execute(
+                            "select * from approval_delegation where starts_on<=%s and ends_on>=%s",
+                            (as_of, as_of),
+                        )
+                        delegations = [_delegation_row(row) for row in cur.fetchall()]
+                        cur.execute("select id,role,status from membership")
+                        members = cur.fetchall()
+                        owner = next(
+                            (
+                                row["id"]
+                                for row in members
+                                if row["role"] == "owner" and row["status"] == "active"
+                            ),
+                            None,
+                        )
+                        if owner is None:
+                            raise ConflictError(details={"reason": "owner_membership_not_found"})
+                        resolved = resolve_approver(
+                            request_value=total,
+                            request_currency=str(group["combined_total_currency"]),
+                            branch_id=group["branch_id"],
+                            rules=rules,
+                            delegations=delegations,
+                            removed_membership_ids={
+                                row["id"] for row in members if row["status"] != "active"
+                            },
+                            owner_membership_id=owner,
+                            as_of=as_of,
+                            is_group=True,
+                        )
+                        cur.execute(
+                            "update purchase_request set status='submitted', submitted_at=%s, "
+                            "updated_at=%s "
+                            "where id=any(%s::uuid[]) returning *",
+                            (now, now, ids),
+                        )
+                        rows = cur.fetchall()
+                        cur.execute(
+                            "insert into approval_step "
+                            "(tenant_id,purchase_request_id,assigned_membership_id,source,status) "
+                            "select %s, id, %s, %s::approval_step_source, 'pending' from "
+                            "unnest(%s::uuid[]) as requests(id) returning *",
+                            (
+                                member.tenant_id,
+                                resolved.assigned_membership_id,
+                                resolved.source,
+                                ids,
+                            ),
+                        )
+                        steps = cur.fetchall()
+                    else:
+                        cur.execute(
+                            "select * from approval_step where "
+                            "purchase_request_id=any(%s::uuid[]) order by id for update",
+                            (ids,),
+                        )
+                        steps = cur.fetchall()
+                        if action in ("approved", "rejected"):
+                            if len(steps) != len(rows):
+                                if member.role is not MemberRole.owner:
+                                    raise PermissionDeniedError(
+                                        details={"reason": "not_assigned_approver"}
+                                    )
+                                raise ConflictError(details={"reason": "not_submitted"})
+                            if any(step["status"] != "pending" for step in steps):
+                                raise ConflictError(details={"reason": "not_submitted"})
+                            for step in steps:
+                                _require_assigned_approver_or_owner(step, member)
+                            if len({step["assigned_membership_id"] for step in steps}) != 1:
+                                raise ConflictError(details={"reason": "invalid_group"})
+                            step_by_request = {
+                                str(step["purchase_request_id"]): step for step in steps
+                            }
+                            decided = [
+                                self._apply_request_decision(
+                                    cur,
+                                    member=member,
+                                    request_id=str(row["id"]),
+                                    step_id=str(step_by_request[str(row["id"])]["id"]),
+                                    decision=action,
+                                    request_status=action,
+                                    comment=comment,
+                                    now=now,
+                                )
+                                for row in rows
+                            ]
+                            rows = [request for request, _ in decided]
+                            steps = [step for _, step in decided]
+                        else:
+                            if statuses == {"ordered"}:
+                                cur.execute(
+                                    "select 1 from purchase_order where "
+                                    "source_request_id=any(%s::uuid[]) and status<>'cancelled' "
+                                    "limit 1",
+                                    (ids,),
+                                )
+                                if cur.fetchone() is not None:
+                                    raise ConflictError(details={"reason": "purchase_order_exists"})
+                            cur.execute(
+                                "update purchase_request set "
+                                "status='withdrawn',withdrawn_at=%s,updated_at=%s "
+                                "where id=any(%s::uuid[]) returning *",
+                                (now, now, ids),
+                            )
+                            rows = cur.fetchall()
+                    result = self._group_response(
+                        conn, member=member, group=group, rows=rows, steps=steps
+                    )
+                    target = {
+                        "request_group_id": str(group_id),
+                        "purchase_request_ids": [str(id_) for id_ in ids],
+                        "approval_step_ids": [str(step["id"]) for step in steps],
+                        "actor_membership_id": str(member.membership_id),
+                        "comment": comment,
+                        "idempotency_key": str(idempotency_key),
+                        "response": [item.model_dump(mode="json") for item in result],
+                    }
+                    cur.execute(
+                        "select record_audit_event(%s,'success',%s,%s,%s,%s,%s)",
+                        (
+                            audit_action,
+                            member.tenant_id,
+                            member.membership_id,
+                            member.email,
+                            Jsonb(target),
+                            get_trace_id(),
+                        ),
+                    )
+                    if action in ("approved", "rejected"):
+                        cur.execute("set local role service_role")
+                        cur.execute(
+                            "insert into push_notification "
+                            "(tenant_id,purchase_request_id,member_id) values (%s,%s,%s) "
+                            "returning id",
+                            (member.tenant_id, result[0].id, rows[0]["requested_by_membership_id"]),
+                        )
+                        notification_id = cur.fetchone()["id"]
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        if notification_id is not None:
+            try:
+                enqueue_push_job(self._settings, notification_id)
+            except Exception:
+                logger.exception(
+                    "push notification enqueue failed after a committed group decision",
+                    extra={
+                        "request_group_id": str(group_id),
+                        "notification_id": str(notification_id),
+                    },
+                )
+        return result
+
+    def _group_response(
+        self,
+        conn: psycopg.Connection,
+        *,
+        member: CurrentMember,
+        group: dict[str, object],
+        rows: list[dict[str, object]],
+        steps: list[dict[str, object]],
+    ) -> list[PurchaseRequest]:
+        """Build and freeze the response within the mutation transaction, under member RLS.
+
+        Lines, contacts, provenance and budgets are batched; spend is loaded once per selected
+        budget, scoped to its currency/period. This also sees the group's just-written statuses.
+        """
+        rows = sorted(rows, key=lambda row: (row["created_at"], row["id"]))
+        ids = [row["id"] for row in rows]
+        lines = conn.execute(
+            f"select {LINE_COLUMNS} from purchase_request_line "
+            "where purchase_request_id=any(%s::uuid[]) order by position,created_at,id",
+            (ids,),
+        ).fetchall()
+        contacts = conn.execute(
+            "select pr.id, m.email as requester_email, a.email as assigned_email, s.name as "
+            "supplier_name, "
+            "row_to_json(e) as auto_prepared from purchase_request pr "
+            "left join membership m on m.id=pr.requested_by_membership_id and "
+            "m.tenant_id=pr.tenant_id "
+            "left join approval_step ast on ast.purchase_request_id=pr.id and "
+            "ast.tenant_id=pr.tenant_id "
+            "left join membership a on a.id=ast.assigned_membership_id and "
+            "a.tenant_id=pr.tenant_id "
+            "left join supplier s on s.id=pr.source_supplier_id and s.tenant_id=pr.tenant_id "
+            "left join auto_preparation_event e on e.purchase_request_id=pr.id and "
+            "e.tenant_id=pr.tenant_id "
+            "where pr.id=any(%s::uuid[])",
+            (ids,),
+        ).fetchall()
+        contacts_by_id = {str(row["id"]): row for row in contacts}
+        budgets = [
+            _budget_row(row)
+            for row in conn.execute(f"select {BUDGET_COLUMNS} from budget").fetchall()
+        ]
+        spend_cache: dict[UUID, list[SpendRow]] = {}
+
+        def spend(budget: BudgetRow) -> list[SpendRow]:
+            if budget.id not in spend_cache:
+                spend_rows = conn.execute(
+                    "select * from purchase_request where "
+                    "status=any(%s::purchase_request_status[]) "
+                    "and estimated_total_currency=%s and required_by_date>=%s and "
+                    "required_by_date<%s "
+                    "and (%s::uuid is null or branch_id=%s) and (%s::uuid is null or "
+                    "cost_centre_id=%s)",
+                    (
+                        list(COMMITTED_SPEND_STATUSES),
+                        budget.currency,
+                        budget.period_start,
+                        budget_period_end(budget),
+                        budget.branch_id,
+                        budget.branch_id,
+                        budget.cost_centre_id,
+                        budget.cost_centre_id,
+                    ),
+                ).fetchall()
+                spend_cache[budget.id] = [
+                    _spend_row(row)
+                    for row in spend_rows
+                    if row["estimated_total_amount"] is not None
+                ]
+            return spend_cache[budget.id]
+
+        summaries = _request_group_summaries([{**row, "request_group": group} for row in rows])
+        steps_by_request = {str(step["purchase_request_id"]): step for step in steps}
+        result = []
+        for row in rows:
+            rid = str(row["id"])
+            contact = contacts_by_id[rid]
+            request_lines = [line for line in lines if line["purchase_request_id"] == row["id"]]
+            source = (
+                RequestSource(
+                    rfq_id=row["source_rfq_id"],
+                    rfq_response_id=row["source_rfq_response_id"],
+                    quotation_id=row["source_quotation_id"],
+                    supplier_id=row["source_supplier_id"],
+                    supplier_name=contact["supplier_name"],
+                )
+                if row.get("source_supplier_id")
+                else None
+            )
+            auto = contact["auto_prepared"]
+            if auto:
+                auto = {**auto, "supplier_name": contact["supplier_name"]}
+            result.append(
+                _purchase_request(
+                    row,
+                    request_lines,
+                    steps_by_request.get(rid),
+                    request_group=summaries[rid],
+                    requester_email=contact["requester_email"],
+                    assigned_email=contact["assigned_email"],
+                    source=source,
+                    auto_prepared=AutoPreparedProvenance.model_validate(auto) if auto else None,
+                    quoted_prices=self._quoted_prices_for(row, request_lines),
+                    budget_status=compute_budget_status(
+                        request_id=row["id"],
+                        request_amount=row["estimated_total_amount"],
+                        request_currency=row["estimated_total_currency"],
+                        branch_id=row["branch_id"],
+                        cost_centre_id=row["cost_centre_id"],
+                        required_by=row["required_by_date"],
+                        budgets=budgets,
+                        committed_spend=spend,
+                    ),
+                )
+            )
+        return result
+
     def submit_request(
         self,
         *,
@@ -834,6 +1296,7 @@ class RequestsService:
     ) -> PurchaseRequest:
         client = authenticated_client(self._settings, bearer_token)
         existing = self._fetch_request(client, request_id)
+        _require_ungrouped(existing)
 
         if str(existing["status"]) != "draft":
             raise ConflictError(details={"reason": "not_draft"})
@@ -964,6 +1427,7 @@ class RequestsService:
                     existing = cur.fetchone()
                     if existing is None:
                         raise NotFoundError(details={"resource": "purchase_request"})
+                    _require_ungrouped(existing)
                     if member.role is not MemberRole.owner:
                         _require_requester(existing, member)
                     previous_status = str(existing["status"])
@@ -1995,6 +2459,7 @@ class RequestsService:
     ) -> PurchaseRequest:
         client = authenticated_client(self._settings, bearer_token)
         request_row = self._fetch_request(client, request_id)
+        _require_ungrouped(request_row)
         if str(request_row["status"]) != "submitted":
             raise ConflictError(details={"reason": "not_submitted"})
 
@@ -2043,6 +2508,68 @@ class RequestsService:
         return self._purchase_request_with_budget_status(
             client, decided_request, line_rows, decided_step
         )
+
+    def _apply_request_decision(
+        self,
+        cur: psycopg.Cursor,
+        *,
+        member: CurrentMember,
+        request_id: str,
+        step_id: str,
+        decision: str,
+        request_status: str,
+        comment: str | None,
+        now: str,
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        """Shared guarded writes; the caller owns the transaction and outbox."""
+        cur.execute(
+            """
+            update purchase_request
+            set status = %s, updated_at = %s
+            where id = %s and status = 'submitted'
+            returning *
+            """,
+            (request_status, now, request_id),
+        )
+        decided_request = cur.fetchone()
+        if decided_request is None:
+            raise ConflictError(details={"reason": "not_submitted"})
+
+        # Repeats the assigned-approver-or-owner check the pre-check already made
+        # (`_require_assigned_approver_or_owner`, run before this transaction opened)
+        # directly in the WHERE clause — approval_step's own RLS is read-only on
+        # authorization (its migration: "Write authorization ... is an application-layer
+        # RBAC check"), so without this the pre-check's result could go stale between the
+        # read and this write. Concretely: the step gets reassigned/escalated (e.g. the
+        # approver is removed from the workspace mid-decision, via
+        # escalate_pending_steps_for_removed_member) after the pre-check passed but before
+        # this statement runs — without re-checking here, the now-unassigned former
+        # approver's decision would still apply (review finding).
+        is_owner = member.role is MemberRole.owner
+        cur.execute(
+            """
+            update approval_step
+            set status = %s, comment = %s, decided_by_membership_id = %s, decided_at = %s
+            where id = %s
+              and status = 'pending'
+              and (%s or assigned_membership_id = %s)
+            returning *
+            """,
+            (
+                decision,
+                comment,
+                str(member.membership_id),
+                now,
+                step_id,
+                is_owner,
+                str(member.membership_id),
+            ),
+        )
+        decided_step = cur.fetchone()
+        if decided_step is None:
+            raise ConflictError(details={"reason": "no_pending_approval"})
+
+        return dict(decided_request), dict(decided_step)
 
     def _decide_and_notify(
         self,
@@ -2093,53 +2620,16 @@ class RequestsService:
                 # a request is also what marks it ordered. `approval_step.status` and the audit
                 # action below still record the human's actual decision ("approved"), unchanged;
                 # only `purchase_request.status` itself takes the new terminal value.
-                request_status = "ordered" if decision == "approved" else decision
-                cur.execute(
-                    """
-                    update purchase_request
-                    set status = %s, updated_at = %s
-                    where id = %s and status = 'submitted'
-                    returning *
-                    """,
-                    (request_status, now, request_id),
+                decided_request, decided_step = self._apply_request_decision(
+                    cur,
+                    member=member,
+                    request_id=request_id,
+                    step_id=step_id,
+                    decision=decision,
+                    request_status="ordered" if decision == "approved" else decision,
+                    comment=comment,
+                    now=now,
                 )
-                decided_request = cur.fetchone()
-                if decided_request is None:
-                    raise ConflictError(details={"reason": "not_submitted"})
-
-                # Repeats the assigned-approver-or-owner check the pre-check already made
-                # (`_require_assigned_approver_or_owner`, run before this transaction opened)
-                # directly in the WHERE clause — approval_step's own RLS is read-only on
-                # authorization (its migration: "Write authorization ... is an application-layer
-                # RBAC check"), so without this the pre-check's result could go stale between the
-                # read and this write. Concretely: the step gets reassigned/escalated (e.g. the
-                # approver is removed from the workspace mid-decision, via
-                # escalate_pending_steps_for_removed_member) after the pre-check passed but before
-                # this statement runs — without re-checking here, the now-unassigned former
-                # approver's decision would still apply (review finding).
-                is_owner = member.role is MemberRole.owner
-                cur.execute(
-                    """
-                    update approval_step
-                    set status = %s, comment = %s, decided_by_membership_id = %s, decided_at = %s
-                    where id = %s
-                      and status = 'pending'
-                      and (%s or assigned_membership_id = %s)
-                    returning *
-                    """,
-                    (
-                        decision,
-                        comment,
-                        str(member.membership_id),
-                        now,
-                        step_id,
-                        is_owner,
-                        str(member.membership_id),
-                    ),
-                )
-                decided_step = cur.fetchone()
-                if decided_step is None:
-                    raise ConflictError(details={"reason": "no_pending_approval"})
 
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -2440,6 +2930,16 @@ def get_requests_service() -> RequestsService:
 
 
 # ── module-level helpers ──────────────────────────────────────────────
+
+
+def _require_ungrouped(request_row: dict[str, object]) -> None:
+    if request_row.get("request_group_id"):
+        raise ConflictError(
+            details={
+                "reason": "part_of_split",
+                "request_group_id": str(request_row["request_group_id"]),
+            }
+        )
 
 
 def _require_requester(request_row: dict[str, object], member: CurrentMember) -> None:
