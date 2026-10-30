@@ -541,7 +541,7 @@ Reached from **Create Order** on the order list (blank), **From approved request
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Page title — "Two-Supplier Basket Split" / Multi-Supplier Optimisation** | Optimise purchasing across 2 to 10 selected suppliers for minimum total landed cost using an exact constraint-programming solver (Google OR-Tools CP-SAT). |
+| 1 | **Page title — "Basket Split"** | Optimise purchasing across 2 to 10 selected suppliers for minimum total landed cost using an exact constraint-programming solver (Google OR-Tools CP-SAT). |
 | 2 | **Supplier selectors** | Choose 2 to 10 suppliers. The selector dynamically enforces mutual exclusion. |
 | 3 | **Commercial Constraints panel** | Toggle to configure supplier commercial terms: Minimum Order Values (MOV), Free Delivery Thresholds, Delivery Fees, and Quantity Tiers. |
 | 4 | **Risk & Urgency controls** | Set Risk Tolerance (`low`, `medium`, `high`), Delivery Urgency (`normal`, `urgent`), and explicit supplier exclusions. |
@@ -555,7 +555,7 @@ Reached from **Create Order** on the order list (blank), **From approved request
 - **Applied & Violated Constraints:** Inspect which commercial terms (MOV, delivery fee) were applied and which constraints were violated if infeasible.
 - **Advisory-Only Protection:** In strict adherence to system principles, basket optimisation is purely advisory and never autonomously creates orders or commits funds.
 
-**Mixed-currency offers:** as in Smart Compare, ProcurePilot never converts or mixes currencies here either. In the **Two-Supplier Basket Split**, if any basket item's offers span more than one currency (or that item's currency doesn't match the currency the rest of the basket is priced in), the whole optimisation is reported as infeasible in the Commercial Infeasibility Report, the same as any other item with no eligible offer. The **Advanced Multi-Supplier Optimiser** is stricter still: any currency inconsistency anywhere in the basket — across any item, supplier term, or fee — fails the entire optimisation job outright before solving even starts, rather than excluding just the affected item and solving around it.
+**Mixed-currency offers:** as in Smart Compare, ProcurePilot never converts or mixes currencies here either. In **Basket Split**, if any basket item's offers span more than one currency (or that item's currency doesn't match the currency the rest of the basket is priced in), the whole optimisation is reported as infeasible in the Commercial Infeasibility Report, the same as any other item with no eligible offer. The **Advanced Multi-Supplier Optimiser** is stricter still: any currency inconsistency anywhere in the basket — across any item, supplier term, or fee — fails the entire optimisation job outright before solving even starts, rather than excluding just the affected item and solving around it.
 
 **Business value:** basket optimisation finds the lowest total landed cost across a real order, not just the cheapest line item. It accounts for supplier minimums, delivery fees, price tiers, urgency, risk, and quality so buyers can avoid overpaying because of supplier constraints while still keeping the final purchasing decision human-authorized.
 
