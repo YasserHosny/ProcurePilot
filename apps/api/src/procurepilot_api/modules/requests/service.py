@@ -750,6 +750,7 @@ class RequestsService:
     ) -> PurchaseRequest:
         client = authenticated_client(self._settings, bearer_token)
         existing = self._fetch_request(client, request_id)
+        _require_ungrouped(existing)
 
         if str(existing["status"]) != "draft":
             raise ConflictError(details={"reason": "not_draft"})
@@ -1068,6 +1069,29 @@ class RequestsService:
                             ),
                         )
                         steps = cur.fetchall()
+                        if resolved.source == "owner_fallback":
+                            for step in steps:
+                                cur.execute(
+                                    "select record_audit_event(%s,'success',%s,%s,%s,%s,%s)",
+                                    (
+                                        "requests.approval_step_escalated",
+                                        member.tenant_id,
+                                        member.membership_id,
+                                        member.email,
+                                        Jsonb(
+                                            {
+                                                "purchase_request_id": str(
+                                                    step["purchase_request_id"]
+                                                ),
+                                                "approval_step_id": str(step["id"]),
+                                                "assigned_membership_id": str(
+                                                    step["assigned_membership_id"]
+                                                ),
+                                            }
+                                        ),
+                                        get_trace_id(),
+                                    ),
+                                )
                     else:
                         cur.execute(
                             "select * from approval_step where "
@@ -1098,7 +1122,7 @@ class RequestsService:
                                     request_id=str(row["id"]),
                                     step_id=str(step_by_request[str(row["id"])]["id"]),
                                     decision=action,
-                                    request_status=action,
+                                    request_status="ordered" if action == "approved" else action,
                                     comment=comment,
                                     now=now,
                                 )
