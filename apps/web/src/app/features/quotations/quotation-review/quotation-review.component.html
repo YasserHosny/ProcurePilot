@@ -167,7 +167,7 @@
         [documentFileName]="documentFileName()"
         [activeExtraction]="activeExtraction()"
         [isWriter]="isWriter()"
-        [isReplacingDocument]="isReplacingDocument()"
+        [isReplacingDocument]="isReplacingDocument() || isConfirming()"
         (replaceDocumentSelected)="onReplaceDocumentSelected($event)"
         (download)="downloadDocument()"
       ></app-quotation-doc-preview>

@@ -114,6 +114,9 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       'getDocumentDownloadUrl',
       'getAuditTrail',
       'getReviewTasks',
+      'presignDocument',
+      'uploadFileToStorage',
+      'replaceDocument',
     ]);
     apiService.getQuotation.and.returnValue(of(mockQuotationDetail));
     apiService.suppliers.and.returnValue(of({ items: mockSuppliers, next_cursor: null }));
@@ -121,6 +124,16 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     apiService.getDocumentDownloadUrl.and.returnValue(of({ download_url: 'https://storage.example.com/doc-1.pdf' }));
     apiService.getAuditTrail.and.returnValue(of({ items: [] }));
     apiService.getReviewTasks.and.returnValue(of({ items: [], next_cursor: null }));
+    apiService.presignDocument.and.returnValue(
+      of({
+        document_id: 'doc-2',
+        storage_bucket: 'quotations',
+        storage_path: 'quotes/doc-2.pdf',
+        upload_url: 'https://storage.example.com/upload',
+        upload_fields: {},
+        expires_at: '2026-10-30T13:00:00Z',
+      }),
+    );
 
     const mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
@@ -1202,6 +1215,21 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(archiveBtn?.disabled).toBeTrue();
     expect(addLineBtn?.disabled).toBeTrue();
 
+    // Replace document control must also be disabled and guard against execution
+    const replaceDocBtn = fixture.nativeElement.querySelector('.replace-doc-btn') as HTMLButtonElement;
+    expect(replaceDocBtn).toBeTruthy();
+    expect(replaceDocBtn?.disabled).toBeTrue();
+
+    const fakeFile = new File(['dummy'], 'replacement.pdf', { type: 'application/pdf' });
+    const fakeEvent = {
+      target: {
+        files: [fakeFile],
+        value: 'replacement.pdf',
+      },
+    } as unknown as Event;
+    component.onReplaceDocumentSelected(fakeEvent);
+    expect(apiService.presignDocument).not.toHaveBeenCalled();
+
     // Status pill
     const statusPill = fixture.nativeElement.querySelector('.page-header .status-pill') as HTMLElement;
     expect(statusPill).toBeTruthy();
@@ -1267,6 +1295,21 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(requoteBtn?.disabled).toBeTrue();
     expect(archiveBtn?.disabled).toBeTrue();
     expect(addLineBtn?.disabled).toBeTrue();
+
+    // Replace document control must also be disabled and guard against execution
+    const replaceDocBtn = fixture.nativeElement.querySelector('.replace-doc-btn') as HTMLButtonElement;
+    expect(replaceDocBtn).toBeTruthy();
+    expect(replaceDocBtn?.disabled).toBeTrue();
+
+    const fakeFile = new File(['dummy'], 'replacement.pdf', { type: 'application/pdf' });
+    const fakeEvent = {
+      target: {
+        files: [fakeFile],
+        value: 'replacement.pdf',
+      },
+    } as unknown as Event;
+    component.onReplaceDocumentSelected(fakeEvent);
+    expect(apiService.presignDocument).not.toHaveBeenCalled();
 
     const statusPill = fixture.nativeElement.querySelector('.page-header .status-pill') as HTMLElement;
     expect(statusPill.querySelector('mat-spinner')).toBeTruthy();
