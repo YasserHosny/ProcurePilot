@@ -893,12 +893,15 @@ describe('CompareComponent (RFQ)', () => {
       fixture.detectChanges();
 
       const compiled = fixture.nativeElement as HTMLElement;
-      const splitBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      const splitBtns = compiled.querySelectorAll<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitBtns.length).toBe(1);
+      const splitBtn = splitBtns[0];
       expect(splitBtn).not.toBeNull();
       expect(splitBtn?.disabled).toBeTrue();
 
-      const reason = compiled.querySelector('[data-testid="split-disabled-reason"]');
-      expect(reason).not.toBeNull();
+      const reasons = compiled.querySelectorAll('[data-testid="split-disabled-reason"]');
+      expect(reasons.length).toBe(1);
+      const reason = reasons[0];
       expect(reason?.textContent).toContain('Needs two matched replies');
       const matchLink = reason?.querySelector<HTMLAnchorElement>('a.match-lines-link');
       expect(matchLink).not.toBeNull();
@@ -951,7 +954,9 @@ describe('CompareComponent (RFQ)', () => {
       fixture.detectChanges();
 
       const compiled = fixture.nativeElement as HTMLElement;
-      const splitBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      const splitBtns = compiled.querySelectorAll<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitBtns.length).toBe(1);
+      const splitBtn = splitBtns[0];
       expect(splitBtn?.disabled).toBeFalse();
       expect(compiled.querySelector('[data-testid="split-disabled-reason"]')).toBeNull();
     });
@@ -1244,7 +1249,7 @@ describe('CompareComponent (RFQ)', () => {
       expect(compiled.querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(0);
     });
 
-    it('split hint: shows SAR 60, triggers splitRfq when open/writer/eligible, hides action when converted, and has no bare route link', () => {
+    it('split hint: shows SAR 60, sits right above the one Split action (splitRfq) on an open RFQ, keeps the text when converted, and has no bare route link', () => {
       const translate = TestBed.inject(TranslateService);
       translate.setTranslation('en', enCatalog, true);
       translate.use('en');
@@ -1262,14 +1267,19 @@ describe('CompareComponent (RFQ)', () => {
       expect(hint).not.toBeNull();
       expect(hint?.textContent).toContain('60');
 
-      // (a) open RFQ, writer, eligible -> the action exists and clicking it calls rfqApi.splitRfq with the RFQ id
+      // (a) open RFQ, writer, eligible -> the hint has no Split button of its own; the RFQ's one Split
+      // action follows it directly and calls rfqApi.splitRfq with the RFQ id
       mockRfqApi.splitRfq.calls.reset();
       mockRfqApi.splitRfq.and.returnValue(
         of({ id: 'job-split-hint', rfq_id: 'rfq-1' } as unknown as BasketSplitJob),
       );
-      const actionBtn = hint?.querySelector<HTMLButtonElement>('[data-testid="split-saving-hint-action"]');
-      expect(actionBtn).not.toBeNull();
-      actionBtn?.click();
+      expect(hint?.querySelector('button')).toBeNull();
+      const splitButtons = compiled.querySelectorAll<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitButtons.length).toBe(1);
+      const actionBtn = splitButtons[0];
+      expect(hint?.nextElementSibling?.contains(actionBtn)).toBeTrue();
+      expect(actionBtn.disabled).toBeFalse();
+      actionBtn.click();
       expect(mockRfqApi.splitRfq).toHaveBeenCalledWith('rfq-1', jasmine.any(String));
 
       // (b) converted RFQ -> the hint text with SAR 60 is shown and the action is absent
@@ -1283,7 +1293,8 @@ describe('CompareComponent (RFQ)', () => {
       const convertedHint = compiled.querySelector('[data-testid="split-saving-hint"]');
       expect(convertedHint).not.toBeNull();
       expect(convertedHint?.textContent).toContain('60');
-      expect(convertedHint?.querySelector('[data-testid="split-saving-hint-action"]')).toBeNull();
+      expect(convertedHint?.querySelector('button')).toBeNull();
+      expect(compiled.querySelector('[data-testid="rfq-compare-split-button"]')).toBeNull();
 
       // (c) no element in the hint has an href ending in /offers/basket-split
       const anyHintLinks = Array.from(convertedHint?.querySelectorAll<HTMLAnchorElement>('a') ?? []);

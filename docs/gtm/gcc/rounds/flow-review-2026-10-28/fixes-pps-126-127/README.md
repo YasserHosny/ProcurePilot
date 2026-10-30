@@ -5,7 +5,7 @@ Claude in Chrome on 2026-10-30. English UI, plus Arabic for the RTL screenshots 
 email addresses are visible in these screenshots.
 
 Most of R16 had already been built under spec 024 (PPS-96) and deployed the same morning. The live run found three
-gaps in that build, fixed in the PPS-127 PR:
+gaps in that build, fixed in #362:
 
 | PR | What | Spec 024 task |
 |---|---|---|
@@ -14,7 +14,7 @@ gaps in that build, fixed in the PPS-127 PR:
 | [#349](https://github.com/YasserHosny/ProcurePilot/pull/349) | «Prepare N requests» dialog and summary on the result | T022 |
 | [#344](https://github.com/YasserHosny/ProcurePilot/pull/344) | standalone Basket Split: empty new rows, pack hint in flow (R15, part 1) | T032 |
 | [#356](https://github.com/YasserHosny/ProcurePilot/pull/356) | standalone Basket Split: «Choose a product» placeholder, no product twice (R15, part 2) | PPS-126 |
-| PPS-127 PR | RFQ mode lists the requested items in packs; «Prepare» disappears once the RFQ is converted; the dialog's date reads DD/MM/YYYY | PPS-127 |
+| [#362](https://github.com/YasserHosny/ProcurePilot/pull/362) | RFQ mode lists the requested items in packs; «Prepare» disappears once the RFQ is converted; the dialog's date reads DD/MM/YYYY | PPS-127 |
 
 ## The run
 
@@ -65,7 +65,7 @@ gaps in that build, fixed in the PPS-127 PR:
 
 The drafts were left as drafts. Submitting and approving them as one is spec 024 US3 (PPS-96).
 
-## Found in the run, fixed in the PPS-127 PR
+## Found in the run, fixed in #362
 
 - **Requested items in RFQ mode** read «60 kg», «30 L», «30 kg», «45 kg»: the pack count printed with the base
   unit. The split itself was right (the job held 600 kg of rice); only the label was wrong. They now read like
@@ -77,14 +77,30 @@ The drafts were left as drafts. Submitting and approving them as one is spec 024
 - **The dialog's required-by date** was a native date input, so it showed «11/06/2026» in an en-US browser. It now
   uses the app's DD/MM/YYYY datepicker.
 
+## After #362 was deployed (2026-10-30)
+
+Job `0c55414d` reopened, the RFQ already converted. The requested items read «60 × 10 kg / 600 kg in total» (Arabic
+«٦٠ × ١٠ كجم / الإجمالي ٦٠٠ كجم»). There is no «Prepare 2 requests» button. The banner «This RFQ has already been
+converted into purchase requests.» links both requests. The datepicker in the dialog is covered by Karma: the
+dialog can't open on a converted RFQ.
+
+![English: requested items in packs](14-split-from-rfq-en-after-fix.jpg)
+
+![English: no Prepare button; the converted banner links the two requests](15-split-converted-en-no-prepare.jpg)
+
+![Arabic: requested items in packs](16-split-from-rfq-ar-after-fix.jpg)
+
+![Arabic: no Prepare button; the converted banner](17-split-converted-ar-no-prepare.jpg)
+
 ## Arabic (RTL)
 
 ![Basket Split from the RFQ in Arabic, before the fix: «60 كجم»](09-split-from-rfq-ar-before-fix.jpg)
 
 ![The result in Arabic: totals, saving, Prepare 2 requests, allocations](10-split-result-ar.jpg)
 
-The layout mirrors correctly. Not changed here: the saving tile shows «١٨٠ ر.س» while the totals beside it show
-«SAR 14,310» in Latin digits.
+The layout mirrors correctly. The «١٨٠ ر.س» saving tile next to «SAR 14,310» totals is stale formatting
+after a live language switch, not a data problem: after a reload every amount uses one format. Switching the
+language without a reload leaves some amounts and dates in the previous locale until the page reloads.
 
 ## R15 (PPS-126)
 

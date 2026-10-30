@@ -100,18 +100,40 @@
         <span class="split-saving-text">
           {{ 'rfq.compare.splitSavingHint' | translate: { money: splitSavingMoney() } }}
         </span>
-        @if (splitEligibility().canSplit && isWriter() && !isConverted()) {
-          <button
-            mat-button
-            class="split-saving-hint-action"
-            data-testid="split-saving-hint-action"
-            [disabled]="isSplitting()"
-            (click)="splitRfq()"
-          >
-            {{ 'rfq.compare.splitBetweenSuppliers' | translate }}
-          </button>
-        }
       </aside>
+    }
+
+    @if (!isConverted() && isWriter()) {
+      <div class="rfq-actions-bar">
+        <button mat-stroked-button color="primary"
+          class="split-btn"
+          data-testid="rfq-compare-split-button"
+          [disabled]="!splitEligibility().canSplit || isSplitting()"
+          (click)="splitRfq()">
+          @if (isSplitting()) {
+            <mat-spinner diameter="18" class="btn-spinner"></mat-spinner>
+          } @else {
+            <mat-icon aria-hidden="true">call_split</mat-icon>
+          }
+          <span>{{ 'rfq.compare.splitBetweenSuppliers' | translate }}</span>
+        </button>
+        @if (!splitEligibility().canSplit) {
+          <div class="split-disabled-reason" data-testid="split-disabled-reason">
+            @if (splitEligibility().reason === 'needs_two_matched') {
+              <span>{{ 'rfq.compare.needsTwoMatched' | translate }}</span>
+              @if (splitEligibility().unmatchedCount > 0) {
+                <a class="match-lines-link"
+                  [routerLink]="['/matching']"
+                  [queryParams]="splitEligibility().unmatchedQuotationIds.length === 1 ? { quotation_id: splitEligibility().unmatchedQuotationIds[0] } : null">
+                  {{ matchLinesLabel(splitEligibility().unmatchedCount) }}
+                </a>
+              }
+            } @else if (splitEligibility().reason === 'mixed_currency') {
+              <span>{{ 'rfq.compare.differentCurrencies' | translate }}</span>
+            }
+          </div>
+        }
+      </div>
     }
 
     <div class="responses-grid">
@@ -250,20 +272,6 @@
                     {{ 'rfq.compare.prepareRequest' | translate }}
                   </button>
                 }
-                @if (!isConverted() && isWriter()) {
-                  <button mat-stroked-button color="primary"
-                    class="split-btn"
-                    data-testid="rfq-compare-split-button"
-                    [disabled]="!splitEligibility().canSplit || isSplitting()"
-                    (click)="splitRfq()">
-                    @if (isSplitting()) {
-                      <mat-spinner diameter="18" class="btn-spinner"></mat-spinner>
-                    } @else {
-                      <mat-icon aria-hidden="true">call_split</mat-icon>
-                    }
-                    <span>{{ 'rfq.compare.splitBetweenSuppliers' | translate }}</span>
-                  </button>
-                }
               </div>
               @if (!isConverted() && isEligible(response) && !selectedBranchId()) {
                 <span class="disabled-reason">{{ 'rfq.compare.chooseBranchFirst' | translate }}</span>
@@ -272,22 +280,6 @@
                 <span class="disabled-reason" data-testid="converted-reason">
                   {{ 'rfq.compare.convertedReason' | translate }}
                 </span>
-              }
-              @if (!isConverted() && isWriter() && !splitEligibility().canSplit) {
-                <div class="split-disabled-reason" data-testid="split-disabled-reason">
-                  @if (splitEligibility().reason === 'needs_two_matched') {
-                    <span>{{ 'rfq.compare.needsTwoMatched' | translate }}</span>
-                    @if (splitEligibility().unmatchedCount > 0) {
-                      <a class="match-lines-link"
-                        [routerLink]="['/matching']"
-                        [queryParams]="splitEligibility().unmatchedQuotationIds.length === 1 ? { quotation_id: splitEligibility().unmatchedQuotationIds[0] } : null">
-                        {{ matchLinesLabel(splitEligibility().unmatchedCount) }}
-                      </a>
-                    }
-                  } @else if (splitEligibility().reason === 'mixed_currency') {
-                    <span>{{ 'rfq.compare.differentCurrencies' | translate }}</span>
-                  }
-                </div>
               }
             </mat-card-actions>
           }

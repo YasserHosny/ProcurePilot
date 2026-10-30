@@ -56,6 +56,7 @@ from procurepilot_api.modules.quotations.schemas import decimal_string as quanti
 from procurepilot_api.modules.rfq.read_api import RfqContext, rfq_lines_for_quotation
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
+from procurepilot_api.shared.postgrest_pages import all_rows
 
 QUOTATION_COLUMNS = (
     "id,tenant_id,document_id,supplier_id,status,issue_date,reviewed_at,reviewed_by,deleted_at"
@@ -107,14 +108,20 @@ class MatchingService:
         lines = _line_rows(client, quotation_id)
         if not lines:
             return QuotationMatches(quotation_id=quotation_id, lines=[])
-        self._ensure_pipeline(
-            client=client,
-            member=member,
-            quote=quote,
-            lines=lines,
-            bearer_token=bearer_token,
-        )
-        return self._build_quotation_matches(client, bearer_token, quotation_id, lines)
+        # Every read is a round trip (PPS-133): read the lines' match state in three batched
+        # queries, and prepare only when some line still needs it.
+        snapshot = _LineMatchState.read(client, lines)
+        if not snapshot.settled(lines):
+            self._ensure_pipeline(
+                client=client,
+                member=member,
+                quote=quote,
+                lines=lines,
+                bearer_token=bearer_token,
+                snapshot=snapshot,
+            )
+            snapshot = _LineMatchState.read(client, lines)
+        return self._build_quotation_matches(client, quote, lines, snapshot)
 
     def list_match_tasks(
         self,
@@ -520,6 +527,7 @@ class MatchingService:
         quote: dict[str, object],
         lines: list[dict[str, object]],
         bearer_token: str | None = None,
+        snapshot: _LineMatchState | None = None,
     ) -> None:
         context = rfq_lines_for_quotation(self._settings, member, UUID(str(quote["id"])))
         excluded_products: set[UUID] = set()
@@ -552,6 +560,7 @@ class MatchingService:
                 bearer_token=bearer_token,
                 defer_guardrail=pending.add if context is not None else None,
                 excluded_products=excluded_products,
+                snapshot=snapshot or _LineMatchState.read(client, lines),
             )
         finally:
             # Evaluate the settled quotation, including decisions inserted before a later error.
@@ -570,13 +579,17 @@ class MatchingService:
         bearer_token: str | None,
         defer_guardrail: Callable[[UUID], None] | None,
         excluded_products: set[UUID],
+        snapshot: _LineMatchState,
     ) -> None:
         for rank, line in enumerate(
             sorted(lines, key=lambda row: int(row["line_number"])), start=1
         ):
-            if _decision_for_line(client, UUID(str(line["id"]))) is not None:
+            line_id = str(line["id"])
+            # The snapshot predates the RFQ read, backfill and earlier lines' searches; a buyer
+            # may have decided this line since, so re-check before routing it.
+            if line_id in snapshot.decisions or _decision_for_line(client, UUID(line_id)):
                 continue
-            existing_candidates = _candidate_rows(client, UUID(str(line["id"])))
+            existing_candidates = snapshot.candidates.get(line_id, [])
             if existing_candidates:
                 self._route_or_accept(
                     client,
@@ -1127,33 +1140,66 @@ class MatchingService:
     def _build_quotation_matches(
         self,
         client: object,
-        bearer_token: str,
-        quotation_id: UUID,
+        quote: dict[str, object],
         lines: list[dict[str, object]],
+        snapshot: _LineMatchState,
     ) -> QuotationMatches:
+        products = _product_summaries(
+            client,
+            [
+                UUID(str(row["candidate_workspace_product_id"]))
+                for rows in snapshot.candidates.values()
+                for row in rows
+            ]
+            + [
+                UUID(str(row["matched_workspace_product_id"]))
+                for row in snapshot.decisions.values()
+            ],
+        )
+        landed_costs = self._landed_cost.latest_for_decisions(
+            client=client,
+            decision_ids=[UUID(str(row["id"])) for row in snapshot.decisions.values()],
+        )
+        line_ids = [str(line["id"]) for line in lines]
+        quotation = (
+            _quotation_summary(
+                client,
+                quote,
+                line_count=len(lines),
+                open_match_task_count=sum(1 for line_id in line_ids if snapshot.open_task(line_id)),
+            )
+            if any(snapshot.task(line_id) for line_id in line_ids)
+            else None
+        )
         states = []
         for line in lines:
-            line_id = UUID(str(line["id"]))
-            candidates = [_candidate(client, row) for row in _candidate_rows(client, line_id)]
-            decision_row = _decision_for_line(client, line_id)
-            task_row = _open_task_for_line(client, line_id) or _latest_task_for_line(
-                client, line_id
-            )
-            landed_cost = None
-            if decision_row is not None:
-                landed_cost = self._landed_cost.get_landed_cost_or_none(
-                    bearer_token=bearer_token, line_id=line_id
-                )
+            line_id = str(line["id"])
+            candidates = [
+                _candidate_from(row, products) for row in snapshot.candidates.get(line_id, [])
+            ]
+            decision_row = snapshot.decisions.get(line_id)
+            decision = _decision_from(decision_row, products) if decision_row else None
+            task_row = snapshot.task(line_id)
             states.append(
                 QuotationLineMatchState(
                     line=_line(line),
                     candidates=candidates,
-                    task=self._task(client, task_row) if task_row else None,
-                    decision=_decision(client, decision_row) if decision_row else None,
-                    landed_cost=landed_cost,
+                    task=_task_from(
+                        task_row,
+                        line_row=line,
+                        quotation=quotation,
+                        candidates=candidates,
+                        decision=decision,
+                    )
+                    if task_row and quotation
+                    else None,
+                    decision=decision,
+                    landed_cost=landed_costs.get(UUID(str(decision_row["id"])))
+                    if decision_row
+                    else None,
                 )
             )
-        return QuotationMatches(quotation_id=quotation_id, lines=states)
+        return QuotationMatches(quotation_id=UUID(str(quote["id"])), lines=states)
 
     def _auto_accepted_tasks(
         self,
@@ -1246,53 +1292,24 @@ class MatchingService:
         decision_row = _decision_for_line(client, UUID(str(row["quotation_line_id"])))
         quotation_id = UUID(str(line_row["quotation_id"]))
         quote = _quotation_row(client, quotation_id)
-        supplier_name = (
-            _supplier_name(client, UUID(str(quote["supplier_id"]))) or None
-            if quote.get("supplier_id")
-            else None
-        )
         quotation_lines = _line_rows(client, quotation_id)
-        document_id = UUID(str(quote["document_id"])) if quote.get("document_id") else None
-        source_filename = _source_filename(client, document_id) if document_id else None
-        reviewer_email = (
-            _membership_email(client, UUID(str(quote["reviewed_by"])))
-            if quote.get("reviewed_by")
-            else None
-        )
-        quotation = QuotationMatchSummary(
-            id=quotation_id,
-            status=str(quote["status"]),
-            document_id=document_id,
-            source_filename=source_filename,
-            supplier_id=UUID(str(quote["supplier_id"])) if quote.get("supplier_id") else None,
-            issue_date=quote.get("issue_date"),
-            reviewed_at=quote.get("reviewed_at"),
-            reviewed_by=(UUID(str(quote["reviewed_by"])) if quote.get("reviewed_by") else None),
-            reviewed_by_email=reviewer_email,
+        quotation = _quotation_summary(
+            client,
+            quote,
             line_count=len(quotation_lines),
             open_match_task_count=_open_task_count(
                 client, [UUID(str(line["id"])) for line in quotation_lines]
             ),
-            supplier_name=supplier_name,
         )
-        decision = _decision(client, decision_row) if decision_row else None
-        return MatchTask(
-            id=UUID(str(row["id"])),
-            quotation_id=quotation_id,
+        return _task_from(
+            row,
+            line_row=line_row,
             quotation=quotation,
-            quotation_line=_line(line_row),
-            status=str(row["status"]),
-            priority=str(row["priority"]),
-            reason=str(row["reason"]),
             candidates=[
                 _candidate(client, candidate)
                 for candidate in _candidate_rows(client, UUID(str(line_row["id"])))
             ],
-            decision=decision,
-            matched_product=decision.matched_product if decision else None,
-            created_at=row["created_at"],
-            resolved_at=row.get("resolved_at"),
-            supplier_name=supplier_name,
+            decision=_decision(client, decision_row) if decision_row else None,
         )
 
     def _backfill_missing_embeddings(self, client: object) -> None:
@@ -1785,13 +1802,176 @@ def _open_task_count(client: object, line_ids: list[UUID]) -> int:
     return len(_rows(response.data))
 
 
+IN_CHUNK = 100
+
+
+def _chunks(values: list[str]) -> list[list[str]]:
+    """Bound `in.(...)` filters so a long quotation cannot overflow the request URL."""
+    return [values[start : start + IN_CHUNK] for start in range(0, len(values), IN_CHUNK)]
+
+
+class _LineMatchState:
+    """The candidates, current decision and tasks of a quotation's lines, read in batches."""
+
+    def __init__(
+        self,
+        *,
+        candidates: dict[str, list[dict[str, object]]],
+        decisions: dict[str, dict[str, object]],
+        tasks: dict[str, list[dict[str, object]]],
+    ) -> None:
+        self.candidates = candidates
+        self.decisions = decisions
+        self._tasks = tasks
+
+    @classmethod
+    def read(cls, client: object, lines: list[dict[str, object]]) -> _LineMatchState:
+        line_ids = [str(line["id"]) for line in lines]
+        candidates: dict[str, list[dict[str, object]]] = {}
+        decisions: dict[str, dict[str, object]] = {}
+        tasks: dict[str, list[dict[str, object]]] = {}
+        try:
+            # Each response is capped at max_rows, however few ids a chunk names: page them all.
+            for chunk in _chunks(line_ids):
+                for row in all_rows(
+                    lambda chunk=chunk: (
+                        client.table("match_candidate")
+                        .select(CANDIDATE_COLUMNS)
+                        .in_("quotation_line_id", chunk)
+                        .order("rank")
+                        .order("id")
+                    ),
+                    _rows,
+                ):
+                    candidates.setdefault(str(row["quotation_line_id"]), []).append(row)
+                for row in all_rows(
+                    lambda chunk=chunk: (
+                        client.table("current_match_decision")
+                        .select(DECISION_COLUMNS)
+                        .in_("quotation_line_id", chunk)
+                        .order("id")
+                    ),
+                    _rows,
+                ):
+                    if str(row["quotation_line_id"]) in decisions:
+                        raise ServiceUnavailableError(
+                            details={"reason": "multiple_match_decisions"}
+                        )
+                    decisions[str(row["quotation_line_id"])] = row
+                for row in all_rows(
+                    lambda chunk=chunk: (
+                        client.table("match_task")
+                        .select(TASK_COLUMNS)
+                        .in_("quotation_line_id", chunk)
+                        .order("created_at", desc=True)
+                        .order("id", desc=True)
+                    ),
+                    _rows,
+                ):
+                    tasks.setdefault(str(row["quotation_line_id"]), []).append(row)
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        for rows in tasks.values():
+            if sum(1 for row in rows if row["status"] in ("open", "in_progress")) > 1:
+                raise ServiceUnavailableError(details={"reason": "multiple_open_match_tasks"})
+        return cls(candidates=candidates, decisions=decisions, tasks=tasks)
+
+    def open_task(self, line_id: str) -> dict[str, object] | None:
+        return next(
+            (
+                row
+                for row in self._tasks.get(line_id, [])
+                if row["status"] in ("open", "in_progress")
+            ),
+            None,
+        )
+
+    def task(self, line_id: str) -> dict[str, object] | None:
+        """The open task, else the newest one."""
+        rows = self._tasks.get(line_id, [])
+        return self.open_task(line_id) or (rows[0] if rows else None)
+
+    def settled(self, lines: list[dict[str, object]]) -> bool:
+        """Every line is decided, or has candidates and a task awaiting a buyer.
+
+        A line with an open task but no candidates is not settled: preparation searches the
+        catalogue for it again, as it always has, so a product added since can still be found.
+        """
+        return all(
+            str(line["id"]) in self.decisions
+            or (self.candidates.get(str(line["id"])) and self.open_task(str(line["id"])))
+            for line in lines
+        )
+
+
+def _quotation_summary(
+    client: object,
+    quote: dict[str, object],
+    *,
+    line_count: int,
+    open_match_task_count: int,
+) -> QuotationMatchSummary:
+    supplier_name = (
+        _supplier_name(client, UUID(str(quote["supplier_id"]))) or None
+        if quote.get("supplier_id")
+        else None
+    )
+    document_id = UUID(str(quote["document_id"])) if quote.get("document_id") else None
+    return QuotationMatchSummary(
+        id=UUID(str(quote["id"])),
+        status=str(quote["status"]),
+        document_id=document_id,
+        source_filename=_source_filename(client, document_id) if document_id else None,
+        supplier_id=UUID(str(quote["supplier_id"])) if quote.get("supplier_id") else None,
+        issue_date=quote.get("issue_date"),
+        reviewed_at=quote.get("reviewed_at"),
+        reviewed_by=(UUID(str(quote["reviewed_by"])) if quote.get("reviewed_by") else None),
+        reviewed_by_email=(
+            _membership_email(client, UUID(str(quote["reviewed_by"])))
+            if quote.get("reviewed_by")
+            else None
+        ),
+        line_count=line_count,
+        open_match_task_count=open_match_task_count,
+        supplier_name=supplier_name,
+    )
+
+
+def _task_from(
+    row: dict[str, object],
+    *,
+    line_row: dict[str, object],
+    quotation: QuotationMatchSummary,
+    candidates: list[MatchCandidate],
+    decision: MatchDecision | None,
+) -> MatchTask:
+    return MatchTask(
+        id=UUID(str(row["id"])),
+        quotation_id=quotation.id,
+        quotation=quotation,
+        quotation_line=_line(line_row),
+        status=str(row["status"]),
+        priority=str(row["priority"]),
+        reason=str(row["reason"]),
+        candidates=candidates,
+        decision=decision,
+        matched_product=decision.matched_product if decision else None,
+        created_at=row["created_at"],
+        resolved_at=row.get("resolved_at"),
+        supplier_name=quotation.supplier_name,
+    )
+
+
 def _candidate(client: object, row: dict[str, object]) -> MatchCandidate:
+    product_id = str(row["candidate_workspace_product_id"])
+    return _candidate_from(row, {product_id: _product_summary(client, UUID(product_id))})
+
+
+def _candidate_from(row: dict[str, object], products: dict[str, ProductSummary]) -> MatchCandidate:
     return MatchCandidate(
         id=UUID(str(row["id"])),
         quotation_line_id=UUID(str(row["quotation_line_id"])),
-        candidate_product=_product_summary(
-            client, UUID(str(row["candidate_workspace_product_id"]))
-        ),
+        candidate_product=products[str(row["candidate_workspace_product_id"])],
         confidence=decimal_string(row["confidence"]),
         reasons=row["reasons"],
         rank=int(row["rank"]),
@@ -1802,10 +1982,15 @@ def _candidate(client: object, row: dict[str, object]) -> MatchCandidate:
 
 
 def _decision(client: object, row: dict[str, object]) -> MatchDecision:
+    product_id = str(row["matched_workspace_product_id"])
+    return _decision_from(row, {product_id: _product_summary(client, UUID(product_id))})
+
+
+def _decision_from(row: dict[str, object], products: dict[str, ProductSummary]) -> MatchDecision:
     return MatchDecision(
         id=UUID(str(row["id"])),
         quotation_line_id=UUID(str(row["quotation_line_id"])),
-        matched_product=_product_summary(client, UUID(str(row["matched_workspace_product_id"]))),
+        matched_product=products[str(row["matched_workspace_product_id"])],
         selected_match_candidate_id=(
             UUID(str(row["selected_match_candidate_id"]))
             if row.get("selected_match_candidate_id")
@@ -1841,6 +2026,44 @@ def _product_summary(client: object, product_id: UUID) -> ProductSummary:
     canonical = _canonical_by_id(client, [UUID(str(product["canonical_product_id"]))]).get(
         str(product["canonical_product_id"])
     )
+    return _product_summary_from(product, canonical)
+
+
+def _product_summaries(client: object, product_ids: list[UUID]) -> dict[str, ProductSummary]:
+    """`_product_summary` for many products: two reads, not two per product."""
+    wanted = sorted({str(product_id) for product_id in product_ids})
+    if not wanted:
+        return {}
+    products: dict[str, dict[str, object]] = {}
+    try:
+        for chunk in _chunks(wanted):
+            for row in _rows(
+                client.table("workspace_product")
+                .select(PRODUCT_COLUMNS)
+                .in_("id", chunk)
+                .execute()
+                .data
+            ):
+                products[str(row["id"])] = row
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    if len(products) != len(wanted):
+        raise NotFoundError(details={"resource": "product"})
+    canonical_ids = sorted({str(row["canonical_product_id"]) for row in products.values()})
+    canonicals: dict[str, dict[str, object]] = {}
+    for chunk in _chunks(canonical_ids):
+        canonicals.update(_canonical_by_id(client, [UUID(value) for value in chunk]))
+    return {
+        product_id: _product_summary_from(
+            product, canonicals.get(str(product["canonical_product_id"]))
+        )
+        for product_id, product in products.items()
+    }
+
+
+def _product_summary_from(
+    product: dict[str, object], canonical: dict[str, object] | None
+) -> ProductSummary:
     if canonical is None:
         raise ServiceUnavailableError(details={"reason": "canonical_product_not_readable"})
     return ProductSummary(

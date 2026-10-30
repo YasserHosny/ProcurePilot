@@ -113,6 +113,13 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'each': 'pcs',
       },
       'approvals': {
+        'budgetStatus': {
+          'no_budget': 'No budget configured',
+          'reasons': {
+            'no_budget_for_branch': 'No budget set for this branch',
+            'no_budget_at_cost_centre_level': 'No budget at cost-centre level',
+          },
+        },
         'title': 'Approval Queue',
         'subtitle': 'Requests awaiting your decision.',
         'columns': {
@@ -318,6 +325,13 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'comingSoon': 'قريباً',
       },
       'approvals': {
+        'budgetStatus': {
+          'no_budget': 'لا توجد ميزانية محددة',
+          'reasons': {
+            'no_budget_for_branch': 'لم يتم تحديد ميزانية لهذا الفرع',
+            'no_budget_at_cost_centre_level': 'لا توجد ميزانية على مستوى مركز التكلفة',
+          },
+        },
         'title': 'قائمة الموافقات',
         'columns': {'requester': 'مقدم الطلب', 'requiredByDate': 'مطلوب قبل'},
         'actions': {'approve': 'اعتماد', 'reject': 'رفض'},

@@ -76,6 +76,68 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    for (final grouped in [false, true]) {
+      for (final locale in ['en', 'ar']) {
+        testWidgets(
+          'no budget renders without remaining amount (grouped=$grouped, $locale)',
+          (tester) async {
+            PurchaseRequest withoutBudget(PurchaseRequest request) {
+              final json = request.toJson();
+              json['budget_status'] = {
+                'remaining_amount': null,
+                'exceeds': false,
+                'status': 'no_budget',
+                'reason_code': 'no_budget_at_cost_centre_level',
+              };
+              return PurchaseRequest.fromJson(json);
+            }
+
+            final requests = splitApprovalRequests()
+                .map(withoutBudget)
+                .toList();
+            await pumpDecision(
+              tester,
+              grouped
+                  ? ApprovalGroup(
+                      summary: requests.first.requestGroup!,
+                      requests: requests,
+                    )
+                  : withoutBudget(decisionRequest()),
+              locale: locale,
+            );
+
+            expect(
+              find.text(
+                locale == 'en'
+                    ? 'No budget configured'
+                    : 'لا توجد ميزانية محددة',
+              ),
+              findsNWidgets(grouped ? 2 : 1),
+            );
+            expect(
+              find.text(
+                locale == 'en'
+                    ? 'No budget at cost-centre level'
+                    : 'لا توجد ميزانية على مستوى مركز التكلفة',
+              ),
+              findsNWidgets(grouped ? 2 : 1),
+            );
+            expect(
+              find.textContaining(
+                locale == 'en' ? 'Remaining budget' : 'الميزانية المتبقية',
+              ),
+              findsNothing,
+            );
+            expect(
+              find.byKey(const Key('requestBudgetExceeded')),
+              findsNothing,
+            );
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+
     Future<void> enterComment(WidgetTester tester, String comment) async {
       await tester.enterText(
         find.byKey(const Key('approvalDecisionCommentField')),
