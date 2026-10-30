@@ -1,6 +1,6 @@
 # CI pipeline notes
 
-Last updated: 2026-10-30. Source of truth is `.github/workflows/ci.yml`; this page records *why* it is shaped the way it is.
+Last updated: 2026-10-31. Source of truth is `.github/workflows/ci.yml`; this page records *why* it is shaped the way it is.
 
 ## Docs-only pull requests skip the heavy jobs
 
@@ -9,6 +9,10 @@ outside `docs/`, `specs/`, `.specify/` and `*.md`. If not, every job except the 
 
 - It is an `if:` on each job, **not** a workflow-level `on.paths` filter. A workflow that never triggers leaves
   required checks pending forever; a job skipped by `if:` counts as passing.
+- If the `changes` job itself fails (say a `paths-filter` API error), every job gated on it is skipped, and a
+  skipped job counts as passing. The `End-to-end` gate therefore fails whenever `changes` did not succeed, and it
+  accepts a skipped shard matrix only when `changes` reported no code change, so a broken filter cannot let a PR
+  through untested. «Regenerate and diff» (below) applies the same rule.
 - Pushes to `main` always run everything.
 - Editing `ci.yml` itself counts as a code change.
 - The job also exposes a `web` output from a second `paths-filter` step (`apps/web/**`, `packages/**`,
@@ -22,8 +26,8 @@ outside `docs/`, `specs/`, `.specify/` and `*.md`. If not, every job except the 
 Playwright runs with `workers: 1`, so the suite is serial inside a shard. The `e2e-shard` matrix splits the spec
 *files* across five runners with the duration-balanced planner `scripts/ci/e2e_shard.py` (each shard runs explicit
 file lists, not Playwright's `--shard`), each with its own isolated Supabase, Redis, API, extraction worker and web
-app. The aggregate job `e2e`, named exactly `End-to-end`, passes when the matrix succeeded or was skipped, so the
-check name other tooling may rely on is unchanged.
+app. The aggregate job `e2e`, named exactly `End-to-end`, passes when the matrix succeeded, or was skipped because
+`changes` found no code change, so the check name other tooling may rely on is unchanged.
 
 - The accessibility step runs the `*a11y*` specs; the following step runs the complement (files whose name lacks
   `a11y`). They used to overlap, which ran ~117 tests twice.

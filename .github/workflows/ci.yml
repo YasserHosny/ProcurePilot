@@ -7,7 +7,8 @@ name: CI
 # Docs-only pull requests (docs/, specs/, .specify/, *.md) skip every job except the secret scan:
 # the `changes` job gates them with `if:` rather than a workflow-level `paths:` filter, because a
 # workflow that never triggers leaves required checks pending, whereas a job skipped by `if:`
-# counts as passing. Pushes to main always run everything.
+# counts as passing. If `changes` itself fails, those jobs are skipped too, so «End-to-end»
+# fails on it. Pushes to main always run everything.
 
 on:
   pull_request:
@@ -660,9 +661,20 @@ jobs:
     steps:
       - name: Check E2E shard result
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          CODE: ${{ needs.changes.outputs.code }}
           E2E_SHARD_RESULT: ${{ needs.e2e-shard.result }}
         run: |
-          if [ "$E2E_SHARD_RESULT" = success ] || [ "$E2E_SHARD_RESULT" = skipped ]; then
+          # A failed path filter skips every job gated on it, and skipped jobs count as passing:
+          # fail here so a broken `changes` job cannot let a PR through untested.
+          if [ "$CHANGES_RESULT" != success ]; then
+            echo "::error::changes job result: $CHANGES_RESULT"
+            exit 1
+          fi
+          if [ "$E2E_SHARD_RESULT" = success ]; then
+            exit 0
+          fi
+          if [ "$E2E_SHARD_RESULT" = skipped ] && [ "$CODE" != true ]; then
             exit 0
           fi
           echo "::error::End-to-end shard matrix result: $E2E_SHARD_RESULT"
