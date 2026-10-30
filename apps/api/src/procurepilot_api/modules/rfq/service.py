@@ -402,15 +402,11 @@ class RfqService:
                 line_rows = cur.fetchall()
                 lines = [RfqLine(**r) for r in line_rows]
 
-                # The supplier email follows the sender's interface language, then the
-                # workspace default -- the same order the digest uses.
+                # Supplier emails use each supplier's preferred language, falling back
+                # to the workspace default, independently of the sender's UI language.
                 cur.execute(
-                    """select t.name,
-                              coalesce(m.preferred_locale, t.default_locale) as default_locale
-                       from tenant t
-                       left join membership m on m.tenant_id = t.id and m.id = %s
-                       where t.id = %s""",
-                    (member.membership_id, member.tenant_id),
+                    "select t.name, t.default_locale from tenant t where t.id = %s",
+                    (member.tenant_id,),
                 )
                 tenant_row = cur.fetchone()
                 cur.execute(
@@ -451,7 +447,7 @@ class RfqService:
 
                 for recipient in draft_recipients:
                     cur.execute(
-                        "select contact_email from supplier where id = %s",
+                        "select contact_email, preferred_locale from supplier where id = %s",
                         (recipient.supplier_id,),  # noqa: E501
                     )
                     supp_row = cur.fetchone()
@@ -460,6 +456,7 @@ class RfqService:
                         continue
 
                     contact_email = supp_row["contact_email"]
+                    locale = supp_row["preferred_locale"] or tenant_row["default_locale"]
                     email_lines = []
                     for line in lines:
                         product = product_by_id.get(line.workspace_product_id)
@@ -468,7 +465,7 @@ class RfqService:
                                 product_name=(
                                     product["tenant_name"]
                                     if product
-                                    else t("rfq.email.unknownProduct", tenant_row["default_locale"])
+                                    else t("rfq.email.unknownProduct", locale)
                                 ),
                                 quantity=line.quantity,
                                 unit_code=product["base_unit"] if product else "each",
@@ -478,7 +475,7 @@ class RfqService:
                         )
                     rendered = render_rfq_email(
                         tenant_name=tenant_row["name"],
-                        locale=tenant_row["default_locale"],
+                        locale=locale,
                         needed_by=rfq.needed_by_date,
                         lines=email_lines,
                         tenant_terms=rfq.tenant_terms,
