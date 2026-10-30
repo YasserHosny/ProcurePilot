@@ -10,7 +10,9 @@ type PurchaseRequestStatus = Literal[
     "draft", "submitted", "approved", "rejected", "withdrawn", "ordered", "delivered"
 ]
 type ApprovalStepStatus = Literal["pending", "approved", "rejected"]
-type ApprovalStepSource = Literal["threshold_match", "delegate", "owner_fallback"]
+type ApprovalStepSource = Literal[
+    "threshold_match", "group_threshold_match", "delegate", "owner_fallback"
+]
 
 
 class StrictApiModel(BaseModel):

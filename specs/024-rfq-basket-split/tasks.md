@@ -156,8 +156,8 @@ best single total of SAR 4,137 and a saving of SAR 74.
 
 ### Tests (red first)
 
-- [ ] T024 [P] [US3] Unit test in `apps/api/tests/unit/test_request_routing.py`: the approver is resolved from the combined total. With thresholds of SAR 2,000 for A and above for B, a group of 2,773 + 1,290 resolves to B, and each request alone would resolve to A for 1,290. The source is `group_threshold_match`, or `owner_fallback` when no rule matches.
-- [ ] T025 [P] [US3] Integration tests in `apps/api/tests/integration/test_request_group_approval.py`:
+- [x] T024 [P] [US3] Unit test in `apps/api/tests/unit/test_request_routing.py`: the approver is resolved from the combined total. With thresholds of SAR 2,000 for A and above for B, a group of 2,773 + 1,290 resolves to B, and each request alone would resolve to A for 1,290. The source is `group_threshold_match`, or `owner_fallback` when no rule matches.
+- [x] T025 [P] [US3] Integration tests in `apps/api/tests/integration/test_request_group_approval.py`:
   - submit group puts both requests `submitted`, with two steps assigned to B;
   - approve group as B puts both `approved` with the same `decided_at` and comment;
   - one notification is sent to the requester;
@@ -170,12 +170,12 @@ best single total of SAR 4,137 and a saving of SAR 74.
 
 ### Implementation
 
-- [ ] T026 [US3] In `modules/requests/service.py` and `modules/requests/routing.py`, add `submit_group`, `approve_group`, `reject_group` and `withdraw_group`.
+- [x] T026 [US3] In `modules/requests/service.py` and `modules/requests/routing.py`, add `submit_group`, `approve_group`, `reject_group` and `withdraw_group`.
   - **Submit**: resolve the approver once with `resolve_approver(combined_total, currency, branch_id, …)`, then in one psycopg transaction update the statuses and insert the steps.
   - **Decide**: reuse the SQL of `_decide_and_notify` for every request in one transaction, with one notification outbox row for the group.
   - Audits: `requests.group_submitted`, `requests.group_approved`, `requests.group_rejected` and `requests.group_withdrawn`.
-- [ ] T027 [US3] Guard `submit_request`, `withdraw_request` and `_decide_request` in `modules/requests/service.py`: a request with `request_group_id` gives `ConflictError(reason="part_of_split", request_group_id=…)`. T025 green.
-- [ ] T028 [US3] Add the routes `POST /request-groups/{group_id}/submit|approve|reject|withdraw` (Idempotency-Key; roles as the per-request routes) in `modules/requests/router.py`. A cross-tenant id gives 404.
+- [x] T027 [US3] Guard `submit_request`, `withdraw_request` and `_decide_request` in `modules/requests/service.py`: a request with `request_group_id` gives `ConflictError(reason="part_of_split", request_group_id=…)`. T025 green.
+- [x] T028 [US3] Add the routes `POST /request-groups/{group_id}/submit|approve|reject|withdraw` (Idempotency-Key; roles as the per-request routes) in `modules/requests/router.py`. A cross-tenant id gives 404.
 - [ ] T029 [P] [US3] Web, delegated to Agy, in `apps/web/src/app/features/approvals/approval-queue/approval-queue.component.{ts,html,scss,spec.ts}` and `approvals-api.ts`:
   - collapse pending requests by `request_group.id` into one row: "Split from RFQ … · 2 requests · SAR 4,063 · saves SAR 74", with budget status per request, expandable to each request's supplier, lines and total;
   - Approve and Reject on the group call the group endpoints, and the dialog title restates the combined amount and branch.

@@ -170,6 +170,74 @@ def update_request(
     )
 
 
+@router.post("/request-groups/{group_id}/submit", response_model=list[PurchaseRequest])
+def submit_group(
+    group_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+) -> list[PurchaseRequest]:
+    return service.submit_group(
+        bearer_token=token,
+        member=member,
+        group_id=group_id,
+        idempotency_key=idempotency_key,
+    )
+
+
+@router.post("/request-groups/{group_id}/approve", response_model=list[PurchaseRequest])
+def approve_group(
+    group_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+    payload: Annotated[ApprovalDecisionInput | None, Body()] = None,
+) -> list[PurchaseRequest]:
+    return service.approve_group(
+        bearer_token=token,
+        member=member,
+        group_id=group_id,
+        idempotency_key=idempotency_key,
+        payload=payload or ApprovalDecisionInput(),
+    )
+
+
+@router.post("/request-groups/{group_id}/reject", response_model=list[PurchaseRequest])
+def reject_group(
+    group_id: UUID,
+    payload: Annotated[ApprovalDecisionInput, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+) -> list[PurchaseRequest]:
+    return service.reject_group(
+        bearer_token=token,
+        member=member,
+        group_id=group_id,
+        idempotency_key=idempotency_key,
+        payload=payload,
+    )
+
+
+@router.post("/request-groups/{group_id}/withdraw", response_model=list[PurchaseRequest])
+def withdraw_group(
+    group_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+) -> list[PurchaseRequest]:
+    return service.withdraw_group(
+        bearer_token=token,
+        member=member,
+        group_id=group_id,
+        idempotency_key=idempotency_key,
+    )
+
+
 @router.post(
     "/requests/{request_id}/submit",
     response_model=PurchaseRequest,

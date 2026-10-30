@@ -319,6 +319,10 @@ class PsycopgTableQuery:
         self._payload = payload
         return self
 
+    def delete(self) -> PsycopgTableQuery:
+        self._operation = "delete"
+        return self
+
     def eq(self, column: str, value: object) -> PsycopgTableQuery:
         self._where.append((column, "=", value))
         return self
@@ -378,6 +382,12 @@ class PsycopgTableQuery:
                 return self._execute_insert()
             if self._operation == "update":
                 return self._execute_update()
+            if self._operation == "delete":
+                query = sql.SQL("delete from {}").format(sql.Identifier(self._table))
+                where_sql, params = self._where_sql()
+                if where_sql is not None:
+                    query += sql.SQL(" where ") + where_sql
+                return _Response(self._fetch(query + sql.SQL(" returning *"), params))
             return self._execute_select()
         finally:
             if (
