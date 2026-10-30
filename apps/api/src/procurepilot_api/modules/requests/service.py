@@ -3383,3 +3383,146 @@ def _write_error(
 def _api_error_code(exc: APIError) -> str | None:
     code = getattr(exc, "code", None)
     return str(code) if code else None
+
+
+def _insert_group_requests(conn: psycopg.Connection, rows: list[dict[str, object]]) -> None:
+    """Single batched insert; separate seam lets rollback tests inject a real constraint error."""
+    conn.execute(
+        """
+        insert into purchase_request
+          (id,tenant_id,branch_id,cost_centre_id,requested_by_membership_id,
+           required_by_date,status,source_rfq_response_id,request_group_id,
+           estimated_total_amount,estimated_total_currency,has_incomplete_estimate)
+        select id,tenant_id,branch_id,cost_centre_id,requested_by_membership_id,
+               required_by_date,'draft',source_rfq_response_id,request_group_id,
+               estimated_total_amount,estimated_total_currency,false
+        from jsonb_to_recordset(%s) as x(
+          id uuid,tenant_id uuid,branch_id uuid,cost_centre_id uuid,
+          requested_by_membership_id uuid,required_by_date date,
+          source_rfq_response_id uuid,request_group_id uuid,
+          estimated_total_amount numeric,estimated_total_currency text)
+        """,
+        (Jsonb(rows),),
+    )
+
+
+def create_requests_for_group(
+    conn: psycopg.Connection,
+    member: CurrentMember,
+    group_row: dict[str, object],
+    allocations: list[dict[str, object]],
+) -> list[UUID]:
+    """Create drafts and RFQ-ordered pack lines in two batched writes, on the caller's transaction.
+
+    The source-snapshot trigger (#325) captures RFQ, quotation and supplier on INSERT.
+    Allocations carry the frozen RFQ pack sizes and destination chosen by the buyer.
+    """
+    requests: list[dict[str, object]] = []
+    lines: list[dict[str, object]] = []
+    request_ids: list[UUID] = []
+    combined = Decimal(0)
+    for allocation in allocations:
+        request_id = uuid4()
+        request_ids.append(request_id)
+        allocated_lines = allocation["lines"]
+        estimates = estimate_from_source_response(
+            conn,
+            rfq_response_id=allocation["response_id"],
+            product_ids=[line["workspace_product_id"] for line in allocated_lines],
+        )
+        total = Decimal(0)
+        for position, line in enumerate(allocated_lines):
+            estimate = estimates.get(line["workspace_product_id"])
+            if (
+                estimate is None
+                or estimate.unit_price_amount is None
+                or estimate.unit_price_currency != group_row["combined_total_currency"]
+                or estimate.source_landed_cost_id != line["source_landed_cost_id"]
+            ):
+                raise ConflictError(details={"reason": "split_stale"})
+            total += estimate.unit_price_amount * line["quantity"]
+            lines.append(
+                {
+                    "tenant_id": str(member.tenant_id),
+                    "purchase_request_id": str(request_id),
+                    "workspace_product_id": str(line["workspace_product_id"]),
+                    "quantity": str(line["quantity"]),
+                    "pack_base_quantity": str(line["pack_base_quantity"]),
+                    "position": position,
+                    "amount": str(estimate.unit_price_amount),
+                    "currency": estimate.unit_price_currency,
+                    "landed_cost_id": str(estimate.source_landed_cost_id)
+                    if estimate.source_landed_cost_id
+                    else None,
+                }
+            )
+        combined += total
+        requests.append(
+            {
+                "id": str(request_id),
+                "tenant_id": str(member.tenant_id),
+                "branch_id": str(group_row["branch_id"]),
+                "cost_centre_id": str(allocation["cost_centre_id"])
+                if allocation["cost_centre_id"]
+                else None,
+                "requested_by_membership_id": str(member.membership_id),
+                "required_by_date": str(allocation["required_by_date"]),
+                "source_rfq_response_id": str(allocation["response_id"]),
+                "request_group_id": str(group_row["id"]),
+                "estimated_total_amount": str(total),
+                "estimated_total_currency": group_row["combined_total_currency"],
+            }
+        )
+    # Never persist evidence that disagrees with the actual drafts (e.g. changed prices).
+    if combined != Decimal(str(group_row["combined_total_amount"])):
+        raise ConflictError(details={"reason": "split_stale"})
+    _insert_group_requests(conn, requests)
+    conn.execute(
+        """
+        insert into purchase_request_line
+          (tenant_id,purchase_request_id,workspace_product_id,quantity,position,
+           pack_base_quantity,estimated_unit_price_amount,estimated_unit_price_currency,
+           estimated_unit_price_source_landed_cost_id,estimated_at)
+        select tenant_id,purchase_request_id,workspace_product_id,quantity,position,
+               pack_base_quantity,amount,currency,landed_cost_id,now()
+        from jsonb_to_recordset(%s) as x(
+          tenant_id uuid,purchase_request_id uuid,workspace_product_id uuid,quantity numeric,
+          position integer,pack_base_quantity numeric,amount numeric,currency text,
+          landed_cost_id uuid)
+        """,
+        (Jsonb(lines),),
+    )
+    return request_ids
+
+
+def validate_group_destination(
+    conn: psycopg.Connection, member: CurrentMember, branch_id: UUID, cost_centre_id: UUID | None
+) -> None:
+    """Match request branch-write scope; destination identifiers are read under member RLS."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            select exists(select 1 from branch where id=%s) as branch_found,
+                   (%s::uuid is null or exists(select 1 from cost_centre where id=%s))
+                     as cost_centre_found,
+                   (current_membership_role()='owner'
+                    or not exists(select 1 from branch_role_assignment where membership_id=%s)
+                    or exists(select 1 from branch_role_assignment
+                              where membership_id=%s and branch_id=%s)) as branch_allowed
+            """,
+            (
+                branch_id,
+                cost_centre_id,
+                cost_centre_id,
+                member.membership_id,
+                member.membership_id,
+                branch_id,
+            ),
+        )
+        destination = cur.fetchone()
+    if not destination["branch_found"]:
+        raise NotFoundError(details={"resource": "branch"})
+    if not destination["cost_centre_found"]:
+        raise NotFoundError(details={"resource": "cost_centre"})
+    if not destination["branch_allowed"]:
+        raise PermissionDeniedError(details={"reason": "branch_not_assigned"})

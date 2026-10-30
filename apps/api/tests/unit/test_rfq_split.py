@@ -151,3 +151,48 @@ def test_two_replies_from_one_supplier_only(member: CurrentMember) -> None:
         "eligible": 1,
         "unmatched_quotation_ids": [],
     }
+
+
+@pytest.mark.parametrize(
+    "change", ["new_reply", "ineligible_reply", "new_cost", "missing_cost", "unchanged"]
+)
+def test_preparation_staleness(change: str) -> None:
+    from procurepilot_api.modules.offers.rfq_split import split_is_stale
+
+    quotations = [str(uuid4()), str(uuid4())]
+    costs = [str(uuid4()), str(uuid4())]
+    current_quotations = list(quotations)
+    current_costs = list(costs)
+    if change == "new_reply":
+        current_quotations.append(str(uuid4()))
+    elif change == "ineligible_reply":
+        current_quotations.pop()
+    elif change == "new_cost":
+        current_costs[0] = str(uuid4())
+    elif change == "missing_cost":
+        current_costs[0] = None
+    assert split_is_stale(quotations, costs, current_quotations, current_costs) == (
+        change != "unchanged"
+    )
+
+
+@pytest.mark.parametrize(
+    "base,expected",
+    [
+        ("250", 25),
+        ("250.00001", 25),
+        ("249.99999", 25),
+        ("250.000011", None),
+        ("249.999989", None),
+        ("255", None),
+    ],
+)
+def test_base_to_whole_packs_tolerance(base: str, expected: int | None) -> None:
+    from procurepilot_api.modules.offers.rfq_split import base_to_packs
+
+    if expected is None:
+        with pytest.raises(ConflictError) as caught:
+            base_to_packs(Decimal(base), Decimal(10))
+        assert caught.value.details["reason"] == "allocation_not_whole_packs"
+    else:
+        assert base_to_packs(Decimal(base), Decimal(10)) == Decimal(expected)

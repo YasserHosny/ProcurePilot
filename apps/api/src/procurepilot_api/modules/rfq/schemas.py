@@ -206,6 +206,8 @@ class RfqList(BaseModel):
 
 
 class RfqDetail(BaseModel):
+    converted_purchase_request_ids: list[UUID] = Field(default_factory=list)
+    request_group_id: UUID | None = None
     rfq: Rfq
     lines: list[RfqLine]
     recipients: list[RfqRecipient]
