@@ -132,6 +132,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-90 | PPS-121 | P-91 | PPS-122 | P-92 | PPS-123 |
 | P-93 | PPS-124 | P-94 | PPS-125 | P-95 | PPS-126 |
 | P-96 | PPS-127 | P-97 | PPS-128 | P-98 | PPS-129 |
+| P-99 | PPS-130 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -288,6 +289,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-96 | — | Basket Split from an RFQ and back (R16): start a split from RFQ Responses pre-filled; «Prepare requests» from the result (one draft per supplier, 024 request groups). Fold into the next 024 phase if already planned | — | — | To Do (PPS-127) |
 | [ ] P-97 | — | Record outcome (R17): no trailing zeros («675.000000», «1230.0000»); the «excl. tax» label follows the VAT basis decided in P-91 | — | — | To Do (PPS-128) |
 | [ ] P-98 | — | Savings baseline from a quoted price (R18): pack price × packs like the PO path, so 85 × 15 = 1,275.00 not 1,275.01 (`savings/baseline.py` ~159–162) | — | — | To Do (PPS-129) |
+| [ ] P-99 | — | Confirm & Authorize returns before preparing matching (follow-up to P-89 / R7): `POST /confirm` 6.0 s on hosted, ~4 s of it the synchronous `quotation_matches`; prepare it in the background (RQ) and keep a confirmed quote's matching prepared even if nobody opens it | — | — | To Do (PPS-130) |
 
 ### E — Pilot environment
 
