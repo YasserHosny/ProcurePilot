@@ -215,11 +215,11 @@ best single total of SAR 4,137 and a saving of SAR 74.
 
 ## Phase 7: Polish & cross-cutting
 
-- [ ] T033 [P] Write an e2e test in `apps/web/tests/e2e/rfq-split-requests.spec.ts`: RFQ Responses → Split → Prepare 2 requests → submit group → approve group, plus an Arabic RTL pass with zero axe violations. Prove it compiles with `npx playwright test --list`; the full run is in CI.
+- [x] T033 [P] Write an e2e test in `apps/web/tests/e2e/rfq-split-requests.spec.ts`: RFQ Responses → Split → Prepare 2 requests → submit group → approve group, plus an Arabic RTL pass with zero axe violations. Prove it compiles with `npx playwright test --list`; the full run is in CI. — Done: #352 merged green (2026-10-31).
 - [ ] T034 [P] Update `docs/architecture/data-dictionary.md` (purchase_request_group, request_group_id, basket_split_job.rfq_id) and `docs/architecture/api-specification.md` (new endpoints, `part_of_split`).
 - [ ] T035 Before the PR, run `debate-review --local` and fix the real findings. Write the PR body with `mattpocock-skills:pr`.
-- [ ] T036 After merge, run `pnpm db:migrate` on hosted and `pnpm db:check-privileges`, and confirm with `supabase migration list`. Deploy the API and optimiser, and confirm the optimiser image is new.
-- [ ] T037 Re-walk round 1 live on «مطاعم رواق»: split (SAR 4,063) → 2 requests → submit → approve as one (web, and mobile if built) → 2 POs, each naming its supplier. Save screenshots to the round-1 flow doc. Update Jira PPS-96 to Done with a Progress comment.
+- [x] T036 After merge, run `pnpm db:migrate` on hosted and `pnpm db:check-privileges`, and confirm with `supabase migration list`. Deploy the API and optimiser, and confirm the optimiser image is new. — Done 2026-10-31: migrations 20261029000000–090000 on hosted; the live split priced only from this RFQ's replies, so the optimiser image is #341's.
+- [x] T037 Re-walk round 1 live on «مطاعم رواق»: split (SAR 4,063) → 2 requests → submit → approve as one (web, and mobile if built) → 2 POs, each naming its supplier. Save screenshots to the round-1 flow doc. Update Jira PPS-96 to Done with a Progress comment. — Done 2026-10-31: SAR 4,063 (saves 74) → 2 requests → submitted and approved as one (web queue one row; approved on the phone after the PPS-137 fix) → PO-000010 الذهبي 2,773, PO-000011 الوفرة 1,290; [`docs/gtm/demo-tenant/round-1-rewalk-2026-10-30/`](../../docs/gtm/demo-tenant/round-1-rewalk-2026-10-30/README.md).
 
 ---
 
