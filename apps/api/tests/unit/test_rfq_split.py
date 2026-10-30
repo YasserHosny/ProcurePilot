@@ -119,3 +119,35 @@ def test_converted_rfq(member: CurrentMember) -> None:
     with pytest.raises(ConflictError) as caught:
         build_rfq_split_request(_connection([], status="converted"), member, uuid4())
     assert caught.value.details["reason"] == "rfq_already_converted"
+
+
+def test_two_reviewed_replies_from_same_supplier_plus_one_from_another(
+    member: CurrentMember,
+) -> None:
+    supplier1 = uuid4()
+    supplier2 = uuid4()
+    reply1a = _reply(supplier_id=supplier1)
+    reply1b = _reply(supplier_id=supplier1)
+    reply2 = _reply(supplier_id=supplier2)
+    payload, snapshot = build_rfq_split_request(
+        _connection([reply1a, reply1b, reply2]), member, uuid4()
+    )
+    assert payload.supplier_ids == [supplier1, supplier2]
+    assert snapshot["price_quotation_ids"] == [
+        str(reply1a["quotation_id"]),
+        str(reply1b["quotation_id"]),
+        str(reply2["quotation_id"]),
+    ]
+
+
+def test_two_replies_from_one_supplier_only(member: CurrentMember) -> None:
+    supplier = uuid4()
+    reply1 = _reply(supplier_id=supplier)
+    reply2 = _reply(supplier_id=supplier)
+    with pytest.raises(ConflictError) as caught:
+        build_rfq_split_request(_connection([reply1, reply2]), member, uuid4())
+    assert caught.value.details == {
+        "reason": "not_enough_replies",
+        "eligible": 1,
+        "unmatched_quotation_ids": [],
+    }

@@ -365,3 +365,101 @@ def test_split_waits_for_conversion_then_refuses(
         assert response.status_code == 409, response.text
         assert response.json()["details"]["reason"] == "rfq_already_converted"
         assert queue == []
+
+
+def test_archived_supplier_reply_is_left_out(
+    monkeypatch: pytest.MonkeyPatch,
+    queue: list[dict[str, object]],
+) -> None:
+    from procurepilot_optimiser_worker.repository import load_advanced_optimisation_input
+    from procurepilot_optimiser_worker.solver import solve_advanced_basket
+
+    with round1_rfq() as fixture:
+        _authenticate(monkeypatch, fixture)
+        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+            with conn.cursor() as cur:
+                archived_supplier_id = make_supplier(
+                    cur, fixture.workspace, name="Archived supplier"
+                )
+                cur.execute(
+                    "update supplier set status = 'archived' where id = %s",
+                    (archived_supplier_id,),
+                )
+                quotation_id = make_quotation(
+                    cur, fixture.workspace, supplier_id=archived_supplier_id, status="reviewed"
+                )
+                cur.execute("update quotation set currency = 'SAR' where id = %s", (quotation_id,))
+                for position, product_id in enumerate(fixture.product_ids, 1):
+                    line_id = uuid4()
+                    cur.execute(
+                        "insert into quotation_line "
+                        "(id,tenant_id,quotation_id,line_number,original_text,quantity,pack_count,unit_size,"
+                        "pack_unit,unit_price_amount,unit_price_currency) "
+                        "values (%s,%s,%s,%s,'Item',10,1,1,'kilogram',100,'SAR')",
+                        (line_id, fixture.workspace.tenant_id, quotation_id, position),
+                    )
+                    decision_id = uuid4()
+                    cur.execute(
+                        "insert into match_decision (id,tenant_id,quotation_line_id,"
+                        "matched_workspace_product_id,outcome,is_automatic,confidence) "
+                        "values (%s,%s,%s,%s,'no_match_new_product',true,1)",
+                        (decision_id, fixture.workspace.tenant_id, line_id, product_id),
+                    )
+                reset_role(cur)
+                recipient_id, response_id = uuid4(), uuid4()
+                cur.execute(
+                    "insert into rfq_recipient (id,tenant_id,rfq_id,supplier_id,status) "
+                    "values (%s,%s,%s,%s,'sent')",
+                    (
+                        recipient_id,
+                        fixture.workspace.tenant_id,
+                        fixture.rfq_id,
+                        archived_supplier_id,
+                    ),
+                )
+                cur.execute(
+                    "insert into rfq_response (id,tenant_id,rfq_recipient_id,quotation_id) "
+                    "values (%s,%s,%s,%s)",
+                    (response_id, fixture.workspace.tenant_id, recipient_id, quotation_id),
+                )
+            conn.commit()
+
+        # Third supplier's reply is reviewed, but supplier is archived -> left out, returns 202
+        response = _post(fixture)
+        assert response.status_code == 202, response.text
+        body = response.json()
+        assert set(body["supplier_ids"]) == set(map(str, fixture.supplier_ids))
+        assert len(queue) == 1
+
+        # The round-1 split must still give SAR 4,063.00 / 4,137.00 / 74.00
+        job_id = UUID(body["id"])
+        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+            data = load_advanced_optimisation_input(
+                conn, job_id=job_id, tenant_id=fixture.workspace.tenant_id
+            )
+            result = solve_advanced_basket(input_payload=data)
+            assert result.feasible
+            assert result.total_landed_cost.currency == "SAR"
+            assert Decimal(result.total_landed_cost.amount) == Decimal("4063.00")
+            baselines = [
+                Decimal(b.total_landed_cost.amount)
+                for b in result.single_supplier_baselines
+                if b.feasible
+            ]
+            assert sorted(baselines) == [Decimal("4137.00"), Decimal("4147.00")]
+            assert min(baselines) - Decimal(result.total_landed_cost.amount) == Decimal("74.00")
+
+        # With only one remaining active supplier -> 409 not_enough_replies
+        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+            conn.execute(
+                "update supplier set status = 'archived' where id = %s",
+                (fixture.supplier_ids[0],),
+            )
+            conn.commit()
+        response_one = _post(fixture)
+        assert response_one.status_code == 409, response_one.text
+        assert response_one.json()["details"] == {
+            "reason": "not_enough_replies",
+            "eligible": 1,
+            "unmatched_quotation_ids": [],
+        }

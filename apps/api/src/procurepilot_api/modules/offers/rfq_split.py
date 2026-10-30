@@ -43,10 +43,11 @@ def build_rfq_split_request(
                      || array[q.currency] as currencies
             from rfq_response r
             join rfq_recipient rec on rec.id = r.rfq_recipient_id
+            join supplier s on s.id = rec.supplier_id and s.tenant_id = r.tenant_id
             join quotation q on q.id = r.quotation_id
             left join quotation_line ql on ql.quotation_id = q.id
             left join current_match_decision md on md.quotation_line_id = ql.id
-            where rec.rfq_id = %s and r.tenant_id = %s
+            where rec.rfq_id = %s and r.tenant_id = %s and s.status in ('active', 'preferred')
             group by r.id, q.id, rec.supplier_id
             order by r.created_at, r.id
             """,
@@ -59,13 +60,17 @@ def build_rfq_split_request(
             if reply["status"] not in ("refused", "deleted") and reply["deleted_at"] is None
         ]
         unmatched = [str(reply["quotation_id"]) for reply in active if reply["unmatched_count"]]
-        eligible = [
+        eligible_replies = [
             reply
             for reply in active
             if reply["status"] == "reviewed"
             and reply["line_count"]
             and not reply["unmatched_count"]
         ]
+        eligible_by_supplier: dict[UUID, dict[str, object]] = {}
+        for reply in eligible_replies:
+            eligible_by_supplier[reply["supplier_id"]] = reply
+        eligible = list(eligible_by_supplier.values())
         if len(eligible) < 2:
             raise ConflictError(
                 details={
@@ -74,7 +79,7 @@ def build_rfq_split_request(
                     "unmatched_quotation_ids": unmatched,
                 }
             )
-        currencies = {currency for reply in eligible for currency in reply["currencies"]}
+        currencies = {currency for reply in eligible_replies for currency in reply["currencies"]}
         if len(currencies) != 1 or None in currencies:
             raise ConflictError(details={"reason": "mixed_currency"})
         cur.execute(
@@ -109,7 +114,7 @@ def build_rfq_split_request(
     )
     return payload, {
         "rfq_id": str(rfq_id),
-        "price_quotation_ids": [str(reply["quotation_id"]) for reply in eligible],
+        "price_quotation_ids": [str(reply["quotation_id"]) for reply in eligible_replies],
         "rfq_response_ids": [str(reply["response_id"]) for reply in eligible],
         "pack_base_quantities": {
             str(line["workspace_product_id"]): str(line["base_quantity"]) for line in lines
