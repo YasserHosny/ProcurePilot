@@ -25,10 +25,10 @@ Two calls, not one. **Discovery first, demo second.** If the buyer insists on se
 
 ### 1. Open (2 min)
 **AR**
-> شكرًا إنك اديتني الوقت ده. أنا مش هعرض حاجة النهارده، عايز أفهم إنتو بتشتروا إزاي. حوالي ٢٠ دقيقة، وفي الآخر لو شايفين إن في حاجة تستاهل، أوريكم ١٥ دقيقة في مكالمة تانية. ينفع؟
+> شكرًا إنك اديتني الوقت ده. أنا مش هعرض حاجة النهارده، عايز أفهم إنتو بتشتروا إزاي. حوالي ٢٠ دقيقة، وفي الآخر لو شايفين إن في حاجة تستاهل، أوريكم ٣٠ دقيقة في مكالمة تانية. ينفع؟
 
 **EN**
-> Thanks for the time. I won't show you anything today; I want to understand how you buy. About 20 minutes, and at the end, if there's something worth it, I'll show you 15 minutes on a second call. OK?
+> Thanks for the time. I won't show you anything today; I want to understand how you buy. About 20 minutes, and at the end, if there's something worth it, I'll show you in 30 minutes on a second call. OK?
 
 ### 2. How they buy today (8 min)
 Ask, then stay quiet. Follow up on anything with a number in it.
@@ -53,8 +53,8 @@ Then quantify, in their words, not yours:
 
 ### 5. Close (2 min)
 **If there's pain:**
-> «اللي سمعته: [ملخص بكلامهم]. عندي ١٥ دقيقة أوريكم ده على مثال لمطعم زيكم، يوم [يوم] الساعة [ساعة]؟ ولو ينفع، [اسم المسؤول عن الشراء] يحضر.»
-> "What I heard: [summary in their words]. Can I show you this on a restaurant example like yours, [day] at [time]? If possible, bring [buyer's name]."
+> «اللي سمعته: [ملخص بكلامهم]. ممكن ٣٠ دقيقة أوريكم ده على مثال لمطعم زيكم، يوم [يوم] الساعة [ساعة]؟ ولو ينفع، [اسم المسؤول عن الشراء] يحضر.»
+> "What I heard: [summary in their words]. Can I take 30 minutes to show you this on a restaurant example like yours, [day] at [time]? If possible, bring [buyer's name]."
 
 **If there's no pain:** thank them, ask «تعرف حد عنده المشكلة دي؟» / "Do you know someone who has this problem?", and move the Lead to **Not now** with the reason.
 
@@ -126,4 +126,4 @@ If they ask the price after the trial (Egypt only; **KSA has no price yet**, say
 1. SP Lead: stage, a comment with the buyer's exact words on pain, objections and next step, and the due date.
 2. A new objection that isn't on a battlecard → add it to the card's table with "(heard once, [date])".
 3. A product gap that would block a pilot → a PPS task labelled `from-demo`.
-4. A call that went well or badly → one line in `docs/gtm/research/` notes (local only, PPS-116).
+4. Every call: finish `docs/gtm/research/calls/YYYY-MM-DD-<company-slug>.md` from the [template](../research/call-notes-template.md) within 24 hours (local only, gitignored; PPS-116).

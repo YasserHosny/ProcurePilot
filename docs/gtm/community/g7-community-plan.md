@@ -22,17 +22,17 @@ Not "a vendor". **An Egyptian founder building software for restaurant groups, w
 
 ## Track 1 — Personal network audit (week 1, highest yield)
 
-Go through your phone contacts, WhatsApp groups, LinkedIn connections, university, Iron Systems clients and family. Fill this table locally in `docs/gtm/prospects/` (it holds named people, and the repo is public):
+Go through your phone contacts, WhatsApp groups, LinkedIn connections, university, Iron Systems clients and family. Fill this table locally in `docs/gtm/prospects/` (it holds named people and companies, and the repo is public; that folder is gitignored):
 
 | Person | How you know them | Works in or knows F&B? | Which Wave 1 account could they reach? | The ask | Status |
 |---|---|---|---|---|---|
-| | | Owner / ops / chef / supplier / investor / none | Tante, Sky, Bascota, Zooba, Raya… or "any restaurant group" | Intro / 10-min reaction / nothing yet | |
+| | | Owner / ops / chef / supplier / investor / none | A named Wave 1 account (see the local list) or "any restaurant group" | Intro / 10-min reaction / nothing yet | |
 
 **Who to look for first:**
 1. Anyone who **owns or runs** a restaurant, café, bakery or cloud kitchen with 2+ branches.
 2. **Suppliers** to restaurants (food distributors, packaging, cleaning). They know every buyer in their area.
 3. **Chefs and F&B consultants.** They move between groups and know who handles purchasing.
-4. **Investors and accountants** who work with F&B groups (Zooba is investor-backed).
+4. **Investors and accountants** who work with F&B groups (several Wave 1 accounts are investor-backed).
 
 **The ask** (DM script §2 covers the wording). Ask for one of two things only:
 - «تعرف حد بيدير مشتريات لسلسلة مطاعم؟ عايز ١٠ دقايق أفهم منه بيشتغلوا إزاي، مش ببيع حاجة.» / "Do you know someone who runs purchasing for a restaurant group? I'd like 10 minutes to understand how they work. I'm not selling anything."

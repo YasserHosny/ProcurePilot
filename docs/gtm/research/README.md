@@ -8,7 +8,7 @@ The ICP and pain list in [`first-customer-gtm-plan.md`](../first-customer-gtm-pl
 |---|---|---|
 | `README.md` (this file) | The method | Yes |
 | [`call-notes-template.md`](call-notes-template.md) | One copy per call | Yes (the blank template) |
-| `calls/YYYY-MM-DD-<company-slug>.md` | Filled-in notes | **No.** Local only: `calls/` is in `.git/info/exclude` (named people; the repo is public), like `prospects/` |
+| `calls/YYYY-MM-DD-<company-slug>.md` | Filled-in notes | **No.** Local only: `calls/` is in the root `.gitignore` (named people; the repo is public), like `prospects/` |
 | `synthesis-YYYY-MM-DD.md` | Themes after 5+ calls, nobody named | Yes, once it exists (phase 2) |
 
 ## Phase 1 — capture every call the same way (now)
