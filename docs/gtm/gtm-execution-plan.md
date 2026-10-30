@@ -133,6 +133,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-93 | PPS-124 | P-94 | PPS-125 | P-95 | PPS-126 |
 | P-96 | PPS-127 | P-97 | PPS-128 | P-98 | PPS-129 |
 | P-99 | PPS-130 | P-100 | PPS-131 | P-101 | PPS-132 |
+| P-105 | PPS-136 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -292,6 +293,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-99 | — | Confirm & Authorize returns before preparing matching (follow-up to P-89 / R7): `POST /confirm` 6.0 s on hosted, ~4 s of it the synchronous `quotation_matches`; prepare it in the background (RQ) and keep a confirmed quote's matching prepared even if nobody opens it | — | — | To Do (PPS-130) |
 | [x] P-100 | — | «Docs screenshots drift» failed on every web PR since #344: the capture submitted an empty Basket Split form. It now fills row 1 first; screenshots 11 and 11b re-rendered | Orch (Agy) | — | Done (PPS-131), #353 merged with the drift job green |
 | [x] P-101 | — | The Purchase Requests list showed the «Create order» cart icon on fully ordered and withdrawn requests (PPS-119 follow-up): `GET /requests` carries `has_quantity_to_order`, and the icon shows only while something is left to order | Orch (Codex API, Agy web, Claude in Chrome) | — | Done (PPS-132), #357; checked live 2026-10-30, `fixes-pps-118-119/` 10 |
+| [ ] P-105 | — | «End-to-end» passed when the `changes` path filter failed: `e2e-shard` was skipped on the failed dependency and a skip counted as a pass, so no end-to-end test ran. The gate now fails unless `changes` succeeded, and accepts a skipped matrix only when there is no code change | Orch (Claude) | — | In Review (PPS-136) |
 
 ### E — Pilot environment
 
