@@ -157,4 +157,179 @@ describe('MatchResolutionCandidatesComponent', () => {
     expect(badge.classList.contains('low')).toBeFalse();
     expect(badge.classList.contains('rfq-info')).toBeTrue();
   });
+
+  it('renders only the signals present in measured map (measured subset only)', () => {
+    component.candidates = [
+      {
+        ...baseCandidate,
+        reasons: {
+          ...baseCandidate.reasons,
+          measured: {
+            lexical_similarity: '0.8200',
+            variant_match: '1.0000',
+            pack_unit_match: '1.0000',
+          },
+        },
+      },
+    ];
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Name 82 % similar');
+    expect(text).toContain('Variant Match');
+    expect(text).toContain('Pack matches');
+    expect(text).not.toContain('Brand Match');
+    expect(text).not.toContain('Pack Size Plausibility');
+    expect(text).not.toContain('Price Plausibility');
+    expect(text).not.toContain('Semantic Similarity');
+  });
+
+  it('shows lexical only and no feature bars for legacy candidate without measured', () => {
+    component.candidates = [
+      {
+        ...baseCandidate,
+        embedding_model: 'stub-hash-v1',
+        reasons: {
+          alias_hit: false,
+          gtin_match: false,
+          supplier_code_match: false,
+          lexical_similarity: '0.7000',
+          semantic_similarity: '0.6000',
+          feature_score: {
+            brand_match: '0.5000',
+            variant_match: '0.5000',
+            pack_unit_match: '0.5000',
+            pack_size_plausibility: '0.5000',
+            price_plausibility: '0.5000',
+          },
+        },
+      },
+    ];
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Name 70 % similar');
+    expect(text).not.toContain('Semantic Similarity');
+    expect(text).not.toContain('Brand Match');
+    expect(text).not.toContain('Variant Match');
+    expect(text).not.toContain('Pack Unit Match');
+    expect(text).not.toContain('Pack Size Plausibility');
+    expect(text).not.toContain('Price Plausibility');
+    expect(text).not.toContain('50%');
+  });
+
+  it('shows the deterministic hit line and no measured signals for deterministic hits', () => {
+    component.candidates = [
+      {
+        ...baseCandidate,
+        reasons: {
+          alias_hit: true,
+          gtin_match: false,
+          supplier_code_match: false,
+          measured: {},
+        },
+      },
+    ];
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Same wording as confirmed before');
+    expect(text).not.toContain('similar');
+    expect(text).not.toContain('Brand Match');
+
+    component.candidates = [
+      {
+        ...baseCandidate,
+        reasons: {
+          alias_hit: false,
+          gtin_match: true,
+          supplier_code_match: false,
+          measured: {},
+        },
+      },
+    ];
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Barcode matches');
+
+    component.candidates = [
+      {
+        ...baseCandidate,
+        reasons: {
+          alias_hit: false,
+          gtin_match: false,
+          supplier_code_match: true,
+          measured: {},
+        },
+      },
+    ];
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Supplier code matches');
+  });
+
+  it('shows RFQ lead line above measured signals and does not style as low confidence red', () => {
+    component.candidates = [
+      {
+        ...baseCandidate,
+        confidence: '0.3400',
+        reasons: {
+          alias_hit: false,
+          gtin_match: false,
+          supplier_code_match: false,
+          rfq: {
+            rfq_id: 'rfq-1',
+            rfq_line_id: 'rfq-line-2',
+            position: 2,
+            pack_check: 'equal',
+            fitting_rfq_line_ids: ['rfq-line-2'],
+          },
+          measured: {
+            lexical_similarity: '0.3400',
+            pack_unit_match: '1.0000',
+          },
+        },
+      },
+    ];
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Your RFQ line 2');
+    expect(text).toContain('Name 34 % similar');
+    expect(text).toContain('Pack matches');
+
+    const badge = fixture.nativeElement.querySelector('.cand-confidence-badge') as HTMLElement;
+    expect(badge.classList.contains('low')).toBeFalse();
+    expect(badge.classList.contains('rfq-info')).toBeTrue();
+  });
+
+  it('never displays "Not available" text anywhere in the component', () => {
+    component.candidates = [
+      {
+        ...baseCandidate,
+        embedding_model: 'stub-hash-v1',
+        reasons: {
+          alias_hit: false,
+          gtin_match: false,
+          supplier_code_match: false,
+          lexical_similarity: '0.7000',
+          semantic_similarity: '0.6000',
+        },
+      },
+      {
+        ...baseCandidate,
+        id: 'cand-2',
+        reasons: {
+          alias_hit: false,
+          gtin_match: false,
+          supplier_code_match: false,
+          measured: {
+            lexical_similarity: '0.8000',
+          },
+        },
+      },
+    ];
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).not.toContain('Not available');
+  });
 });

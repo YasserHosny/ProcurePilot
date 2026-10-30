@@ -73,7 +73,7 @@ def build_similarity_candidates(
             SimilarityCandidate(
                 workspace_product_id=UUID(str(row["workspace_product_id"])),
                 confidence=score_candidate(inputs, embedding_model=embedding_provider.model),
-                reasons=reason_payload(inputs=inputs),
+                reasons=reason_payload(inputs=inputs, embedding_model=embedding_provider.model),
             )
         )
     return sorted(candidates, key=lambda candidate: candidate.confidence, reverse=True)[:limit]

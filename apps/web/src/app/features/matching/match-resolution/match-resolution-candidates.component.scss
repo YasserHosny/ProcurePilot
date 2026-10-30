@@ -1,7 +1,7 @@
 @use '../../../../styles/breakpoints' as bp;
 
 .section-header {
-  margin-bottom: 1rem;
+  margin-block-end: 1rem;
   .section-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 0.25rem; }
   .section-desc { font-size: 0.875rem; color: var(--pp-text-muted); margin: 0; }
 }
@@ -146,11 +146,6 @@ kbd {
       height: 14px;
     }
 
-    &.hit {
-      background: var(--pp-info-container);
-      color: var(--pp-info);
-    }
-
     &.rfq-badge {
       background: var(--pp-info-container);
       color: var(--pp-info);
@@ -177,42 +172,59 @@ kbd {
   }
 }
 
-.similarity-meters {
+.deterministic-line {
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  background: var(--pp-surface-page);
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  .sim-score { font-weight: 700; color: var(--pp-text-strong); }
+  align-items: center;
+  gap: 0.4rem;
+  padding-block: 0.35rem;
+  padding-inline: 0.6rem;
+  background: var(--pp-info-container);
+  color: var(--pp-info);
+  border-radius: var(--pp-radius-chip, 4px);
+  font-size: 0.8125rem;
+  font-weight: 600;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
 }
 
-.sim-row {
+.measured-signals {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: var(--pp-surface-page);
+  padding-block: 0.5rem;
+  padding-inline: 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.measured-signal-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
 
-.feature-scores-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-  gap: 0.25rem;
-  font-size: 0.75rem;
+  .sig-sentence,
+  .sig-text {
+    font-weight: 600;
+    color: var(--pp-text-strong);
+  }
 
-  .feat-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: var(--pp-surface-sunken);
-    padding: 0.2rem 0.35rem;
-    border-radius: 3px;
-    .feat-val { font-weight: 600; color: var(--pp-text); }
+  .sig-label {
+    color: var(--pp-text);
+  }
+
+  .sig-score {
+    font-weight: 700;
+    color: var(--pp-text-strong);
   }
 }
 
 .cand-select-footer {
-  margin-top: auto;
+  margin-block-start: auto;
 
   .cand-select-indicator {
     display: flex;

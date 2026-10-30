@@ -63,8 +63,25 @@ def reason_payload(
     gtin_match: bool = False,
     supplier_code_match: bool = False,
     inputs: ScoreInputs,
+    embedding_model: str = STUB_EMBEDDING_MODEL,
 ) -> dict[str, object]:
+    measured: dict[str, str] = {}
+    # Deterministic hits use fixed scoring inputs, not measured similarities/features.
+    if not (alias_hit or gtin_match or supplier_code_match):
+        measured["lexical_similarity"] = decimal_string(inputs.lexical_similarity)
+        if embedding_model != STUB_EMBEDDING_MODEL:
+            measured["semantic_similarity"] = decimal_string(inputs.semantic_similarity)
+        for name, value in (
+            ("brand_match", inputs.brand_match),
+            ("variant_match", inputs.variant_match),
+            ("pack_unit_match", inputs.pack_unit_match),
+            ("pack_size_plausibility", inputs.pack_size_plausibility),
+            ("price_plausibility", inputs.price_plausibility),
+        ):
+            if value is not None:
+                measured[name] = decimal_string(_optional(value))
     return {
+        "measured": measured,
         "alias_hit": alias_hit,
         "gtin_match": gtin_match,
         "supplier_code_match": supplier_code_match,
