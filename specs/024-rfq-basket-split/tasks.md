@@ -112,7 +112,7 @@ best single total of SAR 4,137 and a saving of SAR 74.
 
 ### Tests (red first)
 
-- [ ] T017 [P] [US2] Integration tests in `apps/api/tests/integration/test_rfq_split_prepare.py` (T001 data):
+- [x] T017 [P] [US2] Integration tests in `apps/api/tests/integration/test_rfq_split_prepare.py` (T001 data):
   - prepare creates 2 drafts: الذهبي rice and flour SAR 2,773, الوفرة oil and sugar SAR 1,290;
   - unit prices equal `estimate_from_source_response` for each reply;
   - `source_rfq_response_id` is set, `request_group_id` is set, and the group stores combined 4,063, best single 4,137 and saving 74;
@@ -123,14 +123,17 @@ best single total of SAR 4,137 and a saving of SAR 74.
   - a new reply or a re-reviewed reply after the split gives 409 `split_stale`;
   - a non-whole pack allocation gives 409 `allocation_not_whole_packs`;
   - an expired reply not confirmed gives 409 `expired_quotation_unconfirmed`.
-- [ ] T018 [P] [US2] Unit tests in `apps/api/tests/unit/test_rfq_split.py` for staleness detection (research R6) and base→pack conversion with the 1e-6 whole-pack tolerance.
+  - compatibility with current main: active-supplier eligibility, provenance when a supplier replies
+    twice, and prepare → `submit_group` succeeds for both one- and two-supplier allocations with
+    matching branches and combined totals.
+- [x] T018 [P] [US2] Unit tests in `apps/api/tests/unit/test_rfq_split.py` for staleness detection (research R6) and base→pack conversion with the 1e-6 whole-pack tolerance.
 
 ### Implementation
 
-- [ ] T019 [US2] Add `create_requests_for_group(conn, member, group_row, allocations)` to `modules/requests/service.py`.
+- [x] T019 [US2] Add `create_requests_for_group(conn, member, group_row, allocations)` to `modules/requests/service.py`.
   - It inserts one draft `purchase_request` per supplier (branch, required-by, cost centre, `source_rfq_response_id`, `request_group_id`), then its lines with `position` (PPS-99), priced with `requests/valuation.estimate_from_source_response`.
   - Use batched inserts (memory: hosted latency is round trips).
-- [ ] T020 [US2] Add `prepare_requests_from_split(member, basket_id, payload, idempotency_key)` to `modules/offers/rfq_split.py`. In one transaction:
+- [x] T020 [US2] Add `prepare_requests_from_split(member, basket_id, payload, idempotency_key)` to `modules/offers/rfq_split.py`. In one transaction:
   1. return the existing group on an idempotency replay;
   2. `rfq.lock_and_convert` lock and status check;
   3. job completed and `rfq_id` set;
@@ -143,7 +146,7 @@ best single total of SAR 4,137 and a saving of SAR 74.
   10. audit `requests.group_prepared`.
 
   T017 and T018 green.
-- [ ] T021 [US2] Add the route `POST /baskets/{basket_id}/prepare-requests` (owner/buyer, Idempotency-Key; 201, or 200 on replay; 409 reasons per the contract) in `modules/offers/router.py`.
+- [x] T021 [US2] Add the route `POST /baskets/{basket_id}/prepare-requests` (owner/buyer, Idempotency-Key; 201, or 200 on replay; 409 reasons per the contract) in `modules/offers/router.py`.
 - [ ] T022 [P] [US2] Web, delegated to Agy: "Prepare N requests" on the RFQ-mode result in `apps/web/src/app/features/offers/basket-split/basket-split-results.component.{ts,html,spec.ts}`.
   - A dialog asks for branch (remembered as on RFQ Responses), required-by (defaults to the RFQ's needed-by) and cost centre. It lists expired replies with a confirm checkbox.
   - The `split_stale` reason shows a "Rerun split" action.

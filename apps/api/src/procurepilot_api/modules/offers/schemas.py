@@ -675,3 +675,15 @@ class NegotiationBriefList(StrictApiModel):
 
 class NegotiationBriefDismissRequest(StrictApiModel):
     reason: StrictStr = Field(min_length=1, max_length=1000)
+
+
+class SplitPrepareRequest(StrictApiModel):
+    branch_id: UUID
+    required_by_date: date
+    cost_centre_id: UUID | None = None
+    confirm_expired_quotation_ids: list[UUID] = Field(default_factory=list)
+
+
+class SplitPrepareResponse(StrictApiModel):
+    request_group_id: UUID
+    purchase_request_ids: list[UUID]

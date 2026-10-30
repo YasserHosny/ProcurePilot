@@ -274,7 +274,21 @@ class RfqService:
                     (rfq_id,),
                 )
                 recipients = [RfqRecipient(**item) for item in cur.fetchall()]
-                return RfqDetail(rfq=Rfq(**row), lines=lines, recipients=recipients)
+                cur.execute(
+                    """select coalesce(array_agg(pr.id order by pr.created_at,pr.id), '{}')
+                              as converted_purchase_request_ids,
+                              (select g.id from purchase_request_group g where g.rfq_id=%s)
+                              as request_group_id
+                       from purchase_request pr
+                       join rfq_response resp on resp.id=pr.source_rfq_response_id
+                       join rfq_recipient rec on rec.id=resp.rfq_recipient_id
+                       where rec.rfq_id=%s""",
+                    (rfq_id, rfq_id),
+                )
+                conversion = cur.fetchone()
+                if row["status"] != "converted":
+                    conversion = {"converted_purchase_request_ids": [], "request_group_id": None}
+                return RfqDetail(rfq=Rfq(**row), lines=lines, recipients=recipients, **conversion)
 
     def update_draft(
         self,

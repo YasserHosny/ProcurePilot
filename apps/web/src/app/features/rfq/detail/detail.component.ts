@@ -147,6 +147,28 @@ export class DetailComponent implements OnInit {
     return this.translate.instant('rfq.detail.responsesReceivedTitle', { count: formatted });
   }
 
+  convertedRequestIds(): string[] {
+    return this.rfqDetail()?.converted_purchase_request_ids ?? [];
+  }
+
+  requestGroupId(): string | null {
+    return this.rfqDetail()?.request_group_id ?? null;
+  }
+
+  convertedRequestsTitle(): string {
+    const count = this.convertedRequestIds().length;
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    const key = `rfq.detail.convertedCount.${category}`;
+    const formatted = this.formatService.formatNumber(count);
+    return this.translate.instant(key, { count: formatted });
+  }
+
+  shortId(id: string): string {
+    if (!id) return '';
+    return id.length > 8 ? id.slice(0, 8) : id;
+  }
+
   onCompareResponses(): void {
     this.onTabChange(TAB_MAP['responses']);
   }
