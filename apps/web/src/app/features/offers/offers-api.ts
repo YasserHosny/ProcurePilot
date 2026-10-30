@@ -29,6 +29,8 @@ import type {
   RecommendationWeights,
   RiskTolerance,
   SingleSupplierBaseline,
+  SplitPrepareRequest,
+  SplitPrepareResponse,
   StockSignal,
   SupplierAllocation,
   UrgencyLevel,
@@ -60,6 +62,8 @@ export type {
   AllocatedBasketLine,
   SupplierAllocation,
   SingleSupplierBaseline,
+  SplitPrepareRequest,
+  SplitPrepareResponse,
   InfeasibleBasketItem,
   BasketSplitResult,
   BasketSplitJobStatus,
@@ -110,5 +114,13 @@ export class OffersApiService {
 
   getBasketSplitJob(id: string): Observable<BasketSplitJob> {
     return this.api.getBasketSplitJob(id);
+  }
+
+  prepareRequests(
+    basketId: string,
+    body: SplitPrepareRequest,
+    idempotencyKey?: string,
+  ): Observable<SplitPrepareResponse> {
+    return this.api.prepareSplitRequests(basketId, body, idempotencyKey);
   }
 }
