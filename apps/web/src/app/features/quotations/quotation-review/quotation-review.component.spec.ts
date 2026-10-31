@@ -775,6 +775,34 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.inferredVatPct()).toBeNull();
   });
 
+  it('shows the stored VAT basis after a second change, not the first correction (ADR-021)', () => {
+    // The header field keeps its first correction (true / 15%); the quote now says false / 5%.
+    const corrected = (field: string, value: unknown) => ({
+      ...mockQuotationDetail.field_extractions[0],
+      id: `fe-${field}`,
+      field_name: field,
+      extracted_value: field === 'vat_rate' ? '0.10' : false,
+      confidence: '0.8000',
+      corrected_value: value,
+      corrected_by: 'member-1',
+    });
+    const q: QuotationDetail = {
+      ...mockQuotationDetail,
+      prices_include_vat: false,
+      vat_rate: '0.0500',
+      field_extractions: [
+        ...mockQuotationDetail.field_extractions,
+        corrected('prices_include_vat', true),
+        corrected('vat_rate', '0.15'),
+      ],
+    };
+    component.quotation.set(q);
+    fixture.detectChanges();
+
+    expect(component.effectivePricesIncludeVat(q)).toBeFalse();
+    expect(component.effectiveVatRate(q)).toBe('0.0500');
+  });
+
   it('still adds VAT on top when the same lines are VAT-exclusive', () => {
     const exclusive: QuotationDetail = {
       ...mockQuotationDetail,

@@ -127,6 +127,8 @@
   PO-000007: line tax 79.3045, order total 608.0000 unchanged
   PO-000008: line tax 79.3045, order total 608.0000 unchanged
   PO-000009: line tax 93.9135, order total 720.0000 unchanged
+  NOT CORRECTED (outside the approved list): PO-000010 (draft), total 2773.0000
+  NOT CORRECTED (outside the approved list): PO-000011 (draft), total 1290.0000
 {
   "quotes_corrected": 23,
   "quotes_skipped_not_gross": 0,
@@ -143,6 +145,10 @@
     "PO-000007",
     "PO-000008",
     "PO-000009"
+  ],
+  "purchase_orders_outside_approval": [
+    "PO-000010",
+    "PO-000011"
   ]
 }
 DRY RUN: rolled back, nothing written.

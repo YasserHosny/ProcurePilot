@@ -1253,6 +1253,15 @@ def _mark_extraction_enqueue_failed(
 def _document_vat_rate(
     fields: list[dict[str, object]], lines: list[dict[str, object]]
 ) -> str | None:
+    # The lines hold the reviewer's latest rate; the header field keeps only its first
+    # correction, so it decides only when the priced lines do not share one rate.
+    rates = {
+        decimal_string(line.get("vat_rate"), scale=4)
+        for line in lines
+        if line.get("unit_price_amount") is not None
+    }
+    if len(rates) == 1 and None not in rates:
+        return rates.pop()
     for field in fields:
         if field.get("entity_type") == "quotation" and field.get("field_name") == "vat_rate":
             value = (
@@ -1261,9 +1270,4 @@ def _document_vat_rate(
                 else field.get("extracted_value")
             )
             return decimal_string(value, scale=4)
-    rates = {
-        decimal_string(line.get("vat_rate"), scale=4)
-        for line in lines
-        if line.get("unit_price_amount") is not None
-    }
-    return rates.pop() if len(rates) == 1 else None
+    return None

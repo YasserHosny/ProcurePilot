@@ -729,13 +729,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       if (this.pendingCorrections().has(fe.id)) {
         return Boolean(this.pendingCorrections().get(fe.id));
       }
-      if (fe.corrected_value !== null && fe.corrected_value !== undefined) {
-        return Boolean(fe.corrected_value);
-      }
-      if (fe.extracted_value !== null && fe.extracted_value !== undefined) {
-        return Boolean(fe.extracted_value);
-      }
     }
+    // The quote holds the latest saved basis; a header field keeps only its first correction.
     return Boolean(q.prices_include_vat);
   }
 
@@ -749,12 +744,6 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       if (this.pendingCorrections().has(fe.id)) {
         const val = this.pendingCorrections().get(fe.id);
         return val !== null && val !== undefined ? String(val) : null;
-      }
-      if (fe.corrected_value !== null && fe.corrected_value !== undefined) {
-        return String(fe.corrected_value);
-      }
-      if (fe.extracted_value !== null && fe.extracted_value !== undefined) {
-        return String(fe.extracted_value);
       }
     }
     return q.vat_rate ?? null;

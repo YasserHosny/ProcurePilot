@@ -17,8 +17,11 @@ This script brings them onto the ADR-021 basis without changing any printed or t
 2. For each corrected line's current match decision whose latest landed cost is v1, a landed-cost
    v2 row is APPENDED (landed_cost is append-only), recomputed by the application's own rule from
    the v1 row's stored inputs: same total, VAT now derived. valid_from/valid_to are copied (same
-   offer, same validity); recorded_at is now.
-3. Every SAR purchase-order line in the workspace with tax 0 is corrected. PO-000001…000005 came
+   offer, same validity). recorded_at is the v1 row's plus one microsecond: the v2 row becomes the
+   decision's current cost (current_landed_cost) while every reader that orders offers by
+   recorded_at keeps the order of the quotes. now() would give all 70 rows one timestamp.
+3. Every SAR line with tax 0 on the owner-approved orders (APPROVED_ORDERS) is corrected; other
+   orders are listed as not corrected. PO-000001…000005 came
    from requests prepared from the quotes above; PO-000006…000009 from requests with no quote link,
    at prices taken from those same quotes. This is safe only because every quote in the workspace
    is VAT-inclusive, so the script stops if step 1 skipped any quote. Unit price becomes net
@@ -45,6 +48,7 @@ import argparse
 import json
 import os
 import sys
+from datetime import timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -65,6 +69,9 @@ RAWAQ_TENANT_ID = UUID("938537ad-846d-4cde-b0d3-1ecda1b38a50")  # «مطاعم �
 SANAD_TENANT_ID = UUID("61590605-752c-4263-b3a3-97dd89a43232")  # «مطاعم سند»: never touched
 VAT_RATE = Decimal("0.15")
 TOLERANCE = Decimal("0.01")
+# The orders the owner approved on 2026-10-31. Orders created since are reported, not corrected,
+# until the owner widens this list.
+APPROVED_ORDERS = [f"PO-{n:06d}" for n in range(1, 10)]
 
 QUOTES_SQL = """
 select q.id, q.stated_total_amount, s.name as supplier,
@@ -98,10 +105,21 @@ select po.id as po_id, po.order_number, po.status, po.total_amount as po_total,
 from purchase_order po
 join purchase_order_line pol on pol.purchase_order_id = po.id and pol.tenant_id = po.tenant_id
 where po.tenant_id = %(tenant)s
+  and po.order_number = any(%(orders)s)
   and po.total_currency = 'SAR'
   and pol.unit_price_currency = 'SAR'
   and pol.tax_amount = 0
 order by po.order_number, pol.line_number
+"""
+
+OUT_OF_SCOPE_SQL = """
+select po.order_number, po.status, po.total_amount
+from purchase_order po
+where po.tenant_id = %(tenant)s and po.total_currency = 'SAR'
+  and not (po.order_number = any(%(orders)s))
+  and exists (select 1 from purchase_order_line pol
+              where pol.purchase_order_id = po.id and pol.tax_amount = 0)
+order by po.order_number
 """
 
 
@@ -194,8 +212,8 @@ def correct(conn: psycopg.Connection, tenant: UUID) -> dict[str, object]:
               base_unit, unit_price_amount, unit_price_currency, vat_amount, vat_currency,
               delivery_fee_amount, delivery_fee_currency, discount_amount, discount_currency,
               other_charges_amount, other_charges_currency, total_amount, total_currency,
-              raw_inputs, rule_version, valid_from, valid_to
-            ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+              raw_inputs, rule_version, valid_from, valid_to, recorded_at
+            ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
             (
                 tenant,
@@ -220,6 +238,7 @@ def correct(conn: psycopg.Connection, tenant: UUID) -> dict[str, object]:
                 RULE_VERSION_V2,
                 row["valid_from"],
                 row["valid_to"],
+                row["recorded_at"] + timedelta(microseconds=1),
             ),
         )
         appended += 1
@@ -232,7 +251,7 @@ def correct(conn: psycopg.Connection, tenant: UUID) -> dict[str, object]:
     order_tax: dict[UUID, Decimal] = {}
     order_meta: dict[UUID, tuple[str, Decimal, Decimal]] = {}
     po_lines = 0
-    for line in cur.execute(PO_LINES_SQL, {"tenant": tenant}).fetchall():
+    for line in cur.execute(PO_LINES_SQL, {"tenant": tenant, "orders": APPROVED_ORDERS}).fetchall():
         quantity = Decimal(line["ordered_quantity"])
         gross = Decimal(line["unit_price_amount"])
         split = split_vat_inclusive_line(gross, quantity, VAT_RATE)
@@ -259,6 +278,15 @@ def correct(conn: psycopg.Connection, tenant: UUID) -> dict[str, object]:
         number, total, _ = order_meta[po_id]
         print(f"  {number}: line tax {tax}, order total {total} unchanged")
 
+    out_of_scope = cur.execute(
+        OUT_OF_SCOPE_SQL, {"tenant": tenant, "orders": APPROVED_ORDERS}
+    ).fetchall()
+    for order in out_of_scope:
+        print(
+            f"  NOT CORRECTED (outside the approved list): {order['order_number']} "
+            f"({order['status']}), total {order['total_amount']}"
+        )
+
     counts = {
         "quotes_corrected": len(quote_ids),
         "quotes_skipped_not_gross": skipped,
@@ -266,6 +294,7 @@ def correct(conn: psycopg.Connection, tenant: UUID) -> dict[str, object]:
         "landed_cost_v2_rows_appended": appended,
         "purchase_order_lines_corrected": po_lines,
         "purchase_orders_corrected": sorted(meta[0] for meta in order_meta.values()),
+        "purchase_orders_outside_approval": [order["order_number"] for order in out_of_scope],
     }
     cur.execute(
         "insert into audit_event (tenant_id, actor_email, action, target, outcome) "
