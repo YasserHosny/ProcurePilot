@@ -137,6 +137,8 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-104 | PPS-135 | P-105 | PPS-136 | P-106 | PPS-137 |
 | P-107 | PPS-138 | P-108 | PPS-139 | P-109 | PPS-140 |
 | P-110 | PPS-141 | P-111 | PPS-142 | P-112 | PPS-143 |
+| P-113 | PPS-144 | P-114 | PPS-145 | P-115 | PPS-146 |
+| P-116 | PPS-147 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -307,6 +309,10 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-110 | — | Edit Supplier: the half-width «Email Language» field wraps its hint onto two lines, into the «Payment Terms» label (found in the PPS-134 live check) | — | — | To Do (PPS-141) |
 | [ ] P-111 | — | 024 review follow-ups (T035): the split Withdraw dialog's missing title key and literal {{count}}, the expired-quote warning naming suppliers instead of quotation ids, the phone reusing one Idempotency-Key per group decision, the Basket Split pack hint taking space and the "two suppliers" subtitle, and the flaky split E2E (position) with its Arabic scan moved before approval | Orch (Claude) | — | In Review (PPS-142) |
 | [ ] P-112 | — | Demo videos to Git LFS from now on (owner decision 2026-10-31): re-renders had added ~840 MB to history in one week. `.gitattributes` tracks `docs/gtm/video/**` media, the 78 cuts are renormalised (no history rewrite), `.lfsconfig` keeps clones and CI from downloading them | Orch | — | PR merged with every required check green on its head commit; `git lfs ls-files` on main lists the 78 cuts (PPS-143) |
+| [ ] P-113 | — | A withdrawn purchase request stays in the Approval Queue with Approve/Reject: withdraw sets the request `withdrawn` but leaves its `approval_step` `pending`, and the queue lists pending steps (found in the PPS-125 live check; stale row `daa275a0` in «مطاعم رواق»). Fix test-first: withdraw closes pending steps, the queue excludes withdrawn requests, a forward-only data fix cancels existing stale steps. Medium | — | — | To Do (PPS-144) |
+| [ ] P-114 | — | The request page's approval line shows the approver's email, not `approval_step.assigned_name`, which the API fills since #359 (PPS-125 follow-up). Low | — | — | To Do (PPS-145) |
+| [ ] P-115 | — | Hosted extraction down: `POST /quotations/{id}/extract` returns 503 `dependency=redis` for every tenant; the backend's `REDIS_URL` differs from the workers' shared Redis (owner, bunny.net). High | — | — | To Do (PPS-146) |
+| [ ] P-116 | — | The extraction enqueue 503 hides the Redis cause: log the exception class and add `details.reason` (connection vs auth). Low | — | — | To Do (PPS-147) |
 
 ### E — Pilot environment
 
