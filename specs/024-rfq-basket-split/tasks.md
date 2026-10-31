@@ -190,7 +190,7 @@ best single total of SAR 4,137 and a saving of SAR 74.
   - Audits: `requests.group_submitted`, `requests.group_approved`, `requests.group_rejected` and `requests.group_withdrawn`.
 - [x] T027 [US3] Guard `submit_request`, `withdraw_request` and `_decide_request` in `modules/requests/service.py`: a request with `request_group_id` gives `ConflictError(reason="part_of_split", request_group_id=…)`. T025 green.
 - [x] T028 [US3] Add the routes `POST /request-groups/{group_id}/submit|approve|reject|withdraw` (Idempotency-Key; roles as the per-request routes) in `modules/requests/router.py`. A cross-tenant id gives 404.
-- [ ] T029 [P] [US3] Web, delegated to Agy, in `apps/web/src/app/features/approvals/approval-queue/approval-queue.component.{ts,html,scss,spec.ts}` and `approvals-api.ts`:
+- [x] T029 [P] [US3] Web, delegated to Agy, in `apps/web/src/app/features/approvals/approval-queue/approval-queue.component.{ts,html,scss,spec.ts}` and `approvals-api.ts`:
   - collapse pending requests by `request_group.id` into one row: "Split from RFQ … · 2 requests · SAR 4,063 · saves SAR 74", with budget status per request, expandable to each request's supplier, lines and total;
   - Approve and Reject on the group call the group endpoints, and the dialog title restates the combined amount and branch.
 

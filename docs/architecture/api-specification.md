@@ -365,7 +365,8 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
   `field_extractions`, and optional `review_task`.
 - Header fields include `id`, `document_id`, optional `supplier_id`, optional `currency`,
   optional `issue_date`, optional `expiry_date`, `status`, optional `previous_quotation_id`,
-  optional `stated_total`, optional `arithmetic_status`, `created_at`, optional `reviewed_by`, and
+  optional `stated_total`, optional `arithmetic_status`, `prices_include_vat` (boolean; true when
+  the document's printed prices include VAT, ADR-021), `created_at`, optional `reviewed_by`, and
   optional `reviewed_at`.
 - Line fields include `id`, `line_number`, `original_text`, optional decimal-string `quantity`,
   optional `pack`, optional `unit_price`, optional decimal-string `vat_rate`, optional
@@ -380,7 +381,9 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 
 - Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
 - Corrects extracted fields and confirms supplier.
-- Request fields: optional `supplier_id`, optional `corrections`.
+- Request fields: optional `supplier_id`, optional `corrections`, optional `prices_include_vat`
+  (default `false`; the reviewer confirms or changes the basis extraction found, ADR-021) and
+  optional `vat_rate`.
 - Each correction has `field_extraction_id` and `corrected_value`.
 - Corrections are recorded as human decisions on field provenance records; original extracted
   values are retained.
@@ -472,6 +475,40 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 - Returns `404` when the quotation is not in the caller's workspace; this is deliberately
   indistinguishable from a quotation that exists in another workspace.
 - Returns `409` when the quotation is not in the reviewed state yet.
+- RFQ-aware matching (spec 023): when the quotation answers an RFQ, its lines are first matched
+  against that RFQ's own lines (product, pack, quantity, position). A line that fits exactly one RFQ
+  line is accepted automatically (`is_automatic`, owner decision Q1); a line that could answer two
+  goes to Match Resolution with both RFQ lines offered. Candidate `reasons` may carry `rfq`
+  (`rule_version`, `rfq_id`, `rfq_line_id`, `position`, `wording_score`, `pack_check` of
+  `equal`, `conflict` or `unknown`, quoted and RFQ pack quantities and units, `fitting_rfq_line_ids`)
+  and `measured` (only the signals that were actually measured; unmeasured signals are absent, not
+  shown at a flat value). A quotation with no RFQ is matched as before.
+- `decision` carries `supersedes_decision_id` and `learned_from_decision_id` (nullable uuid). The
+  decision returned is the current one (head of the chain, ADR-022).
+
+### `POST /quotation-lines/{line_id}/match/corrections`
+
+- Requires bearer auth and owner or buyer role; requires an `Idempotency-Key` (uuid) header.
+- Corrects a line's match without updating any row: inserts a human decision that supersedes the
+  line's current decision (ADR-022).
+- Request fields: `expected_current_decision_id` (required; the head the caller saw), `outcome`
+  (`same_product` or `no_match_new_product`), optional `selected_match_candidate_id`, optional
+  `new_product` (same shape as the resolve endpoint's `create_product`), optional `learn_alias`
+  (default `true`).
+- Returns `200` with `decision` (the new current decision), `superseded_decision_id`,
+  `lines_matched_through_old_wording` (lines that had been matched through the superseded
+  decision's wording) and optional `lines_matched_by_same_wording`. The correction also computes
+  landed cost for the new decision, enqueues guardrail evaluation (ADR-019) and audits
+  `matching.decision_corrected`.
+- Returns `404` when the line is not in the caller's workspace.
+- Returns `409` with `details.reason` of `line_on_purchase_request` (with
+  `details.purchase_request_id`: a live purchase request is priced from the decision, so it must be
+  withdrawn first), `decision_changed` (`expected_current_decision_id` is not the head) or
+  `no_decision`.
+
+`POST /quotation-lines/{line_id}/match` and `POST /match-tasks/confirm-exact` also return
+`lines_matched_by_same_wording` (open lines that one confirmation of a wording cleared; spec 023
+FR-011) next to their existing result.
 
 ### `GET /match-tasks`
 

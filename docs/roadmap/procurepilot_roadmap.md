@@ -10,7 +10,7 @@
 | Document | ProcurePilot Master Roadmap |
 | Version | 1.2 |
 | Status | Active — delivery status maintained in the section "Delivery Status" below |
-| Last updated | 2026-10-18 |
+| Last updated | 2026-10-31 |
 | Source of truth | `procurepilot_ai_context.md` (product context package) |
 | Scope | Business vision, strategy, phased delivery, technical architecture, web and mobile implementation |
 | Planning horizon | 24 months (M0 – M24) |
@@ -67,9 +67,13 @@ release's spec was built and merged; it does not mean the phase's business gate 
 | 4 | R4.2 Grounded analyst | `020-grounded-procurement-analyst` | Shipped | Evidence: `docs/quality/r4.2-release-evidence.md` |
 | 4 | R4.3 RFQ sourcing + guardrails | `021-rfq-sourcing-autonomy` | Shipped | Evidence: `docs/quality/r4.3-release-evidence.md` |
 | Pilot | Home currency (Egypt) | `022-home-currency-readiness` | Merged, 3 tasks open | Real-quote extraction run, mobile screenshots, full test pass |
+| Pilot | RFQ-aware matching | `023-rfq-aware-matching` | Shipped | Replies to an RFQ match the RFQ's own lines; match decisions are correctable by supersession (ADR-022). Open: T027 (recorded Azure DI fixtures), T030, T033, T034 |
+| Pilot | RFQ basket split | `024-rfq-basket-split` | Shipped | A split becomes one request group approved as one (ADR-023). Open: T002. Split is unreachable on a workspace with an enabled guardrail (W2, PPS-148) |
 
-Since 2026-10-15 the hosted demo tenant build has produced 30 findings. As of 2026-10-18, 21 are fixed,
-1 is partly fixed (20) and 8 are open (22, 23, 25–30); see `docs/gtm/demo-tenant/README.md`.
+Since 2026-10-15 the hosted demo tenant build has produced 50 findings in `docs/gtm/demo-tenant/README.md`:
+47 are marked fixed, 20 is partly fixed, 43 is a recorded decision and 50 is not yet explained. The round-1
+flow reviews of 2026-10-28 and 2026-10-30 (R7–R18, W1–W5) are tracked as PPS-118 to PPS-151 in
+`docs/gtm/gtm-execution-plan.md`.
 
 An internal security review of R3.2–R4.3 and the October fixes was completed on 2026-10-18
 (`docs/quality/r3.2-r4.x-security-review-record.md`). Its 7 Critical, High and Medium findings are fixed
@@ -1369,7 +1373,7 @@ customer-configurable. Decisions 3 and 4 have not been revisited in this documen
 
 ## 21. Immediate Next Actions
 
-### 21.1 Current next actions (2026-10-18)
+### 21.1 Next actions (2026-10-18; current work is tracked in `docs/gtm/gtm-execution-plan.md`)
 
 | # | Action | Where tracked |
 |---:|---|---|
