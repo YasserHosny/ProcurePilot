@@ -73,3 +73,23 @@ components:
                 format: uuid
                 default: null
                 description: Request prepared by this guardrail for this response; null when it has not fired.
+        rfq_landed_costs:
+          type: array
+          default: []
+          description: >-
+            This reply's landed cost for the RFQ's requested quantity of each RFQ product it prices, worked out
+            as the RFQ split does (latest valid landed cost, scaled from its normalised base quantity to RFQ
+            packs × pack base quantity). A product with no valid landed cost or pack definition is absent.
+          items:
+            type: object
+            required: [workspace_product_id, total_amount, total_currency]
+            properties:
+              workspace_product_id: { type: string, format: uuid }
+              total_amount: { type: string }
+              total_currency: { type: string }
+        supplier_terms_apply:
+          type: boolean
+          default: false
+          description: >-
+            The supplier has a commercial term in force with a delivery fee, minimum order value or quantity
+            tiers. The split prices these; a per-product comparison does not.
