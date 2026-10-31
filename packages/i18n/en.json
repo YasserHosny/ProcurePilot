@@ -1704,7 +1704,7 @@
     },
     "result": {
       "feasibleTitle": "Recommended Basket Allocation",
-      "feasibleSubtitle": "Minimum landed cost split across the two selected suppliers.",
+      "feasibleSubtitle": "Minimum landed cost split across the selected suppliers.",
       "totalLandedCost": "Optimised Total Landed Cost",
       "supplierAllocation": "Allocation for {{supplier}}",
       "supplierTotal": "Supplier Total: {{total}}",
@@ -2337,6 +2337,7 @@
       "withdrawBoth": "Withdraws both requests of this split",
       "withdrawAll": "Withdraws all {{count}} requests of this split",
       "withdrawConfirmMessageBoth": "Withdraws both requests of this split? Any committed budget will be released.",
+      "withdrawConfirmTitle": "Withdraw this split?",
       "withdrawConfirmMessageAll": "Withdraws all {{count}} requests of this split? Any committed budget will be released."
     },
     "partOfSplitError": "This request is part of a split. Please use the split action to submit, decide, or withdraw all requests together."

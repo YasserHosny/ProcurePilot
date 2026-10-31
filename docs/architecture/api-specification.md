@@ -3029,7 +3029,7 @@ contract: `specs/024-rfq-basket-split/contracts/rfq-split.openapi.yaml`.
   returns `200` with the same body.
 - Returns `409` with `details.reason` one of: `not_rfq_split`, `split_not_completed`,
   `split_stale`, `rfq_already_converted` (`details.purchase_request_ids`),
-  `allocation_not_whole_packs`, `expired_quotation_unconfirmed` (`details.quotation_ids`).
+  `allocation_not_whole_packs`, `expired_quotation_unconfirmed` (`details.quotation_ids`, and `details.expired_quotations`: `[{quotation_id, supplier_id}]` so the client can name each supplier).
 
 ### `POST /request-groups/{group_id}/submit` (spec 024; rolling out)
 

@@ -168,9 +168,10 @@ export class PrepareSplitRequestsDialogComponent implements OnInit {
     );
   }
 
-  getSupplierNameForQuotation(id: string): string {
-    const s = this.data.suppliers?.find((sup) => sup.id === id);
-    return s?.name ?? id;
+  /** The supplier's name for an expired quote, or undefined when the page doesn't know the supplier. */
+  supplierNameFor(supplierId: string | undefined): string | undefined {
+    if (!supplierId) return undefined;
+    return this.data.suppliers?.find((sup) => sup.id === supplierId)?.name;
   }
 
   onSubmit(): void {
@@ -218,11 +219,17 @@ export class PrepareSplitRequestsDialogComponent implements OnInit {
         if (err instanceof HttpErrorResponse && err.status === 409) {
           const reason = err.error?.details?.reason;
           if (reason === 'expired_quotation_unconfirmed') {
-            const quotationIds: string[] = err.error?.details?.quotation_ids ?? [];
+            const details = err.error?.details ?? {};
+            const quotationIds: string[] = details.quotation_ids ?? [];
+            const supplierByQuotation = new Map<string, string>(
+              ((details.expired_quotations ?? []) as { quotation_id: string; supplier_id: string }[]).map(
+                (eq) => [eq.quotation_id, eq.supplier_id],
+              ),
+            );
             this.expiredQuotations.set(
               quotationIds.map((id) => ({
                 id,
-                supplier_name: this.getSupplierNameForQuotation(id),
+                supplier_name: this.supplierNameFor(supplierByQuotation.get(id)),
                 confirmed: false,
               })),
             );

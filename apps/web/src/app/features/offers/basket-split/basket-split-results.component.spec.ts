@@ -390,6 +390,42 @@ describe('BasketSplitResultsComponent — packs and constraint copy', () => {
       expect(dialogComp.form.get('required_by_date')?.value).toEqual(new Date(2026, 10, 20));
     });
 
+    it('an expired quote from a supplier not on the page uses the generic confirmation', () => {
+      const httpTesting = TestBed.inject(HttpTestingController);
+      const dialogFixture = TestBed.createComponent(PrepareSplitRequestsDialogComponent);
+      const dialogComp = dialogFixture.componentInstance;
+      dialogFixture.detectChanges();
+      httpTesting
+        .expectOne('/api/v1/organisation/branches?is_active=true&limit=100')
+        .flush({ items: [{ id: 'branch-1', name: 'Branch 1', is_active: true }], next_cursor: null });
+      httpTesting
+        .expectOne('/api/v1/organisation/cost-centres?is_archived=false&limit=100')
+        .flush({ items: [], next_cursor: null });
+      dialogComp.form.patchValue({ branch_id: 'branch-1', required_by_date: '2026-11-20' });
+
+      dialogComp.onSubmit();
+      httpTesting.expectOne('/api/v1/baskets/j1/prepare-requests').flush(
+        {
+          code: 409,
+          message: 'Quotation expired',
+          details: {
+            reason: 'expired_quotation_unconfirmed',
+            quotation_ids: ['quote-exp-9'],
+            expired_quotations: [{ quotation_id: 'quote-exp-9', supplier_id: 's-unknown' }],
+          },
+        },
+        { status: 409, statusText: 'Conflict' },
+      );
+      dialogFixture.detectChanges();
+
+      const checkbox = (dialogFixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="confirm-expired-checkbox"]',
+      );
+      expect(checkbox?.textContent?.trim()).toBe(
+        en.basketSplit.prepareRequests.dialog.confirmExpiredGeneric.replace('{{id}}', 'quote-exp-9'),
+      );
+    });
+
     it('POST sends the body and reuses the key on retry', () => {
       const httpTesting = TestBed.inject(HttpTestingController);
       const dialogFixture = TestBed.createComponent(PrepareSplitRequestsDialogComponent);
@@ -429,14 +465,20 @@ describe('BasketSplitResultsComponent — packs and constraint copy', () => {
           details: {
             reason: 'expired_quotation_unconfirmed',
             quotation_ids: ['quote-exp-1'],
+            expired_quotations: [{ quotation_id: 'quote-exp-1', supplier_id: 's1' }],
           },
         },
         { status: 409, statusText: 'Conflict' },
       );
       dialogFixture.detectChanges();
 
-      // Expired quotes displayed for confirmation
+      // Expired quotes displayed for confirmation, named by their supplier
       expect(dialogComp.expiredQuotations().length).toBe(1);
+      const checkbox = (dialogFixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="confirm-expired-checkbox"]',
+      );
+      expect(checkbox?.textContent).toContain('Al Nour');
+      expect(checkbox?.textContent).not.toContain('quote-exp-1');
       dialogComp.expiredQuotations.update((list) =>
         list.map((item) => ({ ...item, confirmed: true })),
       );

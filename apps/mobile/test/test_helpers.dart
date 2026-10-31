@@ -880,15 +880,18 @@ class FakeApprovalsApiClient extends ApprovalsApiClient {
   final approveGroupComments = <String?>[];
   final rejectGroupCalls = <String>[];
   final rejectGroupComments = <String>[];
+  final groupDecisionKeys = <String?>[];
   Exception? groupDecisionError;
 
   @override
   Future<List<PurchaseRequest>> approveGroup(
     String groupId, {
     String? comment,
+    String? idempotencyKey,
   }) async {
     approveGroupCalls.add(groupId);
     approveGroupComments.add(comment);
+    groupDecisionKeys.add(idempotencyKey);
     if (groupDecisionError != null) throw groupDecisionError!;
     return pendingResults;
   }
@@ -897,9 +900,11 @@ class FakeApprovalsApiClient extends ApprovalsApiClient {
   Future<List<PurchaseRequest>> rejectGroup(
     String groupId, {
     required String comment,
+    String? idempotencyKey,
   }) async {
     rejectGroupCalls.add(groupId);
     rejectGroupComments.add(comment);
+    groupDecisionKeys.add(idempotencyKey);
     if (groupDecisionError != null) throw groupDecisionError!;
     return pendingResults;
   }

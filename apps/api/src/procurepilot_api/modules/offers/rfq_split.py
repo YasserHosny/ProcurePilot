@@ -316,7 +316,7 @@ def prepare_requests_from_split(
                 response_by_supplier[allocation["supplier_id"]] = source_responses.pop()
             used_replies = [r for r in replies if r["response_id"] in response_by_supplier.values()]
             unconfirmed = [
-                str(r["quotation_id"])
+                r
                 for r in used_replies
                 if r["expiry_date"] is not None
                 and r["expiry_date"] < date.today()
@@ -326,7 +326,14 @@ def prepare_requests_from_split(
                 raise ConflictError(
                     details={
                         "reason": "expired_quotation_unconfirmed",
-                        "quotation_ids": unconfirmed,
+                        "quotation_ids": [str(r["quotation_id"]) for r in unconfirmed],
+                        "expired_quotations": [
+                            {
+                                "quotation_id": str(r["quotation_id"]),
+                                "supplier_id": str(r["supplier_id"]),
+                            }
+                            for r in unconfirmed
+                        ],
                     }
                 )
             cur.execute(

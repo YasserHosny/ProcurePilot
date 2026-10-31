@@ -58,7 +58,7 @@ async function switchToArabic(page: Page): Promise<void> {
  * 2. RFQ compare page → "Split between suppliers" → Basket Split in RFQ mode.
  *    Wait for job via API polling helper. Assert split total, baselines, and saving.
  * 3. "Prepare 2 requests" → fill branch and required-by → submit → summary shows 2 requests.
- * 4. Open one request → "Part of a split · 1 of 2" → Submit (group submit).
+ * 4. Open one request → "Part of a split · N of 2" → Submit (group submit).
  * 5. Sign in as approver/owner → queue shows ONE row for split → Approve → both requests are ordered.
  * 6. Arabic RTL pass on approval queue & basket split RFQ mode with zero axe violations @a11y.
  */
@@ -315,7 +315,7 @@ test.describe.serial('RFQ basket split & group approval flow (024, T033)', () =>
     await expect(requestItems.filter({ hasText: supplier1Name })).toHaveCount(1);
     await expect(requestItems.filter({ hasText: supplier2Name })).toHaveCount(1);
 
-    // 4. Open one of the requests → "Part of a split · 1 of 2" → Submit (group submit)
+    // 4. Open one of the requests → "Part of a split · N of 2" → Submit (group submit)
     const viewFirstLink = requestItems.first().locator('[data-testid="view-request-link"]');
     const requestDetailPromise = page.waitForResponse(
       (resp) =>
@@ -329,7 +329,8 @@ test.describe.serial('RFQ basket split & group approval flow (024, T033)', () =>
 
     const splitInfoLine = page.locator('[data-testid="split-info-line"]');
     await expect(splitInfoLine).toBeVisible({ timeout: 15000 });
-    await expect(splitInfoLine.locator('.split-context-text')).toContainText('Part of a split · 1 of 2');
+    // Both drafts are inserted together, so which one is "1 of 2" is not tied to the summary order.
+    await expect(splitInfoLine.locator('.split-context-text')).toContainText(/Part of a split · [12] of 2/);
 
     const groupSubmitPromise = page.waitForResponse(
       (resp) =>
@@ -366,6 +367,16 @@ test.describe.serial('RFQ basket split & group approval flow (024, T033)', () =>
     const groupRow = page.locator('tr.request-row').filter({ has: splitGroupSummary });
     await expect(groupRow).toBeVisible();
 
+    // 6. Arabic RTL pass on the queue while the split is still pending, so the split row is scanned
+    await switchToArabic(page);
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await expect(page.locator('.approval-queue-title')).toContainText('قائمة الاعتماد');
+    await expect(splitGroupSummary).toHaveCount(1, { timeout: 15000 });
+    await page.waitForLoadState('networkidle');
+    const approvalsAxe = await scan(page);
+    expect(approvalsAxe.violations, describeViolations(approvalsAxe)).toEqual([]);
+
+    // Approve the split as one (the selectors do not depend on the language)
     await groupRow.locator('button.approve-btn').click();
     const decisionDialog = page.locator('mat-dialog-container');
     await expect(decisionDialog).toBeVisible({ timeout: 10000 });
@@ -393,14 +404,6 @@ test.describe.serial('RFQ basket split & group approval flow (024, T033)', () =>
     );
     expect(req1.status).toBe('ordered');
     expect(req2.status).toBe('ordered');
-
-    // 6. Arabic RTL pass directly in the current flow
-    await switchToArabic(page);
-    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-    await expect(page.locator('.approval-queue-title')).toContainText('قائمة الاعتماد');
-    await page.waitForLoadState('networkidle');
-    const approvalsAxe = await scan(page);
-    expect(approvalsAxe.violations, describeViolations(approvalsAxe)).toEqual([]);
   });
 
   test('renders approval queue and basket split in Arabic (RTL) with zero WCAG 2.1 AA violations @a11y', async ({
