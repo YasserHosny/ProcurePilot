@@ -29,6 +29,8 @@ import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
+// Money is compared in 1/10 000ths so totals like 4,830 − 4,770 come out exact.
+const MINOR_UNITS = 10_000;
 
 @Component({
   providers: [provideAppDateAdapter()],
@@ -158,11 +160,9 @@ export class CompareComponent implements OnInit, OnChanges {
     return ids && ids.length === 1 ? ids[0] : null;
   });
 
-  private readonly comparableResponses = computed<{
-    eligible: RfqResponseComparison[];
-    productQuantities: Map<string, number>;
-    currency: string;
-  } | null>(() => {
+  // Replies whose quoted totals can be compared for «Lowest total»: fully matched, one
+  // currency, the same products in the same quantities.
+  private readonly comparableResponses = computed<RfqResponseComparison[] | null>(() => {
     const all = this.responses();
     const eligible = all.filter(
       (r) => r.quotation_status !== 'refused' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
@@ -208,21 +208,16 @@ export class CompareComponent implements OnInit, OnChanges {
       }
     }
 
-    const currency = this.responseCurrency(eligible[0]);
-    return {
-      eligible,
-      productQuantities: baselineMap,
-      currency,
-    };
+    return eligible;
   });
 
   readonly lowestTotalResponseIds = computed<Set<string>>(() => {
-    const comp = this.comparableResponses();
-    if (!comp) {
+    const eligible = this.comparableResponses();
+    if (!eligible) {
       return new Set<string>();
     }
 
-    const totals = comp.eligible.map((r) => ({ id: r.id, total: this.responseTotal(r) }));
+    const totals = eligible.map((r) => ({ id: r.id, total: this.responseTotal(r) }));
     const minTotal = Math.min(...totals.map((t) => t.total));
     const ids = new Set<string>();
     for (const t of totals) {
@@ -237,50 +232,71 @@ export class CompareComponent implements OnInit, OnChanges {
     return this.lowestTotalResponseIds().has(response.id);
   }
 
+  // Each eligible reply's landed cost for the RFQ's quantity of every RFQ product, in
+  // 1/10 000ths of the currency: the figures the RFQ split prices from (rfq_landed_costs).
+  // Null unless at least two fully matched replies price every RFQ product in one currency.
+  private readonly landedCostGrid = computed<{
+    replies: RfqResponseComparison[];
+    costs: Map<string, Map<string, number>>;
+    productIds: string[];
+    currency: string;
+  } | null>(() => {
+    const productIds = [...new Set((this.rfqDetail()?.lines ?? []).map((l) => l.workspace_product_id))];
+    if (productIds.length === 0) {
+      return null;
+    }
+    const replies = this.responses().filter(
+      (r) => r.quotation_status !== 'refused' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
+    );
+    if (replies.length < 2) {
+      return null;
+    }
+
+    const currencies = new Set<string>();
+    const costs = new Map<string, Map<string, number>>();
+    for (const reply of replies) {
+      const byProduct = new Map<string, number>();
+      for (const cost of reply.rfq_landed_costs ?? []) {
+        const amount = Number(cost.total_amount);
+        if (Number.isNaN(amount)) {
+          return null;
+        }
+        byProduct.set(cost.workspace_product_id, Math.round(amount * MINOR_UNITS));
+        currencies.add(cost.total_currency);
+      }
+      if (productIds.some((id) => !byProduct.has(id))) {
+        return null;
+      }
+      costs.set(reply.id, byProduct);
+    }
+    if (currencies.size !== 1) {
+      return null;
+    }
+    return { replies, costs, productIds, currency: [...currencies][0] };
+  });
+
+  private landedCost(replyId: string, productId: string): number {
+    return this.landedCostGrid()?.costs.get(replyId)?.get(productId) ?? 0;
+  }
+
   readonly lowestLinePriceKeys = computed<Set<string>>(() => {
-    const comp = this.comparableResponses();
-    if (!comp) {
-      return new Set<string>();
-    }
-
+    const grid = this.landedCostGrid();
     const keys = new Set<string>();
-
-    for (const productId of comp.productQuantities.keys()) {
-      const prices: number[] = [];
-      for (const reply of comp.eligible) {
-        for (const line of reply.lines) {
-          if (line.workspace_product_id === productId) {
-            const p = Number(line.quoted_unit_price_amount);
-            if (!Number.isNaN(p)) {
-              prices.push(p);
-            }
-          }
-        }
-      }
-
-      if (prices.length === 0) {
-        continue;
-      }
-
-      const minPrice = Math.min(...prices);
-      const maxPrice = Math.max(...prices);
-
-      if (Math.abs(maxPrice - minPrice) < 1e-9) {
-        continue;
-      }
-
-      for (const reply of comp.eligible) {
-        for (const line of reply.lines) {
-          if (line.workspace_product_id === productId) {
-            const p = Number(line.quoted_unit_price_amount);
-            if (Math.abs(p - minPrice) < 1e-9) {
-              keys.add(`${reply.id}:${productId}`);
-            }
-          }
-        }
-      }
+    if (!grid) {
+      return keys;
     }
-
+    for (const productId of grid.productIds) {
+      const amounts = grid.replies.map((r) => this.landedCost(r.id, productId));
+      const min = Math.min(...amounts);
+      if (amounts.every((amount) => amount === min)) {
+        continue;
+      }
+      grid.replies.forEach((reply, i) => {
+        if (amounts[i] === min) {
+          keys.add(`${reply.id}:${productId}`);
+        }
+      });
+    }
     return keys;
   });
 
@@ -291,57 +307,23 @@ export class CompareComponent implements OnInit, OnChanges {
     return this.lowestLinePriceKeys().has(`${response.id}:${line.workspace_product_id}`);
   }
 
+  // The cheapest single supplier against the cheapest supplier per line, both from landed costs.
+  // A supplier's delivery fee, minimum order or tiers can cancel that saving, and only the split
+  // itself prices them, so the hint stays hidden when any eligible supplier has such terms.
   readonly splitSaving = computed<{ amount: number; currency: string } | null>(() => {
-    const comp = this.comparableResponses();
-    if (!comp) {
+    const grid = this.landedCostGrid();
+    if (!grid || grid.replies.some((r) => r.supplier_terms_apply)) {
       return null;
     }
-
-    const MULTIPLIER = 10000;
-
-    let lowestTotalMinor = Infinity;
-    for (const reply of comp.eligible) {
-      let replyTotalMinor = 0;
-      for (const line of reply.lines) {
-        const qty = Number(line.quoted_quantity) || 0;
-        const price = Number(line.quoted_unit_price_amount) || 0;
-        replyTotalMinor += Math.round(qty * price * MULTIPLIER);
-      }
-      if (replyTotalMinor < lowestTotalMinor) {
-        lowestTotalMinor = replyTotalMinor;
-      }
-    }
-
-    let splitTotalMinor = 0;
-    for (const [productId, qty] of comp.productQuantities.entries()) {
-      let minProductPrice = Infinity;
-      for (const reply of comp.eligible) {
-        for (const line of reply.lines) {
-          if (line.workspace_product_id === productId) {
-            const p = Number(line.quoted_unit_price_amount);
-            if (!Number.isNaN(p) && p < minProductPrice) {
-              minProductPrice = p;
-            }
-          }
-        }
-      }
-
-      if (minProductPrice === Infinity) {
-        return null;
-      }
-
-      splitTotalMinor += Math.round(qty * minProductPrice * MULTIPLIER);
-    }
-
-    const savingMinor = lowestTotalMinor - splitTotalMinor;
-    if (savingMinor > 0) {
-      return {
-        amount: savingMinor / MULTIPLIER,
-        currency: comp.currency,
-      };
-    }
-
-    return null;
+    const singleTotals = grid.replies.map((r) =>
+      grid.productIds.reduce((sum, productId) => sum + this.landedCost(r.id, productId), 0),
+    );
+    const splitTotal = grid.productIds.reduce(
+      (sum, productId) => sum + Math.min(...grid.replies.map((r) => this.landedCost(r.id, productId))),
+      0,
+    );
+    const saving = Math.min(...singleTotals) - splitTotal;
+    return saving > 0 ? { amount: saving / MINOR_UNITS, currency: grid.currency } : null;
   });
 
   readonly splitSavingMoney = computed<string>(() => {

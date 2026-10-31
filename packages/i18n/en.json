@@ -4075,7 +4075,7 @@
       "differentCurrencies": "Replies are in different currencies",
       "alreadyConverted": "RFQ is already converted",
       "splitError": "Failed to start split. Please try again.",
-      "lowestLinePrice": "Lowest price",
+      "lowestLinePrice": "Lowest landed cost",
       "splitSavingHint": "Splitting this order between suppliers could save {{money}}.",
       "openPreparedRequest": "Open draft request",
       "openRequest": "Open request",

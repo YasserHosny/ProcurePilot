@@ -4075,7 +4075,7 @@
       "differentCurrencies": "الردود بعملات مختلفة",
       "alreadyConverted": "تم تحويل طلب عروض الأسعار بالفعل",
       "splitError": "فشل بدء التقسيم. يُرجى المحاولة مرة أخرى.",
-      "lowestLinePrice": "أقل سعر",
+      "lowestLinePrice": "أقل تكلفة واصلة",
       "splitSavingHint": "تقسيم هذا الطلب بين الموردين قد يوفّر {{money}}.",
       "openPreparedRequest": "فتح مسودة الطلب",
       "openRequest": "فتح الطلب",

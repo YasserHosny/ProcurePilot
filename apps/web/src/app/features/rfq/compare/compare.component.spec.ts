@@ -1058,6 +1058,41 @@ describe('CompareComponent (RFQ)', () => {
 
   describe('PPS-123 & PPS-124: RFQ line minima, split hint, and converted state', () => {
     const createD8f7fb0cFixtures = () => {
+      const rfqLines = [
+        {
+          id: 'line-flour',
+          tenant_id: 'tenant-1',
+          rfq_id: 'rfq-1',
+          workspace_product_id: 'prod-flour',
+          quantity: '10',
+          created_at: '2026-09-25T09:00:00Z',
+        },
+        {
+          id: 'line-oil',
+          tenant_id: 'tenant-1',
+          rfq_id: 'rfq-1',
+          workspace_product_id: 'prod-oil',
+          quantity: '10',
+          created_at: '2026-09-25T09:00:00Z',
+        },
+        {
+          id: 'line-sugar',
+          tenant_id: 'tenant-1',
+          rfq_id: 'rfq-1',
+          workspace_product_id: 'prod-sugar',
+          quantity: '10',
+          created_at: '2026-09-25T09:00:00Z',
+        },
+        {
+          id: 'line-rice',
+          tenant_id: 'tenant-1',
+          rfq_id: 'rfq-1',
+          workspace_product_id: 'prod-rice',
+          quantity: '10',
+          created_at: '2026-09-25T09:00:00Z',
+        },
+      ];
+
       const respDahabi: RfqResponseComparison = {
         id: 'resp-dahabi',
         rfq_id: 'rfq-1',
@@ -1098,6 +1133,12 @@ describe('CompareComponent (RFQ)', () => {
             quoted_unit_price_currency: 'SAR',
             pending_match: false,
           },
+        ],
+        rfq_landed_costs: [
+          { workspace_product_id: 'prod-flour', total_amount: '1230', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-oil', total_amount: '1500', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-sugar', total_amount: '380', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-rice', total_amount: '1720', total_currency: 'SAR' },
         ],
         guardrail_evaluations: [
           {
@@ -1150,6 +1191,12 @@ describe('CompareComponent (RFQ)', () => {
             pending_match: false,
           },
         ],
+        rfq_landed_costs: [
+          { workspace_product_id: 'prod-flour', total_amount: '1275', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-oil', total_amount: '1460', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-sugar', total_amount: '360', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-rice', total_amount: '1760', total_currency: 'SAR' },
+        ],
         guardrail_evaluations: [
           {
             guardrail_id: 'g-1',
@@ -1159,11 +1206,20 @@ describe('CompareComponent (RFQ)', () => {
         ],
       };
 
-      return { respDahabi, respWafra };
+      return { respDahabi, respWafra, rfqLines };
+    };
+
+    const applyD8f7fb0cDetail = (rfqLines: RfqDetail['lines'], status: RfqDetail['rfq']['status'] = 'responded') => {
+      component.rfqDetail.set({
+        ...sentDetail,
+        rfq: { ...sentDetail.rfq, status },
+        lines: rfqLines,
+      });
     };
 
     it('per-line minima: oil and sugar lines of الوفرة carry lowest-line-price, rice and flour of الذهبي do', () => {
-      const { respDahabi, respWafra } = createD8f7fb0cFixtures();
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
       component.responses.set([respDahabi, respWafra]);
       fixture.detectChanges();
 
@@ -1200,10 +1256,13 @@ describe('CompareComponent (RFQ)', () => {
       expect(wafraRows[1].classList.contains('best')).toBeTrue();
     });
 
-    it('per-line minima: a product quoted at the same price by both is marked on neither', () => {
-      const { respDahabi, respWafra } = createD8f7fb0cFixtures();
-      // Make rice identical price (150) on both
-      respWafra.lines[2] = { ...respWafra.lines[2], quoted_unit_price_amount: '150.00' };
+    it('per-line minima: a product with the same landed cost by both is marked on neither', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      // Make rice identical landed cost on both
+      respWafra.rfq_landed_costs = respWafra.rfq_landed_costs!.map((c) =>
+        c.workspace_product_id === 'prod-rice' ? { ...c, total_amount: '1720' } : c,
+      );
       component.responses.set([respDahabi, respWafra]);
       fixture.detectChanges();
 
@@ -1218,9 +1277,10 @@ describe('CompareComponent (RFQ)', () => {
       expect(wafraRiceRow.querySelector('[data-testid="lowest-line-price"]')).toBeNull();
     });
 
-    it('per-line minima: nothing is marked when quantities differ or a line is pending', () => {
-      const { respDahabi, respWafra } = createD8f7fb0cFixtures();
-      // Different quantities
+    it('per-line minima: quoted quantity differences do not block marks; a pending line still does', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      // Different quoted quantities — marks still follow landed costs
       const wafraDiffQty = {
         ...respWafra,
         lines: [
@@ -1232,9 +1292,9 @@ describe('CompareComponent (RFQ)', () => {
       fixture.detectChanges();
 
       let compiled = fixture.nativeElement as HTMLElement;
-      expect(compiled.querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(0);
+      expect(compiled.querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(4);
 
-      // Pending line
+      // Pending line — not eligible → no marks
       const wafraPending = {
         ...respWafra,
         lines: [
@@ -1254,11 +1314,8 @@ describe('CompareComponent (RFQ)', () => {
       translate.setTranslation('en', enCatalog, true);
       translate.use('en');
 
-      const { respDahabi, respWafra } = createD8f7fb0cFixtures();
-      component.rfqDetail.set({
-        ...sentDetail,
-        rfq: { ...sentDetail.rfq, status: 'responded' },
-      });
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines, 'responded');
       component.responses.set([respDahabi, respWafra]);
       fixture.detectChanges();
 
@@ -1286,6 +1343,7 @@ describe('CompareComponent (RFQ)', () => {
       component.rfqDetail.set({
         ...sentDetail,
         rfq: { ...sentDetail.rfq, status: 'converted' },
+        lines: rfqLines,
         converted_purchase_request_ids: ['pr-single-34049121'],
       });
       fixture.detectChanges();
@@ -1304,11 +1362,15 @@ describe('CompareComponent (RFQ)', () => {
     });
 
     it('split hint: absent when per-line minimum equals the lowest total (one supplier cheapest everywhere)', () => {
-      const { respDahabi, respWafra } = createD8f7fb0cFixtures();
-      // Make الذهبي cheaper on all lines
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      // Make الذهبي cheaper on all landed costs
       const wafraExpensive = {
         ...respWafra,
-        lines: respWafra.lines.map((l) => ({ ...l, quoted_unit_price_amount: '200.00' })),
+        rfq_landed_costs: respWafra.rfq_landed_costs!.map((c) => ({
+          ...c,
+          total_amount: String(Number(c.total_amount) + 500),
+        })),
       };
       component.responses.set([respDahabi, wafraExpensive]);
       fixture.detectChanges();
@@ -1318,17 +1380,143 @@ describe('CompareComponent (RFQ)', () => {
     });
 
     it('split hint: absent when not comparable', () => {
-      const { respDahabi, respWafra } = createD8f7fb0cFixtures();
-      // Mixed currencies
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      // Mixed landed-cost currencies
       const wafraUsd = {
         ...respWafra,
-        lines: respWafra.lines.map((l) => ({ ...l, quoted_unit_price_currency: 'USD' })),
+        rfq_landed_costs: respWafra.rfq_landed_costs!.map((c) => ({
+          ...c,
+          total_currency: 'USD',
+        })),
       };
       component.responses.set([respDahabi, wafraUsd]);
       fixture.detectChanges();
 
       const compiled = fixture.nativeElement as HTMLElement;
       expect(compiled.querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+    });
+
+    it('landed costs: marks and hint follow RFQ landed costs even when quoted quantity differs', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      // Quoted qty differs from RFQ, but landed costs make الذهبي cheapest on all four → no hint, all marks on الذهبي
+      const dahabiDiffQty = {
+        ...respDahabi,
+        lines: respDahabi.lines.map((l) => ({ ...l, quoted_quantity: '7' })),
+        rfq_landed_costs: [
+          { workspace_product_id: 'prod-flour', total_amount: '1000', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-oil', total_amount: '1000', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-sugar', total_amount: '1000', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-rice', total_amount: '1000', total_currency: 'SAR' },
+        ],
+      };
+      const wafraDiffQty = {
+        ...respWafra,
+        lines: respWafra.lines.map((l) => ({ ...l, quoted_quantity: '12' })),
+        rfq_landed_costs: [
+          { workspace_product_id: 'prod-flour', total_amount: '1100', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-oil', total_amount: '1100', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-sugar', total_amount: '1100', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-rice', total_amount: '1100', total_currency: 'SAR' },
+        ],
+      };
+      component.responses.set([dahabiDiffQty, wafraDiffQty]);
+      fixture.detectChanges();
+
+      expect(component.splitSaving()).toBeNull();
+      expect(component.isLowestLinePrice(dahabiDiffQty, dahabiDiffQty.lines[0])).toBeTrue();
+      expect(component.isLowestLinePrice(dahabiDiffQty, dahabiDiffQty.lines[1])).toBeTrue();
+      expect(component.isLowestLinePrice(dahabiDiffQty, dahabiDiffQty.lines[2])).toBeTrue();
+      expect(component.isLowestLinePrice(dahabiDiffQty, dahabiDiffQty.lines[3])).toBeTrue();
+      expect(component.isLowestLinePrice(wafraDiffQty, wafraDiffQty.lines[0])).toBeFalse();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+      const cards = compiled.querySelectorAll('.response-card');
+      expect(cards[0].querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(4);
+      expect(cards[1].querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(0);
+    });
+
+    it('landed costs: a delivery charge that flips the cheapest supplier moves the mark', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      // Base: oil mark is on الوفرة (1460 < 1500). Delivery charge on wafra oil flips it.
+      const wafraWithDelivery = {
+        ...respWafra,
+        rfq_landed_costs: respWafra.rfq_landed_costs!.map((c) =>
+          c.workspace_product_id === 'prod-oil' ? { ...c, total_amount: '1550' } : c,
+        ),
+      };
+      component.responses.set([respDahabi, wafraWithDelivery]);
+      fixture.detectChanges();
+
+      expect(component.isLowestLinePrice(respDahabi, respDahabi.lines[0])).toBeTrue();
+      expect(component.isLowestLinePrice(wafraWithDelivery, wafraWithDelivery.lines[0])).toBeFalse();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const cards = compiled.querySelectorAll('.response-card');
+      expect(cards[0].querySelectorAll('tbody tr')[0].querySelector('[data-testid="lowest-line-price"]')).not.toBeNull();
+      expect(cards[1].querySelectorAll('tbody tr')[0].querySelector('[data-testid="lowest-line-price"]')).toBeNull();
+    });
+
+    it('landed costs: missing a landed cost for one RFQ product → no marks, no hint', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      const wafraMissing = {
+        ...respWafra,
+        rfq_landed_costs: respWafra.rfq_landed_costs!.filter((c) => c.workspace_product_id !== 'prod-rice'),
+      };
+      component.responses.set([respDahabi, wafraMissing]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(0);
+      expect(compiled.querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+      expect(component.splitSaving()).toBeNull();
+    });
+
+    it('landed costs: supplier_terms_apply true keeps marks but hides the hint', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      const wafraWithTerms = { ...respWafra, supplier_terms_apply: true };
+      component.responses.set([respDahabi, wafraWithTerms]);
+      fixture.detectChanges();
+
+      expect(component.isLowestLinePrice(wafraWithTerms, wafraWithTerms.lines[0])).toBeTrue();
+      expect(component.isLowestLinePrice(wafraWithTerms, wafraWithTerms.lines[1])).toBeTrue();
+      expect(component.isLowestLinePrice(respDahabi, respDahabi.lines[2])).toBeTrue();
+      expect(component.isLowestLinePrice(respDahabi, respDahabi.lines[3])).toBeTrue();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(4);
+      expect(compiled.querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+      expect(component.splitSaving()).toBeNull();
+    });
+
+    it('landed costs: absent entirely (older API) → no marks, no hint; Lowest total chip unchanged', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      const { rfq_landed_costs: _d, ...dahabiLegacy } = respDahabi;
+      const { rfq_landed_costs: _w, ...wafraLegacy } = respWafra;
+      void _d;
+      void _w;
+      component.responses.set([dahabiLegacy, wafraLegacy]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(0);
+      expect(compiled.querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+
+      // Quoted totals still comparable → Lowest total chip on الذهبي (4830 < 4855)
+      expect(component.lowestTotalResponseIds()).toEqual(new Set(['resp-dahabi']));
+      const chips = compiled.querySelectorAll('.pp-chip-best');
+      expect(chips.length).toBe(1);
+      expect(chips[0].textContent?.trim()).toBe('Lowest total');
     });
 
     it('fired state: fired outcome has the fired class, the draft link points to /requests/<purchase_request_id>; no link when purchase_request_id is null', () => {
