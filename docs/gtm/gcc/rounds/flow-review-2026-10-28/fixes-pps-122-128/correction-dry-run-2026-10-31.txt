@@ -118,6 +118,10 @@
   PO-000008 (draft) line 1 دقيق (كيس 45 كجم): 2 × 85.0000 → net 73.9130, tax 22.1740, line total 170.0000 (was 170.0000)
   PO-000008 (draft) line 2 زيت دوار الشمس (تنكة 18 لتر): 3 × 146.0000 → net 126.9565, tax 57.1305, line total 438.0000 (was 438.0000)
   PO-000009 (submitted) line 1 زبادي (كرتون 12 × 1 كجم): 15 × 48.0000 → net 41.7391, tax 93.9135, line total 720.0000 (was 720.0000)
+  PO-000010 (draft) line 1 أرز بسمتي (كيس 10 كجم): 25 × 85.0000 → net 73.9130, tax 277.1750, line total 2125.0000 (was 2125.0000)
+  PO-000010 (draft) line 2 دقيق (كيس 45 كجم): 8 × 81.0000 → net 70.4348, tax 84.5216, line total 648.0000 (was 648.0000)
+  PO-000011 (draft) line 1 زيت دوار الشمس (تنكة 18 لتر): 6 × 145.0000 → net 126.0870, tax 113.4780, line total 870.0000 (was 870.0000)
+  PO-000011 (draft) line 2 سكر أبيض (كيس 10 كجم): 12 × 35.0000 → net 30.4348, tax 54.7824, line total 420.0000 (was 420.0000)
   PO-000001: line tax 665.2170, order total 5100.0000 unchanged
   PO-000002: line tax 640.4360, order total 4910.0000 unchanged
   PO-000003: line tax 624.7810, order total 4790.0000 unchanged
@@ -127,14 +131,14 @@
   PO-000007: line tax 79.3045, order total 608.0000 unchanged
   PO-000008: line tax 79.3045, order total 608.0000 unchanged
   PO-000009: line tax 93.9135, order total 720.0000 unchanged
-  NOT CORRECTED (outside the approved list): PO-000010 (draft), total 2773.0000
-  NOT CORRECTED (outside the approved list): PO-000011 (draft), total 1290.0000
+  PO-000010: line tax 361.6966, order total 2773.0000 unchanged
+  PO-000011: line tax 168.2604, order total 1290.0000 unchanged
 {
   "quotes_corrected": 23,
   "quotes_skipped_not_gross": 0,
   "quote_lines_rated": 71,
   "landed_cost_v2_rows_appended": 70,
-  "purchase_order_lines_corrected": 24,
+  "purchase_order_lines_corrected": 28,
   "purchase_orders_corrected": [
     "PO-000001",
     "PO-000002",
@@ -144,11 +148,10 @@
     "PO-000006",
     "PO-000007",
     "PO-000008",
-    "PO-000009"
-  ],
-  "purchase_orders_outside_approval": [
+    "PO-000009",
     "PO-000010",
     "PO-000011"
-  ]
+  ],
+  "purchase_orders_outside_approval": []
 }
 DRY RUN: rolled back, nothing written.
