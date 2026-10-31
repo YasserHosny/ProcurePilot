@@ -69,9 +69,10 @@ RAWAQ_TENANT_ID = UUID("938537ad-846d-4cde-b0d3-1ecda1b38a50")  # «مطاعم �
 SANAD_TENANT_ID = UUID("61590605-752c-4263-b3a3-97dd89a43232")  # «مطاعم سند»: never touched
 VAT_RATE = Decimal("0.15")
 TOLERANCE = Decimal("0.01")
-# The orders the owner approved on 2026-10-31. Orders created since are reported, not corrected,
+# The orders the owner approved on 2026-10-31 (PO-000010 and PO-000011 added the same day, after a
+# re-walk created them). Orders created since are reported, not corrected,
 # until the owner widens this list.
-APPROVED_ORDERS = [f"PO-{n:06d}" for n in range(1, 10)]
+APPROVED_ORDERS = [f"PO-{n:06d}" for n in range(1, 12)]
 
 QUOTES_SQL = """
 select q.id, q.stated_total_amount, s.name as supplier,
