@@ -28,6 +28,7 @@ named in its `.json` source.
 | [Product matching flow](product-matching-flow.html) | Exact lookup → similarity search → auto-accept or review queue → match decision | `73deb00` |
 | [Basket split flow](basket-split-flow.html) | Optimise job → RQ → optimiser worker (attempt-fenced, CP-SAT) → result; stuck jobs failed on poll | `73deb00` |
 | [Purchase order and three-way match](purchase-order-three-way-match.html) | PO, confirmation and receipt evidence + accounting bills → match result → discrepancies | `73deb00` |
+| [Round 1 flow, end to end](round-1-flow.html) | RFQ → supplier replies → review and match (spec 023) → compare → one request or a split group (spec 024) → approval → purchase order → savings, with the guardrail and the W2 gap | — (drawn from the round-1 record, no source lines; see [`flow-review-2026-10-28`](../gtm/gcc/rounds/flow-review-2026-10-28/README.md)) |
 
 The diagrams are snapshots and drift as the code changes. To redraw one, edit its `.json` source (re-check the cited
 line ranges against the current code and update `meta.repository.revision`), then run Archify's `finalize` from the

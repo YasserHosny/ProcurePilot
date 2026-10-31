@@ -14,6 +14,64 @@ R15 and R16 (Basket Split) are fixed under PPS-126 and PPS-127 and were checked 
 R6 (RFQ email language) is fixed under PPS-134 ([#372](https://github.com/YasserHosny/ProcurePilot/pull/372)) and was checked live on 2026-10-31 in
 [`fixes-pps-134/`](fixes-pps-134/README.md).
 
+## Flow at a glance
+
+The flow as it works on `main` today, not as it was recorded: matching reads the RFQ (spec 023), a split becomes
+one request group approved as one (spec 024), and VAT-inclusive quotes keep their printed prices (ADR-021). Step
+numbers match the sections below; R-numbers are the findings. An interactive version is
+[`docs/architecture/round-1-flow.html`](../../../../architecture/round-1-flow.html).
+
+```mermaid
+flowchart LR
+  subgraph S1["1 Send RFQ"]
+    A["Create + send RFQ<br/>4 lines in packs, 2 suppliers<br/>R1-R5"]
+    M["Email per supplier<br/>supplier's language (R6)"]
+  end
+  subgraph S2["2 Replies"]
+    B["Supplier replies<br/>PDF by email"]
+    C["Ingest + extract<br/>tied to its RFQ<br/>keeps the pack column"]
+  end
+  subgraph S3["3-4 Review + match"]
+    D["Review + Confirm &amp; Authorize<br/>VAT basis, flagged fields (R7-R9)"]
+    E["Match lines to the RFQ's lines<br/>auto when exactly one fits"]
+    F["Match Resolution<br/>ambiguous lines only"]
+  end
+  subgraph S5["5 Compare"]
+    G["RFQ Details - Responses<br/>cheapest per line, split hint (R10)"]
+    H{"Guardrail enabled<br/>and all replies matched?"}
+  end
+  subgraph S6["5-6 Prepare + submit"]
+    I["Prepare 1 request<br/>per-pack estimates"]
+    J["Basket Split<br/>priced from the replies (R16)"]
+    K["Prepare N requests<br/>one group, one per supplier"]
+    L["Guardrail drafts 1 request<br/>RFQ converted (R11)<br/>W2: no split possible after this"]
+  end
+  subgraph S7["7 Approve"]
+    N["Approval Queue, web or phone<br/>a split is decided as one (R12)"]
+    X["Rejected or withdrawn"]
+  end
+  subgraph S8["8 Order"]
+    O["Purchase order, draft<br/>net + tax, never sent (R13, R14)"]
+  end
+  subgraph S9["Basket split and savings"]
+    P["Record outcome<br/>Savings Ledger, pending (R17, R18)"]
+  end
+
+  A --> M --> B --> C --> D --> E
+  E -- ambiguous --> F --> G
+  E -- matched --> G
+  E -. guardrail job .-> H
+  H -- yes --> L
+  H -- no --> G
+  G -- one supplier --> I
+  G -- split --> J --> K
+  I --> N
+  K --> N
+  L --> N
+  N -- reject --> X
+  N -- approve --> O --> P
+```
+
 ## Steps
 
 ### 1. Send the RFQ (2026-10-28)
