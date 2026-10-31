@@ -26,6 +26,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Skip docs/gtm/video (~825 MB of demo cuts no job reads): ~60 s per checkout.
+          sparse-checkout: |
+            /*
+            !/docs/gtm/video/
+          sparse-checkout-cone-mode: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
