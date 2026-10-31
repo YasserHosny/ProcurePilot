@@ -1,0 +1,8 @@
+# Rendered demo-video media goes to Git LFS (PPS-143). Re-renders added ~840 MB of history in one
+# week before this. Scripts, docs and stills under docs/gtm/video stay in plain git.
+docs/gtm/video/**/*.mp4 filter=lfs diff=lfs merge=lfs -text
+docs/gtm/video/**/*.mov filter=lfs diff=lfs merge=lfs -text
+docs/gtm/video/**/*.webm filter=lfs diff=lfs merge=lfs -text
+docs/gtm/video/**/*.wav filter=lfs diff=lfs merge=lfs -text
+docs/gtm/video/**/*.mp3 filter=lfs diff=lfs merge=lfs -text
+docs/gtm/video/**/*.m4a filter=lfs diff=lfs merge=lfs -text
