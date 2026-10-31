@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import { FormatDatePipe } from './date.pipe';
+import { FormatService } from './format.service';
 import { FormatMoneyPipe } from './money.pipe';
 import { FormatQuantityPipe } from './quantity.pipe';
 
@@ -104,4 +105,22 @@ describe('format pipes follow a language switch (PPS-139)', () => {
       });
     });
   }
+
+  it('formatMoney reuses its string across checks and reformats only on a language switch', () => {
+    translate.use('en');
+    const spy = spyOn(TestBed.inject(FormatService), 'formatMoney').and.callThrough();
+    const fixture = TestBed.createComponent(EagerFormatHostComponent);
+    fixture.detectChanges();
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    expect(text(fixture, '.money')).toBe('SAR 86');
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    translate.use('ar');
+    fixture.detectChanges();
+
+    expect(text(fixture, '.money')).toBe('٨٦ ر.س');
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
 });
