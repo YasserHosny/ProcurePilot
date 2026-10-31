@@ -14,8 +14,10 @@ Every `.mp4`, `.mov`, `.webm`, `.wav`, `.mp3` and `.m4a` under `docs/gtm/video/`
 are unchanged; history before 2026-10-31 still holds the old copies.
 
 - **Clones do not download the videos by default** (`.lfsconfig` sets `fetchexclude`), and neither does CI. A
-  fresh clone shows each video as a small text pointer. To get them:
-  `git lfs pull --include="docs/gtm/video/**"` (or one cut: `--include="docs/gtm/video/cuts/v2.5/**"`).
+  fresh clone shows each video as a small text pointer. To get them, enable git-lfs once in the clone and pull:
+  `git lfs install --local && git lfs pull --include="docs/gtm/video/**" --exclude=""`
+  (or one cut: `--include="docs/gtm/video/cuts/v2.5/**"`). The empty `--exclude` matters: without it the
+  `fetchexclude` in `.lfsconfig` wins and nothing is downloaded.
 - **To commit a new or re-rendered cut**, git-lfs must be installed and enabled in the repo
   (`git lfs install --local`). On the dev machine it is (`~/.local/bin/git-lfs`, shared by every worktree). Then
   `git add` stores the file in LFS automatically; check with `git lfs ls-files`. Without git-lfs the file would go
