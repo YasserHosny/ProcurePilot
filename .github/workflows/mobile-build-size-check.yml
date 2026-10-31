@@ -18,6 +18,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Skip docs/gtm/video (~825 MB of demo cuts no job reads): ~60 s per checkout.
+          sparse-checkout: |
+            /*
+            !/docs/gtm/video/
+          sparse-checkout-cone-mode: false
       - uses: subosito/flutter-action@v2
         with:
           channel: stable

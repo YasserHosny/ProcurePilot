@@ -70,6 +70,15 @@ schedule and manual runs always capture.
   2026-10-30 (the five non-successes were cancelled runs); the `supabase start failed after 5 attempts` text in
   every log is GitHub echoing the step's script, not an error.
 
+## Sparse checkout (2026-10-31)
+
+`docs/gtm/video/` holds ~825 MB of demo-video cuts (the whole HEAD tree is ~0.91 GB), and no CI or deploy job
+reads it. By the week of 2026-10-31 a plain `actions/checkout` took 50–75 s in every job, up from ~3 s. Every
+checkout except the secret scan now uses a non-cone sparse checkout (`/*`, `!/docs/gtm/video/`). `actions/checkout`
+pairs that with a `blob:none` partial clone, so the video blobs are never downloaded: a local simulation of the
+same fetch leaves an 85 MB working copy. The secret scan keeps its full-history checkout, since gitleaks scans the
+commits a PR adds. If a job ever needs a video, drop the two sparse inputs from that job's checkout.
+
 ## Docker layer cache (deploy workflows)
 
 The five `deploy-*.yml` workflows cache BuildKit layers in the Actions cache, each under its own `scope` (`api`,

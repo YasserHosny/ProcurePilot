@@ -91,6 +91,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Skip docs/gtm/video (~825 MB of demo cuts no job reads): ~60 s per checkout.
+          sparse-checkout: |
+            /*
+            !/docs/gtm/video/
+          sparse-checkout-cone-mode: false
       - name: Build API image
         run: docker build -f infra/docker/api.Dockerfile -t pp-api-ci .
       - name: Check API image catalogues
@@ -131,6 +137,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Skip docs/gtm/video (~825 MB of demo cuts no job reads): ~60 s per checkout.
+          sparse-checkout: |
+            /*
+            !/docs/gtm/video/
+          sparse-checkout-cone-mode: false
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -172,6 +184,12 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Skip docs/gtm/video (~825 MB of demo cuts no job reads): ~60 s per checkout.
+          sparse-checkout: |
+            /*
+            !/docs/gtm/video/
+          sparse-checkout-cone-mode: false
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -278,6 +296,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Skip docs/gtm/video (~825 MB of demo cuts no job reads): ~60 s per checkout.
+          sparse-checkout: |
+            /*
+            !/docs/gtm/video/
+          sparse-checkout-cone-mode: false
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -342,6 +366,12 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Skip docs/gtm/video (~825 MB of demo cuts no job reads): ~60 s per checkout.
+          sparse-checkout: |
+            /*
+            !/docs/gtm/video/
+          sparse-checkout-cone-mode: false
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -411,6 +441,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Skip docs/gtm/video (~825 MB of demo cuts no job reads): ~60 s per checkout.
+          sparse-checkout: |
+            /*
+            !/docs/gtm/video/
+          sparse-checkout-cone-mode: false
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -465,6 +501,12 @@ jobs:
         ports: ['6379:6379']
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Skip docs/gtm/video (~825 MB of demo cuts no job reads): ~60 s per checkout.
+          sparse-checkout: |
+            /*
+            !/docs/gtm/video/
+          sparse-checkout-cone-mode: false
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
