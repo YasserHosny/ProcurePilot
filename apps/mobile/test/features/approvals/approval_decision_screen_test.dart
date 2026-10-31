@@ -234,6 +234,29 @@ void main() {
       },
     );
 
+    testWidgets(
+      'a retried group approval reuses its Idempotency-Key, so a lost response replays',
+      (tester) async {
+        await pumpDecision(tester, splitGroup());
+        fakeApprovalsClient.groupDecisionError = Exception('connection lost');
+        await tapDecision(tester, 'Approve');
+        expect(find.byType(ApprovalDecisionScreen), findsOneWidget);
+
+        fakeApprovalsClient.groupDecisionError = null;
+        await tapDecision(tester, 'Approve');
+
+        expect(fakeApprovalsClient.approveGroupCalls, [
+          splitGroupId,
+          splitGroupId,
+        ]);
+        final keys = fakeApprovalsClient.groupDecisionKeys;
+        expect(keys, hasLength(2));
+        expect(keys.first, isNotNull);
+        expect(keys.last, keys.first);
+        expect(find.byType(ApprovalDecisionScreen), findsNothing);
+      },
+    );
+
     testWidgets('rejects the whole group once with the reason', (tester) async {
       await pumpDecision(tester, splitGroup());
       await enterComment(tester, 'Too expensive');

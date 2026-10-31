@@ -10,6 +10,7 @@ export interface ConfirmDialogData {
   readonly messageParams?: Record<string, unknown>;
   readonly itemName?: string;
   readonly confirmKey: string;
+  readonly confirmParams?: Record<string, unknown>;
   readonly cancelKey?: string;
   readonly isDestructive?: boolean;
   readonly warningKey?: string;

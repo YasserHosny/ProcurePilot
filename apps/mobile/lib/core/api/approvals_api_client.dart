@@ -47,31 +47,48 @@ class ApprovalsApiClient {
   }
 
   /// Approves the entire split in one transaction, never individual requests.
+  ///
+  /// Pass the same [idempotencyKey] when retrying one decision, so a retry after a lost
+  /// response replays the recorded answer instead of reading as someone else's decision.
   Future<List<PurchaseRequest>> approveGroup(
     String groupId, {
     String? comment,
+    String? idempotencyKey,
   }) {
-    return _decideGroup(groupId, action: 'approve', comment: comment);
+    return _decideGroup(
+      groupId,
+      action: 'approve',
+      comment: comment,
+      idempotencyKey: idempotencyKey,
+    );
   }
 
-  /// Rejects the entire split with one required reason.
+  /// Rejects the entire split with one required reason. See [approveGroup] for
+  /// [idempotencyKey].
   Future<List<PurchaseRequest>> rejectGroup(
     String groupId, {
     required String comment,
+    String? idempotencyKey,
   }) {
-    return _decideGroup(groupId, action: 'reject', comment: comment);
+    return _decideGroup(
+      groupId,
+      action: 'reject',
+      comment: comment,
+      idempotencyKey: idempotencyKey,
+    );
   }
 
   Future<List<PurchaseRequest>> _decideGroup(
     String groupId, {
     required String action,
     String? comment,
+    String? idempotencyKey,
   }) async {
     final uri = Uri.parse('$apiBaseUrl/request-groups/$groupId/$action');
     final trimmedComment = comment?.trim();
     final response = await _httpClient.post(
       uri,
-      headers: _headers(idempotencyKey: const Uuid().v4()),
+      headers: _headers(idempotencyKey: idempotencyKey ?? const Uuid().v4()),
       body: jsonEncode({
         if (trimmedComment != null && trimmedComment.isNotEmpty)
           'comment': trimmedComment,

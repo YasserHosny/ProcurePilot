@@ -66,7 +66,11 @@
                 data-testid="confirm-expired-checkbox"
                 class="expired-checkbox"
               >
-                {{ 'basketSplit.prepareRequests.dialog.confirmExpired' | translate: { supplier: eq.supplier_name || eq.id } }}
+                @if (eq.supplier_name) {
+                  {{ 'basketSplit.prepareRequests.dialog.confirmExpired' | translate: { supplier: eq.supplier_name } }}
+                } @else {
+                  {{ 'basketSplit.prepareRequests.dialog.confirmExpiredGeneric' | translate: { id: eq.id } }}
+                }
               </mat-checkbox>
             }
           </div>
