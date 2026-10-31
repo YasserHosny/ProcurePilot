@@ -345,7 +345,9 @@
     Both versions put the landed total on the same basis (including VAT, delivery and discount).
     For that reason the latest offer per supplier is chosen across rule versions: the readers'
     `row_number()` window no longer partitions by `rule_version`, so a version bump never splits a
-    supplier into two offers.
+    supplier into two offers. A decision's cost is its latest landed_cost row: readers that list
+    offers, price history or alert rows read the `current_landed_cost` view, so a decision with a
+    v1 and a v2 row is counted once. The earlier row stays as evidence.
   - **Purchase orders are net + tax.** An order line priced from a VAT-inclusive quote gets
     net unit price = `gross / (1 + r)` rounded to 4 dp, and line tax = gross line total − net line
     total. The order total therefore equals the printed total exactly, with no cent drift.
