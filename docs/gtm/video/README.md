@@ -18,6 +18,11 @@ are unchanged; history before 2026-10-31 still holds the old copies.
   `git lfs install --local && git lfs pull --include="docs/gtm/video/**" --exclude=""`
   (or one cut: `--include="docs/gtm/video/cuts/v2.5/**"`). The empty `--exclude` matters: without it the
   `fetchexclude` in `.lfsconfig` wins and nothing is downloaded.
+- **On a machine where you work on the videos, turn the exclusion off for that repo**:
+  `git config lfs.fetchexclude ""` (repo config beats `.lfsconfig`, and every worktree shares it). Without it, the
+  next `git pull` or checkout that touches a cut replaces the real file with its pointer. The video is not lost
+  (`git lfs checkout docs/gtm/video` restores it from the local store), but scripts that read renders break. The
+  dev machine has this set since 2026-10-31.
 - **To commit a new or re-rendered cut**, git-lfs must be installed and enabled in the repo
   (`git lfs install --local`). On the dev machine it is (`~/.local/bin/git-lfs`, shared by every worktree). Then
   `git add` stores the file in LFS automatically; check with `git lfs ls-files`. Without git-lfs the file would go
