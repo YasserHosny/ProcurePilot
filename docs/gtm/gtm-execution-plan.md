@@ -135,7 +135,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-99 | PPS-130 | P-100 | PPS-131 | P-101 | PPS-132 |
 | P-102 | PPS-133 | | | | |
 | P-104 | PPS-135 | P-105 | PPS-136 | P-106 | PPS-137 |
-| P-107 | PPS-138 | P-108 | PPS-139 | | |
+| P-107 | PPS-138 | P-108 | PPS-139 | P-109 | PPS-140 |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -301,6 +301,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [x] P-106 | — | The phone's approval list was empty whenever a pending request had no budget: since #112 the API sends `budget_status.remaining_amount = null` («no budget»), and the app's `BudgetStatus.fromJson` threw on it, so nothing could be approved on the phone on a workspace without budgets. Found in the 023/024 round-1 re-walk; the amount is now optional and the screens show «No budget configured» | Orch (Codex) | — | Done (PPS-137), #368; proven live in the round-1 re-walk |
 | [ ] P-107 | — | «Dependency audit» failed on main and every PR: new advisories CVE-2026-119194..119197 on `pyasn1 0.6.4` (transitive via python-jose and rsa, `apps/api` only). `pyasn1>=0.6.5` added as a uv constraint, lock regenerated; no new `--ignore-vuln` | Orch (Claude) | — | In Review (PPS-138) |
 | [ ] P-108 | — | After switching the language from the account menu, money, dates and quantities stayed in the previous language until a reload («ر.س ٨٦» on RFQ Responses in English). `formatMoney`, `formatDate` and `formatQuantity` were pure pipes, so a language switch never re-ran them. They now re-render on `onLangChange` (memoised, `markForCheck` for OnPush). The two built-in `\| date` uses moved to `formatDate`; the `\| percent` on quotation lines still uses the static locale | Orch (Cursor) | — | In Review (PPS-139) |
+| [ ] P-109 | — | CI `actions/checkout` grew from ~3 s to 50–75 s per job: the HEAD tree is 0.91 GB, 825 MB of it demo-video cuts in `docs/gtm/video/` that no job reads. Every checkout but the secret scan now uses a sparse checkout without that folder (blob:none, so the videos are never fetched) | Orch | — | PR merged with every required check green on its head commit; measured checkout and shard times recorded in `docs/operations/ci-pipeline.md` (PPS-140) |
 
 ### E — Pilot environment
 
