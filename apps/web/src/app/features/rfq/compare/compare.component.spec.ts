@@ -1055,6 +1055,609 @@ describe('CompareComponent (RFQ)', () => {
       }
     });
   });
+
+  describe('PPS-123 & PPS-124: RFQ line minima, split hint, and converted state', () => {
+    const createD8f7fb0cFixtures = () => {
+      const rfqLines = [
+        {
+          id: 'line-flour',
+          tenant_id: 'tenant-1',
+          rfq_id: 'rfq-1',
+          workspace_product_id: 'prod-flour',
+          quantity: '10',
+          created_at: '2026-09-25T09:00:00Z',
+        },
+        {
+          id: 'line-oil',
+          tenant_id: 'tenant-1',
+          rfq_id: 'rfq-1',
+          workspace_product_id: 'prod-oil',
+          quantity: '10',
+          created_at: '2026-09-25T09:00:00Z',
+        },
+        {
+          id: 'line-sugar',
+          tenant_id: 'tenant-1',
+          rfq_id: 'rfq-1',
+          workspace_product_id: 'prod-sugar',
+          quantity: '10',
+          created_at: '2026-09-25T09:00:00Z',
+        },
+        {
+          id: 'line-rice',
+          tenant_id: 'tenant-1',
+          rfq_id: 'rfq-1',
+          workspace_product_id: 'prod-rice',
+          quantity: '10',
+          created_at: '2026-09-25T09:00:00Z',
+        },
+      ];
+
+      const respDahabi: RfqResponseComparison = {
+        id: 'resp-dahabi',
+        rfq_id: 'rfq-1',
+        supplier_id: 'supp-dahabi',
+        quotation_id: 'quote-dahabi',
+        quotation_status: 'reviewed',
+        submitted_at: '2026-10-25T10:00:00Z',
+        lines: [
+          {
+            workspace_product_id: 'prod-oil',
+            original_text: 'Oil 10L',
+            quoted_quantity: '10',
+            quoted_unit_price_amount: '150.00',
+            quoted_unit_price_currency: 'SAR',
+            pending_match: false,
+          },
+          {
+            workspace_product_id: 'prod-sugar',
+            original_text: 'Sugar 50kg',
+            quoted_quantity: '10',
+            quoted_unit_price_amount: '38.00',
+            quoted_unit_price_currency: 'SAR',
+            pending_match: false,
+          },
+          {
+            workspace_product_id: 'prod-rice',
+            original_text: 'Rice 20kg',
+            quoted_quantity: '10',
+            quoted_unit_price_amount: '150.00',
+            quoted_unit_price_currency: 'SAR',
+            pending_match: false,
+          },
+          {
+            workspace_product_id: 'prod-flour',
+            original_text: 'Flour 25kg',
+            quoted_quantity: '10',
+            quoted_unit_price_amount: '145.00',
+            quoted_unit_price_currency: 'SAR',
+            pending_match: false,
+          },
+        ],
+        rfq_landed_costs: [
+          { workspace_product_id: 'prod-flour', total_amount: '1230', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-oil', total_amount: '1500', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-sugar', total_amount: '380', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-rice', total_amount: '1720', total_currency: 'SAR' },
+        ],
+        guardrail_evaluations: [
+          {
+            guardrail_id: 'g-1',
+            fired: true,
+            reason: 'fired',
+            purchase_request_id: '34049121-0000-0000-0000-000000000000',
+          },
+        ],
+      };
+
+      const respWafra: RfqResponseComparison = {
+        id: 'resp-wafra',
+        rfq_id: 'rfq-1',
+        supplier_id: 'supp-wafra',
+        quotation_id: 'quote-wafra',
+        quotation_status: 'reviewed',
+        submitted_at: '2026-10-25T10:30:00Z',
+        lines: [
+          {
+            workspace_product_id: 'prod-oil',
+            original_text: 'Oil 10L',
+            quoted_quantity: '10',
+            quoted_unit_price_amount: '146.00',
+            quoted_unit_price_currency: 'SAR',
+            pending_match: false,
+          },
+          {
+            workspace_product_id: 'prod-sugar',
+            original_text: 'Sugar 50kg',
+            quoted_quantity: '10',
+            quoted_unit_price_amount: '36.00',
+            quoted_unit_price_currency: 'SAR',
+            pending_match: false,
+          },
+          {
+            workspace_product_id: 'prod-rice',
+            original_text: 'Rice 20kg',
+            quoted_quantity: '10',
+            quoted_unit_price_amount: '155.00',
+            quoted_unit_price_currency: 'SAR',
+            pending_match: false,
+          },
+          {
+            workspace_product_id: 'prod-flour',
+            original_text: 'Flour 25kg',
+            quoted_quantity: '10',
+            quoted_unit_price_amount: '148.50',
+            quoted_unit_price_currency: 'SAR',
+            pending_match: false,
+          },
+        ],
+        rfq_landed_costs: [
+          { workspace_product_id: 'prod-flour', total_amount: '1275', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-oil', total_amount: '1460', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-sugar', total_amount: '360', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-rice', total_amount: '1760', total_currency: 'SAR' },
+        ],
+        guardrail_evaluations: [
+          {
+            guardrail_id: 'g-1',
+            fired: false,
+            reason: 'not_lowest_price',
+          },
+        ],
+      };
+
+      return { respDahabi, respWafra, rfqLines };
+    };
+
+    const applyD8f7fb0cDetail = (rfqLines: RfqDetail['lines'], status: RfqDetail['rfq']['status'] = 'responded') => {
+      component.rfqDetail.set({
+        ...sentDetail,
+        rfq: { ...sentDetail.rfq, status },
+        lines: rfqLines,
+      });
+    };
+
+    it('per-line minima: oil and sugar lines of الوفرة carry lowest-line-price, rice and flour of الذهبي do', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      component.responses.set([respDahabi, respWafra]);
+      fixture.detectChanges();
+
+      expect(component.isLowestLinePrice(respWafra, respWafra.lines[0])).toBeTrue();
+      expect(component.isLowestLinePrice(respWafra, respWafra.lines[1])).toBeTrue();
+      expect(component.isLowestLinePrice(respWafra, respWafra.lines[2])).toBeFalse();
+      expect(component.isLowestLinePrice(respWafra, respWafra.lines[3])).toBeFalse();
+
+      expect(component.isLowestLinePrice(respDahabi, respDahabi.lines[0])).toBeFalse();
+      expect(component.isLowestLinePrice(respDahabi, respDahabi.lines[1])).toBeFalse();
+      expect(component.isLowestLinePrice(respDahabi, respDahabi.lines[2])).toBeTrue();
+      expect(component.isLowestLinePrice(respDahabi, respDahabi.lines[3])).toBeTrue();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const cards = compiled.querySelectorAll('.response-card');
+      expect(cards.length).toBe(2);
+
+      const dahabiRows = cards[0].querySelectorAll('tbody tr');
+      expect(dahabiRows.length).toBe(4);
+      expect(dahabiRows[0].querySelector('[data-testid="lowest-line-price"]')).toBeNull();
+      expect(dahabiRows[1].querySelector('[data-testid="lowest-line-price"]')).toBeNull();
+      expect(dahabiRows[2].querySelector('[data-testid="lowest-line-price"]')).not.toBeNull();
+      expect(dahabiRows[3].querySelector('[data-testid="lowest-line-price"]')).not.toBeNull();
+      expect(dahabiRows[2].classList.contains('best')).toBeTrue();
+      expect(dahabiRows[3].classList.contains('best')).toBeTrue();
+
+      const wafraRows = cards[1].querySelectorAll('tbody tr');
+      expect(wafraRows.length).toBe(4);
+      expect(wafraRows[0].querySelector('[data-testid="lowest-line-price"]')).not.toBeNull();
+      expect(wafraRows[1].querySelector('[data-testid="lowest-line-price"]')).not.toBeNull();
+      expect(wafraRows[2].querySelector('[data-testid="lowest-line-price"]')).toBeNull();
+      expect(wafraRows[3].querySelector('[data-testid="lowest-line-price"]')).toBeNull();
+      expect(wafraRows[0].classList.contains('best')).toBeTrue();
+      expect(wafraRows[1].classList.contains('best')).toBeTrue();
+    });
+
+    it('per-line minima: a product with the same landed cost by both is marked on neither', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      // Make rice identical landed cost on both
+      respWafra.rfq_landed_costs = respWafra.rfq_landed_costs!.map((c) =>
+        c.workspace_product_id === 'prod-rice' ? { ...c, total_amount: '1720' } : c,
+      );
+      component.responses.set([respDahabi, respWafra]);
+      fixture.detectChanges();
+
+      expect(component.isLowestLinePrice(respDahabi, respDahabi.lines[2])).toBeFalse();
+      expect(component.isLowestLinePrice(respWafra, respWafra.lines[2])).toBeFalse();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const cards = compiled.querySelectorAll('.response-card');
+      const dahabiRiceRow = cards[0].querySelectorAll('tbody tr')[2];
+      const wafraRiceRow = cards[1].querySelectorAll('tbody tr')[2];
+      expect(dahabiRiceRow.querySelector('[data-testid="lowest-line-price"]')).toBeNull();
+      expect(wafraRiceRow.querySelector('[data-testid="lowest-line-price"]')).toBeNull();
+    });
+
+    it('per-line minima: quoted quantity differences do not block marks; a pending line still does', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      // Different quoted quantities — marks still follow landed costs
+      const wafraDiffQty = {
+        ...respWafra,
+        lines: [
+          ...respWafra.lines.slice(0, 3),
+          { ...respWafra.lines[3], quoted_quantity: '20' },
+        ],
+      };
+      component.responses.set([respDahabi, wafraDiffQty]);
+      fixture.detectChanges();
+
+      let compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(4);
+
+      // Pending line — not eligible → no marks
+      const wafraPending = {
+        ...respWafra,
+        lines: [
+          ...respWafra.lines.slice(0, 3),
+          { ...respWafra.lines[3], pending_match: true },
+        ],
+      };
+      component.responses.set([respDahabi, wafraPending]);
+      fixture.detectChanges();
+
+      compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(0);
+    });
+
+    it('split hint: shows SAR 60, sits right above the one Split action (splitRfq) on an open RFQ, keeps the text when converted, and has no bare route link', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines, 'responded');
+      component.responses.set([respDahabi, respWafra]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const hint = compiled.querySelector('[data-testid="split-saving-hint"]');
+      expect(hint).not.toBeNull();
+      expect(hint?.textContent).toContain('60');
+
+      // (a) open RFQ, writer, eligible -> the hint has no Split button of its own; the RFQ's one Split
+      // action follows it directly and calls rfqApi.splitRfq with the RFQ id
+      mockRfqApi.splitRfq.calls.reset();
+      mockRfqApi.splitRfq.and.returnValue(
+        of({ id: 'job-split-hint', rfq_id: 'rfq-1' } as unknown as BasketSplitJob),
+      );
+      expect(hint?.querySelector('button')).toBeNull();
+      const splitButtons = compiled.querySelectorAll<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitButtons.length).toBe(1);
+      const actionBtn = splitButtons[0];
+      expect(hint?.nextElementSibling?.contains(actionBtn)).toBeTrue();
+      expect(actionBtn.disabled).toBeFalse();
+      actionBtn.click();
+      expect(mockRfqApi.splitRfq).toHaveBeenCalledWith('rfq-1', jasmine.any(String));
+
+      // (b) converted RFQ -> the hint text with SAR 60 is shown and the action is absent
+      component.rfqDetail.set({
+        ...sentDetail,
+        rfq: { ...sentDetail.rfq, status: 'converted' },
+        lines: rfqLines,
+        converted_purchase_request_ids: ['pr-single-34049121'],
+      });
+      fixture.detectChanges();
+
+      const convertedHint = compiled.querySelector('[data-testid="split-saving-hint"]');
+      expect(convertedHint).not.toBeNull();
+      expect(convertedHint?.textContent).toContain('60');
+      expect(convertedHint?.querySelector('button')).toBeNull();
+      expect(compiled.querySelector('[data-testid="rfq-compare-split-button"]')).toBeNull();
+
+      // (c) no element in the hint has an href ending in /offers/basket-split
+      const anyHintLinks = Array.from(convertedHint?.querySelectorAll<HTMLAnchorElement>('a') ?? []);
+      for (const link of anyHintLinks) {
+        expect(link.getAttribute('href') ?? '').not.toMatch(/\/offers\/basket-split$/);
+      }
+    });
+
+    it('split hint: absent when per-line minimum equals the lowest total (one supplier cheapest everywhere)', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      // Make الذهبي cheaper on all landed costs
+      const wafraExpensive = {
+        ...respWafra,
+        rfq_landed_costs: respWafra.rfq_landed_costs!.map((c) => ({
+          ...c,
+          total_amount: String(Number(c.total_amount) + 500),
+        })),
+      };
+      component.responses.set([respDahabi, wafraExpensive]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+    });
+
+    it('split hint: absent when not comparable', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      // Mixed landed-cost currencies
+      const wafraUsd = {
+        ...respWafra,
+        rfq_landed_costs: respWafra.rfq_landed_costs!.map((c) => ({
+          ...c,
+          total_currency: 'USD',
+        })),
+      };
+      component.responses.set([respDahabi, wafraUsd]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+    });
+
+    it('landed costs: marks and hint follow RFQ landed costs even when quoted quantity differs', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      // Quoted qty differs from RFQ, but landed costs make الذهبي cheapest on all four → no hint, all marks on الذهبي
+      const dahabiDiffQty = {
+        ...respDahabi,
+        lines: respDahabi.lines.map((l) => ({ ...l, quoted_quantity: '7' })),
+        rfq_landed_costs: [
+          { workspace_product_id: 'prod-flour', total_amount: '1000', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-oil', total_amount: '1000', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-sugar', total_amount: '1000', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-rice', total_amount: '1000', total_currency: 'SAR' },
+        ],
+      };
+      const wafraDiffQty = {
+        ...respWafra,
+        lines: respWafra.lines.map((l) => ({ ...l, quoted_quantity: '12' })),
+        rfq_landed_costs: [
+          { workspace_product_id: 'prod-flour', total_amount: '1100', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-oil', total_amount: '1100', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-sugar', total_amount: '1100', total_currency: 'SAR' },
+          { workspace_product_id: 'prod-rice', total_amount: '1100', total_currency: 'SAR' },
+        ],
+      };
+      component.responses.set([dahabiDiffQty, wafraDiffQty]);
+      fixture.detectChanges();
+
+      expect(component.splitSaving()).toBeNull();
+      expect(component.isLowestLinePrice(dahabiDiffQty, dahabiDiffQty.lines[0])).toBeTrue();
+      expect(component.isLowestLinePrice(dahabiDiffQty, dahabiDiffQty.lines[1])).toBeTrue();
+      expect(component.isLowestLinePrice(dahabiDiffQty, dahabiDiffQty.lines[2])).toBeTrue();
+      expect(component.isLowestLinePrice(dahabiDiffQty, dahabiDiffQty.lines[3])).toBeTrue();
+      expect(component.isLowestLinePrice(wafraDiffQty, wafraDiffQty.lines[0])).toBeFalse();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+      const cards = compiled.querySelectorAll('.response-card');
+      expect(cards[0].querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(4);
+      expect(cards[1].querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(0);
+    });
+
+    it('landed costs: a delivery charge that flips the cheapest supplier moves the mark', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      // Base: oil mark is on الوفرة (1460 < 1500). Delivery charge on wafra oil flips it.
+      const wafraWithDelivery = {
+        ...respWafra,
+        rfq_landed_costs: respWafra.rfq_landed_costs!.map((c) =>
+          c.workspace_product_id === 'prod-oil' ? { ...c, total_amount: '1550' } : c,
+        ),
+      };
+      component.responses.set([respDahabi, wafraWithDelivery]);
+      fixture.detectChanges();
+
+      expect(component.isLowestLinePrice(respDahabi, respDahabi.lines[0])).toBeTrue();
+      expect(component.isLowestLinePrice(wafraWithDelivery, wafraWithDelivery.lines[0])).toBeFalse();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const cards = compiled.querySelectorAll('.response-card');
+      expect(cards[0].querySelectorAll('tbody tr')[0].querySelector('[data-testid="lowest-line-price"]')).not.toBeNull();
+      expect(cards[1].querySelectorAll('tbody tr')[0].querySelector('[data-testid="lowest-line-price"]')).toBeNull();
+    });
+
+    it('landed costs: missing a landed cost for one RFQ product → no marks, no hint', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      const wafraMissing = {
+        ...respWafra,
+        rfq_landed_costs: respWafra.rfq_landed_costs!.filter((c) => c.workspace_product_id !== 'prod-rice'),
+      };
+      component.responses.set([respDahabi, wafraMissing]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(0);
+      expect(compiled.querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+      expect(component.splitSaving()).toBeNull();
+    });
+
+    it('landed costs: supplier_terms_apply true keeps marks but hides the hint', () => {
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      const wafraWithTerms = { ...respWafra, supplier_terms_apply: true };
+      component.responses.set([respDahabi, wafraWithTerms]);
+      fixture.detectChanges();
+
+      expect(component.isLowestLinePrice(wafraWithTerms, wafraWithTerms.lines[0])).toBeTrue();
+      expect(component.isLowestLinePrice(wafraWithTerms, wafraWithTerms.lines[1])).toBeTrue();
+      expect(component.isLowestLinePrice(respDahabi, respDahabi.lines[2])).toBeTrue();
+      expect(component.isLowestLinePrice(respDahabi, respDahabi.lines[3])).toBeTrue();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(4);
+      expect(compiled.querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+      expect(component.splitSaving()).toBeNull();
+    });
+
+    it('landed costs: absent entirely (older API) → no marks, no hint; Lowest total chip unchanged', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines);
+      const { rfq_landed_costs: _d, ...dahabiLegacy } = respDahabi;
+      const { rfq_landed_costs: _w, ...wafraLegacy } = respWafra;
+      void _d;
+      void _w;
+      component.responses.set([dahabiLegacy, wafraLegacy]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(0);
+      expect(compiled.querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+
+      // Quoted totals still comparable → Lowest total chip on الذهبي (4830 < 4855)
+      expect(component.lowestTotalResponseIds()).toEqual(new Set(['resp-dahabi']));
+      const chips = compiled.querySelectorAll('.pp-chip-best');
+      expect(chips.length).toBe(1);
+      expect(chips[0].textContent?.trim()).toBe('Lowest total');
+    });
+
+    it('fired state: fired outcome has the fired class, the draft link points to /requests/<purchase_request_id>; no link when purchase_request_id is null', () => {
+      const { respDahabi } = createD8f7fb0cFixtures();
+      component.responses.set([respDahabi]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const firedReason = compiled.querySelector('.outcome-reason.fired');
+      expect(firedReason).not.toBeNull();
+
+      const draftLink = compiled.querySelector<HTMLAnchorElement>('[data-testid="guardrail-draft-link"]');
+      expect(draftLink).not.toBeNull();
+      expect(draftLink?.getAttribute('href')).toBe('/requests/34049121-0000-0000-0000-000000000000');
+
+      // When purchase_request_id is null
+      const respNoDraft = {
+        ...respDahabi,
+        guardrail_evaluations: [
+          {
+            guardrail_id: 'g-1',
+            fired: true,
+            reason: 'fired',
+            purchase_request_id: null,
+          },
+        ],
+      };
+      component.responses.set([respNoDraft]);
+      fixture.detectChanges();
+
+      expect(compiled.querySelector('[data-testid="guardrail-draft-link"]')).toBeNull();
+    });
+
+    it('converted with one request: no enabled Prepare Request on any card; «Open request» links to /requests/<id>', () => {
+      const { respDahabi, respWafra } = createD8f7fb0cFixtures();
+      component.rfqDetail.set({
+        ...sentDetail,
+        rfq: { ...sentDetail.rfq, status: 'converted' },
+        converted_purchase_request_ids: ['pr-single-34049121'],
+      });
+      component.responses.set([respDahabi, respWafra]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      // Prepare Request button should be replaced
+      const openReqLinks = compiled.querySelectorAll<HTMLAnchorElement>('[data-testid="rfq-compare-open-request"]');
+      expect(openReqLinks.length).toBe(2);
+      expect(openReqLinks[0].getAttribute('href')).toBe('/requests/pr-single-34049121');
+      expect(openReqLinks[1].getAttribute('href')).toBe('/requests/pr-single-34049121');
+
+      // Calling prepareRequest returns early
+      mockRfqApi.prepareRequest.calls.reset();
+      component.prepareRequest(respDahabi);
+      expect(mockRfqApi.prepareRequest).not.toHaveBeenCalled();
+    });
+
+    it('converted with two requests: Prepare Request disabled on every card and converted-reason shown', () => {
+      const { respDahabi, respWafra } = createD8f7fb0cFixtures();
+      component.rfqDetail.set({
+        ...sentDetail,
+        rfq: { ...sentDetail.rfq, status: 'converted' },
+        converted_purchase_request_ids: ['pr-1', 'pr-2'],
+      });
+      component.responses.set([respDahabi, respWafra]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('[data-testid="rfq-compare-open-request"]')).toBeNull();
+
+      const reasons = compiled.querySelectorAll('[data-testid="converted-reason"]');
+      expect(reasons.length).toBe(2);
+      expect(reasons[0].textContent).toContain('rfq.compare.convertedReason');
+
+      // Buttons are disabled
+      const cards = compiled.querySelectorAll('.response-card');
+      const btn0 = cards[0].querySelector<HTMLButtonElement>('.prepare-buttons-row button');
+      expect(btn0?.disabled).toBeTrue();
+    });
+
+    it('open (status responded): Prepare Request enabled as today; no open-request link; no converted reason', () => {
+      const { respDahabi, respWafra } = createD8f7fb0cFixtures();
+      component.rfqDetail.set({
+        ...sentDetail,
+        rfq: { ...sentDetail.rfq, status: 'responded' },
+      });
+      component.responses.set([respDahabi, respWafra]);
+      component.selectedBranchId.set('branch-1');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('[data-testid="rfq-compare-open-request"]')).toBeNull();
+      expect(compiled.querySelector('[data-testid="converted-reason"]')).toBeNull();
+
+      const cards = compiled.querySelectorAll('.response-card');
+      const btn0 = cards[0].querySelector<HTMLButtonElement>('.prepare-buttons-row button');
+      expect(btn0?.disabled).toBeFalse();
+    });
+
+    it('rfq_converted reason renders its translation key', () => {
+      const { respDahabi } = createD8f7fb0cFixtures();
+      const respConverted = {
+        ...respDahabi,
+        guardrail_evaluations: [
+          {
+            guardrail_id: 'g-1',
+            fired: false,
+            reason: 'rfq_converted',
+          },
+        ],
+      };
+      component.responses.set([respConverted]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.textContent).toContain('rfq.guardrails.reasons.rfq_converted');
+    });
+
+    it('handles 409 rfq_already_converted in prepareRequest by showing alreadyConverted and reloading data', () => {
+      const { respDahabi } = createD8f7fb0cFixtures();
+      component.rfqDetail.set(sentDetail);
+      component.responses.set([respDahabi]);
+      component.selectedBranchId.set('branch-1');
+
+      mockRfqApi.prepareRequest.and.returnValue(
+        throwError(() => new HttpErrorResponse({
+          status: 409,
+          error: { details: { reason: 'rfq_already_converted' } },
+        })),
+      );
+      spyOn(component, 'loadData');
+
+      component.prepareRequest(respDahabi);
+
+      expect(mockSnackBar.open).toHaveBeenCalledWith(
+        'rfq.compare.alreadyConverted',
+        'rfq.history.dismiss',
+        { duration: 5000 },
+      );
+      expect(component.loadData).toHaveBeenCalledWith('rfq-1');
+    });
+  });
 });
 
 describe('RFQ quantity display', () => {

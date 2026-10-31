@@ -202,7 +202,7 @@ def explain_guardrail_evaluations(
             explanations.append(GuardrailExplanation(guardrail.id, True, "fired"))
             continue
         if rfq_status not in ("sent", "responded"):
-            reason = "rfq_not_open"
+            reason = "rfq_converted" if rfq_status == "converted" else "rfq_not_open"
         elif total_response_count < guardrail.min_response_count:
             reason = "min_response_count_not_met"
         elif responses_pending:

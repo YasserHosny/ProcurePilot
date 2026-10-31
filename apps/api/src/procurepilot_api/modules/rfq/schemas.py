@@ -108,6 +108,15 @@ class RfqGuardrailEvaluation(BaseModel):
     guardrail_id: UUID
     fired: bool
     reason: str
+    purchase_request_id: UUID | None = None
+
+
+class RfqProductLandedCost(BaseModel):
+    """A reply's landed cost for the RFQ's quantity of one product, priced as the split does."""
+
+    workspace_product_id: UUID
+    total_amount: Decimal
+    total_currency: str
 
 
 class RfqResponseComparison(BaseModel):
@@ -121,6 +130,10 @@ class RfqResponseComparison(BaseModel):
     quotation_status: QuotationStatus
     lines: list[RfqResponseLineComparison]
     guardrail_evaluations: list[RfqGuardrailEvaluation] = Field(default_factory=list)
+    rfq_landed_costs: list[RfqProductLandedCost] = Field(default_factory=list)
+    # The supplier has a delivery fee, minimum order or quantity tiers in force; the split
+    # prices those, a per-product comparison cannot.
+    supplier_terms_apply: bool = False
 
 
 class RfqResponseComparisonList(BaseModel):
