@@ -454,6 +454,14 @@ def test_preparation_conflicts(monkeypatch: pytest.MonkeyPatch, queue: list, cha
         _assert_empty(fixture)
         if change == "expired":
             assert response.json()["details"]["quotation_ids"] == [str(fixture.quotation_ids[0])]
+            # Each expired quote names its supplier, so the buyer is warned about a supplier,
+            # not a quotation id.
+            assert response.json()["details"]["expired_quotations"] == [
+                {
+                    "quotation_id": str(fixture.quotation_ids[0]),
+                    "supplier_id": str(fixture.supplier_ids[0]),
+                }
+            ]
             confirmed = _prepare(
                 fixture, job_id, confirm_expired_quotation_ids=[str(fixture.quotation_ids[0])]
             )

@@ -4,6 +4,8 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
+import enCatalog from '../../../../../../../packages/i18n/en.json';
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 
 import { toLocalMidnightIso } from '../../../core/format/iso-date';
 import {
@@ -37,6 +39,7 @@ describe('OutcomeFromOrderComponent', () => {
         base_unit: 'each',
         unit_price: { amount: '5.5000', currency: 'EGP' },
         total_paid: { amount: '330.0000', currency: 'EGP' },
+        tax: { amount: '0.0000', currency: 'EGP' },
         recordable: true,
         reason: null,
         recorded_saving_id: null,
@@ -52,6 +55,7 @@ describe('OutcomeFromOrderComponent', () => {
         base_unit: 'each',
         unit_price: { amount: '50.0000', currency: 'EGP' },
         total_paid: { amount: '50.0000', currency: 'EGP' },
+        tax: { amount: '0.0000', currency: 'EGP' },
         recordable: false,
         reason: 'no_product',
         recorded_saving_id: null,
@@ -116,6 +120,35 @@ describe('OutcomeFromOrderComponent', () => {
     expect(totalInput?.value).toBe('330');
     expect(component.lines()[0].quantity).toBe('60');
     expect(component.lines()[0].total).toBe('330');
+  });
+
+  it('keeps the net total trimmed and shows the excluded tax in both languages', async () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    api.getPurchasePrefill.and.returnValue(of({ ...prefill, lines: [{ ...prefill.lines[0],
+      total_paid: { amount: '1200.0000', currency: 'SAR' },
+      tax: { amount: '180.0000', currency: 'SAR' },
+    }] }));
+    component.load();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector<HTMLInputElement>('[data-testid="line-total"]')?.value).toBe('1200');
+    expect(host.querySelector('[data-testid="excluded-tax-hint"]')?.textContent).toContain('Excludes tax');
+    expect(host.querySelector('[data-testid="excluded-tax-hint"]')?.textContent).toContain('180');
+    translate.use('ar');
+    fixture.detectChanges();
+    expect(host.querySelector('[data-testid="excluded-tax-hint"]')?.textContent).toContain('لا يشمل الضريبة');
+  });
+
+  it('does not show an excluded-tax hint for zero tax', () => {
+    api.getPurchasePrefill.and.returnValue(of({ ...prefill, lines: [{ ...prefill.lines[0],
+      tax: { amount: '0.0000', currency: 'EGP' },
+    }] }));
+    component.load();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="excluded-tax-hint"]')).toBeNull();
   });
 
   it('sends trimmed values when saving unedited pre-filled line', () => {

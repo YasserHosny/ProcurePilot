@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
 
 import psycopg
 from psycopg.rows import dict_row
@@ -36,6 +37,7 @@ from procurepilot_api.modules.rfq.schemas import (
     RfqLine,
     RfqList,
     RfqPrepareRequestResponse,
+    RfqProductLandedCost,
     RfqRecipient,
     RfqResponseComparison,
     RfqResponseComparisonList,
@@ -597,16 +599,22 @@ class RfqService:
                 )
                 if snapshot is not None and snapshot.guardrails:
                     cur.execute(
-                        "select guardrail_id, rfq_response_id "
+                        "select guardrail_id, rfq_response_id, purchase_request_id "
                         "from auto_preparation_event "
                         "where tenant_id = %s and rfq_response_id = any(%s)",
                         (member.tenant_id, response_ids),
                     )
                     fired_by_response: dict[uuid.UUID, set[uuid.UUID]] = {}
+                    request_by_fired_guardrail: dict[
+                        tuple[uuid.UUID, uuid.UUID], uuid.UUID | None
+                    ] = {}
                     for event in cur.fetchall():
                         fired_by_response.setdefault(event["rfq_response_id"], set()).add(
                             event["guardrail_id"]
                         )
+                        request_by_fired_guardrail[
+                            (event["rfq_response_id"], event["guardrail_id"])
+                        ] = event["purchase_request_id"]
                     for response_id in response_ids:
                         explanations = explain_guardrail_evaluations(
                             guardrails=snapshot.guardrails,
@@ -623,6 +631,11 @@ class RfqService:
                                 guardrail_id=item.guardrail_id,
                                 fired=item.fired,
                                 reason=item.reason,
+                                purchase_request_id=(
+                                    request_by_fired_guardrail.get((response_id, item.guardrail_id))
+                                    if item.fired
+                                    else None
+                                ),
                             )
                             for item in explanations
                         ]
@@ -654,6 +667,13 @@ class RfqService:
                                 "pending_match": pending,
                             }
                         )
+
+                landed_by_response, terms_by_response = _rfq_landed_costs(
+                    cur, tenant_id=member.tenant_id, rfq_id=rfq_id
+                )
+                for resp_id, data in responses_by_id.items():
+                    data["rfq_landed_costs"] = landed_by_response.get(resp_id, [])
+                    data["supplier_terms_apply"] = terms_by_response.get(resp_id, False)
 
                 comparisons = [RfqResponseComparison(**data) for data in responses_by_id.values()]
                 return RfqResponseComparisonList(items=comparisons)
@@ -1108,6 +1128,97 @@ class RfqService:
 
         items = [RfqSummary.model_validate(row) for row in rows]
         return RfqList(items=items, next_cursor=next_cursor)
+
+
+# Prices each reply the way the RFQ split does (services/optimiser repository.py
+# read_current_advanced_offers): the reply's latest valid landed cost per product, scaled from its
+# normalised base quantity to the RFQ's requested quantity (packs × the latest pack definition's
+# base quantity, as build_rfq_split_request sizes the basket).
+RFQ_LANDED_COSTS_SQL = """
+with responses as (
+  select r.id as response_id, r.quotation_id, rec.supplier_id
+  from rfq_response r
+  join rfq_recipient rec on rec.id = r.rfq_recipient_id and rec.tenant_id = r.tenant_id
+  where r.tenant_id = %(tenant_id)s and rec.rfq_id = %(rfq_id)s
+),
+rfq_products as (
+  select rl.workspace_product_id, sum(rl.quantity) as packs, pd.base_quantity
+  from rfq_line rl
+  left join lateral (
+    select base_quantity from pack_definition
+    where workspace_product_id = rl.workspace_product_id and tenant_id = rl.tenant_id
+    order by created_at desc, id desc limit 1
+  ) pd on true
+  where rl.rfq_id = %(rfq_id)s and rl.tenant_id = %(tenant_id)s
+  group by rl.workspace_product_id, pd.base_quantity
+),
+ranked as (
+  select
+    resp.response_id,
+    md.matched_workspace_product_id as workspace_product_id,
+    lc.total_amount / lc.normalised_base_quantity * (rp.packs * rp.base_quantity)
+      as projected_total,
+    lc.total_currency,
+    row_number() over (
+      partition by resp.response_id, md.matched_workspace_product_id
+      order by lc.recorded_at desc, lc.id desc
+    ) as rn
+  from responses resp
+  join quotation q on q.id = resp.quotation_id and q.tenant_id = %(tenant_id)s
+  join quotation_line ql on ql.quotation_id = q.id and ql.tenant_id = q.tenant_id
+  join current_match_decision md on md.quotation_line_id = ql.id
+  join rfq_products rp on rp.workspace_product_id = md.matched_workspace_product_id
+  join landed_cost lc
+    on lc.match_decision_id = md.id and lc.quotation_line_id = ql.id
+   and lc.tenant_id = q.tenant_id
+  where q.status = 'reviewed'
+    and rp.base_quantity is not null
+    and lc.normalised_base_quantity > 0
+    and (lc.valid_to is null or lc.valid_to >= now())
+),
+terms as (
+  select distinct on (supplier_id)
+    supplier_id,
+    (delivery_fee_amount is not null
+      or minimum_order_value_amount is not null
+      or jsonb_array_length(quantity_tiers) > 0) as applies
+  from supplier_commercial_term
+  where tenant_id = %(tenant_id)s
+    and supplier_id in (select supplier_id from responses)
+    and effective_from <= now()
+    and (effective_to is null or effective_to > now())
+  order by supplier_id, effective_from desc, created_at desc, id desc
+)
+select resp.response_id, coalesce(t.applies, false) as terms_apply,
+       rk.workspace_product_id, rk.projected_total, rk.total_currency
+from responses resp
+left join terms t on t.supplier_id = resp.supplier_id
+left join ranked rk on rk.response_id = resp.response_id and rk.rn = 1
+"""
+
+_MONEY_QUANT = Decimal("0.0001")
+
+
+def _rfq_landed_costs(
+    cur: psycopg.Cursor, *, tenant_id: uuid.UUID, rfq_id: uuid.UUID
+) -> tuple[dict[uuid.UUID, list[RfqProductLandedCost]], dict[uuid.UUID, bool]]:
+    cur.execute(RFQ_LANDED_COSTS_SQL, {"tenant_id": tenant_id, "rfq_id": rfq_id})
+    landed: dict[uuid.UUID, list[RfqProductLandedCost]] = {}
+    terms: dict[uuid.UUID, bool] = {}
+    for row in cur.fetchall():
+        terms[row["response_id"]] = bool(row["terms_apply"])
+        if row["workspace_product_id"] is None:
+            continue
+        landed.setdefault(row["response_id"], []).append(
+            RfqProductLandedCost(
+                workspace_product_id=row["workspace_product_id"],
+                total_amount=Decimal(row["projected_total"]).quantize(
+                    _MONEY_QUANT, rounding=ROUND_HALF_UP
+                ),
+                total_currency=row["total_currency"],
+            )
+        )
+    return landed, terms
 
 
 def _validate_guardrail_destination(

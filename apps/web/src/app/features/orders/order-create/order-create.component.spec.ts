@@ -101,6 +101,84 @@ describe('OrderCreateComponent', () => {
     expect(component.lines.length).toBe(1); // One empty line added by default
   });
 
+  describe('VAT-inclusive request prefill', () => {
+    function loadInclusiveRequest(): void {
+      fixture.destroy();
+      TestBed.inject(TranslateService).setTranslation('en', enCatalog, true);
+      TestBed.inject(TranslateService).use('en');
+      routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-vat' });
+      const prices = ['82', '150', '38', '86'];
+      const nets = ['71.3043', '130.4348', '33.0435', '74.7826'];
+      const quantities = ['15', '10', '10', '20'];
+      requestsApiService.getRequest.and.returnValue(of({
+        id: 'req-vat', branch_id: 'b1', requested_by_membership_id: 'm1',
+        required_by_date: '2026-10-31', status: 'approved', has_incomplete_estimate: false,
+        created_at: '',
+        lines: prices.map((price, i) => ({
+          id: `rl-${i}`, workspace_product_id: 'p1', product_name: `Item ${i}`,
+          quantity: quantities[i], base_unit: 'KG',
+          quoted_unit_price: { amount: price, currency: 'SAR' },
+          quoted_net_unit_price: { amount: nets[i], currency: 'SAR' },
+          quoted_prices_include_vat: true, quoted_vat_rate: '0.1500',
+        })),
+      } as PurchaseRequest));
+      ordersApiService.getAllocations.and.returnValue(of({
+        source_request_id: 'req-vat',
+        lines: quantities.map((quantity, i) => ({ source_request_line_id: `rl-${i}`,
+          requested_quantity: quantity, allocated_quantity: '0', remaining_quantity: quantity })),
+      }));
+      ordersApiService.createOrder.and.returnValue(of({ id: 'po-vat' }) as never);
+      fixture = TestBed.createComponent(OrderCreateComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+      component.form.controls.supplier_id.setValue('s1');
+    }
+
+    it('prefills net prices and taxes and submits exactly the printed 4830 total', () => {
+      loadInclusiveRequest();
+      expect(component.lines.getRawValue().map(l => l.unit_price)).toEqual([71.3043, 130.4348, 33.0435, 74.7826]);
+      expect(component.lines.getRawValue().map(l => l.line_tax)).toEqual([160.4355, 195.652, 49.565, 224.348]);
+      const hint = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="vat-inclusive-hint"]');
+      expect(hint?.textContent).toContain('Net of 15% VAT');
+      expect(hint?.textContent).toContain('82');
+      component.submit();
+      expect(ordersApiService.createOrder).toHaveBeenCalled();
+      const payload = ordersApiService.createOrder.calls.mostRecent().args[0];
+      expect(payload.total).toEqual({ amount: '4830.0000', currency: 'SAR' });
+      expect(payload.lines.map(l => l.unit_price.amount)).toEqual(['71.3043', '130.4348', '33.0435', '74.7826']);
+      expect(payload.lines.map(l => l.tax.amount)).toEqual(['160.4355', '195.6520', '49.5650', '224.3480']);
+      expect(payload.lines.map(l => l.line_total.amount)).toEqual(['1230.0000', '1500.0000', '380.0000', '1720.0000']);
+    });
+
+    it('recomputes inclusive tax for a changed quantity, including fractional packs', () => {
+      loadInclusiveRequest();
+      component.lines.at(0).controls.quantity.setValue(3.5);
+      expect(component.lines.at(0).controls.line_tax.value).toBe(37.4349);
+      expect(component.computedTotals().orderTotal).toBe(3887);
+      component.submit();
+      const payload = ordersApiService.createOrder.calls.mostRecent().args[0];
+      expect(payload.lines[0].line_total.amount).toBe('287.0000');
+      expect(payload.total.amount).toBe('3887.0000');
+    });
+
+    it('keeps manually edited prices and taxes when quantity changes', () => {
+      loadInclusiveRequest();
+      component.lines.at(0).patchValue({ unit_price: 70, line_tax: 20 });
+      component.lines.at(0).controls.quantity.setValue(2);
+      expect(component.lines.at(0).controls.line_tax.value).toBe(20);
+      component.submit();
+      expect(ordersApiService.createOrder.calls.mostRecent().args[0].lines[0].line_total.amount).toBe('160.0000');
+    });
+
+    it('enforces quote currency while prefilled net prices remain untouched', () => {
+      loadInclusiveRequest();
+      component.form.controls.currency.setValue('USD');
+      component.submit();
+      expect(ordersApiService.createOrder).not.toHaveBeenCalled();
+      expect(component.errorMessage()).toContain('SAR');
+    });
+  });
+
   it('pre-fills supplier (id + name) and next order number when source_request_id is present', () => {
     fixture.destroy();
     routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-42' });
@@ -532,7 +610,7 @@ describe('OrderCreateComponent', () => {
     const request = {
       id: 'req-1', branch_id: 'b1', requested_by_membership_id: 'm1',
       required_by_date: '2026-10-01', status: 'approved',
-      lines: [{ id: 'rl-1', workspace_product_id: 'p1', quantity: '2.000000',
+      lines: [{ quoted_prices_include_vat: false, quoted_vat_rate: null, quoted_net_unit_price: null, id: 'rl-1', workspace_product_id: 'p1', quantity: '2.000000',
         product_name: 'Milk', base_unit: 'litre', pack_base_quantity: '6.000000' }],
       has_incomplete_estimate: false, created_at: '2026-09-29T00:00:00Z',
     } as import('../../../core/api/models').PurchaseRequest;

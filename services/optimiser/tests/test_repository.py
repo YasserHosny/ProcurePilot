@@ -144,10 +144,25 @@ def test_read_current_offers_prices_only_rfq_reply_when_filtered(
                     0, 'GBP',
                     'GBP',
                     60, 'GBP',
-                    %s, 'v1', now()
+                    %s, 'landed-cost-v1', now()
                 )
                 """,
                 (landed_cost_id, tenant_id, quotation_line_id, match_decision_id, Jsonb({})),
+            )
+            # A re-cost of the same decision under v2 must replace v1 in the read model.
+            cur.execute(
+                "insert into landed_cost (tenant_id,quotation_line_id,match_decision_id,"
+                "quantity,normalised_base_quantity,base_unit,unit_price_amount,unit_price_currency,"
+                "vat_amount,vat_currency,delivery_fee_amount,delivery_fee_currency,discount_amount,"
+                "discount_currency,other_charges_currency,total_amount,total_currency,raw_inputs,"
+                "rule_version,valid_from,recorded_at) "
+                "select tenant_id,quotation_line_id,match_decision_id,quantity,"
+                "normalised_base_quantity,"
+                "base_unit,unit_price_amount,unit_price_currency,vat_amount,vat_currency,"
+                "delivery_fee_amount,delivery_fee_currency,discount_amount,discount_currency,"
+                "other_charges_currency,total_amount,total_currency,raw_inputs,'landed-cost-v2',"
+                "valid_from,now()+interval '1 second' from landed_cost where id=%s",
+                (landed_cost_id,),
             )
             # The older quotation was learned/re-costed later, so latest-price selects it.
             older_quote = uuid4()
@@ -409,7 +424,7 @@ def test_read_current_offers_ignores_a_superseded_match_decision() -> None:
                         discount_currency, other_charges_currency, total_amount, total_currency,
                         raw_inputs, rule_version, valid_from
                     ) values (%s, %s, %s, 1, 50, 'kilogram', 81, 'GBP', 0, 'GBP', 0, 'GBP',
-                              0, 'GBP', 'GBP', 81, 'GBP', %s, 'v1', now())
+                              0, 'GBP', 'GBP', 81, 'GBP', %s, 'landed-cost-v1', now())
                     """,
                     (tenant_id, line_id, decision_id, Jsonb({})),
                 )

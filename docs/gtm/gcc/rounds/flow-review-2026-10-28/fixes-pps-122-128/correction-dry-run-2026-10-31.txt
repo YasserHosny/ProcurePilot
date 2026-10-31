@@ -1,0 +1,154 @@
+== Quotes (prices_include_vat → true; empty line vat_rate → 0.15)
+  fix  64361cfe-e8e5-4eac-914b-6bb20bf30c1a الذهبي للتموين: stated 5100.0000, lines sum 5100.0000, 3/3 lines without a rate
+  fix  96a4f9f3-d9bf-4415-93f4-5d442cb49072 الوفرة للمواد الغذائية: stated 4440.0000, lines sum 4440.0000, 2/2 lines without a rate
+  fix  a77bcf01-8411-46f7-bc49-c4b5e1ee0c14 خضار القصيم الطازجة: stated 780.0000, lines sum 780.0000, 1/1 lines without a rate
+  fix  7805987d-3376-4b3e-9b70-ec2fe25ab7cc الذهبي للتموين: stated 4910.0000, lines sum 4910.0000, 3/3 lines without a rate
+  fix  dc8bf396-7305-42b1-aff2-2f786d1ea589 الوفرة للمواد الغذائية: stated 4290.0000, lines sum 4290.0000, 2/2 lines without a rate
+  fix  c27eee27-d6e3-4a14-be0a-28b2918b8980 خضار القصيم الطازجة: stated 740.0000, lines sum 740.0000, 1/1 lines without a rate
+  fix  bbb892fb-d80f-4673-b570-6816de46d0ef الذهبي للتموين: stated 4790.0000, lines sum 4790.0000, 3/3 lines without a rate
+  fix  b0a043ec-3c51-46e5-98f3-4c3eb5f4d3d3 الوفرة للمواد الغذائية: stated 4190.0000, lines sum 4190.0000, 2/2 lines without a rate
+  fix  02769574-f8cf-4c9a-b347-5973f93656c1 خضار القصيم الطازجة: stated 720.0000, lines sum 720.0000, 1/1 lines without a rate
+  fix  341970a1-f340-41e0-add6-02706dadf194 الذهبي للتموين: stated 4910.0000, lines sum 4910.0000, 3/3 lines without a rate
+  fix  2e7861de-644d-41c9-aa0f-9ba67fb6537d الذهبي للتموين: stated 4830.0000, lines sum 4830.0000, 4/4 lines without a rate
+  fix  70ad704c-c64f-447d-b3b8-36f20fffc389 الوفرة للمواد الغذائية: stated 4855.0000, lines sum 4855.0000, 4/4 lines without a rate
+  fix  85ed505f-655f-4604-a1b0-bc39fb797043 الذهبي للتموين: stated 4147.0000, lines sum 4147.0000, 4/4 lines without a rate
+  fix  a10bcd44-dc89-4b31-b323-36f6f6fd0ec0 الوفرة للمواد الغذائية: stated 4137.0000, lines sum 4137.0000, 4/4 lines without a rate
+  fix  8abc780d-8a07-490a-ae6a-bfdbba006fc4 الذهبي للتموين: stated 4830.0000, lines sum 4830.0000, 4/4 lines without a rate
+  fix  55038685-fd5d-437b-b528-577074126246 الذهبي للتموين: stated 14490.0000, lines sum 14490.0000, 4/4 lines without a rate
+  fix  cd309f15-c807-4312-9894-a4851f6e58d6 الوفرة للمواد الغذائية: stated 14565.0000, lines sum 14565.0000, 4/4 lines without a rate
+  fix  b747af40-4c98-479b-b38d-27719ea8fb44 الذهبي للتموين: stated 716.0000, lines sum 716.0000, 2/2 lines without a rate
+  fix  d2c29e47-a575-4c83-a2d6-347eb2301a2d الوفرة للمواد الغذائية: stated 4855.0000, lines sum 4855.0000, 4/4 lines without a rate
+  fix  94241f1e-888d-4fea-8a54-190a47acfe8e الذهبي للتموين: stated 4830.0000, lines sum 4830.0000, 4/4 lines without a rate
+  fix  4562d72a-96e9-4829-ae94-c45a73a58505 الذهبي للتموين: stated 4830.0000, lines sum 4830.0000, 4/4 lines without a rate
+  fix  a801fd0b-da09-4a03-8c9d-b36ca1e33283 الذهبي للتموين: stated 4147.0000, lines sum 4147.0000, 4/4 lines without a rate
+  fix  88ba85e8-5273-488f-9c10-ebc2424dd376 الوفرة للمواد الغذائية: stated 4137.0000, lines sum 4137.0000, 4/4 lines without a rate
+== Landed cost (append v2 beside each current decision's v1 row)
+  decision 00f9db9c-2c4b-48b1-bb64-ddbe69dea3b9: total 1480.0000 unchanged, VAT 0.0000 → 193.0435
+  decision 0d7be74e-2f78-41d3-be8d-e99d104adde4: total 420.0000 unchanged, VAT 0.0000 → 54.7826
+  decision 1d16ee25-9c16-46de-aea1-a4d2304f51ba: total 870.0000 unchanged, VAT 0.0000 → 113.4783
+  decision 25f963bb-8867-4529-83f9-0168f72d0344: total 2670.0000 unchanged, VAT 0.0000 → 348.2609
+  decision 265921b1-7874-42e8-afdc-bb947d20c14d: total 1500.0000 unchanged, VAT 0.0000 → 195.6522
+  decision 33b15ebf-d788-45e3-8221-d88d30758dd9: total 1520.0000 unchanged, VAT 0.0000 → 198.2609
+  decision 34c15b3e-fe7d-4ff4-a625-13c4f56411f0: total 906.0000 unchanged, VAT 0.0000 → 118.1739
+  decision 3c71ac51-8307-4451-8d7e-a82f0c422f45: total 1520.0000 unchanged, VAT 0.0000 → 198.2609
+  decision 3f8155dc-0400-4fa5-8643-aa096574743d: total 1080.0000 unchanged, VAT 0.0000 → 140.8696
+  decision 431b7735-263e-4101-b361-e9170149e24f: total 2670.0000 unchanged, VAT 0.0000 → 348.2609
+  decision 4c1dca96-a954-4ca1-8e09-2ad0f424fe9e: total 1460.0000 unchanged, VAT 0.0000 → 190.4348
+  decision 4ee436cf-82fb-4409-a4a5-5f16f9235624: total 720.0000 unchanged, VAT 0.0000 → 93.9130
+  decision 52912def-0c68-483d-8e17-7e41635f5c50: total 2175.0000 unchanged, VAT 0.0000 → 283.6957
+  decision 53d7ca89-390f-410f-87d0-61000a185f77: total 1720.0000 unchanged, VAT 0.0000 → 224.3478
+  decision 53e00203-1520-4cb2-8ab5-f9ede5217a94: total 740.0000 unchanged, VAT 0.0000 → 96.5217
+  decision 53e93f50-5980-47de-8c73-827cebe817a4: total 1230.0000 unchanged, VAT 0.0000 → 160.4348
+  decision 59559995-fa91-4e96-85ed-b37667a20280: total 380.0000 unchanged, VAT 0.0000 → 49.5652
+  decision 66345858-c191-4e3c-8cb0-26dc69dee834: total 648.0000 unchanged, VAT 0.0000 → 84.5217
+  decision 6ee9b93b-4628-49da-8d46-41c0de83d994: total 2610.0000 unchanged, VAT 0.0000 → 340.4348
+  decision 6f58c7f5-c82c-4164-ac32-732cedb9a135: total 420.0000 unchanged, VAT 0.0000 → 54.7826
+  decision 72796968-c924-4d8f-b3be-67965266e13a: total 380.0000 unchanged, VAT 0.0000 → 49.5652
+  decision 76c1ca05-5051-4fbb-af9b-f593edcce4a1: total 3690.0000 unchanged, VAT 0.0000 → 481.3043
+  decision 831bc1ed-1a2c-43c7-92b1-bcd2b406d773: total 648.0000 unchanged, VAT 0.0000 → 84.5217
+  decision 86ee740c-f76a-45a8-a2cc-f6c2deaca7d4: total 760.0000 unchanged, VAT 0.0000 → 99.1304
+  decision 87a14b92-4c76-48e6-9c42-b13f9d532d98: total 2175.0000 unchanged, VAT 0.0000 → 283.6957
+  decision 88ce67ff-2099-44c2-8984-3e14c59bca1f: total 1230.0000 unchanged, VAT 0.0000 → 160.4348
+  decision 8be80a1f-01d5-4f92-ab2a-115ac19cebb1: total 1560.0000 unchanged, VAT 0.0000 → 203.4783
+  decision 8d3b5287-11fb-432c-b8b4-9f6f38862c25: total 468.0000 unchanged, VAT 0.0000 → 61.0435
+  decision 8ebe7ac7-32cf-4221-b5b9-8a05d65513e3: total 380.0000 unchanged, VAT 0.0000 → 49.5652
+  decision 944cf60d-7a39-4505-85b8-a3c419823125: total 1500.0000 unchanged, VAT 0.0000 → 195.6522
+  decision 9481582a-1fd6-4e7d-8f76-ed27d2b0e186: total 720.0000 unchanged, VAT 0.0000 → 93.9130
+  decision 9e084a4a-1db5-44e1-b747-8f5233119ba1: total 672.0000 unchanged, VAT 0.0000 → 87.6522
+  decision a0e2dd7c-c1b4-4c4e-aae7-69d669abb908: total 906.0000 unchanged, VAT 0.0000 → 118.1739
+  decision a18d205d-6ad1-4bc5-9d8e-9445da63207b: total 1500.0000 unchanged, VAT 0.0000 → 195.6522
+  decision a3fbab64-9d39-4e9e-b27d-b57698c08241: total 380.0000 unchanged, VAT 0.0000 → 49.5652
+  decision a7529675-8135-4a85-9c60-72e65d17baf8: total 2730.0000 unchanged, VAT 0.0000 → 356.0870
+  decision a85efd41-64be-4f52-a988-23b9ee6527c7: total 468.0000 unchanged, VAT 0.0000 → 61.0435
+  decision aa304a75-f1a5-4abd-aa51-8185d67c63bd: total 1720.0000 unchanged, VAT 0.0000 → 224.3478
+  decision aa4da5e2-a4eb-4f00-92eb-31feb08f5858: total 672.0000 unchanged, VAT 0.0000 → 87.6522
+  decision adb89158-1c58-44c7-9d98-d7b2797ccba1: total 1500.0000 unchanged, VAT 0.0000 → 195.6522
+  decision ae73e196-354b-4188-8853-68b392895a1d: total 2125.0000 unchanged, VAT 0.0000 → 277.1739
+  decision b0299c7d-11ac-4f68-b665-eb880b43daf9: total 2670.0000 unchanged, VAT 0.0000 → 348.2609
+  decision b06f2f76-9bef-4c52-a0bf-2c2982b942f6: total 870.0000 unchanged, VAT 0.0000 → 113.4783
+  decision b0d4d178-04c5-4485-af09-9a3b4b0bdeda: total 1580.0000 unchanged, VAT 0.0000 → 206.0870
+  decision b4797575-6b2d-4c72-86ca-4dff42bac9b3: total 200.0000 unchanged, VAT 0.0000 → 26.0870
+  decision b535d0b4-2947-4dfe-bb6c-bcb5f7ca7223: total 780.0000 unchanged, VAT 0.0000 → 101.7391
+  decision b8e85bc1-9948-4cc0-b896-15d6410187dc: total 2820.0000 unchanged, VAT 0.0000 → 367.8261
+  decision bb09e2e7-ea44-45ef-852a-63eea5cfb5d4: total 700.0000 unchanged, VAT 0.0000 → 91.3043
+  decision be220a1d-10cb-4931-b824-b2f3bdb2fd0b: total 2760.0000 unchanged, VAT 0.0000 → 360.0000
+  decision c22de5f9-fa2b-490f-a000-d9ba749dd081: total 4380.0000 unchanged, VAT 0.0000 → 571.3043
+  decision c3fe3a57-dc56-44f1-ac00-b31003070711: total 1230.0000 unchanged, VAT 0.0000 → 160.4348
+  decision c5473570-0928-4497-b576-8f8583101dc4: total 5160.0000 unchanged, VAT 0.0000 → 673.0435
+  decision c6f94487-f9fb-4311-a785-b81975770801: total 1760.0000 unchanged, VAT 0.0000 → 229.5652
+  decision cc5fd2d4-886c-4192-9565-20ea233477e8: total 1720.0000 unchanged, VAT 0.0000 → 224.3478
+  decision d399c35e-3892-4471-85a3-43844f48cbad: total 1620.0000 unchanged, VAT 0.0000 → 211.3043
+  decision d63548c0-f65d-4381-a9e3-5693d2789371: total 1275.0000 unchanged, VAT 0.0000 → 166.3043
+  decision dae154cf-5272-47c1-89ab-6d8729cd246d: total 1460.0000 unchanged, VAT 0.0000 → 190.4348
+  decision ddf6ceef-1a7e-438b-b689-9c3a496ffee2: total 1140.0000 unchanged, VAT 0.0000 → 148.6957
+  decision e0226c55-aa6f-4887-a07b-e037ebd57f9b: total 360.0000 unchanged, VAT 0.0000 → 46.9565
+  decision e1f56274-55a5-49c2-8b42-2ebfa6ba9fa0: total 360.0000 unchanged, VAT 0.0000 → 46.9565
+  decision e478a2f6-9db9-4127-aeff-95b1f42b9ded: total 1230.0000 unchanged, VAT 0.0000 → 160.4348
+  decision e6de7944-fc29-47dc-986c-8f3189550085: total 1275.0000 unchanged, VAT 0.0000 → 166.3043
+  decision ed092572-d8a0-4492-957d-218f7070cf1d: total 1720.0000 unchanged, VAT 0.0000 → 224.3478
+  decision efccea51-2e52-4e9b-a9c6-0e6f095f079b: total 4500.0000 unchanged, VAT 0.0000 → 586.9565
+  decision f0dfa33d-cebd-4a81-a8b8-5d0afdedcc72: total 1760.0000 unchanged, VAT 0.0000 → 229.5652
+  decision f1e8f5e0-2b8f-45db-9f1b-3c2ae9aa80e1: total 2125.0000 unchanged, VAT 0.0000 → 277.1739
+  decision f4a78d5d-d00d-4cd6-9617-7f684a70b286: total 720.0000 unchanged, VAT 0.0000 → 93.9130
+  decision f71f7b98-6065-4777-8d77-fdcc83aec6ab: total 3825.0000 unchanged, VAT 0.0000 → 498.9130
+  decision f84fb503-c05c-4aa7-9f14-76a10c884e16: total 1520.0000 unchanged, VAT 0.0000 → 198.2609
+  decision fda60bcf-8a90-4f1a-b604-f04af742da9d: total 5280.0000 unchanged, VAT 0.0000 → 688.6957
+== Purchase-order lines (unit price → net, tax = gross − net; totals unchanged)
+  PO-000001 (submitted) line 1 زيت دوار الشمس (تنكة 18 لتر): 10 × 158.0000 → net 137.3913, tax 206.0870, line total 1580.0000 (was 1580.0000)
+  PO-000001 (submitted) line 2 طماطم (كرتون 6 كجم): 20 × 38.0000 → net 33.0435, tax 99.1300, line total 760.0000 (was 760.0000)
+  PO-000001 (submitted) line 3 أرز بسمتي (كيس 10 كجم): 30 × 92.0000 → net 80.0000, tax 360.0000, line total 2760.0000 (was 2760.0000)
+  PO-000002 (submitted) line 1 زيت دوار الشمس (تنكة 18 لتر): 10 × 152.0000 → net 132.1739, tax 198.2610, line total 1520.0000 (was 1520.0000)
+  PO-000002 (submitted) line 2 أرز بسمتي (كيس 10 كجم): 30 × 89.0000 → net 77.3913, tax 348.2610, line total 2670.0000 (was 2670.0000)
+  PO-000002 (submitted) line 3 طماطم (كرتون 6 كجم): 20 × 36.0000 → net 31.3043, tax 93.9140, line total 720.0000 (was 720.0000)
+  PO-000003 (submitted) line 1 طماطم (كرتون 6 كجم): 20 × 35.0000 → net 30.4348, tax 91.3040, line total 700.0000 (was 700.0000)
+  PO-000003 (submitted) line 2 زيت دوار الشمس (تنكة 18 لتر): 10 × 148.0000 → net 128.6957, tax 193.0430, line total 1480.0000 (was 1480.0000)
+  PO-000003 (submitted) line 3 أرز بسمتي (كيس 10 كجم): 30 × 87.0000 → net 75.6522, tax 340.4340, line total 2610.0000 (was 2610.0000)
+  PO-000004 (draft) line 1 دقيق (كيس 45 كجم): 8 × 84.0000 → net 73.0435, tax 87.6520, line total 672.0000 (was 672.0000)
+  PO-000004 (draft) line 2 أرز بسمتي (كيس 10 كجم): 25 × 87.0000 → net 75.6522, tax 283.6950, line total 2175.0000 (was 2175.0000)
+  PO-000004 (draft) line 3 سكر أبيض (كيس 10 كجم): 12 × 35.0000 → net 30.4348, tax 54.7824, line total 420.0000 (was 420.0000)
+  PO-000004 (draft) line 4 زيت دوار الشمس (تنكة 18 لتر): 6 × 145.0000 → net 126.0870, tax 113.4780, line total 870.0000 (was 870.0000)
+  PO-000005 (submitted) line 1 دقيق (كيس 45 كجم): 15 × 82.0000 → net 71.3043, tax 160.4355, line total 1230.0000 (was 1230.0000)
+  PO-000005 (submitted) line 2 زيت دوار الشمس (تنكة 18 لتر): 10 × 150.0000 → net 130.4348, tax 195.6520, line total 1500.0000 (was 1500.0000)
+  PO-000005 (submitted) line 3 سكر أبيض (كيس 10 كجم): 10 × 38.0000 → net 33.0435, tax 49.5650, line total 380.0000 (was 380.0000)
+  PO-000005 (submitted) line 4 أرز بسمتي (كيس 10 كجم): 20 × 86.0000 → net 74.7826, tax 224.3480, line total 1720.0000 (was 1720.0000)
+  PO-000006 (draft) line 1 دقيق (كيس 45 كجم): 4 × 85.0000 → net 73.9130, tax 44.3480, line total 340.0000 (was 340.0000)
+  PO-000006 (draft) line 2 زيت دوار الشمس (تنكة 18 لتر): 4 × 146.0000 → net 126.9565, tax 76.1740, line total 584.0000 (was 584.0000)
+  PO-000007 (draft) line 1 دقيق (كيس 45 كجم): 2 × 85.0000 → net 73.9130, tax 22.1740, line total 170.0000 (was 170.0000)
+  PO-000007 (draft) line 2 زيت دوار الشمس (تنكة 18 لتر): 3 × 146.0000 → net 126.9565, tax 57.1305, line total 438.0000 (was 438.0000)
+  PO-000008 (draft) line 1 دقيق (كيس 45 كجم): 2 × 85.0000 → net 73.9130, tax 22.1740, line total 170.0000 (was 170.0000)
+  PO-000008 (draft) line 2 زيت دوار الشمس (تنكة 18 لتر): 3 × 146.0000 → net 126.9565, tax 57.1305, line total 438.0000 (was 438.0000)
+  PO-000009 (submitted) line 1 زبادي (كرتون 12 × 1 كجم): 15 × 48.0000 → net 41.7391, tax 93.9135, line total 720.0000 (was 720.0000)
+  PO-000001: line tax 665.2170, order total 5100.0000 unchanged
+  PO-000002: line tax 640.4360, order total 4910.0000 unchanged
+  PO-000003: line tax 624.7810, order total 4790.0000 unchanged
+  PO-000004: line tax 539.6074, order total 4137.0000 unchanged
+  PO-000005: line tax 630.0005, order total 4830.0000 unchanged
+  PO-000006: line tax 120.5220, order total 924.0000 unchanged
+  PO-000007: line tax 79.3045, order total 608.0000 unchanged
+  PO-000008: line tax 79.3045, order total 608.0000 unchanged
+  PO-000009: line tax 93.9135, order total 720.0000 unchanged
+  NOT CORRECTED (outside the approved list): PO-000010 (draft), total 2773.0000
+  NOT CORRECTED (outside the approved list): PO-000011 (draft), total 1290.0000
+{
+  "quotes_corrected": 23,
+  "quotes_skipped_not_gross": 0,
+  "quote_lines_rated": 71,
+  "landed_cost_v2_rows_appended": 70,
+  "purchase_order_lines_corrected": 24,
+  "purchase_orders_corrected": [
+    "PO-000001",
+    "PO-000002",
+    "PO-000003",
+    "PO-000004",
+    "PO-000005",
+    "PO-000006",
+    "PO-000007",
+    "PO-000008",
+    "PO-000009"
+  ],
+  "purchase_orders_outside_approval": [
+    "PO-000010",
+    "PO-000011"
+  ]
+}
+DRY RUN: rolled back, nothing written.

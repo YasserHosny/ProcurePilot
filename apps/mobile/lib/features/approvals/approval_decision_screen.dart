@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/api/models.dart';
 import '../../core/api/requests_api_client.dart';
@@ -82,6 +83,9 @@ class _ApprovalDecisionScreenState extends State<ApprovalDecisionScreen> {
     }
   }
 
+  String? _groupDecisionAction;
+  String? _groupDecisionKey;
+
   @override
   void dispose() {
     _commentController.dispose();
@@ -108,10 +112,24 @@ class _ApprovalDecisionScreenState extends State<ApprovalDecisionScreen> {
       final group = _group;
       if (group != null) {
         final client = ServiceProvider.of(context).approvalsApiClient;
+        // One key per decision: a retry of the same action replays; switching action starts anew.
+        if (_groupDecisionAction != action) {
+          _groupDecisionAction = action;
+          _groupDecisionKey = const Uuid().v4();
+        }
+        final key = _groupDecisionKey!;
         if (action == 'approve') {
-          await client.approveGroup(group.summary.id, comment: comment);
+          await client.approveGroup(
+            group.summary.id,
+            comment: comment,
+            idempotencyKey: key,
+          );
         } else {
-          await client.rejectGroup(group.summary.id, comment: comment);
+          await client.rejectGroup(
+            group.summary.id,
+            comment: comment,
+            idempotencyKey: key,
+          );
         }
       } else if (action == 'approve') {
         await _apiClient.approveRequest(

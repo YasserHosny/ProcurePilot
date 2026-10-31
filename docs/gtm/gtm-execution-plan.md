@@ -136,7 +136,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-102 | PPS-133 | P-103 | PPS-134 | | |
 | P-104 | PPS-135 | P-105 | PPS-136 | P-106 | PPS-137 |
 | P-107 | PPS-138 | P-108 | PPS-139 | | |
-| P-110 | PPS-141 | | | | |
+| P-110 | PPS-141 | P-111 | PPS-142 | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -286,8 +286,8 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [x] P-89 | — | Confirm & Authorize shows no busy state for ~5 s (flow review R7): disable the actions and show «Authorizing…» until the response; measure whether matching preparation is the delay | Orch (Agy web) | — | Done (PPS-120), #360 merged; checked live 2026-10-30, `fixes-pps-120-121/` |
 | [x] P-90 | — | Quote review shows the unit price as «86.0000» while in review (R8): no trailing zeros in the editable value (`quotation-lines.component.html` ~178) | Orch (Agy web) | — | Done (PPS-121), #360 merged; checked live 2026-10-30, `fixes-pps-120-121/` |
 | [ ] P-91 | — | VAT-inclusive quotes record no VAT per line (R9): product decision on how to store VAT-inclusive pricing, extraction reads «شامل ضريبة القيمة المضافة N%», carried to PO line tax and savings (with R17) | — | — | To Do (PPS-122) |
-| [ ] P-92 | — | RFQ Responses compares totals only (R10): mark the cheapest supplier per line and show the split saving with a link to Basket Split (coordinate with 024 / PPS-96) | — | — | To Do (PPS-123) |
-| [ ] P-93 | — | RFQ Responses guardrail outcome (R11): fired outcome not styled as an error, link to the draft it prepared, Prepare Request disabled once the RFQ is converted, «not open» explained | — | — | To Do (PPS-124) |
+| [ ] P-92 | — | RFQ Responses compares totals only (R10): mark the cheapest supplier per line and show the split saving with a link to Basket Split (coordinate with 024 / PPS-96) | #373 | — | In Review (PPS-123) |
+| [ ] P-93 | — | RFQ Responses guardrail outcome (R11): fired outcome not styled as an error, link to the draft it prepared, Prepare Request disabled once the RFQ is converted, «not open» explained | #373 | — | In Review (PPS-124) |
 | [ ] P-94 | — | Approval Queue shows the requester's email (R12): find why `requester_name` is empty, give members a name, short fallback with tooltip | — | — | To Do (PPS-125) |
 | [ ] P-95 | — | Basket Split input (flow review R15): new rows start empty, no duplicate product in one basket, pack hint no longer overlaps the next row | — | — | To Do (PPS-126) |
 | [ ] P-96 | — | Basket Split from an RFQ and back (R16): start a split from RFQ Responses pre-filled; «Prepare requests» from the result (one draft per supplier, 024 request groups). Fold into the next 024 phase if already planned | — | — | To Do (PPS-127) |
@@ -304,6 +304,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-107 | — | «Dependency audit» failed on main and every PR: new advisories CVE-2026-119194..119197 on `pyasn1 0.6.4` (transitive via python-jose and rsa, `apps/api` only). `pyasn1>=0.6.5` added as a uv constraint, lock regenerated; no new `--ignore-vuln` | Orch (Claude) | — | In Review (PPS-138) |
 | [ ] P-108 | — | After switching the language from the account menu, money, dates and quantities stayed in the previous language until a reload («ر.س ٨٦» on RFQ Responses in English). `formatMoney`, `formatDate` and `formatQuantity` were pure pipes, so a language switch never re-ran them. They now re-render on `onLangChange` (memoised, `markForCheck` for OnPush). The two built-in `\| date` uses moved to `formatDate`; the `\| percent` on quotation lines still uses the static locale | Orch (Cursor) | — | In Review (PPS-139) |
 | [ ] P-110 | — | Edit Supplier: the half-width «Email Language» field wraps its hint onto two lines, into the «Payment Terms» label (found in the PPS-134 live check) | — | — | To Do (PPS-141) |
+| [ ] P-111 | — | 024 review follow-ups (T035): the split Withdraw dialog's missing title key and literal {{count}}, the expired-quote warning naming suppliers instead of quotation ids, the phone reusing one Idempotency-Key per group decision, the Basket Split pack hint taking space and the "two suppliers" subtitle, and the flaky split E2E (position) with its Arabic scan moved before approval | Orch (Claude) | — | In Review (PPS-142) |
 
 ### E — Pilot environment
 

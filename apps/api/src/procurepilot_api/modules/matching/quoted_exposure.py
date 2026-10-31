@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from procurepilot_api.modules.matching.schemas import QuotedExposureIssue
 from procurepilot_api.modules.quotations.schemas import Money
@@ -17,6 +17,7 @@ class QuotedExposureResult:
 
 def quoted_exposure(
     *,
+    prices_include_vat: bool = False,
     quantity: str | None,
     unit_price: Money | None,
     vat_rate: str | None = None,
@@ -35,7 +36,9 @@ def quoted_exposure(
         + Decimal(delivery_fee.amount if delivery_fee else "0")
         - Decimal(discount.amount if discount else "0")
     )
-    total = (line_net * (Decimal("1") + Decimal(vat_rate or "0"))).quantize(FOUR_PLACES)
+    total = (
+        line_net if prices_include_vat else line_net * (Decimal("1") + Decimal(vat_rate or "0"))
+    ).quantize(FOUR_PLACES, rounding=ROUND_HALF_UP)
     return QuotedExposureResult(
         total=Money(amount=format(total, "f"), currency=unit_price.currency)
     )

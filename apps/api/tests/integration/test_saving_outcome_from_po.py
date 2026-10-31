@@ -273,3 +273,34 @@ def test_another_tenants_order_is_not_found(monkeypatch: pytest.MonkeyPatch) -> 
                     delivery_result="ordered",
                 ),
             )
+
+
+def test_purchase_prefill_exposes_net_paid_and_separate_tax(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("vat-prefill") as context:
+        order, line = _make_order(
+            context,
+            status="submitted",
+            order_date=date(2026, 10, 30),
+            pack_price="12.0000",
+            packs="100",
+            pack_size="1",
+        )
+        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+            conn.execute(
+                "update purchase_order_line set tax_amount=180, line_total_amount=1380 where id=%s",
+                (line,),
+            )
+            conn.execute(
+                "update purchase_order set tax_amount=180, total_amount=1380 where id=%s", (order,)
+            )
+            conn.commit()
+        [prefill] = (
+            SavingsService(settings)
+            .purchase_prefill(member=context.member, purchase_order_id=order)
+            .lines
+        )
+        assert prefill.total_paid == Money(amount=Decimal("1200.0000"), currency="GBP")
+        assert prefill.tax == Money(amount=Decimal("180.0000"), currency="GBP")

@@ -163,6 +163,12 @@
   align-items: center;
 }
 
+.pack-hint {
+  margin-block: 0.5rem 0;
+  color: var(--pp-text-muted);
+  font-size: var(--pp-text-12);
+}
+
 .estimate-badge, .remaining-badge {
   padding: 0.25rem 0.5rem;
   border-radius: 4px;

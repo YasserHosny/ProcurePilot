@@ -160,8 +160,9 @@ Specs `001`–`021` are complete and merged; the open spec work is `022`'s three
 file). The next feature has not been scoped. For what shipped when, read `git log` and the PRs.
 
 - Some `tasks.md` boxes stay open on purpose: `specs/018-forecasting-reorder/tasks.md` T011, T016,
-  T019, T020, T024 (tests never written) and `specs/004-matching-normalisation/tasks.md` T049
-  (untestable until the landed-cost rule version can change). Tick them only with that evidence.
+  T019, T020, T024 (tests never written). Tick them only with that evidence.
+- Landed cost is on rule `landed-cost-v2` (ADR-021: VAT-inclusive quotes). Earlier rows stay v1;
+  readers pick the latest offer per supplier across rule versions.
 - Match-score calibration is not feasible yet: hosted has a handful of confirmed human match
   decisions, far short of the 500+ labelled benchmark `specs/004-matching-normalisation/research.md`
   R5/R10 requires. `ml/evals/product_matching/` reports this; keep it that way.

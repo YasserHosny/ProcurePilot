@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
 RULE_VERSION_V1 = "landed-cost-v1"
+RULE_VERSION_V2 = "landed-cost-v2"
 MONEY_QUANT = Decimal("0.0001")
 QUANTITY_QUANT = Decimal("0.000001")
 
@@ -26,6 +27,7 @@ class LandedCostInputs:
     vat_rate: Decimal | None
     delivery_fee: MoneyValue
     discount: MoneyValue
+    prices_include_vat: bool = False
 
 
 @dataclass(frozen=True)
@@ -47,7 +49,7 @@ class LandedCostResult:
 def compute_landed_cost(
     inputs: LandedCostInputs, *, rule_version: str = RULE_VERSION_V1
 ) -> LandedCostResult:
-    if rule_version != RULE_VERSION_V1:
+    if rule_version not in {RULE_VERSION_V1, RULE_VERSION_V2}:
         raise ValueError(f"unsupported landed-cost rule version: {rule_version}")
     currency = inputs.unit_price.currency
     _require_same_currency(currency, inputs.delivery_fee, "delivery_fee")
@@ -58,12 +60,14 @@ def compute_landed_cost(
     unit_price = inputs.unit_price.quantized()
     delivery_fee = inputs.delivery_fee.quantized()
     discount = inputs.discount.quantized()
-    vat_amount = MoneyValue(_money(unit_price.amount * quantity * vat_rate), currency)
+    inclusive = rule_version == RULE_VERSION_V2 and inputs.prices_include_vat
+    vat = unit_price.amount * quantity * vat_rate
+    vat_amount = MoneyValue(_money(vat / (1 + vat_rate) if inclusive else vat), currency)
     other_charges = MoneyValue(Decimal("0.0000"), currency)
     total = MoneyValue(
         _money(
             (unit_price.amount * quantity)
-            + vat_amount.amount
+            + (Decimal("0") if inclusive else vat_amount.amount)
             + delivery_fee.amount
             - discount.amount
         ),
@@ -80,6 +84,8 @@ def compute_landed_cost(
         "discount": _money_payload(discount),
         "other_charges": _money_payload(other_charges),
     }
+    if rule_version == RULE_VERSION_V2:
+        raw_inputs["prices_include_vat"] = inputs.prices_include_vat
     return LandedCostResult(
         quantity=quantity,
         normalised_base_quantity=normalised,
@@ -92,6 +98,7 @@ def compute_landed_cost(
         other_charges=other_charges,
         total=total,
         raw_inputs=raw_inputs,
+        rule_version=rule_version,
     )
 
 
@@ -105,6 +112,9 @@ def replay_landed_cost(raw_inputs: dict[str, object], *, rule_version: str) -> L
             vat_rate=Decimal(str(raw_inputs.get("vat_rate") or "0")),
             delivery_fee=_money_from_payload(raw_inputs["delivery_fee"]),
             discount=_money_from_payload(raw_inputs["discount"]),
+            prices_include_vat=bool(raw_inputs.get("prices_include_vat", False))
+            if rule_version == RULE_VERSION_V2
+            else False,
         ),
         rule_version=rule_version,
     )

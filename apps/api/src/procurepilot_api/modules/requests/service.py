@@ -27,6 +27,7 @@ from procurepilot_api.errors import (
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.devices.push_job import enqueue_push_job
 from procurepilot_api.modules.members.service import authenticated_client
+from procurepilot_api.modules.orders.vat_split import net_unit_price
 from procurepilot_api.modules.requests.budget_status import (
     BudgetRow,
     SpendRow,
@@ -70,6 +71,7 @@ from procurepilot_api.modules.requests.schemas import (
 )
 from procurepilot_api.modules.requests.valuation import (
     LineEstimate,
+    QuotedPrice,
     estimate_from_source_response,
     estimate_line_value,
     quoted_prices_from_source_response,
@@ -2923,7 +2925,7 @@ class RequestsService:
 
     def _quoted_prices_for(
         self, request_row: dict[str, object], line_rows: list[dict[str, object]]
-    ) -> dict[UUID, tuple[Decimal, str]]:
+    ) -> dict[UUID, QuotedPrice]:
         """Quoted per-pack prices of an RFQ-sourced request's source response, by product."""
         source = request_row.get("source_rfq_response_id")
         if not source or not line_rows:
@@ -3050,7 +3052,7 @@ def _purchase_request(
     step_row: dict[str, object] | None,
     *,
     budget_status: BudgetStatus | None = None,
-    quoted_prices: dict[UUID, tuple[Decimal, str]] | None = None,
+    quoted_prices: dict[UUID, QuotedPrice] | None = None,
     requester: MemberContact | None = None,
     assignee: MemberContact | None = None,
     auto_prepared: AutoPreparedProvenance | None = None,
@@ -3096,7 +3098,7 @@ def _purchase_request(
 
 def _purchase_request_line(
     row: dict[str, object],
-    quoted_prices: dict[UUID, tuple[Decimal, str]] | None = None,
+    quoted_prices: dict[UUID, QuotedPrice] | None = None,
 ) -> PurchaseRequestLine:
     quoted = (quoted_prices or {}).get(UUID(str(row["workspace_product_id"])))
     return PurchaseRequestLine(
@@ -3118,7 +3120,18 @@ def _purchase_request_line(
             if row.get("estimated_unit_price_source_landed_cost_id")
             else None
         ),
-        quoted_unit_price=_money(quoted[0], quoted[1]) if quoted else None,
+        quoted_unit_price=_money(quoted.amount, quoted.currency) if quoted else None,
+        quoted_prices_include_vat=quoted.prices_include_vat if quoted else False,
+        quoted_vat_rate=_decimal(quoted.vat_rate, scale=4)
+        if quoted and quoted.prices_include_vat and quoted.vat_rate is not None
+        else None,
+        quoted_net_unit_price=(
+            _money(net_unit_price(quoted.amount, quoted.vat_rate), quoted.currency)
+            if quoted and quoted.prices_include_vat and quoted.vat_rate is not None
+            else _money(quoted.amount, quoted.currency)
+            if quoted and not quoted.prices_include_vat
+            else None
+        ),
         product_name=str(row["product_name"]) if row.get("product_name") is not None else None,
         base_unit=str(row["base_unit"]) if row.get("base_unit") is not None else None,
         pack_base_quantity=(

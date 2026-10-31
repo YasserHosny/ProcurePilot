@@ -164,7 +164,9 @@ export class RequestListComponent implements OnInit {
       data: {
         titleKey,
         messageKey,
+        messageParams: isGroup ? { count: size } : undefined,
         confirmKey,
+        confirmParams: isGroup ? { count: size } : undefined,
         isDestructive: true,
       },
     }).afterClosed().subscribe((confirmed: boolean) => {
