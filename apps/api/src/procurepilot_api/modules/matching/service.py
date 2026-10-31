@@ -349,6 +349,7 @@ class MatchingService:
                     d.storage_path, d.original_filename,
                     q.supplier_id,
                     supplier.name as supplier_name,
+                    q.prices_include_vat,
                     ql.id as quotation_line_id,
                     ql.line_number,
                     ql.original_text,
@@ -411,6 +412,7 @@ class MatchingService:
                     d.storage_path, d.original_filename,
                     q.supplier_id,
                     supplier.name as supplier_name,
+                    q.prices_include_vat,
                     ql.id as quotation_line_id,
                     ql.line_number,
                     ql.original_text,
@@ -2227,6 +2229,7 @@ def _queue_item(row: dict[str, object]) -> MatchQueueItem:
         "delivery_fee_currency": row.get("delivery_fee_currency"),
         "discount_amount": row.get("discount_amount"),
         "discount_currency": row.get("discount_currency"),
+        "prices_include_vat": bool(row.get("prices_include_vat")),
     }
     quotation = QuotationMatchSummary(
         id=UUID(str(row["quotation_id"])),

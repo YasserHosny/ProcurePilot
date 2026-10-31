@@ -325,9 +325,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const computed = parseFloat(computedTotal.amount);
     if (Math.abs(stated - computed) <= 0.01) return false;
 
-    // If gap is explainable by document-level VAT, not a mismatch
+    // If gap is explainable by document-level VAT, not a mismatch. A VAT-inclusive quote's
+    // prices already contain VAT, so a gap there stays a mismatch (as on the server).
     const hasLineVat = this.hasEffectiveLineVat();
-    if (!hasLineVat && computed > 0 && stated > computed) {
+    if (!hasLineVat && !this.effectivePricesIncludeVat(q) && computed > 0 && stated > computed) {
       const inferredPct = Math.round(((stated - computed) / computed) * 100);
       if (inferredPct > 0 && inferredPct <= 30) {
         const recomputed = computed * (1 + inferredPct / 100);
@@ -354,7 +355,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const computed = parseFloat(computedTotal.amount);
     if (Math.abs(stated - computed) <= 0.01) return null;
     const hasLineVat = this.hasEffectiveLineVat();
-    if (!hasLineVat && computed > 0 && stated > computed) {
+    if (!hasLineVat && !this.effectivePricesIncludeVat(q) && computed > 0 && stated > computed) {
       const pct = Math.round(((stated - computed) / computed) * 100);
       if (pct > 0 && pct <= 30) {
         const recomputed = computed * (1 + pct / 100);

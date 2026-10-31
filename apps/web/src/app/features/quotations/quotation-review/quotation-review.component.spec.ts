@@ -759,6 +759,22 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.hasArithmeticMismatch()).toBeFalse();
   });
 
+  it('does not infer document VAT on a VAT-inclusive quote, as the server does not (ADR-021)', () => {
+    // No line rate, stated 287.50 = 250.00 × 1.15: on an inclusive quote the gap is a mismatch.
+    const inclusive: QuotationDetail = {
+      ...mockQuotationDetail,
+      prices_include_vat: true,
+      vat_rate: null,
+      stated_total: { amount: '287.50', currency: 'GBP' },
+      lines: [{ ...mockQuotationDetail.lines[0], vat_rate: null }],
+    };
+    component.quotation.set(inclusive);
+    fixture.detectChanges();
+
+    expect(component.hasArithmeticMismatch()).toBeTrue();
+    expect(component.inferredVatPct()).toBeNull();
+  });
+
   it('still adds VAT on top when the same lines are VAT-exclusive', () => {
     const exclusive: QuotationDetail = {
       ...mockQuotationDetail,
