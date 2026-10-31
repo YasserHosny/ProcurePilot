@@ -38,6 +38,9 @@ const mockPendingRequests: PurchaseRequest[] = [
     },
     lines: [
       {
+        quoted_prices_include_vat: false,
+        quoted_vat_rate: null,
+        quoted_net_unit_price: null,
         id: 'line-1',
         workspace_product_id: 'prod-gloves',
         quantity: '50',
@@ -45,6 +48,9 @@ const mockPendingRequests: PurchaseRequest[] = [
         note: 'Latex-free boxes',
       },
       {
+        quoted_prices_include_vat: false,
+        quoted_vat_rate: null,
+        quoted_net_unit_price: null,
         id: 'line-2',
         workspace_product_id: 'prod-masks',
         quantity: '100',
@@ -584,6 +590,9 @@ describe('ApprovalQueueComponent', () => {
     expect(component.formatLinePrice(mockPendingRequests[0].lines[0])).toBe('SAR 15');
     expect(
       component.formatLinePrice({
+        quoted_prices_include_vat: false,
+        quoted_vat_rate: null,
+        quoted_net_unit_price: null,
         id: 'l3',
         workspace_product_id: 'p3',
         quantity: '1',
@@ -597,6 +606,9 @@ describe('ApprovalQueueComponent', () => {
       id: 'req-pps43',
       lines: [
         {
+          quoted_prices_include_vat: false,
+          quoted_vat_rate: null,
+          quoted_net_unit_price: null,
           id: 'line-pps43',
           workspace_product_id: 'prod-gloves',
           quantity: '20.000000',
@@ -868,6 +880,9 @@ describe('ApprovalQueueComponent', () => {
         },
         lines: [
           {
+            quoted_prices_include_vat: false,
+            quoted_vat_rate: null,
+            quoted_net_unit_price: null,
             id: 'line-g1',
             workspace_product_id: 'prod-gloves',
             quantity: '50',
@@ -911,6 +926,9 @@ describe('ApprovalQueueComponent', () => {
         },
         lines: [
           {
+            quoted_prices_include_vat: false,
+            quoted_vat_rate: null,
+            quoted_net_unit_price: null,
             id: 'line-g2',
             workspace_product_id: 'prod-masks',
             quantity: '100',

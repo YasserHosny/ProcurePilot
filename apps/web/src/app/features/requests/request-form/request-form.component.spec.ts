@@ -25,6 +25,9 @@ const mockRequest: PurchaseRequest = {
   status: 'draft',
   lines: [
     {
+      quoted_prices_include_vat: false,
+      quoted_vat_rate: null,
+      quoted_net_unit_price: null,
       id: 'l1',
       workspace_product_id: 'wp1',
       quantity: '10.000000',
@@ -495,7 +498,10 @@ describe('RequestFormComponent — edit mode (T017)', () => {
   });
 
   it('should display a fallback for a line without price history', () => {
-    const noEstimateLine = { id: 'l2', workspace_product_id: 'wp2', quantity: '5.000000' };
+    const noEstimateLine = {
+      quoted_prices_include_vat: false, quoted_vat_rate: null, quoted_net_unit_price: null,
+      id: 'l2', workspace_product_id: 'wp2', quantity: '5.000000',
+    };
     expect(component.formatEstimate(noEstimateLine)).toBe(
       'No price history available for this product.',
     );

@@ -136,6 +136,10 @@ export class OutcomeFromOrderComponent implements OnInit {
     this.lines.set(this.lines().map((line, i) => (i === index ? { ...line, ...patch } : line)));
   }
 
+  hasTax(line: PurchaseOutcomePrefillLine): boolean {
+    return Number(line.tax.amount) > 0;
+  }
+
   lineValid(line: EditableOutcomeLine): boolean {
     return (
       QUANTITY_PATTERN.test(line.quantity.trim()) &&

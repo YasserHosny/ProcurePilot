@@ -207,6 +207,9 @@
                 }
               </mat-form-field>
             </div>
+            @if (vatInclusiveHint(line); as hint) {
+              <p class="pack-hint" data-testid="vat-inclusive-hint">{{ hint }}</p>
+            }
           </mat-card>
         }
       </div>

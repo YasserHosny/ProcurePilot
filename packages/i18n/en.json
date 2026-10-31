@@ -984,6 +984,9 @@
         "pickDateToConfirm": "Choose a date to confirm this value.",
         "statedTotalLabel": "Stated Total Amount",
         "statedTotalCurrency": "Stated Total Currency",
+        "pricesIncludeVatLabel": "Prices include VAT",
+        "vatRateLabel": "VAT rate (%)",
+        "invalidVatRate": "Enter a VAT rate between 0 and 100%.",
         "statusLabel": "Status"
       },
       "supplierMatch": {
@@ -1004,6 +1007,7 @@
         "colPack": "Pack Details",
         "colUnitPrice": "Unit Price",
         "colVat": "VAT %",
+        "vatInclusiveSuffix": "(incl.)",
         "colDeliveryFee": "Delivery Fee",
         "colDiscount": "Discount",
         "colConfidence": "Confidence",
@@ -1166,6 +1170,7 @@
         "confirmAsIs": "Confirm as-is"
       },
       "fieldLabels": {
+        "prices_include_vat": "Prices include VAT",
         "supplier_name": "Supplier name",
         "issue_date": "Issue date",
         "expiry_date": "Expiry date",
@@ -1979,6 +1984,7 @@
       "quantityLabel": "Quantity ({{unit}})",
       "totalLabel": "Total paid excl. tax ({{currency}})",
       "unitPriceHint": "{{price}} per {{unit}}",
+      "taxExcludedHint": "Excludes tax {{tax}}",
       "submit": "Save {{count}} outcomes",
       "success": "{{count}} purchase outcomes recorded.",
       "loadError": "This order could not be loaded.",
@@ -3633,6 +3639,7 @@
       "quotedCurrencyMismatch": "The order currency ({{order}}) differs from the supplier's quoted currency ({{quoted}}). Use {{quoted}} or edit the prices.",
       "packUnit": "pack of {{size}} {{unit}}",
       "baseUnitPrice": "per {{unit}}",
+      "vatInclusiveHint": "Net of {{rate}}% VAT · quoted {{gross}} incl. VAT",
       "remainingQuantity": "Still to order"
     },
     "status": {

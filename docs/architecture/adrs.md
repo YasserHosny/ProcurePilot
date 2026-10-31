@@ -318,3 +318,44 @@
 - **Consequences:** `estimated_unit_price` on request lines now means "per pack". Existing draft
   requests prepared before this change should be withdrawn and re-prepared. Pre-filling the PO
   supplier from the source response is not done yet (the request API does not expose it).
+
+## ADR-021 — VAT-Inclusive Quotes Keep Their Printed Prices; Orders and Savings Are Net + Tax
+
+- **Status:** Accepted (2026-10-30, owner; PPS-122, PPS-128)
+- **Context:** Saudi suppliers print prices that already include 15% VAT («الأسعار شاملة ضريبة
+  القيمة المضافة 15%»). Extraction left line `vat_rate` empty, so the review screen showed no VAT,
+  purchase orders carried tax 0, and Record outcome saved VAT-inclusive amounts as «Total paid excl.
+  tax» (flow review R9, R17). The obvious fix, extracting `vat_rate = 0.15`, is wrong: landed-cost
+  rule v1 adds VAT on top (`total = price × qty × (1 + r)`), so SAR 4,830 would become 5,554.50.
+  The empty rate was the only thing keeping Saudi comparisons right.
+- **Options considered:**
+  1. Convert printed prices to net at extraction. Rejected: the stored quote would no longer match
+     the document the reviewer sees, and every reviewer correction would need converting back.
+  2. Store the rate and keep v1. Rejected: double-counts VAT.
+  3. Keep printed prices, record the basis on the quote, and make the rule aware of it. Chosen.
+- **Decision:**
+  - `quotation.prices_include_vat` records the document's basis. Extraction sets it from an
+    explicit statement («الأسعار شاملة ضريبة القيمة المضافة N%», «prices include VAT», «incl. VAT
+    N%»). A total-row label alone counts only when the lines sum to the stated total. Lines take
+    the document rate unless they print their own. The reviewer confirms or changes both: they are
+    shown as flagged fields.
+  - **Landed-cost rule v2** (`landed-cost-v2`): on a VAT-inclusive quote,
+    `vat = gross × qty × r / (1 + r)` and `total = gross × qty + delivery − discount`. On an
+    exclusive quote v2 equals v1. Rows already priced under v1 stay v1 (append-only, FR-016/017).
+    Both versions put the landed total on the same basis (including VAT, delivery and discount).
+    For that reason the latest offer per supplier is chosen across rule versions: the readers'
+    `row_number()` window no longer partitions by `rule_version`, so a version bump never splits a
+    supplier into two offers. A decision's cost is its latest landed_cost row: readers that list
+    offers, price history or alert rows read the `current_landed_cost` view, so a decision with a
+    v1 and a v2 row is counted once. The earlier row stays as evidence.
+  - **Purchase orders are net + tax.** An order line priced from a VAT-inclusive quote gets
+    net unit price = `gross / (1 + r)` rounded to 4 dp, and line tax = gross line total − net line
+    total. The order total therefore equals the printed total exactly, with no cent drift.
+  - **Savings compare net to net.** Record outcome pre-fills the order's net line totals. Quoted
+    baselines use the landed total minus its VAT. The last-PO-price baseline uses the PO's net unit
+    price (`saving-baseline-v4`).
+- **Consequences:** Offers, Smart Compare and price history stay VAT-inclusive (landed cost);
+  orders and savings are net. Existing VAT-inclusive data recorded before this decision (the
+  «مطاعم رواق» demo quotes and PO-000001…PO-000009) needs a one-off correction, run with the
+  owner's approval. The saving ledger rows already recorded are left as they are. A quote whose
+  lines mix inclusive and exclusive prices is not modelled: the flag is per document.

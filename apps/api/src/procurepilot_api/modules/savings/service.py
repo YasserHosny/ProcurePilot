@@ -249,6 +249,7 @@ class SavingsService:
                     select pol.id, pol.line_number, pol.description, pol.workspace_product_id,
                            pol.ordered_quantity, pol.base_unit, pol.unit_price_amount,
                            pol.unit_price_currency, pol.pack_base_quantity,
+                           pol.tax_amount, pol.tax_currency,
                            recorded.saving_id
                     from purchase_order_line pol
                     left join lateral (
@@ -412,6 +413,7 @@ def _prefill_line(row: dict[str, object]) -> PurchaseOutcomePrefillLine:
             amount=(pack_price * packs).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP),
             currency=currency,
         ),
+        tax=Money(amount=Decimal(str(row["tax_amount"])), currency=str(row["tax_currency"])),
         recordable=reason is None,
         reason=reason,
         recorded_saving_id=_uuid_or_none(row.get("saving_id")),

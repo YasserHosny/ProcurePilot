@@ -189,6 +189,22 @@
   .field-control {
     width: 100%;
   }
+
+  &.vat-inclusive-field {
+    display: flex;
+    align-items: center;
+    min-block-size: 56px;
+    padding-inline: 0.75rem;
+    border: 1px solid var(--pp-border);
+    border-radius: 4px;
+    background: var(--pp-surface-card);
+
+    .checkbox-control-wrapper {
+      display: flex;
+      align-items: center;
+      inline-size: 100%;
+    }
+  }
 }
 
 .field-needs-review {

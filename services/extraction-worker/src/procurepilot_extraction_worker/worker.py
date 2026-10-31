@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import replace
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import NamedTuple
 from urllib.error import URLError
 from urllib.parse import quote
@@ -18,7 +19,12 @@ from procurepilot_extraction_worker.models import ExtractedField, ExtractedLine,
 from procurepilot_extraction_worker.providers import FakeExtractionProvider
 from procurepilot_extraction_worker.settings import WorkerSettings, get_settings
 from procurepilot_extraction_worker.structured_parse import is_structured_mime_type
-from procurepilot_extraction_worker.validation import low_confidence_fields, validate_arithmetic
+from procurepilot_extraction_worker.validation import (
+    decimal_from_extracted,
+    low_confidence_fields,
+    validate_arithmetic,
+)
+from procurepilot_extraction_worker.vat_basis import detect_vat_basis
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +112,49 @@ def process_extraction_job(payload: dict[str, str]) -> None:
 
 
 def _extract(
+    settings: WorkerSettings, *, document_id: UUID, document: dict[str, object]
+) -> ExtractionResult:
+    return _with_vat_basis(_extract_document(settings, document_id=document_id, document=document))
+
+
+def _with_vat_basis(result: ExtractionResult) -> ExtractionResult:
+    text = result.source_text or "\n".join(line.original_text for line in result.lines)
+    totals: list[Decimal] = []
+    complete = bool(result.lines)
+    for line in result.lines:
+        quantity = line.fields.get("quantity")
+        price = line.fields.get("unit_price")
+        if quantity is None or price is None or not isinstance(price.value, dict):
+            complete = False
+            break
+        try:
+            totals.append(
+                decimal_from_extracted(quantity.value)
+                * decimal_from_extracted(price.value["amount"])
+            )
+        except (ValueError, KeyError):
+            complete = False
+            break
+    stated = None
+    if result.stated_total is not None and isinstance(result.stated_total.value, dict):
+        try:
+            stated = decimal_from_extracted(result.stated_total.value["amount"])
+        except (ValueError, KeyError):
+            pass
+    basis = detect_vat_basis(
+        text, line_sum=sum(totals, Decimal("0")) if complete else None, stated_total=stated
+    )
+    if basis is None:
+        return result
+    header = dict(result.header)
+    header["prices_include_vat"] = ExtractedField(
+        "prices_include_vat", basis.prices_include_vat, basis.confidence
+    )
+    header["vat_rate"] = ExtractedField("vat_rate", format(basis.rate, "f"), basis.confidence)
+    return replace(result, header=header)
+
+
+def _extract_document(
     settings: WorkerSettings,
     *,
     document_id: UUID,
@@ -299,7 +348,7 @@ def _update_quotation_status(
             set status = %s, currency = coalesce(%s, currency), issue_date = %s,
                 expiry_date = %s, stated_total_amount = %s, stated_total_currency = %s,
                 arithmetic_status = %s, suggested_supplier_id = %s,
-                supplier_match_confidence = %s
+                supplier_match_confidence = %s, prices_include_vat = %s
             where id = %s
             """,
             (
@@ -312,9 +361,19 @@ def _update_quotation_status(
                 arithmetic_status,
                 supplier_match.supplier_id,
                 supplier_match.confidence,
+                bool(_header_value(header, "prices_include_vat")),
                 quotation_id,
             ),
         )
+        rate = _header_value(header, "vat_rate")
+        if rate is not None:
+            cur.execute(
+                "update quotation_line ql set vat_rate = %s where ql.quotation_id = %s "
+                "and not exists (select 1 from field_extraction fe "
+                "where fe.quotation_id = ql.quotation_id and fe.entity_type = 'quotation_line' "
+                "and fe.entity_id = ql.id and fe.field_name = 'vat_rate')",
+                (rate, quotation_id),
+            )
 
 
 def _match_supplier(
