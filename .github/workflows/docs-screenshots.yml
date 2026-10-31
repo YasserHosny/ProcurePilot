@@ -94,6 +94,12 @@ jobs:
         ports: ['6379:6379']
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Skip docs/gtm/video (~825 MB of demo cuts no job reads): ~60 s per checkout.
+          sparse-checkout: |
+            /*
+            !/docs/gtm/video/
+          sparse-checkout-cone-mode: false
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
