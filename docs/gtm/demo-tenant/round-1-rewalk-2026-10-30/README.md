@@ -154,7 +154,7 @@ The guardrail was re-enabled after the two POs existed.
 | # | Where | Finding | Status |
 |---|---|---|---|
 | W1 | Phone, Approval Queue | Requests with no budget made the whole pending list fail to load (count 0). | Fixed: PPS-137 |
-| W2 | RFQ split vs guardrail | With an enabled guardrail, the guardrail prepares a single request as soon as every reply is matched and converts the RFQ, so a split can never be prepared on that RFQ (by design in 024's edge cases). On a workspace with a guardrail the split is unreachable in practice. | Open: product decision |
-| W3 | Prepare requests dialog | The cost-centre list offers every branch's cost centres (Olaya, Malqa, Jeddah) for فرع العليا. | Open |
-| W4 | Split submit | After «Submit both requests of this split» the toast is the single-request one, «تم إرسال طلب الشراء للاعتماد.» | Open |
-| W5 | Phone, split decision | Each request is shown by its full UUID («طلب 0d36e6fc-1048-…»), and the queue card is plain text with no card frame. | Open |
+| W2 | RFQ split vs guardrail | With an enabled guardrail, the guardrail prepares a single request as soon as every reply is matched and converts the RFQ, so a split can never be prepared on that RFQ (by design in 024's edge cases). On a workspace with a guardrail the split is unreachable in practice. | Open: product decision (PPS-148, P-117) |
+| W3 | Prepare requests dialog | The cost-centre list offers every branch's cost centres (Olaya, Malqa, Jeddah) for فرع العليا. | Open (PPS-149, P-118) |
+| W4 | Split submit | After «Submit both requests of this split» the toast is the single-request one, «تم إرسال طلب الشراء للاعتماد.» | Open (PPS-150, P-119) |
+| W5 | Phone, split decision | Each request is shown by its full UUID («طلب 0d36e6fc-1048-…»), and the queue card is plain text with no card frame. | Open (PPS-151, P-120) |

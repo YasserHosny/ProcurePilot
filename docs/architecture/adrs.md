@@ -359,3 +359,66 @@
   «مطاعم رواق» demo quotes and PO-000001…PO-000009) needs a one-off correction, run with the
   owner's approval. The saving ledger rows already recorded are left as they are. A quote whose
   lines mix inclusive and exclusive prices is not modelled: the flag is per document.
+
+## ADR-022 — Match Decisions Are Corrected by Supersession, Never Updated
+
+- **Status:** Accepted (2026-10-29, spec 023 research R5; PPS-95)
+- **Context:** `match_decision` is append-only and held one row per quotation line, with correction
+  left to "a supersession model later". Spec 023 accepts an unambiguous RFQ fit automatically (owner
+  decision Q1, 2026-10-28), so a wrong automatic match must be correctable. About 19 modules read
+  decisions (offers, landed cost, savings, supplier IQ, alerts, analyst, request valuation, RFQ
+  responses, the guardrail, the optimiser worker).
+- **Options considered:**
+  1. `superseded_at` on the old row. Rejected: it updates an outcome record (Constitution II).
+  2. Delete and reinsert into a history table. Rejected: it destroys history and breaks the
+     `landed_cost` cascade.
+  3. A separate supersession table. Rejected: the database cannot enforce one current decision per
+     line across two tables without triggers on both.
+  4. An insert-only chain on `match_decision`. Chosen.
+- **Decision:**
+  - `match_decision.supersedes_decision_id` names the decision a correction replaces;
+    `learned_from_decision_id` names the decision that taught the wording (the alias sweep).
+  - The database enforces one chain per line with one head: unique nulls not distinct
+    `(tenant_id, quotation_line_id, supersedes_decision_id)` and unique `(supersedes_decision_id)`,
+    plus a trigger that requires the same line. Two concurrent corrections of one head are
+    stopped by the unique index (`23505`).
+  - The view `current_match_decision` (`security_invoker`) serves the heads. Readers that mean "the
+    line's match" read the view; lookups by decision id and history read the table.
+  - A correction inserts a new human decision, computes its landed cost (old rows stay as
+    evidence), enqueues guardrail evaluation (ADR-019) and audits `matching.decision_corrected`.
+  - A correction is refused (`409 line_on_purchase_request`) while a live purchase request is priced
+    from the decision. `match_decision_live_request()` answers that for the caller's tenant whatever
+    branch the caller can see.
+- **Consequences:** Every new reader must choose the view or the table on purpose. A superseded
+  decision's product attribution stops counting toward offers, supplier IQ and alerts. Corrections
+  are blocked, not cascaded, once a request is priced from the decision: the buyer must withdraw it first.
+
+## ADR-023 — An RFQ Split Is One Request Group with One Preparation Lock
+
+- **Status:** Accepted (2026-10-28, spec 024 research R4, R5; PPS-96)
+- **Context:** A basket split divides one RFQ between the suppliers who replied. Approval, budgets,
+  purchase orders, notifications and the phone all hang off a per-request `approval_step`. An RFQ may
+  be converted to requests once; the guardrail (ADR-019) prepares through the same path.
+- **Options considered:**
+  1. One `approval_step` on the group. Rejected: every consumer of a request's step (PO validation,
+     budgets, mobile) would need a second path.
+  2. Independent requests with no group. Rejected: nothing stops splitting an order below an approval
+     threshold, and the buyer could approve half.
+  3. A group of requests, each keeping its own step, decided together. Chosen.
+- **Decision:**
+  - `purchase_request_group` (one per RFQ, `unique (tenant_id, rfq_id)` as the database backstop)
+    records the split's totals and saving as computed at preparation. Its state is the state of its
+    requests. Each request names its group in `request_group_id`.
+  - Preparation takes the same transaction advisory lock as single-request preparation
+    (`rfq-prepare:{tenant}:{rfq}`) and the same status check, creates the group and its requests in
+    one transaction, and calls `mark_rfq_converted` once. The guardrail goes through that lock too,
+    so it cannot race a split.
+  - Submit resolves one approver from the group's combined total and branch (the anti-splitting
+    control) and creates one step per request, all with source `group_threshold_match` or
+    `owner_fallback`. Approve, reject and withdraw run the existing per-request decision SQL for every
+    request in one transaction, with one notification.
+  - The single-request endpoints answer `409 part_of_split` for a request in a group.
+  - A split result is compared with the quotations it was priced from; a stale one is refused.
+- **Consequences:** An enabled guardrail prepares a single request as soon as every reply is matched
+  and converts the RFQ, so the split cannot be prepared on that RFQ. That is by design in 024's edge
+  cases and is tracked as a product decision (W2, PPS-148).

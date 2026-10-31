@@ -1,10 +1,11 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-10-18 · Active work: Egypt pilot readiness. Specs `001`–`021` have shipped to
-`main`; `022-home-currency-readiness` is merged with three tasks open (T015 real-quote extraction run,
-T018 mobile screenshots, T020 full test pass). Since 2026-10-15 most changes have come from building
-the hosted demo tenant «مطاعم سند» (`docs/gtm/demo-tenant/README.md`, findings 1–20) rather than from
-a new spec. No new spec has been scoped; `docs/gtm/gtm-execution-plan.md` tracks pilot work.
+Last updated: 2026-10-31 · Active work: Egypt and Saudi pilot readiness. Specs `001`–`021`, `023`
+(RFQ-aware matching) and `024` (RFQ basket split) have shipped to `main`; `022-home-currency-readiness`
+is merged with three tasks open (T015 real-quote extraction run, T018 mobile screenshots, T020 full test
+pass). Since 2026-10-15 most changes have come from the hosted demo tenants («مطاعم سند»,
+«مطاعم رواق»; `docs/gtm/demo-tenant/README.md`) and their flow reviews rather than from a new spec. No
+new spec has been scoped; `docs/gtm/gtm-execution-plan.md` tracks pilot work.
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -146,7 +147,7 @@ demo findings and code alike (site, cloudId and the plan-ID → key map in
 |---|---|
 | Why does this exist, what ships when | `docs/roadmap/procurepilot_roadmap.md` |
 | What are the binding rules | `.specify/memory/constitution.md` |
-| What am I building now | `specs/022-home-currency-readiness/tasks.md` · `docs/gtm/gtm-execution-plan.md` |
+| What am I building now | `docs/gtm/gtm-execution-plan.md` (open work) · `specs/022-home-currency-readiness/tasks.md` · `specs/023-rfq-aware-matching/tasks.md` · `specs/024-rfq-basket-split/tasks.md` |
 | How was it decided | `specs/001-platform-foundation/research.md` |
 | Tables, RLS, state transitions | `specs/001-platform-foundation/data-model.md` |
 | How do I run it | `specs/001-platform-foundation/quickstart.md` |
@@ -156,11 +157,19 @@ demo findings and code alike (site, cloudId and the plan-ID → key map in
 
 ## Current phase
 
-Specs `001`–`021` are complete and merged; the open spec work is `022`'s three tasks (top of this
-file). The next feature has not been scoped. For what shipped when, read `git log` and the PRs.
+Specs `001`–`021`, `023` and `024` are complete and merged. The open spec work is `022`'s three tasks
+(top of this file) and a few `023`/`024` tasks left open on purpose (below). The next feature has not
+been scoped. For what shipped when, read `git log` and the PRs.
 
 - Some `tasks.md` boxes stay open on purpose: `specs/018-forecasting-reorder/tasks.md` T011, T016,
-  T019, T020, T024 (tests never written). Tick them only with that evidence.
+  T019, T020, T024 (tests never written). Tick them only with that evidence. In `023`, T027 (recorded
+  Azure DI fixtures), T030, T033 and T034 are open; in `024`, T002 is.
+- Match decisions are corrected by supersession, never updated: read `current_match_decision` for "the
+  line's match" and `current_landed_cost` for a decision's cost (ADR-022, ADR-021). An RFQ split is one
+  request group approved as one (ADR-023). The split is unreachable on a workspace whose guardrail
+  is enabled (W2, PPS-148).
+- `main` requires «Regenerate and diff» (docs screenshots drift) as well as the other checks; demo-video
+  media is in Git LFS (`docs/gtm/video`), so pulls there need `--exclude=""`.
 - Landed cost is on rule `landed-cost-v2` (ADR-021: VAT-inclusive quotes). Earlier rows stay v1;
   readers pick the latest offer per supplier across rule versions.
 - Match-score calibration is not feasible yet: hosted has a handful of confirmed human match
