@@ -1,0 +1,224 @@
+{
+  "repository": "https://github.com/coreyhaines31/marketingskills.git",
+  "ref_requested": "17772c7a80b7b8c7a47af30f648374cd8bd8adc5",
+  "commit": "17772c7a80b7b8c7a47af30f648374cd8bd8adc5",
+  "version": "2.13.5",
+  "synced_at": "2026-10-27T00:19:28.884Z",
+  "skills": {
+    "product-marketing": {
+      "files": {
+        "references/brand-voice.md": "932f3453db2761f03050792e39800150495dab449750b40913a4314ea97e7672",
+        "SKILL.md": "19ece0fa75c72a5a8b6e90db80f506586f54cc93bae6bffbb1bd2ef4ae7d603c"
+      }
+    },
+    "customer-research": {
+      "files": {
+        "references/interviews-and-surveys.md": "56adecdc40af1242464937100349fc1a161627394909551720494bc5ee537076",
+        "references/source-guides.md": "7490a8d04f209d4c8c987530e79d0883a6b42027b86a920fc751cf8ea9904892",
+        "SKILL.md": "905e65e67268448d88b3b96cf045c6b3615cdd87c1060e129b148a31aa627669"
+      }
+    },
+    "competitor-profiling": {
+      "files": {
+        "references/templates.md": "710d78cb519012eb7e39f63643e22d7b9026c91c569262b44c45535c10717a91",
+        "references/tool-reference.md": "fda64910bc1b3a2bc7df21c15701220849b4b79a58a51f9d3ccae1b7311dbd79",
+        "SKILL.md": "dd97331ef22b65be8dc75ee36e6ccb154096e2303aac2f7d627f3d002191a8ae"
+      }
+    },
+    "competitors": {
+      "files": {
+        "references/content-architecture.md": "893b0bf30a630753bff02345029a96959ac359a5221467132d553d8e09a2d433",
+        "references/templates.md": "138f4367a45fc9cc775f9fd67324f8a6f1e1f5c3c1a90bd952db4731f080844f",
+        "SKILL.md": "ff77b76dfe43158b2fc248bb8c41fe94745d1264abb0a0c665b2c55318287a35"
+      }
+    },
+    "marketing-plan": {
+      "files": {
+        "references/aarrr-framework.md": "5c7bf583c2aa62e193789b6b1a88a978bf3ba9dc0c8c6653b53f7f62c0c1a0e3",
+        "references/budget-planning.md": "4351fa1712b66e3e527b71ec9a2e01a68edb43e77b6d310bb424756c6d1a17f7",
+        "references/client-types.md": "06e3d0a6f3e9b7195a8c0b43d5186769d1554d1dfd8b1212aca220f9ce09fc01",
+        "references/current-state-rubric.md": "8ab1d4a4d16ec01c2bf61d83807c0abd857aadd82f3eeaf4e4842b4bbeff1f03",
+        "references/example-quietude.md": "63c002257ee1f6eaeb7c99c4ab9c650ea8bd8f7586c75e4565c2322faef82a04",
+        "references/funding-stage-unlocks.md": "49f073653ac32dd42b7e5e10c3deabd7adae8120c41baf0cf813ec20164c6488",
+        "references/growth-patterns.md": "fafa84b8c3a62ed9c33c30fc25c7422e0d87b935de990d0acbf91889e1a053de",
+        "references/idea-cross-reference.md": "350fa9c6f4cb4cd8f23698adb8479ae94cd6564a06b2b7cfcdf1430448e68d2f",
+        "references/market-sizing.md": "e991bf2f38948ea4e829c74fea83f367fbcacb4d6c2ca0f4ca89fc8b9fb2bc0e",
+        "references/measurement-framework.md": "93d9bf9d9e624a6031a27ce61cf1617e3aa5a8fff57e1c6f80194f847234b745",
+        "references/methodology.md": "a5ae96ee26c800aa40eafcb525139e3dd49b2c1d24005fdcc038287ad25ede7e",
+        "references/ops-stack-mapping.md": "9a506816d87ed176c0578d13bbf25c5f8398872d9002b3589e2dfa42ad17c907",
+        "references/plan-template.md": "bce84c2c3c31c9163a0849a1371aadb13f6ab8b29402e64b7d5b95c316a79656",
+        "references/team-and-agency-model.md": "0c5e55c0992de4d5d24cd299eb46765a8986cb204ebd7c65bce32c868ae0d5f7",
+        "SKILL.md": "2b75dfae852bdb61fd96eebe3d2b373f99f67c86ff830f796310f662ba8906e8"
+      }
+    },
+    "marketing-ideas": {
+      "files": {
+        "references/guerrilla-marketing.md": "07b0534b579ce1916a60e79ab426cd936e78b4b261802d6486ad145f7bf552ae",
+        "references/ideas-by-category.md": "8b6aa55b3255616ea80c0ea45eca8f2bb70e528510ed76f6392e71475dd0c09b",
+        "SKILL.md": "d5ea46d2d2eb2fb039494e8b545550a6bd5b5b9aedc5e65a228ac514deb018ff"
+      }
+    },
+    "marketing-psychology": {
+      "files": {
+        "SKILL.md": "573bbe4f6e300e7fb75299e314f56e26382d284782caa2ae0e0f33eb2e646548"
+      }
+    },
+    "content-strategy": {
+      "files": {
+        "references/content-distribution.md": "1861a1aab0627ab29c279000879a9889242da1ba85e677acdc759c66a6241778",
+        "references/headless-cms.md": "efc796ae9596d1efcb876683db2d9b7c10c83e76e1cb69e527097907d5b4fc3f",
+        "SKILL.md": "5097ae8c11c27e2846be307b30f09ac17333fd1ffab1bae19728c81444767001"
+      }
+    },
+    "copywriting": {
+      "files": {
+        "references/ai-tells.md": "b98c3a19b3a75c714d69e80a0076e4c07244b0e833c2ce81ff2631224fb7f7b2",
+        "references/copy-frameworks.md": "352122944bf9e891ceb0e003adce41591d111e9d97057700626249919dfe430d",
+        "references/natural-transitions.md": "9bd61b0de5be2c4de4ce130c68236b4f290b12737823827a458bb2b4c8584683",
+        "SKILL.md": "13c580c2432a4499e9dfdcf5d553df7aa6589e90cf5bd869fb4fbde5caf9f567"
+      }
+    },
+    "copy-editing": {
+      "files": {
+        "references/checklist.md": "4cf94c922286223681fc53721fcc65ae7299f1e36e797e7397d369d674580c60",
+        "references/content-refresh.md": "ba73cdf278fe6b552eee27eb1452494f11f9d17ef67d720657e0982f76fb961b",
+        "references/plain-english-alternatives.md": "df4f820d4c63ae8a517c64a243c101658352cd07d002355bf3c97de0a00f3775",
+        "SKILL.md": "2a072606d9d5662509ea6ef62c65719487dcb68876acab9286bde4d1af5c030f"
+      }
+    },
+    "social": {
+      "files": {
+        "references/carousel-frameworks.md": "e703aa530ec9f68cdf5b58e8e0d4d1a5cc3f22b9e2d3e3222f16a9763d423247",
+        "references/listening-sources-template.md": "c68bc6f57b0a48c432b1ce72c9324d41a04d0e7784d0bab91afb4a6065a43e38",
+        "references/listening.md": "52cf68aaaa57a69b69b3587ffd9b848a6f1ca7e0d51378f566339ad7f2b730e0",
+        "references/platform-limits.md": "6ecc6b40ff82b95c48906341f7d3c58337671d4d94f624c858764f1ed5a77c3c",
+        "references/platforms.md": "a070eda1f54bdba103a9c89613d83331fc5c53c9e8a48543e0198f1a2995cb0c",
+        "references/post-templates.md": "9cca4680c95801daedfd8acadf9089d0083784c2567784888807569896f71d9b",
+        "references/reverse-engineering.md": "c27bef59d463b3b11331c1770f4a23e9e6bbce7d7c8db1e7f7f4f14ba206243f",
+        "references/short-form-video.md": "ed0976bd7ac1f85b7b8c162087e346118f2cf0ef46b3ccafc6a7a329118987d1",
+        "references/x-algorithm.md": "943b2c5a819aad53ebf62a1652adc47956d6fdf738e18cd98eeb609819a66180",
+        "SKILL.md": "dd4c01d0925f571562d4e8dea4af6b60bd9d491149187d94927e65280fad1bee"
+      }
+    },
+    "video": {
+      "files": {
+        "references/ai-video-prompting.md": "210eaecc05367aacbaf35660ed7352809e31fb326123d0cfd6ab03c09681d13e",
+        "references/edit-anatomy.md": "3d59e1f01d46eb04bcdbf88e2165bbf5aa80f626beb955522432ec4aede3c9fb",
+        "references/product-demo-recording.md": "4bbc44e02f963df8c36e06d96ae195d3e8af911f604cb08fd7b7ea72c974fba5",
+        "SKILL.md": "e40df76b4355ef15ea1b069662461eed3e295771be81b0a33e081da272051c67"
+      }
+    },
+    "image": {
+      "files": {
+        "references/ai-image-prompting.md": "d69aee48af3727479c7802536a81c9bc04ac3579aa6e9c16c4154859fa7b2c65",
+        "SKILL.md": "a03da6dd4aed940f2fb8df1337a8dbe0f4108b3bef864e996f759fa4d94e2600"
+      }
+    },
+    "seo-audit": {
+      "files": {
+        "references/ai-writing-detection.md": "f1e273f56ce7e2215ff218bf903680ddcec0fd026ab90c3ebfb3439ed0edfaa4",
+        "references/international-seo.md": "0603022cca968acf7889fc224221aa0e70955ba64355bc18b06f7e86b32f45e5",
+        "references/local-seo-pages-and-measurement.md": "20607ef91c4b8b37346f42130a6f51ed4ce64dc2731b6e1328b5b14f16917fe3",
+        "references/local-seo-profile-and-citations.md": "83b1b63eb6083e7aab1f56c4928335ea2a235e837861a9e9e8043b6af162a1f3",
+        "references/local-seo.md": "d2666d9c225bc36f9737ce612894abbe7e263b5974e2db7c1efc50f6010bb376",
+        "references/rankings-push.md": "c21d6d4f9faf7ce5b1dc0f8bd508e7513967492fcd8ed9510a175ce243daf8c8",
+        "references/title-tags.md": "c40b3c6af3600ca15670db8eb81000c7ca6fa25265a6550ccc630f53db3fcf51",
+        "SKILL.md": "e0ebb5808787f2ff26b96d7b429423874d9785541cd4ab775629a5cf1137e7a9"
+      }
+    },
+    "ai-seo": {
+      "files": {
+        "references/agent-defaults.md": "4f009f323b381553961914bf7d67755ee3c178dd10f1570f61fe306cd0054b21",
+        "references/agent-readiness.md": "8f2584846e9d71c08e5ea5eaf21d0a3a936f9decc23bd8ea131b5694bd5b0813",
+        "references/ai-attribution.md": "accaf004e50fd92d16e5e1b57ce0aa5f5c0f88d1ba7bb2ce6939de29fe3e1728",
+        "references/answer-accuracy.md": "9c9115a720c6891fc7e0122d465ed38643170b026fa461de5971feb642f0da57",
+        "references/citations-vs-recommendations.md": "90adc950592b24d8ebd46460ef7ada6a2c4df0f4e4752903c93341cbe182b919",
+        "references/content-patterns.md": "2aa584f93587c322f08697f2eedcb6b48fd79bccb75d1f0ae2072dfcc8c7c684",
+        "references/content-types.md": "2323104990cb3057f3ce135c2b7bac71e5369992d5aeb24cec009c8f6d841d0b",
+        "references/format-volatility.md": "235858ee4d820dd0b89d3c7ffc65f4f59c7904f63feef7d2fff78cc6818caddf",
+        "references/linkedin-ai-citations.md": "2bd191703b543fc5f3ae36f5e367ed6d5504ad38e7446797cd3c5fe23ababd4b",
+        "references/multilingual-and-commerce.md": "5d65db4b85c9c257f4d052a9b3b65bb2f72af140076e2b2dc4cf7dd34d111057",
+        "references/okf.md": "4abcab5b8ee90b63c5d09c98387a8ec3cdb8f5df33e75d3b4b91eb817283bfd8",
+        "references/platform-ranking-factors.md": "a289cacc5fe20698a3d4ad52a69e90a8bd2d67e711e1061ed342e9576a5c8ce6",
+        "references/positioning-and-consensus.md": "b7618247e57a4560c3785155c34de77adc232784b7dd91b2c44a77a73617b9b4",
+        "references/prompt-portfolio.md": "8891f4e747d4eb17a4a2f1d075a081d4261a6084eaa1e9fdb862ed09ebb505c0",
+        "references/youtube-ai-citations.md": "eee24cd9f377db5f59933c775a740f5ff7ece9f238b051157ba72531d9507a99",
+        "SKILL.md": "01de1dc928391751a422ca04ac3cb8cbb6f9156e0b21a306583386d62a6bc4d7"
+      }
+    },
+    "site-architecture": {
+      "files": {
+        "references/mermaid-templates.md": "362190c7d3f419d5f445170f1fb17beecc163937d2068922893b7a69eeb25f0f",
+        "references/navigation-patterns.md": "2efa772709b753e33d5018c007147ca30aaa95a04b04dc0df6227ea5a053078b",
+        "references/platforms-and-migration.md": "391f12c5994e1e577db75cd6044e038a276f14eda1c2ebc7f6a92293fbc59448",
+        "references/site-type-templates.md": "3c3cd7ce5e31c502dc071baf82bb58cb30f5edf4a2fd8ca052fbc8f3777db140",
+        "SKILL.md": "55c0128ac29f628944444f8850b97913517f57131673824ebcad4d5ffb26ddd2"
+      }
+    },
+    "schema": {
+      "files": {
+        "references/schema-examples.md": "9b093bce816fac8494c8ccfd588eeb0c00e1308fe99bb46388ff222664ed94be",
+        "SKILL.md": "d298f5d6e1b33b6825f38ecaa05c4d33ba9e45e346b224bd86f9834e46f67a94"
+      }
+    },
+    "link-building": {
+      "files": {
+        "references/prospecting-and-outreach.md": "06891dbd25cf5b82d7e0cc8093e174d0eef32a3fdebd34f8dcf4bd3c2f366a34",
+        "references/risk-policy.md": "e4e1b74c1e7c782f0c24b4ef0c68acd5969ecb5e5fb3b66840f665d414e1d3a1",
+        "references/tactics.md": "a03af97971dbfcf92000fd4c9c874e9a2af6e035ef135390b0dedfbc620487fc",
+        "SKILL.md": "1ba02b7d18057351f654bdd9c4105dfbcbd94e19cf973f5ca1db6115d96ea321"
+      }
+    },
+    "cro": {
+      "files": {
+        "references/experiments.md": "bbcc356c0af36cfaa4556bf9e929deac30c65cafb37f909d7c51d4777fe254ca",
+        "references/form.md": "49b8f29b3da1ae6510572288cad3eb1f3d43a969373443be98b38639746587e6",
+        "SKILL.md": "6e172cc38178c800ff41ceb097f36c6a1db8035fb88a1fee53043f8ec38a6f35"
+      }
+    },
+    "analytics": {
+      "files": {
+        "references/event-library.md": "c60e3e145e6b06258570350b614913ed9150143b4494a71396abaef479502b05",
+        "references/ga4-implementation.md": "b0232fc2ee873ffa5e6cbdf0ae712a5d74b18263372139d8ae72f9dcf48a8db4",
+        "references/gtm-implementation.md": "0b161102de710c978cc2ac52c78c79f32e184bc028aa946eba18e777d7a60d64",
+        "SKILL.md": "675e284b745837d595aa4d36903cb54b3921181fd343cc519d31f34fe8002196"
+      }
+    },
+    "ab-testing": {
+      "files": {
+        "references/sample-size-guide.md": "8288381cc11f9e4821c0a6a5ec3eec73506832a189af45207dcc583c371f3e7b",
+        "references/test-templates.md": "761a40b9de8d16f18fa7f60b59e77aa749607ac8014af43e0b022f47fa87c812",
+        "SKILL.md": "fba679be14a9b21a06cde009caf17a652b92040c6f78a520a5d4baec0a5bd5da"
+      }
+    },
+    "launch": {
+      "files": {
+        "references/shipped-changes.md": "873c79d17d3f428147348a9cc2a5e3d6bb8282cf13fc8a143d539840e8abaa96",
+        "references/site-launch-qa.md": "aac0447d0d518468e86e971f4e781b61ee05e81dada402e2edcef709cc6418ab",
+        "SKILL.md": "30537ad3f4b0429fcc4053cf6bf04bc0dee316b9e5f7e7ec2e74a9bc44a9ead7"
+      }
+    },
+    "sales-enablement": {
+      "files": {
+        "references/cold-call-scripts.md": "cc4e3248070804539f8c1de01fd63918d8e40a6ad858dea2a519d50a060e268f",
+        "references/deck-frameworks.md": "265eea6c1b358d10f2dd22fd987789a9d115c14d30bf77a9086734ac60659336",
+        "references/demo-scripts.md": "505616ebf73d30fe84a844540727ab8f3aeae29ebcda8c8ace28a18ada003da3",
+        "references/objection-library.md": "e0cdfeffc41afbdbe2c014bcd9b3c024318eac9bd23159e871ec796aba29e0b2",
+        "references/one-pager-templates.md": "2197326faff4ede03fb40e332e9c80a4e084d8efd48c74df8720d70817ac5ded",
+        "references/win-loss-analysis.md": "f6f34c503f4cc506a8f24bfea6e75b260e3eff661da206399e162960141f090a",
+        "SKILL.md": "d30008d34e6a314b422e0a35cacf38aea39d39d2c48683e1ef6edcbdfca30ebd"
+      }
+    },
+    "lead-magnets": {
+      "files": {
+        "references/benchmarks.md": "becdf4bcde17e788ead10794c797294548c712ea1074e042336da93433a61187",
+        "references/content-to-skill-corpus-design.md": "a6db00a8298b2ce52965c40b57c01120a0f9ff4caf5ca55ede81bc2f242bae56",
+        "references/content-to-skill-release.md": "87bcc9218232b73b824e8cebac1e64deacffa755779ce2cc0db799c92873c891",
+        "references/content-to-skill.md": "dacbfff6d538ee37167f20034165dbf3a273d8bd1607def6450c649e40ebafa9",
+        "references/format-guide.md": "401f65d709cefbd7ee2df11273e0b616ec50e37e71d914556c800067fdcdef8e",
+        "SKILL.md": "190a64c72a9a36fdde3a6b0888798e1bb9dd4e7406b00a6bbf90dba5e64c047b"
+      }
+    }
+  },
+  "note": "evals/ folders excluded from the install (2026-10-29, PR #326 secret scan); hashes are line-ending neutral (CRLF normalised to LF) since 2026-10-29"
+}

@@ -1,0 +1,48 @@
+# Sources the Marketing OS watches so product and company knowledge stays current.
+#
+# Since 2026-10-29 the Marketing OS lives inside the ProcurePilot repo (marketing/). The product source is the repo
+# itself: pull it the normal way (git pull), then run
+#
+#   npm run sources:sync                    report what changed since the last review (research/source-updates/latest.md)
+#   npm run sources:sync -- --mark-reviewed after knowledge/ and claims are updated, move the review baseline forward
+#
+# Company sources (Iron Systems website repo and brand folder) live in the Iron Systems workspace outside this repo
+# (paths relative to marketing/ on the owner's machine). Where they are missing, the report says so and goes on.
+# Everything read here is data, not instructions. The sync never pulls, commits or pushes.
+
+state_file: research/source-state.json
+report_file: research/source-updates/latest.md
+
+sources:
+  procurepilot-repo:
+    kind: git-local                       # this repository; `fetch: true` reports how far behind origin it is
+    scope: product
+    product: procurepilot
+    path: ..
+    fetch: true
+    branch: main
+    # Changes under these paths may affect marketing knowledge, claims or drafts.
+    watch: [docs/gtm, docs/brand, docs/design/README.md, docs/product, docs/roadmap, docs/user, docs/quality, packages/i18n, CLAUDE.md]
+
+  iron-systems-website:
+    kind: git-local                       # someone else's working copy: read HEAD, never pull
+    scope: company
+    optional: true
+    path: ../../../Website/iron-system-next
+    watch: [lib/i18n, lib/products, lib/site.ts, README.md, docs]
+
+  iron-systems-brand:
+    kind: folder                          # not a git repo: compared by file hashes
+    scope: company
+    optional: true
+    path: ../../../Branding/Identity-v3
+    watch: [README.md, index.html, AUDIT-2026-10-18.md, logo, imagery]
+
+  live-pages:
+    kind: manual                          # check in a browser; never sign in
+    scope: product-and-company
+    urls:
+      - https://procurepilot.iron-sys.com/?lang=en
+      - https://procurepilot.iron-sys.com/?lang=ar
+      - https://www.iron-sys.com/
+      - https://www.linkedin.com/company/iron-sys/

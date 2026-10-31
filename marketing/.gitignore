@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Secrets: never commit
+.env
+.env.*
+*.pem
+*.key
+credentials*.json
+secrets/
+
+# Read-only clones of product repos and downloaded sources used during research
+research/_sources/
+
+# OS and editor
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.vscode/
+.idea/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Generated mirrors of product repos (recreated by npm run sources:sync); large video cuts never committed
+*/product-repo/video-cuts-latest/

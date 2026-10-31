@@ -1,0 +1,9 @@
+# Marketing files are checked with exact hashes (upstream skills) and YAML frontmatter parsers that
+# expect LF. Keep LF on every OS, whatever core.autocrlf says (PR #326).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.mp4 binary
+*.webp binary

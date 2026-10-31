@@ -118,6 +118,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-45 | PPS-75 | P-46 | PPS-76 | | |
 | P-49 | PPS-79 | | | | |
 | P-52 | PPS-82 | P-53 | PPS-83 | P-54 | PPS-84 |
+| G-14 | PPS-111 | | | | |
 | P-57 | PPS-87 | P-58 | PPS-88 | P-59 | PPS-89 |
 | P-60 | PPS-90 | P-61 | PPS-91 | P-62 | PPS-92 |
 | P-63 | PPS-93 | P-64 | PPS-94 | P-65 | PPS-95 |
@@ -219,6 +220,7 @@ Atlassian connector) · **Lane** (code lane via Speckit: Codex / agy / OpenCode)
 | [ ] G-8 | Pilot onboarding runbook: CSV/manual supplier + catalogue load, branches/approvers, inbound-email address for WhatsApp-forwarded quotes, first live RFQ, support WhatsApp group (4 working-hour response) | Orch | E-1, P-1, P-3 | Runbook doc linked on PPS task, dry-run on demo tenant | PPS |
 | [ ] G-9 | Outreach: work SP to 20 conversations at Talked+ | User | G-2, G-5, G-7 | 20 Leads at Talked or beyond | SP |
 | [ ] G-10 | Company formation: Egyptian one-person company on the simplified regime (research in `docs/gtm/company-formation/`) | User | — | Company registered; name + tax ID on PPS-11, then into G-6 | PPS |
+| [ ] G-14 | Marketing OS in the repo (`marketing/`): organic marketing for ProcurePilot and Iron Systems, moved from the workspace on the owner's request (2026-10-29). Knowledge, approved positioning and claims, decisions, the founder LinkedIn and company campaigns, profile kits, research, skills and checks. Rules: `marketing/CLAUDE.md`; nothing is published without the owner's approval | Orch, User (approvals) | — | PR merged; `cd marketing && npm test` green on main | PPS |
 
 ### P — Product tasks (PPS `from-demo` → Speckit spec → code lane)
 
@@ -390,3 +392,4 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-30 | Claude (orchestrator) | P-81 (PPS-112): a purchase request created during a match correction can keep the superseded price (023 US1 review finding D2; needs the correction lock on request-line pricing). P-82 (PPS-113): deterministic (alias/GTIN/supplier-code) auto-matches offer no other candidate to correct to, and a keyed new-product retry cannot repair a missing pack. Both from the 023 US1 review (#331), backlog. | |
 | 2026-10-30 | Claude | Sales-skill assessment → three tasks. P-83 (PPS-114): status-quo battlecard `battlecards/whatsapp-excel.md` + `outreach/discovery-demo-call-script.md` (AR + EN, `sales-enablement`). P-84 (PPS-115): `community/g7-community-plan.md` for G-7 (`community-marketing`, installed 2026-10-30 from coreyhaines31/marketingskills). P-85 (PPS-116): `research/` call-notes template + synthesis method (`customer-research`); filled notes local in `research/calls/` (excluded); phase 2 synthesis blocked by G-9. Skipped: Apify OSM leads, social scraping, outbound-prospecting. | Owner: review the Arabic copy; pick the first 3 communities. |
 | | | | |
+| 2026-10-29 | Claude (marketing session) | G-14 (PPS-111): the Marketing OS moved into the repo as `marketing/` on the owner's request (branch `docs/marketing-os`). It links to `docs/gtm`, `docs/brand` and `packages/i18n` instead of mirroring them. Same day, with the owner: LinkedIn About updated (EN; AR added as a page language, product paragraph removed), positioning approved (Arabic-first + verified savings), claims approved, 10 LinkedIn drafts with v2 images built from real v2.5 frames. Nothing posted. | Owner reviews the 10 drafts and images; merge the PR |
