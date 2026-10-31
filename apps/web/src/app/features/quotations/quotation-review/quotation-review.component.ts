@@ -1299,6 +1299,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   private calculateLineTotal(amounts: EffectiveLineAmounts): number {
     const lineNet = amounts.quantity * amounts.unitPrice + amounts.deliveryFee - amounts.discount;
+    // A VAT-inclusive quote's prices already contain the rate (ADR-021): mirror the server.
+    if (this.effectivePricesIncludeVat(this.quotation())) return lineNet;
     return lineNet * (1 + amounts.vatRate);
   }
 

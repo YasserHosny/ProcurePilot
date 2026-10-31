@@ -744,6 +744,34 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.hasArithmeticMismatch()).toBeTrue();
   });
 
+  it('reconciles a VAT-inclusive quote whose lines carry the rate inside the price (ADR-021)', () => {
+    // 10 × 25.00 at 20% VAT already inside the price: the printed total is 250.00, not 300.00.
+    const inclusive: QuotationDetail = {
+      ...mockQuotationDetail,
+      prices_include_vat: true,
+      vat_rate: '0.20',
+      stated_total: { amount: '250.00', currency: 'GBP' },
+    };
+    component.quotation.set(inclusive);
+    fixture.detectChanges();
+
+    expect(component.computeLineTotal(inclusive.lines[0])).toBe('250.00');
+    expect(component.hasArithmeticMismatch()).toBeFalse();
+  });
+
+  it('still adds VAT on top when the same lines are VAT-exclusive', () => {
+    const exclusive: QuotationDetail = {
+      ...mockQuotationDetail,
+      prices_include_vat: false,
+      stated_total: { amount: '250.00', currency: 'GBP' },
+    };
+    component.quotation.set(exclusive);
+    fixture.detectChanges();
+
+    expect(component.computeLineTotal(exclusive.lines[0])).toBe('300.00');
+    expect(component.hasArithmeticMismatch()).toBeTrue();
+  });
+
   it('renders a flagged stated_total through FormatService.formatMoney in English and Arabic without raw JSON', () => {
     const formatService = TestBed.inject(FormatService);
     const translate = TestBed.inject(TranslateService);

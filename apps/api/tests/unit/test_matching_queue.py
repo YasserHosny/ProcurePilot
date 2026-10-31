@@ -380,7 +380,7 @@ def test_list_match_tasks_accepts_query_params_and_enriches_supplier(
     monkeypatch.setattr(
         matching_service_module,
         "_line_rows",
-        lambda _client, _qid: [fake_line_row],
+        lambda _client, _qid, _quote=None: [fake_line_row],
     )
     monkeypatch.setattr(
         matching_service_module,
