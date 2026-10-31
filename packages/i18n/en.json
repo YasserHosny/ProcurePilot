@@ -688,6 +688,12 @@
         "contactEmailLabel": "Contact Email",
         "contactEmailPlaceholder": "e.g. sales@supplier.com (optional)",
         "contactEmailInvalid": "Please enter a valid email address",
+        "emailLanguageLabel": "Email Language",
+        "emailLanguageHint": "RFQ emails to this supplier are written in this language.",
+        "emailLanguageDefault": "Workspace default ({{language}})",
+        "emailLanguageDefaultPlain": "Workspace default",
+        "languageArabic": "Arabic",
+        "languageEnglish": "English",
         "paymentTermsLabel": "Payment Terms",
         "paymentTermsPlaceholder": "e.g. Net 30 days (optional)",
         "leadTimeLabel": "Lead Time (Days)",
@@ -1703,7 +1709,7 @@
     },
     "result": {
       "feasibleTitle": "Recommended Basket Allocation",
-      "feasibleSubtitle": "Minimum landed cost split across the two selected suppliers.",
+      "feasibleSubtitle": "Minimum landed cost split across the selected suppliers.",
       "totalLandedCost": "Optimised Total Landed Cost",
       "supplierAllocation": "Allocation for {{supplier}}",
       "supplierTotal": "Supplier Total: {{total}}",
@@ -2337,6 +2343,7 @@
       "withdrawBoth": "Withdraws both requests of this split",
       "withdrawAll": "Withdraws all {{count}} requests of this split",
       "withdrawConfirmMessageBoth": "Withdraws both requests of this split? Any committed budget will be released.",
+      "withdrawConfirmTitle": "Withdraw this split?",
       "withdrawConfirmMessageAll": "Withdraws all {{count}} requests of this split? Any committed budget will be released."
     },
     "partOfSplitError": "This request is part of a split. Please use the split action to submit, decide, or withdraw all requests together."
@@ -4081,7 +4088,12 @@
       "needsTwoMatched": "Needs two matched replies",
       "differentCurrencies": "Replies are in different currencies",
       "alreadyConverted": "RFQ is already converted",
-      "splitError": "Failed to start split. Please try again."
+      "splitError": "Failed to start split. Please try again.",
+      "lowestLinePrice": "Lowest landed cost",
+      "splitSavingHint": "Splitting this order between suppliers could save {{money}}.",
+      "openPreparedRequest": "Open draft request",
+      "openRequest": "Open request",
+      "convertedReason": "This RFQ is already converted into a request."
     },
     "history": {
       "title": "RFQ History",
@@ -4216,7 +4228,8 @@
         "save": "Unable to save guardrail settings."
       },
       "reasons": {
-        "rfq_not_open": "The RFQ is not open.",
+        "rfq_not_open": "Not applied: this RFQ is not open for replies (draft or expired).",
+        "rfq_converted": "Not applied: this RFQ was already converted into a request.",
         "min_response_count_not_met": "The minimum response count is not met.",
         "responses_pending": "Other responses are still pending review.",
         "captured_before_guardrail": "This response predates the guardrail.",

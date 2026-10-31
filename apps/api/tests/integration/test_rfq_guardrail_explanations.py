@@ -139,6 +139,12 @@ def test_owner_explanations_are_real_read_only_snapshots_and_update_after_firing
     before = _reasons(service, owner, rfq_id)
     assert before[response_a] == "would_fire"
     assert before[response_b] == "not_lowest_price"
+    before_results = service.list_responses(member=owner, rfq_id=rfq_id)
+    assert all(
+        evaluation.purchase_request_id is None
+        for item in before_results.items
+        for evaluation in item.guardrail_evaluations
+    )
 
     # A second owner read must not create an event, request, audit row, or status transition.
     assert _reasons(service, owner, rfq_id) == before
@@ -167,19 +173,31 @@ def test_owner_explanations_are_real_read_only_snapshots_and_update_after_firing
 
     after = _reasons(service, owner, rfq_id)
     assert after[response_a] == "fired"
-    assert after[response_b] == "rfq_not_open"
+    assert after[response_b] == "rfq_converted"
     with psycopg.connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "select count(*) from auto_preparation_event "
+                "select purchase_request_id from auto_preparation_event "
                 "where tenant_id = %s and guardrail_id = %s",
                 (tenant_id, guardrail_id),
             )
-            assert cur.fetchone()[0] == 1
+            events = cur.fetchall()
+            assert len(events) == 1
+            purchase_request_id = events[0][0]
+            assert purchase_request_id is not None
+
+    after_results = service.list_responses(member=owner, rfq_id=rfq_id)
+    evaluations = {item.id: item.guardrail_evaluations[0] for item in after_results.items}
+    assert evaluations[response_a].guardrail_id == guardrail_id
+    assert evaluations[response_a].fired is True
+    assert evaluations[response_a].purchase_request_id == purchase_request_id
+    assert evaluations[response_b].fired is False
+    assert evaluations[response_b].purchase_request_id is None
 
 
-def test_pending_response_explanation_is_owner_only_and_cross_tenant_guardrails_do_not_leak(
-) -> None:
+def test_pending_response_explanation_is_owner_only_and_cross_tenant_guardrails_do_not_leak() -> (
+    None
+):
     tenant_id, user_id, membership_id, rfq_id, response_a, response_b, _guardrail_id, _ = (
         _seed_explanation_fixture()
     )
@@ -198,7 +216,7 @@ def test_pending_response_explanation_is_owner_only_and_cross_tenant_guardrails_
             )
             cur.execute(
                 "insert into auto_preparation_guardrail "
-                "(id,tenant_id,created_by_membership_id,default_branch_id,max_order_value_amount," 
+                "(id,tenant_id,created_by_membership_id,default_branch_id,max_order_value_amount,"
                 "max_order_value_currency,min_response_count,max_price_variance_pct,enabled) "
                 "values (%s,%s,%s,%s,999,'GBP',1,0.1,true)",
                 (uuid4(), other_tenant, other_membership, branch_id),

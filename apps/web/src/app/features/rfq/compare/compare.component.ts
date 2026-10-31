@@ -18,7 +18,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
-import { RfqApi, RfqDetail, RfqGuardrail, RfqResponseComparison } from '../rfq-api';
+import { RfqApi, RfqDetail, RfqGuardrail, RfqResponseComparison, RfqResponseLineComparison } from '../rfq-api';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -29,6 +29,8 @@ import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
+// Money is compared in 1/10 000ths so totals like 4,830 − 4,770 come out exact.
+const MINOR_UNITS = 10_000;
 
 @Component({
   providers: [provideAppDateAdapter()],
@@ -153,17 +155,24 @@ export class CompareComponent implements OnInit, OnChanges {
     return response.lines[0]?.quoted_unit_price_currency || '';
   }
 
-  readonly lowestTotalResponseIds = computed<Set<string>>(() => {
+  readonly convertedPurchaseRequestId = computed<string | null>(() => {
+    const ids = this.rfqDetail()?.converted_purchase_request_ids;
+    return ids && ids.length === 1 ? ids[0] : null;
+  });
+
+  // Replies whose quoted totals can be compared for «Lowest total»: fully matched, one
+  // currency, the same products in the same quantities.
+  private readonly comparableResponses = computed<RfqResponseComparison[] | null>(() => {
     const all = this.responses();
     const eligible = all.filter(
       (r) => r.quotation_status !== 'refused' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
     );
     if (eligible.length < 2) {
-      return new Set<string>();
+      return null;
     }
-    const currencies = new Set(eligible.map((r) => this.responseCurrency(r)));
+    const currencies = new Set(eligible.map((r) => this.responseCurrency(r)).filter(Boolean));
     if (currencies.size !== 1) {
-      return new Set<string>();
+      return null;
     }
 
     const getProductQuantities = (response: RfqResponseComparison): Map<string, number> | null => {
@@ -182,28 +191,37 @@ export class CompareComponent implements OnInit, OnChanges {
     };
 
     const baselineMap = getProductQuantities(eligible[0]);
-    if (!baselineMap) {
-      return new Set<string>();
+    if (!baselineMap || baselineMap.size === 0) {
+      return null;
     }
 
     for (let i = 1; i < eligible.length; i++) {
       const currentMap = getProductQuantities(eligible[i]);
       if (!currentMap || currentMap.size !== baselineMap.size) {
-        return new Set<string>();
+        return null;
       }
       for (const [productId, baselineQty] of baselineMap.entries()) {
         const currentQty = currentMap.get(productId);
         if (currentQty === undefined || Math.abs(currentQty - baselineQty) > 1e-9) {
-          return new Set<string>();
+          return null;
         }
       }
+    }
+
+    return eligible;
+  });
+
+  readonly lowestTotalResponseIds = computed<Set<string>>(() => {
+    const eligible = this.comparableResponses();
+    if (!eligible) {
+      return new Set<string>();
     }
 
     const totals = eligible.map((r) => ({ id: r.id, total: this.responseTotal(r) }));
     const minTotal = Math.min(...totals.map((t) => t.total));
     const ids = new Set<string>();
     for (const t of totals) {
-      if (t.total === minTotal) {
+      if (Math.abs(t.total - minTotal) < 1e-9) {
         ids.add(t.id);
       }
     }
@@ -213,6 +231,105 @@ export class CompareComponent implements OnInit, OnChanges {
   hasLowestTotal(response: RfqResponseComparison): boolean {
     return this.lowestTotalResponseIds().has(response.id);
   }
+
+  // Each eligible reply's landed cost for the RFQ's quantity of every RFQ product, in
+  // 1/10 000ths of the currency: the figures the RFQ split prices from (rfq_landed_costs).
+  // Null unless at least two fully matched replies price every RFQ product in one currency.
+  private readonly landedCostGrid = computed<{
+    replies: RfqResponseComparison[];
+    costs: Map<string, Map<string, number>>;
+    productIds: string[];
+    currency: string;
+  } | null>(() => {
+    const productIds = [...new Set((this.rfqDetail()?.lines ?? []).map((l) => l.workspace_product_id))];
+    if (productIds.length === 0) {
+      return null;
+    }
+    const replies = this.responses().filter(
+      (r) => r.quotation_status !== 'refused' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
+    );
+    if (replies.length < 2) {
+      return null;
+    }
+
+    const currencies = new Set<string>();
+    const costs = new Map<string, Map<string, number>>();
+    for (const reply of replies) {
+      const byProduct = new Map<string, number>();
+      for (const cost of reply.rfq_landed_costs ?? []) {
+        const amount = Number(cost.total_amount);
+        if (Number.isNaN(amount)) {
+          return null;
+        }
+        byProduct.set(cost.workspace_product_id, Math.round(amount * MINOR_UNITS));
+        currencies.add(cost.total_currency);
+      }
+      if (productIds.some((id) => !byProduct.has(id))) {
+        return null;
+      }
+      costs.set(reply.id, byProduct);
+    }
+    if (currencies.size !== 1) {
+      return null;
+    }
+    return { replies, costs, productIds, currency: [...currencies][0] };
+  });
+
+  private landedCost(replyId: string, productId: string): number {
+    return this.landedCostGrid()?.costs.get(replyId)?.get(productId) ?? 0;
+  }
+
+  readonly lowestLinePriceKeys = computed<Set<string>>(() => {
+    const grid = this.landedCostGrid();
+    const keys = new Set<string>();
+    if (!grid) {
+      return keys;
+    }
+    for (const productId of grid.productIds) {
+      const amounts = grid.replies.map((r) => this.landedCost(r.id, productId));
+      const min = Math.min(...amounts);
+      if (amounts.every((amount) => amount === min)) {
+        continue;
+      }
+      grid.replies.forEach((reply, i) => {
+        if (amounts[i] === min) {
+          keys.add(`${reply.id}:${productId}`);
+        }
+      });
+    }
+    return keys;
+  });
+
+  isLowestLinePrice(response: RfqResponseComparison, line: RfqResponseLineComparison): boolean {
+    if (!line.workspace_product_id) {
+      return false;
+    }
+    return this.lowestLinePriceKeys().has(`${response.id}:${line.workspace_product_id}`);
+  }
+
+  // The cheapest single supplier against the cheapest supplier per line, both from landed costs.
+  // A supplier's delivery fee, minimum order or tiers can cancel that saving, and only the split
+  // itself prices them, so the hint stays hidden when any eligible supplier has such terms.
+  readonly splitSaving = computed<{ amount: number; currency: string } | null>(() => {
+    const grid = this.landedCostGrid();
+    if (!grid || grid.replies.some((r) => r.supplier_terms_apply)) {
+      return null;
+    }
+    const singleTotals = grid.replies.map((r) =>
+      grid.productIds.reduce((sum, productId) => sum + this.landedCost(r.id, productId), 0),
+    );
+    const splitTotal = grid.productIds.reduce(
+      (sum, productId) => sum + Math.min(...grid.replies.map((r) => this.landedCost(r.id, productId))),
+      0,
+    );
+    const saving = Math.min(...singleTotals) - splitTotal;
+    return saving > 0 ? { amount: saving / MINOR_UNITS, currency: grid.currency } : null;
+  });
+
+  readonly splitSavingMoney = computed<string>(() => {
+    const saving = this.splitSaving();
+    return saving ? this.formatService.formatMoney(saving) : '';
+  });
 
   unmatchedCount(response: RfqResponseComparison): number {
     return response.lines.filter((l) => l.pending_match).length;
@@ -413,10 +530,16 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   canPrepare(response: RfqResponseComparison): boolean {
-    return this.isEligible(response) && Boolean(this.selectedBranchId()) && Boolean(this.requiredByDate());
+    return (
+      !this.isConverted() &&
+      this.isEligible(response) &&
+      Boolean(this.selectedBranchId()) &&
+      Boolean(this.requiredByDate())
+    );
   }
 
   prepareRequest(response: RfqResponseComparison): void {
+    if (this.isConverted()) return;
     if (response.quotation_status === 'refused') return;
     if (!this.isEligible(response)) {
       this.snackBar.open(
@@ -471,6 +594,21 @@ export class CompareComponent implements OnInit, OnChanges {
         navigateToDraft();
       },
       error: (err: unknown) => {
+        if (err instanceof HttpErrorResponse && err.status === 409) {
+          const reason = (err.error as ApiError | undefined)?.details?.['reason'];
+          if (reason === 'rfq_already_converted') {
+            this.snackBar.open(
+              this.translate.instant('rfq.compare.alreadyConverted'),
+              this.translate.instant('rfq.history.dismiss'),
+              { duration: 5000 },
+            );
+            const id = this.rfqId();
+            if (id) {
+              this.loadData(id);
+            }
+            return;
+          }
+        }
         const message =
           err instanceof HttpErrorResponse
             ? ((err.error as ApiError | undefined)?.message ??

@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { DatePipe, SlicePipe } from '@angular/common';
+import { SlicePipe } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -25,6 +25,7 @@ import type {
   Quotation,
 } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
+import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 
 export type UploadState =
@@ -74,9 +75,9 @@ const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
     MatProgressBarModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
-    DatePipe,
     SlicePipe,
     TranslatePipe,
+    FormatDatePipe,
     FormatMoneyPipe,
   ],
   templateUrl: './quotation-upload.component.html',

@@ -1,6 +1,6 @@
-import { Pipe, PipeTransform, inject } from '@angular/core';
+import { Pipe, PipeTransform } from '@angular/core';
 
-import { FormatService } from './format.service';
+import { LocaleReactiveFormatPipe } from './locale-reactive-format.pipe';
 
 /**
  * Pipe to format Date objects or ISO date strings with locale sensitivity.
@@ -10,15 +10,28 @@ import { FormatService } from './format.service';
 @Pipe({
   name: 'formatDate',
   standalone: true,
+  // Impure so a language switch re-renders without a reload (the date input itself does not change).
+  pure: false,
 })
-export class FormatDatePipe implements PipeTransform {
-  private readonly formatService = inject(FormatService);
+export class FormatDatePipe extends LocaleReactiveFormatPipe implements PipeTransform {
+  private lastValue: string | Date | number | null | undefined;
+  private lastOptions: Intl.DateTimeFormatOptions | undefined;
+  private hasLast = false;
 
   transform(
     value: string | Date | number | null | undefined,
     options?: Intl.DateTimeFormatOptions,
     localeOverride?: string,
   ): string {
-    return this.formatService.formatDate(value, options, localeOverride);
+    const argsMatch =
+      this.hasLast && this.lastValue === value && this.lastOptions === options;
+
+    const result = this.memoisedOrCompute(localeOverride, argsMatch, () =>
+      this.formatService.formatDate(value, options, localeOverride),
+    );
+    this.hasLast = true;
+    this.lastValue = value;
+    this.lastOptions = options;
+    return result;
   }
 }
