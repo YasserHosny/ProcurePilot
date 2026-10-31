@@ -864,23 +864,23 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(error?.textContent?.trim().length).toBeGreaterThan(0);
     });
 
-    it('the hint element is not absolutely positioned and sits after its input in DOM order', () => {
+    it('the pack hint takes space in the row, so a wrapped hint cannot overlap the next row', () => {
       const translate = TestBed.inject(TranslateService);
       translate.setTranslation('en', en);
       translate.use('en');
       component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
       fixture.detectChanges();
 
-      const input = (fixture.nativeElement as HTMLElement).querySelector('.item-qty-field input');
-      const hint = (fixture.nativeElement as HTMLElement).querySelector('.item-qty-field mat-hint');
-      expect(input).not.toBeNull();
-      expect(hint).not.toBeNull();
+      // MDC positions the hint wrapper, not mat-hint; it joins the flow only with a dynamic subscript.
+      const wrapper = (fixture.nativeElement as HTMLElement).querySelector(
+        '.item-qty-field .mat-mdc-form-field-hint-wrapper',
+      );
+      expect(wrapper).not.toBeNull();
+      expect(window.getComputedStyle(wrapper!).position).toBe('static');
+    });
 
-      const pos = window.getComputedStyle(hint!).position;
-      expect(pos).not.toBe('absolute');
-
-      const positionComparison = input!.compareDocumentPosition(hint!);
-      expect(positionComparison & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    it('the result subtitle does not name a supplier count', () => {
+      expect(en.basketSplit.result.feasibleSubtitle).not.toMatch(/\btwo\b/i);
     });
 
     it('RFQ mode is unchanged with a job that has rfq_id', fakeAsync(() => {

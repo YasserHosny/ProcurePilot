@@ -11,7 +11,7 @@ from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, NotFoundError, ServiceUnavailableError
 from procurepilot_api.modules.landed_cost.rules import (
-    RULE_VERSION_V1,
+    RULE_VERSION_V2,
     LandedCostInputs,
     MoneyValue,
     compute_landed_cost,
@@ -44,7 +44,7 @@ LANDED_COLUMNS = (
 class LandedCostService:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
-        self.active_rule_version = RULE_VERSION_V1
+        self.active_rule_version = RULE_VERSION_V2
 
     def get_landed_cost(self, *, bearer_token: str, line_id: UUID) -> LandedCost:
         client = authenticated_client(self._settings, bearer_token)
@@ -122,6 +122,7 @@ class LandedCostService:
         )
         result = compute_landed_cost(
             LandedCostInputs(
+                prices_include_vat=bool(quote.get("prices_include_vat", False)),
                 quantity=quantity,
                 normalised_base_quantity=quantity * base_quantity,
                 base_unit=str(canonical["base_unit"]),
@@ -272,7 +273,7 @@ def _required_currency(currency: str | None) -> str:
 def _quotation_row(client: object, quotation_id: UUID) -> dict[str, object]:
     response = (
         client.table("quotation")
-        .select("currency,expiry_date")
+        .select("currency,expiry_date,prices_include_vat")
         .eq("id", str(quotation_id))
         .limit(1)
         .execute()

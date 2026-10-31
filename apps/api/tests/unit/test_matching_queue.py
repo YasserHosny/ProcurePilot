@@ -380,7 +380,7 @@ def test_list_match_tasks_accepts_query_params_and_enriches_supplier(
     monkeypatch.setattr(
         matching_service_module,
         "_line_rows",
-        lambda _client, _qid: [fake_line_row],
+        lambda _client, _qid, _quote=None: [fake_line_row],
     )
     monkeypatch.setattr(
         matching_service_module,
@@ -872,3 +872,50 @@ def test_line_match_state_reads_every_candidate_past_the_row_cap(
     )
     assert state.candidates[str(line_id)] == candidates
     assert state._tasks[str(line_id)] == tasks  # noqa: SLF001
+
+
+def test_queue_item_does_not_add_vat_again_on_a_vat_inclusive_quote() -> None:
+    # ADR-021: 2 × SAR 115.00 with 15% VAT inside the price costs 230.00, not 264.50.
+    created_at = datetime.now(UTC)
+    item = _queue_item(
+        {
+            "id": uuid4(),
+            "quotation_id": uuid4(),
+            "quotation_status": "reviewed",
+            "document_id": None,
+            "storage_path": None,
+            "issue_date": None,
+            "reviewed_at": created_at,
+            "reviewed_by": None,
+            "reviewed_by_email": None,
+            "supplier_id": None,
+            "supplier_name": None,
+            "prices_include_vat": True,
+            "quotation_line_id": uuid4(),
+            "line_number": 1,
+            "original_text": "زيت دوار الشمس (تنكة 18 لتر)",
+            "quantity": "2",
+            "pack_count": None,
+            "unit_size": None,
+            "pack_unit": None,
+            "unit_price_amount": "115.0000",
+            "unit_price_currency": "SAR",
+            "vat_rate": "0.1500",
+            "delivery_fee_amount": None,
+            "delivery_fee_currency": None,
+            "discount_amount": None,
+            "discount_currency": None,
+            "status": "open",
+            "priority": "normal",
+            "reason": "no_candidate",
+            "created_at": created_at,
+            "resolved_at": None,
+            "top_candidate_name": None,
+            "top_candidate_confidence": None,
+            "quotation_total_line_count": 1,
+            "quotation_open_task_count": 1,
+        }
+    )
+
+    assert item.quotation_line.quoted_line_total is not None
+    assert item.quotation_line.quoted_line_total.amount == "230.0000"

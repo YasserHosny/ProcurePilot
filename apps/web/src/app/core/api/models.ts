@@ -153,6 +153,7 @@ export interface Supplier {
   readonly contact_email?: string | null;
   readonly status: 'active' | 'preferred' | 'blocked' | 'archived';
   readonly created_at: string;
+  readonly preferred_locale?: 'en' | 'ar' | null;
 }
 
 export interface SupplierCreate {
@@ -162,6 +163,7 @@ export interface SupplierCreate {
   readonly minimum_order_value?: Money | null;
   readonly delivery_fee?: Money | null;
   readonly contact_email?: string | null;
+  readonly preferred_locale?: 'en' | 'ar' | null;
 }
 
 export interface SupplierUpdate {
@@ -172,6 +174,7 @@ export interface SupplierUpdate {
   readonly delivery_fee?: Money | null;
   readonly contact_email?: string | null;
   readonly status?: 'active' | 'preferred' | 'blocked' | 'archived';
+  readonly preferred_locale?: 'en' | 'ar' | null;
 }
 
 export type RefreshScheduleStatus = 'active' | 'paused' | 'due';
@@ -388,6 +391,8 @@ export interface QuotationReviewPatch {
   readonly corrections?: readonly FieldCorrection[];
   readonly add_lines?: readonly NewQuotationLine[];
   readonly remove_line_ids?: readonly string[];
+  readonly prices_include_vat?: boolean;
+  readonly vat_rate?: string;
 }
 
 export interface QuotationDetail extends Quotation {
@@ -398,6 +403,8 @@ export interface QuotationDetail extends Quotation {
   readonly uploaded_by_email?: string | null;
   readonly reviewed_by_email?: string | null;
   readonly suggested_supplier_name?: string | null;
+  readonly prices_include_vat: boolean;
+  readonly vat_rate: string | null;
 }
 
 export interface AuditTrailEntry {
@@ -1204,6 +1211,7 @@ export interface PurchaseOutcomePrefillLine {
   readonly base_unit: string;
   readonly unit_price: Money;
   readonly total_paid: Money;
+  readonly tax: Money;
   readonly recordable: boolean;
   readonly reason: 'no_product' | 'zero_quantity' | 'already_recorded' | null;
   readonly recorded_saving_id: string | null;
@@ -1458,8 +1466,12 @@ export interface PurchaseRequestLine {
   readonly note?: string | null;
   readonly estimated_unit_price?: Money | null;
   readonly estimated_unit_price_source_landed_cost_id?: string | null;
-  /** Supplier's quoted per-pack price from the source RFQ response; the only PO-prefillable price. */
+  /** Printed supplier price per pack from the source RFQ response; gross when VAT-inclusive. */
   readonly quoted_unit_price?: Money | null;
+  readonly quoted_prices_include_vat: boolean;
+  readonly quoted_vat_rate: string | null;
+  /** Net per-pack price; equals the printed price when VAT-exclusive. */
+  readonly quoted_net_unit_price: Money | null;
 }
 
 export interface PurchaseRequestLineInput {

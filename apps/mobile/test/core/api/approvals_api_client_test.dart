@@ -208,4 +208,24 @@ void main() {
       });
     }
   }
+
+  test('a group decision sends the Idempotency-Key it is given', () async {
+    final keys = <String?>[];
+    final client = ApprovalsApiClient(
+      apiBaseUrl: 'https://test.api',
+      httpClient: MockClient((request) async {
+        keys.add(request.headers['Idempotency-Key']);
+        return http.Response('[]', 200);
+      }),
+    )..accessToken = 'test-token';
+
+    await client.approveGroup('grp-1', idempotencyKey: 'key-approve');
+    await client.rejectGroup(
+      'grp-1',
+      comment: 'No',
+      idempotencyKey: 'key-reject',
+    );
+
+    expect(keys, ['key-approve', 'key-reject']);
+  });
 }

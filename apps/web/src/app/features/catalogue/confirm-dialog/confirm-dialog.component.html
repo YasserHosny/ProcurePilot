@@ -33,6 +33,6 @@
     type="button"
     (click)="onConfirm()"
   >
-    {{ data.confirmKey | translate }}
+    {{ data.confirmKey | translate: data.confirmParams }}
   </button>
 </mat-dialog-actions>

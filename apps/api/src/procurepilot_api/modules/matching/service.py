@@ -59,7 +59,8 @@ from procurepilot_api.shared.logging import get_trace_id
 from procurepilot_api.shared.postgrest_pages import all_rows
 
 QUOTATION_COLUMNS = (
-    "id,tenant_id,document_id,supplier_id,status,issue_date,reviewed_at,reviewed_by,deleted_at"
+    "id,tenant_id,document_id,supplier_id,status,issue_date,reviewed_at,reviewed_by,"
+    "deleted_at,prices_include_vat"
 )
 LINE_COLUMNS = (
     "id,tenant_id,quotation_id,line_number,original_text,quantity,pack_count,unit_size,pack_unit,"
@@ -105,7 +106,7 @@ class MatchingService:
         quote = _quotation_row(client, quotation_id)
         if quote["status"] != "reviewed":
             raise ConflictError(details={"reason": "quotation_not_reviewed"})
-        lines = _line_rows(client, quotation_id)
+        lines = _line_rows(client, quotation_id, quote)
         if not lines:
             return QuotationMatches(quotation_id=quotation_id, lines=[])
         # Every read is a round trip (PPS-133): read the lines' match state in three batched
@@ -348,6 +349,7 @@ class MatchingService:
                     d.storage_path, d.original_filename,
                     q.supplier_id,
                     supplier.name as supplier_name,
+                    q.prices_include_vat,
                     ql.id as quotation_line_id,
                     ql.line_number,
                     ql.original_text,
@@ -410,6 +412,7 @@ class MatchingService:
                     d.storage_path, d.original_filename,
                     q.supplier_id,
                     supplier.name as supplier_name,
+                    q.prices_include_vat,
                     ql.id as quotation_line_id,
                     ql.line_number,
                     ql.original_text,
@@ -1292,7 +1295,7 @@ class MatchingService:
         decision_row = _decision_for_line(client, UUID(str(row["quotation_line_id"])))
         quotation_id = UUID(str(line_row["quotation_id"]))
         quote = _quotation_row(client, quotation_id)
-        quotation_lines = _line_rows(client, quotation_id)
+        quotation_lines = _line_rows(client, quotation_id, quote)
         quotation = _quotation_summary(
             client,
             quote,
@@ -1424,7 +1427,9 @@ def _membership_email(client: object, membership_id: UUID) -> str | None:
     return str(rows[0]["email"]) if rows and rows[0].get("email") else None
 
 
-def _line_rows(client: object, quotation_id: UUID) -> list[dict[str, object]]:
+def _line_rows(
+    client: object, quotation_id: UUID, quote: dict[str, object] | None = None
+) -> list[dict[str, object]]:
     try:
         response = (
             client.table("quotation_line")
@@ -1435,7 +1440,7 @@ def _line_rows(client: object, quotation_id: UUID) -> list[dict[str, object]]:
         )
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-    return _with_line_extracted_fields(client, _rows(response.data))
+    return _with_line_extracted_fields(client, _rows(response.data), quote=quote)
 
 
 def _line_row(client: object, line_id: UUID) -> dict[str, object]:
@@ -1549,9 +1554,16 @@ def _supplier_code_aliases_for_line(
 def _with_line_extracted_fields(
     client: object,
     lines: list[dict[str, object]],
+    *,
+    quote: dict[str, object] | None = None,
 ) -> list[dict[str, object]]:
     if not lines:
         return lines
+    # One read per quotation, none when the caller already holds it (PPS-133 round trips).
+    quotes: dict[str, dict[str, object]] = {str(quote["id"]): quote} if quote else {}
+    for quotation_id in {str(line["quotation_id"]) for line in lines if line.get("quotation_id")}:
+        if quotation_id not in quotes:
+            quotes[quotation_id] = _quotation_row(client, UUID(quotation_id))
     line_ids = [UUID(str(line["id"])) for line in lines]
     try:
         response = (
@@ -1579,6 +1591,9 @@ def _with_line_extracted_fields(
     return [
         {
             **line,
+            "prices_include_vat": bool(
+                quotes.get(str(line.get("quotation_id")), {}).get("prices_include_vat", False)
+            ),
             "extracted_fields": extracted_by_line.get(str(line["id"]), {}),
         }
         for line in lines
@@ -2092,6 +2107,7 @@ def _line(row: dict[str, object]) -> QuotationLineSummary:
     delivery_fee = _money(row, "delivery_fee")
     discount = _money(row, "discount")
     exposure = quoted_exposure(
+        prices_include_vat=bool(row.get("prices_include_vat", False)),
         quantity=quantity,
         unit_price=unit_price,
         vat_rate=vat_rate,
@@ -2213,6 +2229,7 @@ def _queue_item(row: dict[str, object]) -> MatchQueueItem:
         "delivery_fee_currency": row.get("delivery_fee_currency"),
         "discount_amount": row.get("discount_amount"),
         "discount_currency": row.get("discount_currency"),
+        "prices_include_vat": bool(row.get("prices_include_vat")),
     }
     quotation = QuotationMatchSummary(
         id=UUID(str(row["quotation_id"])),

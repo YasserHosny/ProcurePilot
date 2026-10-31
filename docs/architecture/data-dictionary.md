@@ -220,6 +220,7 @@ Constraints:
 | `id` | uuid | PK |
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `name` | text | Required supplier name |
+| `preferred_locale` | text | Optional; `en` or `ar`; supplier emails fall back to `tenant.default_locale` when null |
 | `payment_terms` | text | Optional terms, for example `Net 30` |
 | `lead_time_days` | integer | Optional; check `>= 0` |
 | `minimum_order_value_amount` | numeric(18,4) | Optional monetary amount |

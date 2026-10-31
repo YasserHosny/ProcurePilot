@@ -78,6 +78,36 @@
             </mat-form-field>
           </div>
 
+          <div class="form-row" [class.two-col]="isEditMode()">
+            <mat-form-field appearance="outline" class="form-field" [class.full-width]="!isEditMode()">
+              <mat-label>{{ 'catalogue.suppliers.form.emailLanguageLabel' | translate }}</mat-label>
+              <mat-select formControlName="preferred_locale">
+                <mat-option [value]="workspaceDefaultLocale">
+                  @if (workspaceLanguageKey(); as key) {
+                    {{ 'catalogue.suppliers.form.emailLanguageDefault' | translate: { language: (key | translate) } }}
+                  } @else {
+                    {{ 'catalogue.suppliers.form.emailLanguageDefaultPlain' | translate }}
+                  }
+                </mat-option>
+                <mat-option value="ar">{{ 'catalogue.suppliers.form.languageArabic' | translate }}</mat-option>
+                <mat-option value="en">{{ 'catalogue.suppliers.form.languageEnglish' | translate }}</mat-option>
+              </mat-select>
+              <mat-hint>{{ 'catalogue.suppliers.form.emailLanguageHint' | translate }}</mat-hint>
+            </mat-form-field>
+
+            @if (isEditMode()) {
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>{{ 'catalogue.suppliers.form.statusLabel' | translate }}</mat-label>
+                <mat-select formControlName="status">
+                  <mat-option value="active">{{ 'catalogue.suppliers.statusActive' | translate }}</mat-option>
+                  <mat-option value="preferred">{{ 'catalogue.suppliers.statusPreferred' | translate }}</mat-option>
+                  <mat-option value="blocked">{{ 'catalogue.suppliers.statusBlocked' | translate }}</mat-option>
+                  <mat-option value="archived">{{ 'catalogue.suppliers.statusArchived' | translate }}</mat-option>
+                </mat-select>
+              </mat-form-field>
+            }
+          </div>
+
           <div class="form-row two-col">
             <mat-form-field appearance="outline" class="form-field">
               <mat-label>{{ 'catalogue.suppliers.form.paymentTermsLabel' | translate }}</mat-label>
@@ -102,20 +132,6 @@
               }
             </mat-form-field>
           </div>
-
-          @if (isEditMode()) {
-            <div class="form-row">
-              <mat-form-field appearance="outline" class="form-field full-width">
-                <mat-label>{{ 'catalogue.suppliers.form.statusLabel' | translate }}</mat-label>
-                <mat-select formControlName="status">
-                  <mat-option value="active">{{ 'catalogue.suppliers.statusActive' | translate }}</mat-option>
-                  <mat-option value="preferred">{{ 'catalogue.suppliers.statusPreferred' | translate }}</mat-option>
-                  <mat-option value="blocked">{{ 'catalogue.suppliers.statusBlocked' | translate }}</mat-option>
-                  <mat-option value="archived">{{ 'catalogue.suppliers.statusArchived' | translate }}</mat-option>
-                </mat-select>
-              </mat-form-field>
-            </div>
-          }
         </div>
 
         <mat-divider></mat-divider>

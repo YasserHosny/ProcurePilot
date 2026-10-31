@@ -78,6 +78,12 @@ export interface RfqResponseLineComparison {
   pending_match: boolean;
 }
 
+export interface RfqLandedCost {
+  workspace_product_id: string;
+  total_amount: string;
+  total_currency: string;
+}
+
 export interface RfqResponseComparison {
   id: string;
   rfq_id: string;
@@ -87,12 +93,17 @@ export interface RfqResponseComparison {
   quotation_status: QuotationStatus;
   lines: RfqResponseLineComparison[];
   guardrail_evaluations?: RfqGuardrailEvaluation[];
+  /** Landed cost for the RFQ's requested quantity of each priced product. */
+  rfq_landed_costs?: RfqLandedCost[];
+  /** Supplier has delivery-fee / minimum-order / tier terms in force. */
+  supplier_terms_apply?: boolean;
 }
 
 export interface RfqGuardrailEvaluation {
   guardrail_id: string;
   fired: boolean;
   reason: string;
+  purchase_request_id?: string | null;
 }
 
 export interface RfqGuardrail {

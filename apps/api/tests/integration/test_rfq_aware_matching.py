@@ -865,4 +865,4 @@ def test_buyer_corrects_rfq_auto_match_to_rank_two_existing_product(
     ) == {products[1]: after}
     assert quoted_prices_from_source_response(
         conn, rfq_response_id=response_id, product_ids=products
-    ) == {products[1]: (12, "GBP")}
+    ) == {products[1]: (12, "GBP", False, None)}

@@ -364,3 +364,41 @@ def test_without_purchase_orders_the_quote_fallback_is_unchanged() -> None:
 
     assert capture.policy == "last_paid"
     assert capture.delta == Money(amount=Decimal("5.0000"), currency="EGP")
+
+
+def test_inclusive_landed_baseline_compares_net_to_net() -> None:
+    product = uuid4()
+    row = _quote_row(product, "4830.0000", "350", packs="350")
+    row.update(vat_amount=Decimal("630.0000"), total_currency="SAR", rule_version="landed-cost-v2")
+    capture = capture_baseline(
+        _Connection([row]),
+        product_id=product,
+        quantity=Decimal("350"),
+        actual=Money(amount=Decimal("4200"), currency="SAR"),
+    )
+    assert capture.value == Money(amount=Decimal("4200.0000"), currency="SAR")
+    assert capture.delta == Money(amount=Decimal("0.0000"), currency="SAR")
+    assert capture.calculation_inputs["landed_vat"] == {"amount": "630.0000", "currency": "SAR"}
+    assert baseline.CALCULATION_VERSION == "saving-baseline-v4"
+
+
+def test_rolling_quoted_baseline_uses_net_values() -> None:
+    row = _quote_row(uuid4(), "4830.0000", "350")
+    row["vat_amount"] = Decimal("630.0000")
+    assert baseline._quoted_baseline_value([row, row], Decimal("350"), average=True) == Decimal(
+        "4200.0000"
+    )
+    assert baseline._history_point(row).normalised_unit_price.amount == "12.0000"
+
+
+def test_po_baseline_uses_net_unit_price_excluding_line_tax() -> None:
+    po = _po_row(unit_price="12.0000", currency="SAR")
+    po.update(tax_amount=Decimal("180"), tax_currency="SAR")
+    capture = capture_baseline(
+        _Connection([], [po]),
+        product_id=uuid4(),
+        quantity=Decimal("100"),
+        actual=Money(amount=Decimal("1200"), currency="SAR"),
+    )
+    assert capture.value == Money(amount=Decimal("1200.0000"), currency="SAR")
+    assert capture.delta.amount == Decimal("0.0000")

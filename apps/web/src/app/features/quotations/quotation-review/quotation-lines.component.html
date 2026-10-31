@@ -239,7 +239,7 @@
                   <mat-label>{{ 'quotations.review.lines.colVat' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="line.vat_rate ? ((line.vat_rate | percent) || line.vat_rate) : '—'"
+                    [value]="line.vat_rate ? (((line.vat_rate | percent) || line.vat_rate) + (quotation.prices_include_vat ? ' ' + ('quotations.review.lines.vatInclusiveSuffix' | translate) : '')) : '—'"
                     readonly
                   />
                 </mat-form-field>

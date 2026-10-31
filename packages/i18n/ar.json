@@ -688,6 +688,12 @@
         "contactEmailLabel": "البريد الإلكتروني لجهة الاتصال",
         "contactEmailPlaceholder": "مثلاً: sales@supplier.com (اختياري)",
         "contactEmailInvalid": "يرجى إدخال عنوان بريد إلكتروني صالح",
+        "emailLanguageLabel": "لغة البريد الإلكتروني",
+        "emailLanguageHint": "تُرسل طلبات عروض الأسعار إلى هذا المورّد بهذه اللغة.",
+        "emailLanguageDefault": "لغة مساحة العمل ({{language}})",
+        "emailLanguageDefaultPlain": "لغة مساحة العمل",
+        "languageArabic": "العربية",
+        "languageEnglish": "الإنجليزية",
         "paymentTermsLabel": "شروط الدفع",
         "paymentTermsPlaceholder": "مثلاً: الدفع بعد 30 يوماً (اختياري)",
         "leadTimeLabel": "مدة التوريد (بالأيام)",
@@ -978,6 +984,9 @@
         "pickDateToConfirm": "اختر تاريخًا لتأكيد هذه القيمة.",
         "statedTotalLabel": "إجمالي المبلغ المذكور",
         "statedTotalCurrency": "عملة المبلغ المذكور",
+        "pricesIncludeVatLabel": "الأسعار شاملة ضريبة القيمة المضافة",
+        "vatRateLabel": "نسبة الضريبة (%)",
+        "invalidVatRate": "أدخل نسبة ضريبة بين ٠ و١٠٠٪.",
         "statusLabel": "الحالة"
       },
       "supplierMatch": {
@@ -998,6 +1007,7 @@
         "colPack": "تفاصيل العبوة",
         "colUnitPrice": "سعر الوحدة",
         "colVat": "ضريبة القيمة المضافة %",
+        "vatInclusiveSuffix": "(شامل)",
         "colDeliveryFee": "رسوم التوصيل",
         "colDiscount": "الخصم",
         "colConfidence": "مستوى الثقة",
@@ -1160,6 +1170,7 @@
         "confirmAsIs": "تأكيد القيمة كما هي"
       },
       "fieldLabels": {
+        "prices_include_vat": "الأسعار شاملة ضريبة القيمة المضافة",
         "supplier_name": "اسم المورد",
         "issue_date": "تاريخ الإصدار",
         "expiry_date": "تاريخ الانتهاء",
@@ -1973,6 +1984,7 @@
       "quantityLabel": "الكمية ({{unit}})",
       "totalLabel": "إجمالي المدفوع دون الضريبة ({{currency}})",
       "unitPriceHint": "{{price}} لكل {{unit}}",
+      "taxExcludedHint": "لا يشمل الضريبة {{tax}}",
       "submit": "حفظ {{count}} من النتائج",
       "success": "تم تسجيل {{count}} من نتائج الشراء.",
       "loadError": "تعذّر تحميل هذا الأمر.",
@@ -2331,6 +2343,7 @@
       "withdrawBoth": "سحب كلا طلبي هذا التقسيم",
       "withdrawAll": "سحب جميع الطلبات الـ {{count}} لهذا التقسيم",
       "withdrawConfirmMessageBoth": "سحب كلا طلبي هذا التقسيم؟ سيتم تحرير أي ميزانية محجوزة.",
+      "withdrawConfirmTitle": "سحب هذا التقسيم؟",
       "withdrawConfirmMessageAll": "سحب جميع الطلبات الـ {{count}} لهذا التقسيم؟ سيتم تحرير أي ميزانية محجوزة."
     },
     "partOfSplitError": "هذا الطلب جزء من تقسيم. يرجى استخدام إجراء التقسيم لإرسال كافة الطلبات أو اعتمادها أو سحبها معًا."
@@ -3626,6 +3639,7 @@
       "quotedCurrencyMismatch": "عملة أمر الشراء ({{order}}) تختلف عن عملة عرض المورّد ({{quoted}}). استخدم {{quoted}} أو عدّل الأسعار.",
       "packUnit": "عبوة {{size}} {{unit}}",
       "baseUnitPrice": "لكل {{unit}}",
+      "vatInclusiveHint": "صافي بعد خصم ضريبة القيمة المضافة {{rate}}% · سعر العرض {{gross}} شامل الضريبة",
       "remainingQuantity": "المتبقي للطلب"
     },
     "status": {
@@ -4074,7 +4088,12 @@
       "needsTwoMatched": "يتطلب ردّين مطابقين",
       "differentCurrencies": "الردود بعملات مختلفة",
       "alreadyConverted": "تم تحويل طلب عروض الأسعار بالفعل",
-      "splitError": "فشل بدء التقسيم. يُرجى المحاولة مرة أخرى."
+      "splitError": "فشل بدء التقسيم. يُرجى المحاولة مرة أخرى.",
+      "lowestLinePrice": "أقل تكلفة واصلة",
+      "splitSavingHint": "تقسيم هذا الطلب بين الموردين قد يوفّر {{money}}.",
+      "openPreparedRequest": "فتح مسودة الطلب",
+      "openRequest": "فتح الطلب",
+      "convertedReason": "تم تحويل طلب عروض الأسعار بالفعل إلى طلب شراء."
     },
     "history": {
       "title": "سجل طلبات عروض الأسعار",
@@ -4209,7 +4228,8 @@
         "save": "تعذر حفظ إعدادات الضابط."
       },
       "reasons": {
-        "rfq_not_open": "طلب عروض الأسعار غير مفتوح.",
+        "rfq_not_open": "لم يُطبَّق: طلب عروض الأسعار لا يستقبل ردودًا (مسودة أو منتهي الصلاحية).",
+        "rfq_converted": "لم يُطبَّق: تم تحويل طلب عروض الأسعار بالفعل إلى طلب شراء.",
         "min_response_count_not_met": "لم يتحقق الحد الأدنى للردود.",
         "responses_pending": "لا تزال هناك ردود أخرى قيد المراجعة.",
         "captured_before_guardrail": "هذا الرد أسبق من الضابط.",

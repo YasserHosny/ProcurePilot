@@ -8,6 +8,7 @@ import { Router, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { SessionService } from '../../../core/auth/session.service';
 import type { Me, PurchaseRequest, Role } from '../../../core/api/models';
@@ -509,6 +510,37 @@ describe('RequestListComponent (T017)', () => {
       // Dialog message or confirmation references withdrawing both requests
       expect(requestsApi.withdrawGroup).toHaveBeenCalledWith('grp-001', jasmine.any(String));
       expect(requestsApi.withdrawRequest).not.toHaveBeenCalled();
+    });
+
+    it('the group withdraw dialog title is a key that exists in en and ar', () => {
+      requestsApi.withdrawGroup.and.returnValue(of([groupedListRequest]));
+      component.withdrawRequest(groupedListRequest);
+
+      const titleKey = (dialogSpy.open.calls.mostRecent().args[1]?.data as { titleKey: string }).titleKey;
+      const lookup = (catalog: unknown): unknown =>
+        titleKey.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], catalog);
+      expect(typeof lookup(enCatalog)).withContext(`${titleKey} in en.json`).toBe('string');
+      expect(typeof lookup(arCatalog)).withContext(`${titleKey} in ar.json`).toBe('string');
+    });
+
+    it('a split of three passes the count to the withdraw message and button', () => {
+      const threeWay: PurchaseRequest = {
+        ...groupedListRequest,
+        request_group: { ...groupedListRequest.request_group!, size: 3, sibling_request_ids: ['r2', 'r3'] },
+      };
+      requestsApi.withdrawGroup.and.returnValue(of([threeWay]));
+      component.withdrawRequest(threeWay);
+
+      const data = dialogSpy.open.calls.mostRecent().args[1]?.data as {
+        messageKey: string;
+        messageParams?: Record<string, unknown>;
+        confirmKey: string;
+        confirmParams?: Record<string, unknown>;
+      };
+      expect(data.messageKey).toBe('requests.split.withdrawConfirmMessageAll');
+      expect(data.messageParams).toEqual({ count: 3 });
+      expect(data.confirmKey).toBe('requests.split.withdrawAll');
+      expect(data.confirmParams).toEqual({ count: 3 });
     });
 
     it('part_of_split shows the message pointing to the group action', () => {
