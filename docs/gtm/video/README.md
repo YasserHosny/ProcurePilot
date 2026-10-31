@@ -7,6 +7,23 @@ product work being verified on hosted.
 Design source for every animated element (logo sting, end cards):
 <https://claude.ai/artifact/CYVrF8484uFkpiJTqcGPdS> — boards 5–13 (10–13 are the English versions).
 
+## Video files live in Git LFS (2026-10-31, PPS-143)
+
+Every `.mp4`, `.mov`, `.webm`, `.wav`, `.mp3` and `.m4a` under `docs/gtm/video/` is stored in Git LFS (see
+`.gitattributes`). Before this, each re-render added a full copy to git history: about 840 MB in one week. Paths
+are unchanged; history before 2026-10-31 still holds the old copies.
+
+- **Clones do not download the videos by default** (`.lfsconfig` sets `fetchexclude`), and neither does CI. A
+  fresh clone shows each video as a small text pointer. To get them:
+  `git lfs pull --include="docs/gtm/video/**"` (or one cut: `--include="docs/gtm/video/cuts/v2.5/**"`).
+- **To commit a new or re-rendered cut**, git-lfs must be installed and enabled in the repo
+  (`git lfs install --local`). On the dev machine it is (`~/.local/bin/git-lfs`, shared by every worktree). Then
+  `git add` stores the file in LFS automatically; check with `git lfs ls-files`. Without git-lfs the file would go
+  into plain git, which is what this replaced.
+- **Quota:** the free tier is 10 GiB of LFS storage and 10 GiB of downloads a month (0.82 GiB used at the switch).
+  Commit final cuts rather than every intermediate render.
+- `raw.githubusercontent.com` links serve the pointer, not the video. Link to the file's GitHub page instead.
+
 ## Formats
 
 | Cut | Ratio | Length | Use |

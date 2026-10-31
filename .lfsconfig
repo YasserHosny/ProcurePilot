@@ -1,0 +1,5 @@
+# Clones, worktrees and CI do not download the demo videos unless asked:
+#   git lfs pull --include="docs/gtm/video/**"
+# (keeps the 10 GiB/month free LFS bandwidth for the people who watch or re-cut them).
+[lfs]
+	fetchexclude = docs/gtm/video/**
