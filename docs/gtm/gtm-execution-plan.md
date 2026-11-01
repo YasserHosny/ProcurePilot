@@ -118,7 +118,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-45 | PPS-75 | P-46 | PPS-76 | | |
 | P-49 | PPS-79 | | | | |
 | P-52 | PPS-82 | P-53 | PPS-83 | P-54 | PPS-84 |
-| G-14 | PPS-111 | | | | |
+| G-14 | PPS-111 | G-15 | PPS-153 | | |
 | P-57 | PPS-87 | P-58 | PPS-88 | P-59 | PPS-89 |
 | P-60 | PPS-90 | P-61 | PPS-91 | P-62 | PPS-92 |
 | P-63 | PPS-93 | P-64 | PPS-94 | P-65 | PPS-95 |
@@ -210,6 +210,7 @@ Atlassian connector) · **Lane** (code lane via Speckit: Codex / agy / OpenCode)
 | [ ] G-9 | Outreach: work SP to 20 conversations at Talked+ | User | G-2, G-5, G-7 | 20 Leads at Talked or beyond | SP |
 | [ ] G-10 | Company formation: Egyptian one-person company on the simplified regime (research in `docs/gtm/company-formation/`) | User | — | Company registered; name + tax ID on PPS-11, then into G-6 | PPS |
 | [ ] G-14 | Marketing OS in the repo (`marketing/`): organic marketing for ProcurePilot and Iron Systems, moved from the workspace on the owner's request (2026-10-29). Knowledge, approved positioning and claims, decisions, the founder LinkedIn and company campaigns, profile kits, research, skills and checks. Rules: `marketing/CLAUDE.md`; nothing is published without the owner's approval | Orch, User (approvals) | — | PR merged; `cd marketing && npm test` green on main | PPS |
+| [ ] G-15 | B2B focus (owner, 2026-11-01): marketing measures and channels for a B2B buyer, website direction (plainer hero, founder section, ProcurePilot case page, call/WhatsApp contact), first-customer outreach support. Draft: `marketing/strategy/b2b-focus-2026-11.md` | Orch draft, User decide (B-1..B-6) | G-14 | Decisions recorded; approved copy handed to the website repo; outreach week 1 started | PPS |
 
 ### P — Product tasks (PPS `from-demo` → Speckit spec → code lane)
 
@@ -349,3 +350,4 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-29 | Claude (orchestrator) | P-80 (PPS-110): `test_supplier_iq` trace test failed from 00:00 to 03:00 Cairo time because it compared `date.today()` (local) with the scorecard's UTC `window_end`. The service stays on the UTC date (specs 011/019 name no time zone; `reporting_timezone` is for scheduled reports only). Fix: `supplier_iq._utc_now()` clock seam; the test reads today from it; a regression test freezes 00:30 Cairo (21:30 UTC the day before). Verified red then green on hosted (:5432) under TZ=Africa/Cairo and UTC. | |
 | | | | |
 | 2026-10-29 | Claude (marketing session) | G-14 (PPS-111): the Marketing OS moved into the repo as `marketing/` on the owner's request (branch `docs/marketing-os`). It links to `docs/gtm`, `docs/brand` and `packages/i18n` instead of mirroring them. Same day, with the owner: LinkedIn About updated (EN; AR added as a page language, product paragraph removed), positioning approved (Arabic-first + verified savings), claims approved, 10 LinkedIn drafts with v2 images built from real v2.5 frames. Nothing posted. | Owner reviews the 10 drafts and images; merge the PR |
+| 2026-11-01 | Claude (marketing session) | G-15 (PPS-153): owner said the business is mainly B2B. Draft B2B focus written (marketing, website direction, first-customer plan). SP has 14 leads, all at Target | Yasser: decisions B-1..B-6 and the list of 20 warm contacts (G-7) |
