@@ -59,6 +59,9 @@ export class OrderDetailComponent implements OnInit {
   readonly confirmationOpen = signal(false);
   readonly receiptOpen = signal(false);
   readonly cancelOpen = signal(false);
+  readonly submitOpen = signal(false);
+  readonly actionError = signal<string | null>(null);
+  readonly receiptQuantityError = signal(false);
   readonly confirmationReference = signal('');
   readonly confirmationDate = signal('');
   readonly receiptReference = signal('');
@@ -143,35 +146,53 @@ export class OrderDetailComponent implements OnInit {
   }
 
   setQuantity(kind: 'confirmation' | 'receipt', lineId: string, value: string): void {
+    if (kind === 'receipt') this.receiptQuantityError.set(false);
     const target = kind === 'confirmation' ? this.confirmationQuantities : this.receiptQuantities;
     target.set({ ...target(), [lineId]: value });
   }
 
+  /** Cancel is offered until goods are fully received (spec 016 FR-020: partially received can be cancelled). */
+  canCancel(status: string): boolean {
+    return ['draft', 'submitted', 'confirmed', 'partially_received'].includes(status);
+  }
+
+  private failWith(err: unknown): void {
+    const reason = (err as { error?: { details?: { reason?: unknown } } })?.error?.details?.reason;
+    const key = typeof reason === 'string' ? `orders.detail.errors.${reason}` : null;
+    const specific = key ? this.translate.instant(key) : null;
+    this.actionError.set(specific && specific !== key ? specific : this.translate.instant('orders.saveError'));
+    this.isSaving.set(false);
+  }
+
+  requestSubmit(): void {
+    this.actionError.set(null);
+    this.submitOpen.set(true);
+  }
+
   submitOrder(): void {
     this.isSaving.set(true);
+    this.actionError.set(null);
     this.ordersApi.submitOrder(this.orderId).subscribe({
-      next: () => { this.loadOrder(); this.isSaving.set(false); },
-      error: () => { this.errorMessage.set(this.translate.instant('orders.saveError')); this.isSaving.set(false); },
+      next: () => { this.submitOpen.set(false); this.loadOrder(); this.isSaving.set(false); },
+      error: (err: unknown) => this.failWith(err),
     });
   }
 
-  
   cancelOrder(): void {
+    this.actionError.set(null);
     this.cancelOpen.set(true);
   }
 
   confirmCancel(): void {
     this.isSaving.set(true);
+    this.actionError.set(null);
     this.ordersApi.cancelOrder(this.orderId).subscribe({
-      next: () => { 
-        this.loadOrder(); 
-        this.cancelOpen.set(false); 
-        this.isSaving.set(false); 
+      next: () => {
+        this.loadOrder();
+        this.cancelOpen.set(false);
+        this.isSaving.set(false);
       },
-      error: () => { 
-        this.errorMessage.set(this.translate.instant('orders.saveError')); 
-        this.isSaving.set(false); 
-      },
+      error: (err: unknown) => this.failWith(err),
     });
   }
 
@@ -192,13 +213,20 @@ export class OrderDetailComponent implements OnInit {
       })),
     }).subscribe({
       next: (value) => { this.evidence.set(value); this.confirmationOpen.set(false); this.isSaving.set(false); },
-      error: () => { this.errorMessage.set(this.translate.instant('orders.saveError')); this.isSaving.set(false); },
+      error: (err: unknown) => this.failWith(err),
     });
   }
 
   recordReceipt(): void {
     const current = this.evidence();
     if (!current || !this.receiptReference().trim() || !this.receiptDate()) return;
+    const quantities = this.receiptQuantities();
+    if (!current.order.lines.some((line) => (parseFloat(quantities[line.id] ?? '') || 0) > 0)) {
+      this.receiptQuantityError.set(true);
+      return;
+    }
+    this.receiptQuantityError.set(false);
+    this.actionError.set(null);
     this.isSaving.set(true);
     this.ordersApi.recordReceipt(this.orderId, {
       receipt_reference: this.receiptReference().trim(),
@@ -211,7 +239,7 @@ export class OrderDetailComponent implements OnInit {
       })),
     }).subscribe({
       next: (value) => { this.evidence.set(value); this.receiptOpen.set(false); this.isSaving.set(false); },
-      error: () => { this.errorMessage.set(this.translate.instant('orders.saveError')); this.isSaving.set(false); },
+      error: (err: unknown) => this.failWith(err),
     });
   }
 }

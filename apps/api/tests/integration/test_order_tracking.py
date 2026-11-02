@@ -905,3 +905,124 @@ def test_po_creation_rechecks_request_after_concurrent_withdrawal(
                 "select count(*) from purchase_order where source_request_id=%s", (req_id,)
             ).fetchone()[0]
             assert count == 0
+
+
+def _serve_postgrest_from_postgres(
+    monkeypatch: pytest.MonkeyPatch, reader: psycopg.Connection, workspace: Workspace
+) -> None:
+    """Evidence endpoints read through PostgREST; serve that from Postgres as the tenant."""
+    monkeypatch.setattr(
+        orders_service,
+        "authenticated_client",
+        lambda _settings, _bearer_token: PsycopgSupabaseClient(reader, claims=workspace.claims()),
+    )
+
+
+def _evidence_bodies(order_line_id: str) -> tuple[dict[str, object], dict[str, object]]:
+    receipt = {
+        "receipt_reference": "GRN-P180",
+        "receipt_date": "2026-10-01",
+        "source_reference": "test:grn-p180",
+        "lines": [{"purchase_order_line_id": order_line_id, "received_quantity": "3"}],
+    }
+    confirmation = {
+        "supplier_reference": "SO-P180",
+        "confirmed_at": "2026-09-30T10:00:00Z",
+        "source_reference": "test:so-p180",
+        "lines": [{"purchase_order_line_id": order_line_id, "confirmed_quantity": "10"}],
+    }
+    return receipt, confirmation
+
+
+def test_receipt_that_received_nothing_is_rejected_and_leaves_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """P-180: a delivery receipt with every quantity zero must not move the order."""
+    with (
+        committed_smart_context("order-zero-receipt") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+        payload = _base_order_payload(
+            context.supplier_ids[0], req_id, line_id, context.product_id, qty="10"
+        )
+        created = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert created.status_code == 201, created.text
+        order_id = created.json()["id"]
+        order_line_id = created.json()["lines"][0]["id"]
+        submitted = client.post(
+            f"/api/v1/orders/{order_id}/submit", headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert submitted.status_code == 200, submitted.text
+
+        receipt, _ = _evidence_bodies(order_line_id)
+        receipt["lines"] = [{"purchase_order_line_id": order_line_id, "received_quantity": "0"}]
+        res = client.post(
+            f"/api/v1/orders/{order_id}/receipts",
+            json=receipt,
+            headers={"Idempotency-Key": str(uuid4())},
+        )
+
+        assert res.status_code == 422, res.text
+        with psycopg.connect(TEST_DATABASE_URL) as conn, conn.cursor() as cur:
+            cur.execute("select status::text from purchase_order where id = %s", (order_id,))
+            assert cur.fetchone()[0] == "submitted"
+            cur.execute(
+                "select count(*) from delivery_receipt where purchase_order_id = %s", (order_id,)
+            )
+            assert cur.fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("state", ["draft", "cancelled"])
+def test_evidence_is_refused_on_draft_and_cancelled_orders(
+    monkeypatch: pytest.MonkeyPatch, state: str
+) -> None:
+    """P-180: receipts and confirmations only belong to orders that were sent."""
+    with (
+        committed_smart_context(f"order-evidence-{state}") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+        payload = _base_order_payload(
+            context.supplier_ids[0], req_id, line_id, context.product_id, qty="10"
+        )
+        created = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert created.status_code == 201, created.text
+        order_id = created.json()["id"]
+        order_line_id = created.json()["lines"][0]["id"]
+        if state == "cancelled":
+            cancelled = client.post(
+                f"/api/v1/orders/{order_id}/cancel", headers={"Idempotency-Key": str(uuid4())}
+            )
+            assert cancelled.status_code == 200, cancelled.text
+
+        receipt, confirmation = _evidence_bodies(order_line_id)
+        for path, body in (("receipts", receipt), ("confirmations", confirmation)):
+            res = client.post(
+                f"/api/v1/orders/{order_id}/{path}",
+                json=body,
+                headers={"Idempotency-Key": str(uuid4())},
+            )
+            assert res.status_code == 409, (path, res.text)
+            assert res.json()["details"]["reason"] == "order_not_open_for_evidence"
+        with psycopg.connect(TEST_DATABASE_URL) as conn, conn.cursor() as cur:
+            cur.execute("select status::text from purchase_order where id = %s", (order_id,))
+            assert cur.fetchone()[0] == state
+            cur.execute(
+                "select (select count(*) from delivery_receipt where purchase_order_id = %s)"
+                " + (select count(*) from supplier_confirmation where purchase_order_id = %s)",
+                (order_id, order_id),
+            )
+            assert cur.fetchone()[0] == 0

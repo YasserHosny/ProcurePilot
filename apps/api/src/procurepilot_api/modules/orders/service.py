@@ -978,13 +978,21 @@ class OrdersService:
 
     @staticmethod
     def _lock_order_cursor(cur: psycopg.Cursor, tenant_id: UUID, order_id: UUID) -> None:
-        """Serialize evidence writes with each other and with submit/cancel on this order."""
+        """Serialize evidence writes with each other and with submit/cancel on this order.
+
+        Evidence belongs to an order that was sent: a draft, cancelled or closed order refuses it,
+        decided under the lock so a racing cancel cannot slip a receipt past the check.
+        """
         cur.execute(
-            "select 1 from purchase_order where tenant_id = %s and id = %s for update",
+            "select status::text as status from purchase_order "
+            "where tenant_id = %s and id = %s for update",
             (tenant_id, order_id),
         )
-        if cur.fetchone() is None:
+        row = cur.fetchone()
+        if row is None:
             raise NotFoundError(details={"resource": "purchase_order"})
+        if row["status"] in ("draft", "cancelled", "closed"):
+            raise ConflictError(details={"reason": "order_not_open_for_evidence"})
 
     def _progress_status_cursor(
         self, cur: psycopg.Cursor, member: CurrentMember, order_id: UUID
