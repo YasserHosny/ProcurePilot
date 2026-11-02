@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from datetime import date as calendar_date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+from typing import NoReturn
 from uuid import UUID
 
 from postgrest.exceptions import APIError
@@ -82,6 +83,23 @@ class QuotationReviewService:
 
         # Resolve and validate every correction before the first mutation. PostgREST does
         # not provide a transaction spanning these requests, so validation belongs here.
+        live_lines = _rows(
+            client.table("quotation_line")
+            .select("*")
+            .eq("quotation_id", str(quotation_id))
+            .execute()
+            .data
+        )
+        lines_by_id = {str(line["id"]): dict(line) for line in live_lines}
+        line_updates: dict[str, dict[str, object]] = {}
+        removed_lines: list[dict[str, object]] = []
+        for line_id in dict.fromkeys(patch.remove_line_ids):
+            line = _one_row(
+                [line for line in live_lines if str(line["id"]) == str(line_id)],
+                resource="quotation_line",
+            )
+            removed_lines.append(line)
+
         correction_fields: list[tuple[FieldCorrection, dict[str, object]]] = []
         for correction in patch.corrections:
             field = _one_row(
@@ -95,6 +113,16 @@ class QuotationReviewService:
                 resource="field_extraction",
             )
             field_name = field.get("field_name")
+            if field.get("entity_type") == "quotation_line":
+                line = _one_row(
+                    [line for line in live_lines if str(line["id"]) == str(field["entity_id"])],
+                    resource="quotation_line",
+                )
+                if field.get("corrected_by") is None:
+                    _validate_line_correction(client, str(field_name), correction.corrected_value)
+                    payload = _line_correction_payload(str(field_name), correction.corrected_value)
+                    lines_by_id[str(line["id"])].update(payload)
+                    line_updates.setdefault(str(line["id"]), {}).update(payload)
             if field.get("entity_type") == "quotation" and field_name in {
                 "prices_include_vat",
                 "vat_rate",
@@ -103,6 +131,12 @@ class QuotationReviewService:
                     QuotationReviewPatch(**{str(field_name): correction.corrected_value})
                 except ValidationError as exc:
                     raise ConflictError(details={"reason": "invalid_vat_correction"}) from exc
+            if (
+                field.get("corrected_by") is None
+                and field.get("entity_type") == "quotation"
+                and field_name in {"stated_total", "currency"}
+            ):
+                _validate_header_correction(client, str(field_name), correction.corrected_value)
             is_date_field = field_name in {"issue_date", "expiry_date"}
             if (
                 field.get("corrected_by") is None
@@ -111,6 +145,10 @@ class QuotationReviewService:
             ):
                 raise ConflictError(details={"reason": "invalid_date_correction"})
             correction_fields.append((correction, field))
+
+        for line in lines_by_id.values():
+            if (line.get("pack_count") is None) != (line.get("unit_size") is None):
+                raise ConflictError(details={"reason": "invalid_pack_correction"})
 
         try:
             client.table("quotation").update(updates).eq("id", str(quotation_id)).execute()
@@ -124,15 +162,46 @@ class QuotationReviewService:
                         "corrected_at": datetime.now(UTC).isoformat(),
                     }
                 ).eq("id", str(correction.field_extraction_id)).execute()
-                _apply_correction_to_canonical_row(client, field, correction.corrected_value)
+                if field.get("entity_type") != "quotation_line":
+                    _apply_correction_to_canonical_row(client, field, correction.corrected_value)
+            # Pack count and size share a database constraint; apply their corrections
+            # together so previously absent packs can be supplied in one review patch.
+            for line_id, payload in line_updates.items():
+                if payload:
+                    client.table("quotation_line").update(payload).eq("id", line_id).eq(
+                        "quotation_id", str(quotation_id)
+                    ).execute()
 
-            for line_id in patch.remove_line_ids:
-                client.table("field_extraction").delete().eq("entity_id", str(line_id)).eq(
-                    "entity_type", "quotation_line"
-                ).execute()
-                client.table("quotation_line").delete().eq("id", str(line_id)).eq(
-                    "quotation_id", str(quotation_id)
-                ).execute()
+            for line in removed_lines:
+                line = _one_row(
+                    client.table("quotation_line")
+                    .delete()
+                    .eq("id", str(line["id"]))
+                    .eq("quotation_id", str(quotation_id))
+                    .execute()
+                    .data,
+                    resource="quotation_line",
+                )
+                self._record(
+                    bearer_token=bearer_token,
+                    member=member,
+                    action="quotation.line_removed",
+                    target={
+                        "quotation_id": str(quotation_id),
+                        "line_id": str(line["id"]),
+                        "line_number": line["line_number"],
+                        "original_text": line["original_text"],
+                        "quantity": str(line["quantity"])
+                        if line.get("quantity") is not None
+                        else None,
+                        "unit_price": {
+                            "amount": str(line["unit_price_amount"]),
+                            "currency": line["unit_price_currency"],
+                        }
+                        if line.get("unit_price_amount") is not None
+                        else None,
+                    },
+                )
 
             if patch.add_lines:
                 existing_lines = (
@@ -307,17 +376,9 @@ def _apply_correction_to_canonical_row(
     entity_id = str(field["entity_id"])
     field_name = field.get("field_name")
     if entity_type == "quotation_line":
-        if field_name == "quantity":
-            client.table("quotation_line").update({"quantity": corrected_value}).eq(
-                "id", entity_id
-            ).execute()
-        elif field_name == "unit_price" and isinstance(corrected_value, dict):
-            amount = corrected_value.get("amount")
-            currency = corrected_value.get("currency")
-            if amount is not None and currency is not None:
-                client.table("quotation_line").update(
-                    {"unit_price_amount": amount, "unit_price_currency": currency}
-                ).eq("id", entity_id).execute()
+        payload = _line_correction_payload(str(field_name), corrected_value)
+        if payload:
+            client.table("quotation_line").update(payload).eq("id", entity_id).execute()
     elif entity_type == "quotation":
         if field_name == "prices_include_vat" and isinstance(corrected_value, bool):
             client.table("quotation").update({field_name: corrected_value}).eq(
@@ -532,3 +593,87 @@ def _apply_document_vat_rate(client: object, quotation_id: UUID, rate: Decimal) 
             client.table("quotation_line").update({"vat_rate": format(rate, "f")}).eq(
                 "id", str(line["id"])
             ).eq("quotation_id", str(quotation_id)).execute()
+
+
+def _line_correction_payload(name: str, value: object) -> dict[str, object]:
+    if name in {"unit_price", "delivery_fee", "discount"} and isinstance(value, dict):
+        return {f"{name}_amount": value["amount"], f"{name}_currency": value["currency"]}
+    if name in {"description", "original_text"}:
+        return {"original_text": value}
+    if name == "pack_count":
+        return {name: int(Decimal(str(value)))}
+    if name in {"quantity", "unit_size", "pack_unit", "vat_rate"}:
+        return {name: value}
+    # Azure also emits line_total and unparsed pack_text. Neither has a canonical
+    # column; retain their review overlay without guessing a price or pack definition.
+    return {}
+
+
+def _check_number(raw: object, *, scale: int, precision: int, reason: str) -> Decimal:
+    if isinstance(raw, bool) or not isinstance(raw, (str, int, float, Decimal)):
+        raise ConflictError(details={"reason": reason})
+    try:
+        result = Decimal(str(raw))
+    except InvalidOperation as exc:
+        raise ConflictError(details={"reason": reason}) from exc
+    if not result.is_finite():
+        raise ConflictError(details={"reason": reason})
+    if abs(result) >= Decimal(10) ** (precision - scale):
+        raise ConflictError(details={"reason": reason})
+    if result != result.quantize(Decimal(10) ** -scale):
+        raise ConflictError(details={"reason": reason})
+    return result
+
+
+def _check_reference(client: object, table: str, code: object, *, reason: str) -> None:
+    if not isinstance(code, str) or not _rows(
+        client.table(table).select("code").eq("code", code).limit(1).execute().data
+    ):
+        raise ConflictError(details={"reason": reason})
+
+
+def _validate_money(client: object, value: object, *, reason: str) -> None:
+    if not isinstance(value, dict) or set(value) != {"amount", "currency"}:
+        raise ConflictError(details={"reason": reason})
+    _check_number(value["amount"], scale=4, precision=18, reason=reason)
+    _check_reference(client, "supported_currency", value["currency"], reason=reason)
+
+
+def _validate_header_correction(client: object, name: str, value: object) -> None:
+    reason = f"invalid_{name}_correction"
+    if name == "stated_total":
+        _validate_money(client, value, reason=reason)
+    elif name == "currency":
+        _check_reference(client, "supported_currency", value, reason=reason)
+    else:
+        raise ConflictError(details={"reason": reason})
+
+
+def _validate_line_correction(client: object, name: str, value: object) -> None:
+    reason = f"invalid_{name}_correction"
+
+    def reject() -> NoReturn:
+        raise ConflictError(details={"reason": reason})
+
+    if name in {"unit_price", "delivery_fee", "discount", "line_total"}:
+        _validate_money(client, value, reason=reason)
+    elif name in {"quantity", "unit_size", "pack_count"}:
+        result = _check_number(
+            value,
+            scale=0 if name == "pack_count" else 6,
+            precision=10 if name == "pack_count" else 18,
+            reason=reason,
+        )
+        if result <= 0 or (name == "pack_count" and result > 2147483647):
+            reject()
+    elif name == "vat_rate":
+        result = _check_number(value, scale=4, precision=5, reason=reason)
+        if not 0 <= result <= 1:
+            reject()
+    elif name == "pack_unit":
+        _check_reference(client, "supported_base_unit", value, reason=reason)
+    elif name in {"description", "original_text", "pack_text"}:
+        if not isinstance(value, str) or not value.strip():
+            reject()
+    else:
+        reject()
