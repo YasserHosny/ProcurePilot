@@ -827,10 +827,22 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       amount: parsed,
       currency: this.effectiveQuotationCurrency(),
     };
-    this.updateCorrection(fe.id, value);
     if (commit) {
       this.reviewFieldValue('quotation', q.id, 'stated_total', value);
+      return;
     }
+    const currentCorrection = this.pendingCorrections().get(fe.id);
+    if (
+      currentCorrection &&
+      typeof currentCorrection === 'object' &&
+      'amount' in currentCorrection &&
+      (currentCorrection as { amount: unknown }).amount === value.amount &&
+      'currency' in currentCorrection &&
+      (currentCorrection as { currency: unknown }).currency === value.currency
+    ) {
+      return;
+    }
+    this.updateCorrection(fe.id, value);
   }
 
   selectField(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): void {

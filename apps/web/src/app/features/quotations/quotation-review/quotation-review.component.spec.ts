@@ -2249,5 +2249,157 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       expect(corr.currency).toBe('EGP');
       expect(corr.amount).toBe('500');
     });
+
+    it('(g) focus/blur on a high-confidence stated total with displayed text "1,234.57" without input event does not stage a correction', () => {
+      const feStatedTotal: FieldExtraction = {
+        ...mockQuotationDetail.field_extractions[0],
+        id: 'fe-stated-total',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'stated_total',
+        extracted_value: { amount: '1234.5678', currency: 'GBP' },
+        confidence: '0.9500',
+        corrected_value: null,
+        corrected_by: null,
+      };
+      const q: QuotationDetail = {
+        ...mockQuotationDetail,
+        stated_total: { amount: '1234.5678', currency: 'GBP' },
+        field_extractions: [feStatedTotal],
+      };
+      component.quotation.set(q);
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-stated-total input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.value).toContain('1,234.57');
+
+      input.dispatchEvent(new Event('focus'));
+      input.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections().has('fe-stated-total')).toBeFalse();
+      expect(component.pendingCorrections().size).toBe(0);
+      expect(component.hasPendingReviewChanges()).toBeFalse();
+
+      component.onStatedTotalInput(q, '1,234.57', true);
+      expect(component.pendingCorrections().has('fe-stated-total')).toBeFalse();
+      expect(component.pendingCorrections().size).toBe(0);
+    });
+
+    it('(h) an input event with "1500" then blur creates a pending correction with amount "1500"', () => {
+      const feStatedTotal: FieldExtraction = {
+        ...mockQuotationDetail.field_extractions[0],
+        id: 'fe-stated-total',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'stated_total',
+        extracted_value: { amount: '1234.5678', currency: 'GBP' },
+        confidence: '0.9500',
+        corrected_value: null,
+        corrected_by: null,
+      };
+      const q: QuotationDetail = {
+        ...mockQuotationDetail,
+        stated_total: { amount: '1234.5678', currency: 'GBP' },
+        field_extractions: [feStatedTotal],
+      };
+      component.quotation.set(q);
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-stated-total input') as HTMLInputElement;
+      input.value = '1500';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections().get('fe-stated-total')).toEqual({
+        amount: '1500',
+        currency: 'GBP',
+      });
+      expect(component.hasPendingReviewChanges()).toBeTrue();
+
+      component.pendingCorrections.set(new Map());
+      component.onStatedTotalInput(q, '1500', false);
+      component.onStatedTotalInput(q, '1500', true);
+      expect(component.pendingCorrections().get('fe-stated-total')).toEqual({
+        amount: '1500',
+        currency: 'GBP',
+      });
+    });
+
+    it('(i) blur with unparseable text stages nothing', () => {
+      const feStatedTotal: FieldExtraction = {
+        ...mockQuotationDetail.field_extractions[0],
+        id: 'fe-stated-total',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'stated_total',
+        extracted_value: { amount: '1234.5678', currency: 'GBP' },
+        confidence: '0.9500',
+        corrected_value: null,
+        corrected_by: null,
+      };
+      const q: QuotationDetail = {
+        ...mockQuotationDetail,
+        stated_total: { amount: '1234.5678', currency: 'GBP' },
+        field_extractions: [feStatedTotal],
+      };
+      component.quotation.set(q);
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-stated-total input') as HTMLInputElement;
+      input.value = 'abc';
+      input.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections().has('fe-stated-total')).toBeFalse();
+      expect(component.pendingCorrections().size).toBe(0);
+
+      component.onStatedTotalInput(q, 'not-a-number', true);
+      expect(component.pendingCorrections().has('fe-stated-total')).toBeFalse();
+      expect(component.pendingCorrections().size).toBe(0);
+    });
+
+    it('(j) low-confidence stated total blur keeps its existing reviewFieldValue behaviour', () => {
+      const lowConfidenceTotal: FieldExtraction = {
+        ...mockQuotationDetail.field_extractions[0],
+        id: 'fe-stated-total-low',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'stated_total',
+        extracted_value: { amount: '1234.5678', currency: 'GBP' },
+        confidence: '0.5400',
+        corrected_value: null,
+        corrected_by: null,
+      };
+      const q: QuotationDetail = {
+        ...mockQuotationDetail,
+        stated_total: { amount: '1234.5678', currency: 'GBP' },
+        field_extractions: [lowConfidenceTotal],
+      };
+      component.quotation.set(q);
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-stated-total-low input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+
+      input.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections().get('fe-stated-total-low')).toEqual({
+        amount: '1234.57',
+        currency: 'GBP',
+      });
+      expect(component.hasPendingReviewChanges()).toBeTrue();
+
+      component.pendingCorrections.set(new Map());
+      component.onStatedTotalInput(q, '1,234.57', true);
+      expect(component.pendingCorrections().get('fe-stated-total-low')).toEqual({
+        amount: '1234.57',
+        currency: 'GBP',
+      });
+      expect(component.hasPendingReviewChanges()).toBeTrue();
+    });
   });
 });
