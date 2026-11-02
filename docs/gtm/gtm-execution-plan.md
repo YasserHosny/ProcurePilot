@@ -149,6 +149,10 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-143 | PPS-177 | P-144 | PPS-178 | P-145 | PPS-179 |
 | P-146 | PPS-180 | P-147 | PPS-181 | P-148 | PPS-182 |
 | P-149 | PPS-183 | | | | |
+| P-150 | PPS-194 | P-151 | PPS-195 | P-152 | PPS-196 |
+| P-153 | PPS-197 | P-154 | PPS-198 | P-155 | PPS-199 |
+| P-156 | PPS-200 | P-157 | PPS-201 | P-158 | PPS-202 |
+| P-159 | PPS-203 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -350,6 +354,16 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-147 | — | RFQ screens a11y: dialog semantics, no live regions, colour-only errors, static page title. Medium; run axe first | — | — | To Do (PPS-181) |
 | [ ] P-148 | — | RFQ i18n/RTL: raw `{{date}}` in the Detail send dialog (live), hardcoded date hints, mixed numerals, reversed counter. High | — | — | To Do (PPS-182) |
 | [ ] P-149 | — | RFQ UX: reference number, richer list, filters/search/sort, email preview, reply tracking. Medium, owner scope call first | — | — | To Do (PPS-183) |
+| [ ] P-150 | — | Match Resolution: window-level keyboard shortcuts hijack Enter and arrows, so Enter on a focused link or button confirms a match (reproduced live); duplicated key hints; resolve sends no Idempotency-Key. High | — | — | To Do (PPS-194) |
+| [ ] P-151 | — | Matching: no catalogue search to pick an existing product, Correct-match dialog preselects the wrong base unit (live: «pcs» for a 10 kg pack) and fails silently, no reject/unmatched outcome. High, owner scope call first | — | — | To Do (PPS-195) |
+| [ ] P-152 | — | Matching and queue search do not fold Arabic/Persian letter variants (ي/ی, ك/ک) and match substrings (live: «بيض» returns «سكر أبيض», not «بیض»). High | — | — | To Do (PPS-196) |
+| [ ] P-153 | — | Match queue: load failure shows «all matched», To-date drops its day (twin of P-123), no sort control or count, «Confirm & next» leaves the quotation, offset cursors. High | — | — | To Do (PPS-197) |
+| [ ] P-154 | — | Matching decisions: correction retries lose the idempotency key, queue corrections hide alias and dependent-line warnings, stale responses overwrite the current line. Medium-High | — | — | To Do (PPS-198) |
+| [ ] P-155 | — | RFQ compare: «Lowest total» ignores VAT basis, delivery and discount; partial quotes look cheapest; savings hint on converted RFQs (live); edited Required-by date dropped. High | — | — | To Do (PPS-199) |
+| [ ] P-156 | — | RFQ compare page: UUIDs beyond 100 products, Prepare shown to read-only roles, split eligibility counts replies not suppliers, silent load failures. Medium-High; overlaps P-146 | — | — | To Do (PPS-200) |
+| [ ] P-157 | — | Smart Compare: browser projection diverges from the server (supplier pack, fixed charges, currencies, Supplier IQ), first-100 selector, no unit on prices. High; each needs a failing test first | — | — | To Do (PPS-201) |
+| [ ] P-158 | — | Match Resolution cards: landed-cost breakdown does not add up and lacks the VAT basis, «-SAR 0», labels run into values (live). Medium | — | — | To Do (PPS-202) |
+| [ ] P-159 | — | Matching and compare screens: a11y, i18n and RTL gaps (unnamed groups, unlabelled spinners, hardcoded names, Latin vs Arabic digits). Medium; run axe and RTL first | — | — | To Do (PPS-203) |
 
 ### E — Pilot environment
 
@@ -439,3 +453,4 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-11-01 | Claude | Round-1 run on «مطاعم رواق» (RFQ `2094fcc9`): both replies sent and matched; Split failed with 503 `dependency=redis`, which the API did not explain. Filed P-121 (PPS-152) and opened #386 (log the enqueue failure). Redis answers `PING` without a password from outside; the backend's `REDIS_URL` is still PPS-146 (owner). Next: merge #386, deploy, split again and read the logged cause. |
 | 2026-11-02 | Claude | Quotations audit (live Chrome pass on «مطاعم رواق» + Codex static review) filed as P-122–P-131 (PPS-154–PPS-163). P-122, P-123, P-124 fixed test-first (Codex API, Agy web), reviewed by two models, merged (#389, #390, #391, #392) and checked live. The integration test stand-in (`PsycopgTableQuery`) now supports embedded filters and PostgREST `*` wildcards. Leftovers from these three are listed on PPS-163. Next: P-125 (money parsing and totals); P-126 and P-131 need an owner scope call. | |
 | 2026-11-02 | Claude | RFQ audit (live Chrome pass on «مطاعم رواق» + Codex static review) filed as P-140–P-149 (PPS-174–PPS-183). Live-confirmed: raw `{{date}}` in the Detail send dialog, history capped at 50 rows with no filters, empty-submit gives no text on Quantity/Suppliers, malformed RFQ id has no recovery, RFQs never expire. Not exercised: an actual send (no supplier emails), 390px width (window could not be resized), Guardrails page. One test draft (`cb133982`, needed by 9 Nov) was left on «مطاعم رواق»; RFQs cannot be deleted (P-142). Nothing fixed. | |
+| 2026-11-02 | Claude | Matching and comparison audit (live Chrome pass on «مطاعم رواق» + Codex static review, 18 findings merged with the live ones) filed as P-150–P-159 (PPS-194–PPS-203). Live-confirmed: Enter on a focused link fires the match confirm (P-150), no catalogue search and a wrong default base unit in the Correct-match dialog (P-151), Arabic/Persian yeh not folded in queue search (P-152), savings hint on converted RFQs and a partial quote that looks cheapest (P-155), landed-cost breakdown that does not add up (P-158), mixed digit systems in Arabic (P-159). Static only: Smart Compare projection parity (P-157), idempotency and race items (P-154, P-156). Not exercised: confirming, correcting or splitting (no junk decisions on demo data), axe, 390px width. P-141 (mixed-currency prepare) and P-146 (RFQ compare races) already cover part of the same ground and are referenced, not duplicated. Nothing fixed. | |
