@@ -7,7 +7,7 @@ import { Subject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { ReviewTask, Role } from '../../../core/api/models';
+import type { Quotation, ReviewTask, ReviewTaskPriority, Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { ReviewQueueComponent } from './review-queue.component';
 
@@ -16,6 +16,13 @@ describe('ReviewQueueComponent (T052)', () => {
   let fixture: ComponentFixture<ReviewQueueComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
   let mockRole: WritableSignal<Role | null>;
+
+  const mockQuotation: Quotation = {
+    id: 'q-101',
+    document_id: 'doc-1',
+    status: 'reviewed',
+    created_at: '2026-08-21T01:00:00Z',
+  };
 
   const mockTasks: ReviewTask[] = [
     {
@@ -36,6 +43,20 @@ describe('ReviewQueueComponent (T052)', () => {
     },
   ];
 
+  function createMockTasks(count: number, offset = 1): ReviewTask[] {
+    return Array.from({ length: count }, (_, i) => {
+      const num = offset + i;
+      return {
+        id: `task-${num}`,
+        quotation_id: `q-${num}`,
+        status: 'open' as const,
+        priority: 'normal' as const,
+        reason: 'arithmetic_mismatch' as const,
+        created_at: `2026-08-21T01:${String(num % 60).padStart(2, '0')}:00Z`,
+      };
+    });
+  }
+
   beforeEach(async () => {
     apiService = jasmine.createSpyObj('ApiService', [
       'getReviewTasks',
@@ -44,9 +65,9 @@ describe('ReviewQueueComponent (T052)', () => {
       'updateReviewTaskPriority',
     ]);
     apiService.getReviewTasks.and.returnValue(of({ items: mockTasks, next_cursor: null }));
-    apiService.archiveQuotation.and.returnValue(of(undefined as any));
-    apiService.refuseQuotation.and.returnValue(of(undefined as any));
-    apiService.updateReviewTaskPriority.and.returnValue(of(undefined as any));
+    apiService.archiveQuotation.and.returnValue(of(mockQuotation));
+    apiService.refuseQuotation.and.returnValue(of(mockQuotation));
+    apiService.updateReviewTaskPriority.and.returnValue(of(mockTasks[0]));
 
     mockRole = signal<Role | null>('buyer');
     const mockSession = {
@@ -300,7 +321,7 @@ describe('ReviewQueueComponent (T052)', () => {
 
       apiService.archiveQuotation.and.callFake((qId: string) => {
         if (qId === 'q-101') {
-          return of(undefined as any);
+          return of(mockQuotation);
         }
         return throwError(() => new Error('Archive failed for ' + qId));
       });
@@ -360,7 +381,7 @@ describe('ReviewQueueComponent (T052)', () => {
       spyOn(window, 'confirm').and.returnValue(true);
       component.selectedTaskIds.set(new Set(['task-1', 'task-2']));
 
-      apiService.archiveQuotation.and.returnValue(of(undefined as any));
+      apiService.archiveQuotation.and.returnValue(of(mockQuotation));
       apiService.getReviewTasks.calls.reset();
       apiService.getReviewTasks.and.returnValue(
         of({ items: [], next_cursor: null }),
@@ -391,7 +412,7 @@ describe('ReviewQueueComponent (T052)', () => {
       component.tasks.set([mockTasks[0], resolvedTask]);
       component.selectedTaskIds.set(new Set(['task-1', 'task-resolved']));
 
-      apiService.refuseQuotation.and.returnValue(of(undefined as any));
+      apiService.refuseQuotation.and.returnValue(of(mockQuotation));
       apiService.getReviewTasks.calls.reset();
       apiService.getReviewTasks.and.returnValue(
         of({ items: [resolvedTask], next_cursor: null }),
@@ -427,7 +448,7 @@ describe('ReviewQueueComponent (T052)', () => {
     it('single archive: removes the archived task id from selectedTaskIds', () => {
       spyOn(window, 'confirm').and.returnValue(true);
       component.selectedTaskIds.set(new Set(['task-1', 'task-2']));
-      apiService.archiveQuotation.and.returnValue(of(undefined as any));
+      apiService.archiveQuotation.and.returnValue(of(mockQuotation));
 
       component.archiveTask(mockTasks[0], new MouseEvent('click'));
 
@@ -435,6 +456,73 @@ describe('ReviewQueueComponent (T052)', () => {
       expect(component.selectedTaskIds().has('task-1')).toBeFalse();
       expect(component.selectedTaskIds().has('task-2')).toBeTrue();
       expect(component.tasks().some((t) => t.id === 'task-1')).toBeFalse();
+    });
+
+    it('prepends failed rows not in first refreshed page, keeps failed ids selected, and prevents loadMore duplicates', () => {
+      const tasks1To50 = createMockTasks(50, 1);
+      const tasks51To100 = createMockTasks(50, 51);
+      const all100Tasks = [...tasks1To50, ...tasks51To100];
+
+      component.tasks.set(all100Tasks);
+      component.selectedTaskIds.set(new Set(all100Tasks.map((t) => t.id)));
+
+      apiService.updateReviewTaskPriority.and.callFake((taskId: string, priority: ReviewTaskPriority) => {
+        const match = taskId.match(/task-(\d+)/);
+        const index = match ? parseInt(match[1], 10) : 0;
+        if (index <= 50) {
+          return of({
+            ...tasks1To50[index - 1],
+            priority,
+          });
+        }
+        return throwError(() => new Error(`Priority update failed for ${taskId}`));
+      });
+
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: tasks1To50, next_cursor: 'cursor-page-2' }),
+      );
+
+      component.bulkReprioritise('high');
+
+      expect(component.selectedTaskIds().size).toBe(50);
+      for (const failedTask of tasks51To100) {
+        expect(component.selectedTaskIds().has(failedTask.id)).toBeTrue();
+      }
+
+      expect(component.tasks().length).toBe(100);
+      for (const failedTask of tasks51To100) {
+        expect(component.tasks().some((t) => t.id === failedTask.id)).toBeTrue();
+      }
+
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: tasks51To100, next_cursor: null }),
+      );
+
+      component.loadMore();
+
+      expect(component.tasks().length).toBe(100);
+      expect(component.nextCursor()).toBeNull();
+    });
+
+    it('normal bulk success path leaves the refreshed list exactly as returned with empty selection', () => {
+      const refreshedTasks = [mockTasks[0]];
+      component.tasks.set(mockTasks);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-2']));
+
+      apiService.updateReviewTaskPriority.and.returnValue(
+        of({ ...mockTasks[0], priority: 'high' }),
+      );
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: refreshedTasks, next_cursor: null }),
+      );
+
+      component.bulkReprioritise('high');
+
+      expect(component.selectedTaskIds().size).toBe(0);
+      expect(component.tasks()).toEqual(refreshedTasks);
     });
   });
 });
