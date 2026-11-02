@@ -306,6 +306,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     if (q.lines.length === 0 && pendingNewLines.length === 0) return null;
 
     let total = 0;
+    let hasLineTotal = false;
     const currency = this.effectiveQuotationCurrency();
 
     for (const line of q.lines) {
@@ -313,6 +314,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       const amounts = this.effectiveLineAmounts(line);
       if (amounts.quantity === null || amounts.unitPrice === null) continue;
 
+      hasLineTotal = true;
       total += this.calculateLineTotal({
         ...amounts,
         quantity: amounts.quantity,
@@ -324,8 +326,11 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       const parsedQty = parseMoneyInput(line.quantity);
       const parsedPrice = parseMoneyInput(line.unit_price_amount);
       if (parsedQty === null || parsedPrice === null) continue;
+      hasLineTotal = true;
       total += Number(parsedQty) * Number(parsedPrice);
     }
+
+    if (!hasLineTotal) return null;
 
     return {
       amount: total.toFixed(2),
@@ -899,8 +904,13 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   onStatedTotalInput(q: QuotationDetail, rawValue: unknown, commit = false): void {
     const parsed = parseMoneyInput(rawValue);
-    if (parsed === null) return;
     const fe = this.getFieldExtraction('quotation', q.id, 'stated_total');
+    if (parsed === null) {
+      if (fe && this.pendingCorrections().has(fe.id)) {
+        this.revertToAiValue(fe.id);
+      }
+      return;
+    }
     if (!fe) return;
     const value: Money = {
       amount: parsed,

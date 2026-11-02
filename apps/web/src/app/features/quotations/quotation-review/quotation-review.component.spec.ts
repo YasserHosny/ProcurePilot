@@ -285,6 +285,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     } as unknown as QuotationDetail);
     component.currencySelectionChanged('EUR');
     component.newLineText.set('New item');
+    component.newLineQuantity.set('1');
     component.newLinePriceAmount.set('12.50');
 
     component.addNewLine();
@@ -2544,6 +2545,91 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       expect(component.computeLineTotal(q.lines[1])).toBeNull();
       expect(component.computedLinesTotal()?.amount).toBe('10.00');
       expect(component.hasArithmeticMismatch()).toBeTrue();
+    });
+
+    it('(n) typing "1" then clearing stated total leaves no stale correction, effectiveStatedTotal falls back, and saveCorrections sends no stated_total', () => {
+      const feStatedTotal: FieldExtraction = {
+        ...mockQuotationDetail.field_extractions[0],
+        id: 'fe-stated-total',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'stated_total',
+        extracted_value: { amount: '250.00', currency: 'GBP' },
+        confidence: '0.9500',
+        corrected_value: null,
+        corrected_by: null,
+      };
+      const q: QuotationDetail = {
+        ...mockQuotationDetail,
+        stated_total: { amount: '250.00', currency: 'GBP' },
+        field_extractions: [feStatedTotal],
+      };
+      component.quotation.set(q);
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-stated-total input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+
+      input.value = '1';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections().get('fe-stated-total')).toEqual({
+        amount: '1',
+        currency: 'GBP',
+      });
+      expect(component.effectiveStatedTotal()?.amount).toBe('1');
+
+      input.value = '';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections().has('fe-stated-total')).toBeFalse();
+      expect(component.effectiveStatedTotal()?.amount).toBe('250.00');
+
+      apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+      component.saveCorrections();
+      expect(apiService.patchQuotation).toHaveBeenCalled();
+      const patchPayload = apiService.patchQuotation.calls.mostRecent().args[1];
+      const statedCorr = patchPayload.corrections?.find(
+        (c) => c.field_extraction_id === 'fe-stated-total',
+      );
+      expect(statedCorr).toBeUndefined();
+    });
+
+    it('(o) stated total 250, every line missing quantity -> computedLinesTotal null, no mismatch shown', () => {
+      const q: QuotationDetail = {
+        ...mockQuotationDetail,
+        stated_total: { amount: '250.00', currency: 'GBP' },
+        prices_include_vat: false,
+        lines: [
+          {
+            ...mockQuotationDetail.lines[0],
+            id: 'line-no-qty-1',
+            quantity: null,
+            unit_price: { amount: '50.00', currency: 'GBP' },
+            vat_rate: '0',
+            delivery_fee: null,
+            discount: null,
+          },
+          {
+            ...mockQuotationDetail.lines[0],
+            id: 'line-no-qty-2',
+            quantity: null,
+            unit_price: { amount: '100.00', currency: 'GBP' },
+            vat_rate: '0',
+            delivery_fee: null,
+            discount: null,
+          },
+        ],
+        field_extractions: [],
+      };
+      component.quotation.set(q);
+      fixture.detectChanges();
+
+      expect(component.computedLinesTotal()).toBeNull();
+      expect(component.hasArithmeticMismatch()).toBeFalse();
+      expect(fixture.nativeElement.querySelector('.arithmetic-mismatch-banner')).toBeNull();
     });
   });
 
