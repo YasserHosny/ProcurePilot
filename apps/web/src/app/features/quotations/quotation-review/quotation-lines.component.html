@@ -132,9 +132,10 @@
                   <mat-label>{{ 'quotations.review.lines.colQuantity' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="getEffectiveValue('quotation_line', line.id, 'quantity', line.quantity || '1')"
-                    (change)="getFieldExtraction('quotation_line', line.id, 'quantity') && correctionUpdated.emit({ feId: getFieldExtraction('quotation_line', line.id, 'quantity')!.id, newValue: $any($event.target).value })"
-                    (blur)="fieldReviewed.emit({ entityType: 'quotation_line', entityId: line.id, fieldName: 'quantity', reviewedValue: $any($event.target).value })"
+                    [value]="getEffectiveQuantity(line)"
+                    (input)="onQuantityChange(line, $any($event.target).value)"
+                    (change)="onQuantityChange(line, $any($event.target).value)"
+                    (blur)="onQuantityBlur(line, $any($event.target).value)"
                     [readonly]="!isWriter || quotation.status === 'reviewed'"
                   />
                 </mat-form-field>
@@ -179,6 +180,7 @@
                   <input
                     matInput
                     [value]="(!isWriter || quotation.status === 'reviewed') ? formatUnitPrice(getEffectiveUnitPriceAmount(line)) : trimDecimalZeros(getEffectiveUnitPriceAmount(line))"
+                    (input)="onUnitPriceChange(line, $any($event.target).value)"
                     (change)="onUnitPriceChange(line, $any($event.target).value)"
                     (blur)="onUnitPriceBlur(line, $any($event.target).value)"
                     [readonly]="!isWriter || quotation.status === 'reviewed'"

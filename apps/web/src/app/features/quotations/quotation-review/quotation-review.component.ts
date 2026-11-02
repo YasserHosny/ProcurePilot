@@ -66,8 +66,8 @@ interface ExpiryBadge {
 }
 
 interface EffectiveLineAmounts {
-  readonly quantity: number;
-  readonly unitPrice: number;
+  readonly quantity: number | null;
+  readonly unitPrice: number | null;
   readonly deliveryFee: number;
   readonly discount: number;
   readonly vatRate: number;
@@ -304,14 +304,21 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
     for (const line of q.lines) {
       if (this.pendingRemoveLineIds().has(line.id)) continue;
+      const amounts = this.effectiveLineAmounts(line);
+      if (amounts.quantity === null || amounts.unitPrice === null) continue;
 
-      total += this.calculateLineTotal(this.effectiveLineAmounts(line));
+      total += this.calculateLineTotal({
+        ...amounts,
+        quantity: amounts.quantity,
+        unitPrice: amounts.unitPrice,
+      });
     }
 
     for (const line of pendingNewLines) {
-      const qty = this.parseNumericInput(line.quantity, 1);
-      const price = this.parseNumericInput(line.unit_price_amount, 0);
-      total += qty * price;
+      const parsedQty = parseMoneyInput(line.quantity);
+      const parsedPrice = parseMoneyInput(line.unit_price_amount);
+      if (parsedQty === null || parsedPrice === null) continue;
+      total += Number(parsedQty) * Number(parsedPrice);
     }
 
     return {
@@ -952,6 +959,22 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       typeof reviewedValue === 'string' &&
       !/^\d{4}-\d{2}-\d{2}$/.test(reviewedValue)
     ) return;
+    if (entityType === 'quotation_line') {
+      if (fieldName === 'quantity') {
+        const canonical = parseMoneyInput(reviewedValue);
+        if (canonical === null) return;
+        reviewedValue = canonical;
+      } else if (fieldName === 'unit_price') {
+        const amount = this.moneyAmount(reviewedValue);
+        const canonical = parseMoneyInput(amount);
+        if (canonical === null) return;
+        const currency =
+          this.isMoney(reviewedValue) && reviewedValue.currency
+            ? reviewedValue.currency
+            : this.effectiveQuotationCurrency();
+        reviewedValue = { amount: canonical, currency };
+      }
+    }
     const fe = this.getFieldExtraction(entityType, entityId, fieldName);
     if (!fe || fe.corrected_by || parseFloat(fe.confidence) >= 0.85) return;
     if (this.pendingCorrections().has(fe.id)) return;
@@ -970,6 +993,26 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const current = this.pendingCorrections().has(fe.id)
       ? this.pendingCorrections().get(fe.id)
       : fe.extracted_value;
+    if (entityType === 'quotation_line') {
+      if (fieldName === 'quantity') {
+        const canonical = parseMoneyInput(current);
+        if (canonical !== null) {
+          this.updateCorrection(fe.id, canonical);
+          return;
+        }
+      } else if (fieldName === 'unit_price') {
+        const amount = this.moneyAmount(current);
+        const canonical = parseMoneyInput(amount);
+        if (canonical !== null) {
+          const currency =
+            this.isMoney(current) && current.currency
+              ? current.currency
+              : this.effectiveQuotationCurrency();
+          this.updateCorrection(fe.id, { amount: canonical, currency });
+          return;
+        }
+      }
+    }
     this.updateCorrection(fe.id, current);
   }
 
@@ -1403,8 +1446,12 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   computeLineTotal(line: QuotationDetail['lines'][number]): string | null {
     const amounts = this.effectiveLineAmounts(line);
-    if (amounts.unitPrice === 0 && !line.unit_price?.amount) return null;
-    return this.calculateLineTotal(amounts).toFixed(2);
+    if (amounts.quantity === null || amounts.unitPrice === null) return null;
+    return this.calculateLineTotal({
+      ...amounts,
+      quantity: amounts.quantity,
+      unitPrice: amounts.unitPrice,
+    }).toFixed(2);
   }
 
   private hasEffectiveLineVat(): boolean {
@@ -1418,11 +1465,11 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   private effectiveLineAmounts(line: QuotationDetail['lines'][number]): EffectiveLineAmounts {
     return {
-      quantity: this.effectiveNumericLineValue(line, 'quantity', line.quantity, 1),
-      unitPrice: this.effectiveNumericLineValue(line, ['unit_price_amount', 'unit_price'], line.unit_price, 0),
-      deliveryFee: this.effectiveNumericLineValue(line, ['delivery_fee_amount', 'delivery_fee'], line.delivery_fee, 0),
-      discount: this.effectiveNumericLineValue(line, ['discount_amount', 'discount'], line.discount, 0),
-      vatRate: this.effectiveNumericLineValue(line, 'vat_rate', line.vat_rate, 0),
+      quantity: this.effectiveNumericLineValue(line, 'quantity', line.quantity, null),
+      unitPrice: this.effectiveNumericLineValue(line, ['unit_price_amount', 'unit_price'], line.unit_price, null),
+      deliveryFee: this.effectiveNumericLineValue(line, ['delivery_fee_amount', 'delivery_fee'], line.delivery_fee, 0) ?? 0,
+      discount: this.effectiveNumericLineValue(line, ['discount_amount', 'discount'], line.discount, 0) ?? 0,
+      vatRate: this.effectiveNumericLineValue(line, 'vat_rate', line.vat_rate, 0) ?? 0,
     };
   }
 
@@ -1430,19 +1477,22 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     line: QuotationDetail['lines'][number],
     fieldNames: string | readonly string[],
     defaultValue: unknown,
-    fallback: number,
-  ): number {
+    fallback: number | null,
+  ): number | null {
     const names = typeof fieldNames === 'string' ? [fieldNames] : fieldNames;
     for (const fieldName of names) {
       const extraction = this.getFieldExtraction('quotation_line', line.id, fieldName);
       if (extraction && this.pendingCorrections().has(extraction.id)) {
         return this.parseNumericInput(this.pendingCorrections().get(extraction.id), fallback);
       }
+      if (extraction && extraction.corrected_value !== null && extraction.corrected_value !== undefined) {
+        return this.parseNumericInput(extraction.corrected_value, fallback);
+      }
     }
     return this.parseNumericInput(defaultValue, fallback);
   }
 
-  private parseNumericInput(value: unknown, fallback: number): number {
+  private parseNumericInput(value: unknown, fallback: number | null): number | null {
     const parsed = parseMoneyInput(this.moneyAmount(value));
     return parsed !== null ? Number(parsed) : fallback;
   }
@@ -1461,7 +1511,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     );
   }
 
-  private calculateLineTotal(amounts: EffectiveLineAmounts): number {
+  private calculateLineTotal(amounts: EffectiveLineAmounts & { quantity: number; unitPrice: number }): number {
     const lineNet = amounts.quantity * amounts.unitPrice + amounts.deliveryFee - amounts.discount;
     // A VAT-inclusive quote's prices already contain the rate (ADR-021): mirror the server.
     if (this.effectivePricesIncludeVat(this.quotation())) return lineNet;

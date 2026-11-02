@@ -79,4 +79,71 @@ describe('QuotationLinesComponent', () => {
     component.lineTotals = {};
     expect(component.formatLineTotalDisplay(mockLine)).toBe('—');
   });
+
+  it('onUnitPriceChange parses localized text to canonical and emits correctionUpdated', () => {
+    component.quotation = {
+      ...mockQuotation,
+      field_extractions: [
+        {
+          id: 'fe-price-1',
+          quotation_id: 'q-1',
+          entity_type: 'quotation_line',
+          entity_id: 'line-1',
+          field_name: 'unit_price',
+          extracted_value: { amount: '10.00', currency: 'GBP' },
+          confidence: '0.90',
+          extraction_method: 'structured_parse',
+          model_version: 'v1',
+          corrected_value: null,
+          corrected_by: null,
+          corrected_at: null,
+        },
+      ],
+    };
+    spyOn(component.correctionUpdated, 'emit');
+
+    component.onUnitPriceChange(mockLine, '1,234.50');
+    expect(component.correctionUpdated.emit).toHaveBeenCalledWith({
+      feId: 'fe-price-1',
+      newValue: { amount: '1234.50', currency: 'GBP' },
+    });
+
+    // Unparseable input emits nothing
+    (component.correctionUpdated.emit as jasmine.Spy).calls.reset();
+    component.onUnitPriceChange(mockLine, 'abc');
+    expect(component.correctionUpdated.emit).not.toHaveBeenCalled();
+  });
+
+  it('onQuantityChange parses Arabic digits to canonical and emits correctionUpdated', () => {
+    component.quotation = {
+      ...mockQuotation,
+      field_extractions: [
+        {
+          id: 'fe-qty-1',
+          quotation_id: 'q-1',
+          entity_type: 'quotation_line',
+          entity_id: 'line-1',
+          field_name: 'quantity',
+          extracted_value: '2',
+          confidence: '0.90',
+          extraction_method: 'structured_parse',
+          model_version: 'v1',
+          corrected_value: null,
+          corrected_by: null,
+          corrected_at: null,
+        },
+      ],
+    };
+    spyOn(component.correctionUpdated, 'emit');
+
+    component.onQuantityChange(mockLine, '١٢٫٥');
+    expect(component.correctionUpdated.emit).toHaveBeenCalledWith({
+      feId: 'fe-qty-1',
+      newValue: '12.5',
+    });
+
+    (component.correctionUpdated.emit as jasmine.Spy).calls.reset();
+    component.onQuantityChange(mockLine, 'abc');
+    expect(component.correctionUpdated.emit).not.toHaveBeenCalled();
+  });
 });

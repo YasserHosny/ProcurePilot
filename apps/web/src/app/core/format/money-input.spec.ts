@@ -36,6 +36,14 @@ describe('parseMoneyInput', () => {
     expect(parseMoneyInput('SAR 1,500.00')).toBe('1500.00');
     expect(parseMoneyInput('1,500 ج.م')).toBe('1500');
     expect(parseMoneyInput('£12')).toBe('12');
+    expect(parseMoneyInput('12.50 ج.م.')).toBe('12.50');
+    expect(parseMoneyInput('12.50 L.E.')).toBe('12.50');
+    expect(parseMoneyInput('1,500.00 L.E.')).toBe('1500.00');
+    expect(parseMoneyInput('E.G.P. 1,500')).toBe('1500');
+  });
+
+  it('rejects dot-separated groups that are not thousands separators', () => {
+    expect(parseMoneyInput('1.5.2')).toBeNull();
   });
 
   it('handles negative amounts and finite numbers', () => {

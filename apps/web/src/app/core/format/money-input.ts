@@ -48,10 +48,8 @@ export function parseMoneyInput(raw: unknown): string | null {
     }
   }
 
-  // Handle dots adjacent to letters (like abbreviations: "ج.م", "E.G.P.")
-  str = str.replace(/\p{L}+\.\p{L}+/gu, '');
-  str = str.replace(/\p{L}+\./gu, '');
-  str = str.replace(/\.\p{L}+/gu, '');
+  // Remove letter runs together with interleaved/adjacent dots (e.g. abbreviations: "ج.م.", "L.E.", "E.G.P.")
+  str = str.replace(/\.?\p{L}[\p{L}.]*/gu, '');
 
   // Drop currency symbols (\p{Sc}) and letters (\p{L})
   str = str.replace(/[\p{Sc}\p{L}]/gu, '');
@@ -62,6 +60,10 @@ export function parseMoneyInput(raw: unknown): string | null {
   // Must have digits and only digits, '.', ','
   if (!/\d/.test(str) || /[^\d.,]/.test(str)) {
     return null;
+  }
+
+  while (str.endsWith('.')) {
+    str = str.slice(0, -1);
   }
 
   const hasDot = str.includes('.');
@@ -89,7 +91,16 @@ export function parseMoneyInput(raw: unknown): string | null {
   } else if (hasDot && !hasComma) {
     const dotCount = (str.match(/\./g) || []).length;
     if (dotCount > 1) {
-      canonical = str.replace(/\./g, '');
+      const parts = str.split('.');
+      const isThousands =
+        parts[0].length >= 1 &&
+        parts[0].length <= 3 &&
+        parts.slice(1).every((p) => p.length === 3);
+      if (isThousands) {
+        canonical = parts.join('');
+      } else {
+        return null;
+      }
     } else {
       canonical = str;
     }

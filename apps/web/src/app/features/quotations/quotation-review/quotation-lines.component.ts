@@ -198,6 +198,11 @@ export class QuotationLinesComponent {
     return line.unit_price?.amount ?? '';
   }
 
+  getEffectiveQuantity(line: QuotationLine): string {
+    const val = this.getEffectiveValue('quotation_line', line.id, 'quantity', line.quantity ?? '');
+    return val !== null && val !== undefined ? String(val) : '';
+  }
+
   private isNumericEqual(a: string, b: string): boolean {
     const trimmedA = a.trim();
     const trimmedB = b.trim();
@@ -215,15 +220,70 @@ export class QuotationLinesComponent {
     return Number(parsedA) === Number(parsedB);
   }
 
-  onUnitPriceChange(line: QuotationLine, targetValue: string): void {
-    const effective = this.getEffectiveUnitPriceAmount(line);
-    const trimmedTarget = trimDecimalZeros(targetValue.trim());
+  onQuantityChange(line: QuotationLine, targetValue: string): void {
+    const parsed = parseMoneyInput(targetValue);
+    if (parsed === null) {
+      return;
+    }
+    const effective = this.getEffectiveQuantity(line);
+    const trimmedTarget = trimDecimalZeros(parsed);
     const trimmedEffective = trimDecimalZeros(effective.trim());
 
     if (
-      targetValue === effective ||
+      parsed === effective ||
       trimmedTarget === trimmedEffective ||
-      this.isNumericEqual(targetValue, effective)
+      this.isNumericEqual(parsed, effective)
+    ) {
+      return;
+    }
+
+    const fe = this.getFieldExtraction('quotation_line', line.id, 'quantity');
+    if (fe) {
+      this.correctionUpdated.emit({
+        feId: fe.id,
+        newValue: parsed,
+      });
+    }
+  }
+
+  onQuantityBlur(line: QuotationLine, targetValue: string): void {
+    const parsed = parseMoneyInput(targetValue);
+    if (parsed === null) {
+      return;
+    }
+    const effective = this.getEffectiveQuantity(line);
+    const trimmedTarget = trimDecimalZeros(parsed);
+    const trimmedEffective = trimDecimalZeros(effective.trim());
+
+    if (
+      parsed === effective ||
+      trimmedTarget === trimmedEffective ||
+      this.isNumericEqual(parsed, effective)
+    ) {
+      return;
+    }
+
+    this.fieldReviewed.emit({
+      entityType: 'quotation_line',
+      entityId: line.id,
+      fieldName: 'quantity',
+      reviewedValue: parsed,
+    });
+  }
+
+  onUnitPriceChange(line: QuotationLine, targetValue: string): void {
+    const parsed = parseMoneyInput(targetValue);
+    if (parsed === null) {
+      return;
+    }
+    const effective = this.getEffectiveUnitPriceAmount(line);
+    const trimmedTarget = trimDecimalZeros(parsed);
+    const trimmedEffective = trimDecimalZeros(effective.trim());
+
+    if (
+      parsed === effective ||
+      trimmedTarget === trimmedEffective ||
+      this.isNumericEqual(parsed, effective)
     ) {
       return;
     }
@@ -233,7 +293,7 @@ export class QuotationLinesComponent {
       this.correctionUpdated.emit({
         feId: fe.id,
         newValue: {
-          amount: targetValue,
+          amount: parsed,
           currency: line.unit_price?.currency || this.effectiveCurrency,
         },
       });
@@ -241,14 +301,18 @@ export class QuotationLinesComponent {
   }
 
   onUnitPriceBlur(line: QuotationLine, targetValue: string): void {
+    const parsed = parseMoneyInput(targetValue);
+    if (parsed === null) {
+      return;
+    }
     const effective = this.getEffectiveUnitPriceAmount(line);
-    const trimmedTarget = trimDecimalZeros(targetValue.trim());
+    const trimmedTarget = trimDecimalZeros(parsed);
     const trimmedEffective = trimDecimalZeros(effective.trim());
 
     if (
-      targetValue === effective ||
+      parsed === effective ||
       trimmedTarget === trimmedEffective ||
-      this.isNumericEqual(targetValue, effective)
+      this.isNumericEqual(parsed, effective)
     ) {
       return;
     }
@@ -258,7 +322,7 @@ export class QuotationLinesComponent {
       entityId: line.id,
       fieldName: 'unit_price',
       reviewedValue: {
-        amount: targetValue,
+        amount: parsed,
         currency: line.unit_price?.currency || this.effectiveCurrency,
       },
     });

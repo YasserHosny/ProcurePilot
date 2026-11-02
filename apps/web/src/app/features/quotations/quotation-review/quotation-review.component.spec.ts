@@ -2401,5 +2401,143 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       });
       expect(component.hasPendingReviewChanges()).toBeTrue();
     });
+
+    it('(k) typing "1,234.50" into unit price stages canonical "1234.50", saveCorrections sends canonical, and banner total agrees', () => {
+      const priceFe: FieldExtraction = {
+        ...mockQuotationDetail.field_extractions[0],
+        id: 'fe-line1-price-canon',
+        entity_type: 'quotation_line',
+        entity_id: 'line-1',
+        field_name: 'unit_price',
+        extracted_value: { amount: '10.00', currency: 'GBP' },
+        confidence: '0.9500',
+        corrected_value: null,
+        corrected_by: null,
+      };
+      const q: QuotationDetail = {
+        ...mockQuotationDetail,
+        lines: [
+          {
+            ...mockQuotationDetail.lines[0],
+            quantity: '1',
+            unit_price: { amount: '10.00', currency: 'GBP' },
+            vat_rate: '0',
+          },
+        ],
+        field_extractions: [priceFe],
+      };
+      component.quotation.set(q);
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-line1-price-canon input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+
+      input.value = '1,234.50';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      const staged = component.pendingCorrections().get('fe-line1-price-canon');
+      expect(staged).toEqual({
+        amount: '1234.50',
+        currency: 'GBP',
+      });
+      expect(component.computedLinesTotal()?.amount).toBe('1234.50');
+
+      apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+      component.saveCorrections();
+      expect(apiService.patchQuotation).toHaveBeenCalled();
+      const patchPayload = apiService.patchQuotation.calls.mostRecent().args[1];
+      const priceCorr = patchPayload.corrections?.find(
+        (c) => c.field_extraction_id === 'fe-line1-price-canon',
+      );
+      expect(priceCorr?.corrected_value).toEqual({
+        amount: '1234.50',
+        currency: 'GBP',
+      });
+    });
+
+    it('(l) typing "١٢٫٥" into quantity stages canonical "12.5", and "abc" stages nothing', () => {
+      const qtyFe: FieldExtraction = {
+        ...mockQuotationDetail.field_extractions[0],
+        id: 'fe-line1-qty-canon',
+        entity_type: 'quotation_line',
+        entity_id: 'line-1',
+        field_name: 'quantity',
+        extracted_value: '1',
+        confidence: '0.9500',
+        corrected_value: null,
+        corrected_by: null,
+      };
+      const q: QuotationDetail = {
+        ...mockQuotationDetail,
+        lines: [
+          {
+            ...mockQuotationDetail.lines[0],
+            quantity: '1',
+            unit_price: { amount: '10.00', currency: 'GBP' },
+            vat_rate: '0',
+          },
+        ],
+        field_extractions: [qtyFe],
+      };
+      component.quotation.set(q);
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-line1-qty-canon input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+
+      input.value = 'abc';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+      input.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections().has('fe-line1-qty-canon')).toBeFalse();
+
+      input.value = '١٢٫٥';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections().get('fe-line1-qty-canon')).toBe('12.5');
+      expect(component.computedLinesTotal()?.amount).toBe('125.00');
+    });
+
+    it('(m) stated total 30, one complete line worth 10 and a null-quantity line priced 20 -> computed total 10 (not 30) and the banner shows a mismatch', () => {
+      const q: QuotationDetail = {
+        ...mockQuotationDetail,
+        stated_total: { amount: '30.00', currency: 'GBP' },
+        prices_include_vat: false,
+        lines: [
+          {
+            ...mockQuotationDetail.lines[0],
+            id: 'line-complete',
+            quantity: '1',
+            unit_price: { amount: '10.00', currency: 'GBP' },
+            vat_rate: '0',
+            delivery_fee: null,
+            discount: null,
+          },
+          {
+            ...mockQuotationDetail.lines[0],
+            id: 'line-null-qty',
+            quantity: null,
+            unit_price: { amount: '20.00', currency: 'GBP' },
+            vat_rate: '0',
+            delivery_fee: null,
+            discount: null,
+          },
+        ],
+        field_extractions: [],
+      };
+      component.quotation.set(q);
+      fixture.detectChanges();
+
+      expect(component.computeLineTotal(q.lines[0])).toBe('10.00');
+      expect(component.computeLineTotal(q.lines[1])).toBeNull();
+      expect(component.computedLinesTotal()?.amount).toBe('10.00');
+      expect(component.hasArithmeticMismatch()).toBeTrue();
+    });
   });
 });
