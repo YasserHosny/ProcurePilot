@@ -32,6 +32,8 @@ def test_deterministic_matching_checks_gtin_before_supplier_code_and_alias() -> 
     assert candidate.workspace_product_id == gtin_product_id
     assert candidate.match_type == "gtin_match"
     assert candidate.reasons["gtin_match"] is True
+    assert candidate.reasons["measured"] == {}
+    assert str(candidate.confidence).encode("ascii") == b"0.9650"
 
 
 def test_deterministic_matching_checks_supplier_code_before_alias() -> None:
@@ -55,6 +57,8 @@ def test_deterministic_matching_checks_supplier_code_before_alias() -> None:
     assert candidate.workspace_product_id == supplier_product_id
     assert candidate.match_type == "supplier_code_match"
     assert candidate.reasons["supplier_code_match"] is True
+    assert candidate.reasons["measured"] == {}
+    assert str(candidate.confidence).encode("ascii") == b"0.9650"
 
 
 def test_deterministic_matching_falls_back_to_case_insensitive_alias_hit() -> None:
@@ -75,3 +79,5 @@ def test_deterministic_matching_falls_back_to_case_insensitive_alias_hit() -> No
     assert candidate.workspace_product_id == alias_product_id
     assert candidate.match_type == "alias_hit"
     assert candidate.reasons["alias_hit"] is True
+    assert candidate.reasons["measured"] == {}
+    assert str(candidate.confidence).encode("ascii") == b"0.9650"

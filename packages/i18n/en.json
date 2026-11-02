@@ -106,6 +106,10 @@
       "tokenHint": "Requires a valid 32+ character platform invitation token",
       "tokenRequired": "Invitation token is required",
       "tokenMinLength": "Token must be at least 32 characters",
+      "nameLabel": "Your name",
+      "namePlaceholder": "e.g. Sara Ahmed",
+      "nameRequired": "Your name is required",
+      "nameMaxLength": "Name cannot exceed 100 characters",
       "businessNameLabel": "Business Name",
       "businessNamePlaceholder": "Acme Supplies Ltd",
       "businessNameRequired": "Business name is required",
@@ -430,6 +434,7 @@
     "membersSectionTitle": "Workspace Members",
     "invitationsSectionTitle": "Pending Invitations",
     "columns": {
+      "name": "Name",
       "member": "Member",
       "email": "Email Address",
       "role": "Role",
@@ -439,6 +444,7 @@
       "expires": "Expires",
       "actions": "Actions"
     },
+    "noName": "No name",
     "status": {
       "active": "Active",
       "removed": "Removed",
@@ -448,6 +454,7 @@
       "expired": "Expired"
     },
     "actions": {
+      "editName": "Edit name",
       "changeRole": "Change role",
       "removeMember": "Remove member",
       "revokeInvitation": "Revoke invitation",
@@ -458,14 +465,28 @@
     "inviteSuccess": "Invitation created successfully.",
     "revokeSuccess": "Invitation revoked successfully.",
     "roleChangeSuccess": "Member role updated successfully.",
+    "editNameSuccess": "Member name updated successfully.",
     "removeSuccess": "Member removed successfully.",
     "lastOwnerErrorTitle": "Action Refused",
     "lastOwnerErrorMessage": "A workspace must retain at least one active owner. Demoting or removing the only owner is refused by the server.",
     "resendTooSoon": "This invitation was just sent. Wait a minute before resending it.",
     "genericError": "An unexpected error occurred. Please try again.",
+    "editNameDialog": {
+      "title": "Edit name",
+      "description": "The name colleagues see in approvals and the team list.",
+      "nameLabel": "Name",
+      "namePlaceholder": "Enter name",
+      "nameRequired": "Name is required",
+      "nameMaxLength": "Name cannot exceed 100 characters",
+      "cancelButton": "Cancel",
+      "saveButton": "Save"
+    },
     "inviteDialog": {
       "title": "Invite a Colleague",
       "subtitle": "Create an invitation for a team member to join this workspace with a specified role.",
+      "nameLabel": "Name (optional)",
+      "nameMaxLength": "Name cannot exceed 100 characters",
+      "namePlaceholder": "e.g. Sara Ahmed",
       "emailLabel": "Work Email Address",
       "emailPlaceholder": "colleague@company.com",
       "emailRequired": "Email is required",
@@ -667,6 +688,12 @@
         "contactEmailLabel": "Contact Email",
         "contactEmailPlaceholder": "e.g. sales@supplier.com (optional)",
         "contactEmailInvalid": "Please enter a valid email address",
+        "emailLanguageLabel": "Email Language",
+        "emailLanguageHint": "RFQ emails to this supplier are written in this language.",
+        "emailLanguageDefault": "Workspace default ({{language}})",
+        "emailLanguageDefaultPlain": "Workspace default",
+        "languageArabic": "Arabic",
+        "languageEnglish": "English",
         "paymentTermsLabel": "Payment Terms",
         "paymentTermsPlaceholder": "e.g. Net 30 days (optional)",
         "leadTimeLabel": "Lead Time (Days)",
@@ -888,6 +915,18 @@
       "bulkRefuseConfirm": "Refuse {{count}} quotation(s)? This action marks them as refused.",
       "bulkReprioritiseButton": "Set Priority",
       "bulkClear": "Clear Selection",
+      "bulk": {
+        "result": {
+          "allSucceeded": "{{count}} tasks updated",
+          "allSucceededSkipped": "{{count}} tasks updated, {{skipped}} skipped (resolved)",
+          "all": "{{count}} tasks updated",
+          "partial": "{{succeeded}} updated, {{failed}} failed - the failed ones stay selected so you can retry",
+          "partialSkipped": "{{succeeded}} updated, {{failed}} failed - the failed ones stay selected so you can retry, {{skipped}} skipped (resolved)",
+          "allFailed": "No tasks were updated ({{failed}} failed)",
+          "allFailedSkipped": "No tasks were updated ({{failed}} failed), {{skipped}} skipped (resolved)",
+          "skipped": "{{skipped}} skipped (resolved)"
+        }
+      },
       "selectAllLabel": "Select all review tasks",
       "selectTaskLabel": "Select quotation {{id}}",
       "readOnlyBadge": "Read-Only Access",
@@ -899,6 +938,18 @@
       "clearFilters": "Clear filters"
     },
     "review": {
+      "loadError": {
+        "title": "Unable to load quotation",
+        "notFound": "Quotation not found",
+        "retry": "Retry",
+        "backToInbox": "Back to the inbox"
+      },
+      "nextStep": {
+        "title": "Next step",
+        "description": "This quotation is confirmed. Match the extracted lines to your catalogue products to compare prices.",
+        "matchLines": "Match lines",
+        "backToInbox": "Back to the inbox"
+      },
       "title": "Quotation Review & Authorization",
       "currencyFallbackReview": "Currency defaulted from home currency. Please confirm or correct it.",
       "subtitle": "Inspect extracted fields side by side with the source document. Verify supplier and resolve any discrepancies.",
@@ -951,6 +1002,9 @@
         "pickDateToConfirm": "Choose a date to confirm this value.",
         "statedTotalLabel": "Stated Total Amount",
         "statedTotalCurrency": "Stated Total Currency",
+        "pricesIncludeVatLabel": "Prices include VAT",
+        "vatRateLabel": "VAT rate (%)",
+        "invalidVatRate": "Enter a VAT rate between 0 and 100%.",
         "statusLabel": "Status"
       },
       "supplierMatch": {
@@ -971,6 +1025,7 @@
         "colPack": "Pack Details",
         "colUnitPrice": "Unit Price",
         "colVat": "VAT %",
+        "vatInclusiveSuffix": "(incl.)",
         "colDeliveryFee": "Delivery Fee",
         "colDiscount": "Discount",
         "colConfidence": "Confidence",
@@ -1019,6 +1074,7 @@
         "cancelCorrection": "Cancel",
         "editTooltip": "Correct this field value",
         "correctedBadge": "Corrected by Human",
+        "confirmedBadge": "Confirmed",
         "confirmAsIsTooltip": "Confirm this value is correct as extracted"
       },
       "arithmetic": {
@@ -1098,7 +1154,8 @@
         "extracted": "Extracted (Awaiting Review)",
         "in_review": "In Review",
         "reviewed": "Reviewed & Authorized",
-        "refused": "Refused"
+        "refused": "Refused",
+        "authorizing": "Authorizing…"
       },
       "confirmBlocked": {
         "quotation_not_confirmable": "This quotation is not in a state that can be confirmed.",
@@ -1131,6 +1188,7 @@
         "confirmAsIs": "Confirm as-is"
       },
       "fieldLabels": {
+        "prices_include_vat": "Prices include VAT",
         "supplier_name": "Supplier name",
         "issue_date": "Issue date",
         "expiry_date": "Expiry date",
@@ -1214,6 +1272,9 @@
         "fuzzy_match_review": "Close Match — Needs Confirmation",
         "no_candidate": "No Candidate",
         "alias_conflict": "Alias Conflict",
+        "auto_accepted": "Auto-matched",
+        "corrected": "Corrected",
+        "human_decided": "Decided by a buyer",
         "all": "All Reasons"
       },
       "columns": {
@@ -1239,8 +1300,10 @@
       },
       "actions": {
         "resolve": "Resolve Match",
-        "view": "View Details"
+        "view": "View Details",
+        "correctMatch": "Correct match"
       },
+      "fromRfqLine": "From your RFQ line {{position}}",
       "groupsLabel": "Quotation match tasks",
       "collapseGroup": "Collapse quotation group",
       "expandGroup": "Expand quotation group",
@@ -1261,6 +1324,8 @@
       "loadMore": "Load More",
       "emptyTitle": "No match tasks found",
       "emptyMessage": "There are no quotation lines currently awaiting match resolution.",
+      "allLinesMatchedTitle": "All lines of this quote are matched",
+      "compareResponses": "Compare responses",
       "badgeAutoAccepted": "Auto-matched",
       "badgeResolved": "Resolved",
       "autoAcceptedBanner": "Auto-matched above threshold without human review. View details only.",
@@ -1284,6 +1349,13 @@
         "confirmed": "{{count}} matches confirmed.",
         "skipped": "{{count}} could not be confirmed (alias conflict or already resolved). Open them individually to resolve."
       }
+    },
+    "sweptLines": {
+      "one": "Also matched 1 more line with the same wording",
+      "two": "Also matched {{count}} more lines with the same wording",
+      "few": "Also matched {{count}} more lines with the same wording",
+      "many": "Also matched {{count}} more lines with the same wording",
+      "other": "Also matched {{count}} more lines with the same wording"
     },
     "resolution": {
       "title": "Match Resolution",
@@ -1313,7 +1385,7 @@
       },
       "candidates": {
         "title": "Ranked Product Candidates",
-        "subtitle": "Evaluated through deterministic keys, lexical (pg_trgm), semantic (pgvector), and feature plausibility scoring.",
+        "subtitle": "Ranked by how closely each catalogue product matches the supplier's line.",
         "rank": "Rank #{{rank}}",
         "confidence": "Match Score",
         "scoreExplainer": "This score ranks candidates; it is not yet a calibrated probability.",
@@ -1322,15 +1394,21 @@
         "selectLabel": "Select candidate #{{rank}}: {{name}}",
         "signalsTitle": "Reason Breakdown",
         "signals": {
-          "aliasHit": "Alias Hit",
+          "rfqLine": "Your RFQ line {{position}}",
+          "packConflict": "Pack differs from your RFQ ({{asked}} asked, {{quoted}} quoted)",
+          "notInRfq": "Not in your RFQ",
+          "multiFittingRfqLines": "Could be more than one of your RFQ lines",
+          "aliasHit": "Same wording as confirmed before",
           "aliasHitDesc": "Matches existing confirmed alias",
-          "gtinMatch": "GTIN Match",
+          "gtinMatch": "Barcode matches",
           "gtinMatchDesc": "Matches product barcode/GTIN",
-          "supplierCodeMatch": "Supplier Code Match",
+          "supplierCodeMatch": "Supplier code matches",
           "supplierCodeMatchDesc": "Matches supplier catalog code",
           "lexicalSimilarity": "Lexical Similarity",
+          "lexicalMeasured": "Name {{percent}} % similar",
           "semanticSimilarity": "Semantic Similarity",
-          "unavailableForStub": "Not available",
+          "packMatches": "Pack matches",
+          "packDiffers": "Pack differs",
           "featureScores": "Feature Plausibility Breakdown",
           "brandMatch": "Brand Match",
           "variantMatch": "Variant Match",
@@ -1412,7 +1490,8 @@
         "noPreferredSupplier": "None (No preferred supplier)"
       },
       "landedCost": {
-        "title": "Deterministic Landed Cost (US3)",
+        "title": "Landed cost",
+        "details": "Details",
         "subtitle": "Replayable landed cost normalised to the catalogue base unit.",
         "unitPrice": "Unit Price",
         "vatAmount": "Derived VAT",
@@ -1436,18 +1515,37 @@
         "decidedAt": "Decided At:",
         "automatic": "Automatic Match",
         "human": "Human Resolution",
-        "confidence": "Match Score:"
+        "confidence": "Match Score:",
+        "fromRfqLine": "From your RFQ line {{position}}"
       },
       "actions": {
         "confirm": "Confirm Match Decision",
         "confirmAndNext": "Resolve and Next",
         "confirming": "Confirming...",
-        "saveSuccess": "Match decision confirmed and alias saved successfully.",
+        "saveSuccess": "Match saved. Next time this wording matches automatically.",
         "queueCleared": "All match tasks resolved — queue cleared.",
         "candidateRequired": "Please select a candidate before confirming.",
-        "formInvalid": "Please correct the product creation errors before confirming."
+        "formInvalid": "Please correct the product creation errors before confirming.",
+        "correctMatch": "Correct match",
+        "correctSuccess": "Match corrected"
+      },
+      "correction": {
+        "dialogTitle": "Correct match",
+        "dialogSubtitle": "Select another candidate product or create a new catalogue product.",
+        "currentMatch": "Current match",
+        "candidatesTitle": "Available candidates",
+        "learnAlias": "Remember this wording for future matches",
+        "submit": "Save correction",
+        "cancel": "Cancel",
+        "dependentLinesNotice": "{{count}} other lines were matched through the old wording — review them",
+        "reviewQueue": "Review queue",
+        "aliasConflictNotice": "The wording already points to another product; it was not changed"
       },
       "errors": {
+        "lineOnPurchaseRequest": "This match prices request {{shortId}} — withdraw it first",
+        "decisionChanged": "Someone changed this match — reload",
+        "viewRequest": "View request",
+        "reload": "Reload",
         "aliasConflict": "Alias Conflict: This supplier wording is already assigned to a different product in your catalogue.",
         "notReviewed": "Quotation has not reached the reviewed state yet.",
         "invalidCandidate": "Selected candidate is not valid for this quotation line.",
@@ -1587,11 +1685,15 @@
     }
   },
   "basketSplit": {
-    "title": "Two-Supplier Basket Split",
-    "subtitle": "Optimise purchasing across exactly two suppliers for minimum total landed cost.",
+    "title": "Basket Split",
+    "subtitle": "Optimise purchasing across {{min}} to {{max}} suppliers for minimum total landed cost.",
     "readOnlyNotice": "You have view-only access. Workspace owners and buyers can configure and submit basket splits.",
+    "fromRfq": "From RFQ {{id}} (sent {{date}})",
+    "rfqScope": "RFQ items & suppliers",
+    "rfqSuppliers": "Suppliers",
+    "rfqItems": "Requested items",
     "form": {
-      "suppliersSectionTitle": "Select Two Suppliers",
+      "suppliersSectionTitle": "Select Suppliers",
       "supplier1": "First Supplier",
       "supplier2": "Second Supplier",
       "selectSupplier": "Select supplier...",
@@ -1602,8 +1704,12 @@
       "packHint": "{{count}} pack(s) × {{size}} {{unit}} = {{total}} {{unit}}",
       "unitLabel": "Unit: {{unit}}",
       "addItem": "Add Item",
-      "addSupplier": "Add Supplier (2–10)",
+      "addSupplier": "Add Supplier ({{min}}–{{max}})",
       "removeItem": "Remove Item",
+      "selectProduct": "Choose a product",
+      "duplicateProduct": "This product is already in the basket.",
+      "productRequired": "Select a product.",
+      "quantityRequired": "Enter a quantity greater than zero.",
       "submitButton": "Optimise Basket Split",
       "submitting": "Submitting Basket...",
       "validationError": "Please specify two distinct suppliers and at least one item with positive quantity."
@@ -1621,7 +1727,7 @@
     },
     "result": {
       "feasibleTitle": "Recommended Basket Allocation",
-      "feasibleSubtitle": "Minimum landed cost split across the two selected suppliers.",
+      "feasibleSubtitle": "Minimum landed cost split across the selected suppliers.",
       "totalLandedCost": "Optimised Total Landed Cost",
       "supplierAllocation": "Allocation for {{supplier}}",
       "supplierTotal": "Supplier Total: {{total}}",
@@ -1647,11 +1753,66 @@
       "solverVersion": "Solver Version: {{version}}",
       "computedAt": "Computed at {{time}}",
       "packQuantity": "{{count}} × {{size}} {{unit}}",
-      "baseEquivalent": "{{total}} {{unit}} in total"
+      "baseEquivalent": "{{total}} {{unit}} in total",
+      "splitTotal": "Split total",
+      "saving": "Saving against single supplier",
+      "singleSupplierTotal": "Single supplier total",
+      "infeasible": "Infeasible"
     },
     "actions": {
       "newSplit": "Start New Basket Split",
       "viewCompare": "Compare Product Offers"
+    },
+    "prepareRequests": {
+      "button": {
+        "zero": "Prepare {{count}} requests",
+        "one": "Prepare 1 request",
+        "two": "Prepare 2 requests",
+        "few": "Prepare {{count}} requests",
+        "many": "Prepare {{count}} requests",
+        "other": "Prepare {{count}} requests"
+      },
+      "dialog": {
+        "title": "Prepare purchase requests",
+        "branchLabel": "Branch",
+        "branchPlaceholder": "Select a branch",
+        "branchRequired": "Branch is required",
+        "requiredByLabel": "Required-by date",
+        "requiredByRequired": "Required-by date is required",
+        "costCentreLabel": "Cost centre (optional)",
+        "costCentrePlaceholder": "Select a cost centre",
+        "expiredSectionTitle": "Expired quotations",
+        "expiredDescription": "The following replies have expired quotations. Please confirm that you want to proceed with them:",
+        "confirmExpired": "Confirm using expired quote from {{supplier}}",
+        "confirmExpiredGeneric": "Confirm using expired quote ({{id}})",
+        "cancel": "Cancel",
+        "submit": "Prepare requests",
+        "submitting": "Preparing requests..."
+      },
+      "summary": {
+        "title": "Prepared purchase requests",
+        "description": "Created {{count}} draft requests from this split.",
+        "supplierColumn": "Supplier",
+        "totalColumn": "Estimated Total",
+        "budgetStatusColumn": "Budget Status",
+        "viewRequest": "View request",
+        "budgetWithin": "Within budget",
+        "budgetOver": "Exceeds budget",
+        "budgetNone": "No budget configured"
+      },
+      "errors": {
+        "splitStale": "The RFQ split is stale because quotation prices or eligible replies have changed.",
+        "rerunSplit": "Rerun split",
+        "rfqAlreadyConverted": "This RFQ has already been converted into purchase requests.",
+        "viewExistingRequest": "View request {{id}}",
+        "expiredUnconfirmed": "One or more quotations have expired. Please confirm them to proceed.",
+        "notRfqSplit": "This basket split is not linked to an RFQ.",
+        "splitNotCompleted": "The split optimisation is not completed.",
+        "allocationNotWholePacks": "The allocation contains quantities that cannot be converted to whole packs.",
+        "packDefinitionRequired": "Pack definition is required for the allocated items.",
+        "idempotencyKeyReused": "This idempotency key has already been used with different parameters.",
+        "generic": "Failed to prepare requests."
+      }
     }
   },
   "alerts": {
@@ -1841,6 +2002,7 @@
       "quantityLabel": "Quantity ({{unit}})",
       "totalLabel": "Total paid excl. tax ({{currency}})",
       "unitPriceHint": "{{price}} per {{unit}}",
+      "taxExcludedHint": "Excludes tax {{tax}}",
       "submit": "Save {{count}} outcomes",
       "success": "{{count}} purchase outcomes recorded.",
       "loadError": "This order could not be loaded.",
@@ -2106,11 +2268,17 @@
     },
     "columns": {
       "branch": "Branch",
+      "supplier": "Supplier",
       "costCentre": "Cost Centre",
       "requiredByDate": "Required By",
       "status": "Status",
       "estimatedTotal": "Estimated Total",
       "actions": "Actions"
+    },
+    "source": {
+      "from": "From",
+      "rfq": "RFQ",
+      "quote": "quote"
     },
     "actions": {
       "view": "View request",
@@ -2143,6 +2311,8 @@
       "submitButton": "Submit Request",
       "submittingButton": "Submitting...",
       "createOrderButton": "Create purchase order",
+      "purchaseOrders": "Purchase orders",
+      "fullyOrdered": "Everything on this request has been ordered.",
       "atLeastOneLineRequired": "At least one line item is required."
     },
     "empty": "No purchase requests yet. Create your first request to get started.",
@@ -2179,7 +2349,22 @@
     },
     "withdrawConfirmTitle": "Withdraw purchase request?",
     "withdrawConfirmMessage": "Withdraw this request? Any committed budget will be released. Requests linked to an active purchase order cannot be withdrawn.",
-    "purchaseOrderExists": "Cancel the linked purchase order before withdrawing this request."
+    "purchaseOrderExists": "Cancel the linked purchase order before withdrawing this request.",
+    "split": {
+      "partOfSplit": "Part of a split · {{position}} of {{size}} · {{total}}",
+      "marker": "Split {{position}} of {{size}}",
+      "siblingsLabel": "Other requests in this split",
+      "siblingLink": "Request {{id}}",
+      "readOnlyReason": "Part of a split: these requests are submitted and approved together",
+      "submitBoth": "Submits both requests of this split",
+      "submitAll": "Submits all {{count}} requests of this split",
+      "withdrawBoth": "Withdraws both requests of this split",
+      "withdrawAll": "Withdraws all {{count}} requests of this split",
+      "withdrawConfirmMessageBoth": "Withdraws both requests of this split? Any committed budget will be released.",
+      "withdrawConfirmTitle": "Withdraw this split?",
+      "withdrawConfirmMessageAll": "Withdraws all {{count}} requests of this split? Any committed budget will be released."
+    },
+    "partOfSplitError": "This request is part of a split. Please use the split action to submit, decide, or withdraw all requests together."
   },
   "delivery": {
     "title": "Confirm Delivery",
@@ -2230,16 +2415,39 @@
     },
     "actions": {
       "approve": "Approve",
-      "reject": "Reject"
+      "reject": "Reject",
+      "createOrder": "Create purchase order"
     },
+    "createOrderAction": "Create purchase order",
     "decisionDialog": {
-      "approveTitle": "Approve Purchase Request",
+      "approveTitle": "Approve {{amount}} for {{branchName}}?",
+      "approveTitleBranchOnly": "Approve the request for {{branchName}}?",
+      "approveTitleDefault": "Approve Purchase Request",
       "rejectTitle": "Reject Purchase Request",
       "commentLabel": "Comment (optional)",
       "commentPlaceholder": "Add a comment for the requester...",
+      "reasonLabel": "Reason for rejection",
+      "reasonPlaceholder": "Explain why this request is being rejected...",
+      "reasonRequired": "A reason is required to reject.",
       "confirmButton": "Confirm",
       "cancelButton": "Cancel"
     },
+    "splitGroup": {
+      "summary": "Split from RFQ {{short}} · {{requests}} · {{total}} · saves {{saving}}",
+      "summaryNoSaving": "Split from RFQ {{short}} · {{requests}} · {{total}}",
+      "splitFromRfq": "Split from RFQ {{short}}",
+      "saves": "saves {{saving}}"
+    },
+    "requestCount": {
+      "zero": "{{count}} requests",
+      "one": "{{count}} request",
+      "two": "2 requests",
+      "few": "{{count}} requests",
+      "many": "{{count}} requests",
+      "other": "{{count}} requests"
+    },
+    "partOfSplitError": "This request is part of a split and must be decided as a group.",
+    "notAssigned": "You are not the assigned approver for this request.",
     "approveSuccess": "Request approved.",
     "rejectSuccess": "Request rejected.",
     "genericError": "Unable to record the decision. Please try again.",
@@ -3394,6 +3602,7 @@
     "backToOrders": "Back to orders",
     "open": "Open order",
     "orderDate": "Ordered {{date}}",
+    "createdDate": "Created {{date}}",
     "lineCount": "{{count}} line(s)",
     "notProvided": "Not provided",
     "createButton": "Create Order",
@@ -3402,6 +3611,8 @@
     "create": {
       "title": "Create Purchase Order",
       "subtitle": "Manually record an internal purchase order.",
+      "fromRequestSubtitle": "Check the order, then create it.",
+      "fromApprovedRequestBanner": "From an approved request — {{supplier}}, {{branch}}",
       "orderNumber": "Order Number",
       "orderNumberPlaceholder": "e.g. PO-2026-001",
       "supplier": "Supplier",
@@ -3434,15 +3645,20 @@
         "nonNegativePrice": "Must be >= 0",
         "maxQuantity": "Cannot exceed remaining quantity",
         "orderNumberExists": "Order number already exists. Please use a different order number.",
-        "idempotencyKeyExists": "This order submission is already being processed or was already submitted."
+        "idempotencyKeyExists": "This order submission is already being processed or was already submitted.",
+        "quantityExceedsAllocation": "Part of this request was ordered after you opened this form. Reload the page to see what is still to order."
       },
+      "createdNotice": "{{orderNumber}} was created.",
+      "openOrder": "Open order",
+      "fullyOrderedNotice": "Everything on this request has already been ordered.",
       "creatingFromRequest": "Creating from Request",
       "estimateReference": "Estimate",
       "quotedMixedCurrencies": "This request's supplier quote lines are in more than one currency, so unit prices were not pre-filled. Enter the prices manually.",
       "quotedCurrencyMismatch": "The order currency ({{order}}) differs from the supplier's quoted currency ({{quoted}}). Use {{quoted}} or edit the prices.",
       "packUnit": "pack of {{size}} {{unit}}",
       "baseUnitPrice": "per {{unit}}",
-      "remainingQuantity": "Remaining Allocatable"
+      "vatInclusiveHint": "Net of {{rate}}% VAT · quoted {{gross}} incl. VAT",
+      "remainingQuantity": "Still to order"
     },
     "status": {
       "draft": "Draft",
@@ -3465,6 +3681,7 @@
     "detail": {
       "eyebrow": "Purchase order",
       "createdAt": "Created {{date}}",
+      "fromRequest": "From request",
       "orderDate": "Order date",
       "expectedDelivery": "Expected delivery",
       "total": "Order total",
@@ -3855,8 +4072,14 @@
       "quantity": "Quantity",
       "unitPrice": "Unit Price",
       "totalValue": "Total Value",
+      "total": "Total",
+      "lowestTotal": "Lowest total",
       "pendingMatch": "Pending Match",
       "pendingMatchExplanation": "Not yet linked to a catalogue product.",
+      "matchLine": "Match 1 line",
+      "matchLines": "Match {{count}} lines",
+      "matchLinesTwo": "Match 2 lines",
+      "chooseBranchFirst": "Choose a delivery branch first",
       "prepareRequest": "Prepare Request",
       "cannotPreparePending": "Cannot prepare request while lines are unmatched",
       "prepareSuccess": "Draft purchase request prepared successfully.",
@@ -3878,7 +4101,17 @@
       "editDraft": "Edit",
       "sendDraft": "Send",
       "refused": "Refused",
-      "refusedExplanation": "The quotation from this reply was refused and cannot be used to prepare a request."
+      "refusedExplanation": "The quotation from this reply was refused and cannot be used to prepare a request.",
+      "splitBetweenSuppliers": "Split between suppliers",
+      "needsTwoMatched": "Needs two matched replies",
+      "differentCurrencies": "Replies are in different currencies",
+      "alreadyConverted": "RFQ is already converted",
+      "splitError": "Failed to start split. Please try again.",
+      "lowestLinePrice": "Lowest landed cost",
+      "splitSavingHint": "Splitting this order between suppliers could save {{money}}.",
+      "openPreparedRequest": "Open draft request",
+      "openRequest": "Open request",
+      "convertedReason": "This RFQ is already converted into a request."
     },
     "history": {
       "title": "RFQ History",
@@ -3930,6 +4163,17 @@
     "detail": {
       "title": "RFQ Details",
       "subtitle": "What was asked, who it went to and what came back.",
+      "responsesReceivedTitle": "{{count}} responses received",
+      "responsesReceived": {
+        "zero": "0 responses received",
+        "one": "1 response received",
+        "two": "2 responses received",
+        "few": "{{count}} responses received",
+        "many": "{{count}} responses received",
+        "other": "{{count}} responses received"
+      },
+      "responsesReceivedDescription": "Supplier responses are ready for comparison. Review lines, compare totals, and prepare a purchase request.",
+      "compareResponses": "Compare responses",
       "breadcrumbRfqSent": "RFQ · Sent {{date}} · {{time}}",
       "breadcrumbRfqDraft": "RFQ · Draft",
       "tabDetails": "Details",
@@ -3957,7 +4201,17 @@
       "loadError": "Failed to load RFQ details.",
       "recipientStatus_sent": "Sent",
       "recipientStatus_failed": "Failed",
-      "recipientStatus_draft": "Not sent"
+      "recipientStatus_draft": "Not sent",
+      "convertedIntoRequest": "Converted into request",
+      "convertedCount": {
+        "zero": "Converted into {{count}} requests",
+        "one": "Converted into 1 request",
+        "two": "Converted into {{count}} requests",
+        "few": "Converted into {{count}} requests",
+        "many": "Converted into {{count}} requests",
+        "other": "Converted into {{count}} requests"
+      },
+      "approvedTogether": "These requests are submitted and approved together"
     },
     "guardrails": {
       "title": "Guardrail settings",
@@ -3992,7 +4246,8 @@
         "save": "Unable to save guardrail settings."
       },
       "reasons": {
-        "rfq_not_open": "The RFQ is not open.",
+        "rfq_not_open": "Not applied: this RFQ is not open for replies (draft or expired).",
+        "rfq_converted": "Not applied: this RFQ was already converted into a request.",
         "min_response_count_not_met": "The minimum response count is not met.",
         "responses_pending": "Other responses are still pending review.",
         "captured_before_guardrail": "This response predates the guardrail.",

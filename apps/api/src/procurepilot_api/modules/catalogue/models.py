@@ -136,6 +136,7 @@ class Supplier(BaseModel):
     delivery_fee: Money | None = None
     reliability_score: str | None = None
     contact_email: str | None = None
+    preferred_locale: Literal["en", "ar"] | None = None
     status: SupplierStatus
     created_at: datetime | None = None
 
@@ -152,6 +153,7 @@ class SupplierCreate(StrictApiModel):
     minimum_order_value: Money | None = None
     delivery_fee: Money | None = None
     contact_email: str | None = None
+    preferred_locale: Literal["en", "ar"] | None = None
 
 
 class SupplierUpdate(StrictApiModel):
@@ -161,6 +163,7 @@ class SupplierUpdate(StrictApiModel):
     minimum_order_value: Money | None = None
     delivery_fee: Money | None = None
     contact_email: str | None = None
+    preferred_locale: Literal["en", "ar"] | None = None
     status: SupplierStatus | None = None
 
 

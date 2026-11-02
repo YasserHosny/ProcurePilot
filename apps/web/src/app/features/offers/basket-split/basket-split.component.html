@@ -2,7 +2,14 @@
   <div class="page-header">
     <div class="header-content">
       <h1 class="page-title">{{ 'basketSplit.title' | translate }}</h1>
-      <p class="page-subtitle">{{ 'basketSplit.subtitle' | translate }}</p>
+      <p class="page-subtitle">{{ 'basketSplit.subtitle' | translate: { min: minSuppliers, max: maxSuppliers } }}</p>
+      @if (currentJob()?.rfq_id) {
+        <div class="rfq-source-header" data-testid="rfq-source-header">
+          <a [routerLink]="['/rfq', currentJob()!.rfq_id]" class="rfq-source-link">
+            {{ 'basketSplit.fromRfq' | translate: { id: rfqShortId(), date: (rfqSentDate() | formatDate) } }}
+          </a>
+        </div>
+      }
     </div>
 
     @if (currentJob()) {
@@ -104,7 +111,7 @@
             </div>
           }
 
-          @if (allSelectedSupplierIds().length < 10) {
+          @if (allSelectedSupplierIds().length < maxSuppliers) {
             <div class="add-supplier-action">
               <button
                 mat-stroked-button
@@ -114,7 +121,7 @@
                 class="add-supplier-btn"
               >
                 <mat-icon aria-hidden="true">add</mat-icon>
-                <span>{{ 'basketSplit.form.addSupplier' | translate }}</span>
+                <span>{{ 'basketSplit.form.addSupplier' | translate: { min: minSuppliers, max: maxSuppliers } }}</span>
               </button>
             </div>
           }
@@ -270,36 +277,50 @@
 
           <div class="items-list">
             @for (item of items(); track $index; let i = $index) {
+              @let otherIds = otherProductIds(i);
               <div class="item-row">
                 <!-- Product Selector -->
-                <mat-form-field appearance="outline" class="item-product-field">
+                <mat-form-field appearance="outline" class="item-product-field" floatLabel="always">
                   <mat-label>{{ 'basketSplit.form.product' | translate }}</mat-label>
                   <mat-select
-                    [value]="item.workspace_product_id"
+                    [name]="'product_' + i"
+                    [(ngModel)]="item.workspace_product_id"
+                    [placeholder]="'basketSplit.form.selectProduct' | translate"
+                    [errorStateMatcher]="getProductErrorMatcher(i)"
                     (selectionChange)="onProductSelect(i, $event.value)"
                     required
                   >
                     @for (prod of products(); track prod.id) {
-                      <mat-option [value]="prod.id">
+                      <mat-option
+                        [value]="prod.id"
+                        [disabled]="prod.id !== item.workspace_product_id && otherIds.has(prod.id)"
+                      >
                         {{ prod.tenant_name }}
                         @if (prod.variant) { ({{ prod.variant }}) }
                       </mat-option>
                     }
                   </mat-select>
+                  @if (isItemProductDuplicate(i)) {
+                    <mat-error>{{ 'basketSplit.form.duplicateProduct' | translate }}</mat-error>
+                  } @else {
+                    <mat-error>{{ 'basketSplit.form.productRequired' | translate }}</mat-error>
+                  }
                 </mat-form-field>
 
                 <!-- Quantity Input -->
-                <mat-form-field appearance="outline" class="item-qty-field">
+                <mat-form-field appearance="outline" class="item-qty-field" subscriptSizing="dynamic">
                   <mat-label>{{ 'basketSplit.form.quantity' | translate }}</mat-label>
                   <input
                     matInput
                     type="number"
                     min="1"
                     step="1"
-                    [value]="item.quantity"
+                    [name]="'quantity_' + i"
+                    [(ngModel)]="item.quantity"
                     (input)="onQuantityChange(i, $any($event.target).value)"
                     required
                   />
+                  <mat-error>{{ 'basketSplit.form.quantityRequired' | translate }}</mat-error>
                   @if (baseUnitFor(item.workspace_product_id)) {
                     <mat-hint>{{ 'basketSplit.form.packHint' | translate: packHintParams(item) }}</mat-hint>
                   }
@@ -335,7 +356,7 @@
             mat-flat-button
             color="primary"
             type="submit"
-            [disabled]="!isFormValid() || !isWriter() || isSubmitting()"
+            [disabled]="!isWriter() || isSubmitting()"
             class="submit-btn"
           >
             @if (isSubmitting()) {
@@ -354,6 +375,42 @@
           </button>
         </div>
       </form>
+    </mat-card>
+  }
+
+  <!-- RFQ Scope View (Read-only suppliers and items in RFQ mode) -->
+  @if (isRfqMode()) {
+    <mat-card class="rfq-scope-card" data-testid="rfq-split-scope">
+      <div class="rfq-scope-header">
+        <h2 class="rfq-scope-title">{{ 'basketSplit.rfqScope' | translate }}</h2>
+      </div>
+      <div class="rfq-scope-content">
+        <div class="rfq-scope-section">
+          <span class="rfq-section-label">{{ 'basketSplit.rfqSuppliers' | translate }}:</span>
+          <mat-chip-set class="rfq-suppliers-list" [attr.aria-label]="'basketSplit.rfqSuppliers' | translate">
+            @for (supplierId of currentJob()?.supplier_ids ?? []; track supplierId) {
+              <mat-chip class="rfq-supplier-chip">{{ getSupplierName(supplierId) }}</mat-chip>
+            }
+          </mat-chip-set>
+        </div>
+        <div class="rfq-scope-section">
+          <span class="rfq-section-label">{{ 'basketSplit.rfqItems' | translate }}:</span>
+          <div class="rfq-items-list">
+            @for (item of currentJob()?.items ?? []; track item.workspace_product_id) {
+              <div class="rfq-item-row">
+                <span class="rfq-item-name">{{ getProductName(item.workspace_product_id) }}</span>
+                <span class="rfq-item-qty">
+                  @let q = quantityDisplay(item);
+                  <span class="qty-primary">{{ q.primary }}</span>
+                  @if (q.secondary) {
+                    <small class="qty-secondary">{{ q.secondary }}</small>
+                  }
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
     </mat-card>
   }
 
@@ -387,6 +444,7 @@
       [violatedConstraints]="violatedConstraints()"
       [riskNotes]="riskNotes()"
       [singleSupplierSavings]="getSingleSupplierSavings()"
+      [rfqDetail]="rfqDetail()"
     ></app-basket-split-results>
   }
 

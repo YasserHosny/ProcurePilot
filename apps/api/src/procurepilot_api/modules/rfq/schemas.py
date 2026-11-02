@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from procurepilot_api.modules.quotations.schemas import QuotationStatus
 
@@ -97,6 +97,7 @@ class RfqResponseLineComparison(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     workspace_product_id: UUID | None
+    original_text: str
     quoted_quantity: Decimal
     quoted_unit_price_amount: Decimal
     quoted_unit_price_currency: str
@@ -107,6 +108,15 @@ class RfqGuardrailEvaluation(BaseModel):
     guardrail_id: UUID
     fired: bool
     reason: str
+    purchase_request_id: UUID | None = None
+
+
+class RfqProductLandedCost(BaseModel):
+    """A reply's landed cost for the RFQ's quantity of one product, priced as the split does."""
+
+    workspace_product_id: UUID
+    total_amount: Decimal
+    total_currency: str
 
 
 class RfqResponseComparison(BaseModel):
@@ -115,10 +125,15 @@ class RfqResponseComparison(BaseModel):
     id: UUID
     rfq_id: UUID
     supplier_id: UUID
+    quotation_id: UUID
     submitted_at: datetime
     quotation_status: QuotationStatus
     lines: list[RfqResponseLineComparison]
     guardrail_evaluations: list[RfqGuardrailEvaluation] = Field(default_factory=list)
+    rfq_landed_costs: list[RfqProductLandedCost] = Field(default_factory=list)
+    # The supplier has a delivery fee, minimum order or quantity tiers in force; the split
+    # prices those, a per-product comparison cannot.
+    supplier_terms_apply: bool = False
 
 
 class RfqResponseComparisonList(BaseModel):
@@ -186,7 +201,16 @@ class RfqSummary(BaseModel):
     created_by_membership_id: UUID
     recipient_count: int
     response_count: int
-    converted_purchase_request_id: UUID | None
+    converted_purchase_request_ids: list[UUID] = Field(default_factory=list)
+    request_group_id: UUID | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def converted_purchase_request_id(self) -> UUID | None:
+        """The first converted request, kept for clients that predate splits (spec 024)."""
+        return (
+            self.converted_purchase_request_ids[0] if self.converted_purchase_request_ids else None
+        )
 
 
 class RfqList(BaseModel):
@@ -195,6 +219,8 @@ class RfqList(BaseModel):
 
 
 class RfqDetail(BaseModel):
+    converted_purchase_request_ids: list[UUID] = Field(default_factory=list)
+    request_group_id: UUID | None = None
     rfq: Rfq
     lines: list[RfqLine]
     recipients: list[RfqRecipient]

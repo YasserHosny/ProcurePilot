@@ -28,6 +28,7 @@ import type {
   BudgetCreated,
   BudgetList,
   BudgetScope,
+  BulkConfirmResult,
   ConfigOptions,
   CatalogueRefreshReview,
   CatalogueRefreshReviewDecision,
@@ -47,6 +48,8 @@ import type {
   LimitCheck,
   MatchDecision,
   MatchResolutionRequest,
+  MatchCorrectionRequest,
+  MatchCorrectionResponse,
   MatchQueueItem,
   MatchTask,
   MatchTaskPriority,
@@ -87,6 +90,8 @@ import type {
   SavingRecord,
   SavingStatus,
   Session,
+  SplitPrepareRequest,
+  SplitPrepareResponse,
   Supplier,
   SupplierCommercialTerm,
   SupplierCommercialTermCreate,
@@ -123,6 +128,7 @@ export class ApiService {
     currency: string;
     tax_model: string;
     default_locale?: 'en' | 'ar';
+    display_name?: string;
   }): Observable<Session> {
     return this.http.post<Session>(`${this.base}/auth/signup`, body);
   }
@@ -209,6 +215,12 @@ export class ApiService {
     return this.http.patch<Member>(`${this.base}/members/${memberId}`, { role });
   }
 
+  renameMember(memberId: string, displayName: string): Observable<Member> {
+    return this.http.patch<Member>(`${this.base}/members/${memberId}`, {
+      display_name: displayName,
+    });
+  }
+
   removeMember(memberId: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/members/${memberId}`);
   }
@@ -217,8 +229,13 @@ export class ApiService {
     return this.http.get<{ items: Invitation[] }>(`${this.base}/invitations`);
   }
 
-  invite(email: string, role: Role): Observable<Invitation> {
-    return this.http.post<Invitation>(`${this.base}/invitations`, { email, role });
+  invite(email: string, role: Role, displayName?: string | null): Observable<Invitation> {
+    const body: { email: string; role: Role; display_name?: string } = { email, role };
+    const trimmed = displayName?.trim();
+    if (trimmed) {
+      body.display_name = trimmed;
+    }
+    return this.http.post<Invitation>(`${this.base}/invitations`, body);
   }
 
   resendInvitation(id: string): Observable<Invitation> {
@@ -633,8 +650,8 @@ export class ApiService {
     return this.http.get<{ count: number }>(`${this.base}/match-tasks/exact-matches`);
   }
 
-  confirmExactMatches(idempotencyKey: string): Observable<{ confirmed: number; skipped: number }> {
-    return this.http.post<{ confirmed: number; skipped: number }>(
+  confirmExactMatches(idempotencyKey: string): Observable<BulkConfirmResult> {
+    return this.http.post<BulkConfirmResult>(
       `${this.base}/match-tasks/confirm-exact`,
       {},
       { headers: { 'Idempotency-Key': idempotencyKey } },
@@ -695,6 +712,19 @@ export class ApiService {
     const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
     return this.http.post<MatchDecision>(
       `${this.base}/quotation-lines/${lineId}/match`,
+      body,
+      { headers },
+    );
+  }
+
+  correctMatch(
+    lineId: string,
+    body: MatchCorrectionRequest,
+    idempotencyKey?: string,
+  ): Observable<MatchCorrectionResponse> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<MatchCorrectionResponse>(
+      `${this.base}/quotation-lines/${lineId}/match/corrections`,
       body,
       { headers },
     );
@@ -770,6 +800,19 @@ export class ApiService {
 
   getBasketSplitJob(id: string): Observable<BasketSplitJob> {
     return this.http.get<BasketSplitJob>(`${this.base}/baskets/${id}`);
+  }
+
+  prepareSplitRequests(
+    basketId: string,
+    body: SplitPrepareRequest,
+    idempotencyKey?: string,
+  ): Observable<SplitPrepareResponse> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<SplitPrepareResponse>(
+      `${this.base}/baskets/${basketId}/prepare-requests`,
+      body,
+      headers ? { headers } : undefined,
+    );
   }
 
   getAlerts(params?: {
@@ -1019,8 +1062,13 @@ export class ApiService {
     );
   }
 
-  withdrawRequest(requestId: string): Observable<PurchaseRequest> {
-    return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/withdraw`, null);
+  withdrawRequest(requestId: string, idempotencyKey?: string): Observable<PurchaseRequest> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest>(
+      `${this.base}/requests/${requestId}/withdraw`,
+      null,
+      headers ? { headers } : undefined,
+    );
   }
 
   approveRequest(
@@ -1035,6 +1083,50 @@ export class ApiService {
     body: ApprovalDecisionInput,
   ): Observable<PurchaseRequest> {
     return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/reject`, body);
+  }
+
+  submitGroup(groupId: string, idempotencyKey?: string): Observable<PurchaseRequest[]> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest[]>(
+      `${this.base}/request-groups/${groupId}/submit`,
+      null,
+      { headers },
+    );
+  }
+
+  approveGroup(
+    groupId: string,
+    body?: ApprovalDecisionInput,
+    idempotencyKey?: string,
+  ): Observable<PurchaseRequest[]> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest[]>(
+      `${this.base}/request-groups/${groupId}/approve`,
+      body ?? {},
+      { headers },
+    );
+  }
+
+  rejectGroup(
+    groupId: string,
+    body: ApprovalDecisionInput,
+    idempotencyKey?: string,
+  ): Observable<PurchaseRequest[]> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest[]>(
+      `${this.base}/request-groups/${groupId}/reject`,
+      body,
+      { headers },
+    );
+  }
+
+  withdrawGroup(groupId: string, idempotencyKey?: string): Observable<PurchaseRequest[]> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest[]>(
+      `${this.base}/request-groups/${groupId}/withdraw`,
+      null,
+      { headers },
+    );
   }
 
   listPendingApprovals(params?: {

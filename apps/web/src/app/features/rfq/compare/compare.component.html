@@ -54,7 +54,7 @@
           [ngModel]="selectedBranchId()"
           (ngModelChange)="onBranchChange($event)"
           [placeholder]="'rfq.compare.branchPlaceholder' | translate"
-          required
+          [required]="!isConverted()"
           >
           @for (branch of branches(); track branch) {
             <mat-option [value]="branch.id">
@@ -94,6 +94,48 @@
   }
 
   @if (!isLoading() && responses().length > 0) {
+    @if (splitSaving()) {
+      <aside class="split-saving-hint" data-testid="split-saving-hint">
+        <mat-icon class="split-saving-icon" aria-hidden="true">savings</mat-icon>
+        <span class="split-saving-text">
+          {{ 'rfq.compare.splitSavingHint' | translate: { money: splitSavingMoney() } }}
+        </span>
+      </aside>
+    }
+
+    @if (!isConverted() && isWriter()) {
+      <div class="rfq-actions-bar">
+        <button mat-stroked-button color="primary"
+          class="split-btn"
+          data-testid="rfq-compare-split-button"
+          [disabled]="!splitEligibility().canSplit || isSplitting()"
+          (click)="splitRfq()">
+          @if (isSplitting()) {
+            <mat-spinner diameter="18" class="btn-spinner"></mat-spinner>
+          } @else {
+            <mat-icon aria-hidden="true">call_split</mat-icon>
+          }
+          <span>{{ 'rfq.compare.splitBetweenSuppliers' | translate }}</span>
+        </button>
+        @if (!splitEligibility().canSplit) {
+          <div class="split-disabled-reason" data-testid="split-disabled-reason">
+            @if (splitEligibility().reason === 'needs_two_matched') {
+              <span>{{ 'rfq.compare.needsTwoMatched' | translate }}</span>
+              @if (splitEligibility().unmatchedCount > 0) {
+                <a class="match-lines-link"
+                  [routerLink]="['/matching']"
+                  [queryParams]="splitEligibility().unmatchedQuotationIds.length === 1 ? { quotation_id: splitEligibility().unmatchedQuotationIds[0] } : null">
+                  {{ matchLinesLabel(splitEligibility().unmatchedCount) }}
+                </a>
+              }
+            } @else if (splitEligibility().reason === 'mixed_currency') {
+              <span>{{ 'rfq.compare.differentCurrencies' | translate }}</span>
+            }
+          </div>
+        }
+      </div>
+    }
+
     <div class="responses-grid">
       @for (response of responses(); track response) {
         <mat-card class="response-card">
@@ -116,10 +158,15 @@
                   <th mat-header-cell *matHeaderCellDef>{{ 'rfq.compare.product' | translate }}</th>
                   <td mat-cell *matCellDef="let line">
                     @if (line.pending_match) {
-                      <span class="pending-badge">
-                        <mat-icon class="pending-icon" aria-hidden="true">warning</mat-icon>
-                        {{ 'rfq.compare.pendingMatch' | translate }}
-                      </span>
+                      <div class="pending-cell-content">
+                        <span class="pending-badge">
+                          <mat-icon class="pending-icon" aria-hidden="true">warning</mat-icon>
+                          {{ 'rfq.compare.pendingMatch' | translate }}
+                        </span>
+                        @if (line.original_text) {
+                          <span class="original-text" dir="auto">{{ line.original_text }}</span>
+                        }
+                      </div>
                     }
                     @if (!line.pending_match) {
                       <span>
@@ -127,31 +174,58 @@
                       </span>
                     }
                   </td>
+                  <td mat-footer-cell *matFooterCellDef class="total-label-cell">
+                    <div class="total-cell-content">
+                      <span class="total-label">{{ 'rfq.compare.total' | translate }}</span>
+                      @if (hasLowestTotal(response)) {
+                        <mat-chip class="pp-chip-best lowest-total-chip">
+                          {{ 'rfq.compare.lowestTotal' | translate }}
+                        </mat-chip>
+                      }
+                    </div>
+                  </td>
                 </ng-container>
                 <ng-container matColumnDef="quantity">
                   <th mat-header-cell *matHeaderCellDef>{{ 'rfq.compare.quantity' | translate }}</th>
                   <td mat-cell *matCellDef="let line" class="pp-figures">{{ formatQuantity(line.quoted_quantity) }}</td>
+                  <td mat-footer-cell *matFooterCellDef></td>
                 </ng-container>
                 <ng-container matColumnDef="unitPrice">
                   <th mat-header-cell *matHeaderCellDef>{{ 'rfq.compare.unitPrice' | translate }}</th>
                   <td mat-cell *matCellDef="let line" class="pp-figures">
                     {{ { amount: line.quoted_unit_price_amount, currency: line.quoted_unit_price_currency } | formatMoney }}
+                    @if (isLowestLinePrice(response, line)) {
+                      <span class="lowest-line-price" data-testid="lowest-line-price">
+                        {{ 'rfq.compare.lowestLinePrice' | translate }}
+                      </span>
+                    }
                   </td>
+                  <td mat-footer-cell *matFooterCellDef></td>
                 </ng-container>
                 <ng-container matColumnDef="totalValue">
                   <th mat-header-cell *matHeaderCellDef>{{ 'rfq.compare.totalValue' | translate }}</th>
                   <td mat-cell *matCellDef="let line" class="pp-figures">
                     {{ { amount: (line.quoted_quantity * line.quoted_unit_price_amount), currency: line.quoted_unit_price_currency } | formatMoney }}
                   </td>
+                  <td mat-footer-cell *matFooterCellDef class="pp-figures total-value-cell">
+                    {{ { amount: responseTotal(response), currency: responseCurrency(response) } | formatMoney }}
+                  </td>
                 </ng-container>
                 <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-                <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+                <tr mat-row *matRowDef="let row; columns: displayedColumns;" [class.best]="isLowestLinePrice(response, row)"></tr>
+                <tr mat-footer-row *matFooterRowDef="displayedColumns" class="total-row"></tr>
               </table>
             }
             @if (response.quotation_status !== 'refused' && !isEligible(response)) {
               <div class="pending-warning">
                 <mat-icon color="warn" aria-hidden="true">info</mat-icon>
-                <span>{{ 'rfq.compare.cannotPreparePending' | translate }}</span>
+                <a
+                  class="match-lines-link"
+                  [routerLink]="['/matching']"
+                  [queryParams]="{ quotation_id: response.quotation_id }"
+                >
+                  {{ matchLinesLabel(unmatchedCount(response)) }}
+                </a>
               </div>
             }
             @if (response.guardrail_evaluations?.length) {
@@ -160,8 +234,19 @@
                 @for (evaluation of response.guardrail_evaluations; track evaluation) {
                   <div class="guardrail-outcome">
                     <span>{{ guardrailLabel(evaluation.guardrail_id) }}</span>
-                    <span class="outcome-reason" [class.fired]="evaluation.fired">
-                      {{ 'rfq.guardrails.reasons.' + evaluation.reason | translate }}
+                    <span class="outcome-detail">
+                      <span class="outcome-reason" [class.fired]="evaluation.fired">
+                        {{ 'rfq.guardrails.reasons.' + evaluation.reason | translate }}
+                      </span>
+                      @if (evaluation.fired && evaluation.purchase_request_id) {
+                        <a
+                          class="guardrail-draft-link"
+                          data-testid="guardrail-draft-link"
+                          [routerLink]="['/requests', evaluation.purchase_request_id]"
+                        >
+                          {{ 'rfq.compare.openPreparedRequest' | translate }}
+                        </a>
+                      }
                     </span>
                   </div>
                 }
@@ -169,12 +254,33 @@
             }
           </mat-card-content>
           @if (response.quotation_status !== 'refused') {
-            <mat-card-actions align="end">
-              <button mat-flat-button color="primary"
-                [disabled]="!canPrepare(response)"
-                (click)="prepareRequest(response)">
-                {{ 'rfq.compare.prepareRequest' | translate }}
-              </button>
+            <mat-card-actions align="end" class="prepare-actions">
+              <div class="prepare-buttons-row">
+                @if (isConverted() && convertedPurchaseRequestId()) {
+                  <a
+                    mat-stroked-button
+                    color="primary"
+                    [routerLink]="['/requests', convertedPurchaseRequestId()]"
+                    data-testid="rfq-compare-open-request"
+                  >
+                    {{ 'rfq.compare.openRequest' | translate }}
+                  </a>
+                } @else {
+                  <button mat-flat-button color="primary"
+                    [disabled]="!canPrepare(response) || isConverted()"
+                    (click)="prepareRequest(response)">
+                    {{ 'rfq.compare.prepareRequest' | translate }}
+                  </button>
+                }
+              </div>
+              @if (!isConverted() && isEligible(response) && !selectedBranchId()) {
+                <span class="disabled-reason">{{ 'rfq.compare.chooseBranchFirst' | translate }}</span>
+              }
+              @if (isConverted() && !convertedPurchaseRequestId()) {
+                <span class="disabled-reason" data-testid="converted-reason">
+                  {{ 'rfq.compare.convertedReason' | translate }}
+                </span>
+              }
             </mat-card-actions>
           }
         </mat-card>

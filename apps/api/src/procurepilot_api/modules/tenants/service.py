@@ -117,6 +117,7 @@ class TenantSignupRepository:
                             tenant_id=tenant.id,
                             user_id=user_id,
                             email=request.email,
+                            display_name=request.display_name,
                         )
                         assign_default_plan_in_signup(cur, tenant_id=tenant.id)
                         invitation_store.mark_spent(invitation)
@@ -214,6 +215,7 @@ class TenantSignupRepository:
         tenant_id: UUID,
         user_id: UUID,
         email: str,
+        display_name: str | None = None,
     ) -> UUID:
         cur.execute(
             """
@@ -227,12 +229,12 @@ class TenantSignupRepository:
         cur.execute(
             """
             insert into membership (
-              tenant_id, user_id, email, role, is_active_workspace, status
+              tenant_id, user_id, email, display_name, role, is_active_workspace, status
             )
-            values (%s, %s, %s, 'owner', true, 'active')
+            values (%s, %s, %s, %s, 'owner', true, 'active')
             returning id
             """,
-            (tenant_id, user_id, email),
+            (tenant_id, user_id, email, display_name),
         )
         row = cur.fetchone()
         if row is None:

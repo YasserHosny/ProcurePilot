@@ -103,7 +103,10 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
     // The branch column renders the branch's name (getBranchName), never its raw id.
     const row = page.locator('tr.request-row', { hasText: request.branchName });
     await expect(row).toBeVisible();
-    await expect(row.locator('.requester-cell')).toContainText(ownerEmail);
+    // No name was set for this owner: the cell shows the address's local part, the full
+    // address is in the tooltip and aria-label (PPS-125).
+    await expect(row.locator('.requester-cell')).toContainText(ownerEmail.split('@')[0]);
+    await expect(row.locator('.requester-cell [aria-label]')).toHaveAttribute('aria-label', ownerEmail);
     await expect(row.locator('.requester-cell')).not.toContainText(request.requesterId);
     // The required-by date renders as a locale-formatted local calendar date (PPS-48).
     const [year, month, day] = request.requiredByDate.split('-').map(Number);
@@ -121,8 +124,9 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
     await page.mouse.move(0, 0);
 
     await row.locator('.approve-btn').click();
-    const dialog = page.locator('mat-dialog-container', { hasText: 'Approve Purchase Request' });
+    const dialog = page.locator('mat-dialog-container', { hasText: 'Approve' });
     await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(request.branchName);
     await dialog.locator('textarea').fill('Approved from the E2E queue');
     await dialog.locator('.confirm-btn').click();
 

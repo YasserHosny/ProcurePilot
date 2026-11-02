@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from procurepilot_api.modules.requests.service import RequestsService
+from procurepilot_api.modules.requests.service import MemberContact, RequestsService
 
 
 class FailingMembershipClient:
@@ -46,7 +46,7 @@ def test_approver_lookup_failure_returns_request_with_null_email(
     assert "email lookup failed" in caplog.text
 
 
-def test_membership_email_batch_queries_requesters_and_assignees_once() -> None:
+def test_member_contact_batch_queries_requesters_and_assignees_once() -> None:
     requester_id, assigned_id = str(uuid4()), str(uuid4())
 
     class MembershipClient:
@@ -59,7 +59,7 @@ def test_membership_email_batch_queries_requesters_and_assignees_once() -> None:
             return self
 
         def select(self, columns: str) -> MembershipClient:
-            assert columns == "id,email"
+            assert columns == "id,email,display_name"
             return self
 
         def in_(self, column: str, values: list[str]) -> MembershipClient:
@@ -70,25 +70,25 @@ def test_membership_email_batch_queries_requesters_and_assignees_once() -> None:
         def execute(self) -> SimpleNamespace:
             return SimpleNamespace(
                 data=[
-                    {"id": requester_id, "email": "requester@example.test"},
-                    {"id": assigned_id, "email": "approver@example.test"},
+                    {"id": requester_id, "email": "requester@example.test", "display_name": "سارة"},
+                    {"id": assigned_id, "email": "approver@example.test", "display_name": None},
                 ]
             )
 
     client = MembershipClient()
-    emails = RequestsService()._fetch_membership_emails_batch(
+    emails = RequestsService()._fetch_member_contacts_batch(
         client,
         [{"requested_by_membership_id": requester_id}] * 3,
         [{"assigned_membership_id": assigned_id}] * 3,
     )
     assert client.queries == 1
     assert emails == {
-        requester_id: "requester@example.test",
-        assigned_id: "approver@example.test",
+        requester_id: MemberContact("requester@example.test", "سارة"),
+        assigned_id: MemberContact("approver@example.test", None),
     }
 
 
-def test_membership_email_batch_skips_missing_approval_step() -> None:
+def test_member_contact_batch_skips_missing_approval_step() -> None:
     requester_id = str(uuid4())
 
     class MembershipClient:
@@ -101,7 +101,7 @@ def test_membership_email_batch_skips_missing_approval_step() -> None:
             return self
 
         def select(self, columns: str) -> MembershipClient:
-            assert columns == "id,email"
+            assert columns == "id,email,display_name"
             return self
 
         def in_(self, column: str, values: list[str]) -> MembershipClient:
@@ -113,8 +113,8 @@ def test_membership_email_batch_skips_missing_approval_step() -> None:
             return SimpleNamespace(data=[{"id": requester_id, "email": "requester@example.test"}])
 
     client = MembershipClient()
-    emails = RequestsService()._fetch_membership_emails_batch(
+    emails = RequestsService()._fetch_member_contacts_batch(
         client, [{"requested_by_membership_id": requester_id}], [None]
     )
     assert client.queries == 1
-    assert emails == {requester_id: "requester@example.test"}
+    assert emails == {requester_id: MemberContact("requester@example.test", None)}

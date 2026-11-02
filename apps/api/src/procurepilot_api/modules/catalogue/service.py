@@ -67,7 +67,7 @@ SUBSTITUTE_COLUMNS = "workspace_product_id,substitute_product_id"
 SUPPLIER_COLUMNS = (
     "id,tenant_id,name,payment_terms,lead_time_days,minimum_order_value_amount,"
     "minimum_order_value_currency,delivery_fee_amount,delivery_fee_currency,"
-    "reliability_score,contact_email,status,created_at"
+    "reliability_score,contact_email,preferred_locale,status,created_at"
 )
 ALIAS_COLUMNS = "id,tenant_id,workspace_product_id,supplier_id,alias_text,created_by,created_at"
 
@@ -386,6 +386,7 @@ class CatalogueService:
             "payment_terms": payload.payment_terms,
             "lead_time_days": payload.lead_time_days,
             "contact_email": payload.contact_email,
+            "preferred_locale": payload.preferred_locale,
             **money_columns("minimum_order_value", payload.minimum_order_value),
             **money_columns("delivery_fee", payload.delivery_fee),
         }
@@ -426,7 +427,14 @@ class CatalogueService:
     ) -> Supplier:
         client = authenticated_client(self._settings, bearer_token)
         updates: dict[str, object] = {}
-        for field in ("name", "payment_terms", "lead_time_days", "contact_email", "status"):
+        for field in (
+            "name",
+            "payment_terms",
+            "lead_time_days",
+            "contact_email",
+            "preferred_locale",
+            "status",
+        ):
             if field in patch.model_fields_set:
                 updates[field] = getattr(patch, field)
         if "minimum_order_value" in patch.model_fields_set:
@@ -972,6 +980,7 @@ def _supplier(row: dict[str, object]) -> Supplier:
         delivery_fee=_money(row.get("delivery_fee_amount"), row.get("delivery_fee_currency")),
         reliability_score=decimal_to_string(row.get("reliability_score"), places=3),
         contact_email=_nullable_str(row.get("contact_email")),
+        preferred_locale=_nullable_str(row.get("preferred_locale")),
         status=str(row["status"]),
         created_at=row.get("created_at"),
     )

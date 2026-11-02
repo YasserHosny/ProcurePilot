@@ -22,6 +22,8 @@ class _MapAssetBundle extends AssetBundle {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   final en = jsonEncode({
     'common': {'brandName': 'ProcurePilot'},
     'lowStock': {
@@ -96,5 +98,19 @@ void main() {
 
       expect(loader.t('missing.key'), 'missing.key');
     });
+
+    test(
+      'loads the shared not-assigned message from both bundled catalogues',
+      () async {
+        final loader = I18nLoader();
+        await loader.load('en');
+        expect(
+          loader.t('approvals.notAssigned'),
+          'You are not the assigned approver for this request.',
+        );
+        await loader.load('ar');
+        expect(loader.t('approvals.notAssigned'), 'لست المعتمد المعيّن لهذا الطلب.');
+      },
+    );
   });
 }

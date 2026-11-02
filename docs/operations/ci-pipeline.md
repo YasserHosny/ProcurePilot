@@ -1,6 +1,6 @@
 # CI pipeline notes
 
-Last updated: 2026-10-18. Source of truth is `.github/workflows/ci.yml`; this page records *why* it is shaped the way it is.
+Last updated: 2026-10-31. Source of truth is `.github/workflows/ci.yml`; this page records *why* it is shaped the way it is.
 
 ## Docs-only pull requests skip the heavy jobs
 
@@ -9,6 +9,10 @@ outside `docs/`, `specs/`, `.specify/` and `*.md`. If not, every job except the 
 
 - It is an `if:` on each job, **not** a workflow-level `on.paths` filter. A workflow that never triggers leaves
   required checks pending forever; a job skipped by `if:` counts as passing.
+- If the `changes` job itself fails (say a `paths-filter` API error), every job gated on it is skipped, and a
+  skipped job counts as passing. The `End-to-end` gate therefore fails whenever `changes` did not succeed, and it
+  accepts a skipped shard matrix only when `changes` reported no code change, so a broken filter cannot let a PR
+  through untested. «Regenerate and diff» (below) applies the same rule.
 - Pushes to `main` always run everything.
 - Editing `ci.yml` itself counts as a code change.
 - The job also exposes a `web` output from a second `paths-filter` step (`apps/web/**`, `packages/**`,
@@ -22,8 +26,8 @@ outside `docs/`, `specs/`, `.specify/` and `*.md`. If not, every job except the 
 Playwright runs with `workers: 1`, so the suite is serial inside a shard. The `e2e-shard` matrix splits the spec
 *files* across five runners with the duration-balanced planner `scripts/ci/e2e_shard.py` (each shard runs explicit
 file lists, not Playwright's `--shard`), each with its own isolated Supabase, Redis, API, extraction worker and web
-app. The aggregate job `e2e`, named exactly `End-to-end`, passes when the matrix succeeded or was skipped, so the
-check name other tooling may rely on is unchanged.
+app. The aggregate job `e2e`, named exactly `End-to-end`, passes when the matrix succeeded, or was skipped because
+`changes` found no code change, so the check name other tooling may rely on is unchanged.
 
 - The accessibility step runs the `*a11y*` specs; the following step runs the complement (files whose name lacks
   `a11y`). They used to overlap, which ran ~117 tests twice.
@@ -46,6 +50,41 @@ check name other tooling may rely on is unchanged.
   measured) and are never dropped. The matrix size and the planner's `--total 5` must change together. The `lint`
   job runs the planner's unit tests plus `check`, so a new spec cannot be silently left out. Regenerate the manifest
   from downloaded CI list-reporter logs with `e2e_shard.py from-logs`.
+
+## Docs screenshots drift always reports
+
+`docs-screenshots.yml` triggers on every PR, and its own `changes` job (`Docs screenshot paths`) decides whether
+the capture job («Capture and compare screenshots») runs: the web app source, the docs capture spec,
+`apps/web/tests/e2e/support/**`, the Playwright configs and global setup, `packages/i18n/**`,
+`docs/user/screenshots/**` and the workflow file itself. On any other PR the capture ends `skipped`. The old
+workflow-level `on.paths` filter never started, so its check could not be made required (PPS-135). The weekly
+schedule and manual runs always capture.
+
+- **«Regenerate and diff» is a gate job**, and it is the one required on main since 2026-10-31 (the capture job
+  is not). It passes when the capture passed, or was skipped because nothing relevant changed, and fails if the
+  path filter itself failed: a job skipped because its `needs` failed also counts as passing, so requiring the
+  capture job directly would let a broken filter through.
+
+- The `screens` filter is the list to extend when a new file starts to affect the captures.
+- The «Start Supabase» and «Start the extraction worker» steps did not fail in any of the 100 runs before
+  2026-10-30 (the five non-successes were cancelled runs); the `supabase start failed after 5 attempts` text in
+  every log is GitHub echoing the step's script, not an error.
+
+## Sparse checkout (2026-10-31)
+
+`docs/gtm/video/` holds ~825 MB of demo-video cuts (the whole HEAD tree is ~0.91 GB), and no CI or deploy job
+reads it. By the week of 2026-10-31 a plain `actions/checkout` took 50–75 s in every job, up from ~3 s. Every
+checkout except the secret scan now uses a non-cone sparse checkout (`/*`, `!/docs/gtm/video/`). `actions/checkout`
+pairs that with a `blob:none` partial clone, so the video blobs are never downloaded: a local simulation of the
+same fetch leaves an 85 MB working copy. The secret scan keeps its full-history checkout, since gitleaks scans the
+commits a PR adds. If a job ever needs a video, drop the two sparse inputs from that job's checkout.
+
+Measured (one run each, ±30% runner noise):
+
+| Run | Checkout per job | Slowest E2E shard | Backend tests | Whole run |
+|---|---|---|---|---|
+| Five green runs before (`41145708177`…`41147908855`) | 49–75 s | 423–443 s | 293–324 s | 442–557 s |
+| PR #376 (`41149690966`) | 2–6 s (secret scan, full history: 14 s) | 358 s | 246 s | 377 s |
 
 ## Docker layer cache (deploy workflows)
 

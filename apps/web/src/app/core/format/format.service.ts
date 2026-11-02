@@ -173,7 +173,11 @@ export function formatCurrencyAmount(
 export class FormatService {
   private readonly translate = inject(TranslateService, { optional: true });
 
-  private resolveLocale(localeOverride?: string): string {
+  /**
+   * Resolves the active locale from an optional override, else TranslateService,
+   * else `'en'`. Pipes call this on every impure CD pass to detect language switches.
+   */
+  locale(localeOverride?: string): string {
     if (localeOverride) {
       return localeOverride;
     }
@@ -182,7 +186,7 @@ export class FormatService {
   }
 
   currencySymbol(currency: string, localeOverride?: string): string {
-    return currencySymbol(currency, this.resolveLocale(localeOverride));
+    return currencySymbol(currency, this.locale(localeOverride));
   }
 
   /**
@@ -196,7 +200,7 @@ export class FormatService {
     value: MoneyLike | null | undefined,
     localeOverride?: string,
   ): string {
-    return formatCurrencyAmount(value, this.resolveLocale(localeOverride));
+    return formatCurrencyAmount(value, this.locale(localeOverride));
   }
 
   /**
@@ -207,7 +211,7 @@ export class FormatService {
     value: MoneyLike | null | undefined,
     localeOverride?: string,
   ): string {
-    return formatCurrencyAmount(value, this.resolveLocale(localeOverride));
+    return formatCurrencyAmount(value, this.locale(localeOverride));
   }
 
   /**
@@ -218,7 +222,7 @@ export class FormatService {
     value: number | string | null | undefined,
     localeOverride?: string,
   ): string {
-    return formatLocaleNumber(value, this.resolveLocale(localeOverride), {
+    return formatLocaleNumber(value, this.locale(localeOverride), {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     });
@@ -232,7 +236,7 @@ export class FormatService {
     value: number | string | null | undefined,
     localeOverride?: string,
   ): string {
-    return formatExactQuantity(value, this.resolveLocale(localeOverride));
+    return formatExactQuantity(value, this.locale(localeOverride));
   }
 
   /**
@@ -253,7 +257,7 @@ export class FormatService {
           : date;
     if (isNaN(d.getTime())) return '—';
 
-    const locale = this.resolveLocale(localeOverride);
+    const locale = this.locale(localeOverride);
     const resolvedOptions: Intl.DateTimeFormatOptions = {
       ...(isArabicLocale(locale) ? { numberingSystem: 'arab' } : {}),
       ...options,
@@ -270,6 +274,6 @@ export class FormatService {
     options?: Intl.NumberFormatOptions,
     localeOverride?: string,
   ): string {
-    return formatLocaleNumber(value, this.resolveLocale(localeOverride), options);
+    return formatLocaleNumber(value, this.locale(localeOverride), options);
   }
 }

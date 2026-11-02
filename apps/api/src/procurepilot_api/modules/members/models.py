@@ -4,10 +4,11 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.tenants.models import Tenant
+from procurepilot_api.shared.display_name import DisplayName
 
 type Locale = Literal["en", "ar"]
 type MembershipStatus = Literal["active", "removed"]
@@ -19,6 +20,7 @@ class Membership(BaseModel):
     tenant_id: UUID
     user_id: UUID
     email: str
+    display_name: str | None = None
     role: MemberRole
     mfa_enabled: bool
     preferred_locale: Locale | None = None
@@ -30,6 +32,7 @@ class Membership(BaseModel):
 class Member(BaseModel):
     id: UUID
     email: str
+    display_name: str | None = None
     role: MemberRole
     status: MembershipStatus
     mfa_enabled: bool = False
@@ -41,13 +44,23 @@ class MemberList(BaseModel):
     next_cursor: str | None = None
 
 
-class MemberRoleUpdate(BaseModel):
-    role: MemberRole
+class MemberUpdate(BaseModel):
+    """PATCH /members/{id}: an owner changes a member's role, name, or both."""
+
+    role: MemberRole | None = None
+    display_name: DisplayName | None = None
+
+    @model_validator(mode="after")
+    def _something_to_change(self) -> MemberUpdate:
+        if self.role is None and self.display_name is None:
+            raise ValueError("role or display_name is required")
+        return self
 
 
 class MemberInvitation(BaseModel):
     id: UUID
     email: str
+    display_name: str | None = None
     role: MemberRole
     status: MemberInvitationStatus
     expires_at: datetime
@@ -62,6 +75,7 @@ class MemberInvitationList(BaseModel):
 class MemberInvitationCreate(BaseModel):
     email: str
     role: MemberRole
+    display_name: DisplayName | None = None
 
 
 class MemberInvitationAccept(BaseModel):
@@ -73,6 +87,7 @@ class Me(BaseModel):
     id: UUID
     membership_id: UUID | None = None
     email: str
+    display_name: str | None = None
     role: MemberRole
     preferred_locale: Locale | None = None
     mfa_enabled: bool
@@ -81,6 +96,7 @@ class Me(BaseModel):
 
 class MeUpdate(BaseModel):
     preferred_locale: Locale | None = None
+    display_name: DisplayName | None = None
 
 
 class WorkspaceSummary(BaseModel):

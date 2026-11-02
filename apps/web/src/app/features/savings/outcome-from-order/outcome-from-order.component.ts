@@ -19,6 +19,7 @@ import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { CurrencySymbolPipe } from '../../../core/format/currency-symbol.pipe';
 import { toLocalMidnightIsoOrNull } from '../../../core/format/iso-date';
+import { trimDecimal } from '../../../core/format/trim-decimal';
 import { lineDescription, packLabel } from '../../orders/pack-label';
 import {
   type PurchaseDeliveryResult,
@@ -118,8 +119,8 @@ export class OutcomeFromOrderComponent implements OnInit {
           value.lines.map((line) => ({
             line,
             include: line.recordable,
-            quantity: line.quantity,
-            total: line.total_paid.amount,
+            quantity: trimDecimal(line.quantity),
+            total: trimDecimal(line.total_paid.amount),
           })),
         );
         this.isLoading.set(false);
@@ -133,6 +134,10 @@ export class OutcomeFromOrderComponent implements OnInit {
 
   update(index: number, patch: Partial<Pick<EditableOutcomeLine, 'include' | 'quantity' | 'total'>>): void {
     this.lines.set(this.lines().map((line, i) => (i === index ? { ...line, ...patch } : line)));
+  }
+
+  hasTax(line: PurchaseOutcomePrefillLine): boolean {
+    return Number(line.tax.amount) > 0;
   }
 
   lineValid(line: EditableOutcomeLine): boolean {

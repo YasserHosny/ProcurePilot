@@ -62,7 +62,7 @@ describe('OrderDetailComponent', () => {
         detail: {
           eyebrow: 'Purchase order', createdAt: 'Created {{date}}', orderDate: 'Order date', expectedDelivery: 'Expected',
           total: 'Total', confirmation: 'Confirmation', receipt: 'Receipt', linesTitle: 'Lines', linesSubtitle: 'Evidence',
-          ordered: 'Ordered', confirmed: 'Confirmed', received: 'Received', remaining: 'Remaining', actionsTitle: 'Actions',
+          ordered: 'Ordered', confirmed: 'Confirmed', received: 'Received', remaining: 'Remaining', fromRequest: 'From request', actionsTitle: 'Actions',
           actionsSubtitle: 'Internal', submit: 'Submit', recordOutcome: 'Record outcome', recordConfirmation: 'Confirm', recordReceipt: 'Receive',
           confirmationFormTitle: 'Confirmation', receiptFormTitle: 'Receipt', reference: 'Reference', confirmedDate: 'Date',
           receivedDate: 'Date', confirmedQuantity: 'Quantity', receivedQuantity: 'Quantity', save: 'Save',
@@ -219,5 +219,73 @@ describe('OrderDetailComponent', () => {
         receipt_date: '2026-10-25',
       }),
     );
+  });
+
+  it('displays supplier name, from-request link, and remaining quantity as ordered minus received', () => {
+    api.getOrder.and.returnValue(
+      of({
+        order: {
+          id: 'order-1',
+          tenant_id: 'tenant-1',
+          order_number: 'PO-1001',
+          supplier_id: 'supplier-1',
+          supplier_name: 'الوفرة للمواد الغذائية',
+          source_request_id: 'req-456',
+          status: 'submitted',
+          order_date: '2026-09-20',
+          expected_delivery_date: '2026-09-25',
+          total: { amount: '120.00', currency: 'GBP' },
+          tax: { amount: '0.00', currency: 'GBP' },
+          source_kind: 'manual',
+          source_reference: 'PO-1001',
+          source_hash: null,
+          created_by: 'member-1',
+          created_at: '2026-09-20T10:00:00Z',
+          updated_at: '2026-09-20T10:00:00Z',
+          lines: [{
+            id: 'line-1',
+            line_number: 1,
+            workspace_product_id: 'p1',
+            description: 'Paper',
+            ordered_quantity: '10',
+            base_unit: 'kilogram',
+            pack_base_quantity: '25.000000',
+            unit_price: { amount: '940.00', currency: 'GBP' },
+            tax: { amount: '0.00', currency: 'GBP' },
+            line_total: { amount: '120.00', currency: 'GBP' },
+          }],
+        },
+        confirmation: null,
+        receipts: [],
+        lifecycle: {
+          purchase_order_id: 'order-1',
+          status: 'submitted',
+          confirmation: 'pending',
+          receipt: 'pending',
+          lines: [{
+            purchase_order_line_id: 'line-1',
+            ordered_quantity: '10.000000',
+            confirmed: { state: 'pending', quantity: null, source_ids: [] },
+            received: { state: 'pending', quantity: null, source_ids: [] },
+            remaining_quantity: null,
+            over_received_quantity: null,
+          }],
+        },
+      }),
+    );
+    fixture = TestBed.createComponent(OrderDetailComponent);
+    fixture.detectChanges();
+
+    const supplier = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="order-supplier"]');
+    expect(supplier).toBeTruthy();
+    expect(supplier?.textContent?.trim()).toBe('الوفرة للمواد الغذائية');
+    expect(supplier?.getAttribute('dir')).toBe('auto');
+
+    const requestLink = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="from-request-link"]');
+    expect(requestLink).toBeTruthy();
+    expect(requestLink?.getAttribute('href')).toBe('/requests/req-456');
+
+    const remainingText = (fixture.nativeElement as HTMLElement).querySelector('.line-remaining strong');
+    expect(remainingText?.textContent?.trim()).toBe('10');
   });
 });

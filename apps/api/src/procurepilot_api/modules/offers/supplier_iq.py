@@ -799,7 +799,7 @@ select
   (lc.total_amount / nullif(lc.normalised_base_quantity, 0)) as normalised_unit_price,
   lc.total_currency as currency,
   lc.recorded_at
-from landed_cost lc
+from current_landed_cost lc
 join current_match_decision md
   on md.tenant_id = lc.tenant_id
  and md.id = lc.match_decision_id
@@ -823,7 +823,7 @@ select
   (lc.total_amount / nullif(lc.normalised_base_quantity, 0)) as normalised_unit_price,
   lc.total_currency as currency,
   lc.recorded_at
-from landed_cost lc
+from current_landed_cost lc
 join current_match_decision md
   on md.tenant_id = lc.tenant_id
  and md.id = lc.match_decision_id

@@ -6,6 +6,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from postgrest.exceptions import APIError
+from pydantic import ValidationError
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
@@ -13,6 +14,7 @@ from procurepilot_api.errors import ConflictError, ServiceUnavailableError
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.quotations.review_gate import blocking_low_confidence_fields
 from procurepilot_api.modules.quotations.schemas import (
+    FieldCorrection,
     QuotationDetail,
     QuotationReviewPatch,
 )
@@ -43,7 +45,7 @@ class QuotationReviewService:
         client = authenticated_client(self._settings, bearer_token)
         quotation = _one_row(
             client.table("quotation")
-            .select("id,status,supplier_id,currency,reviewer_notes,tenant_id")
+            .select("id,status,supplier_id,currency,reviewer_notes,tenant_id,prices_include_vat")
             .eq("id", str(quotation_id))
             .limit(2)
             .execute()
@@ -69,6 +71,9 @@ class QuotationReviewService:
         if "currency" in patch.model_fields_set:
             updates["currency"] = patch.currency
 
+        if "prices_include_vat" in patch.model_fields_set:
+            updates["prices_include_vat"] = patch.prices_include_vat
+
         if "reviewer_notes" in patch.model_fields_set:
             updates["reviewer_notes"] = patch.reviewer_notes
         quotation_tenant_id = quotation.get("tenant_id")
@@ -77,7 +82,7 @@ class QuotationReviewService:
 
         # Resolve and validate every correction before the first mutation. PostgREST does
         # not provide a transaction spanning these requests, so validation belongs here.
-        correction_fields: list[tuple[object, object]] = []
+        correction_fields: list[tuple[FieldCorrection, dict[str, object]]] = []
         for correction in patch.corrections:
             field = _one_row(
                 client.table("field_extraction")
@@ -89,7 +94,16 @@ class QuotationReviewService:
                 .data,
                 resource="field_extraction",
             )
-            is_date_field = field.get("field_name") in {"issue_date", "expiry_date"}
+            field_name = field.get("field_name")
+            if field.get("entity_type") == "quotation" and field_name in {
+                "prices_include_vat",
+                "vat_rate",
+            }:
+                try:
+                    QuotationReviewPatch(**{str(field_name): correction.corrected_value})
+                except ValidationError as exc:
+                    raise ConflictError(details={"reason": "invalid_vat_correction"}) from exc
+            is_date_field = field_name in {"issue_date", "expiry_date"}
             if (
                 field.get("corrected_by") is None
                 and is_date_field
@@ -150,6 +164,8 @@ class QuotationReviewService:
                     client.table("quotation_line").insert(row_data).execute()
                     next_number += 1
 
+            if "vat_rate" in patch.model_fields_set:
+                _apply_document_vat_rate(client, quotation_id, patch.vat_rate)
             _recompute_arithmetic_status(client, quotation_id)
             _sync_review_task_after_patch(
                 client,
@@ -175,6 +191,15 @@ class QuotationReviewService:
                 "currency_changed": (
                     "currency" in patch.model_fields_set
                     and quotation.get("currency") != patch.currency
+                ),
+                "vat_basis_changed": (
+                    bool({"prices_include_vat", "vat_rate"} & patch.model_fields_set)
+                    or any(
+                        field.get("entity_type") == "quotation"
+                        and field.get("field_name") in {"prices_include_vat", "vat_rate"}
+                        and field.get("corrected_by") is None
+                        for _, field in correction_fields
+                    )
                 ),
                 "notes_changed": (
                     "reviewer_notes" in patch.model_fields_set
@@ -294,7 +319,13 @@ def _apply_correction_to_canonical_row(
                     {"unit_price_amount": amount, "unit_price_currency": currency}
                 ).eq("id", entity_id).execute()
     elif entity_type == "quotation":
-        if field_name == "currency" and isinstance(corrected_value, str):
+        if field_name == "prices_include_vat" and isinstance(corrected_value, bool):
+            client.table("quotation").update({field_name: corrected_value}).eq(
+                "id", entity_id
+            ).execute()
+        elif field_name == "vat_rate":
+            _apply_document_vat_rate(client, UUID(entity_id), Decimal(str(corrected_value)))
+        elif field_name == "currency" and isinstance(corrected_value, str):
             client.table("quotation").update({field_name: corrected_value}).eq(
                 "id", entity_id
             ).execute()
@@ -318,7 +349,7 @@ def _apply_correction_to_canonical_row(
 def _recompute_arithmetic_status(client: object, quotation_id: UUID) -> None:
     quote = _one_row(
         client.table("quotation")
-        .select("id,stated_total_amount,arithmetic_status")
+        .select("id,stated_total_amount,arithmetic_status,prices_include_vat")
         .eq("id", str(quotation_id))
         .limit(2)
         .execute()
@@ -353,13 +384,18 @@ def _recompute_arithmetic_status(client: object, quotation_id: UUID) -> None:
             vat_rate = Decimal(str(raw_vat))
         else:
             vat_rate = Decimal("0")
-        subtotal += line_net * (1 + vat_rate)
+        subtotal += line_net if quote.get("prices_include_vat") else line_net * (1 + vat_rate)
     if not has_line_total:
         return
     stated = Decimal(str(stated_amount))
     if abs(subtotal - stated) <= ARITHMETIC_TOLERANCE:
         status = "reconciled"
-    elif not has_any_vat and subtotal > 0 and stated > subtotal:
+    elif (
+        not quote.get("prices_include_vat")
+        and not has_any_vat
+        and subtotal > 0
+        and stated > subtotal
+    ):
         inferred_pct = round(float((stated - subtotal) / subtotal) * 100)
         if 0 < inferred_pct <= 30:
             recomputed = subtotal * (1 + Decimal(str(inferred_pct)) / 100)
@@ -471,3 +507,28 @@ def _is_iso_date(value: object) -> bool:
 
 def get_quotation_review_service() -> QuotationReviewService:
     return QuotationReviewService()
+
+
+def _apply_document_vat_rate(client: object, quotation_id: UUID, rate: Decimal) -> None:
+    own_rates = _rows(
+        client.table("field_extraction")
+        .select("entity_id")
+        .eq("quotation_id", str(quotation_id))
+        .eq("entity_type", "quotation_line")
+        .eq("field_name", "vat_rate")
+        .execute()
+        .data
+    )
+    own_ids = {str(field["entity_id"]) for field in own_rates}
+    lines = _rows(
+        client.table("quotation_line")
+        .select("id")
+        .eq("quotation_id", str(quotation_id))
+        .execute()
+        .data
+    )
+    for line in lines:
+        if str(line["id"]) not in own_ids:
+            client.table("quotation_line").update({"vat_rate": format(rate, "f")}).eq(
+                "id", str(line["id"])
+            ).eq("quotation_id", str(quotation_id)).execute()

@@ -94,6 +94,57 @@ def test_list_requests_includes_draft_without_step_and_submitted_assignee_email(
             assert step.assigned_email == context.workspace.label + "-owner@example.test"
 
 
+def test_requests_and_approval_queue_carry_member_display_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PPS-125: requester_name and assigned_name come from membership.display_name."""
+    with committed_smart_context("web-member-names", supplier_count=1) as context:
+        member = member_from_workspace(context.workspace)
+        with pytest.importorskip("psycopg").connect(TEST_DATABASE_URL) as conn:
+            with conn.cursor() as cur:
+                branch_id = _add_branch(cur, context.workspace, "Olaya")
+                cur.execute(
+                    "update membership set display_name = 'المالك' where id = %s",
+                    (context.workspace.membership_id,),
+                )
+                request_id = uuid4()
+                act_as(cur, context.workspace)
+                cur.execute(
+                    "insert into purchase_request (id,tenant_id,branch_id,requested_by_membership_id,"  # noqa: E501
+                    "required_by_date,status,estimated_total_amount,estimated_total_currency) "
+                    "values (%s,%s,%s,%s,'2026-10-10','submitted',100,'GBP')",
+                    (
+                        request_id,
+                        context.workspace.tenant_id,
+                        branch_id,
+                        context.workspace.membership_id,
+                    ),
+                )
+                cur.execute(
+                    "insert into approval_step (tenant_id,purchase_request_id,assigned_membership_id,source,status) "  # noqa: E501
+                    "values (%s,%s,%s,'owner_fallback','pending')",
+                    (context.workspace.tenant_id, request_id, context.workspace.membership_id),
+                )
+            client = PsycopgSupabaseClient(conn, claims=context.workspace.claims())
+            monkeypatch.setattr(requests_module, "authenticated_client", lambda *_: client)
+            service = requests_module.RequestsService(settings_for_test_db(monkeypatch))
+            queued = {
+                item.id: item
+                for item in service.list_pending_approvals(
+                    bearer_token="test-token", member=member
+                ).items
+            }[request_id]
+            listed = {
+                item.id: item for item in service.list_requests(bearer_token="test-token").items
+            }[request_id]
+            detail = service.get_request(bearer_token="test-token", request_id=request_id)
+            for result in (queued, listed, detail):
+                assert result.requester_name == "المالك"
+                assert result.requester_email == context.workspace.label + "-owner@example.test"
+                assert result.approval_step is not None
+                assert result.approval_step.assigned_name == "المالك"
+
+
 def test_approval_queue_includes_requester_email_and_branch_budget_reasons(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

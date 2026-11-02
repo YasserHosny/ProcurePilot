@@ -39,10 +39,10 @@ describe('OrderListComponent', () => {
     TestBed.inject(TranslateService).setTranslation('en', {
       orders: {
         title: 'Order Tracking', subtitle: 'Orders', refresh: 'Refresh', retry: 'Retry', loadMore: 'Load more',
-        loadError: 'Load failed', open: 'Open', orderDate: 'Ordered {{date}}', lineCount: '{{count}} line(s)',
+        loadError: 'Load failed', open: 'Open', orderDate: 'Ordered {{date}}', createdDate: 'Created {{date}}', lineCount: '{{count}} line(s)',
         createButton: 'Create Order', fromApprovedRequest: 'From approved request',
         fromApprovedRequestEmpty: 'No approved requests available.',
-        status: { submitted: 'Submitted' }, empty: { title: 'Empty', description: 'No orders' },
+        status: { submitted: 'Submitted', draft: 'Draft' }, empty: { title: 'Empty', description: 'No orders' },
       },
     });
     TestBed.inject(TranslateService).use('en');
@@ -211,5 +211,66 @@ describe('OrderListComponent', () => {
     expect(updatedOption?.textContent).toContain('٢٠٢٦');
     expect(component.formatRequiredBy('2026-09-20')).toContain('٢٠');
     expect(/[0-9]/.test(component.formatRequiredBy('2026-09-20'))).toBeFalse();
+  });
+
+  it('renders supplier name and displays Created date for draft and Ordered date for submitted', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({
+      next_cursor: null,
+      items: [
+        {
+          id: 'order-draft',
+          tenant_id: 'tenant-1',
+          order_number: 'PO-DRAFT',
+          supplier_id: 'supplier-1',
+          supplier_name: 'الوفرة للمواد الغذائية',
+          status: 'draft',
+          order_date: '2026-10-28',
+          expected_delivery_date: null,
+          total: { amount: '120.00', currency: 'SAR' },
+          tax: { amount: '0.00', currency: 'SAR' },
+          source_kind: 'manual',
+          source_reference: 'PO-DRAFT',
+          source_hash: null,
+          created_by: 'member-1',
+          created_at: '2026-10-28T09:00:00Z',
+          updated_at: '2026-10-28T09:00:00Z',
+          lines: [],
+        },
+        {
+          id: 'order-sub',
+          tenant_id: 'tenant-1',
+          order_number: 'PO-SUBMITTED',
+          supplier_id: 'supplier-1',
+          supplier_name: 'شركة الأغذية',
+          status: 'submitted',
+          order_date: '2026-10-25',
+          expected_delivery_date: null,
+          total: { amount: '200.00', currency: 'SAR' },
+          tax: { amount: '0.00', currency: 'SAR' },
+          source_kind: 'manual',
+          source_reference: 'PO-SUBMITTED',
+          source_hash: null,
+          created_by: 'member-1',
+          created_at: '2026-10-24T09:00:00Z',
+          updated_at: '2026-10-25T09:00:00Z',
+          lines: [],
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    const suppliers = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="order-card-supplier"]',
+    );
+    expect(suppliers.length).toBe(2);
+    expect(suppliers[0]?.textContent?.trim()).toBe('الوفرة للمواد الغذائية');
+    expect(suppliers[0]?.getAttribute('dir')).toBe('auto');
+    expect(suppliers[1]?.textContent?.trim()).toBe('شركة الأغذية');
+
+    const cards = (fixture.nativeElement as HTMLElement).querySelectorAll('.order-row');
+    expect(cards[0]?.querySelector('.order-date')?.textContent).toContain('Created');
+    expect(cards[0]?.querySelector('.order-date')?.textContent).not.toContain('Ordered');
+    expect(cards[1]?.querySelector('.order-date')?.textContent).toContain('Ordered');
   });
 });

@@ -10,7 +10,9 @@ type PurchaseRequestStatus = Literal[
     "draft", "submitted", "approved", "rejected", "withdrawn", "ordered", "delivered"
 ]
 type ApprovalStepStatus = Literal["pending", "approved", "rejected"]
-type ApprovalStepSource = Literal["threshold_match", "delegate", "owner_fallback"]
+type ApprovalStepSource = Literal[
+    "threshold_match", "group_threshold_match", "delegate", "owner_fallback"
+]
 
 
 class StrictApiModel(BaseModel):
@@ -41,6 +43,9 @@ class PurchaseRequestLine(BaseModel):
     # response the request was prepared from; null for any line without that provenance. This,
     # not `estimated_unit_price` (a landed estimate), is what a purchase order may pre-fill.
     quoted_unit_price: Money | None = None
+    quoted_prices_include_vat: bool = False
+    quoted_vat_rate: str | None = None
+    quoted_net_unit_price: Money | None = None
     product_name: str | None = None
     base_unit: str | None = None
     pack_base_quantity: StrictStr | None = Field(default=None, pattern=r"^\d+(\.\d{1,6})?$")
@@ -55,7 +60,7 @@ class PurchaseRequestLineInput(StrictApiModel):
 class ApprovalStep(BaseModel):
     id: UUID
     assigned_membership_id: UUID
-    assigned_name: str | None = None  # Reserved until membership has a display name.
+    assigned_name: str | None = None
     assigned_email: str | None = None
     source: ApprovalStepSource
     status: ApprovalStepStatus
@@ -75,9 +80,33 @@ class AutoPreparedProvenance(BaseModel):
     created_at: datetime
 
 
+class RequestSource(BaseModel):
+    """The RFQ response a request was prepared from, so request, approval and order screens can
+    say which supplier and RFQ it is about (UX audit 2026-10-28, R1-H4)."""
+
+    rfq_id: UUID
+    rfq_response_id: UUID
+    quotation_id: UUID
+    supplier_id: UUID
+    supplier_name: str | None = None
+
+
+class RequestGroupSummary(BaseModel):
+    id: UUID
+    rfq_id: UUID
+    position: int
+    size: int
+    combined_total: Money
+    best_single_total: Money | None
+    saving: Money | None
+    sibling_request_ids: list[UUID]
+
+
 class PurchaseRequest(BaseModel):
     id: UUID
+    request_group: RequestGroupSummary | None = None
     source_rfq_response_id: UUID | None = None
+    source: RequestSource | None = None
     auto_prepared: AutoPreparedProvenance | None = None
     branch_id: UUID
     cost_centre_id: UUID | None = None
@@ -91,6 +120,7 @@ class PurchaseRequest(BaseModel):
     has_incomplete_estimate: bool
     budget_status: BudgetStatus | None = None
     approval_step: ApprovalStep | None = None
+    has_quantity_to_order: bool | None = None
     submitted_at: datetime | None = None
     withdrawn_at: datetime | None = None
     delivered_at: datetime | None = None

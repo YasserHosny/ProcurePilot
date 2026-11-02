@@ -45,6 +45,7 @@ def resolve_approver(
     removed_membership_ids: Collection[UUID],
     owner_membership_id: UUID,
     as_of: date,
+    is_group: bool = False,
 ) -> ResolvedApproval:
     """Resolve who a submitted request routes to (research.md R3). Pure function, no DB write —
     called once at submission time and its result is captured onto approval_step, never silently
@@ -64,6 +65,11 @@ def resolve_approver(
         owner_membership_id,
     )
     delegate = _active_delegation_for(assignee, delegations, as_of, removed_membership_ids)
+    if is_group:
+        return ResolvedApproval(
+            assigned_membership_id=delegate or assignee,
+            source="group_threshold_match" if source == "threshold_match" else source,
+        )
     if delegate is not None:
         return ResolvedApproval(assigned_membership_id=delegate, source="delegate")
     return ResolvedApproval(assigned_membership_id=assignee, source=source)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import cast
 from uuid import UUID, uuid4
 
@@ -8,6 +9,7 @@ import pytest
 
 from procurepilot_api.modules.matching import service as matching_service_module
 from procurepilot_api.modules.matching.service import MatchingService, _queue_item
+from procurepilot_api.shared import postgrest_pages
 
 
 class FakeQuery:
@@ -16,6 +18,7 @@ class FakeQuery:
         self.filters: list[tuple[str, str, object]] = []
         self.orders: list[tuple[str, bool]] = []
         self.range_args: tuple[int, int] | None = None
+        self.limit_count: int | None = None
 
     def select(self, _cols: str) -> FakeQuery:
         return self
@@ -40,6 +43,10 @@ class FakeQuery:
         self.orders.append((column, desc))
         return self
 
+    def limit(self, count: int) -> FakeQuery:
+        self.limit_count = count
+        return self
+
     def range(self, start: int, end: int) -> FakeQuery:
         self.range_args = (start, end)
         return self
@@ -50,6 +57,8 @@ class FakeQuery:
                 self.data = data
 
         data = list(self._data)
+        if self.limit_count is not None:
+            data = data[: self.limit_count]
         if self.range_args is not None:
             start, end = self.range_args
             data = data[start : end + 1]
@@ -371,7 +380,7 @@ def test_list_match_tasks_accepts_query_params_and_enriches_supplier(
     monkeypatch.setattr(
         matching_service_module,
         "_line_rows",
-        lambda _client, _qid: [fake_line_row],
+        lambda _client, _qid, _quote=None: [fake_line_row],
     )
     monkeypatch.setattr(
         matching_service_module,
@@ -472,9 +481,14 @@ def test_matching_pipeline_passes_supplier_code_aliases_to_deterministic_matcher
     )()
     service = MatchingService()
 
+    monkeypatch.setattr(matching_service_module, "rfq_lines_for_quotation", lambda *_: None)
     monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
-    monkeypatch.setattr(matching_service_module, "_decision_for_line", lambda _c, _lid: None)
-    monkeypatch.setattr(matching_service_module, "_candidate_rows", lambda _c, _lid: [])
+    monkeypatch.setattr(
+        matching_service_module._LineMatchState,  # noqa: SLF001
+        "read",
+        classmethod(lambda cls, _client, _lines: cls(candidates={}, decisions={}, tasks={})),
+    )
+    monkeypatch.setattr(matching_service_module, "_decision_for_line", lambda *_a: None)
     monkeypatch.setattr(
         matching_service_module,
         "_deterministic_products_for_line",
@@ -809,3 +823,99 @@ def test_list_match_tasks_search_finds_matches_beyond_first_page_before_paginati
     assert [task.id for task in result.items] == [second_task_id]
     assert task_calls == 1
     assert result.next_cursor is None
+
+
+class _CappedQuery:
+    """A PostgREST stand-in that returns at most `cap` rows per response, like `max_rows`."""
+
+    def __init__(self, tables: dict[str, list[dict[str, object]]], cap: int) -> None:
+        self._tables, self._cap = tables, cap
+        self._rows: list[dict[str, object]] = []
+        self._start, self._end = 0, None
+
+    def table(self, name: str) -> _CappedQuery:
+        query = _CappedQuery(self._tables, self._cap)
+        query._rows = self._tables.get(name, [])
+        return query
+
+    def select(self, _columns: str) -> _CappedQuery:
+        return self
+
+    def in_(self, _column: str, _values: list[str]) -> _CappedQuery:
+        return self
+
+    def order(self, _column: str, *, desc: bool = False) -> _CappedQuery:
+        return self
+
+    def range(self, start: int, end: int) -> _CappedQuery:
+        self._start, self._end = start, end
+        return self
+
+    def execute(self) -> SimpleNamespace:
+        end = len(self._rows) if self._end is None else self._end + 1
+        return SimpleNamespace(data=self._rows[self._start : min(end, self._start + self._cap)])
+
+
+def test_line_match_state_reads_every_candidate_past_the_row_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # PPS-133: PostgREST caps each response at max_rows; a batched read must page.
+    line_id = uuid4()
+    candidates = [
+        {"id": uuid4(), "quotation_line_id": line_id, "rank": rank} for rank in range(1, 6)
+    ]
+    tasks = [{"id": uuid4(), "quotation_line_id": line_id, "status": "resolved"} for _ in range(3)]
+    monkeypatch.setattr(postgrest_pages, "PAGE_ROWS", 2)
+    state = matching_service_module._LineMatchState.read(  # noqa: SLF001
+        _CappedQuery({"match_candidate": candidates, "match_task": tasks}, cap=2),
+        [{"id": line_id}],
+    )
+    assert state.candidates[str(line_id)] == candidates
+    assert state._tasks[str(line_id)] == tasks  # noqa: SLF001
+
+
+def test_queue_item_does_not_add_vat_again_on_a_vat_inclusive_quote() -> None:
+    # ADR-021: 2 × SAR 115.00 with 15% VAT inside the price costs 230.00, not 264.50.
+    created_at = datetime.now(UTC)
+    item = _queue_item(
+        {
+            "id": uuid4(),
+            "quotation_id": uuid4(),
+            "quotation_status": "reviewed",
+            "document_id": None,
+            "storage_path": None,
+            "issue_date": None,
+            "reviewed_at": created_at,
+            "reviewed_by": None,
+            "reviewed_by_email": None,
+            "supplier_id": None,
+            "supplier_name": None,
+            "prices_include_vat": True,
+            "quotation_line_id": uuid4(),
+            "line_number": 1,
+            "original_text": "زيت دوار الشمس (تنكة 18 لتر)",
+            "quantity": "2",
+            "pack_count": None,
+            "unit_size": None,
+            "pack_unit": None,
+            "unit_price_amount": "115.0000",
+            "unit_price_currency": "SAR",
+            "vat_rate": "0.1500",
+            "delivery_fee_amount": None,
+            "delivery_fee_currency": None,
+            "discount_amount": None,
+            "discount_currency": None,
+            "status": "open",
+            "priority": "normal",
+            "reason": "no_candidate",
+            "created_at": created_at,
+            "resolved_at": None,
+            "top_candidate_name": None,
+            "top_candidate_confidence": None,
+            "quotation_total_line_count": 1,
+            "quotation_open_task_count": 1,
+        }
+    )
+
+    assert item.quotation_line.quoted_line_total is not None
+    assert item.quotation_line.quoted_line_total.amount == "230.0000"

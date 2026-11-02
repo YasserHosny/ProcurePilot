@@ -32,6 +32,8 @@ from procurepilot_api.modules.offers.schemas import (
     RefreshScheduleCreate,
     RefreshScheduleList,
     RefreshScheduleUpdate,
+    SplitPrepareRequest,
+    SplitPrepareResponse,
     SupplierCommercialTerm,
     SupplierCommercialTermCreate,
     SupplierCommercialTermList,
@@ -367,3 +369,21 @@ def create_supplier_commercial_term(
     if not created:
         response.status_code = status.HTTP_200_OK
     return term
+
+
+@router.post(
+    "/baskets/{basket_id}/prepare-requests", status_code=201, response_model=SplitPrepareResponse
+)
+def prepare_split_requests(
+    basket_id: UUID,
+    payload: SplitPrepareRequest,
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+    response: Response,
+) -> SplitPrepareResponse:
+    from procurepilot_api.modules.offers.rfq_split import prepare_requests_from_split
+
+    result, created = prepare_requests_from_split(member, basket_id, payload, idempotency_key)
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return result

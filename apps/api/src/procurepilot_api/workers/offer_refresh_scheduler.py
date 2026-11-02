@@ -38,7 +38,7 @@ def tick(settings: Settings) -> dict[str, int]:
                       order by lc.recorded_at desc, lc.id desc
                     ) as rn
                   from current_match_decision md
-                  join landed_cost lc on lc.match_decision_id = md.id
+                  join current_landed_cost lc on lc.match_decision_id = md.id
                   join quotation_line ql on ql.id = lc.quotation_line_id
                   join quotation q on q.id = ql.quotation_id
                   join workspace_product wp

@@ -38,6 +38,7 @@ export interface PurchaseOrder {
   tenant_id: string;
   order_number: string;
   supplier_id: string;
+  supplier_name?: string | null;
   status: OrderStatus;
   order_date: string;
   expected_delivery_date: string | null;
@@ -162,9 +163,16 @@ export interface RequestLineAllocation {
   remaining_quantity: string;
 }
 
+export interface RequestAllocationOrder {
+  id: string;
+  order_number: string;
+  status: OrderStatus;
+}
+
 export interface RequestAllocation {
   source_request_id: string;
   lines: RequestLineAllocation[];
+  orders?: RequestAllocationOrder[];
 }
 
 export interface PurchaseOrderLineInput {

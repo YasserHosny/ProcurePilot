@@ -3,13 +3,33 @@ info:
   title: ProcurePilot matching — RFQ fit and corrections (023)
   version: 0.1.0
   description: >
-    Additions only. Existing matching endpoints are unchanged except that candidate `reasons` may
-    carry `rfq` and `measured` (see data-model.md). Error envelope {code, message, details, trace_id}.
+    Additions only. Candidate `reasons` may carry `rfq` and `measured`; human resolve, bulk confirm
+    and correction responses may include `lines_matched_by_same_wording` (see data-model.md). Error envelope {code, message, details, trace_id}.
 servers:
   - url: /api/v1
 security:
   - bearerAuth: []
 paths:
+  /quotation-lines/{line_id}/match:
+    post:
+      summary: Resolve a line and sweep open lines using its learned wording (FR-011)
+      parameters:
+        - { name: line_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Existing resolve response with optional swept line ids.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MatchDecision' }
+  /match-tasks/confirm-exact:
+    post:
+      summary: Confirm exact matches, then sweep once per learned alias (FR-011)
+      responses:
+        '200':
+          description: Existing bulk result with optional swept line ids.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkConfirmResult' }
   /quotation-lines/{line_id}/match/corrections:
     post:
       summary: Correct the current match decision of a line (FR-005)
@@ -44,6 +64,8 @@ paths:
                 properties:
                   decision: { $ref: '#/components/schemas/MatchDecision' }
                   superseded_decision_id: { type: string, format: uuid }
+                  lines_matched_by_same_wording:
+                    $ref: '#/components/schemas/LinesMatchedBySameWording'
                   lines_matched_through_old_wording:
                     type: array
                     items: { type: string, format: uuid }
@@ -59,8 +81,23 @@ components:
     NewProductInput:
       type: object
       description: Same shape as the existing resolve endpoint's new-product input.
+    LinesMatchedBySameWording:
+      type: [array, 'null']
+      description: Additional open lines automatically matched by this human decision's wording.
+      items: { type: string, format: uuid }
+    BulkConfirmResult:
+      type: object
+      required: [confirmed, skipped]
+      properties:
+        confirmed: { type: integer, minimum: 0 }
+        skipped: { type: integer, minimum: 0 }
+        lines_matched_by_same_wording:
+          $ref: '#/components/schemas/LinesMatchedBySameWording'
     MatchDecision:
       type: object
       description: >
         Existing MatchDecision plus `supersedes_decision_id` and `learned_from_decision_id`
         (both nullable uuid).
+      properties:
+        lines_matched_by_same_wording:
+          $ref: '#/components/schemas/LinesMatchedBySameWording'

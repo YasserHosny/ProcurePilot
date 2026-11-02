@@ -187,7 +187,7 @@
                   </span>
                   <span>
                     {{ 'quotations.upload.duplicateWarning.uploaded' | translate }}
-                    {{ dup.created_at | date }}
+                    {{ dup.created_at | formatDate }}
                   </span>
                   @if (dup.supplier_name) {
                     <span>

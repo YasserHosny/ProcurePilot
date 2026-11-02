@@ -61,3 +61,7 @@ scratch/
 
 # Archify scratch output (diagrams worth keeping move to docs/)
 .archify/
+
+# GTM files that name real people or companies stay local (the repo is public)
+docs/gtm/prospects/
+docs/gtm/research/calls/

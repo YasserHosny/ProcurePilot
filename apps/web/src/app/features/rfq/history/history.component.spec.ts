@@ -189,6 +189,19 @@ describe('HistoryComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/requests', 'pr-1']);
   });
 
+  it('navigates to details view for a converted RFQ with several requests', () => {
+    const multiRequestRfq: RfqSummary = {
+      ...mockRfqs[2],
+      id: 'rfq-multi-1',
+      status: 'converted',
+      converted_purchase_request_id: 'pr-1',
+      converted_purchase_request_ids: ['pr-1', 'pr-2'],
+      request_group_id: 'grp-1',
+    };
+    component.onRowClick(multiRequestRfq);
+    expect(router.navigate).toHaveBeenCalledWith(['/rfq', 'rfq-multi-1']);
+  });
+
   it('should display error snackbar on load failure', () => {
     rfqApiSpy.listRfqs.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
     component.loadRfqs();

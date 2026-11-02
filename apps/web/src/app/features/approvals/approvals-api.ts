@@ -3,10 +3,13 @@ import { Observable } from 'rxjs';
 
 import { ApiService } from '../../core/api/api.service';
 import type {
+  ApprovalDecisionInput,
   ApprovalDelegation,
   ApprovalDelegationCreate,
   ApprovalDelegationList,
+  PurchaseRequest,
   PurchaseRequestList,
+  RequestGroupSummary,
   ThresholdRule,
   ThresholdRuleCreate,
   ThresholdRuleList,
@@ -14,9 +17,12 @@ import type {
 } from '../../core/api/models';
 
 export type {
+  ApprovalDecisionInput,
   ApprovalDelegation,
   ApprovalDelegationCreate,
   ApprovalDelegationList,
+  PurchaseRequest,
+  RequestGroupSummary,
   ThresholdRule,
   ThresholdRuleCreate,
   ThresholdRuleList,
@@ -32,6 +38,22 @@ export class ApprovalsApiService {
     limit?: number;
   }): Observable<PurchaseRequestList> {
     return this.api.listPendingApprovals(params);
+  }
+
+  approveGroup(
+    groupId: string,
+    body?: ApprovalDecisionInput,
+    idempotencyKey?: string,
+  ): Observable<PurchaseRequest[]> {
+    return this.api.approveGroup(groupId, body, idempotencyKey);
+  }
+
+  rejectGroup(
+    groupId: string,
+    body: ApprovalDecisionInput,
+    idempotencyKey?: string,
+  ): Observable<PurchaseRequest[]> {
+    return this.api.rejectGroup(groupId, body, idempotencyKey);
   }
 
   listThresholdRules(params?: { cursor?: string; limit?: number }): Observable<ThresholdRuleList> {

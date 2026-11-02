@@ -112,11 +112,21 @@ class RequestContextSection extends StatelessWidget {
             valueStyle: LedgerTypography.tabularFigures(),
           ),
         if (request.budgetStatus != null) ...[
-          RequestInfoRow(
-            label: i18n.t('requests.budgetStatus.remainingLabel'),
-            value: _formatMoney(i18n, request.budgetStatus!.remainingAmount),
-            valueStyle: LedgerTypography.tabularFigures(),
-          ),
+          if (request.budgetStatus!.remainingAmount != null)
+            RequestInfoRow(
+              label: i18n.t('requests.budgetStatus.remainingLabel'),
+              value: _formatMoney(i18n, request.budgetStatus!.remainingAmount!),
+              valueStyle: LedgerTypography.tabularFigures(),
+            )
+          else ...[
+            Text(i18n.t('approvals.budgetStatus.no_budget')),
+            if (request.budgetStatus!.reasonCode != null)
+              Text(
+                i18n.t(
+                  'approvals.budgetStatus.reasons.${request.budgetStatus!.reasonCode}',
+                ),
+              ),
+          ],
           if (request.budgetStatus!.exceeds)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),

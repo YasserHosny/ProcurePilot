@@ -2,7 +2,7 @@
   <div class="page-header">
     <div>
       <h1>{{ 'orders.create.title' | translate }}</h1>
-      <p>{{ 'orders.create.subtitle' | translate }}</p>
+      <p>{{ (sourceRequest() ? 'orders.create.fromRequestSubtitle' : 'orders.create.subtitle') | translate }}</p>
     </div>
   </div>
 
@@ -15,12 +15,50 @@
     </mat-card>
   }
 
+  @if (savedOrder(); as saved) {
+    @if (navigationFailed()) {
+      <div class="banner success created-notice" role="status" data-testid="order-created-notice">
+        <mat-icon aria-hidden="true">check_circle</mat-icon>
+        <div class="banner-body">
+          <b>{{ 'orders.create.createdNotice' | translate: { orderNumber: saved.order_number } }}</b>
+        </div>
+        <a [routerLink]="['/orders', saved.id]" class="open-order-link" data-testid="open-order-link">
+          {{ 'orders.create.openOrder' | translate }}
+        </a>
+      </div>
+    }
+  }
+
+  @if (isFullyOrdered()) {
+    <div class="banner info fully-ordered-notice" role="status" data-testid="fully-ordered-notice">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      <div class="banner-body">
+        <p>{{ 'orders.create.fullyOrderedNotice' | translate }}</p>
+        @if (allocatedOrders().length > 0) {
+          <div class="order-links-row">
+            @for (ord of allocatedOrders(); track ord.id) {
+              <a [routerLink]="['/orders', ord.id]" class="po-link">{{ ord.order_number }}</a>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+
   <form [formGroup]="form" (ngSubmit)="submit()">
     
-    @if (sourceRequest()) {
+    @if (sourceRequest(); as req) {
       <div class="source-request-banner">
         <mat-icon color="primary">info</mat-icon>
-        <span>{{ 'orders.create.creatingFromRequest' | translate }}: {{ sourceRequest()?.id }}</span>
+        <a [routerLink]="['/requests', req.id]" class="source-request-banner-link" data-testid="source-request-link">
+          <span dir="auto">
+            @if (sourceSupplierName() && sourceBranchName()) {
+              {{ 'orders.create.fromApprovedRequestBanner' | translate: { supplier: sourceSupplierName(), branch: sourceBranchName() } }}
+            } @else {
+              {{ 'orders.create.creatingFromRequest' | translate }}: {{ req.id }}
+            }
+          </span>
+        </a>
       </div>
     }
 
@@ -70,7 +108,7 @@
       <div class="form-row">
         <mat-form-field appearance="outline">
           <mat-label>{{ 'orders.create.currency' | translate }}</mat-label>
-          <input matInput formControlName="currency" [placeholder]="'orders.create.currencyPlaceholder' | translate: { currency: homeCurrency }" />
+          <input matInput formControlName="currency" [readonly]="!!sourceRequest()" [placeholder]="'orders.create.currencyPlaceholder' | translate: { currency: homeCurrency }" />
           @if (form.controls.currency.hasError('required')) {
             <mat-error>{{ 'orders.create.errors.required' | translate }}</mat-error>
           }
@@ -169,6 +207,9 @@
                 }
               </mat-form-field>
             </div>
+            @if (vatInclusiveHint(line); as hint) {
+              <p class="pack-hint" data-testid="vat-inclusive-hint">{{ hint }}</p>
+            }
           </mat-card>
         }
       </div>
@@ -204,11 +245,11 @@
       </mat-card>
 
       <div class="actions">
-        <button mat-button type="button" routerLink="/orders" [disabled]="isSubmitting()">
+        <button mat-button type="button" routerLink="/orders" [disabled]="isSubmitting() || !!savedOrder()">
           {{ 'common.cancel' | translate }}
         </button>
-        <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || lines.length === 0 || isSubmitting()">
-          @if (isSubmitting()) {
+        <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || lines.length === 0 || isSubmitting() || !!savedOrder()">
+          @if (isSubmitting() || savedOrder()) {
             {{ 'orders.create.submitting' | translate }}
           } @else {
             {{ 'orders.create.submit' | translate }}

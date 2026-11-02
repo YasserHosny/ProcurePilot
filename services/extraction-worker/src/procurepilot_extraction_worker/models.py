@@ -36,3 +36,5 @@ class ExtractionResult:
     suggested_currency: str | None = None
     warnings: tuple[str, ...] = field(default_factory=tuple)
     expected_line_count: int | None = None
+    # Original document/cell text carried to provider-agnostic evidence detection.
+    source_text: str = ""

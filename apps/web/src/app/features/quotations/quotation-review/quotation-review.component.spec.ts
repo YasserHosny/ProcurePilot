@@ -3,14 +3,15 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { MatDatepicker } from '@angular/material/datepicker';
-import { ActivatedRoute, provideRouter } from '@angular/router';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { ActivatedRoute, ParamMap, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { QuotationDetail, Role, Supplier } from '../../../core/api/models';
+import type { ApiError, AuditTrailEntry, FieldExtraction, Quotation, QuotationDetail, Role, Supplier } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { QuotationReviewComponent } from './quotation-review.component';
@@ -19,9 +20,12 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
   let component: QuotationReviewComponent;
   let fixture: ComponentFixture<QuotationReviewComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  let paramMapSubject: BehaviorSubject<ParamMap>;
   const homeCurrency = signal<string | undefined>('EGP');
 
   const mockQuotationDetail: QuotationDetail = {
+    prices_include_vat: false,
+    vat_rate: null,
     id: 'q-review-1',
     document_id: 'doc-1',
     supplier_id: null,
@@ -113,13 +117,34 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       'getDocumentDownloadUrl',
       'getAuditTrail',
       'getReviewTasks',
+      'presignDocument',
+      'uploadFileToStorage',
+      'replaceDocument',
+      'refuseQuotation',
+      'archiveQuotation',
+      'retryExtraction',
     ]);
     apiService.getQuotation.and.returnValue(of(mockQuotationDetail));
     apiService.suppliers.and.returnValue(of({ items: mockSuppliers, next_cursor: null }));
+    apiService.refuseQuotation.and.returnValue(of(mockQuotationDetail));
+    apiService.archiveQuotation.and.returnValue(of(mockQuotationDetail));
+    apiService.retryExtraction.and.returnValue(of(mockQuotationDetail));
     apiService.getQuotationMatches.and.returnValue(of({ quotation_id: 'q-review-1', lines: [] }));
     apiService.getDocumentDownloadUrl.and.returnValue(of({ download_url: 'https://storage.example.com/doc-1.pdf' }));
     apiService.getAuditTrail.and.returnValue(of({ items: [] }));
     apiService.getReviewTasks.and.returnValue(of({ items: [], next_cursor: null }));
+    apiService.presignDocument.and.returnValue(
+      of({
+        document_id: 'doc-2',
+        storage_bucket: 'quotations',
+        storage_path: 'quotes/doc-2.pdf',
+        upload_url: 'https://storage.example.com/upload',
+        upload_fields: {},
+        expires_at: '2026-10-30T13:00:00Z',
+      }),
+    );
+
+    paramMapSubject = new BehaviorSubject<ParamMap>(convertToParamMap({ id: 'q-review-1' }));
 
     const mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
@@ -141,9 +166,10 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
         {
           provide: ActivatedRoute,
           useValue: {
+            paramMap: paramMapSubject.asObservable(),
             snapshot: {
-              paramMap: {
-                get: (k: string) => (k === 'id' ? 'q-review-1' : null),
+              get paramMap() {
+                return paramMapSubject.value;
               },
             },
           },
@@ -572,6 +598,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     // the backend only sees supplier_id once this PATCH lands (regression guard: a supplier-only
     // change must not be silently skipped just because pendingCorrections is empty).
     apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
+    apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
     apiService.confirmQuotation.and.returnValue(of(confirmedQuotation));
 
     component.selectedSupplierId.set('sup-1');
@@ -599,6 +626,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       status: 'reviewed' as const,
       supplier_id: 'sup-1',
     };
+    apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
     apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
     apiService.confirmQuotation.and.returnValue(of(confirmedQuotation));
 
@@ -638,6 +666,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     const alreadyConfirmedSupplier = { ...mockQuotationDetail, supplier_id: 'sup-1' };
     component.quotation.set(alreadyConfirmedSupplier);
     const confirmedQuotation = { ...alreadyConfirmedSupplier, status: 'reviewed' as const };
+    apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
     apiService.confirmQuotation.and.returnValue(of(confirmedQuotation));
 
     component.selectedSupplierId.set('sup-1');
@@ -725,6 +754,78 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.hasArithmeticMismatch()).toBeTrue();
   });
 
+  it('reconciles a VAT-inclusive quote whose lines carry the rate inside the price (ADR-021)', () => {
+    // 10 × 25.00 at 20% VAT already inside the price: the printed total is 250.00, not 300.00.
+    const inclusive: QuotationDetail = {
+      ...mockQuotationDetail,
+      prices_include_vat: true,
+      vat_rate: '0.20',
+      stated_total: { amount: '250.00', currency: 'GBP' },
+    };
+    component.quotation.set(inclusive);
+    fixture.detectChanges();
+
+    expect(component.computeLineTotal(inclusive.lines[0])).toBe('250.00');
+    expect(component.hasArithmeticMismatch()).toBeFalse();
+  });
+
+  it('does not infer document VAT on a VAT-inclusive quote, as the server does not (ADR-021)', () => {
+    // No line rate, stated 287.50 = 250.00 × 1.15: on an inclusive quote the gap is a mismatch.
+    const inclusive: QuotationDetail = {
+      ...mockQuotationDetail,
+      prices_include_vat: true,
+      vat_rate: null,
+      stated_total: { amount: '287.50', currency: 'GBP' },
+      lines: [{ ...mockQuotationDetail.lines[0], vat_rate: null }],
+    };
+    component.quotation.set(inclusive);
+    fixture.detectChanges();
+
+    expect(component.hasArithmeticMismatch()).toBeTrue();
+    expect(component.inferredVatPct()).toBeNull();
+  });
+
+  it('shows the stored VAT basis after a second change, not the first correction (ADR-021)', () => {
+    // The header field keeps its first correction (true / 15%); the quote now says false / 5%.
+    const corrected = (field: string, value: unknown) => ({
+      ...mockQuotationDetail.field_extractions[0],
+      id: `fe-${field}`,
+      field_name: field,
+      extracted_value: field === 'vat_rate' ? '0.10' : false,
+      confidence: '0.8000',
+      corrected_value: value,
+      corrected_by: 'member-1',
+    });
+    const q: QuotationDetail = {
+      ...mockQuotationDetail,
+      prices_include_vat: false,
+      vat_rate: '0.0500',
+      field_extractions: [
+        ...mockQuotationDetail.field_extractions,
+        corrected('prices_include_vat', true),
+        corrected('vat_rate', '0.15'),
+      ],
+    };
+    component.quotation.set(q);
+    fixture.detectChanges();
+
+    expect(component.effectivePricesIncludeVat(q)).toBeFalse();
+    expect(component.effectiveVatRate(q)).toBe('0.0500');
+  });
+
+  it('still adds VAT on top when the same lines are VAT-exclusive', () => {
+    const exclusive: QuotationDetail = {
+      ...mockQuotationDetail,
+      prices_include_vat: false,
+      stated_total: { amount: '250.00', currency: 'GBP' },
+    };
+    component.quotation.set(exclusive);
+    fixture.detectChanges();
+
+    expect(component.computeLineTotal(exclusive.lines[0])).toBe('300.00');
+    expect(component.hasArithmeticMismatch()).toBeTrue();
+  });
+
   it('renders a flagged stated_total through FormatService.formatMoney in English and Arabic without raw JSON', () => {
     const formatService = TestBed.inject(FormatService);
     const translate = TestBed.inject(TranslateService);
@@ -788,5 +889,1169 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(valueEl).toBeTruthy();
     expect(valueEl.textContent?.trim()).not.toBe('2026-08-20');
     expect(valueEl.textContent?.trim()).toBe(formatService.formatDate(new Date(2026, 7, 20)));
+  });
+
+  it('shows success snackbar and "Next step" card with Match lines and Back to inbox after successful authorize', () => {
+    const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+    spyOn(snackBar, 'open');
+
+    const confirmedQuotation = {
+      ...mockQuotationDetail,
+      status: 'reviewed' as const,
+      supplier_id: 'sup-1',
+    };
+    component.quotation.set({ ...mockQuotationDetail, supplier_id: 'sup-1' });
+    component.selectedSupplierId.set('sup-1');
+    apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
+    apiService.confirmQuotation.and.returnValue(of(confirmedQuotation));
+    apiService.getQuotation.and.returnValue(of(confirmedQuotation));
+
+    component.confirmQuotation();
+    fixture.detectChanges();
+
+    expect(snackBar.open).toHaveBeenCalledWith(
+      enCatalog.quotations.review.actions.confirmSuccess,
+      undefined,
+      { duration: 4000 },
+    );
+
+    const nextStepCard = fixture.nativeElement.querySelector('[data-testid="next-step-card"]');
+    expect(nextStepCard).toBeTruthy();
+
+    const matchBtn = fixture.nativeElement.querySelector('[data-testid="next-step-match-lines"]');
+    expect(matchBtn).toBeTruthy();
+    expect(matchBtn.textContent.trim()).toBe('Match lines');
+
+    const inboxBtn = fixture.nativeElement.querySelector('[data-testid="next-step-back-inbox"]');
+    expect(inboxBtn).toBeTruthy();
+    expect(inboxBtn.textContent.trim()).toBe('Back to the inbox');
+  });
+
+  it('distinguishes between changed value (Corrected by Human) and confirmed-as-is (Confirmed)', () => {
+    const lowConfField = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-currency',
+      quotation_id: 'q-review-1',
+      entity_type: 'quotation' as const,
+      entity_id: 'q-review-1',
+      field_name: 'currency',
+      extracted_value: 'SAR',
+      corrected_value: null,
+      confidence: '0.6000',
+      corrected_by: null,
+      corrected_at: null,
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      field_extractions: [lowConfField],
+    });
+    fixture.detectChanges();
+
+    // 1. Initially neither changed nor confirmed
+    expect(component.isFieldChanged('quotation', 'q-review-1', 'currency')).toBeFalse();
+    expect(component.isFieldConfirmedAsIs('quotation', 'q-review-1', 'currency')).toBeFalse();
+
+    // 2. Confirmed as-is (value equals extracted_value)
+    component.confirmFieldAsIs('quotation', 'q-review-1', 'currency');
+    fixture.detectChanges();
+    expect(component.isFieldChanged('quotation', 'q-review-1', 'currency')).toBeFalse();
+    expect(component.isFieldConfirmedAsIs('quotation', 'q-review-1', 'currency')).toBeTrue();
+
+    const confirmedBadge = fixture.nativeElement.querySelector('[data-testid="confirmed-badge"]');
+    expect(confirmedBadge).toBeTruthy();
+    expect(confirmedBadge.textContent.trim()).toBe('Confirmed');
+    expect(fixture.nativeElement.querySelector('.corrected-tag')).toBeNull();
+
+    // 3. Changed value (different from extracted_value)
+    component.currencySelectionChanged('USD');
+    fixture.detectChanges();
+    expect(component.isFieldChanged('quotation', 'q-review-1', 'currency')).toBeTrue();
+    expect(component.isFieldConfirmedAsIs('quotation', 'q-review-1', 'currency')).toBeFalse();
+
+    const correctedTag = fixture.nativeElement.querySelector('.corrected-tag');
+    expect(correctedTag).toBeTruthy();
+    expect(correctedTag.textContent.trim()).toBe('Corrected by Human');
+  });
+
+  it('shows the corrected tag on the stated total field after a money correction differs from the extracted value', () => {
+    const statedTotal = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-stated-total',
+      field_name: 'stated_total',
+      extracted_value: { amount: '88.00', currency: 'GBP' },
+      confidence: '0.9500',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [statedTotal] });
+    fixture.detectChanges();
+
+    const input = fixture.nativeElement.querySelector('#field-fe-stated-total input') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    input.value = '75.00';
+    input.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const fieldBox = fixture.nativeElement.querySelector('#field-fe-stated-total') as HTMLElement;
+    expect(fieldBox.querySelector('.corrected-tag')).toBeTruthy();
+    expect(fieldBox.querySelector('.confirmed-tag')).toBeNull();
+  });
+
+  it('shows the confirmed tag on the stated total field when the money correction equals the extracted value', () => {
+    const statedTotal = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-stated-total',
+      field_name: 'stated_total',
+      extracted_value: { amount: '75.00', currency: 'GBP' },
+      confidence: '0.9500',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [statedTotal] });
+    fixture.detectChanges();
+
+    const input = fixture.nativeElement.querySelector('#field-fe-stated-total input') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    input.value = '75';
+    input.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const fieldBox = fixture.nativeElement.querySelector('#field-fe-stated-total') as HTMLElement;
+    expect(fieldBox.querySelector('.confirmed-tag')).toBeTruthy();
+    expect(fieldBox.querySelector('.corrected-tag')).toBeNull();
+  });
+
+  it('displays exact stored amount with trailing decimal zeros removed in editable unit price input (PPS-121 B1)', () => {
+    // 1. Read-only display of 85.0000 still shows "85"
+    component.quotation.set({
+      ...mockQuotationDetail,
+      status: 'reviewed',
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          unit_price: { amount: '85.0000', currency: 'SAR' },
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    const readOnlyInput = fixture.nativeElement.querySelector(
+      '#field-fe-line1-price input',
+    ) as HTMLInputElement | null;
+    expect(readOnlyInput).toBeTruthy();
+    expect(readOnlyInput?.value).toBe('85');
+
+    // 2. Editable input carries exact stored amount with trailing zeros trimmed (85.0000 -> 85, 86.5000 -> 86.5, 0.1234 -> 0.1234)
+    for (const status of ['extracted', 'in_review'] as const) {
+      component.quotation.set({
+        ...mockQuotationDetail,
+        status,
+        lines: [
+          {
+            ...mockQuotationDetail.lines[0],
+            unit_price: { amount: '85.0000', currency: 'SAR' },
+          },
+        ],
+      });
+      fixture.detectChanges();
+
+      const editableInput = fixture.nativeElement.querySelector(
+        '#field-fe-line1-price input',
+      ) as HTMLInputElement | null;
+      expect(editableInput).toBeTruthy();
+      expect(editableInput?.value).toBe('85');
+
+      // Case 86.5000 -> 86.5
+      component.quotation.set({
+        ...mockQuotationDetail,
+        status,
+        lines: [
+          {
+            ...mockQuotationDetail.lines[0],
+            unit_price: { amount: '86.5000', currency: 'SAR' },
+          },
+        ],
+      });
+      fixture.detectChanges();
+      expect(editableInput?.value).toBe('86.5');
+
+      // Case 0.1234 -> 0.1234
+      component.quotation.set({
+        ...mockQuotationDetail,
+        status,
+        lines: [
+          {
+            ...mockQuotationDetail.lines[0],
+            unit_price: { amount: '0.1234', currency: 'SAR' },
+          },
+        ],
+      });
+      fixture.detectChanges();
+      expect(editableInput?.value).toBe('0.1234');
+    }
+  });
+
+  it('PPS-121 (B2): blurring an unedited low-confidence 86.0000 unit price stages no correction, while typing 86.125 stages exactly 86.125', () => {
+    const lowConfPriceExtraction = {
+      ...mockQuotationDetail.field_extractions[1],
+      id: 'fe-line1-price',
+      field_name: 'unit_price',
+      extracted_value: { amount: '86.0000', currency: 'SAR' },
+      confidence: '0.5000',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      status: 'extracted',
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          unit_price: { amount: '86.0000', currency: 'SAR' },
+        },
+      ],
+      field_extractions: [
+        mockQuotationDetail.field_extractions[0],
+        lowConfPriceExtraction,
+      ],
+    });
+    fixture.detectChanges();
+
+    const unitPriceInput = fixture.nativeElement.querySelector(
+      '#field-fe-line1-price input',
+    ) as HTMLInputElement;
+    expect(unitPriceInput).toBeTruthy();
+    expect(unitPriceInput.value).toBe('86');
+
+    // Trigger blur on unedited field
+    unitPriceInput.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    // Blurring an unedited field must stage NO correction
+    expect(component.pendingCorrections().has('fe-line1-price')).toBeFalse();
+
+    // saveCorrections sends no unit_price correction
+    apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+    component.saveCorrections();
+    if (apiService.patchQuotation.calls.count() > 0) {
+      const patchPayload = apiService.patchQuotation.calls.mostRecent().args[1];
+      const priceCorr = patchPayload.corrections?.find(
+        (c) => c.field_extraction_id === 'fe-line1-price',
+      );
+      expect(priceCorr).toBeUndefined();
+    }
+
+    // Now type 86.125 and trigger blur/change
+    unitPriceInput.value = '86.125';
+    unitPriceInput.dispatchEvent(new Event('change'));
+    unitPriceInput.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    const staged = component.pendingCorrections().get('fe-line1-price');
+    expect(staged).toBeDefined();
+    expect((staged as { amount: string }).amount).toBe('86.125');
+  });
+
+  it('PPS-121 (Delta): typing 0 on a line with null unit_price stages a correction with amount 0', () => {
+    const missingPriceExtraction = {
+      ...mockQuotationDetail.field_extractions[1],
+      id: 'fe-line1-price',
+      field_name: 'unit_price',
+      extracted_value: null,
+      confidence: '0.5000',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      status: 'extracted',
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          unit_price: null,
+        },
+      ],
+      field_extractions: [
+        mockQuotationDetail.field_extractions[0],
+        missingPriceExtraction,
+      ],
+    });
+    fixture.detectChanges();
+
+    const unitPriceInput = fixture.nativeElement.querySelector(
+      '#field-fe-line1-price input',
+    ) as HTMLInputElement;
+    expect(unitPriceInput).toBeTruthy();
+    expect(unitPriceInput.value).toBe('');
+
+    unitPriceInput.value = '0';
+    unitPriceInput.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const staged = component.pendingCorrections().get('fe-line1-price');
+    expect(staged).toBeDefined();
+    expect((staged as { amount: string }).amount).toBe('0');
+  });
+
+  it('PPS-121 (B3): Line Total input shows formatted amount without currency code in English and Arabic', () => {
+    const priceExtraction = {
+      ...mockQuotationDetail.field_extractions[1],
+      id: 'fe-line1-price',
+      field_name: 'unit_price',
+      extracted_value: { amount: '86.0000', currency: 'SAR' },
+      confidence: '0.9500',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          quantity: '20',
+          unit_price: { amount: '86.0000', currency: 'SAR' },
+          vat_rate: '0',
+          delivery_fee: null,
+          discount: null,
+        },
+      ],
+      field_extractions: [
+        mockQuotationDetail.field_extractions[0],
+        priceExtraction,
+      ],
+    });
+    fixture.detectChanges();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.use('en');
+    fixture.detectChanges();
+
+    const lineTotalInput = fixture.nativeElement.querySelector(
+      '.line-total-field input',
+    ) as HTMLInputElement;
+    expect(lineTotalInput).toBeTruthy();
+    // 20 * 86 = 1720 -> "1,720"
+    expect(lineTotalInput.value).toBe('1,720');
+
+    // Arabic-Indic form in Arabic
+    translate.use('ar');
+    fixture.detectChanges();
+    expect(lineTotalInput.value).toBe('١٬٧٢٠');
+
+    // Non-whole total: 1720.50
+    const nonWholePriceExtraction = {
+      ...mockQuotationDetail.field_extractions[1],
+      id: 'fe-line1-price',
+      field_name: 'unit_price',
+      extracted_value: { amount: '1720.50', currency: 'SAR' },
+      confidence: '0.9500',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          quantity: '1',
+          unit_price: { amount: '1720.50', currency: 'SAR' },
+          vat_rate: '0',
+          delivery_fee: null,
+          discount: null,
+        },
+      ],
+      field_extractions: [
+        mockQuotationDetail.field_extractions[0],
+        nonWholePriceExtraction,
+      ],
+    });
+    translate.use('en');
+    fixture.detectChanges();
+    expect(lineTotalInput.value).toBe('1,720.50');
+
+    translate.use('ar');
+    fixture.detectChanges();
+    expect(lineTotalInput.value).toBe('١٬٧٢٠٫٥٠');
+  });
+
+  it('PPS-120 (A1): busy state while authorizing disables actions, shows spinner in status pill, and avoids blank flash', () => {
+    const confirmSubject = new Subject<Quotation>();
+    apiService.confirmQuotation.and.returnValue(confirmSubject.asObservable());
+
+    component.quotation.set({
+      ...mockQuotationDetail,
+      supplier_id: 'sup-1',
+      status: 'in_review',
+    });
+    component.selectedSupplierId.set('sup-1');
+    fixture.detectChanges();
+
+    const isLoadingSpy = spyOn(component.isLoading, 'set').and.callThrough();
+
+    component.confirmQuotation();
+    fixture.detectChanges();
+
+    expect(component.isConfirming()).toBeTrue();
+
+    // Buttons must be disabled
+    const refuseBtn = fixture.nativeElement.querySelector('.refuse-btn') as HTMLButtonElement;
+    const saveBtn = fixture.nativeElement.querySelector('.save-btn') as HTMLButtonElement;
+    const confirmBtn = fixture.nativeElement.querySelector('.confirm-btn') as HTMLButtonElement;
+    const allHeaderBtns = Array.from(fixture.nativeElement.querySelectorAll('.header-actions button') as NodeListOf<HTMLButtonElement>);
+    const retryBtn = allHeaderBtns.find((b) => b.textContent?.includes('Retry Extraction'));
+    const requoteBtn = allHeaderBtns.find((b) => b.textContent?.includes('Create Re-Quote'));
+    const archiveBtn = allHeaderBtns.find((b) => b.textContent?.includes('Archive'));
+    const addLineBtn = fixture.nativeElement.querySelector('.add-line-btn') as HTMLButtonElement;
+
+    expect(refuseBtn?.disabled).toBeTrue();
+    expect(saveBtn?.disabled).toBeTrue();
+    expect(confirmBtn?.disabled).toBeTrue();
+    expect(retryBtn?.disabled).toBeTrue();
+    expect(requoteBtn?.disabled).toBeTrue();
+    expect(archiveBtn?.disabled).toBeTrue();
+    expect(addLineBtn?.disabled).toBeTrue();
+
+    // Replace document control must also be disabled and guard against execution
+    const replaceDocBtn = fixture.nativeElement.querySelector('.replace-doc-btn') as HTMLButtonElement;
+    expect(replaceDocBtn).toBeTruthy();
+    expect(replaceDocBtn?.disabled).toBeTrue();
+
+    const fakeFile = new File(['dummy'], 'replacement.pdf', { type: 'application/pdf' });
+    const fakeEvent = {
+      target: {
+        files: [fakeFile],
+        value: 'replacement.pdf',
+      },
+    } as unknown as Event;
+    component.onReplaceDocumentSelected(fakeEvent);
+    expect(apiService.presignDocument).not.toHaveBeenCalled();
+
+    // Status pill
+    const statusPill = fixture.nativeElement.querySelector('.page-header .status-pill') as HTMLElement;
+    expect(statusPill).toBeTruthy();
+    expect(statusPill.getAttribute('role')).toBe('status');
+    expect(statusPill.getAttribute('aria-live')).toBe('polite');
+    expect(statusPill.querySelector('mat-spinner')).toBeTruthy();
+    expect(statusPill.textContent).toContain(enCatalog.quotations.review.status.authorizing);
+
+    // Review section aria-busy
+    const reviewSection = fixture.nativeElement.querySelector('.data-panel') as HTMLElement;
+    expect(reviewSection.getAttribute('aria-busy')).toBe('true');
+
+    // Emit reviewed quotation
+    isLoadingSpy.calls.reset();
+    const confirmedQuotation = {
+      ...mockQuotationDetail,
+      status: 'reviewed' as const,
+      supplier_id: 'sup-1',
+      reviewed_by: 'reviewer-1',
+      reviewed_at: '2026-10-30T12:00:00Z',
+    };
+    apiService.getQuotation.and.returnValue(of(confirmedQuotation));
+    confirmSubject.next(confirmedQuotation);
+    confirmSubject.complete();
+    fixture.detectChanges();
+
+    expect(component.quotation()?.status).toBe('reviewed');
+    expect(statusPill.textContent).toContain(enCatalog.quotations.review.status.reviewed);
+    expect(isLoadingSpy).not.toHaveBeenCalledWith(true);
+  });
+
+  it('PPS-120 (A2): busy state holds during PATCH-first path when staged changes exist', () => {
+    const patchSubject = new Subject<QuotationDetail>();
+    apiService.patchQuotation.and.returnValue(patchSubject.asObservable());
+
+    component.quotation.set({
+      ...mockQuotationDetail,
+      supplier_id: 'sup-1',
+      status: 'in_review',
+    });
+    component.selectedSupplierId.set('sup-1');
+    component.reviewerNotes.set('Staged change to notes');
+    fixture.detectChanges();
+
+    component.confirmQuotation();
+    fixture.detectChanges();
+
+    expect(component.isConfirming()).toBeTrue();
+
+    const refuseBtn = fixture.nativeElement.querySelector('.refuse-btn') as HTMLButtonElement;
+    const saveBtn = fixture.nativeElement.querySelector('.save-btn') as HTMLButtonElement;
+    const confirmBtn = fixture.nativeElement.querySelector('.confirm-btn') as HTMLButtonElement;
+    const allHeaderBtns = Array.from(fixture.nativeElement.querySelectorAll('.header-actions button') as NodeListOf<HTMLButtonElement>);
+    const retryBtn = allHeaderBtns.find((b) => b.textContent?.includes('Retry Extraction'));
+    const requoteBtn = allHeaderBtns.find((b) => b.textContent?.includes('Create Re-Quote'));
+    const archiveBtn = allHeaderBtns.find((b) => b.textContent?.includes('Archive'));
+    const addLineBtn = fixture.nativeElement.querySelector('.add-line-btn') as HTMLButtonElement;
+
+    expect(refuseBtn?.disabled).toBeTrue();
+    expect(saveBtn?.disabled).toBeTrue();
+    expect(confirmBtn?.disabled).toBeTrue();
+    expect(retryBtn?.disabled).toBeTrue();
+    expect(requoteBtn?.disabled).toBeTrue();
+    expect(archiveBtn?.disabled).toBeTrue();
+    expect(addLineBtn?.disabled).toBeTrue();
+
+    // Replace document control must also be disabled and guard against execution
+    const replaceDocBtn = fixture.nativeElement.querySelector('.replace-doc-btn') as HTMLButtonElement;
+    expect(replaceDocBtn).toBeTruthy();
+    expect(replaceDocBtn?.disabled).toBeTrue();
+
+    const fakeFile = new File(['dummy'], 'replacement.pdf', { type: 'application/pdf' });
+    const fakeEvent = {
+      target: {
+        files: [fakeFile],
+        value: 'replacement.pdf',
+      },
+    } as unknown as Event;
+    component.onReplaceDocumentSelected(fakeEvent);
+    expect(apiService.presignDocument).not.toHaveBeenCalled();
+
+    const statusPill = fixture.nativeElement.querySelector('.page-header .status-pill') as HTMLElement;
+    expect(statusPill.querySelector('mat-spinner')).toBeTruthy();
+    expect(statusPill.textContent).toContain(enCatalog.quotations.review.status.authorizing);
+  });
+
+  it('PPS-120 (A3): on a 409 from /confirm, isConfirming becomes false and buttons are re-enabled', () => {
+    apiService.confirmQuotation.and.returnValue(
+      throwError(() => new HttpErrorResponse({
+        status: 409,
+        error: { details: { reason: 'quotation_not_confirmable' } },
+      })),
+    );
+
+    component.quotation.set({
+      ...mockQuotationDetail,
+      supplier_id: 'sup-1',
+      status: 'in_review',
+    });
+    component.selectedSupplierId.set('sup-1');
+    fixture.detectChanges();
+
+    component.confirmQuotation();
+    fixture.detectChanges();
+
+    expect(component.isConfirming()).toBeFalse();
+
+    const allHeaderBtns = Array.from(fixture.nativeElement.querySelectorAll('.header-actions button') as NodeListOf<HTMLButtonElement>);
+    const retryBtn = allHeaderBtns.find((b) => b.textContent?.includes('Retry Extraction'));
+    const requoteBtn = allHeaderBtns.find((b) => b.textContent?.includes('Create Re-Quote'));
+    const archiveBtn = allHeaderBtns.find((b) => b.textContent?.includes('Archive'));
+    const addLineBtn = fixture.nativeElement.querySelector('.add-line-btn') as HTMLButtonElement;
+
+    expect(retryBtn?.disabled).toBeFalse();
+    expect(requoteBtn?.disabled).toBeFalse();
+    expect(archiveBtn?.disabled).toBeFalse();
+    expect(addLineBtn?.disabled).toBeFalse();
+  });
+
+  it('preserves exact 4-decimal unit price on blur and save of unchanged low-confidence price without staging rounded correction', () => {
+    const lowConfPriceExtraction = {
+      ...mockQuotationDetail.field_extractions[1],
+      id: 'fe-line1-price',
+      field_name: 'unit_price',
+      extracted_value: { amount: '0.1234', currency: 'SAR' },
+      confidence: '0.5000',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      status: 'extracted',
+      lines: [
+        {
+          ...mockQuotationDetail.lines[0],
+          unit_price: { amount: '0.1234', currency: 'SAR' },
+        },
+      ],
+      field_extractions: [
+        mockQuotationDetail.field_extractions[0],
+        lowConfPriceExtraction,
+      ],
+    });
+    fixture.detectChanges();
+
+    const unitPriceInput = fixture.nativeElement.querySelector(
+      '#field-fe-line1-price input',
+    ) as HTMLInputElement | null;
+    expect(unitPriceInput).toBeTruthy();
+    expect(unitPriceInput?.value).toBe('0.1234');
+
+    // Trigger blur on unedited field
+    unitPriceInput?.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    // Blur on an unedited field must not stage a correction at all (or, if staged, exactly 0.1234)
+    const staged = component.pendingCorrections().get('fe-line1-price');
+    if (staged) {
+      expect((staged as { amount: string }).amount).toBe('0.1234');
+    } else {
+      expect(component.pendingCorrections().has('fe-line1-price')).toBeFalse();
+    }
+
+    // Saving must not send a rounded 0.12 correction
+    apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+    component.saveCorrections();
+
+    if (apiService.patchQuotation.calls.count() > 0) {
+      const patchPayload = apiService.patchQuotation.calls.mostRecent().args[1];
+      const priceCorr = patchPayload.corrections?.find(
+        (c) => c.field_extraction_id === 'fe-line1-price',
+      );
+      if (priceCorr) {
+        expect((priceCorr.corrected_value as { amount: string }).amount).toBe('0.1234');
+      }
+    }
+  });
+
+  describe('VAT-inclusive quote review (PPS-122)', () => {
+    it('rejects a VAT rate outside 0–100 percent instead of patching an invalid fraction', () => {
+      component.quotation.set({ ...mockQuotationDetail, field_extractions: [] });
+      apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+      component.vatRateInputChanged('101');
+      component.saveCorrections();
+      expect(apiService.patchQuotation).not.toHaveBeenCalled();
+    });
+
+    it('confirms flagged VAT values as-is and sends both header values and corrections', () => {
+      const extractions = [
+        { id: 'fe-vat-inc', field_name: 'prices_include_vat', extracted_value: true },
+        { id: 'fe-vat-rate', field_name: 'vat_rate', extracted_value: '0.15' },
+      ].map(field => ({ ...field, quotation_id: mockQuotationDetail.id, entity_type: 'quotation' as const,
+        entity_id: mockQuotationDetail.id, confidence: '0.8000', extraction_method: 'bedrock' as const,
+        model_version: 'v1', corrected_value: null, corrected_by: null, corrected_at: null }));
+      component.quotation.set({ ...mockQuotationDetail, prices_include_vat: true, vat_rate: '0.15', field_extractions: extractions });
+      fixture.detectChanges();
+      expect(component.flaggedFields().length).toBe(2);
+      const host = fixture.nativeElement as HTMLElement;
+      host.querySelector<HTMLButtonElement>('#field-fe-vat-inc .confirm-as-is-btn')!.click();
+      host.querySelector<HTMLButtonElement>('#field-fe-vat-rate .confirm-as-is-btn')!.click();
+      fixture.detectChanges();
+      expect(component.flaggedFields().length).toBe(0);
+      expect(host.querySelectorAll('[data-testid="confirmed-badge"]').length).toBe(2);
+      apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+      component.saveCorrections();
+      expect(apiService.patchQuotation.calls.mostRecent().args[1]).toEqual(jasmine.objectContaining({
+        prices_include_vat: true, vat_rate: '0.15',
+        corrections: jasmine.arrayContaining([
+          { field_extraction_id: 'fe-vat-inc', corrected_value: true },
+          { field_extraction_id: 'fe-vat-rate', corrected_value: '0.15' },
+        ]),
+      }));
+    });
+
+    it('enables saving when only VAT fields without extraction rows change', () => {
+      component.quotation.set({ ...mockQuotationDetail, prices_include_vat: false, vat_rate: null, field_extractions: [] });
+      component.reviewerNotes.set(mockQuotationDetail.reviewer_notes || '');
+      expect(component.hasPendingReviewChanges()).toBeFalse();
+      component.pricesIncludeVatToggled(true);
+      expect(component.hasPendingReviewChanges()).toBeTrue();
+      component.pendingPricesIncludeVat.set(undefined);
+      component.vatRateInputChanged('15');
+      expect(component.hasPendingReviewChanges()).toBeTrue();
+    });
+
+    it('(a) an extracted inclusive quote shows the checkbox checked, rate 15, flagged with the low-confidence pill and a «Confirm as is» button', () => {
+      const vatIncExtraction: FieldExtraction = {
+        id: 'fe-vat-inc',
+        quotation_id: 'q-review-1',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'prices_include_vat',
+        extracted_value: true,
+        confidence: '0.8000',
+        extraction_method: 'bedrock',
+        model_version: 'v1',
+        corrected_value: null,
+        corrected_by: null,
+        corrected_at: null,
+      };
+      const vatRateExtraction: FieldExtraction = {
+        id: 'fe-vat-rate',
+        quotation_id: 'q-review-1',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'vat_rate',
+        extracted_value: '0.15',
+        confidence: '0.8000',
+        extraction_method: 'bedrock',
+        model_version: 'v1',
+        corrected_value: null,
+        corrected_by: null,
+        corrected_at: null,
+      };
+      component.quotation.set({
+        ...mockQuotationDetail,
+        prices_include_vat: true,
+        vat_rate: '0.1500',
+        field_extractions: [vatIncExtraction, vatRateExtraction],
+      });
+      fixture.detectChanges();
+
+      const vatIncBox = fixture.nativeElement.querySelector('#field-fe-vat-inc');
+      expect(vatIncBox).toBeTruthy();
+      const checkbox = vatIncBox.querySelector('mat-checkbox input[type="checkbox"]') as HTMLInputElement;
+      expect(checkbox).toBeTruthy();
+      expect(checkbox.checked).toBeTrue();
+
+      const vatRateBox = fixture.nativeElement.querySelector('#field-fe-vat-rate');
+      expect(vatRateBox).toBeTruthy();
+      const vatRateInput = vatRateBox.querySelector('input') as HTMLInputElement;
+      expect(vatRateInput).toBeTruthy();
+      expect(vatRateInput.value).toBe('15');
+
+      const vatIncPill = vatIncBox.querySelector('.confidence-pill');
+      expect(vatIncPill?.classList.contains('low-conf')).toBeTrue();
+      expect(vatIncPill?.textContent?.trim()).toContain('80%');
+
+      const vatRatePill = vatRateBox.querySelector('.confidence-pill');
+      expect(vatRatePill?.classList.contains('low-conf')).toBeTrue();
+      expect(vatRatePill?.textContent?.trim()).toContain('80%');
+
+      const vatIncConfirmBtn = vatIncBox.querySelector('.confirm-as-is-btn');
+      expect(vatIncConfirmBtn).toBeTruthy();
+
+      const vatRateConfirmBtn = vatRateBox.querySelector('.confirm-as-is-btn');
+      expect(vatRateConfirmBtn).toBeTruthy();
+
+      expect(component.flaggedFields().map(f => f.fieldName)).toContain('prices_include_vat');
+      expect(component.flaggedFields().map(f => f.fieldName)).toContain('vat_rate');
+    });
+
+    it('(b) confirming/changing sends the expected correction/patch (prices_include_vat: false / vat_rate: "0.05")', () => {
+      const vatIncExtraction: FieldExtraction = {
+        id: 'fe-vat-inc',
+        quotation_id: 'q-review-1',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'prices_include_vat',
+        extracted_value: true,
+        confidence: '0.8000',
+        extraction_method: 'bedrock',
+        model_version: 'v1',
+        corrected_value: null,
+        corrected_by: null,
+        corrected_at: null,
+      };
+      const vatRateExtraction: FieldExtraction = {
+        id: 'fe-vat-rate',
+        quotation_id: 'q-review-1',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'vat_rate',
+        extracted_value: '0.15',
+        confidence: '0.8000',
+        extraction_method: 'bedrock',
+        model_version: 'v1',
+        corrected_value: null,
+        corrected_by: null,
+        corrected_at: null,
+      };
+      component.quotation.set({
+        ...mockQuotationDetail,
+        prices_include_vat: true,
+        vat_rate: '0.1500',
+        field_extractions: [vatIncExtraction, vatRateExtraction],
+      });
+      component.selectedSupplierId.set('sup-1');
+      fixture.detectChanges();
+
+      component.pricesIncludeVatToggled(false);
+      component.vatRateInputChanged('5');
+
+      apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+      component.saveCorrections();
+
+      expect(apiService.patchQuotation).toHaveBeenCalledWith(
+        'q-review-1',
+        jasmine.objectContaining({
+          prices_include_vat: false,
+          vat_rate: '0.05',
+          corrections: jasmine.arrayContaining([
+            { field_extraction_id: 'fe-vat-inc', corrected_value: false },
+            { field_extraction_id: 'fe-vat-rate', corrected_value: '0.05' },
+          ]),
+        }),
+      );
+    });
+
+    it('(c) a quote without the extracted rows shows the field unflagged and unchecked, and toggling it sends prices_include_vat: true in the patch', () => {
+      component.quotation.set({
+        ...mockQuotationDetail,
+        prices_include_vat: false,
+        vat_rate: null,
+        field_extractions: [],
+      });
+      component.selectedSupplierId.set('sup-1');
+      fixture.detectChanges();
+
+      const vatIncBox = fixture.nativeElement.querySelector('#field-prices_include_vat');
+      expect(vatIncBox).toBeTruthy();
+      const checkbox = vatIncBox.querySelector('mat-checkbox input[type="checkbox"]') as HTMLInputElement;
+      expect(checkbox.checked).toBeFalse();
+      expect(vatIncBox.querySelector('.confidence-pill')).toBeFalsy();
+      expect(vatIncBox.querySelector('.confirm-as-is-btn')).toBeFalsy();
+      expect(component.flaggedFields().map(f => f.fieldName)).not.toContain('prices_include_vat');
+
+      component.pricesIncludeVatToggled(true);
+
+      apiService.patchQuotation.and.returnValue(of(component.quotation()!));
+      component.saveCorrections();
+
+      expect(apiService.patchQuotation).toHaveBeenCalledWith(
+        'q-review-1',
+        jasmine.objectContaining({
+          prices_include_vat: true,
+        }),
+      );
+    });
+  });
+
+  describe('Error state and route param changes (PPS-156 / B7 & B8)', () => {
+    it('(a) getQuotation errors with HttpErrorResponse 404 -> shows not-found error state, back link and retry control, and hides review form', () => {
+      apiService.getQuotation.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 404, statusText: 'Not Found' })),
+      );
+      paramMapSubject.next(convertToParamMap({ id: 'missing-quote-id' }));
+      fixture.detectChanges();
+
+      const errorEl = fixture.nativeElement.querySelector('[data-testid="quotation-load-error"]');
+      expect(errorEl).toBeTruthy();
+      expect(errorEl.textContent).toContain('Quotation not found');
+
+      const backLink = errorEl.querySelector('a.back-link') ?? errorEl.querySelector('a');
+      expect(backLink).toBeTruthy();
+      expect(backLink?.getAttribute('routerLink') ?? backLink?.getAttribute('href')).toBe('/quotations');
+
+      const buttons = Array.from(errorEl.querySelectorAll('button')) as HTMLButtonElement[];
+      const retryBtn = buttons.find((b) => b.textContent?.includes('Retry'));
+      expect(retryBtn).toBeTruthy();
+
+      expect(fixture.nativeElement.querySelector('.page-header')).toBeFalsy();
+      expect(fixture.nativeElement.querySelector('app-quotation-review-banners')).toBeFalsy();
+    });
+
+    it('(b) clicking Retry calls getQuotation again and on success renders the quotation', () => {
+      apiService.getQuotation.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 500, error: { message: 'Server error' } })),
+      );
+      paramMapSubject.next(convertToParamMap({ id: 'retry-quote-id' }));
+      fixture.detectChanges();
+
+      const errorEl = fixture.nativeElement.querySelector('[data-testid="quotation-load-error"]');
+      expect(errorEl).toBeTruthy();
+
+      const buttons = Array.from(errorEl.querySelectorAll('button')) as HTMLButtonElement[];
+      const retryBtn = buttons.find((b) => b.textContent?.includes('Retry'));
+      expect(retryBtn).toBeTruthy();
+
+      apiService.getQuotation.and.returnValue(of(mockQuotationDetail));
+      retryBtn?.click();
+      fixture.detectChanges();
+
+      expect(apiService.getQuotation).toHaveBeenCalledWith('retry-quote-id');
+      expect(fixture.nativeElement.querySelector('[data-testid="quotation-load-error"]')).toBeFalsy();
+      expect(fixture.nativeElement.querySelector('.page-header')).toBeTruthy();
+      expect(component.quotation()?.id).toBe('q-review-1');
+    });
+
+    it('(c) a non-404 failure (500 with an ApiError body incl. trace_id) shows the message and the trace id', () => {
+      const apiError: ApiError = {
+        code: 'internal_error',
+        message: 'Database connection failed',
+        details: {},
+        trace_id: 'trace-test-12345',
+      };
+      apiService.getQuotation.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 500, statusText: 'Internal Server Error', error: apiError })),
+      );
+      paramMapSubject.next(convertToParamMap({ id: 'error-quote-id' }));
+      fixture.detectChanges();
+
+      const errorEl = fixture.nativeElement.querySelector('[data-testid="quotation-load-error"]');
+      expect(errorEl).toBeTruthy();
+      expect(errorEl.textContent).toContain('Database connection failed');
+      expect(errorEl.textContent).toContain('trace-test-12345');
+    });
+
+    it('(d) a failed silent reload keeps the quotation visible (no load-error state)', () => {
+      expect(component.quotation()).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('[data-testid="quotation-load-error"]')).toBeFalsy();
+
+      apiService.getQuotation.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 500, error: { message: 'Background failure' } })),
+      );
+      component.loadQuotation('q-review-1', { silent: true });
+      fixture.detectChanges();
+
+      expect(component.quotation()).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('[data-testid="quotation-load-error"]')).toBeFalsy();
+      expect(fixture.nativeElement.querySelector('.page-header')).toBeTruthy();
+    });
+
+    it('(e) paramMap emitting a second id calls getQuotation with the new id, replaces the displayed quotation, and clears pending corrections and pending new lines left from the first', () => {
+      component.pendingCorrections.set(new Map([['fe-line1-price', { amount: '30.00', currency: 'GBP' }]]));
+      component.pendingNewLines.set([
+        {
+          original_text: 'Extra delivery charge',
+          quantity: '1',
+          unit_price_amount: '15.00',
+          unit_price_currency: 'GBP',
+        },
+      ]);
+      component.pendingRemoveLineIds.set(new Set(['line-1']));
+      component.reviewerNotes.set('Notes for first quote');
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections().size).toBe(1);
+      expect(component.pendingNewLines().length).toBe(1);
+      expect(component.pendingRemoveLineIds().size).toBe(1);
+
+      const secondQuotation: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'q-review-2',
+        reviewer_notes: 'Initial notes for second quote',
+      };
+      apiService.getQuotation.and.returnValue(of(secondQuotation));
+
+      paramMapSubject.next(convertToParamMap({ id: 'q-review-2' }));
+      fixture.detectChanges();
+
+      expect(apiService.getQuotation).toHaveBeenCalledWith('q-review-2');
+      expect(component.quotation()?.id).toBe('q-review-2');
+      expect(component.pendingCorrections().size).toBe(0);
+      expect(component.pendingNewLines().length).toBe(0);
+      expect(component.pendingRemoveLineIds().size).toBe(0);
+      expect(component.reviewerNotes()).toBe('Initial notes for second quote');
+    });
+
+    it('(f) paramMap emits id A, getQuotation(A) pending; paramMap emits id B and getQuotation(B) responds; then A response arrives -> quotation().id is still B', () => {
+      const quoteASubject = new Subject<QuotationDetail>();
+      const quoteBSubject = new Subject<QuotationDetail>();
+      apiService.getQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return quoteASubject.asObservable();
+        if (id === 'quote-B') return quoteBSubject.asObservable();
+        return of(mockQuotationDetail);
+      });
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+
+      const quoteB: QuotationDetail = { ...mockQuotationDetail, id: 'quote-B' };
+      quoteBSubject.next(quoteB);
+      fixture.detectChanges();
+
+      expect(component.quotation()?.id).toBe('quote-B');
+
+      const quoteA: QuotationDetail = { ...mockQuotationDetail, id: 'quote-A' };
+      quoteASubject.next(quoteA);
+      fixture.detectChanges();
+
+      expect(component.quotation()?.id).toBe('quote-B');
+    });
+
+    it('(g) A audit reply arriving after switching to B must not populate auditTrail', () => {
+      const auditASubject = new Subject<{ items: AuditTrailEntry[] }>();
+      const quoteA: QuotationDetail = { ...mockQuotationDetail, id: 'quote-A' };
+      const quoteB: QuotationDetail = { ...mockQuotationDetail, id: 'quote-B' };
+
+      apiService.getQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return of(quoteA);
+        if (id === 'quote-B') return of(quoteB);
+        return of(mockQuotationDetail);
+      });
+      apiService.getAuditTrail.and.callFake((id: string) => {
+        if (id === 'quote-A') return auditASubject.asObservable();
+        return of({ items: [] });
+      });
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+
+      const auditA: AuditTrailEntry = {
+        id: 1,
+        action: 'quotation.reviewed',
+        actor_email: 'user@example.com',
+        outcome: 'success',
+        target: null,
+        trace_id: null,
+        occurred_at: '2026-10-30T10:00:00Z',
+      };
+      auditASubject.next({ items: [auditA] });
+      fixture.detectChanges();
+
+      expect(component.auditTrail()).toEqual([]);
+    });
+
+    it('(h) A document download URL arriving after switching to B must not populate documentPreviewUrl', () => {
+      const docASubject = new Subject<{ download_url: string }>();
+      const quoteA: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-A',
+        document: { ...mockQuotationDetail.document, id: 'doc-A' },
+      };
+      const quoteB: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-B',
+        document: { ...mockQuotationDetail.document, id: 'doc-B' },
+      };
+
+      apiService.getQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return of(quoteA);
+        if (id === 'quote-B') return of(quoteB);
+        return of(mockQuotationDetail);
+      });
+      apiService.getDocumentDownloadUrl.and.callFake((id: string) => {
+        if (id === 'doc-A') return docASubject.asObservable();
+        return of({ download_url: 'https://storage.example.com/doc-B.pdf' });
+      });
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+
+      docASubject.next({ download_url: 'https://storage.example.com/doc-A-stale.pdf' });
+      fixture.detectChanges();
+
+      expect(component.documentPreviewUrl()).not.toBe('https://storage.example.com/doc-A-stale.pdf');
+    });
+
+    it('(i) a first-load HttpErrorResponse with status 0 and no ApiError body shows the translated generic message, not err.message', () => {
+      const translate = TestBed.inject(TranslateService);
+      const genericError = translate.instant('quotations.review.actions.genericError');
+
+      const rawHttpError = new HttpErrorResponse({
+        status: 0,
+        statusText: 'Unknown Error',
+        url: 'http://localhost/api/v1/quotations/quote-err-0',
+      });
+      apiService.getQuotation.and.returnValue(throwError(() => rawHttpError));
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-err-0' }));
+      fixture.detectChanges();
+
+      expect(component.loadFailed()).toBeTrue();
+      expect(component.errorMessage()).toBe(genericError);
+      expect(component.errorMessage()).not.toBe(rawHttpError.message);
+    });
+
+    it('(j) saveCorrections for A pending, paramMap switches to B, B loads, then A PATCH response arrives -> quotation().id is still B, pendingCorrections for B untouched, getQuotation was not called again for A', () => {
+      const quoteA: QuotationDetail = { ...mockQuotationDetail, id: 'quote-A' };
+      const quoteB: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-B',
+        field_extractions: [
+          {
+            ...mockQuotationDetail.field_extractions[0],
+            id: 'fe-quote-B-1',
+            quotation_id: 'quote-B',
+          },
+        ],
+      };
+      const patchASubject = new Subject<QuotationDetail>();
+
+      apiService.getQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return of(quoteA);
+        if (id === 'quote-B') return of(quoteB);
+        return of(mockQuotationDetail);
+      });
+      apiService.patchQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return patchASubject.asObservable();
+        return of(quoteB);
+      });
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+      expect(component.quotation()?.id).toBe('quote-A');
+
+      component.pendingCorrections.set(new Map([['fe-quote-A-1', 'corrected-A']]));
+      component.saveCorrections();
+      expect(component.isSaving()).toBeTrue();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+      expect(component.quotation()?.id).toBe('quote-B');
+      expect(component.isSaving()).toBeFalse();
+
+      component.pendingCorrections.set(new Map([['fe-quote-B-1', 'corrected-B']]));
+      apiService.getQuotation.calls.reset();
+
+      patchASubject.next({ ...quoteA, reviewer_notes: 'Updated note A' });
+      fixture.detectChanges();
+
+      expect(component.quotation()?.id).toBe('quote-B');
+      expect(component.pendingCorrections().get('fe-quote-B-1')).toBe('corrected-B');
+      expect(apiService.getQuotation).not.toHaveBeenCalledWith('quote-A');
+    });
+
+    it('(k) refuse for A pending then switch -> late response does not call loadQuotation/navigate/snackbar for A', () => {
+      const quoteA: QuotationDetail = { ...mockQuotationDetail, id: 'quote-A' };
+      const quoteB: QuotationDetail = { ...mockQuotationDetail, id: 'quote-B' };
+      const refuseASubject = new Subject<Quotation>();
+
+      apiService.getQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return of(quoteA);
+        if (id === 'quote-B') return of(quoteB);
+        return of(mockQuotationDetail);
+      });
+      apiService.refuseQuotation.and.returnValue(refuseASubject.asObservable());
+
+      const router = TestBed.inject(Router);
+      spyOn(router, 'navigate');
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      spyOn(snackBar, 'open');
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+      expect(component.quotation()?.id).toBe('quote-A');
+
+      component.refuseQuotation();
+      expect(component.isRefusing()).toBeTrue();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+      expect(component.quotation()?.id).toBe('quote-B');
+      expect(component.isRefusing()).toBeFalse();
+
+      apiService.getQuotation.calls.reset();
+
+      refuseASubject.next({ ...quoteA, status: 'refused' });
+      fixture.detectChanges();
+
+      expect(apiService.getQuotation).not.toHaveBeenCalledWith('quote-A');
+      expect(router.navigate).not.toHaveBeenCalled();
+      expect(snackBar.open).not.toHaveBeenCalled();
+      expect(component.quotation()?.id).toBe('quote-B');
+      expect(component.isRefusing()).toBeFalse();
+    });
+
+    it('(l) retryExtraction for A pending then switch -> late response does not reload A', () => {
+      const quoteA: QuotationDetail = { ...mockQuotationDetail, id: 'quote-A', status: 'in_review' };
+      const quoteB: QuotationDetail = { ...mockQuotationDetail, id: 'quote-B' };
+      const retryASubject = new Subject<Quotation>();
+
+      apiService.getQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return of(quoteA);
+        if (id === 'quote-B') return of(quoteB);
+        return of(mockQuotationDetail);
+      });
+      apiService.retryExtraction.and.returnValue(retryASubject.asObservable());
+      spyOn(window, 'confirm').and.returnValue(true);
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+      expect(component.quotation()?.id).toBe('quote-A');
+
+      component.retryExtraction();
+      expect(component.isRetryingExtraction()).toBeTrue();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+      expect(component.quotation()?.id).toBe('quote-B');
+      expect(component.isRetryingExtraction()).toBeFalse();
+
+      apiService.getQuotation.calls.reset();
+
+      retryASubject.next({ ...quoteA, status: 'extracted' });
+      fixture.detectChanges();
+
+      expect(apiService.getQuotation).not.toHaveBeenCalledWith('quote-A');
+      expect(component.quotation()?.id).toBe('quote-B');
+      expect(component.isRetryingExtraction()).toBeFalse();
+    });
   });
 });

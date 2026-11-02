@@ -407,15 +407,15 @@ def test_explain_guardrail_evaluations_reports_candidate_reason(
         recent_average_price_by_product={product_id: Decimal("100.00")},
         response_id=base_candidate.rfq_response_id,
     )
-    assert result == [
-        type(result[0])(base_guardrail.id, False, "price_variance_exceeded")
-    ]
+    assert result == [type(result[0])(base_guardrail.id, False, "price_variance_exceeded")]
 
 
 @pytest.mark.parametrize(
     ("rfq_status", "count", "pending", "expected"),
     [
         ("draft", 1, False, "rfq_not_open"),
+        ("expired", 1, False, "rfq_not_open"),
+        ("converted", 1, False, "rfq_converted"),
         ("responded", 0, False, "min_response_count_not_met"),
         ("responded", 1, True, "responses_pending"),
     ],

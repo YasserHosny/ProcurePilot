@@ -8,6 +8,7 @@ import '../../core/i18n/i18n_loader.dart';
 import '../../core/theme/brand_logo.dart';
 import '../../core/theme/ledger_typography.dart';
 import '../service_provider.dart';
+import 'approval_group.dart';
 
 class ApprovalQueueScreen extends StatefulWidget {
   const ApprovalQueueScreen({super.key});
@@ -49,11 +50,9 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
     }
   }
 
-  Future<void> _navigateToDecision(PurchaseRequest request) async {
-    final result = await Navigator.of(context).pushNamed(
-      '/approvals/detail',
-      arguments: request,
-    );
+  Future<void> _navigateToDecision(Object request) async {
+    final result = await Navigator.of(context)
+        .pushNamed('/approvals/detail', arguments: request);
     if (result == true && mounted) {
       await _loadApprovals();
     }
@@ -62,6 +61,21 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
   @override
   Widget build(BuildContext context) {
     final i18n = _i18n;
+    final entries = <List<PurchaseRequest>>[];
+    final groups = <String, List<PurchaseRequest>>{};
+    for (final request in _requests) {
+      final group = request.requestGroup;
+      if (group == null) {
+        entries.add([request]);
+      } else {
+        final members = groups.putIfAbsent(group.id, () {
+          final members = <PurchaseRequest>[];
+          entries.add(members);
+          return members;
+        });
+        members.add(request);
+      }
+    }
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -97,9 +111,20 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
                   ? Center(child: Text(i18n.t('approvals.empty')))
                   : ListView.builder(
                       key: const Key('approvalQueueList'),
-                      itemCount: _requests.length,
+                      itemCount: entries.length,
                       itemBuilder: (context, index) {
-                        final request = _requests[index];
+                        final requests = entries[index];
+                        final request = requests.first;
+                        final group = request.requestGroup;
+                        if (group != null) {
+                          return ListTile(
+                            key: Key('approvalQueueItem_$index'),
+                            title: Text(approvalGroupSummary(i18n, group)),
+                            onTap: () => _navigateToDecision(
+                              ApprovalGroup(summary: group, requests: requests),
+                            ),
+                          );
+                        }
                         return ListTile(
                           key: Key('approvalQueueItem_$index'),
                           title: Text(

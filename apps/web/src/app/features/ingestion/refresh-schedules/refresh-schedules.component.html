@@ -65,7 +65,7 @@
           <ng-container matColumnDef="product"><th mat-header-cell *matHeaderCellDef>{{ 'ingestion.refreshSchedules.product' | translate }}</th><td mat-cell *matCellDef="let row">{{ productName(row.workspace_product_id) }}</td></ng-container>
           <ng-container matColumnDef="supplier"><th mat-header-cell *matHeaderCellDef>{{ 'ingestion.refreshSchedules.supplier' | translate }}</th><td mat-cell *matCellDef="let row">{{ supplierName(row.supplier_id) }}</td></ng-container>
           <ng-container matColumnDef="cadence"><th mat-header-cell *matHeaderCellDef>{{ 'ingestion.refreshSchedules.cadence' | translate }}</th><td mat-cell *matCellDef="let row">{{ row.cadence_days }} {{ 'ingestion.refreshSchedules.days' | translate }}</td></ng-container>
-          <ng-container matColumnDef="nextRefresh"><th mat-header-cell *matHeaderCellDef>{{ 'ingestion.refreshSchedules.nextRefresh' | translate }}</th><td mat-cell *matCellDef="let row">{{ row.next_refresh_at | date:'mediumDate' }}</td></ng-container>
+          <ng-container matColumnDef="nextRefresh"><th mat-header-cell *matHeaderCellDef>{{ 'ingestion.refreshSchedules.nextRefresh' | translate }}</th><td mat-cell *matCellDef="let row">{{ row.next_refresh_at | formatDate }}</td></ng-container>
           <ng-container matColumnDef="source"><th mat-header-cell *matHeaderCellDef>{{ 'ingestion.refreshSchedules.source' | translate }}</th><td mat-cell *matCellDef="let row">
             <mat-form-field appearance="outline" class="source-field">
               <mat-select [ngModel]="row.source_import_id ?? ''" (ngModelChange)="assignSource(row, $event)">

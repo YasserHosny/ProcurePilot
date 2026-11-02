@@ -11,13 +11,14 @@ from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, NotFoundError, ServiceUnavailableError
 from procurepilot_api.modules.landed_cost.rules import (
-    RULE_VERSION_V1,
+    RULE_VERSION_V2,
     LandedCostInputs,
     MoneyValue,
     compute_landed_cost,
 )
 from procurepilot_api.modules.landed_cost.schemas import LandedCost, Money
 from procurepilot_api.modules.members.service import authenticated_client
+from procurepilot_api.shared.postgrest_pages import all_rows
 
 LINE_COLUMNS = (
     "id,tenant_id,quotation_id,quantity,pack_count,unit_size,unit_price_amount,"
@@ -43,7 +44,7 @@ LANDED_COLUMNS = (
 class LandedCostService:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
-        self.active_rule_version = RULE_VERSION_V1
+        self.active_rule_version = RULE_VERSION_V2
 
     def get_landed_cost(self, *, bearer_token: str, line_id: UUID) -> LandedCost:
         client = authenticated_client(self._settings, bearer_token)
@@ -62,6 +63,34 @@ class LandedCostService:
             return None
         row = self._latest_landed_cost(client, UUID(str(decision["id"])))
         return _landed_cost(row) if row else None
+
+    def latest_for_decisions(
+        self, *, client: object, decision_ids: list[UUID]
+    ) -> dict[UUID, LandedCost]:
+        """The newest landed cost of each decision, read in batches rather than per decision."""
+        ids = sorted({str(decision_id) for decision_id in decision_ids})
+        rows: list[dict[str, object]] = []
+        try:
+            # A decision keeps one row per rule version; page past the max_rows cap.
+            for start in range(0, len(ids), 100):
+                rows.extend(
+                    all_rows(
+                        lambda chunk=ids[start : start + 100]: (
+                            client.table("landed_cost")
+                            .select(LANDED_COLUMNS)
+                            .in_("match_decision_id", chunk)
+                            .order("recorded_at", desc=True)
+                            .order("id", desc=True)
+                        ),
+                        _rows,
+                    )
+                )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        latest: dict[UUID, LandedCost] = {}
+        for row in rows:
+            latest.setdefault(UUID(str(row["match_decision_id"])), _landed_cost(row))
+        return latest
 
     def compute_for_line_with_client(
         self,
@@ -93,6 +122,7 @@ class LandedCostService:
         )
         result = compute_landed_cost(
             LandedCostInputs(
+                prices_include_vat=bool(quote.get("prices_include_vat", False)),
                 quantity=quantity,
                 normalised_base_quantity=quantity * base_quantity,
                 base_unit=str(canonical["base_unit"]),
@@ -243,7 +273,7 @@ def _required_currency(currency: str | None) -> str:
 def _quotation_row(client: object, quotation_id: UUID) -> dict[str, object]:
     response = (
         client.table("quotation")
-        .select("currency,expiry_date")
+        .select("currency,expiry_date,prices_include_vat")
         .eq("id", str(quotation_id))
         .limit(1)
         .execute()

@@ -13,6 +13,8 @@ from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.errors import PermissionDeniedError, UnprocessableEntityError
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
+from procurepilot_api.modules.offers.rfq_split import start_rfq_split
+from procurepilot_api.modules.offers.schemas import BasketSplitJob
 from procurepilot_api.modules.rfq.schemas import (
     AutoPreparationGuardrail,
     GuardrailCreateInput,
@@ -218,6 +220,28 @@ def list_responses(
     return service.list_responses(
         member=member,
         rfq_id=rfq_id,
+    )
+
+
+@router.post(
+    "/{rfq_id}/split",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=BasketSplitJob,
+    operation_id="splitRfq",
+)
+@mutation_limiter.limit(_rfq_create_limit)
+def split_rfq(
+    request: Request,
+    rfq_id: uuid.UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*RFQ_WRITE_ROLES))],
+    idempotency_key: Annotated[uuid.UUID, Header(alias="Idempotency-Key")],
+) -> BasketSplitJob:
+    return start_rfq_split(
+        member=member,
+        rfq_id=rfq_id,
+        idempotency_key=idempotency_key,
+        bearer_token=token,
     )
 
 

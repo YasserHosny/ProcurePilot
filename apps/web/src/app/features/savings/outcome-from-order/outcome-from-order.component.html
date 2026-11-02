@@ -69,7 +69,7 @@
                   data-testid="line-quantity"
                 />
               </mat-form-field>
-              <mat-form-field appearance="outline" class="total-field">
+              <mat-form-field appearance="outline" class="total-field" subscriptSizing="dynamic">
                 <mat-label>{{ 'savings.fromOrder.totalLabel' | translate: { currency: (edit.line.total_paid.currency | currencySymbol) } }}</mat-label>
                 <input
                   matInput
@@ -80,9 +80,14 @@
                   [disabled]="!edit.include || isSubmitting()"
                   data-testid="line-total"
                 />
-                @if (unitPrice(edit); as price) {
-                  <mat-hint>{{ 'savings.fromOrder.unitPriceHint' | translate: { price: ({ amount: price, currency: edit.line.total_paid.currency } | formatMoney), unit: unitLabel(edit.line) } }}</mat-hint>
-                }
+                <mat-hint>
+                  @if (unitPrice(edit); as price) {
+                    <span>{{ 'savings.fromOrder.unitPriceHint' | translate: { price: ({ amount: price, currency: edit.line.total_paid.currency } | formatMoney), unit: unitLabel(edit.line) } }}</span>
+                  }
+                  @if (hasTax(edit.line)) {
+                    <span data-testid="excluded-tax-hint"> · {{ 'savings.fromOrder.taxExcludedHint' | translate: { tax: (edit.line.tax | formatMoney) } }}</span>
+                  }
+                </mat-hint>
               </mat-form-field>
             }
           </div>

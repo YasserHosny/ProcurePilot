@@ -365,7 +365,8 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
   `field_extractions`, and optional `review_task`.
 - Header fields include `id`, `document_id`, optional `supplier_id`, optional `currency`,
   optional `issue_date`, optional `expiry_date`, `status`, optional `previous_quotation_id`,
-  optional `stated_total`, optional `arithmetic_status`, `created_at`, optional `reviewed_by`, and
+  optional `stated_total`, optional `arithmetic_status`, `prices_include_vat` (boolean; true when
+  the document's printed prices include VAT, ADR-021), `created_at`, optional `reviewed_by`, and
   optional `reviewed_at`.
 - Line fields include `id`, `line_number`, `original_text`, optional decimal-string `quantity`,
   optional `pack`, optional `unit_price`, optional decimal-string `vat_rate`, optional
@@ -380,7 +381,9 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 
 - Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
 - Corrects extracted fields and confirms supplier.
-- Request fields: optional `supplier_id`, optional `corrections`.
+- Request fields: optional `supplier_id`, optional `corrections`, optional `prices_include_vat`
+  (default `false`; the reviewer confirms or changes the basis extraction found, ADR-021) and
+  optional `vat_rate`.
 - Each correction has `field_extraction_id` and `corrected_value`.
 - Corrections are recorded as human decisions on field provenance records; original extracted
   values are retained.
@@ -472,6 +475,40 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 - Returns `404` when the quotation is not in the caller's workspace; this is deliberately
   indistinguishable from a quotation that exists in another workspace.
 - Returns `409` when the quotation is not in the reviewed state yet.
+- RFQ-aware matching (spec 023): when the quotation answers an RFQ, its lines are first matched
+  against that RFQ's own lines (product, pack, quantity, position). A line that fits exactly one RFQ
+  line is accepted automatically (`is_automatic`, owner decision Q1); a line that could answer two
+  goes to Match Resolution with both RFQ lines offered. Candidate `reasons` may carry `rfq`
+  (`rule_version`, `rfq_id`, `rfq_line_id`, `position`, `wording_score`, `pack_check` of
+  `equal`, `conflict` or `unknown`, quoted and RFQ pack quantities and units, `fitting_rfq_line_ids`)
+  and `measured` (only the signals that were actually measured; unmeasured signals are absent, not
+  shown at a flat value). A quotation with no RFQ is matched as before.
+- `decision` carries `supersedes_decision_id` and `learned_from_decision_id` (nullable uuid). The
+  decision returned is the current one (head of the chain, ADR-022).
+
+### `POST /quotation-lines/{line_id}/match/corrections`
+
+- Requires bearer auth and owner or buyer role; requires an `Idempotency-Key` (uuid) header.
+- Corrects a line's match without updating any row: inserts a human decision that supersedes the
+  line's current decision (ADR-022).
+- Request fields: `expected_current_decision_id` (required; the head the caller saw), `outcome`
+  (`same_product` or `no_match_new_product`), optional `selected_match_candidate_id`, optional
+  `new_product` (same shape as the resolve endpoint's `create_product`), optional `learn_alias`
+  (default `true`).
+- Returns `200` with `decision` (the new current decision), `superseded_decision_id`,
+  `lines_matched_through_old_wording` (lines that had been matched through the superseded
+  decision's wording) and optional `lines_matched_by_same_wording`. The correction also computes
+  landed cost for the new decision, enqueues guardrail evaluation (ADR-019) and audits
+  `matching.decision_corrected`.
+- Returns `404` when the line is not in the caller's workspace.
+- Returns `409` with `details.reason` of `line_on_purchase_request` (with
+  `details.purchase_request_id`: a live purchase request is priced from the decision, so it must be
+  withdrawn first), `decision_changed` (`expected_current_decision_id` is not the head) or
+  `no_decision`.
+
+`POST /quotation-lines/{line_id}/match` and `POST /match-tasks/confirm-exact` also return
+`lines_matched_by_same_wording` (open lines that one confirmation of a wording cleared; spec 023
+FR-011) next to their existing result.
 
 ### `GET /match-tasks`
 
@@ -886,11 +923,16 @@ Response:
     "baseline_value": { "amount": "100.0000", "currency": "GBP" },
     "actual_value": { "amount": "88.0000", "currency": "GBP" },
     "delta": { "amount": "12.0000", "currency": "GBP" },
-    "calculation_version": "saving-baseline-v1",
+    "calculation_version": "saving-baseline-v3",
     "calculation_inputs": {
       "quantity": "10.000000",
-      "selected_policy": "last_paid",
-      "window_months": 6
+      "actual_value": { "amount": "88.0000", "currency": "GBP" },
+      "selected_metric": "last_paid",
+      "source_landed_cost_ids": ["00000000-0000-4000-8000-000000000090"],
+      "price_history_point_count": 1,
+      "landed_total": { "amount": "100.0000", "currency": "GBP" },
+      "landed_quantity": "10.000000",
+      "landed_base_quantity": "10.000000"
     },
     "recorded_by": "00000000-0000-4000-8000-000000000070",
     "recorded_at": "2026-08-21T09:05:00Z",
@@ -923,7 +965,8 @@ Response:
   `baseline_unit_price`, nullable `baseline_value`, `actual_value`, nullable `delta`,
   `calculation_version`, `calculation_inputs`, `recorded_by`, `recorded_at`, nullable
   `verified_by`, and nullable `verified_at`.
-- `baseline_policy` is `last_paid`, `rolling_average_6m`, or `none_available`. When no baseline
+- `baseline_policy` is `last_po_price`, `last_paid`, `rolling_average_6m`, or `none_available`, tried
+  in that order. When no baseline
   exists, `baseline_unit_price`, `baseline_value`, and `delta` are null.
 - Returns `404` when the saving record is not in the caller's workspace.
 
@@ -953,8 +996,8 @@ Response:
     "baseline_value": { "amount": "100.0000", "currency": "GBP" },
     "actual_value": { "amount": "88.0000", "currency": "GBP" },
     "delta": { "amount": "12.0000", "currency": "GBP" },
-    "calculation_version": "saving-baseline-v1",
-    "calculation_inputs": { "selected_policy": "last_paid" },
+    "calculation_version": "saving-baseline-v3",
+    "calculation_inputs": { "selected_metric": "last_paid", "quantity": "10.000000" },
     "recorded_by": "00000000-0000-4000-8000-000000000070",
     "recorded_at": "2026-08-21T09:05:00Z",
     "verified_by": "00000000-0000-4000-8000-000000000070",
@@ -993,7 +1036,7 @@ Response:
     "actual_value": { "amount": "88.0000", "currency": "GBP" },
     "delta": { "amount": "12.0000", "currency": "GBP" },
     "source_landed_cost_ids": ["00000000-0000-4000-8000-000000000090"],
-    "calculation_inputs": { "selected_policy": "last_paid" }
+    "calculation_inputs": { "selected_metric": "last_paid", "quantity": "10.000000" }
   }
 }
 ```
@@ -1384,12 +1427,21 @@ Request:
 - Requires bearer auth. Branch-scoped visibility as above.
 - Query parameters: optional `status`, optional `branch_id`, optional `cursor`, optional `limit`
   capped at 100 and defaulting to 50.
-- Returns `200` with `items` of `PurchaseRequest` and nullable `next_cursor`.
+- `has_quantity_to_order`: nullable boolean; for visible requests with an approved approval
+  step and status `approved` or `ordered`, indicates whether any line has quantity remaining
+  to order. Non-cancelled orders allocate ordered quantity; cancelled orders allocate only
+  received quantity. Other rows, or calls without member context, return `null`.
+- Returns `200` with `items` of `PurchaseRequest` and nullable `next_cursor`. Each request
+  carries `request_group` (spec 024): a `RequestGroupSummary` (`id`, `rfq_id`, `position`,
+  `size`, `combined_total`, `best_single_total`, `saving`, `sibling_request_ids`) when the
+  request belongs to an RFQ split, `null` for an ordinary request.
 
 ### `GET /requests/{request_id}`
 
 - Requires bearer auth. Returns `200` with the `PurchaseRequest`, including `approval_step`
-  (once submitted) and `budget_status` (when an applicable budget exists — see below).
+  (once submitted), `budget_status` (when an applicable budget exists — see below), and
+  `request_group` (spec 024) — a `RequestGroupSummary` for a request that belongs to an RFQ
+  split, `null` for an ordinary request.
 - Returns `404` when the request is outside the caller's workspace or branch-scoped visibility.
 
 ### `PATCH /requests/{request_id}`
@@ -1413,6 +1465,9 @@ Request:
   source is `owner_fallback`.
 - Returns `200` with the `PurchaseRequest` (`status: "submitted"`, `approval_step` populated).
 - Returns `409` (`not_draft`) if the request is not in `draft`.
+- Returns `409` (`part_of_split`, `details.request_group_id`) when the request belongs to a
+  split group — grouped requests are submitted together via
+  `POST /request-groups/{group_id}/submit` (spec 024).
 - Returns `422` (`no_lines`) if the request has no lines (FR-003).
 
 ### `POST /requests/{request_id}/withdraw`
@@ -1427,6 +1482,9 @@ Request:
   after acquiring that lock.
 - Returns `200` with the updated request; `403` (`not_requester`) for another member;
   `404` for an invisible request; `409` (`already_decided_or_withdrawn`) for other states.
+- Returns `409` (`part_of_split`, `details.request_group_id`) when the request belongs to a
+  split group — grouped requests are withdrawn together via
+  `POST /request-groups/{group_id}/withdraw` (spec 024).
 
 ### `GET /approvals/pending`
 
@@ -1435,8 +1493,9 @@ Request:
 - Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50.
 - Returns `200` with `items` of `PurchaseRequest`, each embedding the full decision context
   (requester, branch, cost centre, lines, required-by date, `approval_step`, and `budget_status`
-  when applicable) so the approver never has to navigate elsewhere (FR-005). A decided request
-  no longer appears here.
+  when applicable) so the approver never has to navigate elsewhere (FR-005). Each request also
+  carries `request_group` (spec 024) — a `RequestGroupSummary` for a request that belongs to an
+  RFQ split, `null` for an ordinary request. A decided request no longer appears here.
 
 ### `POST /requests/{request_id}/approve` · `POST /requests/{request_id}/reject`
 
@@ -1455,6 +1514,9 @@ Request:
 - Returns `403` (`not_assigned_approver`) when the caller is neither the assignee nor an owner.
 - Returns `409` (`not_submitted` or `no_pending_approval`) when the request has already left
   `submitted` or the step is no longer pending.
+- Returns `409` (`part_of_split`, `details.request_group_id`) when the request belongs to a
+  split group — grouped requests are approved or rejected together via
+  `POST /request-groups/{group_id}/approve|reject` (spec 024).
 
 Request:
 ```json
@@ -2626,6 +2688,8 @@ different response that confirms existence.
 - Requires bearer auth.
 - Returns `RequestAllocation` with one item per request line: `source_request_line_id`,
   `requested_quantity`, `allocated_quantity`, and `remaining_quantity`.
+- `orders` lists the request's non-cancelled purchase orders (`id`, `order_number`, `status`),
+  oldest first by `created_at`, then `order_number`.
 - Allocation is computed from all PO lines linked to the request line. Non-cancelled orders count
   ordered quantity; cancelled orders count received quantity only.
 
@@ -2863,6 +2927,9 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
   workspace (`rfq_select` RLS policy); another workspace's RFQ returns `404`.
 - Returns the `Rfq` with its lines and recipients (`RfqDetail`), so a saved draft can be reopened
   for editing.
+- Also carries `converted_purchase_request_ids` (every purchase request prepared from this RFQ —
+  one per supplier in a split) and `request_group_id` (the split's group, once prepared)
+  (spec 024; rolling out).
 
 ### `PUT /rfq/{rfq_id}`
 
@@ -2918,7 +2985,9 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
 
 - Lists every RFQ visible to the caller, cursor-paginated (`limit` capped at 100), each with its
   recipient count, response count, and — once `status = converted` — the id of the purchase
-  request it produced.
+  request it produced. Each `RfqSummary` also carries `converted_purchase_request_ids` (every
+  purchase request prepared from the RFQ — one per supplier in a split) and `request_group_id`
+  (the split's group, once prepared) (spec 024).
 - Optional `status` filter.
 - Scoped per FR-016, same creator-plus-owner/buyer pattern as every list endpoint in this release.
 - Returns `200` with an `RfqList`.
@@ -2965,3 +3034,64 @@ plus a dedicated `rfq.auto_prepared` audit event distinct from the manual path's
 response that fails even one condition is left for the manual `POST /rfq/{rfq_id}/prepare-request`
 path with no special treatment. Disabling or tightening a guardrail only affects responses
 evaluated after the change (FR-014) — an already-fired event is never retroactively altered.
+
+## RFQ split and request groups (spec 024)
+
+A split of an RFQ becomes one group of purchase requests: one draft request per eligible
+supplier's reply, all sharing the split's branch, submitted, approved, rejected, and withdrawn
+only together, and routed to a single approver by the group's combined total. The group is
+immutable evidence (`purchase_request_group` in the data dictionary): which split, which branch,
+and the totals and saving as computed when it was prepared. Every mutation requires
+`Idempotency-Key`; tenant comes from the JWT, and a cross-tenant id answers `404`. Full
+contract: `specs/024-rfq-basket-split/contracts/rfq-split.openapi.yaml`.
+
+### `POST /rfq/{rfq_id}/split` (spec 024; rolling out)
+
+- Owner or buyer. Accepts `Idempotency-Key` (required).
+- Starts a basket split for the RFQ from its eligible replies: items (pack → base units) and
+  suppliers are built server-side from the RFQ's responses.
+- Returns `202` with the queued advanced basket job (the existing `BasketSplitJob` shape plus
+  `rfq_id`).
+- Returns `409` with `details.reason` one of: `rfq_already_converted`, `not_enough_replies`
+  (`details.eligible`, `details.unmatched_quotation_ids`), `mixed_currency`.
+
+### `POST /baskets/{basket_id}/prepare-requests` (spec 024; rolling out)
+
+- Accepts `Idempotency-Key` (required).
+- Turns a completed RFQ split into one draft request per supplier, all in one request group.
+- Request fields: required `branch_id`, required `required_by_date`; optional `cost_centre_id`;
+  optional `confirm_expired_quotation_ids` (replies past their expiry date that the buyer
+  confirmed).
+- Returns `201` with `request_group_id` and `purchase_request_ids`; a replay with the same key
+  returns `200` with the same body.
+- Returns `409` with `details.reason` one of: `not_rfq_split`, `split_not_completed`,
+  `split_stale`, `rfq_already_converted` (`details.purchase_request_ids`),
+  `allocation_not_whole_packs`, `expired_quotation_unconfirmed` (`details.quotation_ids`, and `details.expired_quotations`: `[{quotation_id, supplier_id}]` so the client can name each supplier).
+
+### `POST /request-groups/{group_id}/submit` (spec 024; rolling out)
+
+- Accepts `Idempotency-Key` (required).
+- Submits every request of the split at once and routes them to the approver for the group's
+  combined total (`approval_step.source = group_threshold_match`).
+- Returns `200` with the group's requests (a `PurchaseRequest` list, each with `request_group`).
+- Returns `409` (`not_draft`).
+
+### `POST /request-groups/{group_id}/approve` (spec 024; rolling out)
+
+- Accepts `Idempotency-Key` (required). Request fields: optional `comment`.
+- Approves every request of the split at once.
+- Returns `200` with the group's requests, all approved.
+- Returns `403` when the caller is not the assigned approver (or owner).
+- Returns `409` (`not_submitted`).
+
+### `POST /request-groups/{group_id}/reject` (spec 024; rolling out)
+
+- Accepts `Idempotency-Key` (required). Request fields: required `comment`.
+- Rejects every request of the split with one reason.
+- Returns `200` with the group's requests, all rejected.
+
+### `POST /request-groups/{group_id}/withdraw` (spec 024; rolling out)
+
+- Accepts `Idempotency-Key` (required).
+- Withdraws every request of the split.
+- Returns `200` with the group's requests, all withdrawn.

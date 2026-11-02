@@ -176,7 +176,7 @@ def load_risk_input(
                    md.matched_workspace_product_id as product_id,
                    lc.base_unit, lc.total_currency, lc.total_amount,
                    lc.normalised_base_quantity, lc.recorded_at, lc.valid_from, lc.valid_to
-            from landed_cost lc
+            from current_landed_cost lc
             join current_match_decision md
               on md.tenant_id = lc.tenant_id and md.id = lc.match_decision_id
             join quotation_line ql

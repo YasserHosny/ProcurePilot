@@ -1,5 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subject, takeUntil } from 'rxjs';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -31,6 +33,7 @@ import type {
   Money,
   NewQuotationLine,
   QuotationDetail,
+  QuotationReviewPatch,
   Supplier,
 } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
@@ -42,6 +45,7 @@ import { QuotationReviewBannersComponent } from './quotation-review-banners.comp
 import { QuotationDocPreviewComponent } from './quotation-doc-preview.component';
 import { QuotationLinesComponent } from './quotation-lines.component';
 import { QuotationAuditTrailComponent } from './quotation-audit-trail.component';
+import { sameReviewedValue } from './reviewed-value';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 interface FlaggedField {
@@ -138,10 +142,15 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
   private readonly sanitizer = inject(DomSanitizer);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly cancelLoads$ = new Subject<void>();
 
   readonly isLoading = signal<boolean>(true);
+  readonly loadFailed = signal<boolean>(false);
+  readonly isNotFound = signal<boolean>(false);
   readonly isSaving = signal<boolean>(false);
   readonly isConfirming = signal<boolean>(false);
+  readonly showNextStep = signal<boolean>(false);
   readonly isRefusing = signal<boolean>(false);
   readonly isArchiving = signal<boolean>(false);
   readonly isRetryingExtraction = signal<boolean>(false);
@@ -158,6 +167,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   readonly selectedSupplierId = signal<string | null>(null);
   readonly pendingQuotationCurrency = signal<string | undefined>(undefined);
+  readonly pendingPricesIncludeVat = signal<boolean | undefined>(undefined);
+  readonly pendingVatRate = signal<string | null | undefined>(undefined);
   readonly effectiveQuotationCurrency = computed(() => {
     const q = this.quotation();
     return this.pendingQuotationCurrency() ?? (q?.currency || q?.lines[0]?.unit_price?.currency ||
@@ -320,9 +331,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const computed = parseFloat(computedTotal.amount);
     if (Math.abs(stated - computed) <= 0.01) return false;
 
-    // If gap is explainable by document-level VAT, not a mismatch
+    // If gap is explainable by document-level VAT, not a mismatch. A VAT-inclusive quote's
+    // prices already contain VAT, so a gap there stays a mismatch (as on the server).
     const hasLineVat = this.hasEffectiveLineVat();
-    if (!hasLineVat && computed > 0 && stated > computed) {
+    if (!hasLineVat && !this.effectivePricesIncludeVat(q) && computed > 0 && stated > computed) {
       const inferredPct = Math.round(((stated - computed) / computed) * 100);
       if (inferredPct > 0 && inferredPct <= 30) {
         const recomputed = computed * (1 + inferredPct / 100);
@@ -349,7 +361,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const computed = parseFloat(computedTotal.amount);
     if (Math.abs(stated - computed) <= 0.01) return null;
     const hasLineVat = this.hasEffectiveLineVat();
-    if (!hasLineVat && computed > 0 && stated > computed) {
+    if (!hasLineVat && !this.effectivePricesIncludeVat(q) && computed > 0 && stated > computed) {
       const pct = Math.round(((stated - computed) / computed) * 100);
       if (pct > 0 && pct <= 30) {
         const recomputed = computed * (1 + pct / 100);
@@ -373,6 +385,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     return (
       this.pendingCorrections().size > 0 ||
       this.pendingQuotationCurrency() !== undefined ||
+      this.pendingPricesIncludeVat() !== undefined ||
+      this.pendingVatRate() !== undefined ||
       this.reviewerNotes() !== (q?.reviewer_notes || '') ||
       this.pendingNewLines().length > 0 ||
       this.pendingRemoveLineIds().size > 0
@@ -383,29 +397,96 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.handleKeyboardEvent(event);
   };
 
+  private resetPerQuotationState(): void {
+    this.cancelLoads$.next();
+    this.quotation.set(null);
+    this.loadFailed.set(false);
+    this.isNotFound.set(false);
+
+    this.pendingCorrections.set(new Map());
+    this.pendingNewLines.set([]);
+    this.pendingRemoveLineIds.set(new Set());
+    this.isAddingLine.set(false);
+    this.newLineText.set('');
+    this.newLineQuantity.set('');
+    this.newLinePriceAmount.set('');
+
+    this.pendingQuotationCurrency.set(undefined);
+    this.pendingPricesIncludeVat.set(undefined);
+    this.pendingVatRate.set(undefined);
+
+    this.reviewerNotes.set('');
+    this.selectedSupplierId.set(null);
+    this.isRequote.set(false);
+    this.selectedPreviousQuotationId.set(null);
+    this.isCreatingSupplierFromExtraction.set(false);
+
+    this.activeExtraction.set(null);
+    this.documentPreviewUrl.set(null);
+    this.currentFlaggedIndex.set(0);
+
+    this.auditTrail.set([]);
+    this.isLoadingAudit.set(false);
+
+    this.matchingSetupStatus.set('idle');
+    this.matchingSetupError.set(null);
+
+    this.errorMessage.set(null);
+    this.errorTraceId.set(null);
+    this.confirmBlockedReason.set(null);
+
+    this.isSaving.set(false);
+    this.isConfirming.set(false);
+    this.showNextStep.set(false);
+    this.isRefusing.set(false);
+    this.isArchiving.set(false);
+    this.isRetryingExtraction.set(false);
+    this.isReplacingDocument.set(false);
+    this.isExporting.set(false);
+    this.mismatchAcknowledged.set(false);
+    this.confirmDialogVisible.set(false);
+  }
+
   ngOnInit(): void {
     window.addEventListener('keydown', this.onKeyDownCapture, { capture: true });
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      this.quotationId.set(id);
-      this.loadQuotation(id);
-      this.loadSuppliers();
-      this.loadPriorQuotations();
-    }
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const id = params.get('id');
+      if (id) {
+        this.quotationId.set(id);
+        this.resetPerQuotationState();
+        this.loadQuotation(id);
+        if (this.suppliers().length === 0) {
+          this.loadSuppliers();
+        }
+        this.loadPriorQuotations();
+      }
+    });
   }
 
   ngOnDestroy(): void {
     window.removeEventListener('keydown', this.onKeyDownCapture, { capture: true });
+    this.cancelLoads$.next();
+    this.cancelLoads$.complete();
   }
 
-  loadQuotation(id: string): void {
-    this.isLoading.set(true);
+  loadQuotation(id: string, options?: { silent?: boolean }): void {
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      this.isLoading.set(true);
+      this.loadFailed.set(false);
+      this.isNotFound.set(false);
+    }
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
 
-    this.api.getQuotation(id).subscribe({
+    this.api
+      .getQuotation(id)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: (q) => {
         this.quotation.set(q);
+        this.loadFailed.set(false);
+        this.isNotFound.set(false);
         this.reviewerNotes.set(q.reviewer_notes || '');
         this.selectedSupplierId.set(q.supplier_id || null);
         this.pendingQuotationCurrency.set(undefined);
@@ -414,28 +495,49 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
           this.selectedPreviousQuotationId.set(q.previous_quotation_id);
         }
 
-        // Set default active extraction if any flagged field exists
-        const flagged = this.flaggedFields();
-        if (flagged.length > 0) {
-          this.activeExtraction.set(flagged[0].extraction);
-        } else {
-          const defaultExtraction = this.defaultExtraction(q);
-          if (defaultExtraction) this.activeExtraction.set(defaultExtraction);
-        }
+        if (!silent) {
+          // Set default active extraction if any flagged field exists
+          const flagged = this.flaggedFields();
+          if (flagged.length > 0) {
+            this.activeExtraction.set(flagged[0].extraction);
+          } else {
+            const defaultExtraction = this.defaultExtraction(q);
+            if (defaultExtraction) this.activeExtraction.set(defaultExtraction);
+          }
 
-        this.isLoading.set(false);
+          this.isLoading.set(false);
+        }
         this.loadDocumentPreview(q.document.id);
         this.loadAuditTrail(q.id);
       },
       error: (err: unknown) => {
-        this.isLoading.set(false);
+        if (!silent) {
+          this.isLoading.set(false);
+          this.loadFailed.set(true);
+          if (err instanceof HttpErrorResponse && err.status === 404) {
+            this.isNotFound.set(true);
+          }
+        }
         this.handleError(err);
+        if (!silent) {
+          if (err instanceof HttpErrorResponse && err.status === 404) {
+            this.errorMessage.set(this.translate.instant('quotations.review.loadError.notFound'));
+          } else {
+            const apiError = err instanceof HttpErrorResponse ? (err.error as ApiError | undefined) : null;
+            if (!apiError?.message) {
+              this.errorMessage.set(this.translate.instant('quotations.review.actions.genericError'));
+            }
+          }
+        }
       },
     });
   }
 
   private loadDocumentPreview(documentId: string): void {
-    this.api.getDocumentDownloadUrl(documentId).subscribe({
+    this.api
+      .getDocumentDownloadUrl(documentId)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: ({ download_url }) => {
         this.documentPreviewUrl.set(download_url);
       },
@@ -484,7 +586,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     if (!quotationId) return;
     this.isLoadingAudit.set(true);
 
-    this.api.getAuditTrail(quotationId).subscribe({
+    this.api
+      .getAuditTrail(quotationId)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: (res) => {
         this.auditTrail.set(res.items);
         this.isLoadingAudit.set(false);
@@ -541,7 +646,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     if (!name) return;
     this.isCreatingSupplierFromExtraction.set(true);
     this.errorMessage.set(null);
-    this.api.createSupplier({ name }).subscribe({
+    this.api
+      .createSupplier({ name })
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: (supplier) => {
         this.suppliers.update((items) => [...items, supplier]);
         this.selectedSupplierId.set(supplier.id);
@@ -583,6 +691,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       issue_date: 'Issue Date',
       expiry_date: 'Expiry Date',
       stated_total: 'Stated Total',
+      prices_include_vat: this.translate.instant('quotations.review.header.pricesIncludeVatLabel'),
       quantity: 'Quantity',
       unit_price: 'Unit Price',
       discount: 'Discount',
@@ -639,6 +748,29 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     return this.pendingCorrections().has(fe.id) || fe.corrected_value !== null && fe.corrected_value !== undefined;
   }
 
+  isFieldChanged(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): boolean {
+    const fe = this.getFieldExtraction(entityType, entityId, fieldName);
+    if (!fe) return false;
+    const effective = this.pendingCorrections().has(fe.id)
+      ? this.pendingCorrections().get(fe.id)
+      : fe.corrected_value;
+    if (effective === null || effective === undefined) return false;
+    return !sameReviewedValue(effective, fe.extracted_value);
+  }
+
+  isFieldConfirmedAsIs(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): boolean {
+    const fe = this.getFieldExtraction(entityType, entityId, fieldName);
+    if (!fe) return false;
+    const hasCorrection =
+      this.pendingCorrections().has(fe.id) ||
+      (fe.corrected_value !== null && fe.corrected_value !== undefined);
+    if (!hasCorrection) return false;
+    const effective = this.pendingCorrections().has(fe.id)
+      ? this.pendingCorrections().get(fe.id)
+      : fe.corrected_value;
+    return sameReviewedValue(effective, fe.extracted_value);
+  }
+
   getFieldConfidence(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): number {
     const fe = this.getFieldExtraction(entityType, entityId, fieldName);
     if (!fe) return 1.0;
@@ -679,6 +811,75 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     if (field) this.updateCorrection(field.id, currency);
     else this.pendingQuotationCurrency.set(currency);
   }
+
+  effectivePricesIncludeVat(q: QuotationDetail | null): boolean {
+    if (!q) return false;
+    if (this.pendingPricesIncludeVat() !== undefined) {
+      return this.pendingPricesIncludeVat()!;
+    }
+    const fe = this.getFieldExtraction('quotation', q.id, 'prices_include_vat');
+    if (fe) {
+      if (this.pendingCorrections().has(fe.id)) {
+        return Boolean(this.pendingCorrections().get(fe.id));
+      }
+    }
+    // The quote holds the latest saved basis; a header field keeps only its first correction.
+    return Boolean(q.prices_include_vat);
+  }
+
+  effectiveVatRate(q: QuotationDetail | null): string | null {
+    if (!q) return null;
+    if (this.pendingVatRate() !== undefined) {
+      return this.pendingVatRate()!;
+    }
+    const fe = this.getFieldExtraction('quotation', q.id, 'vat_rate');
+    if (fe) {
+      if (this.pendingCorrections().has(fe.id)) {
+        const val = this.pendingCorrections().get(fe.id);
+        return val !== null && val !== undefined ? String(val) : null;
+      }
+    }
+    return q.vat_rate ?? null;
+  }
+
+  formatVatRatePercent(rateFraction: string | null): string {
+    if (!rateFraction) return '';
+    const num = parseFloat(rateFraction);
+    if (isNaN(num)) return '';
+    return String(Math.round(num * 10000) / 100);
+  }
+
+  pricesIncludeVatToggled(checked: boolean): void {
+    const q = this.quotation();
+    this.pendingPricesIncludeVat.set(checked);
+    if (q) {
+      const fe = this.getFieldExtraction('quotation', q.id, 'prices_include_vat');
+      if (fe) {
+        this.updateCorrection(fe.id, checked);
+      }
+    }
+  }
+
+  vatRateInputChanged(val: string): void {
+    const q = this.quotation();
+    const trimmed = val.trim();
+    let fraction: string | null = null;
+    if (trimmed !== '') {
+      const num = Number(trimmed);
+      if (Number.isFinite(num) && num >= 0 && num <= 100) {
+        fraction = (num / 100).toString();
+      }
+    }
+    this.pendingVatRate.set(fraction);
+    if (q) {
+      const fe = this.getFieldExtraction('quotation', q.id, 'vat_rate');
+      if (fe && fraction !== null) {
+        this.updateCorrection(fe.id, fraction);
+      }
+    }
+  }
+
+  readonly invalidVatRate = computed(() => this.pendingVatRate() === null);
 
   reviewFieldValue(
     entityType: 'quotation' | 'quotation_line',
@@ -827,9 +1028,41 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.reviewerNotes.set(value);
   }
 
+  private buildReviewPatch(corrections: FieldCorrection[]): QuotationReviewPatch {
+    const q = this.quotation();
+    const patch: Record<string, unknown> = {
+      supplier_id: this.selectedSupplierId(),
+      reviewer_notes: this.reviewerNotes() || null,
+      corrections,
+      add_lines: this.pendingNewLines(),
+      remove_line_ids: Array.from(this.pendingRemoveLineIds()),
+    };
+    if (this.pendingQuotationCurrency() !== undefined) {
+      patch['currency'] = this.pendingQuotationCurrency();
+    }
+    if (this.pendingPricesIncludeVat() !== undefined) {
+      patch['prices_include_vat'] = this.pendingPricesIncludeVat();
+    } else {
+      const fe = q ? this.getFieldExtraction('quotation', q.id, 'prices_include_vat') : null;
+      if (fe && this.pendingCorrections().has(fe.id)) {
+        patch['prices_include_vat'] = Boolean(this.pendingCorrections().get(fe.id));
+      }
+    }
+    if (this.pendingVatRate() !== undefined && this.pendingVatRate() !== null) {
+      patch['vat_rate'] = this.pendingVatRate();
+    } else {
+      const fe = q ? this.getFieldExtraction('quotation', q.id, 'vat_rate') : null;
+      if (fe && this.pendingCorrections().has(fe.id)) {
+        const value = this.pendingCorrections().get(fe.id);
+        if (typeof value === 'string') patch['vat_rate'] = value;
+      }
+    }
+    return patch as QuotationReviewPatch;
+  }
+
   saveCorrections(): void {
     const q = this.quotation();
-    if (!q) return;
+    if (!q || this.invalidVatRate()) return;
 
     this.isSaving.set(true);
     this.errorMessage.set(null);
@@ -841,21 +1074,15 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     }
 
     this.api
-      .patchQuotation(q.id, {
-        supplier_id: this.selectedSupplierId(),
-        ...(this.pendingQuotationCurrency() !== undefined
-          ? { currency: this.pendingQuotationCurrency() }
-          : {}),
-        reviewer_notes: this.reviewerNotes() || null,
-        corrections,
-        add_lines: this.pendingNewLines(),
-        remove_line_ids: Array.from(this.pendingRemoveLineIds()),
-      })
+      .patchQuotation(q.id, this.buildReviewPatch(corrections))
+      .pipe(takeUntil(this.cancelLoads$))
       .subscribe({
         next: (updated) => {
           this.quotation.set(updated);
           this.pendingCorrections.set(new Map());
           this.pendingQuotationCurrency.set(undefined);
+          this.pendingPricesIncludeVat.set(undefined);
+          this.pendingVatRate.set(undefined);
           this.pendingNewLines.set([]);
           this.pendingRemoveLineIds.set(new Set());
           this.isSaving.set(false);
@@ -874,6 +1101,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   }
 
   requestConfirm(): void {
+    if (this.invalidVatRate()) return;
     if (!this.selectedSupplierId()) {
       this.confirmBlockedReason.set(
         this.translate.instant('quotations.review.actions.confirmBlockedMissingSupplier'),
@@ -889,7 +1117,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   confirmQuotation(): void {
     const q = this.quotation();
-    if (!q) return;
+    if (!q || this.invalidVatRate()) return;
 
     this.confirmDialogVisible.set(false);
     this.isConfirming.set(true);
@@ -901,12 +1129,16 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const lineChangesNeedSaving =
       this.pendingNewLines().length > 0 || this.pendingRemoveLineIds().size > 0;
     const currencyNeedsSaving = this.pendingQuotationCurrency() !== undefined;
+    const vatInclusiveNeedsSaving = this.pendingPricesIncludeVat() !== undefined;
+    const vatRateNeedsSaving = this.pendingVatRate() !== undefined;
     if (
       this.pendingCorrections().size > 0 ||
       currencyNeedsSaving ||
       supplierNeedsSaving ||
       notesNeedSaving ||
-      lineChangesNeedSaving
+      lineChangesNeedSaving ||
+      vatInclusiveNeedsSaving ||
+      vatRateNeedsSaving
     ) {
       const corrections: FieldCorrection[] = [];
       for (const [field_extraction_id, corrected_value] of this.pendingCorrections().entries()) {
@@ -914,21 +1146,15 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       }
 
       this.api
-        .patchQuotation(q.id, {
-          supplier_id: this.selectedSupplierId(),
-          ...(this.pendingQuotationCurrency() !== undefined
-            ? { currency: this.pendingQuotationCurrency() }
-            : {}),
-          reviewer_notes: this.reviewerNotes() || null,
-          corrections,
-          add_lines: this.pendingNewLines(),
-          remove_line_ids: Array.from(this.pendingRemoveLineIds()),
-        })
+        .patchQuotation(q.id, this.buildReviewPatch(corrections))
+        .pipe(takeUntil(this.cancelLoads$))
         .subscribe({
           next: (updated) => {
             this.quotation.set(updated);
             this.pendingCorrections.set(new Map());
             this.pendingQuotationCurrency.set(undefined);
+            this.pendingPricesIncludeVat.set(undefined);
+            this.pendingVatRate.set(undefined);
             this.pendingNewLines.set([]);
             this.pendingRemoveLineIds.set(new Set());
             this.executeConfirm(q.id);
@@ -950,7 +1176,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.isRefusing.set(true);
     this.errorMessage.set(null);
 
-    this.api.refuseQuotation(q.id).subscribe({
+    this.api
+      .refuseQuotation(q.id)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: () => {
         this.isRefusing.set(false);
         this.loadQuotation(q.id);
@@ -977,7 +1206,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.isArchiving.set(true);
     this.errorMessage.set(null);
 
-    this.api.archiveQuotation(q.id).subscribe({
+    this.api
+      .archiveQuotation(q.id)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: () => {
         this.isArchiving.set(false);
         this.snackBar.open(this.translate.instant('quotations.review.archived'), undefined, {
@@ -1002,7 +1234,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.isRetryingExtraction.set(true);
     this.errorMessage.set(null);
 
-    this.api.retryExtraction(q.id).subscribe({
+    this.api
+      .retryExtraction(q.id)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: (updated) => {
         this.isRetryingExtraction.set(false);
         this.loadQuotation(updated.id);
@@ -1015,6 +1250,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   }
 
   onReplaceDocumentSelected(event: Event): void {
+    if (this.isConfirming()) return;
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
@@ -1032,11 +1268,20 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.isReplacingDocument.set(true);
     this.errorMessage.set(null);
 
-    this.api.presignDocument({ filename: file.name, mime_type: mimeType, size_bytes: file.size }).subscribe({
+    this.api
+      .presignDocument({ filename: file.name, mime_type: mimeType, size_bytes: file.size })
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: (presign) => {
-        this.api.uploadFileToStorage(presign.upload_url, file, presign.upload_fields).subscribe({
+        this.api
+          .uploadFileToStorage(presign.upload_url, file, presign.upload_fields)
+          .pipe(takeUntil(this.cancelLoads$))
+          .subscribe({
           next: () => {
-            this.api.replaceDocument(q.id, presign.document_id).subscribe({
+            this.api
+              .replaceDocument(q.id, presign.document_id)
+              .pipe(takeUntil(this.cancelLoads$))
+              .subscribe({
               next: () => {
                 this.isReplacingDocument.set(false);
                 this.loadQuotation(q.id);
@@ -1072,7 +1317,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.isExporting.set(true);
     this.errorMessage.set(null);
 
-    this.api.exportQuotation(q.id).subscribe({
+    this.api
+      .exportQuotation(q.id)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: (blob) => {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1157,6 +1405,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   private calculateLineTotal(amounts: EffectiveLineAmounts): number {
     const lineNet = amounts.quantity * amounts.unitPrice + amounts.deliveryFee - amounts.discount;
+    // A VAT-inclusive quote's prices already contain the rate (ADR-021): mirror the server.
+    if (this.effectivePricesIncludeVat(this.quotation())) return lineNet;
     return lineNet * (1 + amounts.vatRate);
   }
 
@@ -1197,10 +1447,22 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
         previous_quotation_id: previousQuotationId,
         acknowledge_mismatch: this.mismatchAcknowledged() || undefined,
       })
+      .pipe(takeUntil(this.cancelLoads$))
       .subscribe({
         next: (confirmed) => {
           this.isConfirming.set(false);
-          this.loadQuotation(confirmed.id);
+          this.showNextStep.set(true);
+          this.quotation.update((current) =>
+            current
+              ? {
+                  ...current,
+                  status: confirmed.status,
+                  reviewed_by: confirmed.reviewed_by,
+                  reviewed_at: confirmed.reviewed_at,
+                }
+              : null,
+          );
+          this.loadQuotation(confirmed.id, { silent: true });
           this.snackBar.open(
             this.translate.instant('quotations.review.actions.confirmSuccess'),
             undefined,
@@ -1233,7 +1495,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     if (!quotationId) return;
     this.matchingSetupStatus.set('loading');
     this.matchingSetupError.set(null);
-    this.api.getQuotationMatches(quotationId).subscribe({
+    this.api
+      .getQuotationMatches(quotationId)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: () => this.matchingSetupStatus.set('ready'),
       error: (err: unknown) => {
         this.matchingSetupStatus.set('error');

@@ -352,3 +352,50 @@ def test_real_db_signup_retries_when_base_slug_is_occupied() -> None:
                 (invitation_id, blocker_invitation),
             )
             cur.execute("set session_replication_role = default")
+
+
+@pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL is not set")
+def test_real_db_signup_names_the_owner() -> None:
+    """PPS-125: the owner's name from sign-up is their membership's display name."""
+    import psycopg
+
+    from procurepilot_api.config import get_settings
+    from procurepilot_api.modules.tenants.service import TenantSignupRepository
+
+    suffix = uuid4().hex
+    user_id, invitation_id = uuid4(), uuid4()
+    email = f"signup-name-{suffix}@example.test"
+    token = suffix.ljust(32, "n")
+    tenant_ids: list[UUID] = []
+    try:
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+            cur.execute("insert into auth.users (id,email) values (%s,%s)", (user_id, email))
+            cur.execute(
+                "insert into platform_invitation (id,email,token_hash,expires_at) "
+                "values (%s,%s,%s,now()+interval '7 days')",
+                (invitation_id, email, hash_platform_invitation_token(token)),
+            )
+        request = SignupRequest(
+            invitation_token=token,
+            email=email,
+            password="correct-horse-password",
+            business_name=f"Names {suffix[:8]}",
+            region="GB",
+            currency="GBP",
+            tax_model="uk_vat",
+            display_name="  المالك ",
+        )
+        created = TenantSignupRepository(get_settings()).create_workspace(request, user_id)
+        tenant_ids.append(created.tenant.id)
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            row = conn.execute(
+                "select display_name from membership where id = %s", (created.membership_id,)
+            ).fetchone()
+        assert row == ("المالك",)
+    finally:
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+            cur.execute("set session_replication_role = replica")
+            cur.execute("delete from tenant where id = any(%s)", (tenant_ids,))
+            cur.execute("delete from auth.users where id = %s", (user_id,))
+            cur.execute("delete from platform_invitation where id = %s", (invitation_id,))
+            cur.execute("set session_replication_role = default")

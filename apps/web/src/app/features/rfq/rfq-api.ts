@@ -2,7 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-import type { QuotationStatus } from '../../core/api/models';
+import type { QuotationStatus, BasketSplitJob } from '../../core/api/models';
 import { environment } from '../../../environments/environment';
 
 export interface Rfq {
@@ -14,6 +14,7 @@ export interface Rfq {
   tenant_terms: string | null;
   idempotency_key: string;
   created_at: string;
+  sent_at?: string | null;
 }
 
 export interface RfqLine {
@@ -45,6 +46,8 @@ export interface RfqDetail {
   rfq: Rfq;
   lines: RfqLine[];
   recipients: RfqRecipient[];
+  converted_purchase_request_ids?: string[];
+  request_group_id?: string | null;
 }
 
 export interface RfqCreatePayload {
@@ -68,26 +71,39 @@ export interface RfqSendResponse {
 
 export interface RfqResponseLineComparison {
   workspace_product_id: string | null;
+  original_text: string;
   quoted_quantity: string;
   quoted_unit_price_amount: string;
   quoted_unit_price_currency: string;
   pending_match: boolean;
 }
 
+export interface RfqLandedCost {
+  workspace_product_id: string;
+  total_amount: string;
+  total_currency: string;
+}
+
 export interface RfqResponseComparison {
   id: string;
   rfq_id: string;
   supplier_id: string;
+  quotation_id: string;
   submitted_at: string;
   quotation_status: QuotationStatus;
   lines: RfqResponseLineComparison[];
   guardrail_evaluations?: RfqGuardrailEvaluation[];
+  /** Landed cost for the RFQ's requested quantity of each priced product. */
+  rfq_landed_costs?: RfqLandedCost[];
+  /** Supplier has delivery-fee / minimum-order / tier terms in force. */
+  supplier_terms_apply?: boolean;
 }
 
 export interface RfqGuardrailEvaluation {
   guardrail_id: string;
   fired: boolean;
   reason: string;
+  purchase_request_id?: string | null;
 }
 
 export interface RfqGuardrail {
@@ -131,6 +147,8 @@ export interface RfqSummary {
   recipient_count: number;
   response_count: number;
   converted_purchase_request_id: string | null;
+  converted_purchase_request_ids?: string[];
+  request_group_id?: string | null;
 }
 
 export interface RfqList {
@@ -190,6 +208,13 @@ export class RfqApi {
     return this.http.post<PrepareRequestResponse>(
       `${this.baseUrl}/${rfqId}/prepare-request`, payload, { headers },
     );
+  }
+
+  splitRfq(rfqId: string, idempotencyKey?: string): Observable<BasketSplitJob> {
+    const headers = new HttpHeaders({
+      'Idempotency-Key': idempotencyKey || crypto.randomUUID(),
+    });
+    return this.http.post<BasketSplitJob>(`${this.baseUrl}/${rfqId}/split`, {}, { headers });
   }
 
   listRfqs(status?: string, cursor?: string, limit?: number): Observable<RfqList> {

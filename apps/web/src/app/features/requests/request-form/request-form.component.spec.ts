@@ -2,7 +2,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink, provideRouter } from '@angular/router';
+import { By } from '@angular/platform-browser';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, Subject, throwError } from 'rxjs';
 
@@ -11,6 +12,7 @@ import { ApiService } from '../../../core/api/api.service';
 import type { BranchList, Member, PurchaseRequest } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
+import { OrdersApiService } from '../../orders/orders-api';
 import { RequestFormComponent } from './request-form.component';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
@@ -23,6 +25,9 @@ const mockRequest: PurchaseRequest = {
   status: 'draft',
   lines: [
     {
+      quoted_prices_include_vat: false,
+      quoted_vat_rate: null,
+      quoted_net_unit_price: null,
       id: 'l1',
       workspace_product_id: 'wp1',
       quantity: '10.000000',
@@ -38,6 +43,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
   let component: RequestFormComponent;
   let fixture: ComponentFixture<RequestFormComponent>;
   let requestsApi: jasmine.SpyObj<RequestsApiService>;
+  let ordersApi: jasmine.SpyObj<OrdersApiService>;
   let organisationApi: jasmine.SpyObj<OrganisationApiService>;
   let api: jasmine.SpyObj<ApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
@@ -48,8 +54,25 @@ describe('RequestFormComponent — create mode (T017)', () => {
       'createRequest',
       'updateRequest',
       'submitRequest',
+      'submitGroup',
+      'withdrawGroup',
       'getRequest',
     ]);
+    ordersApi = jasmine.createSpyObj('OrdersApiService', ['getAllocations']);
+    ordersApi.getAllocations.and.returnValue(
+      of({
+        source_request_id: 'r1',
+        lines: [
+          {
+            source_request_line_id: 'l1',
+            requested_quantity: '10.000000',
+            allocated_quantity: '0',
+            remaining_quantity: '10.000000',
+          },
+        ],
+        orders: [],
+      }),
+    );
     organisationApi = jasmine.createSpyObj('OrganisationApiService', [
       'listBranches',
       'listCostCentres',
@@ -67,7 +90,9 @@ describe('RequestFormComponent — create mode (T017)', () => {
       imports: [RequestFormComponent],
       providers: [
         provideTranslateService(),
+        provideRouter([]),
         { provide: RequestsApiService, useValue: requestsApi },
+        { provide: OrdersApiService, useValue: ordersApi },
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: api },
         {
@@ -208,6 +233,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
   let component: RequestFormComponent;
   let fixture: ComponentFixture<RequestFormComponent>;
   let requestsApi: jasmine.SpyObj<RequestsApiService>;
+  let ordersApi: jasmine.SpyObj<OrdersApiService>;
   let organisationApi: jasmine.SpyObj<OrganisationApiService>;
   let api: jasmine.SpyObj<ApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
@@ -218,8 +244,25 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       'createRequest',
       'updateRequest',
       'submitRequest',
+      'submitGroup',
+      'withdrawGroup',
       'getRequest',
     ]);
+    ordersApi = jasmine.createSpyObj('OrdersApiService', ['getAllocations']);
+    ordersApi.getAllocations.and.returnValue(
+      of({
+        source_request_id: 'r1',
+        lines: [
+          {
+            source_request_line_id: 'l1',
+            requested_quantity: '10.000000',
+            allocated_quantity: '0',
+            remaining_quantity: '10.000000',
+          },
+        ],
+        orders: [],
+      }),
+    );
     organisationApi = jasmine.createSpyObj('OrganisationApiService', [
       'listBranches',
       'listCostCentres',
@@ -254,7 +297,9 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       imports: [RequestFormComponent],
       providers: [
         provideTranslateService(),
+        provideRouter([]),
         { provide: RequestsApiService, useValue: requestsApi },
+        { provide: OrdersApiService, useValue: ordersApi },
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: api },
         {
@@ -453,7 +498,10 @@ describe('RequestFormComponent — edit mode (T017)', () => {
   });
 
   it('should display a fallback for a line without price history', () => {
-    const noEstimateLine = { id: 'l2', workspace_product_id: 'wp2', quantity: '5.000000' };
+    const noEstimateLine = {
+      quoted_prices_include_vat: false, quoted_vat_rate: null, quoted_net_unit_price: null,
+      id: 'l2', workspace_product_id: 'wp2', quantity: '5.000000',
+    };
     expect(component.formatEstimate(noEstimateLine)).toBe(
       'No price history available for this product.',
     );
@@ -731,5 +779,336 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     const compiled = hostFixture.nativeElement as HTMLElement;
     const section = compiled.querySelector('.approval-step');
     expect(section?.textContent).toContain('unknown-approver-id');
+  });
+
+  it('renders a source line linking to RFQ and quote and naming the supplier with dir="auto"', () => {
+    const sourcedRequest: PurchaseRequest = {
+      ...mockRequest,
+      source: {
+        rfq_id: 'rfq-123',
+        rfq_response_id: 'resp-456',
+        quotation_id: 'quote-789',
+        supplier_id: 'sup-1',
+        supplier_name: 'الوفرة للمواد الغذائية',
+      },
+    };
+    requestsApi.getRequest.and.returnValue(of(sourcedRequest));
+
+    const hostFixture = TestBed.createComponent(RequestFormComponent);
+    hostFixture.detectChanges();
+
+    const compiled = hostFixture.nativeElement as HTMLElement;
+    const sourceLine = compiled.querySelector('[data-testid="request-source-line"]');
+    expect(sourceLine).toBeTruthy();
+    expect(sourceLine?.textContent).toContain('الوفرة للمواد الغذائية');
+
+    const supplierSpan = sourceLine?.querySelector('.source-supplier');
+    expect(supplierSpan?.getAttribute('dir')).toBe('auto');
+
+    const linkDirectives = hostFixture.debugElement.queryAll(By.directive(RouterLink));
+    expect(linkDirectives.length).toBe(2);
+    const getLinkInput = (dir: typeof linkDirectives[0]) =>
+      (dir.injector.get(RouterLink) as unknown as Record<string, () => unknown>)['routerLinkInput']();
+    expect(getLinkInput(linkDirectives[0])).toEqual(['/rfq', 'rfq-123']);
+    expect(getLinkInput(linkDirectives[1])).toEqual(['/quotations', 'quote-789', 'review']);
+  });
+
+  describe('Spec 024 User Story 3 (T030) — Grouped request', () => {
+    const groupedRequest: PurchaseRequest = {
+      ...mockRequest,
+      status: 'draft',
+      request_group: {
+        id: 'grp-001',
+        rfq_id: 'rfq-split-001',
+        position: 1,
+        size: 2,
+        combined_total: { amount: '4063.00', currency: 'SAR' },
+        best_single_total: { amount: '4137.00', currency: 'SAR' },
+        saving: { amount: '74.00', currency: 'SAR' },
+        sibling_request_ids: ['r2'],
+      },
+    };
+
+    it('shows 1 of 2 and links to sibling request', () => {
+      requestsApi.getRequest.and.returnValue(of(groupedRequest));
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const compiled = hostFixture.nativeElement as HTMLElement;
+      expect(compiled.textContent).toContain('1 of 2');
+      expect(compiled.textContent).toContain('Part of a split');
+      expect(compiled.textContent).toContain('4,063');
+
+      const siblingLinks = compiled.querySelectorAll('a.sibling-link');
+      expect(siblingLinks.length).toBe(1);
+    });
+
+    it('a grouped draft renders read-only with no Save and explains why', () => {
+      requestsApi.getRequest.and.returnValue(of(groupedRequest));
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const comp = hostFixture.componentInstance;
+      const compiled = hostFixture.nativeElement as HTMLElement;
+
+      expect(comp.isReadOnly()).toBeTrue();
+      expect(comp.form.disabled).toBeTrue();
+      expect(compiled.querySelector('button[type="submit"]')).toBeNull();
+      expect(compiled.textContent).toContain(
+        'Part of a split: these requests are submitted and approved together',
+      );
+      expect(compiled.querySelector('.submit-request-btn')).toBeTruthy();
+    });
+
+    it('Submit calls submitGroup once directly and never updateRequest', () => {
+      requestsApi.getRequest.and.returnValue(of(groupedRequest));
+      requestsApi.submitGroup.and.returnValue(of([groupedRequest]));
+
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const compiled = hostFixture.nativeElement as HTMLElement;
+      const submitBtn = compiled.querySelector('.submit-request-btn') as HTMLButtonElement;
+      expect(submitBtn).toBeTruthy();
+      expect(submitBtn.textContent).toContain('Submits both requests of this split');
+
+      submitBtn.click();
+      hostFixture.detectChanges();
+
+      expect(requestsApi.submitGroup).toHaveBeenCalledTimes(1);
+      expect(requestsApi.submitGroup.calls.mostRecent().args[0]).toBe('grp-001');
+      expect(requestsApi.submitGroup.calls.mostRecent().args[1]).toEqual(jasmine.any(String));
+      expect(requestsApi.updateRequest).not.toHaveBeenCalled();
+      expect(requestsApi.submitRequest).not.toHaveBeenCalled();
+    });
+
+    it('a retry after an error reuses the same key', () => {
+      requestsApi.getRequest.and.returnValue(of(groupedRequest));
+      requestsApi.submitGroup.and.returnValue(throwError(() => new Error('Network error')));
+
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const compiled = hostFixture.nativeElement as HTMLElement;
+      const submitBtn = compiled.querySelector('.submit-request-btn') as HTMLButtonElement;
+
+      // First click -> error
+      submitBtn.click();
+      hostFixture.detectChanges();
+
+      expect(requestsApi.submitGroup).toHaveBeenCalledTimes(1);
+      const firstKey = requestsApi.submitGroup.calls.mostRecent().args[1];
+      expect(firstKey).toBeTruthy();
+
+      // Retry click -> reuses key
+      requestsApi.submitGroup.and.returnValue(of([groupedRequest]));
+      submitBtn.click();
+      hostFixture.detectChanges();
+
+      expect(requestsApi.submitGroup).toHaveBeenCalledTimes(2);
+      const retryKey = requestsApi.submitGroup.calls.mostRecent().args[1];
+      expect(retryKey).toBe(firstKey);
+    });
+
+    it('withdraw retry after an error reuses the same key', () => {
+      const submittedGrouped = { ...groupedRequest, status: 'submitted' as const };
+      requestsApi.getRequest.and.returnValue(of(submittedGrouped));
+      requestsApi.withdrawGroup.and.returnValue(throwError(() => new Error('Server error')));
+
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const compiled = hostFixture.nativeElement as HTMLElement;
+      const withdrawBtn = compiled.querySelector('.withdraw-request-btn') as HTMLButtonElement;
+      expect(withdrawBtn).toBeTruthy();
+
+      // First click -> error
+      withdrawBtn.click();
+      hostFixture.detectChanges();
+
+      expect(requestsApi.withdrawGroup).toHaveBeenCalledTimes(1);
+      const firstKey = requestsApi.withdrawGroup.calls.mostRecent().args[1];
+      expect(firstKey).toBeTruthy();
+
+      // Retry click -> reuses key
+      requestsApi.withdrawGroup.and.returnValue(of([submittedGrouped]));
+      withdrawBtn.click();
+      hostFixture.detectChanges();
+
+      expect(requestsApi.withdrawGroup).toHaveBeenCalledTimes(2);
+      const retryKey = requestsApi.withdrawGroup.calls.mostRecent().args[1];
+      expect(retryKey).toBe(firstKey);
+    });
+
+    it('part_of_split shows the message pointing to the group action', () => {
+      requestsApi.getRequest.and.returnValue(of(mockRequest));
+      requestsApi.updateRequest.and.returnValue(of(mockRequest));
+      const errorResp = new HttpErrorResponse({
+        error: { code: 'conflict', message: 'Conflict', details: { reason: 'part_of_split' } },
+        status: 409,
+        statusText: 'Conflict',
+      });
+      requestsApi.submitRequest.and.returnValue(throwError(() => errorResp));
+
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const compiled = hostFixture.nativeElement as HTMLElement;
+      const submitBtn = compiled.querySelector('.submit-request-btn') as HTMLButtonElement;
+      submitBtn.click();
+      hostFixture.detectChanges();
+
+      expect(hostFixture.componentInstance.errorMessage()).toBeTruthy();
+      expect(compiled.querySelector('.error-banner')?.textContent?.toLowerCase()).toContain('split');
+    });
+  });
+
+  describe('PPS-119: offer Create purchase order only while something is left', () => {
+    const baseApprovedRequest: PurchaseRequest = {
+      ...mockRequest,
+      status: 'approved',
+      approval_step: {
+        id: 'step1',
+        assigned_membership_id: 'm1',
+        source: 'owner_fallback',
+        status: 'approved',
+        decided_by_membership_id: 'm1',
+        decided_at: '2026-10-01T00:00:00Z',
+      },
+    };
+
+    it('approved request with (none ordered) → button, no PO row', () => {
+      requestsApi.getRequest.and.returnValue(of(baseApprovedRequest));
+      ordersApi.getAllocations.and.returnValue(
+        of({
+          source_request_id: 'r1',
+          lines: [
+            {
+              source_request_line_id: 'l1',
+              requested_quantity: '10',
+              allocated_quantity: '0',
+              remaining_quantity: '10',
+            },
+          ],
+          orders: [],
+        }),
+      );
+
+      const f = TestBed.createComponent(RequestFormComponent);
+      f.detectChanges();
+
+      const btn = f.nativeElement.querySelector('[data-testid="request-create-order-btn"]');
+      expect(btn).toBeTruthy();
+
+      const poRow = f.nativeElement.querySelector('[data-testid="request-purchase-orders-row"]');
+      expect(poRow).toBeNull();
+    });
+
+    it('(partly ordered) → button and PO-000005 link', () => {
+      requestsApi.getRequest.and.returnValue(of({ ...baseApprovedRequest, status: 'ordered' }));
+      ordersApi.getAllocations.and.returnValue(
+        of({
+          source_request_id: 'r1',
+          lines: [
+            {
+              source_request_line_id: 'l1',
+              requested_quantity: '10',
+              allocated_quantity: '4',
+              remaining_quantity: '6',
+            },
+          ],
+          orders: [
+            {
+              id: 'po-5',
+              order_number: 'PO-000005',
+              status: 'draft',
+            },
+          ],
+        }),
+      );
+
+      const f = TestBed.createComponent(RequestFormComponent);
+      f.detectChanges();
+
+      const btn = f.nativeElement.querySelector('[data-testid="request-create-order-btn"]');
+      expect(btn).toBeTruthy();
+
+      const poRow = f.nativeElement.querySelector('[data-testid="request-purchase-orders-row"]');
+      expect(poRow).toBeTruthy();
+
+      const link = Array.from((f.nativeElement as HTMLElement).querySelectorAll('a')).find((a) =>
+        a.textContent?.includes('PO-000005'),
+      );
+      expect(link).toBeTruthy();
+    });
+
+    it('(fully ordered) → no button, link, ordered text', () => {
+      requestsApi.getRequest.and.returnValue(of({ ...baseApprovedRequest, status: 'ordered' }));
+      ordersApi.getAllocations.and.returnValue(
+        of({
+          source_request_id: 'r1',
+          lines: [
+            {
+              source_request_line_id: 'l1',
+              requested_quantity: '10',
+              allocated_quantity: '10',
+              remaining_quantity: '0',
+            },
+          ],
+          orders: [
+            {
+              id: 'po-5',
+              order_number: 'PO-000005',
+              status: 'draft',
+            },
+          ],
+        }),
+      );
+
+      const f = TestBed.createComponent(RequestFormComponent);
+      f.detectChanges();
+
+      const btn = f.nativeElement.querySelector('[data-testid="request-create-order-btn"]');
+      expect(btn).toBeNull();
+
+      const poRow = f.nativeElement.querySelector('[data-testid="request-purchase-orders-row"]');
+      expect(poRow).toBeTruthy();
+
+      const link = Array.from((f.nativeElement as HTMLElement).querySelectorAll('a')).find((a) =>
+        a.textContent?.includes('PO-000005'),
+      );
+      expect(link).toBeTruthy();
+
+      const orderedText = f.nativeElement.querySelector('[data-testid="request-fully-ordered-text"]');
+      expect(orderedText).toBeTruthy();
+      expect(orderedText?.textContent).toContain('Everything on this request has been ordered.');
+    });
+
+    it('(allocation call fails) → button', () => {
+      requestsApi.getRequest.and.returnValue(of(baseApprovedRequest));
+      ordersApi.getAllocations.and.returnValue(throwError(() => new Error('Failed to load allocations')));
+
+      const f = TestBed.createComponent(RequestFormComponent);
+      f.detectChanges();
+
+      const btn = f.nativeElement.querySelector('[data-testid="request-create-order-btn"]');
+      expect(btn).toBeTruthy();
+    });
+
+    it('(status withdrawn with an approved step) → no button', () => {
+      requestsApi.getRequest.and.returnValue(
+        of({
+          ...baseApprovedRequest,
+          status: 'withdrawn',
+        }),
+      );
+
+      const f = TestBed.createComponent(RequestFormComponent);
+      f.detectChanges();
+
+      const btn = f.nativeElement.querySelector('[data-testid="request-create-order-btn"]');
+      expect(btn).toBeNull();
+      expect(ordersApi.getAllocations).not.toHaveBeenCalled();
+    });
   });
 });

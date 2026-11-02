@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 
 from procurepilot_api.modules.documents.schemas import Document
 
@@ -116,6 +116,8 @@ class NewQuotationLine(StrictApiModel):
 
 
 class QuotationReviewPatch(StrictApiModel):
+    prices_include_vat: StrictBool = False
+    vat_rate: Decimal = Field(default=Decimal("0"), ge=0, lt=1)
     supplier_id: UUID | None = None
     currency: StrictStr | None = Field(default=None, pattern=r"^[A-Z]{3}$")
     reviewer_notes: str | None = None
@@ -186,6 +188,8 @@ class QuotationVersionReference(BaseModel):
 
 
 class QuotationDetail(Quotation):
+    prices_include_vat: bool = False
+    vat_rate: str | None = None
     document: Document
     lines: list[QuotationLine]
     field_extractions: list[FieldExtraction]

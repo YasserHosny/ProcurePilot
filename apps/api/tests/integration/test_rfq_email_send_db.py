@@ -21,18 +21,45 @@ pytestmark = pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL
 
 
 @pytest.mark.parametrize(
-    ("locale", "member_locale", "arabic"),
-    [("ar", None, True), ("en", None, False), ("en", "ar", True), ("ar", "en", False)],
+    ("tenant_locale", "member_locale", "supplier_locale", "arabic"),
+    [
+        ("ar", None, None, True),
+        ("en", None, None, False),
+        ("ar", "en", None, True),
+        ("en", "ar", None, False),
+        ("en", "en", "ar", True),
+        ("ar", "ar", "en", False),
+    ],
 )
 def test_send_localized_rfq_with_persisted_terms(
-    monkeypatch: pytest.MonkeyPatch, locale: str, member_locale: str | None, arabic: bool
+    monkeypatch: pytest.MonkeyPatch,
+    tenant_locale: str,
+    member_locale: str | None,
+    supplier_locale: str | None,
+    arabic: bool,
+) -> None:
+    _assert_localized_send(monkeypatch, tenant_locale, member_locale, supplier_locale, arabic)
+
+
+def test_send_one_rfq_in_each_suppliers_language(monkeypatch: pytest.MonkeyPatch) -> None:
+    _assert_localized_send(monkeypatch, "en", "en", "ar", True, mixed=True)
+
+
+def _assert_localized_send(
+    monkeypatch: pytest.MonkeyPatch,
+    tenant_locale: str,
+    member_locale: str | None,
+    supplier_locale: str | None,
+    arabic: bool,
+    *,
+    mixed: bool = False,
 ) -> None:
     suffix = uuid4().hex
     email = f"rfq-email-{suffix}@example.test"
     tenant_id, user_id, membership_id, invitation_id = (uuid4() for _ in range(4))
     supplier_id, canonical_id, product_id, pack_id = (uuid4() for _ in range(4))
     terms = "الدفع خلال 30 يوم\nالتسليم بالمخزن"
-    tenant_name = "مطاعم سند"
+    tenant_name = "RFQ Locale Test"
     product_name = "عدس بجبة"
     db_url = TEST_DATABASE_URL or ""
     FakeMailer.clear()
@@ -49,7 +76,7 @@ def test_send_localized_rfq_with_persisted_terms(
                 "insert into tenant (id,name,slug,region,currency,tax_model,"
                 "platform_invitation_id,default_locale) values (%s,%s,%s,'GB','GBP',"
                 "'uk_vat',%s,%s)",
-                (tenant_id, tenant_name, f"rfq-email-{suffix}", invitation_id, locale),
+                (tenant_id, tenant_name, f"rfq-email-{suffix}", invitation_id, tenant_locale),
             )
             cur.execute(
                 "insert into membership "
@@ -73,9 +100,29 @@ def test_send_localized_rfq_with_persisted_terms(
                 (pack_id, tenant_id, product_id),
             )
             cur.execute(
-                "insert into supplier (id,tenant_id,name,contact_email) values (%s,%s,%s,%s)",
-                (supplier_id, tenant_id, f"Supplier {suffix}", f"supplier-{suffix}@example.test"),
+                "insert into supplier (id,tenant_id,name,contact_email,preferred_locale) "
+                "values (%s,%s,%s,%s,%s)",
+                (
+                    supplier_id,
+                    tenant_id,
+                    f"Supplier {suffix}",
+                    f"supplier-{suffix}@example.test",
+                    supplier_locale,
+                ),
             )
+            supplier_ids = [supplier_id]
+            if mixed:
+                supplier_ids.append(uuid4())
+                cur.execute(
+                    "insert into supplier (id,tenant_id,name,contact_email,preferred_locale) "
+                    "values (%s,%s,%s,%s,'en')",
+                    (
+                        supplier_ids[1],
+                        tenant_id,
+                        f"English Supplier {suffix}",
+                        f"english-{suffix}@example.test",
+                    ),
+                )
 
         member = CurrentMember(
             membership_id=membership_id,
@@ -88,8 +135,8 @@ def test_send_localized_rfq_with_persisted_terms(
         rfq, _, recipients, _ = service.create(
             member=member,
             lines_data=[SimpleNamespace(workspace_product_id=product_id, quantity=Decimal(50))],
-            recipient_supplier_ids=[supplier_id],
-            needed_by_date=date.today(),
+            recipient_supplier_ids=supplier_ids,
+            needed_by_date=date(2099, 10, 20),
             idempotency_key=uuid4(),
             tenant_terms=terms,
         )
@@ -99,15 +146,27 @@ def test_send_localized_rfq_with_persisted_terms(
         with psycopg.connect(db_url) as conn, conn.cursor() as cur:
             cur.execute("select tenant_terms from rfq where id=%s", (rfq.id,))
             assert cur.fetchone()[0] == terms
-        assert len(FakeMailer.sent_messages) == 1
-        msg = FakeMailer.sent_messages[0]
+        assert len(FakeMailer.sent_messages) == len(supplier_ids)
+        messages = {msg.to: msg for msg in FakeMailer.sent_messages}
+        if mixed:
+            english = messages[f"english-{suffix}@example.test"]
+            assert english.subject.startswith("Request for quotation")
+            assert "50 packs (500 kg each) — 25000 kg" in english.body
+            assert 'dir="ltr"' in english.html
+            assert "20 October 2099" in english.subject
+            assert "20 October 2099" in english.body
+            assert "20 October 2099" in english.html
+        msg = messages[f"supplier-{suffix}@example.test"]
         assert tenant_name in msg.subject and tenant_name in msg.from_name
-        # Subject, date and body share one language: the sender's, then the workspace's.
+        # Subject, date and body use the supplier's language, then the workspace default.
         if arabic:
             assert msg.subject.startswith("طلب عرض سعر")
             assert "Request for quotation" not in msg.subject
         else:
             assert msg.subject.startswith("Request for quotation")
+        expected_date = "٢٠ أكتوبر ٢٠٩٩" if arabic else "20 October 2099"
+        assert expected_date in msg.subject
+        assert expected_date in msg.body and expected_date in msg.html
         assert terms.splitlines()[0] in msg.body and terms.splitlines()[1] in msg.body
         assert terms.splitlines()[0] in msg.html and terms.splitlines()[1] in msg.html
         assert product_name in msg.body and product_name in msg.html
@@ -120,7 +179,9 @@ def test_send_localized_rfq_with_persisted_terms(
         assert expected in msg.body and expected in msg.html
         if arabic:
             assert 'dir="rtl"' in msg.html
-        assert sent_recipients[0].outbound_message_id == msg.message_id
+        assert {r.outbound_message_id for r in sent_recipients} == {
+            msg.message_id for msg in messages.values()
+        }
     finally:
         with psycopg.connect(db_url) as conn, conn.cursor() as cur:
             cur.execute("set session_replication_role = replica")

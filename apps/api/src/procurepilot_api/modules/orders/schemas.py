@@ -88,6 +88,7 @@ class PurchaseOrder(StrictModel):
     tenant_id: UUID
     order_number: str = Field(min_length=1, max_length=100)
     supplier_id: UUID
+    supplier_name: str | None = None
     status: OrderStatus
     order_date: date
     expected_delivery_date: date | None = None
@@ -354,6 +355,13 @@ class RequestLineAllocation(StrictModel):
     remaining_quantity: Decimal
 
 
+class RequestAllocationOrder(StrictModel):
+    id: UUID
+    order_number: str
+    status: OrderStatus
+
+
 class RequestAllocation(StrictModel):
     source_request_id: UUID
     lines: tuple[RequestLineAllocation, ...]
+    orders: tuple[RequestAllocationOrder, ...] = ()

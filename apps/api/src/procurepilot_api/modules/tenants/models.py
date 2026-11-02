@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from procurepilot_api.modules.auth.jwt import MemberRole
+from procurepilot_api.shared.display_name import DisplayName
 
 type Locale = Literal["en", "ar"]
 type PlatformInvitationStatus = Literal["pending", "spent", "revoked", "expired"]
@@ -74,6 +75,8 @@ class SignupRequest(BaseModel):
     currency: str = Field(pattern=r"^[A-Z]{3}$")
     tax_model: str
     default_locale: Locale = "en"
+    # The owner's name, shown to colleagues (PPS-125). Optional so older clients still sign up.
+    display_name: DisplayName | None = None
 
 
 class WorkspaceCreated(BaseModel):

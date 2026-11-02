@@ -123,6 +123,7 @@ class PurchaseOutcomePrefillLine(BaseModel):
     base_unit: str
     unit_price: Money
     total_paid: Money
+    tax: Money
     recordable: bool
     reason: Literal["no_product", "zero_quantity", "already_recorded"] | None = None
     recorded_saving_id: UUID | None = None

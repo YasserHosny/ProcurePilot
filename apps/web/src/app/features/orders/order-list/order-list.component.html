@@ -78,7 +78,14 @@
               <a [routerLink]="['/orders', order.id]">{{ order.order_number }}</a>
               <span class="status-chip" [attr.data-status]="order.status">{{ getStatusLabel(order.status) }}</span>
             </div>
-            <span class="order-date">{{ 'orders.orderDate' | translate: { date: (order.order_date | formatDate) } }}</span>
+            @if (order.supplier_name; as supplier) {
+              <span class="order-supplier" dir="auto" data-testid="order-card-supplier">{{ supplier }}</span>
+            }
+            @if (order.status === 'draft') {
+              <span class="order-date">{{ 'orders.createdDate' | translate: { date: (order.created_at | formatDate) } }}</span>
+            } @else {
+              <span class="order-date">{{ 'orders.orderDate' | translate: { date: (order.order_date | formatDate) } }}</span>
+            }
           </div>
           <div class="order-summary">
             <span>{{ 'orders.lineCount' | translate: { count: order.lines.length } }}</span>

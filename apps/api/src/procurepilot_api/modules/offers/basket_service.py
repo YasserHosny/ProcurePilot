@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -39,6 +40,9 @@ ADVANCED_BASKET_RULE_VERSION = "advanced-basket-v1"
 BasketRequest = BasketOptimiseRequest | AdvancedBasketOptimiseRequest
 
 
+logger = logging.getLogger(__name__)
+
+
 class BasketService:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
@@ -47,13 +51,23 @@ class BasketService:
         self,
         *,
         member: CurrentMember,
-        payload: BasketRequest,
+        payload: BasketRequest | None = None,
+        rfq_id: UUID | None = None,
         bearer_token: str | None = None,
         idempotency_key: UUID | None = None,
     ) -> tuple[BasketSplitJob, bool]:
         with _authenticated_db(self._settings, member) as conn:
+            if rfq_id is not None:
+                from procurepilot_api.modules.rfq.service import lock_rfq_for_preparation
+
+                with conn.cursor() as cur:
+                    if (
+                        lock_rfq_for_preparation(cur, tenant_id=member.tenant_id, rfq_id=rfq_id)
+                        is None
+                    ):
+                        raise NotFoundError(details={"resource": "rfq"})
             job, created, pending = self._create_job_in_tx(
-                conn, member=member, payload=payload, idempotency_key=idempotency_key
+                conn, member=member, payload=payload, idempotency_key=idempotency_key, rfq_id=rfq_id
             )
         if pending is not None:
             # Enqueue only after the row is committed: a worker that dequeues first would
@@ -85,8 +99,9 @@ class BasketService:
         conn: object,
         *,
         member: CurrentMember,
-        payload: BasketRequest,
+        payload: BasketRequest | None,
         idempotency_key: UUID | None,
+        rfq_id: UUID | None = None,
     ) -> tuple[BasketSplitJob, bool, dict[str, object] | None]:
         """Persist (or find) the job; returns the row to enqueue once this transaction commits."""
         if idempotency_key is not None:
@@ -99,15 +114,32 @@ class BasketService:
                 existing = cur.fetchone()
             if existing is not None:
                 existing = dict(existing)
+                if existing.get("rfq_id") != rfq_id:
+                    raise ConflictError(details={"reason": "idempotency_key_reused"})
                 if existing["status"] != "failed":
                     return _job(existing), False, None
+                if rfq_id is not None:
+                    from procurepilot_api.modules.offers.rfq_split import build_rfq_split_request
+
+                    # A failed attempt cannot restart after conversion or after its replies
+                    # cease to qualify. Keep its original pricing snapshot for a retry.
+                    build_rfq_split_request(conn, member, rfq_id)
                 # Requeue first: the new created_at is this attempt's fence token.
                 requeued = _requeue_failed_job(conn, UUID(str(existing["id"])))
                 return _job(requeued), True, requeued
+        rfq_snapshot = None
+        if rfq_id is not None:
+            from procurepilot_api.modules.offers.rfq_split import build_rfq_split_request
+
+            payload, rfq_snapshot = build_rfq_split_request(conn, member, rfq_id)
+        if payload is None:
+            raise ValueError("basket payload or rfq_id is required")
         self._expire_stuck_jobs(conn)
         _visible_suppliers(conn, payload.supplier_ids)
         _visible_products(conn, [item.workspace_product_id for item in payload.items])
         request_snapshot = _request_snapshot(conn, member, payload)
+        if rfq_snapshot is not None:
+            request_snapshot["rfq"] = rfq_snapshot
         _ensure_no_active_equivalent(conn, payload, request_snapshot)
         job_id = uuid4()
         with conn.cursor() as cur:
@@ -118,8 +150,8 @@ class BasketService:
                     """
                     insert into basket_split_job
                       (id, tenant_id, requested_by, supplier_ids, items, request_snapshot,
-                       idempotency_key, status)
-                    values (%s, %s, %s, %s, %s, %s, %s, 'queued')
+                       idempotency_key, status, rfq_id)
+                    values (%s, %s, %s, %s, %s, %s, %s, 'queued', %s)
                     returning *
                     """,
                     (
@@ -130,6 +162,7 @@ class BasketService:
                         Jsonb([item.model_dump(mode="json") for item in payload.items]),
                         Jsonb(request_snapshot) if request_snapshot is not None else None,
                         idempotency_key,
+                        rfq_id,
                     ),
                 )
                 row = dict(cur.fetchone())
@@ -146,7 +179,29 @@ class BasketService:
                 existing = cur.fetchone()
             if existing is None:
                 raise
+            if existing.get("rfq_id") != rfq_id:
+                raise ConflictError(details={"reason": "idempotency_key_reused"}) from None
             return _job(dict(existing)), False, None
+        if rfq_snapshot is not None:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select record_audit_event(%s, 'success'::audit_outcome, %s, %s, %s, "
+                    "%s::jsonb, %s)",
+                    (
+                        "offers.rfq_split_started",
+                        member.tenant_id,
+                        member.membership_id,
+                        member.email,
+                        Jsonb(
+                            {
+                                "rfq_id": str(rfq_id),
+                                "basket_split_job_id": str(job_id),
+                                "price_quotation_ids": rfq_snapshot["price_quotation_ids"],
+                            }
+                        ),
+                        get_trace_id(),
+                    ),
+                )
         return _job(row), True, row
 
     def get_job(self, *, member: CurrentMember, job_id: UUID) -> BasketSplitJob:
@@ -546,6 +601,15 @@ def _enqueue_redis_job(settings: Settings, row: dict[str, object], member: Curre
             job_id=rq_job_id(row),
         )
     except Exception as exc:
+        # The client sees only «redis unavailable»; the cause (refused, timeout, AUTH, a bad
+        # payload) goes to the log. Never log settings.redis_url: it can carry the password.
+        logger.exception(
+            "Could not enqueue basket-split job %s on queue %s: %s: %s",
+            row.get("id"),
+            settings.basket_split_queue_name,
+            type(exc).__name__,
+            exc,
+        )
         raise ServiceUnavailableError(details={"dependency": "redis"}) from exc
 
 
@@ -609,6 +673,7 @@ def _job(row: dict[str, object]) -> BasketSplitJob:
             "created_at": row["created_at"],
             "started_at": row.get("started_at"),
             "completed_at": row.get("completed_at"),
+            "rfq_id": row.get("rfq_id"),
             "pack_snapshot": (
                 row["request_snapshot"].get("pack_snapshot")
                 if isinstance(row.get("request_snapshot"), dict)

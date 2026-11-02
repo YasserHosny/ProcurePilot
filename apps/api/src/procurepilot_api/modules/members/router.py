@@ -23,7 +23,7 @@ from procurepilot_api.modules.members.models import (
     MemberInvitationCreate,
     MemberInvitationList,
     MemberList,
-    MemberRoleUpdate,
+    MemberUpdate,
     MeUpdate,
     SessionResponse,
     WorkspaceList,
@@ -96,14 +96,14 @@ def list_members(
 
 
 @router.patch("/members/{member_id}", response_model=Member)
-def update_member_role(
+def update_member(
     member_id: UUID,
-    payload: Annotated[MemberRoleUpdate, Body()],
+    payload: Annotated[MemberUpdate, Body()],
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(MemberRole.owner))],
     service: Annotated[MemberService, Depends(get_member_service)],
 ) -> Member:
-    return service.update_member_role(
+    return service.update_member(
         bearer_token=token,
         actor=member,
         member_id=member_id,
@@ -183,6 +183,7 @@ def issue_invitation(
         member=member,
         email=payload.email,
         role=payload.role,
+        display_name=payload.display_name,
     )
 
 

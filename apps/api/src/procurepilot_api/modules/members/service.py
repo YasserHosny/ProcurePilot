@@ -21,7 +21,7 @@ from procurepilot_api.modules.members.models import (
     Me,
     Member,
     MemberList,
-    MemberRoleUpdate,
+    MemberUpdate,
     MeUpdate,
     WorkspaceList,
     WorkspaceSummary,
@@ -54,7 +54,7 @@ def load_me_for_token(settings: Settings, bearer_token: str, member: CurrentMemb
     )
     membership_rows = _rows(
         client.table("membership")
-        .select("preferred_locale,mfa_enabled")
+        .select("preferred_locale,mfa_enabled,display_name")
         .eq("id", str(member.membership_id))
         .limit(2)
         .execute()
@@ -67,6 +67,7 @@ def load_me_for_token(settings: Settings, bearer_token: str, member: CurrentMemb
         id=member.user_id,
         membership_id=member.membership_id,
         email=member.email,
+        display_name=membership.get("display_name"),
         role=member.role,
         preferred_locale=membership.get("preferred_locale"),
         mfa_enabled=bool(membership.get("mfa_enabled", False)),
@@ -161,7 +162,7 @@ class MemberService:
         try:
             response = (
                 client.table("membership")
-                .select("id,email,role,status,mfa_enabled,created_at")
+                .select("id,email,display_name,role,status,mfa_enabled,created_at")
                 .order("created_at")
                 .order("id")
                 .range(offset, offset + capped_limit)
@@ -177,37 +178,44 @@ class MemberService:
             next_cursor=next_cursor,
         )
 
-    def update_member_role(
+    def update_member(
         self,
         *,
         bearer_token: str,
         actor: CurrentMember,
         member_id: UUID,
-        patch: MemberRoleUpdate,
+        patch: MemberUpdate,
     ) -> Member:
         client = authenticated_client(self._settings, bearer_token)
+        payload: dict[str, object] = {}
+        if patch.role is not None:
+            payload["role"] = patch.role.value
+        if patch.display_name is not None:
+            payload["display_name"] = patch.display_name
         try:
-            response = (
-                client.table("membership")
-                .update({"role": patch.role.value})
-                .eq("id", str(member_id))
-                .execute()
-            )
+            response = client.table("membership").update(payload).eq("id", str(member_id)).execute()
         except APIError as exc:
             raise _member_update_error(exc) from exc
 
         updated = _one_member(response.data)
-        get_audit_writer().record(
-            AuditEventCreate(
-                tenant_id=actor.tenant_id,
-                actor_membership_id=actor.membership_id,
-                actor_email=actor.email,
-                action="member.role_changed",
-                target={"member_id": str(member_id), "role": patch.role.value},
-                outcome="success",
-            ),
-            bearer_token=bearer_token,
-        )
+        for action, target in (
+            ("member.role_changed", {"role": patch.role.value} if patch.role else None),
+            # A name is personal data: the audit trail records that it changed, not to what.
+            ("member.renamed", {} if patch.display_name is not None else None),
+        ):
+            if target is None:
+                continue
+            get_audit_writer().record(
+                AuditEventCreate(
+                    tenant_id=actor.tenant_id,
+                    actor_membership_id=actor.membership_id,
+                    actor_email=actor.email,
+                    action=action,
+                    target={"member_id": str(member_id), **target},
+                    outcome="success",
+                ),
+                bearer_token=bearer_token,
+            )
         return updated
 
     def remove_member(
@@ -301,9 +309,7 @@ class MemberService:
             MemberRole.branch_manager.value,
             MemberRole.approver.value,
         }:
-            raise UnprocessableEntityError(
-                details={"reason": "branch_scopable_role_required"}
-            )
+            raise UnprocessableEntityError(details={"reason": "branch_scopable_role_required"})
 
         try:
             branch_response = (

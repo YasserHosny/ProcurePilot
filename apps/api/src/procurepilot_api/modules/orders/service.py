@@ -37,6 +37,7 @@ from procurepilot_api.modules.orders.schemas import (
     PurchaseOrderLine,
     PurchaseOrderList,
     RequestAllocation,
+    RequestAllocationOrder,
     RequestLineAllocation,
     SupplierConfirmation,
     SupplierConfirmationCreate,
@@ -82,6 +83,33 @@ RECEIPT_COLUMNS = (
 )
 RECEIPT_LINE_COLUMNS = "id,purchase_order_line_id,received_quantity"
 WRITE_ROLES = {MemberRole.owner, MemberRole.buyer}
+
+
+def _request_allocation_sql(
+    *,
+    line_filter: str = "pol.source_request_line_id = any(%s)",
+    allocation_alias: str = "allocated_quantity",
+    excluded_order: bool = False,
+) -> str:
+    """Shared allocation rule; SQL fragments are supplied only by internal callers."""
+    excluded_clause = "and pol.purchase_order_id != %s " if excluded_order else ""
+    return (
+        "select pol.source_request_line_id, "
+        "sum(case when po.status != 'cancelled' then pol.ordered_quantity "
+        f"else coalesce(receipts.total_received, 0) end) as {allocation_alias} "
+        "from purchase_order_line pol "
+        "join purchase_order po on po.tenant_id = pol.tenant_id "
+        "and po.id = pol.purchase_order_id "
+        "left join (select tenant_id, purchase_order_line_id, "
+        "sum(received_quantity) as total_received "
+        "from delivery_receipt_line where tenant_id = %s "
+        "group by tenant_id, purchase_order_line_id) receipts "
+        "on receipts.tenant_id = pol.tenant_id "
+        "and receipts.purchase_order_line_id = pol.id "
+        f"where po.tenant_id = %s and {line_filter} "
+        f"{excluded_clause}"
+        "group by pol.source_request_line_id"
+    )
 
 
 class OrdersService:
@@ -529,6 +557,28 @@ class OrdersService:
                 return True
             raise
 
+    def requests_with_quantity_to_order(
+        self, *, member: CurrentMember, request_ids: list[UUID]
+    ) -> set[UUID]:
+        if not request_ids:
+            return set()
+
+        allocation_sql = _request_allocation_sql(
+            line_filter="pol.source_request_line_id in (select id from request_lines)"
+        )
+        with self._transaction(member) as cur:
+            cur.execute(
+                "with request_lines as ("
+                "select id, purchase_request_id, quantity from purchase_request_line "
+                "where tenant_id = %s and purchase_request_id = any(%s)), "
+                f"allocations as ({allocation_sql}) "
+                "select distinct rl.purchase_request_id from request_lines rl "
+                "left join allocations a on a.source_request_line_id = rl.id "
+                "where rl.quantity - coalesce(a.allocated_quantity, 0) > 0",
+                (member.tenant_id, request_ids, member.tenant_id, member.tenant_id),
+            )
+            return {UUID(str(row["purchase_request_id"])) for row in cur.fetchall()}
+
     def get_request_allocation(
         self, *, bearer_token: str, member: CurrentMember, source_request_id: UUID
     ) -> RequestAllocation:
@@ -545,20 +595,24 @@ class OrdersService:
 
         with self._transaction(member) as cur:
             cur.execute(
-                "select pol.source_request_line_id, sum(case when po.status != 'cancelled' then pol.ordered_quantity "  # noqa: E501
-                "else coalesce(receipts.total_received, 0) end) as allocated_quantity "  # noqa: E501
-                "from purchase_order_line pol "
-                "join purchase_order po on po.tenant_id = pol.tenant_id and po.id = pol.purchase_order_id "  # noqa: E501
-                "left join (select tenant_id, purchase_order_line_id, sum(received_quantity) as total_received "  # noqa: E501
-                "from delivery_receipt_line where tenant_id = %s group by tenant_id, purchase_order_line_id) receipts "  # noqa: E501
-                "on receipts.tenant_id = pol.tenant_id and receipts.purchase_order_line_id = pol.id "  # noqa: E501
-                "where po.tenant_id = %s and pol.source_request_line_id = any(%s) "  # noqa: E501
-                "group by pol.source_request_line_id",
+                _request_allocation_sql(),
                 (member.tenant_id, member.tenant_id, req_line_ids),
             )
             allocations = {
                 str(r["source_request_line_id"]): r["allocated_quantity"] for r in cur.fetchall()
             }
+            cur.execute(
+                "select po.id, po.order_number, po.status "
+                "from purchase_order po "
+                "where po.tenant_id = %s and po.status != 'cancelled' "
+                "and (po.source_request_id = %s or exists ("
+                "select 1 from purchase_order_line pol "
+                "where pol.tenant_id = po.tenant_id and pol.purchase_order_id = po.id "
+                "and pol.source_request_line_id = any(%s))) "
+                "order by po.created_at, po.order_number",
+                (member.tenant_id, source_request_id, req_line_ids),
+            )
+            orders = tuple(RequestAllocationOrder.model_validate(row) for row in cur.fetchall())
 
         line_allocations = []
         for line in request.lines:
@@ -577,6 +631,7 @@ class OrdersService:
         return RequestAllocation(
             source_request_id=source_request_id,
             lines=tuple(line_allocations),
+            orders=orders,
         )
 
     @staticmethod
@@ -613,32 +668,18 @@ class OrdersService:
         if not incoming:
             return
 
-        excluded_clause = ""
         params: tuple[object, ...] = (
             tenant_id,
             tenant_id,
             list(request_lines_by_id.keys()),
         )
         if excluded_order_id is not None:
-            excluded_clause = "and pol.purchase_order_id != %s "
             params = (*params, excluded_order_id)
 
         cur.execute(
-            "select pol.source_request_line_id, "
-            "sum(case when po.status != 'cancelled' then pol.ordered_quantity "
-            "else coalesce(receipts.total_received, 0) end) as allocated "
-            "from purchase_order_line pol "
-            "join purchase_order po on po.tenant_id = pol.tenant_id "
-            "and po.id = pol.purchase_order_id "
-            "left join (select tenant_id, purchase_order_line_id, "
-            "sum(received_quantity) as total_received "
-            "from delivery_receipt_line where tenant_id = %s "
-            "group by tenant_id, purchase_order_line_id) receipts "
-            "on receipts.tenant_id = pol.tenant_id "
-            "and receipts.purchase_order_line_id = pol.id "
-            "where po.tenant_id = %s and pol.source_request_line_id = any(%s) "
-            f"{excluded_clause}"
-            "group by pol.source_request_line_id",
+            _request_allocation_sql(
+                allocation_alias="allocated", excluded_order=excluded_order_id is not None
+            ),
             params,
         )
         allocations = {str(r["source_request_line_id"]): r["allocated"] for r in cur.fetchall()}
@@ -1012,7 +1053,10 @@ class OrdersService:
             "where purchase_order_id = %s order by line_number",
             (order_id,),
         )
-        return _order_model(row, cur.fetchall())
+        lines = cur.fetchall()
+        cur.execute("select name from supplier where id = %s", (row["supplier_id"],))
+        supplier = cur.fetchone()
+        return _order_model(row, lines, supplier["name"] if supplier else None)
 
     @staticmethod
     def _load_confirmation_cursor(cur: psycopg.Cursor, identifier: UUID) -> SupplierConfirmation:
@@ -1059,7 +1103,10 @@ class OrdersService:
             .execute()
             .data
         )
-        return _order_model(row, lines)
+        suppliers = _rows(
+            client.table("supplier").select("name").eq("id", str(row["supplier_id"])).execute().data
+        )
+        return _order_model(row, lines, str(suppliers[0]["name"]) if suppliers else None)
 
     def _load_confirmations(self, client: Client, order_id: UUID) -> list[SupplierConfirmation]:
         rows = _rows(
@@ -1191,7 +1238,9 @@ def _assert_same_order(row: dict[str, object], order_id: UUID) -> None:
 
 
 def _order_model(
-    row: dict[str, object], lines: list[dict[str, object]] | tuple[dict[str, object], ...]
+    row: dict[str, object],
+    lines: list[dict[str, object]] | tuple[dict[str, object], ...],
+    supplier_name: str | None = None,
 ) -> PurchaseOrder:
     return _model(
         PurchaseOrder,
@@ -1200,6 +1249,7 @@ def _order_model(
             "tenant_id": row["tenant_id"],
             "order_number": row["order_number"],
             "supplier_id": row["supplier_id"],
+            "supplier_name": supplier_name,
             "status": row["status"],
             "order_date": row["order_date"],
             "expected_delivery_date": row["expected_delivery_date"],

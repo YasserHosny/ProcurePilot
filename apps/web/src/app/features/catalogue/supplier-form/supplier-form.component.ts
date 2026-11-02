@@ -31,6 +31,9 @@ import type {
 import { SessionService } from "../../../core/auth/session.service";
 import { I18nService } from "../../../core/i18n/i18n.service";
 
+/** Form-only sentinel for "workspace default"; API payloads map this (and null) to null. */
+export const WORKSPACE_DEFAULT_LOCALE = "workspace" as const;
+
 /** Money validator: amount and currency must either both be present or both empty (Constitution VII). */
 function moneyGroupValidator(amountKey: string, currencyKey: string) {
   return (group: AbstractControl): ValidationErrors | null => {
@@ -82,6 +85,9 @@ export class SupplierFormComponent implements OnInit {
   private readonly translate = inject(TranslateService);
   readonly i18n = inject(I18nService);
 
+  /** Exposed for the template's default mat-option value. */
+  readonly workspaceDefaultLocale = WORKSPACE_DEFAULT_LOCALE;
+
   readonly isEditMode = signal<boolean>(false);
   readonly supplierId = signal<string | null>(null);
   readonly isLoading = signal<boolean>(true);
@@ -90,6 +96,19 @@ export class SupplierFormComponent implements OnInit {
   readonly errorTraceId = signal<string | null>(null);
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole("owner", "buyer"));
+
+  readonly workspaceLanguageKey = computed<
+    "catalogue.suppliers.form.languageArabic" | "catalogue.suppliers.form.languageEnglish" | null
+  >(() => {
+    const defaultLocale = this.session.tenant()?.default_locale;
+    if (defaultLocale === "ar") {
+      return "catalogue.suppliers.form.languageArabic";
+    }
+    if (defaultLocale === "en") {
+      return "catalogue.suppliers.form.languageEnglish";
+    }
+    return null;
+  });
 
   readonly currencies = signal<ReferenceOption[]>([
     { code: "GBP", label_en: "GBP (£)", label_ar: "جنيه إسترليني (£)" },
@@ -111,6 +130,7 @@ export class SupplierFormComponent implements OnInit {
       delivery_fee_currency: [this.session.homeCurrency() ?? "USD"],
       contact_email: ["", [Validators.email]],
       status: ["active"],
+      preferred_locale: [WORKSPACE_DEFAULT_LOCALE],
     },
     {
       validators: [
@@ -180,6 +200,7 @@ export class SupplierFormComponent implements OnInit {
       delivery_fee_currency: sup.delivery_fee ? sup.delivery_fee.currency : "",
       contact_email: sup.contact_email || "",
       status: sup.status || "active",
+      preferred_locale: sup.preferred_locale ?? WORKSPACE_DEFAULT_LOCALE,
     });
   }
 
@@ -206,6 +227,9 @@ export class SupplierFormComponent implements OnInit {
         : null;
 
     const leadTime = fv.lead_time_days != null && fv.lead_time_days !== "" ? Number(fv.lead_time_days) : null;
+    // Sentinel or legacy null both mean workspace default → API null.
+    const preferredLocale =
+      fv.preferred_locale === "en" || fv.preferred_locale === "ar" ? fv.preferred_locale : null;
 
     if (this.isEditMode()) {
       const id = this.supplierId()!;
@@ -217,6 +241,7 @@ export class SupplierFormComponent implements OnInit {
         delivery_fee: deliveryFeeVal,
         contact_email: fv.contact_email?.trim() || null,
         status: fv.status,
+        preferred_locale: preferredLocale,
       };
 
       this.api.updateSupplier(id, updatePayload).subscribe({
@@ -242,6 +267,7 @@ export class SupplierFormComponent implements OnInit {
         minimum_order_value: minOrderVal,
         delivery_fee: deliveryFeeVal,
         contact_email: fv.contact_email?.trim() || null,
+        preferred_locale: preferredLocale,
       };
 
       this.api.createSupplier(createPayload).subscribe({

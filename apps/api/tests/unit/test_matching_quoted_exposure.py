@@ -47,3 +47,15 @@ def test_quoted_exposure_rejects_mixed_currencies() -> None:
 
     assert result.total is None
     assert result.issue == "currency_mismatch"
+
+
+def test_inclusive_exposure_does_not_add_tax_again() -> None:
+    result = quoted_exposure(
+        quantity="350",
+        unit_price=money("13.80", "SAR"),
+        vat_rate="0.15",
+        delivery_fee=money("5", "SAR"),
+        discount=money("2", "SAR"),
+        prices_include_vat=True,
+    )
+    assert result.total == money("4833.0000", "SAR")

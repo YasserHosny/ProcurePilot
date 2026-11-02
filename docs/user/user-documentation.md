@@ -99,7 +99,7 @@ The email's link opens **Choose a new password** (`/auth/update-password`). Ente
 
 ![Create Workspace](screenshots/01c-workspace-signup.jpg)
 
-Workspace creation is invitation-gated during the pilot programme. The form captures the platform invitation token, business name, owner email, password, operating region, primary currency, tax model, and default locale; successful completion creates the isolated tenant and first owner account, then takes you to a **Plan Confirmation** screen (`/onboarding/plan`) before entering the workspace.
+Workspace creation is invitation-gated during the pilot programme. The form captures the platform invitation token, business name, the owner's name (shown to colleagues, for example in the Approval Queue), owner email, password, operating region, primary currency, tax model, and default locale; successful completion creates the isolated tenant and first owner account, then takes you to a **Plan Confirmation** screen (`/onboarding/plan`) before entering the workspace.
 
 Under the **Create Workspace & Sign In** button, a notice says that creating an account means agreeing to the **Terms of Service** (`/terms`) and acknowledging the **Privacy Policy** (`/privacy`). Both links open in a new tab and need no sign-in.
 
@@ -453,18 +453,18 @@ Tracks a purchase order's lifecycle — submitted, confirmed by the supplier, de
 
 **Route:** `/orders/new` (Owner/Buyer), or `/orders/:id/edit` to edit an existing draft
 
-Reached from **Create Order** on the order list (blank), **From approved request** on the order list (pick an approved request from the menu), the **Create Order** icon on a request whose approval decision is Approved — such a request is listed with status `ordered` in Purchase Requests (§18), not `approved`, or **Create purchase order** on an approved request's own page (§19). All of them open this form; none places an order without it.
+Reached from **Create Order** on the order list (blank), **From approved request** on the order list (pick an approved request from the menu), the **Create Order** icon on a request whose approval decision is Approved and that still has something left to order — such a request is listed with status `ordered` in Purchase Requests (§18), not `approved`, or **Create purchase order** on an approved request's own page (§19), shown only while some line still has quantity left to order. All of them open this form; none places an order without it.
 
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Source request banner** | Shown only when arriving from a purchase request. Names the request you're creating from, for context. |
 | 2 | **Order Number, Supplier, Order Date, Expected Delivery Date, Currency** | Standard header fields. Order Number is pre-filled with a suggested next number, which you can change. Currency starts as your workspace's home currency and can be changed per order. When the request was prepared from a supplier's RFQ response, **Supplier** is pre-filled with that supplier; otherwise you choose it here. |
-| 3 | **Order Lines** | When creating from a request: one line per request line that still has quantity left to allocate (lines fully covered by an earlier draft are left out entirely). Each line's **Product**, **Description**, and **Base Unit** are pre-filled from the request line; **Unit Price** is left for you to enter — the request's estimated price is never used as the real price silently. The one exception: if the request was prepared from a supplier's RFQ response, **Unit Price** starts filled with that supplier's quoted price per pack, which you can still change. Quantities are in packs, and the description says the pack size (for example "pack of 18 litre"). |
+| 3 | **Order Lines** | When creating from a request: one line per request line that still has quantity left to allocate (lines fully covered by an earlier draft are left out entirely). If every line of the request has already been ordered, the form shows "Everything on this request has already been ordered." with links to the request's purchase orders, and no order lines. Each line's **Product**, **Description**, and **Base Unit** are pre-filled from the request line; **Unit Price** is left for you to enter — the request's estimated price is never used as the real price silently. The one exception: if the request was prepared from a supplier's RFQ response, **Unit Price** starts filled with that supplier's quoted price per pack, which you can still change. Quantities are in packs, and the description says the pack size (for example "pack of 18 litre"). |
 | 4 | **Estimate badge** | Shown only when creating a new order from a request (not when re-opening an existing draft via **Edit Draft**). Shows the purchase request's own estimated unit price next to the matching line, as a reference-only figure — it has no effect on the order total unless it is in **Unit Price**, either because you typed it or because the request came from an RFQ response (row 3). |
-| 5 | **Remaining Allocatable badge / quantity cap** | Also shown only when creating from a request. Shows how much of that request line's quantity is still unallocated across all non-cancelled draft/submitted orders, and **Quantity** on that line is capped at this figure so you cannot over-allocate a request across multiple orders. |
+| 5 | **"Still to order" badge / quantity cap** | Also shown only when creating from a request. Shows how much of that request line's quantity is still unallocated across all non-cancelled draft/submitted orders, and **Quantity** on that line is capped at this figure so you cannot over-allocate a request across multiple orders. |
 | 6 | **Add Line / Remove Line** | Add a line with no source request (manual), or remove any line, same as a plain manual order. |
 | 7 | **Lines Total / Order Tax / Order Total** | Recalculates live as you edit quantity, unit price, or line tax. |
-| 8 | **Create Purchase Order button** | Submits the draft — the button reads the same whether you're creating a new order or editing an existing draft. On success, you land on the order's detail screen. |
+| 8 | **Create Purchase Order button** | Submits the draft — the button reads the same whether you're creating a new order or editing an existing draft. After one click it stays disabled and you land on the order's detail screen. If that screen does not open, a notice says «PO-… was created.» with an **Open order** link, so there is never a reason to click twice. If part of the request was ordered after you opened the form, the order is refused: "Part of this request was ordered after you opened this form. Reload the page to see what is still to order." |
 
 **Editing and cancelling a draft:** from Order Detail (below), a `Draft` order shows **Edit Draft** (reopens this same form, pre-filled from the saved order) and **Cancel Order**. Cancelling asks for confirmation first: "Are you sure you want to cancel this order? Any received quantity will remain consumed, and any unreceived quantity will be released back to the source request." — the wording mentions the source request even for a standalone order with none. Both actions, and Submit, are only available while the order is still a `Draft`.
 
@@ -541,7 +541,7 @@ Reached from **Create Order** on the order list (blank), **From approved request
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Page title — "Two-Supplier Basket Split" / Multi-Supplier Optimisation** | Optimise purchasing across 2 to 10 selected suppliers for minimum total landed cost using an exact constraint-programming solver (Google OR-Tools CP-SAT). |
+| 1 | **Page title — "Basket Split"** | Optimise purchasing across 2 to 10 selected suppliers for minimum total landed cost using an exact constraint-programming solver (Google OR-Tools CP-SAT). |
 | 2 | **Supplier selectors** | Choose 2 to 10 suppliers. The selector dynamically enforces mutual exclusion. |
 | 3 | **Commercial Constraints panel** | Toggle to configure supplier commercial terms: Minimum Order Values (MOV), Free Delivery Thresholds, Delivery Fees, and Quantity Tiers. |
 | 4 | **Risk & Urgency controls** | Set Risk Tolerance (`low`, `medium`, `high`), Delivery Urgency (`normal`, `urgent`), and explicit supplier exclusions. |
@@ -555,7 +555,7 @@ Reached from **Create Order** on the order list (blank), **From approved request
 - **Applied & Violated Constraints:** Inspect which commercial terms (MOV, delivery fee) were applied and which constraints were violated if infeasible.
 - **Advisory-Only Protection:** In strict adherence to system principles, basket optimisation is purely advisory and never autonomously creates orders or commits funds.
 
-**Mixed-currency offers:** as in Smart Compare, ProcurePilot never converts or mixes currencies here either. In the **Two-Supplier Basket Split**, if any basket item's offers span more than one currency (or that item's currency doesn't match the currency the rest of the basket is priced in), the whole optimisation is reported as infeasible in the Commercial Infeasibility Report, the same as any other item with no eligible offer. The **Advanced Multi-Supplier Optimiser** is stricter still: any currency inconsistency anywhere in the basket — across any item, supplier term, or fee — fails the entire optimisation job outright before solving even starts, rather than excluding just the affected item and solving around it.
+**Mixed-currency offers:** as in Smart Compare, ProcurePilot never converts or mixes currencies here either. In **Basket Split**, if any basket item's offers span more than one currency (or that item's currency doesn't match the currency the rest of the basket is priced in), the whole optimisation is reported as infeasible in the Commercial Infeasibility Report, the same as any other item with no eligible offer. The **Advanced Multi-Supplier Optimiser** is stricter still: any currency inconsistency anywhere in the basket — across any item, supplier term, or fee — fails the entire optimisation job outright before solving even starts, rather than excluding just the affected item and solving around it.
 
 **Business value:** basket optimisation finds the lowest total landed cost across a real order, not just the cheapest line item. It accounts for supplier minimums, delivery fees, price tiers, urgency, risk, and quality so buyers can avoid overpaying because of supplier constraints while still keeping the final purchasing decision human-authorized.
 
@@ -650,7 +650,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 |---|---------|-------------|
 | 1 | **Baseline note** | Savings are measured against the last purchase-order price for each product, excluding this order. |
 | 2 | **Delivery Outcome** | Pre-selected from the order status (Ordered, Partially Delivered, or Delivered); change it if needed. |
-| 3 | **One line per order line** | Each line shows the pack conversion (e.g. "2 × pack of 30 piece = 60 piece"), with the quantity in base units and the total paid (excluding tax) pre-filled and editable. Untick a line to skip it. |
+| 3 | **One line per order line** | Each line shows the pack conversion (e.g. "2 × pack of 30 piece = 60 piece"), with the quantity in base units and the total paid (excluding tax) pre-filled without trailing zeros (e.g. «675», «1230») and editable; the value shown is the value saved. Untick a line to skip it. |
 | 4 | **Lines that cannot be recorded** | Lines not linked to a catalogue product, with nothing ordered, or already recorded are greyed out; an already-recorded line links to its saving. |
 | 5 | **Save outcomes** | Records one purchase outcome per selected line, each linked to its order line. A line can be recorded only once. |
 
@@ -665,7 +665,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | 3 | **Purchase Details** | The full purchase record as entered. |
 | 4 | **Calculation Snapshot** | The exact formula applied ("Baseline Value − Actual Paid = Net Saving") and the competing offers that were on the table at compare time — the full evidence chain from quotation → match → offer → purchase → saving. |
 
-**Key concept — the baseline:** the saving is measured against the **last purchase-order price** for the product: the newest submitted, confirmed, received, or closed order line in the same base unit, excluding the order being recorded. PO prices are per pack, so the baseline is scaled to the outcome's base units (a carton of 30 at 172 against 60 pieces gives a baseline of 344). Without an earlier purchase order, the baseline falls back to the **last quoted price**, then the 6-month quoted average; otherwise no baseline is available.
+**Key concept — the baseline:** the saving is measured against the **last purchase-order price** for the product: the newest submitted, confirmed, received, or closed order line in the same base unit, excluding the order being recorded. PO prices are per pack, so the baseline is scaled to the outcome's base units (a carton of 30 at 172 against 60 pieces gives a baseline of 344). Without an earlier purchase order, the baseline falls back to the **last quoted price**, scaled from the quote's landed total so a whole number of packs gives the quote's exact total (85 per 45 kg pack against 675 kg gives 1,275.00), then the 6-month quoted average; otherwise no baseline is available. The baseline unit price shown is rounded to 4 decimals, so unit price × quantity can differ from the baseline value in the last digits.
 
 **Key concept — Verified Savings:**
 - Verified savings are **immutable** — once verified, they cannot be edited or deleted. If a correction is needed, a new adjustment record is created.
@@ -729,7 +729,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | # | Element | Description |
 |---|---------|-------------|
 | 0 | **Auto-prepared banner** | Shown only on a request an RFQ guardrail drafted (§38): "Prepared automatically by a guardrail" and the supplier whose quote won. On a draft it asks the owner to review and submit it; nothing is ordered until the request is approved. Approvers see the same banner. |
-| 1 | **Page title** | Reads "New Purchase Request" when creating a draft, "Edit Purchase Request" when editing a draft, and "Purchase Request" (with its status) when the request can no longer be edited. An approved request also shows a **Create purchase order** button (§11). |
+| 1 | **Page title** | Reads "New Purchase Request" when creating a draft, "Edit Purchase Request" when editing a draft, and "Purchase Request" (with its status) when the request can no longer be edited. An approved request shows a **Create purchase order** button (§11) while at least one line still has quantity left to order (draft orders count as ordered). Once orders exist, the page lists them under **Purchase orders** as links (for example «PO-000005»). When nothing is left to order, the button is replaced by "Everything on this request has been ordered." |
 | 2 | **Branch selector** (required) | Select the branch this request is for. Branches are defined in Organisation Settings (section 22) — a request cannot be created until at least one branch exists. Existing requests show the saved branch. |
 | 3 | **Cost Centre selector** (optional) | Optionally assign the request to a cost centre for budget tracking. |
 | 4 | **Required By date** (required) | The date by which the goods are needed. |
@@ -754,7 +754,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you — directly, or via an active delegation (section 22) — based on threshold approval rules appear here. |
-| 2 | **Approvals table** | One row per pending request: required-by date, requester (name or email), branch, cost centre, estimated total (with an "incomplete estimate" badge when some lines lack pricing), budget status, and line count. Budget status uses the most specific budget that applies: the cost centre's, otherwise the branch's, otherwise an organisation-wide budget; only when none of the three exists does it show **No budget configured** and say why. |
+| 2 | **Approvals table** | One row per pending request: required-by date, requester (their name; a member with no name shows the part of their email before the @ on one line, with the full address on hover), branch, cost centre, estimated total (with an "incomplete estimate" badge when some lines lack pricing), budget status, and line count. Budget status uses the most specific budget that applies: the cost centre's, otherwise the branch's, otherwise an organisation-wide budget; only when none of the three exists does it show **No budget configured** and say why. |
 | 3 | **Budget Status column** | Shows the remaining budget after this request, or an amber "Budget Exceeded" badge with a tooltip and the remaining-budget figure when the request would exceed the applicable budget. When no cost-centre, branch or organisation budget applies it shows **No budget configured** with the reason; it is blank only when the request cannot be valued (no budget status). |
 | 4 | **Lines column + expand toggle** | Shows the line count; the expand icon reveals a nested table underneath the row with each line's product, quantity, unit price, and note — so you can review the full request without leaving the queue. |
 | 5 | **Approve / Reject buttons** | Each row has both actions. Either opens a confirmation dialog with an optional comment field before committing the decision. |
@@ -778,18 +778,18 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title — "Team Management"** | Manage workspace members, invite colleagues, and configure role-based access. |
-| 2 | **Invite Member button** | Opens a dialog to invite a colleague by email. You assign them a role (Owner, Buyer, Branch Manager, Approver, Viewer) at invitation time. |
-| 3 | **Members tab** | Lists all current members with columns: member, role (colour-coded pill), status (Active/Removed), MFA status, and join date. |
+| 2 | **Invite Member button** | Opens a dialog to invite a colleague by email, optionally with their name. You assign them a role (Owner, Buyer, Branch Manager, Approver, Viewer) at invitation time. |
+| 3 | **Members tab** | Lists all current members with columns: name (or «No name»), email address, role (colour-coded pill), status (Active/Removed), MFA status, and join date. |
 | 4 | **Pending Invitations tab** | Lists all sent invitations with email, assigned role, status (Pending/Accepted/Revoked/Expired), and expiry date. |
-| 5 | **Actions menu** (per member) | Options: Change Role, Remove Member. The workspace owner cannot be removed. |
+| 5 | **Actions menu** (per member) | Options: Edit name, Change Role, Remove Member. The name is what colleagues see in approvals and the team list. The workspace owner cannot be removed. |
 
 **Invitation flow:**
-1. Click **Invite Member** → enter email and select role → send.
+1. Click **Invite Member** → enter their name (optional), email and role → send.
 2. When Mailgun is configured, the invitee receives an email in the workspace language with a link to accept. The dialog confirms “Invitation emailed to” their address. If email is not configured or sending fails, a distinct warning explains that the email was not sent and asks you to copy the link below.
 3. The copy-link fallback is always available. Keep or share it before closing the dialog: the token is shown once.
 4. Use **Resend invitation** next to Revoke on a pending invitation to create and email a new link. The old link stops working immediately and the expiry restarts. A second resend within about a minute is refused with a message. The result dialog shows delivery status and the new copy-link fallback.
 5. They can create a new account or sign in with an existing one.
-6. Once accepted, they appear in the Members tab with their assigned role.
+6. Once accepted, they appear in the Members tab with their assigned role and the name you gave them.
 
 **Business value:** Team Management lets the owner delegate procurement work while preserving accountability. Each role creates a clear operating boundary, so buyers can move quickly and sensitive controls stay with the right people.
 
@@ -1370,7 +1370,10 @@ A: If you have configured a domain allowlist, any incoming email sent from an un
 A: ProcurePilot uses partial import resilience. All valid rows are imported into the supplier catalogue immediately, while rows with errors (such as missing product names or invalid currency codes) are reported in the expandable Error Details table with their row number and reason so you can fix and re-import them.
 
 **Q: Who can create a purchase order, and where?**
-A: An Owner or Buyer, from Order Tracking (§11). Click **Create Order** on the order list for a blank draft, **From approved request** on the order list, or **Create Order** / **Create purchase order** on an `approved` purchase request to open the same screen pre-filled from that request. There is still no bulk import tool or accounting/POS provider writer for orders — those remain API-only. Once an order exists, use Order Tracking to edit or cancel it while it's a draft, submit it, record supplier confirmations, and record deliveries.
+A: An Owner or Buyer, from Order Tracking (§11). Click **Create Order** on the order list for a blank draft, **From approved request** on the order list, or **Create Order** / **Create purchase order** on an `approved` purchase request that still has something left to order to open the same screen pre-filled from that request. There is still no bulk import tool or accounting/POS provider writer for orders — those remain API-only. Once an order exists, use Order Tracking to edit or cancel it while it's a draft, submit it, record supplier confirmations, and record deliveries.
+
+**Q: A page reloaded by itself when I opened it. Why?**
+A: A new version of ProcurePilot was released while you had the app open. The app loads that page again in full so you get the new version. Your saved work is not affected.
 
 **Q: Why didn't my RFQ auto-prepare a request through the guardrail?**
 A: Every condition has to hold at once: the RFQ still open, at least the configured minimum number of responses received, every line on that response matched to a catalogue product, its currency matching the guardrail's currency exactly, its supplier allowed (if a supplier allowlist is configured), its total under the configured maximum, its price within the configured variance of your recent purchase history for that product, and it must be the single lowest-priced eligible response — a tie never fires, and if more than one guardrail would independently fire the result is treated as ambiguous rather than picked arbitrarily. If even one condition fails, the response is simply left for you to prepare manually from RFQ Responses (§38) — which now also tells you exactly which condition failed for each response, per guardrail.

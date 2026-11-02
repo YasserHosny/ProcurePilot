@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import NamedTuple
 from uuid import UUID
 
 import psycopg
@@ -115,9 +116,18 @@ def estimate_from_source_response(
     return estimates
 
 
+class QuotedPrice(NamedTuple):
+    amount: Decimal
+    currency: str
+    prices_include_vat: bool = False
+    vat_rate: Decimal | None = None
+
+
 QUOTED_PRICES_SQL = """
-select md.matched_workspace_product_id, ql.unit_price_amount, ql.unit_price_currency
+select md.matched_workspace_product_id, ql.unit_price_amount, ql.unit_price_currency,
+       q.prices_include_vat, ql.vat_rate
 from rfq_response resp
+join quotation q on q.id = resp.quotation_id
 join quotation_line ql on ql.quotation_id = resp.quotation_id
 join current_match_decision md on md.quotation_line_id = ql.id
 where resp.id = %(rfq_response_id)s
@@ -133,7 +143,7 @@ def quoted_prices_from_source_response(
     *,
     rfq_response_id: UUID,
     product_ids: list[UUID],
-) -> dict[UUID, tuple[Decimal, str]]:
+) -> dict[UUID, QuotedPrice]:
     """The supplier's own quoted per-pack price per product on an RFQ response (no landed
     charges): the only figure that may pre-fill a purchase order's unit price."""
     with conn.cursor(row_factory=dict_row) as cur:
@@ -143,9 +153,13 @@ def quoted_prices_from_source_response(
         )
         rows = cur.fetchall()
     return {
-        row["matched_workspace_product_id"]: (
+        row["matched_workspace_product_id"]: QuotedPrice(
             Decimal(str(row["unit_price_amount"])),
             str(row["unit_price_currency"]),
+            bool(row["prices_include_vat"]),
+            Decimal(str(row["vat_rate"]))
+            if row["vat_rate"] is not None and row["prices_include_vat"]
+            else None,
         )
         for row in rows
     }

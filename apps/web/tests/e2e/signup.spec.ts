@@ -48,6 +48,7 @@ test.describe('Workspace sign-up (US1)', () => {
 
     await page.fill('input[formControlName="invitation_token"]', invitation.invitation_token);
     await page.fill('input[formControlName="business_name"]', businessName);
+    await page.fill('input[formControlName="display_name"]', 'E2E Owner');
     await page.fill('input[formControlName="email"]', email);
     await page.fill('input[formControlName="password"]', password);
 
@@ -83,6 +84,7 @@ test.describe('Workspace sign-up (US1)', () => {
 
     await page.fill('input[formControlName="invitation_token"]', 'not-a-real-invitation-token');
     await page.fill('input[formControlName="business_name"]', `Rejected Co ${stamp}`);
+    await page.fill('input[formControlName="display_name"]', 'E2E Owner');
     await page.fill('input[formControlName="email"]', `e2e.rejected.${stamp}@example.test`);
     await page.fill('input[formControlName="password"]', 'E2eRejectedPassword123!');
 

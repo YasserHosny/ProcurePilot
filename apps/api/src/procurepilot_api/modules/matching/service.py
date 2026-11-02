@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import PurePosixPath
@@ -24,7 +26,10 @@ from procurepilot_api.modules.matching.embeddings import (
     get_embedding_provider,
     vector_literal,
 )
+from procurepilot_api.modules.matching.exact import normalise_name
 from procurepilot_api.modules.matching.quoted_exposure import quoted_exposure
+from procurepilot_api.modules.matching.rfq_fit import RULE_VERSION as RFQ_FIT_VERSION
+from procurepilot_api.modules.matching.rfq_fit import RfqFit, fit_against_rfq
 from procurepilot_api.modules.matching.schemas import (
     MatchCandidate,
     MatchDecision,
@@ -48,11 +53,14 @@ from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.modules.quotations.schemas import Money, Pack
 from procurepilot_api.modules.quotations.schemas import decimal_string as quantity_string
+from procurepilot_api.modules.rfq.read_api import RfqContext, rfq_lines_for_quotation
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
+from procurepilot_api.shared.postgrest_pages import all_rows
 
 QUOTATION_COLUMNS = (
-    "id,tenant_id,document_id,supplier_id,status,issue_date,reviewed_at,reviewed_by,deleted_at"
+    "id,tenant_id,document_id,supplier_id,status,issue_date,reviewed_at,reviewed_by,"
+    "deleted_at,prices_include_vat"
 )
 LINE_COLUMNS = (
     "id,tenant_id,quotation_id,line_number,original_text,quantity,pack_count,unit_size,pack_unit,"
@@ -73,6 +81,11 @@ DECISION_COLUMNS = (
     "is_automatic,decided_by,decided_at,confidence,alias_id,created_at,"
     "supersedes_decision_id,learned_from_decision_id"
 )
+logger = logging.getLogger(__name__)
+ALIAS_SWEEP_LIMIT = 200
+ALIAS_SWEEP_SCAN_LIMIT = 1000
+ALIAS_SWEEP_BATCH = 100
+
 ALIAS_COLUMNS = "id,workspace_product_id,supplier_id,alias_text,created_by,created_at"
 
 
@@ -93,17 +106,23 @@ class MatchingService:
         quote = _quotation_row(client, quotation_id)
         if quote["status"] != "reviewed":
             raise ConflictError(details={"reason": "quotation_not_reviewed"})
-        lines = _line_rows(client, quotation_id)
+        lines = _line_rows(client, quotation_id, quote)
         if not lines:
             return QuotationMatches(quotation_id=quotation_id, lines=[])
-        self._ensure_pipeline(
-            client=client,
-            member=member,
-            quote=quote,
-            lines=lines,
-            bearer_token=bearer_token,
-        )
-        return self._build_quotation_matches(client, bearer_token, quotation_id, lines)
+        # Every read is a round trip (PPS-133): read the lines' match state in three batched
+        # queries, and prepare only when some line still needs it.
+        snapshot = _LineMatchState.read(client, lines)
+        if not snapshot.settled(lines):
+            self._ensure_pipeline(
+                client=client,
+                member=member,
+                quote=quote,
+                lines=lines,
+                bearer_token=bearer_token,
+                snapshot=snapshot,
+            )
+            snapshot = _LineMatchState.read(client, lines)
+        return self._build_quotation_matches(client, quote, lines, snapshot)
 
     def list_match_tasks(
         self,
@@ -143,7 +162,7 @@ class MatchingService:
         clean_search = search.strip()[:200].lower() if search else None
         try:
             _sync_open_match_tasks(client)
-            needs_merge = status in ("all", "auto_accepted") or clean_search is not None
+            needs_merge = status in ("all", "auto_accepted", "resolved") or clean_search is not None
             if status == "auto_accepted":
                 rows = []
             else:
@@ -208,11 +227,12 @@ class MatchingService:
 
             rows = filtered_rows
 
-        # Automatic decisions are queue items only for the explicit auto status or all statuses.
+        # The auto/decided filter also retains corrected heads, reported as resolved/corrected.
         auto_tasks: list[MatchTask] = []
-        if status in ("all", "auto_accepted"):
+        if status in ("all", "auto_accepted", "resolved"):
             auto_tasks = self._auto_accepted_tasks(
                 client,
+                status=status,
                 quotation_id=quotation_id,
                 date_from=date_from,
                 date_to=date_to,
@@ -278,7 +298,10 @@ class MatchingService:
             "status": "status_rank",
         }[sort_by]
         direction = "asc" if sort_order == "asc" else "desc"
-        filters = ["(%(status)s = 'all' or status = %(status)s)"]
+        filters = [
+            "(%(status)s = 'all' or status = %(status)s "
+            "or (%(status)s = 'auto_accepted' and reason = 'corrected'))"
+        ]
         params: dict[str, object] = {
             "tenant_id": member.tenant_id,
             "status": status,
@@ -326,6 +349,7 @@ class MatchingService:
                     d.storage_path, d.original_filename,
                     q.supplier_id,
                     supplier.name as supplier_name,
+                    q.prices_include_vat,
                     ql.id as quotation_line_id,
                     ql.line_number,
                     ql.original_text,
@@ -346,7 +370,8 @@ class MatchingService:
                     mt.created_at,
                     mt.resolved_at,
                     top_candidate.product_name as top_candidate_name,
-                    top_candidate.confidence as top_candidate_confidence
+                    top_candidate.confidence as top_candidate_confidence,
+                    top_candidate.rfq_position as top_candidate_rfq_position
                 from match_task mt
                 join quotation_line ql
                   on ql.tenant_id = mt.tenant_id and ql.id = mt.quotation_line_id
@@ -357,7 +382,10 @@ class MatchingService:
                 left join membership reviewer
                   on reviewer.tenant_id = mt.tenant_id and reviewer.id = q.reviewed_by
                 left join lateral (
-                    select wp.tenant_name as product_name, mc.confidence
+                    select wp.tenant_name as product_name, mc.confidence,
+                           case when mc.reasons->'rfq'->>'matched' = 'true'
+                                then (mc.reasons->'rfq'->>'position')::integer
+                           end as rfq_position
                     from match_candidate mc
                     join workspace_product wp
                       on wp.tenant_id = mc.tenant_id
@@ -384,6 +412,7 @@ class MatchingService:
                     d.storage_path, d.original_filename,
                     q.supplier_id,
                     supplier.name as supplier_name,
+                    q.prices_include_vat,
                     ql.id as quotation_line_id,
                     ql.line_number,
                     ql.original_text,
@@ -398,13 +427,16 @@ class MatchingService:
                     ql.delivery_fee_currency,
                     ql.discount_amount,
                     ql.discount_currency,
-                    'auto_accepted'::text as status,
+                    case when md.supersedes_decision_id is not null then 'resolved'
+                         else 'auto_accepted' end::text as status,
                     'normal'::text as priority,
-                    'auto_accepted'::text as reason,
+                    case when md.supersedes_decision_id is not null then 'corrected'
+                         else 'auto_accepted' end::text as reason,
                     coalesce(md.decided_at, md.created_at) as created_at,
                     coalesce(md.decided_at, md.created_at) as resolved_at,
                     top_candidate.product_name as top_candidate_name,
-                    coalesce(top_candidate.confidence, md.confidence) as top_candidate_confidence
+                    coalesce(top_candidate.confidence, md.confidence) as top_candidate_confidence,
+                    top_candidate.rfq_position as top_candidate_rfq_position
                 from current_match_decision md
                 join quotation_line ql
                   on ql.tenant_id = md.tenant_id and ql.id = md.quotation_line_id
@@ -415,7 +447,11 @@ class MatchingService:
                 left join membership reviewer
                   on reviewer.tenant_id = md.tenant_id and reviewer.id = q.reviewed_by
                 left join lateral (
-                    select wp.tenant_name as product_name, mc.confidence
+                    select wp.tenant_name as product_name, mc.confidence,
+                           case when mc.id = md.selected_match_candidate_id
+                                     and mc.reasons->'rfq'->>'matched' = 'true'
+                                then (mc.reasons->'rfq'->>'position')::integer
+                           end as rfq_position
                     from match_candidate mc
                     join workspace_product wp
                       on wp.tenant_id = mc.tenant_id
@@ -425,7 +461,13 @@ class MatchingService:
                     order by (mc.id = md.selected_match_candidate_id) desc, mc.rank
                     limit 1
                 ) top_candidate on true
-                where md.tenant_id = %(tenant_id)s and md.is_automatic = true
+                where md.tenant_id = %(tenant_id)s
+                  and (md.is_automatic or md.supersedes_decision_id is not null)
+                  and not exists (
+                      select 1 from match_task existing_task
+                      where existing_task.tenant_id = md.tenant_id
+                        and existing_task.quotation_line_id = md.quotation_line_id
+                  )
             )
             select *,
                    case priority
@@ -475,18 +517,8 @@ class MatchingService:
         task = _latest_task_for_line(client, line_id)
         if task is None:
             decision = _decision_for_line(client, line_id)
-            if decision and bool(decision.get("is_automatic")):
-                decided_at = decision.get("decided_at") or decision.get("created_at")
-                synthetic_row: dict[str, object] = {
-                    "id": decision["id"],
-                    "quotation_line_id": decision["quotation_line_id"],
-                    "status": "auto_accepted",
-                    "priority": "normal",
-                    "reason": "auto_accepted",
-                    "created_at": decided_at,
-                    "resolved_at": decided_at,
-                }
-                return self._task(client, synthetic_row, line_row=line)
+            if decision:
+                return self._task(client, _synthetic_decided_task(decision), line_row=line)
             raise NotFoundError(details={"resource": "match_task"})
         return self._task(client, task, line_row=line)
 
@@ -498,24 +530,131 @@ class MatchingService:
         quote: dict[str, object],
         lines: list[dict[str, object]],
         bearer_token: str | None = None,
+        snapshot: _LineMatchState | None = None,
     ) -> None:
+        context = rfq_lines_for_quotation(self._settings, member, UUID(str(quote["id"])))
+        excluded_products: set[UUID] = set()
+        if context is not None:
+            # RFQs can outlive catalogue products. Archived products must never be proposed.
+            active = {
+                str(row["id"])
+                for row in _rows(
+                    client.table("workspace_product")
+                    .select("id")
+                    .eq("status", "active")
+                    .in_("id", [str(line.workspace_product_id) for line in context.lines])
+                    .execute()
+                    .data
+                )
+            }
+            excluded_products = {
+                line.workspace_product_id
+                for line in context.lines
+                if str(line.workspace_product_id) not in active
+            }
         self._backfill_missing_embeddings(client)
-        for line in lines:
-            if _decision_for_line(client, UUID(str(line["id"]))) is not None:
+        pending: set[UUID] = set()
+        try:
+            self._match_lines(
+                client=client,
+                member=member,
+                lines=lines,
+                context=context,
+                bearer_token=bearer_token,
+                defer_guardrail=pending.add if context is not None else None,
+                excluded_products=excluded_products,
+                snapshot=snapshot or _LineMatchState.read(client, lines),
+            )
+        finally:
+            # Evaluate the settled quotation, including decisions inserted before a later error.
+            for quotation_id in sorted(pending):
+                enqueue_guardrail_evaluation(
+                    self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
+                )
+
+    def _match_lines(
+        self,
+        *,
+        client: object,
+        member: CurrentMember,
+        lines: list[dict[str, object]],
+        context: RfqContext | None,
+        bearer_token: str | None,
+        defer_guardrail: Callable[[UUID], None] | None,
+        excluded_products: set[UUID],
+        snapshot: _LineMatchState,
+    ) -> None:
+        for rank, line in enumerate(
+            sorted(lines, key=lambda row: int(row["line_number"])), start=1
+        ):
+            line_id = str(line["id"])
+            # The snapshot predates the RFQ read, backfill and earlier lines' searches; a buyer
+            # may have decided this line since, so re-check before routing it.
+            if line_id in snapshot.decisions or _decision_for_line(client, UUID(line_id)):
                 continue
-            existing_candidates = _candidate_rows(client, UUID(str(line["id"])))
+            existing_candidates = snapshot.candidates.get(line_id, [])
             if existing_candidates:
                 self._route_or_accept(
-                    client, member, line, existing_candidates, bearer_token=bearer_token
+                    client,
+                    member,
+                    line,
+                    existing_candidates,
+                    bearer_token=bearer_token,
+                    defer_guardrail=defer_guardrail,
                 )
                 continue
-            deterministic = find_deterministic_candidate(
-                line=line,
-                products=_deterministic_products_for_line(client, line),
-                aliases=_aliases_for_line(client, line),
-                supplier_code_aliases=_supplier_code_aliases_for_line(client, line),
+            fit = None
+            proposals: list[dict[str, object]] = []
+            seen: set[UUID] = set()
+            if context is not None:
+                fit = fit_against_rfq(
+                    original_text=str(line["original_text"]),
+                    pack_count=Decimal(str(line["pack_count"]))
+                    if line.get("pack_count") is not None
+                    else None,
+                    unit_size=Decimal(str(line["unit_size"]))
+                    if line.get("unit_size") is not None
+                    else None,
+                    pack_unit=str(line["pack_unit"]) if line.get("pack_unit") else None,
+                    rank=rank,
+                    context=context,
+                    excluded_products=frozenset(excluded_products),
+                    floor=Decimal(str(self._settings.matching_rfq_fit_floor)),
+                    margin=Decimal(str(self._settings.matching_rfq_fit_margin)),
+                )
+                if fit.matched_rfq_line is not None:
+                    reasons = fit.reasons
+                    reasons["rfq"]["matched"] = True
+                    # Keep the automatic winner first, then retain the ordinary proposals
+                    # so a buyer can correct it to another existing catalogue product.
+                    seen.add(fit.matched_rfq_line.workspace_product_id)
+                    proposals.append(
+                        {
+                            "workspace_product_id": fit.matched_rfq_line.workspace_product_id,
+                            "confidence": Decimal("1.0000"),
+                            "reasons": reasons,
+                            "scoring_version": RFQ_FIT_VERSION,
+                        }
+                    )
+            deterministic = (
+                find_deterministic_candidate(
+                    line=line,
+                    products=_deterministic_products_for_line(client, line),
+                    aliases=_aliases_for_line(client, line),
+                    supplier_code_aliases=_supplier_code_aliases_for_line(client, line),
+                )
+                if not proposals
+                else None
             )
-            if deterministic is not None:
+            if (
+                deterministic is not None
+                and deterministic.workspace_product_id not in excluded_products
+            ):
+                reasons = deterministic.reasons
+                if context is not None and fit is not None:
+                    reasons["rfq"] = _rfq_reason_for_product(
+                        context, fit, deterministic.workspace_product_id
+                    )
                 persisted = self._persist_candidates(
                     client,
                     member,
@@ -524,40 +663,89 @@ class MatchingService:
                         {
                             "workspace_product_id": deterministic.workspace_product_id,
                             "confidence": deterministic.confidence,
-                            "reasons": deterministic.reasons,
+                            "reasons": reasons,
                         }
                     ],
                 )
                 if _candidate_is_deterministic(persisted[0]):
                     self._create_automatic_decision(
-                        client, member, line, persisted[0], bearer_token=bearer_token
+                        client,
+                        member,
+                        line,
+                        persisted[0],
+                        bearer_token=bearer_token,
+                        defer_guardrail=defer_guardrail,
                     )
                 else:
-                    # A concurrent runner persisted a non-deterministic set first.
+                    # A concurrent runner may have persisted another candidate set first.
                     self._route_or_accept(
-                        client, member, line, persisted, bearer_token=bearer_token
+                        client,
+                        member,
+                        line,
+                        persisted,
+                        bearer_token=bearer_token,
+                        defer_guardrail=defer_guardrail,
                     )
                 continue
+            if fit is not None:
+                # Keep conflicting RFQ packs visible as evidence, after non-conflicting fits.
+                offered = sorted(
+                    (
+                        score
+                        for score in fit.scores
+                        if score.wording_score
+                        >= Decimal(str(self._settings.matching_rfq_fit_floor))
+                    ),
+                    key=lambda score: score.pack_check == "conflict",
+                )
+                for score in offered:
+                    product_id = score.rfq_line.workspace_product_id
+                    if product_id in seen:
+                        continue
+                    seen.add(product_id)
+                    score.reasons["rfq"]["matched"] = False
+                    proposals.append(
+                        {
+                            "workspace_product_id": product_id,
+                            "confidence": score.score,
+                            "reasons": score.reasons,
+                            "scoring_version": RFQ_FIT_VERSION,
+                        }
+                    )
             candidates = build_similarity_candidates(
                 client=client,
                 line=_line_summary_dict(line),
                 embedding_provider=self._embeddings,
                 trigram_threshold=self._settings.matching_trigram_threshold,
             )
-            persisted = self._persist_candidates(
-                client,
-                member,
-                line,
-                [
+            for candidate in candidates:
+                if (
+                    candidate.workspace_product_id in seen
+                    or candidate.workspace_product_id in excluded_products
+                ):
+                    continue
+                seen.add(candidate.workspace_product_id)
+                reasons = candidate.reasons
+                if context is not None and fit is not None:
+                    reasons["rfq"] = _rfq_reason_for_product(
+                        context, fit, candidate.workspace_product_id
+                    )
+                proposals.append(
                     {
                         "workspace_product_id": candidate.workspace_product_id,
                         "confidence": candidate.confidence,
-                        "reasons": candidate.reasons,
+                        "reasons": reasons,
                     }
-                    for candidate in candidates
-                ],
+                )
+            persisted = self._persist_candidates(client, member, line, proposals)
+            self._route_or_accept(
+                client,
+                member,
+                line,
+                persisted,
+                bearer_token=bearer_token,
+                defer_guardrail=defer_guardrail,
             )
-            self._route_or_accept(client, member, line, persisted, bearer_token=bearer_token)
 
     def _persist_candidates(
         self,
@@ -576,7 +764,7 @@ class MatchingService:
                 "confidence": decimal_string(candidate["confidence"]),
                 "reasons": candidate["reasons"],
                 "rank": rank,
-                "scoring_version": SCORING_VERSION,
+                "scoring_version": candidate.get("scoring_version", SCORING_VERSION),
                 "embedding_model": self._embeddings.model,
             }
             for rank, candidate in enumerate(candidates, start=1)
@@ -603,6 +791,7 @@ class MatchingService:
         candidates: list[dict[str, object]],
         *,
         bearer_token: str | None = None,
+        defer_guardrail: Callable[[UUID], None] | None = None,
     ) -> None:
         if not candidates:
             self._create_task(
@@ -610,6 +799,17 @@ class MatchingService:
             )
             return
         top = candidates[0]
+        rfq = top.get("reasons", {}).get("rfq", {})
+        if top.get("scoring_version") == RFQ_FIT_VERSION and rfq.get("matched") is True:
+            self._create_automatic_decision(
+                client,
+                member,
+                line,
+                top,
+                bearer_token=bearer_token,
+                defer_guardrail=defer_guardrail,
+            )
+            return
         second = candidates[1] if len(candidates) > 1 else None
         top_confidence = Decimal(str(top["confidence"]))
         close_call = second is not None and top_confidence - Decimal(
@@ -620,10 +820,19 @@ class MatchingService:
             top_confidence >= Decimal(str(self._settings.matching_auto_accept_threshold))
             and not close_call
         )
-        if threshold_and_margin_pass and (
-            deterministic or self._settings.matching_fuzzy_auto_accept_enabled
+        if (
+            top.get("scoring_version") != RFQ_FIT_VERSION
+            and threshold_and_margin_pass
+            and (deterministic or self._settings.matching_fuzzy_auto_accept_enabled)
         ):
-            self._create_automatic_decision(client, member, line, top, bearer_token=bearer_token)
+            self._create_automatic_decision(
+                client,
+                member,
+                line,
+                top,
+                bearer_token=bearer_token,
+                defer_guardrail=defer_guardrail,
+            )
             return
         fuzzy_auto_accept_withheld = threshold_and_margin_pass and not deterministic
         self._create_task(
@@ -642,6 +851,139 @@ class MatchingService:
             fuzzy_auto_accept_withheld=fuzzy_auto_accept_withheld,
         )
 
+    def sweep_open_lines_for_alias(
+        self,
+        client: object,
+        member: CurrentMember,
+        alias_row: dict[str, object],
+        learned_from_decision_id: UUID,
+        bearer_token: str,
+        *,
+        defer_guardrail: Callable[[UUID], None] | None = None,
+    ) -> list[UUID]:
+        """Inspect the newest 1,000 open tasks; match at most 200 lines per alias.
+
+        Batched member-client reads retain RLS, including current-decision reads. Scanning
+        is bounded separately so unrelated wording cannot make a request unbounded.
+        Existing candidates are immutable evidence: reuse the product row or append a rank.
+        """
+        swept: list[UUID] = []
+        quotations: set[UUID] = set()
+        try:
+            text = normalise_name(alias_row["alias_text"])
+            if not text:
+                return swept
+            deterministic = find_deterministic_candidate(
+                line={"original_text": alias_row["alias_text"]},
+                products=[],
+                aliases=[alias_row],
+                supplier_code_aliases=[],
+            )
+            assert deterministic is not None  # Comparing the alias with its own text always hits.
+            tasks = _rows(
+                client.table("match_task")
+                .select(TASK_COLUMNS)
+                .in_("status", ["open", "in_progress"])
+                .order("created_at", desc=True)
+                .order("id", desc=True)
+                .limit(ALIAS_SWEEP_SCAN_LIMIT)
+                .execute()
+                .data
+            )
+            for offset in range(0, len(tasks), ALIAS_SWEEP_BATCH):
+                ids = [
+                    str(task["quotation_line_id"])
+                    for task in tasks[offset : offset + ALIAS_SWEEP_BATCH]
+                ]
+                lines = {
+                    str(row["id"]): row
+                    for row in _rows(
+                        client.table("quotation_line")
+                        .select(LINE_COLUMNS)
+                        .in_("id", ids)
+                        .execute()
+                        .data
+                    )
+                }
+                decided = {
+                    str(row["quotation_line_id"])
+                    for row in _rows(
+                        client.table("current_match_decision")
+                        .select("quotation_line_id")
+                        .in_("quotation_line_id", ids)
+                        .execute()
+                        .data
+                    )
+                }
+                for line_id in ids:
+                    line = lines.get(line_id)
+                    if (
+                        line is None
+                        or line_id in decided
+                        or normalise_name(line["original_text"]) != text
+                    ):
+                        continue
+                    if len(swept) >= ALIAS_SWEEP_LIMIT:
+                        return swept
+                    candidates = _candidate_rows(client, UUID(line_id))
+                    candidate = next(
+                        (
+                            row
+                            for row in candidates
+                            if str(row["candidate_workspace_product_id"])
+                            == str(alias_row["workspace_product_id"])
+                        ),
+                        None,
+                    )
+                    if candidate is None:
+                        candidate = _one_row(
+                            client.table("match_candidate")
+                            .insert(
+                                {
+                                    "tenant_id": str(member.tenant_id),
+                                    "quotation_line_id": line_id,
+                                    "candidate_workspace_product_id": str(
+                                        alias_row["workspace_product_id"]
+                                    ),
+                                    "confidence": decimal_string(deterministic.confidence),
+                                    "reasons": deterministic.reasons,
+                                    "rank": max((int(row["rank"]) for row in candidates), default=0)
+                                    + 1,
+                                    "scoring_version": SCORING_VERSION,
+                                    "embedding_model": self._embeddings.model,
+                                }
+                            )
+                            .execute()
+                            .data,
+                            resource="match_candidate",
+                        )
+                    decision = self._create_automatic_decision(
+                        client,
+                        member,
+                        line,
+                        {**candidate, "confidence": decimal_string(deterministic.confidence)},
+                        bearer_token=bearer_token,
+                        defer_guardrail=quotations.add,
+                        alias_id=UUID(str(alias_row["id"])),
+                        learned_from_decision_id=learned_from_decision_id,
+                    )
+                    if decision is not None:
+                        swept.append(UUID(line_id))
+        except Exception:
+            logger.exception("Alias sweep failed for alias %s", alias_row.get("id"))
+        finally:
+            for quotation_id in sorted(quotations):
+                try:
+                    if defer_guardrail is None:
+                        enqueue_guardrail_evaluation(
+                            self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
+                        )
+                    else:
+                        defer_guardrail(quotation_id)
+                except Exception:
+                    logger.exception("Alias sweep guardrail enqueue failed for %s", quotation_id)
+        return swept
+
     def _create_automatic_decision(
         self,
         client: object,
@@ -650,7 +992,10 @@ class MatchingService:
         candidate: dict[str, object],
         *,
         bearer_token: str | None = None,
-    ) -> dict[str, object]:
+        defer_guardrail: Callable[[UUID], None] | None = None,
+        alias_id: UUID | None = None,
+        learned_from_decision_id: UUID | None = None,
+    ) -> dict[str, object] | None:
         try:
             response = (
                 client.table("match_decision")
@@ -664,6 +1009,11 @@ class MatchingService:
                         "selected_match_candidate_id": str(candidate["id"]),
                         "outcome": "same_product",
                         "is_automatic": True,
+                        "decided_by": None,
+                        "alias_id": str(alias_id) if alias_id else None,
+                        "learned_from_decision_id": str(learned_from_decision_id)
+                        if learned_from_decision_id
+                        else None,
                         "confidence": decimal_string(candidate["confidence"]),
                     }
                 )
@@ -671,20 +1021,41 @@ class MatchingService:
             )
         except APIError as exc:
             if exc.code == "23505":
+                if learned_from_decision_id is not None:
+                    return None  # A concurrent human or automatic runner decided first.
                 existing = _decision_for_line(client, UUID(str(line["id"])))
                 if existing is not None:
                     return existing
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         decision = _one_row(response.data, resource="match_decision")
-        enqueue_guardrail_evaluation(
-            self._settings, tenant_id=member.tenant_id, quotation_id=UUID(str(line["quotation_id"]))
-        )
+        if learned_from_decision_id is not None:
+            client.table("match_task").update(
+                {"status": "resolved", "resolved_at": datetime.now(UTC).isoformat()}
+            ).eq("quotation_line_id", str(line["id"])).in_(
+                "status", ["open", "in_progress"]
+            ).execute()
+        quotation_id = UUID(str(line["quotation_id"]))
+        if defer_guardrail is None:
+            enqueue_guardrail_evaluation(
+                self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
+            )
+        else:
+            defer_guardrail(quotation_id)
         if bearer_token is not None:
             self._record(
                 bearer_token=bearer_token,
                 member=member,
-                action="matching.auto_accepted",
+                action="matching.alias_sweep_matched"
+                if learned_from_decision_id
+                else "matching.auto_accepted",
                 target={
+                    "alias_id": str(alias_id),
+                    "learned_from_decision_id": str(learned_from_decision_id),
+                    "decision_id": str(decision["id"]),
+                    "quotation_line_id": str(line["id"]),
+                }
+                if learned_from_decision_id
+                else {
                     "quotation_id": str(line["quotation_id"]),
                     "quotation_line_id": str(line["id"]),
                     "decision_id": str(decision["id"]),
@@ -694,6 +1065,16 @@ class MatchingService:
                     "score": decimal_string(candidate["confidence"]),
                     "threshold": decimal_string(self._settings.matching_auto_accept_threshold),
                     "scoring_version": candidate.get("scoring_version") or SCORING_VERSION,
+                    **(
+                        {
+                            "reason": "rfq_fit",
+                            "rfq_id": candidate["reasons"]["rfq"]["rfq_id"],
+                            "rfq_line_id": candidate["reasons"]["rfq"]["rfq_line_id"],
+                            "rule_version": RFQ_FIT_VERSION,
+                        }
+                        if candidate.get("scoring_version") == RFQ_FIT_VERSION
+                        else {}
+                    ),
                 },
             )
         self._landed_cost.compute_for_line_with_client(
@@ -762,38 +1143,72 @@ class MatchingService:
     def _build_quotation_matches(
         self,
         client: object,
-        bearer_token: str,
-        quotation_id: UUID,
+        quote: dict[str, object],
         lines: list[dict[str, object]],
+        snapshot: _LineMatchState,
     ) -> QuotationMatches:
+        products = _product_summaries(
+            client,
+            [
+                UUID(str(row["candidate_workspace_product_id"]))
+                for rows in snapshot.candidates.values()
+                for row in rows
+            ]
+            + [
+                UUID(str(row["matched_workspace_product_id"]))
+                for row in snapshot.decisions.values()
+            ],
+        )
+        landed_costs = self._landed_cost.latest_for_decisions(
+            client=client,
+            decision_ids=[UUID(str(row["id"])) for row in snapshot.decisions.values()],
+        )
+        line_ids = [str(line["id"]) for line in lines]
+        quotation = (
+            _quotation_summary(
+                client,
+                quote,
+                line_count=len(lines),
+                open_match_task_count=sum(1 for line_id in line_ids if snapshot.open_task(line_id)),
+            )
+            if any(snapshot.task(line_id) for line_id in line_ids)
+            else None
+        )
         states = []
         for line in lines:
-            line_id = UUID(str(line["id"]))
-            candidates = [_candidate(client, row) for row in _candidate_rows(client, line_id)]
-            decision_row = _decision_for_line(client, line_id)
-            task_row = _open_task_for_line(client, line_id) or _latest_task_for_line(
-                client, line_id
-            )
-            landed_cost = None
-            if decision_row is not None:
-                landed_cost = self._landed_cost.get_landed_cost_or_none(
-                    bearer_token=bearer_token, line_id=line_id
-                )
+            line_id = str(line["id"])
+            candidates = [
+                _candidate_from(row, products) for row in snapshot.candidates.get(line_id, [])
+            ]
+            decision_row = snapshot.decisions.get(line_id)
+            decision = _decision_from(decision_row, products) if decision_row else None
+            task_row = snapshot.task(line_id)
             states.append(
                 QuotationLineMatchState(
                     line=_line(line),
                     candidates=candidates,
-                    task=self._task(client, task_row) if task_row else None,
-                    decision=_decision(client, decision_row) if decision_row else None,
-                    landed_cost=landed_cost,
+                    task=_task_from(
+                        task_row,
+                        line_row=line,
+                        quotation=quotation,
+                        candidates=candidates,
+                        decision=decision,
+                    )
+                    if task_row and quotation
+                    else None,
+                    decision=decision,
+                    landed_cost=landed_costs.get(UUID(str(decision_row["id"])))
+                    if decision_row
+                    else None,
                 )
             )
-        return QuotationMatches(quotation_id=quotation_id, lines=states)
+        return QuotationMatches(quotation_id=UUID(str(quote["id"])), lines=states)
 
     def _auto_accepted_tasks(
         self,
         client: object,
         *,
+        status: str = "auto_accepted",
         quotation_id: UUID | None,
         date_from: str | None,
         date_to: str | None,
@@ -802,15 +1217,11 @@ class MatchingService:
         reason: MatchTaskReason | None,
     ) -> list[MatchTask]:
         if (priority is not None and priority != "normal") or (
-            reason is not None and reason != "auto_accepted"
+            reason is not None and reason not in ("auto_accepted", "corrected")
         ):
             return []
         try:
-            query = (
-                client.table("current_match_decision")
-                .select(DECISION_COLUMNS)
-                .eq("is_automatic", True)
-            )
+            query = client.table("current_match_decision").select(DECISION_COLUMNS)
             if date_from is not None:
                 query = query.gte("decided_at", date_from)
             if date_to is not None:
@@ -823,7 +1234,11 @@ class MatchingService:
             response = query.execute()
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        decision_rows = _rows(response.data)
+        decision_rows = [
+            row
+            for row in _rows(response.data)
+            if row.get("is_automatic") or row.get("supersedes_decision_id") is not None
+        ]
         if clean_search:
             line_ids = list({str(row["quotation_line_id"]) for row in decision_rows})
             context_by_line = _prefetch_search_context(client, line_ids) if line_ids else {}
@@ -855,16 +1270,13 @@ class MatchingService:
                 line = _line_row(client, UUID(str(dec["quotation_line_id"])))
             except NotFoundError:
                 continue
-            decided_at = dec.get("decided_at") or dec.get("created_at")
-            synthetic_row: dict[str, object] = {
-                "id": dec["id"],
-                "quotation_line_id": dec["quotation_line_id"],
-                "status": "auto_accepted",
-                "priority": "normal",
-                "reason": "auto_accepted",
-                "created_at": decided_at,
-                "resolved_at": decided_at,
-            }
+            synthetic_row = _synthetic_decided_task(dec)
+            if status == "resolved" and synthetic_row["status"] != "resolved":
+                continue
+            if reason is not None and synthetic_row["reason"] != reason:
+                continue
+            if _latest_task_for_line(client, UUID(str(dec["quotation_line_id"]))) is not None:
+                continue
             try:
                 task = self._task(client, synthetic_row, line_row=line)
             except (NotFoundError, ServiceUnavailableError):
@@ -883,53 +1295,24 @@ class MatchingService:
         decision_row = _decision_for_line(client, UUID(str(row["quotation_line_id"])))
         quotation_id = UUID(str(line_row["quotation_id"]))
         quote = _quotation_row(client, quotation_id)
-        supplier_name = (
-            _supplier_name(client, UUID(str(quote["supplier_id"]))) or None
-            if quote.get("supplier_id")
-            else None
-        )
-        quotation_lines = _line_rows(client, quotation_id)
-        document_id = UUID(str(quote["document_id"])) if quote.get("document_id") else None
-        source_filename = _source_filename(client, document_id) if document_id else None
-        reviewer_email = (
-            _membership_email(client, UUID(str(quote["reviewed_by"])))
-            if quote.get("reviewed_by")
-            else None
-        )
-        quotation = QuotationMatchSummary(
-            id=quotation_id,
-            status=str(quote["status"]),
-            document_id=document_id,
-            source_filename=source_filename,
-            supplier_id=UUID(str(quote["supplier_id"])) if quote.get("supplier_id") else None,
-            issue_date=quote.get("issue_date"),
-            reviewed_at=quote.get("reviewed_at"),
-            reviewed_by=(UUID(str(quote["reviewed_by"])) if quote.get("reviewed_by") else None),
-            reviewed_by_email=reviewer_email,
+        quotation_lines = _line_rows(client, quotation_id, quote)
+        quotation = _quotation_summary(
+            client,
+            quote,
             line_count=len(quotation_lines),
             open_match_task_count=_open_task_count(
                 client, [UUID(str(line["id"])) for line in quotation_lines]
             ),
-            supplier_name=supplier_name,
         )
-        decision = _decision(client, decision_row) if decision_row else None
-        return MatchTask(
-            id=UUID(str(row["id"])),
-            quotation_id=quotation_id,
+        return _task_from(
+            row,
+            line_row=line_row,
             quotation=quotation,
-            quotation_line=_line(line_row),
-            status=str(row["status"]),
-            priority=str(row["priority"]),
-            reason=str(row["reason"]),
             candidates=[
                 _candidate(client, candidate)
                 for candidate in _candidate_rows(client, UUID(str(line_row["id"])))
             ],
-            decision=decision,
-            matched_product=decision.matched_product if decision else None,
-            created_at=row["created_at"],
-            resolved_at=row.get("resolved_at"),
-            supplier_name=supplier_name,
+            decision=_decision(client, decision_row) if decision_row else None,
         )
 
     def _backfill_missing_embeddings(self, client: object) -> None:
@@ -1044,7 +1427,9 @@ def _membership_email(client: object, membership_id: UUID) -> str | None:
     return str(rows[0]["email"]) if rows and rows[0].get("email") else None
 
 
-def _line_rows(client: object, quotation_id: UUID) -> list[dict[str, object]]:
+def _line_rows(
+    client: object, quotation_id: UUID, quote: dict[str, object] | None = None
+) -> list[dict[str, object]]:
     try:
         response = (
             client.table("quotation_line")
@@ -1055,7 +1440,7 @@ def _line_rows(client: object, quotation_id: UUID) -> list[dict[str, object]]:
         )
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-    return _with_line_extracted_fields(client, _rows(response.data))
+    return _with_line_extracted_fields(client, _rows(response.data), quote=quote)
 
 
 def _line_row(client: object, line_id: UUID) -> dict[str, object]:
@@ -1169,9 +1554,16 @@ def _supplier_code_aliases_for_line(
 def _with_line_extracted_fields(
     client: object,
     lines: list[dict[str, object]],
+    *,
+    quote: dict[str, object] | None = None,
 ) -> list[dict[str, object]]:
     if not lines:
         return lines
+    # One read per quotation, none when the caller already holds it (PPS-133 round trips).
+    quotes: dict[str, dict[str, object]] = {str(quote["id"]): quote} if quote else {}
+    for quotation_id in {str(line["quotation_id"]) for line in lines if line.get("quotation_id")}:
+        if quotation_id not in quotes:
+            quotes[quotation_id] = _quotation_row(client, UUID(quotation_id))
     line_ids = [UUID(str(line["id"])) for line in lines]
     try:
         response = (
@@ -1199,6 +1591,9 @@ def _with_line_extracted_fields(
     return [
         {
             **line,
+            "prices_include_vat": bool(
+                quotes.get(str(line.get("quotation_id")), {}).get("prices_include_vat", False)
+            ),
             "extracted_fields": extracted_by_line.get(str(line["id"]), {}),
         }
         for line in lines
@@ -1422,13 +1817,176 @@ def _open_task_count(client: object, line_ids: list[UUID]) -> int:
     return len(_rows(response.data))
 
 
+IN_CHUNK = 100
+
+
+def _chunks(values: list[str]) -> list[list[str]]:
+    """Bound `in.(...)` filters so a long quotation cannot overflow the request URL."""
+    return [values[start : start + IN_CHUNK] for start in range(0, len(values), IN_CHUNK)]
+
+
+class _LineMatchState:
+    """The candidates, current decision and tasks of a quotation's lines, read in batches."""
+
+    def __init__(
+        self,
+        *,
+        candidates: dict[str, list[dict[str, object]]],
+        decisions: dict[str, dict[str, object]],
+        tasks: dict[str, list[dict[str, object]]],
+    ) -> None:
+        self.candidates = candidates
+        self.decisions = decisions
+        self._tasks = tasks
+
+    @classmethod
+    def read(cls, client: object, lines: list[dict[str, object]]) -> _LineMatchState:
+        line_ids = [str(line["id"]) for line in lines]
+        candidates: dict[str, list[dict[str, object]]] = {}
+        decisions: dict[str, dict[str, object]] = {}
+        tasks: dict[str, list[dict[str, object]]] = {}
+        try:
+            # Each response is capped at max_rows, however few ids a chunk names: page them all.
+            for chunk in _chunks(line_ids):
+                for row in all_rows(
+                    lambda chunk=chunk: (
+                        client.table("match_candidate")
+                        .select(CANDIDATE_COLUMNS)
+                        .in_("quotation_line_id", chunk)
+                        .order("rank")
+                        .order("id")
+                    ),
+                    _rows,
+                ):
+                    candidates.setdefault(str(row["quotation_line_id"]), []).append(row)
+                for row in all_rows(
+                    lambda chunk=chunk: (
+                        client.table("current_match_decision")
+                        .select(DECISION_COLUMNS)
+                        .in_("quotation_line_id", chunk)
+                        .order("id")
+                    ),
+                    _rows,
+                ):
+                    if str(row["quotation_line_id"]) in decisions:
+                        raise ServiceUnavailableError(
+                            details={"reason": "multiple_match_decisions"}
+                        )
+                    decisions[str(row["quotation_line_id"])] = row
+                for row in all_rows(
+                    lambda chunk=chunk: (
+                        client.table("match_task")
+                        .select(TASK_COLUMNS)
+                        .in_("quotation_line_id", chunk)
+                        .order("created_at", desc=True)
+                        .order("id", desc=True)
+                    ),
+                    _rows,
+                ):
+                    tasks.setdefault(str(row["quotation_line_id"]), []).append(row)
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        for rows in tasks.values():
+            if sum(1 for row in rows if row["status"] in ("open", "in_progress")) > 1:
+                raise ServiceUnavailableError(details={"reason": "multiple_open_match_tasks"})
+        return cls(candidates=candidates, decisions=decisions, tasks=tasks)
+
+    def open_task(self, line_id: str) -> dict[str, object] | None:
+        return next(
+            (
+                row
+                for row in self._tasks.get(line_id, [])
+                if row["status"] in ("open", "in_progress")
+            ),
+            None,
+        )
+
+    def task(self, line_id: str) -> dict[str, object] | None:
+        """The open task, else the newest one."""
+        rows = self._tasks.get(line_id, [])
+        return self.open_task(line_id) or (rows[0] if rows else None)
+
+    def settled(self, lines: list[dict[str, object]]) -> bool:
+        """Every line is decided, or has candidates and a task awaiting a buyer.
+
+        A line with an open task but no candidates is not settled: preparation searches the
+        catalogue for it again, as it always has, so a product added since can still be found.
+        """
+        return all(
+            str(line["id"]) in self.decisions
+            or (self.candidates.get(str(line["id"])) and self.open_task(str(line["id"])))
+            for line in lines
+        )
+
+
+def _quotation_summary(
+    client: object,
+    quote: dict[str, object],
+    *,
+    line_count: int,
+    open_match_task_count: int,
+) -> QuotationMatchSummary:
+    supplier_name = (
+        _supplier_name(client, UUID(str(quote["supplier_id"]))) or None
+        if quote.get("supplier_id")
+        else None
+    )
+    document_id = UUID(str(quote["document_id"])) if quote.get("document_id") else None
+    return QuotationMatchSummary(
+        id=UUID(str(quote["id"])),
+        status=str(quote["status"]),
+        document_id=document_id,
+        source_filename=_source_filename(client, document_id) if document_id else None,
+        supplier_id=UUID(str(quote["supplier_id"])) if quote.get("supplier_id") else None,
+        issue_date=quote.get("issue_date"),
+        reviewed_at=quote.get("reviewed_at"),
+        reviewed_by=(UUID(str(quote["reviewed_by"])) if quote.get("reviewed_by") else None),
+        reviewed_by_email=(
+            _membership_email(client, UUID(str(quote["reviewed_by"])))
+            if quote.get("reviewed_by")
+            else None
+        ),
+        line_count=line_count,
+        open_match_task_count=open_match_task_count,
+        supplier_name=supplier_name,
+    )
+
+
+def _task_from(
+    row: dict[str, object],
+    *,
+    line_row: dict[str, object],
+    quotation: QuotationMatchSummary,
+    candidates: list[MatchCandidate],
+    decision: MatchDecision | None,
+) -> MatchTask:
+    return MatchTask(
+        id=UUID(str(row["id"])),
+        quotation_id=quotation.id,
+        quotation=quotation,
+        quotation_line=_line(line_row),
+        status=str(row["status"]),
+        priority=str(row["priority"]),
+        reason=str(row["reason"]),
+        candidates=candidates,
+        decision=decision,
+        matched_product=decision.matched_product if decision else None,
+        created_at=row["created_at"],
+        resolved_at=row.get("resolved_at"),
+        supplier_name=quotation.supplier_name,
+    )
+
+
 def _candidate(client: object, row: dict[str, object]) -> MatchCandidate:
+    product_id = str(row["candidate_workspace_product_id"])
+    return _candidate_from(row, {product_id: _product_summary(client, UUID(product_id))})
+
+
+def _candidate_from(row: dict[str, object], products: dict[str, ProductSummary]) -> MatchCandidate:
     return MatchCandidate(
         id=UUID(str(row["id"])),
         quotation_line_id=UUID(str(row["quotation_line_id"])),
-        candidate_product=_product_summary(
-            client, UUID(str(row["candidate_workspace_product_id"]))
-        ),
+        candidate_product=products[str(row["candidate_workspace_product_id"])],
         confidence=decimal_string(row["confidence"]),
         reasons=row["reasons"],
         rank=int(row["rank"]),
@@ -1439,10 +1997,15 @@ def _candidate(client: object, row: dict[str, object]) -> MatchCandidate:
 
 
 def _decision(client: object, row: dict[str, object]) -> MatchDecision:
+    product_id = str(row["matched_workspace_product_id"])
+    return _decision_from(row, {product_id: _product_summary(client, UUID(product_id))})
+
+
+def _decision_from(row: dict[str, object], products: dict[str, ProductSummary]) -> MatchDecision:
     return MatchDecision(
         id=UUID(str(row["id"])),
         quotation_line_id=UUID(str(row["quotation_line_id"])),
-        matched_product=_product_summary(client, UUID(str(row["matched_workspace_product_id"]))),
+        matched_product=products[str(row["matched_workspace_product_id"])],
         selected_match_candidate_id=(
             UUID(str(row["selected_match_candidate_id"]))
             if row.get("selected_match_candidate_id")
@@ -1478,6 +2041,44 @@ def _product_summary(client: object, product_id: UUID) -> ProductSummary:
     canonical = _canonical_by_id(client, [UUID(str(product["canonical_product_id"]))]).get(
         str(product["canonical_product_id"])
     )
+    return _product_summary_from(product, canonical)
+
+
+def _product_summaries(client: object, product_ids: list[UUID]) -> dict[str, ProductSummary]:
+    """`_product_summary` for many products: two reads, not two per product."""
+    wanted = sorted({str(product_id) for product_id in product_ids})
+    if not wanted:
+        return {}
+    products: dict[str, dict[str, object]] = {}
+    try:
+        for chunk in _chunks(wanted):
+            for row in _rows(
+                client.table("workspace_product")
+                .select(PRODUCT_COLUMNS)
+                .in_("id", chunk)
+                .execute()
+                .data
+            ):
+                products[str(row["id"])] = row
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    if len(products) != len(wanted):
+        raise NotFoundError(details={"resource": "product"})
+    canonical_ids = sorted({str(row["canonical_product_id"]) for row in products.values()})
+    canonicals: dict[str, dict[str, object]] = {}
+    for chunk in _chunks(canonical_ids):
+        canonicals.update(_canonical_by_id(client, [UUID(value) for value in chunk]))
+    return {
+        product_id: _product_summary_from(
+            product, canonicals.get(str(product["canonical_product_id"]))
+        )
+        for product_id, product in products.items()
+    }
+
+
+def _product_summary_from(
+    product: dict[str, object], canonical: dict[str, object] | None
+) -> ProductSummary:
     if canonical is None:
         raise ServiceUnavailableError(details={"reason": "canonical_product_not_readable"})
     return ProductSummary(
@@ -1506,6 +2107,7 @@ def _line(row: dict[str, object]) -> QuotationLineSummary:
     delivery_fee = _money(row, "delivery_fee")
     discount = _money(row, "discount")
     exposure = quoted_exposure(
+        prices_include_vat=bool(row.get("prices_include_vat", False)),
         quantity=quantity,
         unit_price=unit_price,
         vat_rate=vat_rate,
@@ -1627,6 +2229,7 @@ def _queue_item(row: dict[str, object]) -> MatchQueueItem:
         "delivery_fee_currency": row.get("delivery_fee_currency"),
         "discount_amount": row.get("discount_amount"),
         "discount_currency": row.get("discount_currency"),
+        "prices_include_vat": bool(row.get("prices_include_vat")),
     }
     quotation = QuotationMatchSummary(
         id=UUID(str(row["quotation_id"])),
@@ -1650,6 +2253,7 @@ def _queue_item(row: dict[str, object]) -> MatchQueueItem:
         MatchQueueCandidateSummary(
             product_name=str(row["top_candidate_name"]),
             confidence=decimal_string(row["top_candidate_confidence"]),
+            rfq_position=row.get("top_candidate_rfq_position"),
         )
         if row.get("top_candidate_name")
         else None
@@ -1667,3 +2271,35 @@ def _queue_item(row: dict[str, object]) -> MatchQueueItem:
         resolved_at=row.get("resolved_at"),
         supplier_name=row.get("supplier_name"),
     )
+
+
+def _synthetic_decided_task(decision: dict[str, object]) -> dict[str, object]:
+    """Taskless heads stay addressable. Corrections are resolved/corrected, while the
+    auto_accepted queue filter includes them for continuity with their automatic root.
+    """
+    corrected = decision.get("supersedes_decision_id") is not None
+    decided_at = decision.get("decided_at") or decision.get("created_at")
+    return {
+        "id": decision["id"],
+        "quotation_line_id": decision["quotation_line_id"],
+        "status": "resolved" if corrected or not decision.get("is_automatic") else "auto_accepted",
+        "priority": "normal",
+        "reason": "corrected"
+        if corrected
+        else ("auto_accepted" if decision.get("is_automatic") else "human_decided"),
+        "created_at": decided_at,
+        "resolved_at": decided_at,
+    }
+
+
+def _rfq_reason_for_product(
+    context: RfqContext, fit: RfqFit, product_id: UUID
+) -> dict[str, object]:
+    # Membership and fit answer different questions: a requested product can conflict on pack.
+    for score in fit.scores:
+        if score.rfq_line.workspace_product_id == product_id:
+            return score.reasons["rfq"]
+    return {
+        "rfq_id": str(context.rfq_id),
+        "not_in_rfq": all(line.workspace_product_id != product_id for line in context.lines),
+    }

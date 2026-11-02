@@ -64,12 +64,12 @@ ranked as (
     s.reliability_score,
     pd.base_quantity as pack_base_quantity,
     row_number() over (
-      partition by md.matched_workspace_product_id, q.supplier_id, lc.rule_version
+      partition by md.matched_workspace_product_id, q.supplier_id
       order by lc.recorded_at desc, lc.id desc
     ) as rn
   from product p
   join current_match_decision md on md.matched_workspace_product_id = p.id
-  join landed_cost lc on lc.match_decision_id = md.id
+  join current_landed_cost lc on lc.match_decision_id = md.id
   join quotation_line ql on ql.id = lc.quotation_line_id
   join quotation q on q.id = ql.quotation_id
   join supplier s on s.id = q.supplier_id
@@ -101,7 +101,7 @@ select
   wp.tenant_name
 from workspace_product wp
 join current_match_decision md on md.matched_workspace_product_id = wp.id
-join landed_cost lc on lc.match_decision_id = md.id
+join current_landed_cost lc on lc.match_decision_id = md.id
 join quotation_line ql on ql.id = lc.quotation_line_id
 join quotation q on q.id = ql.quotation_id
 join supplier s on s.id = q.supplier_id

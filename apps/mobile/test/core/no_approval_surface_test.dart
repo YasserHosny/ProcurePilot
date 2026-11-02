@@ -7,7 +7,8 @@ import 'package:procurepilot_mobile/main.dart' as app;
 ///
 /// This test does not render any widget. It inspects the mobile API clients
 /// and the registered route table to prove that the now-authorized mobile
-/// decision surface still calls only the shared request decision endpoints.
+/// decision surface still calls only the shared request and request-group
+/// decision endpoints.
 void main() {
   // Scans every .dart file actually present under lib/core/api/ rather than a hardcoded
   // filename list — a hardcoded list stays green when a NEW client file is added with an
@@ -37,24 +38,28 @@ void main() {
 
   group('No divergent approval/rejection API surface', () {
     for (final path in apiFiles) {
-      test(
-        '$path keeps approve/reject endpoint paths in RequestsApiClient only',
-        () {
-          final file = File(path);
-          final content = file.readAsStringSync();
-          if (path.endsWith('requests_api_client.dart')) {
-            expect(content, contains("action: 'approve'"));
-            expect(content, contains("action: 'reject'"));
-          } else {
-            expect(
-              endpointPattern.hasMatch(content),
-              isFalse,
-              reason:
-                  'Found an approve/reject endpoint path reference in $path',
-            );
-          }
-        },
-      );
+      test('$path keeps decisions in the shared request API clients', () {
+        final file = File(path);
+        final content = file.readAsStringSync();
+        if (path.endsWith('requests_api_client.dart')) {
+          expect(content, contains("action: 'approve'"));
+          expect(content, contains("action: 'reject'"));
+        } else if (path.endsWith('approvals_api_client.dart')) {
+          expect(
+            content,
+            contains(r'$apiBaseUrl/request-groups/$groupId/$action'),
+          );
+          expect(content, contains("action: 'approve'"));
+          expect(content, contains("action: 'reject'"));
+          expect(content, isNot(contains(r'$apiBaseUrl/requests/')));
+        } else {
+          expect(
+            endpointPattern.hasMatch(content),
+            isFalse,
+            reason: 'Found an approve/reject endpoint path reference in $path',
+          );
+        }
+      });
     }
   });
 

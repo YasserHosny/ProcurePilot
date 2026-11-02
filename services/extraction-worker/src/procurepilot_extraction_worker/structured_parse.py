@@ -19,9 +19,7 @@ def is_structured_mime_type(mime_type: str) -> bool:
     return mime_type in CSV_MIME_TYPES | XLSX_MIME_TYPES
 
 
-def parse_structured_content(
-    content: bytes, *, mime_type: str
-) -> ExtractionResult:
+def parse_structured_content(content: bytes, *, mime_type: str) -> ExtractionResult:
     if mime_type in XLSX_MIME_TYPES:
         return _parse_xlsx(content)
     text = content.decode("utf-8-sig")
@@ -44,9 +42,7 @@ def _parse_xlsx(content: bytes) -> ExtractionResult:
     return _parse_rows(dict_rows)
 
 
-def _parse_rows(
-    rows: Iterable[dict[str, object]]
-) -> ExtractionResult:
+def _parse_rows(rows: Iterable[dict[str, object]]) -> ExtractionResult:
     rows = list(rows)
     header: dict[str, ExtractedField] = {}
     lines: list[ExtractedLine] = []
@@ -120,6 +116,7 @@ def _parse_rows(
         lines=lines,
         stated_total=stated_total,
         cost_usd=0.0,
+        source_text=document_text,
     )
 
 

@@ -1,0 +1,271 @@
+{
+  "apiVersion": "2024-11-30",
+  "modelId": "prebuilt-layout",
+  "content": "الذهبي للتموين\nعرض سعر رقم: DH-26-1252\nم | الصنف | العبوة | الكمية | سعر العبوة (ر.س) | الإجمالي (ر.س)\n1 | أرز بسمتي | كيس 10 كجم | 25 | 85.00 | 2125.00\n2 | زيت دوار الشمس | تنكة 18 لتر | 6 | 151.00 | 906.00\n3 | سكر أبيض | كيس 10 كجم | 12 | 39.00 | 468.00\n4 | دقيق | كيس 45 كجم | 8 | 81.00 | 648.00\nالإجمالي شامل ضريبة القيمة المضافة 15%: 4,147.00 ر.س",
+  "pages": [],
+  "paragraphs": [
+    {
+      "content": "الذهبي للتموين"
+    },
+    {
+      "content": "عرض سعر رقم: DH-26-1252"
+    },
+    {
+      "content": "م | الصنف | العبوة | الكمية | سعر العبوة (ر.س) | الإجمالي (ر.س)"
+    },
+    {
+      "content": "1 | أرز بسمتي | كيس 10 كجم | 25 | 85.00 | 2125.00"
+    },
+    {
+      "content": "2 | زيت دوار الشمس | تنكة 18 لتر | 6 | 151.00 | 906.00"
+    },
+    {
+      "content": "3 | سكر أبيض | كيس 10 كجم | 12 | 39.00 | 468.00"
+    },
+    {
+      "content": "4 | دقيق | كيس 45 كجم | 8 | 81.00 | 648.00"
+    },
+    {
+      "content": "الإجمالي شامل ضريبة القيمة المضافة 15%: 4,147.00 ر.س"
+    }
+  ],
+  "tables": [
+    {
+      "rowCount": 6,
+      "columnCount": 6,
+      "cells": [
+        {
+          "rowIndex": 0,
+          "columnIndex": 0,
+          "content": "م",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 1,
+          "content": "الصنف",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 2,
+          "content": "العبوة",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 3,
+          "content": "الكمية",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 4,
+          "content": "سعر العبوة (ر.س)",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 5,
+          "content": "الإجمالي (ر.س)",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 0,
+          "content": "1",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 1,
+          "content": "أرز بسمتي",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 2,
+          "content": "كيس 10 كجم",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 3,
+          "content": "25",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 4,
+          "content": "85.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 5,
+          "content": "2125.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 0,
+          "content": "2",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 1,
+          "content": "زيت دوار الشمس",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 2,
+          "content": "تنكة 18 لتر",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 3,
+          "content": "6",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 4,
+          "content": "151.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 5,
+          "content": "906.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 0,
+          "content": "3",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 1,
+          "content": "سكر أبيض",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 2,
+          "content": "كيس 10 كجم",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 3,
+          "content": "12",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 4,
+          "content": "39.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 5,
+          "content": "468.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 0,
+          "content": "4",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 1,
+          "content": "دقيق",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 2,
+          "content": "كيس 45 كجم",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 3,
+          "content": "8",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 4,
+          "content": "81.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 5,
+          "content": "648.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 0,
+          "content": "الإجمالي شامل ضريبة القيمة المضافة 15%",
+          "rowSpan": 1,
+          "columnSpan": 5
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 5,
+          "content": "4,147.00 ر.س",
+          "rowSpan": 1,
+          "columnSpan": 1
+        }
+      ]
+    }
+  ],
+  "documents": []
+}

@@ -8,6 +8,7 @@ import { Router, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { SessionService } from '../../../core/auth/session.service';
 import type { Me, PurchaseRequest, Role } from '../../../core/api/models';
@@ -57,6 +58,7 @@ describe('RequestListComponent (T017)', () => {
     requestsApi = jasmine.createSpyObj('RequestsApiService', [
       'listRequests',
       'withdrawRequest',
+      'withdrawGroup',
     ]);
     organisationApi = jasmine.createSpyObj('OrganisationApiService', ['listBranches']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
@@ -131,6 +133,47 @@ describe('RequestListComponent (T017)', () => {
     expect(compiled.textContent).toContain('b1');
   });
 
+  it('renders a Supplier column placed after Branch, showing source.supplier_name or —', () => {
+    expect(component.displayedColumns).toEqual([
+      'requiredByDate',
+      'branch',
+      'supplier',
+      'status',
+      'estimatedTotal',
+      'actions',
+    ]);
+
+    requestsApi.listRequests.and.returnValue(
+      of({
+        items: [
+          {
+            ...mockRequests[0],
+            source: {
+              rfq_id: 'rfq-1',
+              rfq_response_id: 'resp-1',
+              quotation_id: 'q-1',
+              supplier_id: 'sup-1',
+              supplier_name: 'الوفرة للمواد الغذائية',
+            },
+          },
+          mockRequests[1],
+        ],
+        next_cursor: null,
+      }),
+    );
+    component.loadRequests();
+    fixture.detectChanges();
+
+    const header = fixture.nativeElement.querySelector('th.mat-column-supplier');
+    expect(header?.textContent?.trim()).toBe('Supplier');
+
+    const cells = fixture.nativeElement.querySelectorAll('td.mat-column-supplier');
+    expect(cells.length).toBe(2);
+    expect(cells[0].textContent?.trim()).toBe('الوفرة للمواد الغذائية');
+    expect(cells[0].getAttribute('dir')).toBe('auto');
+    expect(cells[1].textContent?.trim()).toBe('—');
+  });
+
   it('marks a guardrail-prepared request and leaves manual ones unmarked', () => {
     requestsApi.listRequests.and.returnValue(
       of({
@@ -201,6 +244,102 @@ describe('RequestListComponent (T017)', () => {
       }),
     ).toBeTrue();
     expect(component.canCreateOrder({ ...mockRequests[1], status: 'ordered' })).toBeFalse();
+  });
+
+  describe('create-order action button / shopping_cart icon visibility (PPS-132)', () => {
+    const approvedStep = {
+      id: 'step-1',
+      assigned_membership_id: 'm1',
+      source: 'owner_fallback' as const,
+      status: 'approved' as const,
+      decided_by_membership_id: 'm1',
+      decided_at: '2026-09-30T00:00:00Z',
+    };
+
+    const pendingStep = {
+      id: 'step-2',
+      assigned_membership_id: 'm1',
+      source: 'owner_fallback' as const,
+      status: 'pending' as const,
+    };
+
+    const getCartButton = (): HTMLButtonElement | null =>
+      fixture.nativeElement.querySelector('button[aria-label="Create Order"]');
+
+    const getCartIcon = (): HTMLElement | null => {
+      const root = fixture.nativeElement as HTMLElement;
+      const icons = Array.from(root.querySelectorAll<HTMLElement>('mat-icon'));
+      return icons.find((el) => el.textContent?.trim() === 'shopping_cart') ?? null;
+    };
+
+    it('shows the cart icon when step is approved, status is ordered, and has_quantity_to_order is true', () => {
+      const req: PurchaseRequest = {
+        ...mockRequests[0],
+        status: 'ordered',
+        approval_step: approvedStep,
+        has_quantity_to_order: true,
+      };
+      component.requests.set([req]);
+      fixture.detectChanges();
+
+      expect(component.canCreateOrder(req)).toBeTrue();
+      expect(getCartButton()).toBeTruthy();
+      expect(getCartIcon()?.textContent?.trim()).toBe('shopping_cart');
+    });
+
+    it('hides the cart icon when step is approved, status is ordered, and has_quantity_to_order is false', () => {
+      const req: PurchaseRequest = {
+        ...mockRequests[0],
+        status: 'ordered',
+        approval_step: approvedStep,
+        has_quantity_to_order: false,
+      };
+      component.requests.set([req]);
+      fixture.detectChanges();
+
+      expect(component.canCreateOrder(req)).toBeFalse();
+      expect(getCartButton()).toBeNull();
+    });
+
+    it('shows the cart icon when step is approved, status is ordered, and has_quantity_to_order is missing', () => {
+      const req: PurchaseRequest = {
+        ...mockRequests[0],
+        status: 'ordered',
+        approval_step: approvedStep,
+      };
+      component.requests.set([req]);
+      fixture.detectChanges();
+
+      expect(component.canCreateOrder(req)).toBeTrue();
+      expect(getCartButton()).toBeTruthy();
+      expect(getCartIcon()?.textContent?.trim()).toBe('shopping_cart');
+    });
+
+    it('hides the cart icon when status is withdrawn even with an approved step', () => {
+      const req: PurchaseRequest = {
+        ...mockRequests[0],
+        status: 'withdrawn',
+        approval_step: approvedStep,
+      };
+      component.requests.set([req]);
+      fixture.detectChanges();
+
+      expect(component.canCreateOrder(req)).toBeFalse();
+      expect(getCartButton()).toBeNull();
+    });
+
+    it('hides the cart icon when approval step is pending', () => {
+      const req: PurchaseRequest = {
+        ...mockRequests[0],
+        status: 'submitted',
+        approval_step: pendingStep,
+      };
+      component.requests.set([req]);
+      fixture.detectChanges();
+
+      expect(component.canCreateOrder(req)).toBeFalse();
+      expect(getCartButton()).toBeNull();
+    });
   });
 
   it('shows Withdraw on an ordered request and hides it on terminal requests', () => {
@@ -325,5 +464,102 @@ describe('RequestListComponent (T017)', () => {
     expect(cell).toBeTruthy();
     expect(cell.classList.contains('date-cell')).toBeTrue();
     expect(getComputedStyle(cell).overflow).toBe('visible');
+  });
+
+  describe('Spec 024 User Story 3 (T030) — Grouped requests in list', () => {
+    const groupedListRequest: PurchaseRequest = {
+      ...mockRequests[0],
+      request_group: {
+        id: 'grp-001',
+        rfq_id: 'rfq-split-001',
+        position: 1,
+        size: 2,
+        combined_total: { amount: '4063.00', currency: 'SAR' },
+        best_single_total: { amount: '4137.00', currency: 'SAR' },
+        saving: { amount: '74.00', currency: 'SAR' },
+        sibling_request_ids: ['r2'],
+      },
+    };
+
+    it('shows a small "Split 1 of 2" marker on grouped rows', () => {
+      requestsApi.listRequests.and.returnValue(of({ items: [groupedListRequest], next_cursor: null }));
+      component.loadRequests();
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const marker = compiled.querySelector('.split-badge, [data-testid="split-badge"]');
+      expect(marker).toBeTruthy();
+      expect(marker?.textContent).toContain('Split 1 of 2');
+    });
+
+    it('Withdraw on a grouped request calls withdrawGroup and says "Withdraws both requests of this split"', () => {
+      requestsApi.listRequests.and.returnValue(of({ items: [groupedListRequest], next_cursor: null }));
+      requestsApi.withdrawGroup.and.returnValue(of([groupedListRequest]));
+      component.loadRequests();
+      fixture.detectChanges();
+
+      component.withdrawRequest(groupedListRequest);
+
+      expect(dialogSpy.open).toHaveBeenCalled();
+      const dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as {
+        titleKey?: string;
+        messageKey?: string;
+        confirmKey?: string;
+      };
+      expect(dialogData?.confirmKey).toBe('requests.split.withdrawBoth');
+      // Dialog message or confirmation references withdrawing both requests
+      expect(requestsApi.withdrawGroup).toHaveBeenCalledWith('grp-001', jasmine.any(String));
+      expect(requestsApi.withdrawRequest).not.toHaveBeenCalled();
+    });
+
+    it('the group withdraw dialog title is a key that exists in en and ar', () => {
+      requestsApi.withdrawGroup.and.returnValue(of([groupedListRequest]));
+      component.withdrawRequest(groupedListRequest);
+
+      const titleKey = (dialogSpy.open.calls.mostRecent().args[1]?.data as { titleKey: string }).titleKey;
+      const lookup = (catalog: unknown): unknown =>
+        titleKey.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], catalog);
+      expect(typeof lookup(enCatalog)).withContext(`${titleKey} in en.json`).toBe('string');
+      expect(typeof lookup(arCatalog)).withContext(`${titleKey} in ar.json`).toBe('string');
+    });
+
+    it('a split of three passes the count to the withdraw message and button', () => {
+      const threeWay: PurchaseRequest = {
+        ...groupedListRequest,
+        request_group: { ...groupedListRequest.request_group!, size: 3, sibling_request_ids: ['r2', 'r3'] },
+      };
+      requestsApi.withdrawGroup.and.returnValue(of([threeWay]));
+      component.withdrawRequest(threeWay);
+
+      const data = dialogSpy.open.calls.mostRecent().args[1]?.data as {
+        messageKey: string;
+        messageParams?: Record<string, unknown>;
+        confirmKey: string;
+        confirmParams?: Record<string, unknown>;
+      };
+      expect(data.messageKey).toBe('requests.split.withdrawConfirmMessageAll');
+      expect(data.messageParams).toEqual({ count: 3 });
+      expect(data.confirmKey).toBe('requests.split.withdrawAll');
+      expect(data.confirmParams).toEqual({ count: 3 });
+    });
+
+    it('part_of_split shows the message pointing to the group action', () => {
+      requestsApi.listRequests.and.returnValue(of({ items: [mockRequests[0]], next_cursor: null }));
+      const errorResp = new HttpErrorResponse({
+        error: { code: 'conflict', message: 'Conflict', details: { reason: 'part_of_split' } },
+        status: 409,
+        statusText: 'Conflict',
+      });
+      requestsApi.withdrawRequest.and.returnValue(throwError(() => errorResp));
+
+      component.loadRequests();
+      fixture.detectChanges();
+
+      component.withdrawRequest(mockRequests[0]);
+
+      expect(snackBarSpy.open).toHaveBeenCalled();
+      const snackMsg = snackBarSpy.open.calls.mostRecent().args[0];
+      expect(snackMsg.toLowerCase()).toContain('split');
+    });
   });
 });

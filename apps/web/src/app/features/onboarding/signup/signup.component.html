@@ -59,6 +59,23 @@
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="form-field">
+        <mat-label>{{ 'onboarding.signup.nameLabel' | translate }}</mat-label>
+        <input
+          matInput
+          formControlName="display_name"
+          [placeholder]="'onboarding.signup.namePlaceholder' | translate"
+          required
+          autocomplete="name"
+        />
+        @if (form.controls.display_name.hasError('required') || form.controls.display_name.hasError('whitespace')) {
+          <mat-error>{{ 'onboarding.signup.nameRequired' | translate }}</mat-error>
+        }
+        @if (form.controls.display_name.hasError('maxlength')) {
+          <mat-error>{{ 'onboarding.signup.nameMaxLength' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="form-field">
         <mat-label>{{ 'onboarding.signup.emailLabel' | translate }}</mat-label>
         <input
           matInput

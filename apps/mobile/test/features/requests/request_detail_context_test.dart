@@ -24,6 +24,61 @@ void main() {
       createdAt: DateTime(2026, 10, 20),
     );
 
+    for (final locale in ['en', 'ar']) {
+      testWidgets('no budget renders without remaining amount ($locale)', (
+        tester,
+      ) async {
+        final json = request.toJson();
+        json['budget_status'] = {
+          'remaining_amount': null,
+          'exceeds': false,
+          'status': 'no_budget',
+          'reason_code': 'no_budget_at_cost_centre_level',
+        };
+        final noBudgetRequest = PurchaseRequest.fromJson(json);
+        await pumpWithServices(
+          tester,
+          locale: locale,
+          child: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  settings: RouteSettings(arguments: noBudgetRequest),
+                  builder: (_) => const RequestDetailScreen(),
+                ),
+              ),
+              child: const Text('Open'),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text(
+            locale == 'en' ? 'No budget configured' : 'لا توجد ميزانية محددة',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.text(
+            locale == 'en'
+                ? 'No budget at cost-centre level'
+                : 'لا توجد ميزانية على مستوى مركز التكلفة',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining(
+            locale == 'en' ? 'Remaining budget' : 'الميزانية المتبقية',
+          ),
+          findsNothing,
+        );
+        expect(find.byKey(const Key('requestBudgetExceeded')), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
     testWidgets('formats required-by date in English with tabular figures', (
       tester,
     ) async {

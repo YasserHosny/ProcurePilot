@@ -60,6 +60,7 @@ export class InviteDialogComponent {
   readonly isCopied = signal<boolean>(false);
 
   readonly form = this.fb.nonNullable.group({
+    name: ['', [Validators.maxLength(100)]],
     email: ['', [Validators.required, Validators.email]],
     role: ['buyer' as Role, [Validators.required]],
   });
@@ -74,9 +75,9 @@ export class InviteDialogComponent {
     this.errorTraceId.set(null);
     this.isSubmitting.set(true);
 
-    const { email, role } = this.form.getRawValue();
+    const { email, role, name } = this.form.getRawValue();
 
-    this.api.invite(email.trim(), role).subscribe({
+    this.api.invite(email.trim(), role, name.trim() || null).subscribe({
       next: (invitation) => {
         this.isSubmitting.set(false);
         this.showResult(invitation);

@@ -35,6 +35,7 @@ verified JWT tenant claim.
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `user_id` | uuid | Required FK -> `auth.users.id`; Supabase Auth identity |
 | `email` | text | Required denormalised email for display and invitation matching |
+| `display_name` | text | Optional name shown to colleagues (Approval Queue, Team Management); trimmed, 1–100 characters. Set at sign-up or from the invitation, editable by the member or an owner (PPS-125) |
 | `role` | enum | owner, buyer, branch_manager, approver, viewer |
 | `mfa_enabled` | boolean | MFA status |
 | `preferred_locale` | text | Optional user locale override; `en` or `ar` |
@@ -79,6 +80,7 @@ Indexes and checks:
 | `id` | uuid | PK, default `gen_random_uuid()` |
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `email` | text | Required invited address |
+| `display_name` | text | Optional name the owner gave; copied to `membership.display_name` on acceptance (PPS-125) |
 | `role` | enum | Required role assigned on acceptance |
 | `token_hash` | text | Required, unique; only the token hash is stored |
 | `invited_by` | uuid | Required FK -> `membership.id` |
@@ -218,6 +220,7 @@ Constraints:
 | `id` | uuid | PK |
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `name` | text | Required supplier name |
+| `preferred_locale` | text | Optional; `en` or `ar`; supplier emails fall back to `tenant.default_locale` when null |
 | `payment_terms` | text | Optional terms, for example `Net 30` |
 | `lead_time_days` | integer | Optional; check `>= 0` |
 | `minimum_order_value_amount` | numeric(18,4) | Optional monetary amount |
@@ -315,6 +318,7 @@ Constraints:
 | `issue_date` | date | Optional quotation issue date |
 | `expiry_date` | date | Optional quotation expiry date |
 | `status` | enum | `pending`, `extracting`, `extracted`, `in_review`, `reviewed`, or `refused` |
+| `prices_include_vat` | boolean | Required; default `false`. True when the document states its printed prices include VAT (ADR-021). Extraction sets it from that statement; the reviewer confirms or changes it. Existing rows are `false`; nothing is reinterpreted retroactively. Landed-cost rule v2 reads it |
 | `previous_quotation_id` | uuid | Optional FK -> Quotation; links a supplier re-quote without replacing history |
 | `stated_total_amount` | numeric(18,4) | Optional stated quotation total amount |
 | `stated_total_currency` | text | Optional FK -> `supported_currency.code`; required exactly when amount is present |
@@ -532,6 +536,8 @@ Constraints:
 | `decided_at` | timestamptz | Required decision timestamp; default `now()` |
 | `confidence` | numeric(5,4) | Required accepted confidence score; check `0 <= confidence <= 1` |
 | `alias_id` | uuid | Optional FK -> ProductAlias learned or reused by the decision |
+| `supersedes_decision_id` | uuid | Optional; composite FK -> MatchDecision `(tenant_id, id)`. Set only on a correction: the decision this row replaces (spec 023, ADR-022) |
+| `learned_from_decision_id` | uuid | Optional; composite FK -> MatchDecision `(tenant_id, id)`. Set when the decision was made because another decision taught the wording (the alias sweep), so correcting the teacher can list what it taught |
 | `created_at` | timestamptz | Audit field |
 
 One decision resolves one quotation line. `no_match_new_product` means no existing product fit and
@@ -539,12 +545,21 @@ the newly created workspace product is the match; the line is not left unmatched
 
 Constraints:
 
-- Unique `(tenant_id, quotation_line_id)`: one final decision per line in this chunk.
+- Unique nulls not distinct `(tenant_id, quotation_line_id, supersedes_decision_id)`: exactly one root decision per line (replaces the original one-per-line constraint, migration `20261029000000`).
+- Unique `(supersedes_decision_id)`: a decision is superseded at most once. Together these make a line's decisions a single chain with one head.
+- A trigger (`match_decision_supersession_same_line`) requires a correction to supersede a decision of the same quotation line; the composite FK keeps it in the same tenant. A decision in another tenant is reported like a missing one.
+- Check `supersedes_decision_id <> id`.
 - Automatic decisions have no `decided_by`; human decisions must name the deciding membership.
 - `selected_match_candidate_id` is null exactly when `outcome = 'no_match_new_product'`.
 
-`MatchDecision` is append-only outcome history for this chunk. Correcting a previously confirmed
-match is out of scope and requires a future supersession model, not an update to this row.
+`MatchDecision` is append-only outcome history. A confirmed or automatic match is corrected by inserting
+a new human decision whose `supersedes_decision_id` names the old one; no row is ever updated
+(spec 023, ADR-022). The view `current_match_decision` (`security_invoker = true`) returns the head of
+each line's chain, i.e. the decisions no other decision supersedes. Readers that mean "the line's
+match" read the view; readers of one specific decision by id, and history, read the table.
+`match_decision_live_request(decision_id)` (SECURITY DEFINER, pinned to the caller's tenant) returns the
+id of a live purchase request (not `withdrawn` or `rejected`) priced from the decision, whatever the
+caller's branch visibility; a correction is refused with `409 line_on_purchase_request` while one exists.
 
 Human decisions create or reuse `product_alias` from the exact `quotation_line.original_text`. If
 the lowercased wording already exists for the same product, the alias is reused. If it exists for a
@@ -597,7 +612,7 @@ Constraints:
 | `total_amount` | numeric(18,4) | Required computed landed-cost total |
 | `total_currency` | text | Required FK -> `supported_currency.code` |
 | `raw_inputs` | jsonb | Required complete replay snapshot used by the pinned rule version |
-| `rule_version` | text | Required landed-cost rule identifier, for example `landed-cost-v1` |
+| `rule_version` | text | Required landed-cost rule identifier: `landed-cost-v1`, or `landed-cost-v2` since ADR-021 |
 | `valid_from` | timestamptz | Required valid-time start: when the price or cost applies |
 | `valid_to` | timestamptz | Optional valid-time end |
 | `recorded_at` | timestamptz | Required record-time: when the workspace learned or stored this cost |
@@ -618,6 +633,18 @@ Constraints:
 discount_amount + 0 other_charges`. Missing `vat_rate` is treated as zero. `other_charges` is
 stored as zero because quotation lines do not model it in this chunk.
 
+`landed-cost-v2` (ADR-021) differs only on a quote with `quotation.prices_include_vat = true`: the printed
+price already contains VAT, so `vat_amount = gross * quantity * r / (1 + r)` and
+`total_amount = gross * quantity + delivery_fee_amount - discount_amount`. On a VAT-exclusive quote it
+equals v1. Rows computed under v1 stay v1 (append-only). Both versions put `total_amount` on the same
+basis (including VAT, delivery and discount), so readers pick the latest offer per supplier across rule
+versions.
+
+The view `current_landed_cost` (`security_invoker = true`, migration `20261031010000`) returns the
+latest row per `match_decision_id` (`recorded_at`, then `id`). Since v2 a decision can carry a v1 and a
+v2 row; readers that list offers, price history or alert rows read the view so the decision counts once.
+Earlier rows remain in `landed_cost` as evidence.
+
 All tenant-scoped matching and landed-cost tables have RLS enabled and forced with tenant-claim
 `USING` and `WITH CHECK` policies. Owner and buyer may resolve matches and create products from
 no-match decisions; branch manager, approver, and viewer are read-only. Cross-tenant reads return
@@ -636,6 +663,7 @@ truth.
 | `id` | uuid | PK, default `gen_random_uuid()` |
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `requested_by` | uuid | Required FK -> Membership that submitted the solve |
+| `rfq_id` | uuid | Optional; composite FK -> Rfq `(tenant_id, id)`; the RFQ a split was started from (spec 024); null for a standalone split |
 | `supplier_ids` | uuid[] | Required exactly two distinct supplier ids |
 | `items` | jsonb | Required request snapshot: array of `{workspace_product_id, quantity}`; `quantity` is denominated in the product's normalised base unit, never a count of the supplier's original pack/case (same convention as `Offer.requested_quantity`) |
 | `status` | enum | `queued`, `running`, `completed`, or `failed`; default `queued` |
@@ -837,14 +865,14 @@ of the purchase evidence row.
 | `baseline_source_po_line_ids` | uuid[] | Optional source `purchase_order_line` rows of a `last_po_price` baseline (pack price / `pack_base_quantity`, ADR-020); null for quote-based policies |
 | `baseline_unit_price_amount` | numeric(18,4) | Optional normalised unit baseline amount |
 | `baseline_unit_price_currency` | text | Optional FK -> `supported_currency.code`; required with `baseline_unit_price_amount` |
-| `baseline_value_amount` | numeric(18,4) | Optional baseline unit price multiplied by recorded quantity |
+| `baseline_value_amount` | numeric(18,4) | Optional baseline for the recorded quantity. `last_po_price`: the PO pack price × the packs the quantity represents (ADR-020). `last_paid` (v3): the source landed cost's total × quantity ÷ its base quantity, rounded once to 4 dp. `rolling_average_6m` (v3): mean of the unrounded per-base-unit landed prices × quantity, rounded once. v1/v2 rows multiplied the 4-dp unit price, so they can differ in the last digits |
 | `baseline_value_currency` | text | Optional FK -> `supported_currency.code`; required with `baseline_value_amount` |
 | `actual_value_amount` | numeric(18,4) | Required copied `purchase_record.total_paid_amount` |
 | `actual_value_currency` | text | Required FK -> `supported_currency.code` |
 | `delta_amount` | numeric(18,4) | Optional signed saving, `baseline_value - actual_value`; positive, zero, and negative values are valid |
 | `delta_currency` | text | Optional FK -> `supported_currency.code`; required with `delta_amount` |
-| `calculation_version` | text | Required calculation identifier, for example `saving-baseline-v2` (v2 adds `last_po_price`) |
-| `calculation_inputs` | jsonb | Required replay snapshot: quantity, selected policy, source point ids, window months, and actual total |
+| `calculation_version` | text | Required calculation identifier, for example `saving-baseline-v3` (v2 adds `last_po_price`; v3 computes a quoted baseline from the landed total instead of a rounded per-unit price) |
+| `calculation_inputs` | jsonb | Required replay snapshot: quantity, actual value, selected metric, and source point ids (landed costs or PO lines); `last_po_price` adds the PO pack price and pack size; `last_paid` (v3) adds the source landed cost's `landed_total`, `landed_quantity` and `landed_base_quantity` |
 | `recorded_by` | uuid | Required FK -> Membership; copied from the purchase record |
 | `recorded_at` | timestamptz | Required time the baseline, actual, and delta were captured |
 | `verified_by` | uuid | Optional FK -> Membership; set only by explicit verification |
@@ -1083,6 +1111,10 @@ R2.0 branch/cost-centre/budget pattern. Full contract:
 | `branch_id` | uuid | Required; composite FK -> Branch `(tenant_id, id)` |
 | `cost_centre_id` | uuid | Optional; composite FK -> CostCentre `(tenant_id, id)` |
 | `requested_by_membership_id` | uuid | Required; composite FK -> Membership `(tenant_id, id)` |
+| `request_group_id` | uuid | Optional; composite FK -> PurchaseRequestGroup `(tenant_id, id)`; the group a request belongs to when it was prepared from an RFQ split (spec 024) |
+| `source_rfq_id` | uuid | Optional; composite FK -> Rfq `(tenant_id, id)`. Snapshot of where the request came from, derived from `source_rfq_response_id` (PPS-97) |
+| `source_quotation_id` | uuid | Optional; composite FK -> Quotation `(tenant_id, id)`; same snapshot |
+| `source_supplier_id` | uuid | Optional; composite FK -> Supplier `(tenant_id, id)`; same snapshot, so approvers see the supplier without read access to the RFQ tables |
 | `required_by_date` | date | Required |
 | `status` | enum | `draft` \| `submitted` \| `approved` \| `rejected` \| `withdrawn` \| `ordered` \| `delivered`; default `draft` |
 | `estimated_total_amount` | numeric(18,4) | Sum of line estimates; null when lines span >1 currency or no line has an estimate |
@@ -1110,7 +1142,14 @@ estimates are recomputed live while the request is `draft` and frozen on submit 
 stamped, never updated again — research.md R2). `purchase_request_scoped_visibility` is a
 RESTRICTIVE SELECT-only policy adding the requester-always-sees-own clause to R2.0's shape;
 `purchase_request_tenant_isolation` is the permissive `ENABLE`+`FORCE` `for all` policy with
-`USING` and `WITH CHECK`.
+`USING` and `WITH CHECK`. The three `source_*` snapshot columns are written only by the
+`purchase_request_source_snapshot` trigger (SECURITY DEFINER; recomputed on every insert and update from
+`source_rfq_response_id`, so a client can neither forge nor forget them); check
+`purchase_request_source_snapshot_complete` requires them null exactly when `source_rfq_response_id` is
+null (migration `20261029060000`). The API additionally exposes a computed `request_group` on each
+request (spec 024): a `RequestGroupSummary` (`id`, `rfq_id`, `position`, `size`,
+`combined_total`, `best_single_total`, `saving`, `sibling_request_ids`) when the request
+belongs to a split group, `null` for an ordinary request.
 
 ## `PurchaseRequestLine`
 
@@ -1127,6 +1166,8 @@ RESTRICTIVE SELECT-only policy adding the requester-always-sees-own clause to R2
 | `estimated_unit_price_source_landed_cost_id` | uuid | Composite FK -> LandedCost `(tenant_id, id)` |
 | `estimated_at` | timestamptz | Stamped when the estimate is frozen at submit |
 | `quantity_received` | numeric(18,6) | Chunk R2.3; null until the parent request is `delivered`. `check (quantity_received is null or quantity_received >= 0)` |
+| `pack_base_quantity` | numeric(18,6) | Pack size in base units when the line was created or edited (ADR-020); null when no pack is known; check `> 0`. Backfilled only where the newest pack provably predates the line (migration `20261018000006`) |
+| `position` | integer | Required, default `0`, check `>= 0`. 0-based order the lines were given; every read orders by `position`, then `created_at`, `id` (PPS-99, migration `20261029050000`) |
 
 A line's own delivery shortfall is `quantity_received < quantity` once both are set — computed at
 read time (mirroring how `has_incomplete_estimate` is a computed-and-cached flag at the parent
@@ -1147,7 +1188,7 @@ duplicating `branch_id` onto this table. `T002` added `unique (tenant_id, id)` t
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `purchase_request_id` | uuid | Required; composite FK -> PurchaseRequest `(tenant_id, id)`, `on delete cascade`. `unique (tenant_id, purchase_request_id)` — one step per request |
 | `assigned_membership_id` | uuid | Composite FK -> Membership `(tenant_id, id)`; who the request routed to |
-| `source` | enum | `threshold_match` \| `delegate` \| `owner_fallback` — how `assigned_membership_id` was resolved (informational) |
+| `source` | enum | `threshold_match` \| `delegate` \| `owner_fallback` \| `group_threshold_match` — how `assigned_membership_id` was resolved (informational) |
 | `status` | enum | `pending` \| `approved` \| `rejected`; default `pending` |
 | `comment` | text | Optional decision comment |
 | `decided_by_membership_id` | uuid | Composite FK -> Membership `(tenant_id, id)`; null while pending |
@@ -1163,8 +1204,52 @@ differ from `assigned_membership_id` — FR-007 lets an owner decide as a standi
 Produced by `resolve_approver()` at submission time and never silently re-resolved; the one
 exception is member removal, which re-routes a still-`pending` step to the owner
 (`source = 'owner_fallback'`, audited `requests.approval_step_escalated`, FR-009).
+`group_threshold_match` (spec 024) applies when the step is created on a group submission and
+the approver was resolved from the group's combined total rather than a single request's;
+`owner_fallback` still applies.
 `approval_step_scoped_visibility` (RESTRICTIVE, SELECT-only): owner sees all; the assignee sees
 their own step; the requester sees the step on their own request.
+
+## `purchase_request_group`
+
+A split of an RFQ becomes one group of purchase requests (spec 024). The group is immutable
+evidence of the single act of turning one RFQ's split into requests: which split, which branch,
+and the totals and saving as computed when it was prepared. Its state is the state of its
+requests — nothing is stored twice.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key. `unique (tenant_id, id)` for composite FKs |
+| `rfq_id` | uuid | Required; composite FK -> Rfq `(tenant_id, id)` |
+| `basket_split_job_id` | uuid | Required; composite FK -> BasketSplitJob `(tenant_id, id)` |
+| `branch_id` | uuid | Required; composite FK -> Branch `(tenant_id, id)`; every request in the group uses it |
+| `combined_total_amount` / `combined_total_currency` | numeric(18,4) / text | Required; sum of the requests' estimated totals at preparation; `check >= 0`; currency FK -> `supported_currency(code)` |
+| `best_single_total_amount` / `best_single_total_currency` | numeric(18,4) / text | Optional, null together (check); from the job result; `check >= 0` |
+| `saving_amount` / `saving_currency` | numeric(18,4) / text | Optional, null together (check); best single − combined; `check >= 0` |
+| `idempotency_key` | uuid | Required; replay key for the preparation |
+| `created_by_membership_id` | uuid | Required; composite FK -> Membership `(tenant_id, id)` |
+| `created_at` | timestamptz | Audit field; default `now()` |
+
+Constraints:
+
+- `unique (tenant_id, rfq_id)`: one group per RFQ — an RFQ converts once.
+- `unique (tenant_id, idempotency_key)`: one group per idempotency key.
+- All references are composite `(tenant_id, id)` FKs (Rfq, BasketSplitJob, Branch, Membership).
+- Every amount has a currency column next to it, null together (Constitution VII).
+- Index on `tenant_id`.
+
+`purchase_request_group` is tenant-scoped with RLS `ENABLE` + `FORCE`. SELECT is scoped like
+`purchase_request`: owners, members with no branch assignment, members assigned to the group's
+branch, and the group's creator (the requester-sees-own clause). INSERT is pinned to the caller
+as the group's creator — `created_by_membership_id = current_membership_id()` with a live role
+lookup, owner or buyer only. There is no client update or delete: the group is immutable
+evidence, and its state is the state of its requests.
+
+Group state is derived from its requests: `draft -> submitted -> (approved | rejected |
+withdrawn)`. All requests of a group share one status; they are submitted, approved, rejected,
+and withdrawn only together, routed by the group's combined total. A single-request transition
+on a grouped request is refused with `409 part_of_split`.
 
 ## `PurchaseOrder`
 
@@ -2290,6 +2375,7 @@ and every preparation is appended to `audit_event`.
 | `rfq_id` | uuid | Required FK -> Rfq, `on delete cascade` |
 | `workspace_product_id` | uuid | Required FK -> WorkspaceProduct |
 | `quantity` | numeric(18,6) | Required, > 0 |
+| `position` | integer | Required, default `0`, check `>= 0`. 0-based order the buyer entered the lines; reads and supplier emails order by `position`, then `created_at`, `id` (migration `20261028000000`) |
 | `created_at` | timestamptz | Audit field; default `now()` |
 
 `RfqLine` (table `rfq_line`) is one requested product/quantity within an RFQ. RLS inherits read/write access from the parent `Rfq`.

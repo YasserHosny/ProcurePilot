@@ -16,6 +16,11 @@ from procurepilot_api.modules.quotations import confirmation_service as confirma
 from procurepilot_api.modules.quotations.confirmation_service import QuotationConfirmationService
 
 
+@pytest.fixture(autouse=True)
+def _no_rfq_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(matching_module, "rfq_lines_for_quotation", lambda *_: None)
+
+
 class _ConfirmationQuery:
     def __init__(self, row: dict[str, object]) -> None:
         self.row = row
@@ -127,7 +132,7 @@ def test_matching_concurrent_preparation_reuses_unique_constraint_winner(
     service = MatchingService(get_settings())
     client = _ConflictingInsert()
     member = _member()
-    line = {"id": uuid4(), "quotation_id": uuid4()}
+    line = {"id": uuid4(), "quotation_id": uuid4(), "line_number": 1}
     product_id = uuid4()
     candidate = {
         "id": uuid4(),
@@ -177,7 +182,7 @@ def test_matching_preparation_never_routes_a_partial_candidate_set(
     )
     service = MatchingService(settings)
     member = _member()
-    line = {"id": uuid4(), "quotation_id": uuid4()}
+    line = {"id": uuid4(), "quotation_id": uuid4(), "line_number": 1}
     candidates = [
         {"workspace_product_id": uuid4(), "confidence": "0.98", "reasons": {}},
         {"workspace_product_id": uuid4(), "confidence": "0.97", "reasons": {}},
@@ -209,13 +214,25 @@ def test_matching_preparation_never_routes_a_partial_candidate_set(
             visible.extend(committed)
             observations.append(len(visible))
             service._ensure_pipeline(  # noqa: SLF001
-                client=self, member=member, quote={}, lines=[line]
+                client=self, member=member, quote={"id": line["quotation_id"]}, lines=[line]
             )
             return SimpleNamespace(data=list(reversed(committed)))
 
     monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
     monkeypatch.setattr(matching_module, "_decision_for_line", lambda *_a: None)
     monkeypatch.setattr(matching_module, "_candidate_rows", lambda *_a: list(visible))
+    # The competing GET reads every line's candidates in one statement.
+    monkeypatch.setattr(
+        matching_module._LineMatchState,  # noqa: SLF001
+        "read",
+        classmethod(
+            lambda cls, _client, _lines: cls(
+                candidates={str(line["id"]): list(visible)} if visible else {},
+                decisions={},
+                tasks={},
+            )
+        ),
+    )
     monkeypatch.setattr(
         service, "_create_automatic_decision", lambda *_a, **_k: decisions.append(True)
     )
@@ -248,7 +265,7 @@ def test_matching_deterministic_preparation_preserves_below_threshold_auto_accep
         get_settings().model_copy(update={"matching_auto_accept_threshold": 0.92})
     )
     member = _member()
-    line = {"id": uuid4(), "quotation_id": uuid4()}
+    line = {"id": uuid4(), "quotation_id": uuid4(), "line_number": 1}
     deterministic = SimpleNamespace(
         workspace_product_id=uuid4(), confidence="0.80", reasons={"alias_hit": True}
     )
@@ -263,8 +280,12 @@ def test_matching_deterministic_preparation_preserves_below_threshold_auto_accep
     decisions: list[object] = []
     task_reasons: list[object] = []
     monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
+    monkeypatch.setattr(
+        matching_module._LineMatchState,  # noqa: SLF001
+        "read",
+        classmethod(lambda cls, _client, _lines: cls(candidates={}, decisions={}, tasks={})),
+    )
     monkeypatch.setattr(matching_module, "_decision_for_line", lambda *_a: None)
-    monkeypatch.setattr(matching_module, "_candidate_rows", lambda *_a: [])
     for name in (
         "_deterministic_products_for_line",
         "_aliases_for_line",
@@ -284,7 +305,11 @@ def test_matching_deterministic_preparation_preserves_below_threshold_auto_accep
         service, "_create_task", lambda *_a, **kwargs: task_reasons.append(kwargs["reason"])
     )
     service._ensure_pipeline(  # noqa: SLF001
-        client=object(), member=member, quote={}, lines=[line], bearer_token="caller-token"
+        client=object(),
+        member=member,
+        quote={"id": line["quotation_id"]},
+        lines=[line],
+        bearer_token="caller-token",
     )
     if deterministic_top:
         assert decisions == persisted
@@ -292,3 +317,40 @@ def test_matching_deterministic_preparation_preserves_below_threshold_auto_accep
     else:
         assert decisions == []
         assert task_reasons == ["low_confidence"]
+
+
+def test_matching_preparation_skips_a_line_decided_after_the_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # PPS-133: the batched snapshot is read before the RFQ read, embedding backfill and other
+    # lines' searches. A buyer may decide a line in that window; it must not get a new task.
+    service = MatchingService(get_settings())
+    member = _member()
+    line = {"id": uuid4(), "quotation_id": uuid4(), "line_number": 1}
+    candidate = {
+        "id": uuid4(),
+        "candidate_workspace_product_id": uuid4(),
+        "confidence": "0.40",
+        "reasons": {},
+    }
+    routed: list[object] = []
+    monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
+    monkeypatch.setattr(
+        matching_module._LineMatchState,  # noqa: SLF001
+        "read",
+        classmethod(
+            lambda cls, _client, _lines: cls(
+                candidates={str(line["id"]): [candidate]}, decisions={}, tasks={}
+            )
+        ),
+    )
+    monkeypatch.setattr(matching_module, "_decision_for_line", lambda *_a: {"id": uuid4()})
+    monkeypatch.setattr(service, "_route_or_accept", lambda *_a, **_k: routed.append(True))
+    service._ensure_pipeline(  # noqa: SLF001
+        client=object(),
+        member=member,
+        quote={"id": line["quotation_id"]},
+        lines=[line],
+        bearer_token="caller-token",
+    )
+    assert routed == []

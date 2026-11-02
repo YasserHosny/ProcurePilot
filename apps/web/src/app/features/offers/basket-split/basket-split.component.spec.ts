@@ -2,14 +2,17 @@ import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
+import { MatSelect } from '@angular/material/select';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import en from '../../../../../../../packages/i18n/en.json';
 import ar from '../../../../../../../packages/i18n/ar.json';
 import { of } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
+import { RfqApi } from '../../rfq/rfq-api';
 import type { Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import type { BasketSplitJob } from '../offers-api';
@@ -19,6 +22,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
   let component: BasketSplitComponent;
   let fixture: ComponentFixture<BasketSplitComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  let mockRfqApi: jasmine.SpyObj<RfqApi>;
 
   const mockFeasibleJob: BasketSplitJob = {
     id: 'job-1',
@@ -123,6 +127,25 @@ describe('BasketSplitComponent (US3, T045)', () => {
       'getBasketSplitJob',
     ]);
 
+    mockRfqApi = jasmine.createSpyObj<RfqApi>('RfqApi', ['getRfq']);
+    mockRfqApi.getRfq.and.returnValue(
+      of({
+        rfq: {
+          id: 'rfq-abcdef12-3456',
+          tenant_id: 'tenant-1',
+          created_by_membership_id: 'member-1',
+          status: 'responded',
+          needed_by_date: '2026-10-30',
+          tenant_terms: null,
+          idempotency_key: 'key-1',
+          created_at: '2026-10-28T08:00:00Z',
+          sent_at: '2026-10-28T09:00:00Z',
+        },
+        lines: [],
+        recipients: [],
+      }),
+    );
+
     const mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
       role: signal<Role | null>('buyer'),
@@ -176,6 +199,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
+        { provide: RfqApi, useValue: mockRfqApi },
         { provide: SessionService, useValue: mockSession },
       ],
     }).compileComponents();
@@ -196,6 +220,10 @@ describe('BasketSplitComponent (US3, T045)', () => {
   });
 
   it('should validate form and prevent submission with same supplier or invalid quantities', () => {
+    // Fresh page item is empty, so form is invalid until filled
+    expect(component.isFormValid()).toBeFalse();
+    component.onProductSelect(0, 'prod-1');
+    component.onQuantityChange(0, '10');
     expect(component.isFormValid()).toBeTrue();
 
     // Select same supplier
@@ -211,6 +239,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
   });
 
   it('should submit basket and handle queued to feasible completed job', () => {
+    component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
     const queuedJob: BasketSplitJob = {
       ...mockFeasibleJob,
       status: 'queued',
@@ -236,6 +265,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
   });
 
   it('renders the basket pack hint in English and Arabic', () => {
+    component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', en);
     translate.setTranslation('ar', ar);
@@ -286,11 +316,12 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(component.items()[0].quantity).toBe('50');
     });
 
-    it('should add a new item with the first available product as default', () => {
+    it('should add a new empty item with addItem()', () => {
       const initialCount = component.items().length;
       component.addItem();
       expect(component.items().length).toBe(initialCount + 1);
-      expect(component.items()[initialCount].workspace_product_id).toBe('prod-1');
+      expect(component.items()[initialCount].workspace_product_id).toBe('');
+      expect(component.items()[initialCount].quantity).toBe('');
     });
 
     it('should remove an item by index', () => {
@@ -369,6 +400,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
     });
 
     it('should start polling when submitBasket is called with a queued response', fakeAsync(() => {
+      component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
       const queuedJob: BasketSplitJob = {
         ...mockFeasibleJob,
         id: 'job-poll',
@@ -629,6 +661,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
     });
 
     it('should pass advanced constraint fields in submitBasket request body', () => {
+      component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
       apiService.optimiseBasket.and.returnValue(of(mockFeasibleJob));
 
       component.riskTolerance.set('low');
@@ -654,6 +687,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
     });
 
     it('should re-trigger optimisation via rerunOptimisation', () => {
+      component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
       apiService.optimiseBasket.and.returnValue(of(mockFeasibleJob));
       component.currentJob.set(mockFeasibleJob);
 
@@ -702,6 +736,322 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(el.textContent).toContain('Minimum order value checked for Supplier Alpha');
       expect(el.textContent).not.toContain('requires a GBP 250.00');
       expect(el.textContent).toContain('Supplier Alpha has moderate lead time risk.');
+    });
+  });
+
+  describe('RFQ mode (T016)', () => {
+    const rfqJob: BasketSplitJob = {
+      ...mockFeasibleJob,
+      id: 'job-rfq-1',
+      rfq_id: 'rfq-abcdef12-3456',
+      items: [
+        { workspace_product_id: 'prod-1', quantity: '100.000000' },
+        { workspace_product_id: 'prod-2', quantity: '50.000000' },
+      ],
+      pack_snapshot: {
+        'prod-1': { base_quantity: '10', base_unit: 'EA' },
+        'prod-2': { base_quantity: '25', base_unit: 'EA' },
+      },
+    };
+
+    it('renders header line with short id, sent date, and link to RFQ', fakeAsync(() => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+
+      apiService.getBasketSplitJob.and.returnValue(of(rfqJob));
+      component.fetchJob('job-rfq-1');
+      tick();
+      fixture.detectChanges();
+
+      expect(mockRfqApi.getRfq).toHaveBeenCalledWith('rfq-abcdef12-3456');
+
+      const el: HTMLElement = fixture.nativeElement;
+      const headerLine = el.querySelector('[data-testid="rfq-source-header"]');
+      expect(headerLine).not.toBeNull();
+      const text = headerLine?.textContent ?? '';
+      expect(text).toContain('From RFQ rfq-abcd');
+      expect(text).toContain('sent');
+
+      const link = headerLine?.querySelector<HTMLAnchorElement>('a');
+      expect(link).not.toBeNull();
+      expect(link?.getAttribute('href')).toContain('/rfq/rfq-abcdef12-3456');
+    }));
+
+    it('displays items and suppliers read-only with quantities shown in packs (base / pack_base)', fakeAsync(() => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+
+      apiService.getBasketSplitJob.and.returnValue(of(rfqJob));
+      component.fetchJob('job-rfq-1');
+      tick();
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      const scopeCard = el.querySelector('[data-testid="rfq-split-scope"]');
+      expect(scopeCard).not.toBeNull();
+
+      // Read-only suppliers listed
+      expect(scopeCard?.textContent).toContain('Supplier Alpha');
+      expect(scopeCard?.textContent).toContain('Supplier Beta');
+      // No editable supplier selects or buttons in scope
+      expect(scopeCard?.querySelector('mat-select')).toBeNull();
+      expect(scopeCard?.querySelector('button')).toBeNull();
+
+      // Quantities shown in packs: prod-1: 100 base / 10 = 10 packs; prod-2: 50 base / 25 = 2 packs
+      expect(scopeCard?.textContent).toContain('Product 1');
+      expect(scopeCard?.textContent).toContain('10');
+      expect(scopeCard?.textContent).toContain('Product 2');
+      expect(scopeCard?.textContent).toContain('2');
+    }));
+
+    it('behaves as standard basket split without RFQ header or scope when job has no rfq_id', fakeAsync(() => {
+      apiService.getBasketSplitJob.and.returnValue(of(mockFeasibleJob));
+      component.fetchJob('job-1');
+      tick();
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('[data-testid="rfq-source-header"]')).toBeNull();
+      expect(el.querySelector('[data-testid="rfq-split-scope"]')).toBeNull();
+      expect(mockRfqApi.getRfq).not.toHaveBeenCalled();
+    }));
+  });
+
+  describe('Basket Split standalone clarity (T032, US4)', () => {
+    it('the subtitle reflects the limits', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+      fixture.detectChanges();
+      const subtitle = (fixture.nativeElement as HTMLElement).querySelector('.page-subtitle');
+      expect(subtitle?.textContent).toContain(`${component.minSuppliers}`);
+      expect(subtitle?.textContent).toContain(`${component.maxSuppliers}`);
+      expect(subtitle?.textContent).not.toContain('exactly two');
+    });
+
+    it('addItem() appends an empty row', () => {
+      const initialCount = component.items().length;
+      component.addItem();
+      expect(component.items().length).toBe(initialCount + 1);
+      const lastItem = component.items()[component.items().length - 1];
+      expect(lastItem.workspace_product_id).toBe('');
+      expect(lastItem.quantity).toBe('');
+    });
+
+    it('a fresh page has one empty row', () => {
+      expect(component.items().length).toBe(1);
+      expect(component.items()[0]).toEqual({ workspace_product_id: '', quantity: '' });
+    });
+
+    it('the empty row shows a validation message on submit, not before', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      // Before submit: no error message on the row
+      expect(el.querySelector('.item-row mat-error')).toBeNull();
+
+      // On submit:
+      component.submitBasket();
+      fixture.detectChanges();
+
+      const error = el.querySelector('.item-row mat-error');
+      expect(error).not.toBeNull();
+      expect(error?.textContent?.trim().length).toBeGreaterThan(0);
+    });
+
+    it('the pack hint takes space in the row, so a wrapped hint cannot overlap the next row', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+      component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
+      fixture.detectChanges();
+
+      // MDC positions the hint wrapper, not mat-hint; it joins the flow only with a dynamic subscript.
+      const wrapper = (fixture.nativeElement as HTMLElement).querySelector(
+        '.item-qty-field .mat-mdc-form-field-hint-wrapper',
+      );
+      expect(wrapper).not.toBeNull();
+      expect(window.getComputedStyle(wrapper!).position).toBe('static');
+    });
+
+    it('the result subtitle does not name a supplier count', () => {
+      expect(en.basketSplit.result.feasibleSubtitle).not.toMatch(/\btwo\b/i);
+    });
+
+    it('RFQ mode is unchanged with a job that has rfq_id', fakeAsync(() => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+
+      const rfqJob: BasketSplitJob = {
+        ...mockFeasibleJob,
+        id: 'job-rfq-standalone',
+        rfq_id: 'rfq-stand-1234',
+      };
+      apiService.getBasketSplitJob.and.returnValue(of(rfqJob));
+      component.fetchJob('job-rfq-standalone');
+      tick();
+      fixture.detectChanges();
+
+      expect(component.isRfqMode()).toBeTrue();
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('[data-testid="rfq-source-header"]')).not.toBeNull();
+      expect(el.querySelector('[data-testid="rfq-split-scope"]')).not.toBeNull();
+      expect(el.querySelector('form')).toBeNull();
+    }));
+
+    it('PPS-127: RFQ-mode requested items renders pack quantity and base equivalent from pack_snapshot', fakeAsync(() => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+
+      const rfqJob: BasketSplitJob = {
+        ...mockFeasibleJob,
+        id: 'job-rfq-pack-display',
+        rfq_id: 'rfq-pack-1234',
+        items: [
+          { workspace_product_id: 'prod-rice', quantity: '600' },
+        ],
+        pack_snapshot: {
+          'prod-rice': { base_quantity: '10', base_unit: 'kilogram' },
+        },
+      };
+      apiService.getBasketSplitJob.and.returnValue(of(rfqJob));
+      component.fetchJob('job-rfq-pack-display');
+      tick();
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      const row = el.querySelector('.rfq-items-list .rfq-item-row');
+      expect(row).not.toBeNull();
+      expect(row?.textContent).toContain('60 × 10');
+      expect(row?.textContent).toContain('600');
+      expect(row?.querySelector('.rfq-item-qty')?.textContent?.trim()).not.toBe('60 kg');
+    }));
+  });
+
+  describe('PPS-126: Placeholder and duplicate product prevention', () => {
+    it('shows the "Choose a product" placeholder for empty rows on fresh page and after addItem()', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      const initialPlaceholder = el.querySelector('.item-product-field .mat-mdc-select-placeholder');
+      expect(initialPlaceholder).not.toBeNull();
+      expect(initialPlaceholder?.textContent?.trim()).toBe('Choose a product');
+
+      component.addItem();
+      fixture.detectChanges();
+
+      const placeholders = el.querySelectorAll('.item-product-field .mat-mdc-select-placeholder');
+      expect(placeholders.length).toBe(2);
+      expect(placeholders[0].textContent?.trim()).toBe('Choose a product');
+      expect(placeholders[1].textContent?.trim()).toBe('Choose a product');
+    });
+
+    it('disables products chosen in other rows while keeping current row product enabled', fakeAsync(() => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+
+      // Row 0 has product A ('prod-1'), row 1 is empty
+      component.items.set([
+        { workspace_product_id: 'prod-1', quantity: '10' },
+        { workspace_product_id: '', quantity: '5' },
+      ]);
+      fixture.detectChanges();
+      tick();
+
+      const productSelectDebugEls = fixture.debugElement.queryAll(By.css('.item-product-field mat-select'));
+      expect(productSelectDebugEls.length).toBe(2);
+
+      // Open row 1's select dropdown
+      const matSelect1 = productSelectDebugEls[1].componentInstance as MatSelect;
+      matSelect1.open();
+      fixture.detectChanges();
+      tick();
+
+      // In row 1 dropdown: product A ('prod-1') is disabled, product B ('prod-2') is enabled
+      const overlayOptionsRow1 = Array.from(document.querySelectorAll<HTMLElement>('mat-option'));
+      expect(overlayOptionsRow1.length).toBeGreaterThanOrEqual(2);
+
+      const optionAInRow1 = overlayOptionsRow1.find((opt) => opt.textContent?.includes('Product 1'));
+      const optionBInRow1 = overlayOptionsRow1.find((opt) => opt.textContent?.includes('Product 2'));
+
+      expect(optionAInRow1).toBeDefined();
+      expect(optionBInRow1).toBeDefined();
+      expect(
+        optionAInRow1?.getAttribute('aria-disabled') === 'true' ||
+        optionAInRow1?.classList.contains('mdc-list-item--disabled')
+      ).toBeTrue();
+      expect(
+        optionBInRow1?.getAttribute('aria-disabled') === 'true' ||
+        optionBInRow1?.classList.contains('mdc-list-item--disabled')
+      ).toBeFalse();
+
+      // Close row 1 dropdown
+      matSelect1.close();
+      fixture.detectChanges();
+      tick();
+
+      // Open row 0's select dropdown
+      const matSelect0 = productSelectDebugEls[0].componentInstance as MatSelect;
+      matSelect0.open();
+      fixture.detectChanges();
+      tick();
+
+      // In row 0 dropdown: product A ('prod-1') is row 0's own product, so it must stay enabled
+      const overlayOptionsRow0 = Array.from(document.querySelectorAll<HTMLElement>('mat-option'));
+      const optionAInRow0 = overlayOptionsRow0.find((opt) => opt.textContent?.includes('Product 1'));
+      expect(optionAInRow0).toBeDefined();
+      expect(
+        optionAInRow0?.getAttribute('aria-disabled') === 'true' ||
+        optionAInRow0?.classList.contains('mdc-list-item--disabled')
+      ).toBeFalse();
+
+      // Close row 0 dropdown
+      matSelect0.close();
+      fixture.detectChanges();
+      tick();
+    }));
+
+    it('marks form invalid, shows duplicate error on submit, and blocks optimise request when two rows have the same product', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+      apiService.optimiseBasket.and.returnValue(of(mockFeasibleJob));
+
+      // Both rows set to prod-1
+      component.items.set([
+        { workspace_product_id: 'prod-1', quantity: '10' },
+        { workspace_product_id: 'prod-1', quantity: '20' },
+      ]);
+      fixture.detectChanges();
+
+      expect(component.isFormValid()).toBeFalse();
+
+      const el: HTMLElement = fixture.nativeElement;
+      // Before submit, no error message displayed
+      expect(el.querySelector('.item-product-field mat-error')).toBeNull();
+
+      component.submitBasket();
+      fixture.detectChanges();
+
+      expect(apiService.optimiseBasket).not.toHaveBeenCalled();
+
+      // After submit, the duplicate error key renders
+      const errors = Array.from(el.querySelectorAll('.item-product-field mat-error'));
+      const duplicateError = errors.find((err) =>
+        err.textContent?.includes('This product is already in the basket.')
+      );
+      expect(duplicateError).toBeDefined();
     });
   });
 });

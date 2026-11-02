@@ -1,0 +1,368 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Round 1 Flow, End to End",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "frontend": {
+          "label": "Buyer or owner action"
+        },
+        "backend": {
+          "label": "System step"
+        },
+        "security": {
+          "label": "Gate or failure"
+        },
+        "external": {
+          "label": "Supplier"
+        },
+        "database": {
+          "label": "Stored record"
+        }
+      }
+    },
+    "output": "docs/architecture/round-1-flow.html"
+  },
+  "lanes": [
+    {
+      "id": "optimiser",
+      "label": "Basket split (optimiser worker)"
+    },
+    {
+      "id": "buyer",
+      "label": "Buyer (web)"
+    },
+    {
+      "id": "supplier",
+      "label": "Supplier (email)"
+    },
+    {
+      "id": "system",
+      "label": "System (apps/api)"
+    },
+    {
+      "id": "approver",
+      "label": "Owner or approver (web, phone)"
+    },
+    {
+      "id": "orders",
+      "label": "Orders"
+    },
+    {
+      "id": "savings",
+      "label": "Savings"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p1",
+      "label": "1 Send RFQ",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "p2",
+      "label": "2 Reply + ingest",
+      "fromCol": 1,
+      "toCol": 1
+    },
+    {
+      "id": "p3",
+      "label": "3 Review + match",
+      "fromCol": 2,
+      "toCol": 2,
+      "variant": "emphasis"
+    },
+    {
+      "id": "p4",
+      "label": "4 Compare",
+      "fromCol": 3,
+      "toCol": 3
+    },
+    {
+      "id": "p5",
+      "label": "5 Prepare",
+      "fromCol": 4,
+      "toCol": 4,
+      "variant": "emphasis"
+    },
+    {
+      "id": "p6",
+      "label": "6 Approve, order, save",
+      "fromCol": 5,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "create",
+    "reply",
+    "ingest",
+    "review",
+    "match",
+    "compare",
+    "prepare",
+    "queue",
+    "po",
+    "outcome"
+  ],
+  "nodes": [
+    {
+      "id": "create",
+      "lane": "buyer",
+      "col": 0,
+      "type": "frontend",
+      "label": "Create + send RFQ",
+      "sublabel": "4 lines in packs · 2 suppliers",
+      "tag": "supplier's language"
+    },
+    {
+      "id": "reply",
+      "lane": "supplier",
+      "col": 0,
+      "type": "external",
+      "label": "Supplier replies",
+      "sublabel": "PDF quote by email",
+      "tag": "SAR, 15% VAT incl."
+    },
+    {
+      "id": "ingest",
+      "lane": "system",
+      "col": 1,
+      "type": "backend",
+      "label": "Ingest + extract",
+      "sublabel": "reply tied to its RFQ",
+      "tag": "keeps the pack column"
+    },
+    {
+      "id": "review",
+      "lane": "buyer",
+      "col": 2,
+      "type": "frontend",
+      "label": "Review + authorize",
+      "sublabel": "per quote · flagged fields",
+      "tag": "prices-include-VAT basis"
+    },
+    {
+      "id": "match",
+      "lane": "system",
+      "col": 2,
+      "type": "backend",
+      "label": "Match lines to the RFQ",
+      "sublabel": "auto when one RFQ line fits",
+      "tag": "else Match Resolution"
+    },
+    {
+      "id": "guardrail",
+      "lane": "system",
+      "col": 3,
+      "type": "security",
+      "label": "Guardrail check",
+      "sublabel": "all replies matched?",
+      "tag": "ADR-019"
+    },
+    {
+      "id": "compare",
+      "lane": "buyer",
+      "col": 3,
+      "type": "frontend",
+      "label": "Compare responses",
+      "sublabel": "cheapest per line · split hint"
+    },
+    {
+      "id": "split",
+      "lane": "optimiser",
+      "col": 4,
+      "type": "backend",
+      "label": "Basket split",
+      "sublabel": "optimiser from the replies",
+      "tag": "2–10 items"
+    },
+    {
+      "id": "prepare",
+      "lane": "buyer",
+      "col": 4,
+      "type": "database",
+      "label": "Draft request(s)",
+      "sublabel": "one, or one per supplier",
+      "tag": "request group"
+    },
+    {
+      "id": "rejected",
+      "lane": "approver",
+      "col": 4,
+      "type": "security",
+      "label": "Rejected or withdrawn",
+      "sublabel": "no order can follow"
+    },
+    {
+      "id": "queue",
+      "lane": "approver",
+      "col": 5,
+      "type": "frontend",
+      "label": "Approval queue",
+      "sublabel": "a split is decided as one",
+      "tag": "combined total"
+    },
+    {
+      "id": "po",
+      "lane": "orders",
+      "col": 5,
+      "type": "database",
+      "label": "Purchase order",
+      "sublabel": "draft · net + tax",
+      "tag": "never sent by the app"
+    },
+    {
+      "id": "outcome",
+      "lane": "savings",
+      "col": 5,
+      "type": "database",
+      "label": "Record outcome",
+      "sublabel": "Savings Ledger · pending",
+      "tag": "baseline: last PO price"
+    }
+  ],
+  "edges": [
+    {
+      "id": "send-email",
+      "from": "create",
+      "to": "reply",
+      "label": "email per supplier",
+      "variant": "emphasis"
+    },
+    {
+      "id": "reply-ingest",
+      "from": "reply",
+      "to": "ingest",
+      "label": "reply + PDF",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ingest-review",
+      "from": "ingest",
+      "to": "review",
+      "label": "extracted",
+      "variant": "emphasis"
+    },
+    {
+      "id": "review-match",
+      "from": "review",
+      "to": "match",
+      "label": "authorize",
+      "variant": "emphasis"
+    },
+    {
+      "id": "match-compare",
+      "from": "match",
+      "to": "compare",
+      "label": "matched",
+      "variant": "emphasis"
+    },
+    {
+      "id": "match-guardrail",
+      "from": "match",
+      "to": "guardrail",
+      "label": "async job",
+      "variant": "dashed",
+      "role": "async"
+    },
+    {
+      "id": "compare-prepare",
+      "from": "compare",
+      "to": "prepare",
+      "label": "one supplier",
+      "variant": "emphasis"
+    },
+    {
+      "id": "compare-split",
+      "from": "compare",
+      "to": "split",
+      "label": "split",
+      "variant": "emphasis",
+      "role": "branch"
+    },
+    {
+      "id": "split-prepare",
+      "from": "split",
+      "to": "prepare",
+      "label": "N drafts",
+      "variant": "emphasis"
+    },
+    {
+      "id": "guardrail-prepare",
+      "from": "guardrail",
+      "to": "prepare",
+      "label": "fires (W2)",
+      "variant": "security",
+      "role": "branch"
+    },
+    {
+      "id": "prepare-queue",
+      "from": "prepare",
+      "to": "queue",
+      "label": "human submits",
+      "variant": "emphasis"
+    },
+    {
+      "id": "queue-rejected",
+      "from": "queue",
+      "to": "rejected",
+      "label": "reject",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "queue-po",
+      "from": "queue",
+      "to": "po",
+      "label": "approve",
+      "variant": "emphasis"
+    },
+    {
+      "id": "po-outcome",
+      "from": "po",
+      "to": "outcome",
+      "label": "submit order",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Matching (spec 023)",
+      "items": [
+        "A reply line that fits exactly one RFQ line is matched automatically",
+        "An ambiguous line goes to Match Resolution with both RFQ lines offered",
+        "A wrong match is corrected by a new decision, never an update (ADR-022)"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Split (spec 024)",
+      "items": [
+        "Priced only from the suppliers' replies; one request per supplier",
+        "Approved, rejected or withdrawn as one, routed by the combined total (ADR-023)"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Known gap W2 (PPS-148)",
+      "items": [
+        "An enabled guardrail drafts one request and converts the RFQ",
+        "A split can then no longer be prepared on that RFQ"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Money rules",
+      "items": [
+        "VAT-inclusive quotes keep printed prices; orders and savings are net + tax (ADR-021)",
+        "Savings stay pending until verified; no autonomous purchasing"
+      ]
+    }
+  ]
+}

@@ -1,5 +1,4 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -21,6 +20,7 @@ import type {
   RefreshSchedule,
   Supplier,
 } from '../../../core/api/models';
+import { FormatDatePipe } from '../../../core/format/date.pipe';
 import {
   type CatalogueImportSummary,
   IngestionApiService,
@@ -31,7 +31,7 @@ import {
   standalone: true,
   imports: [
     FormsModule,
-    DatePipe,
+    FormatDatePipe,
     MatButtonModule,
     MatCardModule,
     MatFormFieldModule,

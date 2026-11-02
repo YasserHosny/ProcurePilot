@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import csv
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from io import StringIO
 from typing import Literal
 from uuid import UUID
@@ -41,7 +41,7 @@ QUOTATION_COLUMNS = (
     "id,document_id,supplier_id,suggested_supplier_id,supplier_match_confidence,currency,"
     "issue_date,expiry_date,status,previous_quotation_id,stated_total_amount,"
     "stated_total_currency,arithmetic_status,created_at,reviewed_by,reviewed_at,deleted_at,"
-    "reviewer_notes,archive_idempotency_key"
+    "reviewer_notes,archive_idempotency_key,prices_include_vat"
 )
 LINE_COLUMNS = (
     "id,line_number,original_text,quantity,pack_count,unit_size,pack_unit,unit_price_amount,"
@@ -57,6 +57,16 @@ TASK_COLUMNS = (
     "quotation(deleted_at,stated_total_amount,stated_total_currency,"
     "supplier!quotation_supplier_id_fkey(name))"
 )
+TASK_LIST_COLUMNS = (
+    "id,quotation_id,status,priority,reason,created_at,resolved_at,"
+    "quotation!inner(deleted_at,stated_total_amount,stated_total_currency,"
+    "supplier!quotation_supplier_id_fkey(name))"
+)
+
+
+def _csv_text(value: object) -> str:
+    text = str(value) if value is not None else ""
+    return "'" + text if text.startswith(("=", "+", "-", "@", "\t", "\r")) else text
 
 
 class QuotationService:
@@ -146,6 +156,8 @@ class QuotationService:
         )
         return QuotationDetail(
             **_quotation(quote).model_dump(),
+            prices_include_vat=bool(quote.get("prices_include_vat", False)),
+            vat_rate=_document_vat_rate(fields, lines),
             document=document,
             lines=[_line(row) for row in lines],
             field_extractions=[_field(row) for row in fields],
@@ -174,10 +186,45 @@ class QuotationService:
         client = authenticated_client(self._settings, bearer_token)
         capped_limit = max(1, min(limit, 100))
         offset = _decode_cursor(cursor)
-        clean_search = search.strip()[:200].lower() if search else None
+        clean_search = search.strip()[:200].lower() if search else ""
         try:
+            supplier_ids: list[str] = []
+            id_bounds: tuple[str, str] | None = None
+            if clean_search:
+                escaped = (
+                    clean_search.replace("\\", "\\\\")
+                    .replace("%", "\\%")
+                    .replace("_", "\\_")
+                    .replace("*", "\\*")
+                )
+                supplier_matches = (
+                    client.table("supplier")
+                    .select("id")
+                    .ilike("name", f"*{escaped}*")
+                    .order("name")
+                    .limit(500)
+                    .execute()
+                )
+                supplier_ids = [str(row["id"]) for row in _rows(supplier_matches.data)]
+                if not supplier_ids:
+                    prefix = clean_search.replace("-", "")
+                    if 1 <= len(prefix) <= 32 and all(c in "0123456789abcdef" for c in prefix):
+                        id_bounds = (
+                            str(UUID(hex=prefix.ljust(32, "0"))),
+                            str(UUID(hex=prefix.ljust(32, "f"))),
+                        )
+                    else:
+                        return ReviewTaskList(items=[], next_cursor=None)
             _sync_open_review_tasks(client, self._settings.extraction_confidence_threshold)
-            query = client.table("review_task").select(TASK_COLUMNS)
+            query = (
+                client.table("review_task")
+                .select(TASK_LIST_COLUMNS)
+                .filter("quotation.deleted_at", "is", "null")
+            )
+            if supplier_ids:
+                query = query.in_("quotation.supplier_id", supplier_ids)
+            elif id_bounds is not None:
+                query = query.gte("quotation_id", id_bounds[0]).lte("quotation_id", id_bounds[1])
             if status != "all":
                 query = query.eq("status", status)
             if priority is not None:
@@ -185,9 +232,25 @@ class QuotationService:
             if date_from is not None:
                 query = query.gte("created_at", date_from)
             if date_to is not None:
-                query = query.lte("created_at", date_to)
+                next_day = None
+                if "T" not in date_to:
+                    try:
+                        next_day = date.fromisoformat(date_to) + timedelta(days=1)
+                    except (ValueError, OverflowError):
+                        pass
+                if next_day is not None:
+                    query = query.lt("created_at", f"{next_day.isoformat()}T00:00:00+00:00")
+                else:
+                    query = query.lte("created_at", date_to)
+            descending = sort_order == "desc"
+            sort_column = sort_by
+            if sort_by == "stated_total":
+                sort_column = f"quotation(stated_total_amount).{sort_order}"
+                if descending:
+                    sort_column += ".nullslast"
+                descending = False
             response = (
-                query.order(sort_by, desc=sort_order == "desc")
+                query.order(sort_column, desc=descending)
                 .order("id")
                 .range(offset, offset + capped_limit)
                 .execute()
@@ -195,14 +258,6 @@ class QuotationService:
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         rows = _rows(response.data)
-        rows = [row for row in rows if not _task_quotation_deleted(row)]
-        if clean_search:
-            rows = [
-                r
-                for r in rows
-                if clean_search in str(r.get("quotation_id", "")).lower()
-                or clean_search in _nested_supplier_name(r).lower()
-            ]
         visible = rows[:capped_limit]
         return ReviewTaskList(
             items=[_task(row) for row in visible],
@@ -628,13 +683,14 @@ class QuotationService:
 
         output = StringIO()
         writer = csv.writer(output)
-        writer.writerow(["supplier_name", supplier_name])
-        writer.writerow(["issue_date", quote.get("issue_date") or ""])
+        writer.writerow(["supplier_name", _csv_text(supplier_name)])
+        writer.writerow(["issue_date", _csv_text(quote.get("issue_date"))])
+        writer.writerow(["status", _csv_text(quote.get("status"))])
         writer.writerow(["stated_total", decimal_string(quote.get("stated_total_amount")) or ""])
         writer.writerow(
             [
                 "currency",
-                quote.get("stated_total_currency") or quote.get("currency") or "",
+                _csv_text(quote.get("stated_total_currency") or quote.get("currency")),
             ]
         )
         writer.writerow([])
@@ -647,20 +703,24 @@ class QuotationService:
                 "unit_price_currency",
                 "vat_rate",
                 "delivery_fee_amount",
+                "delivery_fee_currency",
                 "discount_amount",
+                "discount_currency",
             ]
         )
         for line in lines:
             writer.writerow(
                 [
                     line.get("line_number") or "",
-                    line.get("original_text") or "",
+                    _csv_text(line.get("original_text")),
                     decimal_string(line.get("quantity")) or "",
                     decimal_string(line.get("unit_price_amount")) or "",
-                    line.get("unit_price_currency") or "",
+                    _csv_text(line.get("unit_price_currency")),
                     decimal_string(line.get("vat_rate")) or "",
                     decimal_string(line.get("delivery_fee_amount")) or "",
+                    _csv_text(line.get("delivery_fee_currency")),
                     decimal_string(line.get("discount_amount")) or "",
+                    _csv_text(line.get("discount_currency")),
                 ]
             )
         self._record(
@@ -907,20 +967,6 @@ def _field(row: dict[str, object]) -> FieldExtraction:
         corrected_by=UUID(str(row["corrected_by"])) if row.get("corrected_by") else None,
         corrected_at=row.get("corrected_at"),
     )
-
-
-def _nested_supplier_name(row: dict[str, object]) -> str:
-    q = row.get("quotation")
-    if isinstance(q, dict):
-        s = q.get("supplier")
-        if isinstance(s, dict):
-            return str(s.get("name", ""))
-    return ""
-
-
-def _task_quotation_deleted(row: dict[str, object]) -> bool:
-    q = row.get("quotation")
-    return isinstance(q, dict) and q.get("deleted_at") is not None
 
 
 def _task(row: dict[str, object]) -> ReviewTask:
@@ -1246,3 +1292,26 @@ def _mark_extraction_enqueue_failed(
         client.table("quotation").update(updates).eq("id", str(quotation_id)).execute()
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+
+def _document_vat_rate(
+    fields: list[dict[str, object]], lines: list[dict[str, object]]
+) -> str | None:
+    # The lines hold the reviewer's latest rate; the header field keeps only its first
+    # correction, so it decides only when the priced lines do not share one rate.
+    rates = {
+        decimal_string(line.get("vat_rate"), scale=4)
+        for line in lines
+        if line.get("unit_price_amount") is not None
+    }
+    if len(rates) == 1 and None not in rates:
+        return rates.pop()
+    for field in fields:
+        if field.get("entity_type") == "quotation" and field.get("field_name") == "vat_rate":
+            value = (
+                field.get("corrected_value")
+                if field.get("corrected_by") is not None
+                else field.get("extracted_value")
+            )
+            return decimal_string(value, scale=4)
+    return None

@@ -173,3 +173,45 @@ def test_delegation_to_removed_delegate_falls_through_to_original_assignee() -> 
 
     assert result.assigned_membership_id == approver
     assert result.source == "threshold_match"
+
+
+def test_split_combined_total_routes_to_b_while_small_request_routes_to_a() -> None:
+    branch_id, owner, approver_a, approver_b = (uuid4() for _ in range(4))
+    rules = [
+        rule(branch_id=branch_id, maximum="2000", currency="SAR", approver_id=approver_a),
+        rule(branch_id=branch_id, minimum="2000", currency="SAR", approver_id=approver_b),
+    ]
+    common = dict(
+        request_currency="SAR",
+        branch_id=branch_id,
+        rules=rules,
+        delegations=[],
+        removed_membership_ids=set(),
+        owner_membership_id=owner,
+        as_of=date(2026, 10, 30),
+    )
+    result = resolve_approver(
+        request_value=Decimal("2773") + Decimal("1290"), is_group=True, **common
+    )
+    assert result.assigned_membership_id == approver_b
+    assert result.source == "group_threshold_match"
+    single = resolve_approver(request_value=Decimal("1290"), **common)
+    assert single.assigned_membership_id == approver_a
+    assert single.source == "threshold_match"
+
+
+def test_split_without_matching_rule_keeps_owner_fallback() -> None:
+    owner = uuid4()
+    result = resolve_approver(
+        request_value=Decimal("4063"),
+        request_currency="SAR",
+        branch_id=uuid4(),
+        rules=[rule(currency="USD")],
+        delegations=[],
+        removed_membership_ids=set(),
+        owner_membership_id=owner,
+        as_of=date(2026, 10, 30),
+        is_group=True,
+    )
+    assert result.assigned_membership_id == owner
+    assert result.source == "owner_fallback"

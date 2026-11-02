@@ -137,7 +137,7 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     await expect(priceFlag).toHaveClass(/flagged-highlight/);
     await priceFlag.locator('button').last().click();
     await page.locator('button.save-btn').click();
-    await expect(page.locator('.corrected-tag').first()).toBeVisible();
+    await expect(page.locator('.confirmed-tag').first()).toBeVisible();
     await page.locator('button.confirm-btn').click();
     const dialog = page.locator('.confirm-dialog');
     await expect(dialog).toBeVisible();

@@ -295,6 +295,53 @@ def test_quoted_prices_are_the_supplier_line_price_without_landed_charges() -> N
         Decimal(575),
         Decimal(68),
     ]
-    assert {currency for _, currency in sourced.values()} == {"EGP"}
+    assert {price.currency for price in sourced.values()} == {"EGP"}
     assert stray not in sourced
     assert service._quoted_prices_for({"source_rfq_response_id": None}, lines) == {}
+
+
+def test_inclusive_response_exposes_printed_and_net_request_prices() -> None:
+    from procurepilot_api.modules.requests.service import _purchase_request_line
+    from procurepilot_api.modules.requests.valuation import quoted_prices_from_source_response
+
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant, _user, member = _seed_tenant(cur, email_suffix=f"vat-request-{uuid4().hex[:8]}")
+            products, responses = _seed(cur, tenant, member)
+            cur.execute(
+                "update quotation set prices_include_vat=true "
+                "where id=(select quotation_id from rfq_response where id=%s)",
+                (responses["amana"],),
+            )
+            cur.execute(
+                "update quotation_line set vat_rate=0.15 "
+                "where quotation_id=(select quotation_id from rfq_response where id=%s)",
+                (responses["amana"],),
+            )
+        prices = quoted_prices_from_source_response(
+            conn, rfq_response_id=responses["amana"], product_ids=products
+        )
+        line = _purchase_request_line(
+            {"id": uuid4(), "workspace_product_id": products[0], "quantity": "100"}, prices
+        )
+        assert line.quoted_unit_price.amount == "1725.0000"
+        assert line.quoted_prices_include_vat is True
+        assert line.quoted_vat_rate == "0.1500"
+        assert line.quoted_net_unit_price.amount == "1500.0000"
+        assert line.quoted_net_unit_price.currency == line.quoted_unit_price.currency == "EGP"
+        with conn.cursor() as cur:
+            cur.execute(
+                "update quotation set prices_include_vat=false "
+                "where id=(select quotation_id from rfq_response where id=%s)",
+                (responses["amana"],),
+            )
+        exclusive = quoted_prices_from_source_response(
+            conn, rfq_response_id=responses["amana"], product_ids=products
+        )
+        line = _purchase_request_line(
+            {"id": uuid4(), "workspace_product_id": products[0], "quantity": "100"}, exclusive
+        )
+        assert line.quoted_prices_include_vat is False
+        assert line.quoted_vat_rate is None
+        assert line.quoted_net_unit_price == line.quoted_unit_price
+        conn.rollback()

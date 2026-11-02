@@ -1,8 +1,9 @@
-import { toIsoDate } from '../../../core/format/iso-date';
+import { parseIsoDateLocal, toIsoDate } from '../../../core/format/iso-date';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -15,17 +16,24 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { RequestsApiService } from '../../requests/requests-api';
+import { OrganisationApiService } from '../../settings/organisation-api';
 import { SessionService } from '../../../core/auth/session.service';
-import type { PurchaseRequest } from '../../../core/api/models';
+import type { Branch, PurchaseRequest, PurchaseRequestLine } from '../../../core/api/models';
 import type { RequestAllocation } from '../orders-api';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, forkJoin, of } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { Product, Supplier } from '../../../core/api/models';
-import { OrdersApiService, type PurchaseOrderCreate } from '../orders-api';
+import {
+  OrdersApiService,
+  type PurchaseOrder,
+  type PurchaseOrderCreate,
+  type RequestAllocationOrder,
+} from '../orders-api';
 import { packLabel } from '../pack-label';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
+import { formatMoneyUnits, lineNetUnits, moneyUnits, splitVatInclusiveLine } from '../vat-split';
 
 interface OrderLineForm {
   workspace_product_id: FormControl<string | null>;
@@ -70,13 +78,39 @@ export class OrderCreateComponent implements OnInit {
   private readonly ordersApi = inject(OrdersApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly requestsApi = inject(RequestsApiService);
+  private readonly organisationApi = inject(OrganisationApiService);
   private readonly session = inject(SessionService);
+  private readonly destroyRef = inject(DestroyRef);
   readonly homeCurrency = this.session.homeCurrency() ?? 'USD';
 
   readonly suppliers = signal<Supplier[]>([]);
   readonly products = signal<Product[]>([]);
+  readonly branches = signal<Branch[]>([]);
+
+  readonly branchNameById = computed<Map<string, string>>(() => {
+    const byId = new Map<string, string>();
+    for (const b of this.branches()) {
+      byId.set(b.id, b.name);
+    }
+    return byId;
+  });
+
+  sourceSupplierName(): string {
+    return (
+      this.sourceRequest()?.source?.supplier_name ||
+      this.suppliers().find(s => s.id === this.form.controls.supplier_id.value)?.name ||
+      ''
+    );
+  }
+
+  sourceBranchName(): string {
+    const branchId = this.sourceRequest()?.branch_id;
+    return branchId ? this.branchNameById().get(branchId) || branchId : '';
+  }
 
   readonly isSubmitting = signal(false);
+  readonly savedOrder = signal<PurchaseOrder | null>(null);
+  readonly navigationFailed = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
   readonly sourceRequest = signal<PurchaseRequest | null>(null);
   // Currency of the supplier quote the unit prices were pre-filled from; the order must use it.
@@ -84,6 +118,29 @@ export class OrderCreateComponent implements OnInit {
   // Pre-filled quoted price per source request line; the quote currency is enforced only while
   // at least one of these values is still in the form unchanged.
   private readonly prefilledQuotes = new Map<string, number>();
+
+  private inclusiveQuote(line: FormGroup<OrderLineForm>): PurchaseRequestLine | null {
+    const requestLine = this.sourceRequest()?.lines.find(
+      candidate => candidate.id === line.controls.source_request_line_id.value,
+    );
+    if (!requestLine?.quoted_prices_include_vat || !requestLine.quoted_net_unit_price ||
+        !requestLine.quoted_unit_price || !requestLine.quoted_vat_rate ||
+        !this.prefilledQuotes.has(requestLine.id)) return null;
+    return requestLine;
+  }
+
+  vatInclusiveHint(line: FormGroup<OrderLineForm>): string | null {
+    const quote = this.inclusiveQuote(line);
+    if (!quote) return null;
+    return this.translate.instant('orders.create.vatInclusiveHint', {
+      rate: this.formatService.formatNumber(Number(quote.quoted_vat_rate) * 100),
+      gross: this.formatService.formatMoney(quote.quoted_unit_price),
+    });
+  }
+
+  private lineTotalUnits(line: ReturnType<FormGroup<OrderLineForm>['getRawValue']>): bigint {
+    return lineNetUnits(line.unit_price || 0, line.quantity || 0) + moneyUnits(line.line_tax || 0);
+  }
 
   packDescription(product: Product | undefined): string | null {
     return packLabel(product?.pack, product?.base_unit ?? '', this.translate, this.formatService).label;
@@ -112,6 +169,18 @@ export class OrderCreateComponent implements OnInit {
   readonly requestAllocations = signal<RequestAllocation | null>(null);
   readonly editOrderId = signal<string | null>(null);
 
+  readonly allocatedOrders = computed<RequestAllocationOrder[]>(() => {
+    return this.requestAllocations()?.orders ?? [];
+  });
+
+  readonly isFullyOrdered = computed<boolean>(() => {
+    if (this.editOrderId()) return false;
+    const req = this.sourceRequest();
+    const alloc = this.requestAllocations();
+    if (!req || !alloc) return false;
+    return alloc.lines.length > 0 && alloc.lines.every(l => parseFloat(l.remaining_quantity || '0') <= 0);
+  });
+
   readonly form = new FormGroup({
     order_number: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
     supplier_id: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
@@ -128,14 +197,12 @@ export class OrderCreateComponent implements OnInit {
 
   get computedTotals() {
     return () => {
-      let linesTotal = 0;
+      let units = 0n;
       const lines = this.lines.getRawValue();
       for (const line of lines) {
-        const qty = line.quantity || 0;
-        const price = line.unit_price || 0;
-        const tax = line.line_tax || 0;
-        linesTotal += (qty * price) + tax;
+        units += this.lineTotalUnits(line);
       }
+      const linesTotal = Number(units) / 10000;
       return {
         linesTotal,
         orderTotal: linesTotal,
@@ -154,6 +221,7 @@ export class OrderCreateComponent implements OnInit {
     forkJoin({
       suppliers: this.api.suppliers({ limit: 100 }).pipe(catchError(() => of({ items: [], next_cursor: null }))),
       products: this.api.products({ status: 'all', limit: 100 }).pipe(catchError(() => of({ items: [], next_cursor: null }))),
+      branches: this.organisationApi.listBranches({ limit: 100 }).pipe(catchError(() => of({ items: [], next_cursor: null }))),
       request: sourceRequestId ? this.requestsApi.getRequest(sourceRequestId).pipe(catchError(() => of(null))) : of(null),
       allocations: sourceRequestId ? this.ordersApi.getAllocations(sourceRequestId).pipe(catchError(() => of(null))) : of(null),
       prefill: !editId && sourceRequestId && this.ordersApi.getRequestPrefill
@@ -163,7 +231,8 @@ export class OrderCreateComponent implements OnInit {
         ? this.ordersApi.getNextOrderNumber().pipe(catchError(() => of(null)))
         : of(null),
       orderToEdit: editId ? this.ordersApi.getOrder(editId).pipe(catchError(() => of(null))) : of(null),
-    }).subscribe(({ suppliers, products, request, allocations, prefill, nextNumber, orderToEdit }) => {
+    }).subscribe(({ suppliers, products, branches, request, allocations, prefill, nextNumber, orderToEdit }) => {
+      this.branches.set([...branches.items]);
       const supplierItems = [...suppliers.items];
       if (!orderToEdit && prefill?.supplier) {
         const prefillSupplier = prefill.supplier;
@@ -243,6 +312,9 @@ export class OrderCreateComponent implements OnInit {
       } else if (request && allocations) {
         this.sourceRequest.set(request);
         this.requestAllocations.set(allocations);
+        if (request.required_by_date && !this.form.controls.expected_delivery_date.value) {
+          this.form.controls.expected_delivery_date.setValue(parseIsoDateLocal(request.required_by_date));
+        }
         this.lines.clear();
 
         // Pre-filled prices are in the quote's currency, so the order currency follows it. A
@@ -271,30 +343,40 @@ export class OrderCreateComponent implements OnInit {
           const remaining = parseFloat(remainingStr);
           
           if (remaining > 0) {
+            const inclusive = prefillQuotes && reqLine.quoted_prices_include_vat &&
+              reqLine.quoted_unit_price && reqLine.quoted_net_unit_price && reqLine.quoted_vat_rate;
+            const quotedPrice = inclusive ? reqLine.quoted_net_unit_price : reqLine.quoted_unit_price;
+            const split = inclusive
+              ? splitVatInclusiveLine(reqLine.quoted_unit_price!.amount, remainingStr, reqLine.quoted_vat_rate!)
+              : null;
             if (prefillQuotes && reqLine.quoted_unit_price) {
-              this.prefilledQuotes.set(reqLine.id, parseFloat(reqLine.quoted_unit_price.amount));
+              this.prefilledQuotes.set(reqLine.id, parseFloat(quotedPrice!.amount));
             }
-            this.lines.push(
-              new FormGroup<OrderLineForm>({
+            const lineGroup = new FormGroup<OrderLineForm>({
                 workspace_product_id: new FormControl<string | null>(reqLine.workspace_product_id || null),
                 description: new FormControl<string>(reqLine.product_name ?? this.requestLineDescription(products.items.find(p => p.id === reqLine.workspace_product_id)), { nonNullable: true, validators: [Validators.required] }),
                 quantity: new FormControl<number | null>(remaining, { validators: [Validators.required, Validators.min(0.0001), Validators.max(remaining)] }),
                 // Request quantities are in PACKS. Only the supplier's quoted per-pack price pre-fills
                 // the PO; the (landed) estimate stays a reference. packHint uses the request snapshot.
                 base_unit: new FormControl<string>(reqLine.base_unit ?? products.items.find(p => p.id === reqLine.workspace_product_id)?.base_unit ?? 'EA', { nonNullable: true, validators: [Validators.required] }),
-                unit_price: new FormControl<number | null>(prefillQuotes && reqLine.quoted_unit_price ? parseFloat(reqLine.quoted_unit_price.amount) : null, { validators: [Validators.required, Validators.min(0)] }),
-                line_tax: new FormControl<number | null>(0, { validators: [Validators.min(0)] }),
+                unit_price: new FormControl<number | null>(prefillQuotes && quotedPrice ? parseFloat(quotedPrice.amount) : null, { validators: [Validators.required, Validators.min(0)] }),
+                line_tax: new FormControl<number | null>(split?.tax ?? 0, { validators: [Validators.min(0)] }),
                 source_request_line_id: new FormControl<string | null>(reqLine.id),
                 remaining_quantity: new FormControl<number | null>(remaining),
                 estimated_price: new FormControl<number | null>(reqLine.estimated_unit_price ? parseFloat(reqLine.estimated_unit_price.amount) : null),
-              })
-            );
+              });
+            if (inclusive) {
+              lineGroup.controls.quantity.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(quantity => {
+                if (quantity !== null && lineGroup.controls.unit_price.value === this.prefilledQuotes.get(reqLine.id)) {
+                  lineGroup.controls.line_tax.setValue(
+                    splitVatInclusiveLine(reqLine.quoted_unit_price!.amount, quantity, reqLine.quoted_vat_rate!).tax,
+                  );
+                }
+              });
+            }
+            this.lines.push(lineGroup);
           }
         });
-        
-        if (this.lines.length === 0) {
-          this.addLine();
-        }
       } else {
         this.addLine();
       }
@@ -334,7 +416,7 @@ export class OrderCreateComponent implements OnInit {
   }
 
   submit(): void {
-    if (this.form.invalid || this.lines.length === 0) return;
+    if (this.isSubmitting() || this.savedOrder() !== null || this.form.invalid || this.lines.length === 0) return;
 
     this.isSubmitting.set(true);
     this.errorMessage.set(null);
@@ -357,12 +439,12 @@ export class OrderCreateComponent implements OnInit {
 
     const formatDate = (date: Date | null) => date ? toIsoDate(date) : null;
 
-    let linesTotalAmount = 0;
+    let linesTotalAmount = 0n;
     const mappedLines = value.lines.map((line, i) => {
       const qty = line.quantity || 0;
       const price = line.unit_price || 0;
       const tax = line.line_tax || 0;
-      const lineTotal = (qty * price) + tax;
+      const lineTotal = this.lineTotalUnits(line);
       linesTotalAmount += lineTotal;
 
       return {
@@ -371,9 +453,9 @@ export class OrderCreateComponent implements OnInit {
         description: line.description,
         ordered_quantity: qty.toFixed(6), // up to 6 decimal places as per api schema
         base_unit: line.base_unit,
-        unit_price: { amount: price.toFixed(4), currency },
-        tax: { amount: tax.toFixed(4), currency },
-        line_total: { amount: lineTotal.toFixed(4), currency },
+        unit_price: { amount: formatMoneyUnits(moneyUnits(price)), currency },
+        tax: { amount: formatMoneyUnits(moneyUnits(tax)), currency },
+        line_total: { amount: formatMoneyUnits(lineTotal), currency },
         source_request_line_id: line.source_request_line_id,
       };
     });
@@ -385,7 +467,7 @@ export class OrderCreateComponent implements OnInit {
       supplier_id: value.supplier_id,
       order_date: formatDate(value.order_date)!,
       expected_delivery_date: formatDate(value.expected_delivery_date),
-      total: { amount: linesTotalAmount.toFixed(4), currency },
+      total: { amount: formatMoneyUnits(linesTotalAmount), currency },
       tax: { amount: orderTaxAmount.toFixed(4), currency },
       source_kind: 'manual',
       source_reference: value.order_number,
@@ -399,9 +481,19 @@ export class OrderCreateComponent implements OnInit {
 
     request$.subscribe({
       next: (order) => {
-        this.isSubmitting.set(false);
+        this.savedOrder.set(order);
         this.snackBar.open(this.translate.instant('orders.create.success'), undefined, { duration: 3500 });
-        this.router.navigate(['/orders', order.id]);
+        const navPromise = this.router.navigate(['/orders', order.id]);
+        Promise.resolve(navPromise).then(
+          (navigated) => {
+            if (!navigated) {
+              this.navigationFailed.set(true);
+            }
+          },
+          () => {
+            this.navigationFailed.set(true);
+          },
+        );
       },
       error: (err: unknown) => {
         this.isSubmitting.set(false);
@@ -414,6 +506,10 @@ export class OrderCreateComponent implements OnInit {
           }
           if (reason === 'idempotency_key_exists') {
             this.errorMessage.set(this.translate.instant('orders.create.errors.idempotencyKeyExists'));
+            return;
+          }
+          if (reason === 'quantity_exceeds_allocation') {
+            this.errorMessage.set(this.translate.instant('orders.create.errors.quantityExceedsAllocation'));
             return;
           }
         }

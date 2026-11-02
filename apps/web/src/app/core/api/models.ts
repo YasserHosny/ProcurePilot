@@ -36,6 +36,7 @@ export interface Me {
   readonly preferred_locale: Locale | null;
   readonly mfa_enabled: boolean;
   readonly tenant: Tenant;
+  readonly display_name?: string | null;
 }
 
 export interface Session {
@@ -59,6 +60,7 @@ export interface Member {
   readonly status: 'active' | 'removed';
   readonly mfa_enabled: boolean;
   readonly created_at: string;
+  readonly display_name?: string | null;
 }
 
 export interface Invitation {
@@ -69,6 +71,7 @@ export interface Invitation {
   readonly role: Role;
   readonly status: 'pending' | 'accepted' | 'revoked' | 'expired';
   readonly expires_at: string;
+  readonly display_name?: string | null;
 }
 
 export interface ReferenceOption {
@@ -150,6 +153,7 @@ export interface Supplier {
   readonly contact_email?: string | null;
   readonly status: 'active' | 'preferred' | 'blocked' | 'archived';
   readonly created_at: string;
+  readonly preferred_locale?: 'en' | 'ar' | null;
 }
 
 export interface SupplierCreate {
@@ -159,6 +163,7 @@ export interface SupplierCreate {
   readonly minimum_order_value?: Money | null;
   readonly delivery_fee?: Money | null;
   readonly contact_email?: string | null;
+  readonly preferred_locale?: 'en' | 'ar' | null;
 }
 
 export interface SupplierUpdate {
@@ -169,6 +174,7 @@ export interface SupplierUpdate {
   readonly delivery_fee?: Money | null;
   readonly contact_email?: string | null;
   readonly status?: 'active' | 'preferred' | 'blocked' | 'archived';
+  readonly preferred_locale?: 'en' | 'ar' | null;
 }
 
 export type RefreshScheduleStatus = 'active' | 'paused' | 'due';
@@ -385,6 +391,8 @@ export interface QuotationReviewPatch {
   readonly corrections?: readonly FieldCorrection[];
   readonly add_lines?: readonly NewQuotationLine[];
   readonly remove_line_ids?: readonly string[];
+  readonly prices_include_vat?: boolean;
+  readonly vat_rate?: string;
 }
 
 export interface QuotationDetail extends Quotation {
@@ -395,6 +403,8 @@ export interface QuotationDetail extends Quotation {
   readonly uploaded_by_email?: string | null;
   readonly reviewed_by_email?: string | null;
   readonly suggested_supplier_name?: string | null;
+  readonly prices_include_vat: boolean;
+  readonly vat_rate: string | null;
 }
 
 export interface AuditTrailEntry {
@@ -465,7 +475,9 @@ export type MatchTaskReason =
   | 'fuzzy_match_review'
   | 'no_candidate'
   | 'alias_conflict'
-  | 'auto_accepted';
+  | 'auto_accepted'
+  | 'corrected'
+  | 'human_decided';
 
 export interface ProductSummary {
   readonly id: string;
@@ -500,13 +512,31 @@ export interface FeatureScore {
   readonly price_plausibility: string;
 }
 
+export interface RfqMatchReason {
+  readonly rule_version?: string | null;
+  readonly rfq_id: string;
+  readonly rfq_line_id?: string | null;
+  readonly position?: number | null;
+  readonly wording_score?: string | null;
+  readonly pack_check?: 'equal' | 'conflict' | 'unknown' | null;
+  readonly quoted_pack_base_quantity?: string | null;
+  readonly quoted_pack_unit?: string | null;
+  readonly rfq_pack_base_quantity?: string | null;
+  readonly rfq_pack_unit?: string | null;
+  readonly fitting_rfq_line_ids?: readonly string[];
+  readonly not_in_rfq?: boolean;
+  readonly matched?: boolean;
+}
+
 export interface MatchReason {
   readonly alias_hit: boolean;
   readonly gtin_match: boolean;
   readonly supplier_code_match: boolean;
-  readonly lexical_similarity: string;
-  readonly semantic_similarity: string;
-  readonly feature_score: FeatureScore;
+  readonly lexical_similarity?: string | null;
+  readonly semantic_similarity?: string | null;
+  readonly feature_score?: FeatureScore | null;
+  readonly rfq?: RfqMatchReason | null;
+  readonly measured?: Record<string, string> | null;
 }
 
 export interface MatchCandidate {
@@ -532,6 +562,9 @@ export interface MatchDecision {
   readonly decided_at: string;
   readonly confidence: string;
   readonly alias_id?: string | null;
+  readonly supersedes_decision_id?: string | null;
+  readonly learned_from_decision_id?: string | null;
+  readonly lines_matched_by_same_wording?: readonly string[] | null;
 }
 
 export interface QuotationMatchSummary {
@@ -568,6 +601,7 @@ export interface MatchTask {
 export interface MatchQueueCandidateSummary {
   readonly product_name: string;
   readonly confidence: string;
+  readonly rfq_position?: number | null;
 }
 
 export interface MatchQueueItem {
@@ -579,6 +613,8 @@ export interface MatchQueueItem {
   readonly priority: MatchTaskPriority;
   readonly reason: MatchTaskReason;
   readonly top_candidate?: MatchQueueCandidateSummary | null;
+  readonly decision?: MatchDecision | null;
+  readonly candidates?: readonly MatchCandidate[];
   readonly created_at: string;
   readonly resolved_at?: string | null;
   readonly supplier_name?: string | null;
@@ -632,6 +668,28 @@ export interface MatchResolutionRequest {
   readonly outcome: MatchOutcome;
   readonly selected_match_candidate_id?: string | null;
   readonly create_product?: ProductCreate | null;
+}
+
+export interface MatchCorrectionRequest {
+  readonly expected_current_decision_id: string;
+  readonly outcome: 'same_product' | 'no_match_new_product';
+  readonly selected_match_candidate_id?: string | null;
+  readonly new_product?: ProductCreate | null;
+  readonly learn_alias?: boolean;
+}
+
+export interface MatchCorrectionResponse {
+  readonly decision: MatchDecision;
+  readonly superseded_decision_id: string;
+  readonly lines_matched_through_old_wording: readonly string[];
+  readonly alias_conflict_product_id?: string | null;
+  readonly lines_matched_by_same_wording?: readonly string[] | null;
+}
+
+export interface BulkConfirmResult {
+  readonly confirmed: number;
+  readonly skipped: number;
+  readonly lines_matched_by_same_wording?: readonly string[] | null;
 }
 
 export interface LandedCost {
@@ -871,6 +929,7 @@ export type BasketSplitJobStatus = 'queued' | 'running' | 'completed' | 'failed'
 
 export interface BasketSplitJob {
   readonly id: string;
+  readonly rfq_id?: string | null;
   readonly supplier_ids: readonly string[];
   readonly items: readonly BasketItemRequest[];
   readonly status: BasketSplitJobStatus;
@@ -887,6 +946,18 @@ export interface BasketSplitJob {
 export interface BasketPackSnapshot {
   readonly base_quantity: string;
   readonly base_unit: string;
+}
+
+export interface SplitPrepareRequest {
+  readonly branch_id: string;
+  readonly required_by_date: string;
+  readonly cost_centre_id?: string | null;
+  readonly confirm_expired_quotation_ids?: readonly string[];
+}
+
+export interface SplitPrepareResponse {
+  readonly request_group_id: string;
+  readonly purchase_request_ids: readonly string[];
 }
 
 // --- R2.4 Supplier IQ & Scorecards ---------------------------------------
@@ -1140,6 +1211,7 @@ export interface PurchaseOutcomePrefillLine {
   readonly base_unit: string;
   readonly unit_price: Money;
   readonly total_paid: Money;
+  readonly tax: Money;
   readonly recordable: boolean;
   readonly reason: 'no_product' | 'zero_quantity' | 'already_recorded' | null;
   readonly recorded_saving_id: string | null;
@@ -1394,8 +1466,12 @@ export interface PurchaseRequestLine {
   readonly note?: string | null;
   readonly estimated_unit_price?: Money | null;
   readonly estimated_unit_price_source_landed_cost_id?: string | null;
-  /** Supplier's quoted per-pack price from the source RFQ response; the only PO-prefillable price. */
+  /** Printed supplier price per pack from the source RFQ response; gross when VAT-inclusive. */
   readonly quoted_unit_price?: Money | null;
+  readonly quoted_prices_include_vat: boolean;
+  readonly quoted_vat_rate: string | null;
+  /** Net per-pack price; equals the printed price when VAT-exclusive. */
+  readonly quoted_net_unit_price: Money | null;
 }
 
 export interface PurchaseRequestLineInput {
@@ -1417,6 +1493,14 @@ export interface ApprovalStep {
 }
 
 /** Set when an RFQ auto-preparation guardrail, not a person, drafted the request. */
+export interface RequestSource {
+  readonly rfq_id: string;
+  readonly rfq_response_id: string;
+  readonly quotation_id: string;
+  readonly supplier_id: string;
+  readonly supplier_name?: string | null;
+}
+
 export interface AutoPreparedProvenance {
   readonly guardrail_id: string;
   readonly rfq_id?: string | null;
@@ -1425,9 +1509,22 @@ export interface AutoPreparedProvenance {
   readonly created_at: string;
 }
 
+export interface RequestGroupSummary {
+  readonly id: string;
+  readonly rfq_id: string;
+  readonly position: number;
+  readonly size: number;
+  readonly combined_total: Money;
+  readonly best_single_total?: Money | null;
+  readonly saving?: Money | null;
+  readonly sibling_request_ids: readonly string[];
+}
+
 export interface PurchaseRequest {
   readonly id: string;
+  readonly request_group?: RequestGroupSummary | null;
   readonly source_rfq_response_id?: string | null;
+  readonly source?: RequestSource | null;
   readonly auto_prepared?: AutoPreparedProvenance | null;
   readonly branch_id: string;
   readonly cost_centre_id?: string | null;
@@ -1439,6 +1536,7 @@ export interface PurchaseRequest {
   readonly lines: readonly PurchaseRequestLine[];
   readonly estimated_total?: Money | null;
   readonly has_incomplete_estimate: boolean;
+  readonly has_quantity_to_order?: boolean | null;
   readonly budget_status?: BudgetStatus | null;
   readonly approval_step?: ApprovalStep | null;
   readonly submitted_at?: string | null;

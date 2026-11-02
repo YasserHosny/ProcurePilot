@@ -107,6 +107,7 @@ def test_persisted_landed_cost_raw_inputs_contain_complete_audit_snapshot(
         assert row is not None
         raw_inputs = row[0]
         assert set(raw_inputs) == {
+            "prices_include_vat",
             "quantity",
             "normalised_base_quantity",
             "base_unit",
@@ -165,3 +166,59 @@ def _candidate(cur: psycopg.Cursor, workspace: object, line_id: UUID, product_id
         ),
     )
     return candidate_id
+
+
+def test_rule_change_appends_v2_without_changing_v1_snapshot(conn: object) -> None:
+    from procurepilot_api.modules.landed_cost.service import LandedCostService
+
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        workspace = make_workspace(cur, "landed-cost-rule-change")
+        quote = make_quotation(
+            cur,
+            workspace,
+            document_id=make_document(cur, workspace),
+            supplier_id=make_supplier(cur, workspace),
+            status="reviewed",
+            arithmetic_status="reconciled",
+        )
+        line = make_line(cur, workspace, quote)
+        product = make_workspace_product(cur, workspace, name="VAT Product")
+        candidate = _candidate(cur, workspace, line, product)
+        act_as(cur, workspace)
+        cur.execute(
+            "update quotation set prices_include_vat = true, expiry_date = '2030-12-31' "
+            "where id = %s",
+            (quote,),
+        )
+        cur.execute("update quotation_line set vat_rate = 0.15 where id = %s", (line,))
+        cur.execute(
+            "insert into match_decision (id, tenant_id, quotation_line_id, "
+            "matched_workspace_product_id, selected_match_candidate_id, outcome, is_automatic, "
+            "confidence) values (%s,%s,%s,%s,%s,'same_product',true,0.7)",
+            (uuid4(), workspace.tenant_id, line, product, candidate),
+        )
+        service = LandedCostService(cast(Settings, _Settings()))
+        client = PsycopgSupabaseClient(conn)
+        service.active_rule_version = "landed-cost-v1"
+        first = service.compute_for_line_with_client(
+            client=client, member=_member(workspace), line_id=line
+        )
+        cur.execute("select row_to_json(lc)::text from landed_cost lc where id = %s", (first.id,))
+        snapshot = cur.fetchone()[0]
+        service.active_rule_version = "landed-cost-v2"
+        second = service.compute_for_line_with_client(
+            client=client, member=_member(workspace), line_id=line
+        )
+        assert second.id != first.id
+        assert second.rule_version == "landed-cost-v2"
+        assert second.total.amount == "24.0000"
+        assert first.total.amount == "27.6000"
+        assert first.valid_to is not None
+        cur.execute("select row_to_json(lc)::text from landed_cost lc where id = %s", (first.id,))
+        assert cur.fetchone()[0] == snapshot
+        cur.execute(
+            "select count(*) from landed_cost where match_decision_id = %s",
+            (first.match_decision_id,),
+        )
+        assert cur.fetchone()[0] == 2

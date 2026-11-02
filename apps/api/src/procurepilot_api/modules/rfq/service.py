@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
 
 import psycopg
 from psycopg.rows import dict_row
@@ -36,6 +37,7 @@ from procurepilot_api.modules.rfq.schemas import (
     RfqLine,
     RfqList,
     RfqPrepareRequestResponse,
+    RfqProductLandedCost,
     RfqRecipient,
     RfqResponseComparison,
     RfqResponseComparisonList,
@@ -64,6 +66,58 @@ def _authenticated_db(settings: Settings, member: CurrentMember) -> Iterator[psy
             yield conn
     except psycopg.Error as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+
+def _validate_needed_by(needed_by_date: date) -> None:
+    """A supplier email must never ask for a date that has passed. Callers run this after their
+    idempotent replay lookup: a retry of a save that committed yesterday must get its RFQ back."""
+    if needed_by_date < date.today():
+        raise UnprocessableEntityError(
+            details={"reason": "needed_by_in_past", "field": "needed_by_date"}
+        )
+
+
+def _validate_rfq_lines(lines_data: list) -> None:
+    """A supplier email must never ask for one product twice."""
+    seen: set[uuid.UUID] = set()
+    for line in lines_data:
+        if line.workspace_product_id in seen:
+            raise UnprocessableEntityError(
+                details={
+                    "reason": "duplicate_product",
+                    "workspace_product_id": str(line.workspace_product_id),
+                }
+            )
+        seen.add(line.workspace_product_id)
+
+
+def lock_rfq_for_preparation(
+    cur: psycopg.Cursor, *, tenant_id: uuid.UUID, rfq_id: uuid.UUID
+) -> str | None:
+    """Serialise every preparation of one RFQ — a single-supplier request or a split (spec 024
+    research R4) — and return its status, or None when the caller cannot see it.
+
+    The transaction-scoped advisory lock is held until the caller's transaction ends, so the
+    preparation that converts the RFQ commits before another can read its status.
+    """
+    cur.execute(
+        "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+        (f"rfq-prepare:{tenant_id}:{rfq_id}",),
+    )
+    cur.execute("select status from rfq where id = %s and tenant_id = %s", (rfq_id, tenant_id))
+    row = cur.fetchone()
+    if row is None:
+        return None
+    return str(row["status"] if isinstance(row, dict) else row[0])
+
+
+def mark_converted(
+    cur: psycopg.Cursor, *, rfq_id: uuid.UUID, purchase_request_id: uuid.UUID
+) -> None:
+    """Close an RFQ after a preparation (20261019000001): rfq_update matches only the RFQ's
+    creator, so any other owner or buyer goes through the mark_rfq_converted definer, which checks
+    the request came from this RFQ."""
+    cur.execute("select mark_rfq_converted(%s, %s)", (rfq_id, purchase_request_id))
 
 
 class RfqService:
@@ -100,6 +154,7 @@ class RfqService:
         idempotency_key: uuid.UUID,
         tenant_terms: str | None = None,
     ) -> tuple[Rfq, list[RfqLine], list[RfqRecipient], list[dict]]:
+        _validate_rfq_lines(lines_data)
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 # True idempotent replay: a retry with the same key after the original
@@ -115,6 +170,7 @@ class RfqService:
                 existing = cur.fetchone()
                 if existing is not None:
                     return self._fetch_created(cur, existing["id"])
+                _validate_needed_by(needed_by_date)
 
                 cur.execute(
                     "select pg_try_advisory_xact_lock(%s)",
@@ -220,7 +276,21 @@ class RfqService:
                     (rfq_id,),
                 )
                 recipients = [RfqRecipient(**item) for item in cur.fetchall()]
-                return RfqDetail(rfq=Rfq(**row), lines=lines, recipients=recipients)
+                cur.execute(
+                    """select coalesce(array_agg(pr.id order by pr.created_at,pr.id), '{}')
+                              as converted_purchase_request_ids,
+                              (select g.id from purchase_request_group g where g.rfq_id=%s)
+                              as request_group_id
+                       from purchase_request pr
+                       join rfq_response resp on resp.id=pr.source_rfq_response_id
+                       join rfq_recipient rec on rec.id=resp.rfq_recipient_id
+                       where rec.rfq_id=%s""",
+                    (rfq_id, rfq_id),
+                )
+                conversion = cur.fetchone()
+                if row["status"] != "converted":
+                    conversion = {"converted_purchase_request_ids": [], "request_group_id": None}
+                return RfqDetail(rfq=Rfq(**row), lines=lines, recipients=recipients, **conversion)
 
     def update_draft(
         self,
@@ -233,6 +303,7 @@ class RfqService:
         tenant_terms: str | None,
         idempotency_key: uuid.UUID,
     ) -> tuple[Rfq, list[RfqLine], list[RfqRecipient], list[dict]]:
+        _validate_rfq_lines(lines_data)
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 row = _lock_rfq_for_creator(cur, member, rfq_id)
@@ -241,6 +312,7 @@ class RfqService:
                     # result without re-creating lines/recipients or auditing again.
                     rfq, lines, recipients, _ = self._fetch_created(cur, rfq_id)
                     return rfq, lines, recipients, []
+                _validate_needed_by(needed_by_date)
                 if row["status"] != "draft":
                     from procurepilot_api.errors import ConflictError
 
@@ -320,6 +392,10 @@ class RfqService:
 
                 rfq_row = _lock_rfq_for_creator(cur, member, rfq_id)
                 rfq = Rfq(**rfq_row)
+                if rfq.status == "draft" and rfq.needed_by_date < date.today():
+                    raise UnprocessableEntityError(
+                        details={"reason": "needed_by_in_past", "field": "needed_by_date"}
+                    )
 
                 cur.execute(
                     "select * from rfq_line where rfq_id = %s order by position, created_at, id",
@@ -328,15 +404,11 @@ class RfqService:
                 line_rows = cur.fetchall()
                 lines = [RfqLine(**r) for r in line_rows]
 
-                # The supplier email follows the sender's interface language, then the
-                # workspace default -- the same order the digest uses.
+                # Supplier emails use each supplier's preferred language, falling back
+                # to the workspace default, independently of the sender's UI language.
                 cur.execute(
-                    """select t.name,
-                              coalesce(m.preferred_locale, t.default_locale) as default_locale
-                       from tenant t
-                       left join membership m on m.tenant_id = t.id and m.id = %s
-                       where t.id = %s""",
-                    (member.membership_id, member.tenant_id),
+                    "select t.name, t.default_locale from tenant t where t.id = %s",
+                    (member.tenant_id,),
                 )
                 tenant_row = cur.fetchone()
                 cur.execute(
@@ -377,7 +449,7 @@ class RfqService:
 
                 for recipient in draft_recipients:
                     cur.execute(
-                        "select contact_email from supplier where id = %s",
+                        "select contact_email, preferred_locale from supplier where id = %s",
                         (recipient.supplier_id,),  # noqa: E501
                     )
                     supp_row = cur.fetchone()
@@ -386,6 +458,7 @@ class RfqService:
                         continue
 
                     contact_email = supp_row["contact_email"]
+                    locale = supp_row["preferred_locale"] or tenant_row["default_locale"]
                     email_lines = []
                     for line in lines:
                         product = product_by_id.get(line.workspace_product_id)
@@ -394,7 +467,7 @@ class RfqService:
                                 product_name=(
                                     product["tenant_name"]
                                     if product
-                                    else t("rfq.email.unknownProduct", tenant_row["default_locale"])
+                                    else t("rfq.email.unknownProduct", locale)
                                 ),
                                 quantity=line.quantity,
                                 unit_code=product["base_unit"] if product else "each",
@@ -404,7 +477,7 @@ class RfqService:
                         )
                     rendered = render_rfq_email(
                         tenant_name=tenant_row["name"],
-                        locale=tenant_row["default_locale"],
+                        locale=locale,
                         needed_by=rfq.needed_by_date,
                         lines=email_lines,
                         tenant_terms=rfq.tenant_terms,
@@ -490,8 +563,10 @@ class RfqService:
                         r.id as response_id,
                         rec.supplier_id,
                         r.created_at as submitted_at,
+                        q.id as quotation_id,
                         q.status as quotation_status,
                         ql.id as ql_id,
+                        ql.original_text,
                         ql.quantity,
                         ql.unit_price_amount,
                         ql.unit_price_currency,
@@ -501,8 +576,17 @@ class RfqService:
                     join quotation q on r.quotation_id = q.id
                     left join quotation_line ql on r.quotation_id = ql.quotation_id
                     left join current_match_decision md on ql.id = md.quotation_line_id
+                    -- Lines follow the RFQ's own line order (the product each line matched);
+                    -- unmatched lines come last, in the supplier's document order.
+                    left join lateral (
+                        select min(rl.position) as position
+                        from rfq_line rl
+                        where rl.rfq_id = rec.rfq_id
+                          and rl.workspace_product_id = md.matched_workspace_product_id
+                    ) rfq_order on true
                     where r.tenant_id = %s and rec.rfq_id = %s
-                    order by r.created_at, ql.created_at
+                    order by r.created_at, r.id, rfq_order.position nulls last,
+                             ql.line_number, ql.id
                     """,
                     (member.tenant_id, rfq_id),
                 )
@@ -515,16 +599,22 @@ class RfqService:
                 )
                 if snapshot is not None and snapshot.guardrails:
                     cur.execute(
-                        "select guardrail_id, rfq_response_id "
+                        "select guardrail_id, rfq_response_id, purchase_request_id "
                         "from auto_preparation_event "
                         "where tenant_id = %s and rfq_response_id = any(%s)",
                         (member.tenant_id, response_ids),
                     )
                     fired_by_response: dict[uuid.UUID, set[uuid.UUID]] = {}
+                    request_by_fired_guardrail: dict[
+                        tuple[uuid.UUID, uuid.UUID], uuid.UUID | None
+                    ] = {}
                     for event in cur.fetchall():
                         fired_by_response.setdefault(event["rfq_response_id"], set()).add(
                             event["guardrail_id"]
                         )
+                        request_by_fired_guardrail[
+                            (event["rfq_response_id"], event["guardrail_id"])
+                        ] = event["purchase_request_id"]
                     for response_id in response_ids:
                         explanations = explain_guardrail_evaluations(
                             guardrails=snapshot.guardrails,
@@ -541,6 +631,11 @@ class RfqService:
                                 guardrail_id=item.guardrail_id,
                                 fired=item.fired,
                                 reason=item.reason,
+                                purchase_request_id=(
+                                    request_by_fired_guardrail.get((response_id, item.guardrail_id))
+                                    if item.fired
+                                    else None
+                                ),
                             )
                             for item in explanations
                         ]
@@ -553,6 +648,7 @@ class RfqService:
                             "id": resp_id,
                             "rfq_id": rfq_id,
                             "supplier_id": row["supplier_id"],
+                            "quotation_id": row["quotation_id"],
                             "submitted_at": row["submitted_at"],
                             "quotation_status": row["quotation_status"],
                             "lines": [],
@@ -564,12 +660,20 @@ class RfqService:
                         responses_by_id[resp_id]["lines"].append(
                             {
                                 "workspace_product_id": row["matched_workspace_product_id"],
+                                "original_text": row["original_text"],
                                 "quoted_quantity": row["quantity"],
                                 "quoted_unit_price_amount": row["unit_price_amount"],
                                 "quoted_unit_price_currency": row["unit_price_currency"],
                                 "pending_match": pending,
                             }
                         )
+
+                landed_by_response, terms_by_response = _rfq_landed_costs(
+                    cur, tenant_id=member.tenant_id, rfq_id=rfq_id
+                )
+                for resp_id, data in responses_by_id.items():
+                    data["rfq_landed_costs"] = landed_by_response.get(resp_id, [])
+                    data["supplier_terms_apply"] = terms_by_response.get(resp_id, False)
 
                 comparisons = [RfqResponseComparison(**data) for data in responses_by_id.values()]
                 return RfqResponseComparisonList(items=comparisons)
@@ -592,16 +696,8 @@ class RfqService:
         # 'converted'. The guardrail evaluator's own lock uses a different key.
         with _authenticated_db(self.settings, member) as lock_conn:
             with lock_conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
-                    "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
-                    (f"rfq-prepare:{member.tenant_id}:{rfq_id}",),
-                )
-                cur.execute(
-                    "select status from rfq where id = %s and tenant_id = %s",
-                    (rfq_id, member.tenant_id),
-                )
-                rfq_row = cur.fetchone()
-                if rfq_row is not None and rfq_row["status"] == "converted":
+                status = lock_rfq_for_preparation(cur, tenant_id=member.tenant_id, rfq_id=rfq_id)
+                if status == "converted":
                     # A retry of the preparation that converted it gets that request back -- only a
                     # request with this key that was prepared from one of this RFQ's responses.
                     cur.execute(
@@ -817,10 +913,7 @@ class RfqService:
                 # closes the sourcing loop for this RFQ. rfq_update only matches the RFQ's
                 # creator, so any other owner or buyer goes through mark_rfq_converted
                 # (20261019000001), which checks the request came from this RFQ.
-                cur.execute(
-                    "select mark_rfq_converted(%s, %s)",
-                    (rfq_id, purchase_request.id),
-                )
+                mark_converted(cur, rfq_id=rfq_id, purchase_request_id=purchase_request.id)
 
         return RfqPrepareRequestResponse(
             purchase_request_id=purchase_request.id, status=purchase_request.status
@@ -1005,13 +1098,16 @@ class RfqService:
                     WHERE rr2.rfq_id = r.id
                 ) as response_count,
                 (
-                    SELECT pr.id 
-                    FROM purchase_request pr 
+                    SELECT coalesce(array_agg(pr.id ORDER BY pr.created_at, pr.id), '{{}}')
+                    FROM purchase_request pr
                     JOIN rfq_response resp ON pr.source_rfq_response_id = resp.id
                     JOIN rfq_recipient rr3 ON resp.rfq_recipient_id = rr3.id
-                    WHERE rr3.rfq_id = r.id 
-                    LIMIT 1
-                ) as converted_purchase_request_id
+                    WHERE rr3.rfq_id = r.id
+                ) as converted_purchase_request_ids,
+                (
+                    SELECT g.id FROM purchase_request_group g
+                    WHERE g.tenant_id = r.tenant_id AND g.rfq_id = r.id
+                ) as request_group_id
             FROM rfq r
             WHERE {" AND ".join(query_filters)}
             ORDER BY r.created_at DESC, r.id DESC
@@ -1032,6 +1128,97 @@ class RfqService:
 
         items = [RfqSummary.model_validate(row) for row in rows]
         return RfqList(items=items, next_cursor=next_cursor)
+
+
+# Prices each reply the way the RFQ split does (services/optimiser repository.py
+# read_current_advanced_offers): the reply's latest valid landed cost per product, scaled from its
+# normalised base quantity to the RFQ's requested quantity (packs × the latest pack definition's
+# base quantity, as build_rfq_split_request sizes the basket).
+RFQ_LANDED_COSTS_SQL = """
+with responses as (
+  select r.id as response_id, r.quotation_id, rec.supplier_id
+  from rfq_response r
+  join rfq_recipient rec on rec.id = r.rfq_recipient_id and rec.tenant_id = r.tenant_id
+  where r.tenant_id = %(tenant_id)s and rec.rfq_id = %(rfq_id)s
+),
+rfq_products as (
+  select rl.workspace_product_id, sum(rl.quantity) as packs, pd.base_quantity
+  from rfq_line rl
+  left join lateral (
+    select base_quantity from pack_definition
+    where workspace_product_id = rl.workspace_product_id and tenant_id = rl.tenant_id
+    order by created_at desc, id desc limit 1
+  ) pd on true
+  where rl.rfq_id = %(rfq_id)s and rl.tenant_id = %(tenant_id)s
+  group by rl.workspace_product_id, pd.base_quantity
+),
+ranked as (
+  select
+    resp.response_id,
+    md.matched_workspace_product_id as workspace_product_id,
+    lc.total_amount / lc.normalised_base_quantity * (rp.packs * rp.base_quantity)
+      as projected_total,
+    lc.total_currency,
+    row_number() over (
+      partition by resp.response_id, md.matched_workspace_product_id
+      order by lc.recorded_at desc, lc.id desc
+    ) as rn
+  from responses resp
+  join quotation q on q.id = resp.quotation_id and q.tenant_id = %(tenant_id)s
+  join quotation_line ql on ql.quotation_id = q.id and ql.tenant_id = q.tenant_id
+  join current_match_decision md on md.quotation_line_id = ql.id
+  join rfq_products rp on rp.workspace_product_id = md.matched_workspace_product_id
+  join landed_cost lc
+    on lc.match_decision_id = md.id and lc.quotation_line_id = ql.id
+   and lc.tenant_id = q.tenant_id
+  where q.status = 'reviewed'
+    and rp.base_quantity is not null
+    and lc.normalised_base_quantity > 0
+    and (lc.valid_to is null or lc.valid_to >= now())
+),
+terms as (
+  select distinct on (supplier_id)
+    supplier_id,
+    (delivery_fee_amount is not null
+      or minimum_order_value_amount is not null
+      or jsonb_array_length(quantity_tiers) > 0) as applies
+  from supplier_commercial_term
+  where tenant_id = %(tenant_id)s
+    and supplier_id in (select supplier_id from responses)
+    and effective_from <= now()
+    and (effective_to is null or effective_to > now())
+  order by supplier_id, effective_from desc, created_at desc, id desc
+)
+select resp.response_id, coalesce(t.applies, false) as terms_apply,
+       rk.workspace_product_id, rk.projected_total, rk.total_currency
+from responses resp
+left join terms t on t.supplier_id = resp.supplier_id
+left join ranked rk on rk.response_id = resp.response_id and rk.rn = 1
+"""
+
+_MONEY_QUANT = Decimal("0.0001")
+
+
+def _rfq_landed_costs(
+    cur: psycopg.Cursor, *, tenant_id: uuid.UUID, rfq_id: uuid.UUID
+) -> tuple[dict[uuid.UUID, list[RfqProductLandedCost]], dict[uuid.UUID, bool]]:
+    cur.execute(RFQ_LANDED_COSTS_SQL, {"tenant_id": tenant_id, "rfq_id": rfq_id})
+    landed: dict[uuid.UUID, list[RfqProductLandedCost]] = {}
+    terms: dict[uuid.UUID, bool] = {}
+    for row in cur.fetchall():
+        terms[row["response_id"]] = bool(row["terms_apply"])
+        if row["workspace_product_id"] is None:
+            continue
+        landed.setdefault(row["response_id"], []).append(
+            RfqProductLandedCost(
+                workspace_product_id=row["workspace_product_id"],
+                total_amount=Decimal(row["projected_total"]).quantize(
+                    _MONEY_QUANT, rounding=ROUND_HALF_UP
+                ),
+                total_currency=row["total_currency"],
+            )
+        )
+    return landed, terms
 
 
 def _validate_guardrail_destination(

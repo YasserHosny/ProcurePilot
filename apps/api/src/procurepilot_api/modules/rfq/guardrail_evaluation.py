@@ -214,7 +214,7 @@ def compute_guardrail_evaluation(
             """
             select md.matched_workspace_product_id,
                    avg(lc.total_amount / lc.normalised_base_quantity) as avg_price
-            from landed_cost lc
+            from current_landed_cost lc
             join current_match_decision md on lc.match_decision_id = md.id
             where lc.tenant_id = %s and lc.created_at >= now() - interval '90 days'
               and md.matched_workspace_product_id = any(%s)

@@ -149,7 +149,7 @@ description: "Task list for Matching and Normalisation implementation"
 
 ### Tests for User Story 4
 
-- [ ] T049 [P] [US4] Write replay/audit integration tests proving a stored `landed_cost` row's `valid_from`, `valid_to`, `recorded_at` and `rule_version` remain unchanged after the active rule version changes per FR-016 and FR-017 — **re-verified 2026-09-29, deliberately not attempted**: `valid_to` is never written by any code path, and is now structurally impossible to set from application code since a separate fix correctly revoked UPDATE/DELETE on `landed_cost` for FR-017 append-only compliance; `LandedCostService.active_rule_version` is hardcoded with no path to ever change. Not exercisable until one of those changes — a test here would be fake or impossible, not a gap to close by writing more code around it.
+- [x] T049 [P] [US4] Prove stored landed-cost history remains unchanged after a rule change — **2026-10-31 evidence**: `test_rule_change_appends_v2_without_changing_v1_snapshot` appends v2 and verifies the complete v1 row remains byte-identical, including validity, recording time, rule version and total.
 - [x] T050 [US4] Write raw-input inspection tests in `apps/api/tests/integration/test_landed_cost_audit.py` proving every stored computation exposes complete `raw_inputs` for quantity, normalised base quantity, base unit, unit price, VAT rate, derived VAT amount, delivery fee, discount and zero other charges per FR-014 — **restored 2026-09-29**, `test_persisted_landed_cost_raw_inputs_contain_complete_audit_snapshot`
 
 ### Implementation for User Story 4

@@ -106,6 +106,10 @@
       "tokenHint": "يتطلب رمز دعوة صالح للمنصة مكون من 32 حرفاً على الأقل",
       "tokenRequired": "رمز الدعوة مطلوب",
       "tokenMinLength": "يجب أن يتكون الرمز من 32 حرفاً على الأقل",
+      "nameLabel": "اسمك",
+      "namePlaceholder": "مثال: سارة أحمد",
+      "nameRequired": "اسمك مطلوب",
+      "nameMaxLength": "لا يمكن أن يتجاوز الاسم 100 حرف",
       "businessNameLabel": "اسم المنشأة",
       "businessNamePlaceholder": "شركة التوريدات المحدودة",
       "businessNameRequired": "اسم المنشأة مطلوب",
@@ -430,6 +434,7 @@
     "membersSectionTitle": "أعضاء مساحة العمل",
     "invitationsSectionTitle": "الدعوات المعلقة",
     "columns": {
+      "name": "الاسم",
       "member": "العضو",
       "email": "البريد الإلكتروني",
       "role": "الدور",
@@ -439,6 +444,7 @@
       "expires": "تاريخ الانتهاء",
       "actions": "الإجراءات"
     },
+    "noName": "بلا اسم",
     "status": {
       "active": "نشط",
       "removed": "تمت الإزالة",
@@ -448,6 +454,7 @@
       "expired": "منتهية الصلاحية"
     },
     "actions": {
+      "editName": "تعديل الاسم",
       "changeRole": "تغيير الدور",
       "removeMember": "إزالة العضو",
       "revokeInvitation": "إلغاء الدعوة",
@@ -458,14 +465,28 @@
     "inviteSuccess": "تم إنشاء الدعوة بنجاح.",
     "revokeSuccess": "تم إلغاء الدعوة بنجاح.",
     "roleChangeSuccess": "تم تحديث دور العضو بنجاح.",
+    "editNameSuccess": "تم تحديث اسم العضو بنجاح.",
     "removeSuccess": "تمت إزالة العضو بنجاح.",
     "lastOwnerErrorTitle": "تم رفض الإجراء",
     "lastOwnerErrorMessage": "يجب أن تحتفظ مساحة العمل بمالك نشط واحد على الأقل. يرفض الخادم إزالة المالك الوحيد أو تخفيض صلاحياته.",
     "resendTooSoon": "أُرسلت هذه الدعوة للتو. انتظر دقيقة قبل إعادة إرسالها.",
     "genericError": "حدث خطأ غير متوقع. يُرجى المحاولة مرة أخرى.",
+    "editNameDialog": {
+      "title": "تعديل الاسم",
+      "description": "الاسم الذي يراه زملاؤك في الموافقات وقائمة الفريق.",
+      "nameLabel": "الاسم",
+      "namePlaceholder": "أدخل الاسم",
+      "nameRequired": "الاسم مطلوب",
+      "nameMaxLength": "لا يمكن أن يتجاوز الاسم 100 حرف",
+      "cancelButton": "إلغاء",
+      "saveButton": "حفظ"
+    },
     "inviteDialog": {
       "title": "دعوة زميل عمل",
       "subtitle": "إنشاء دعوة لعضو فريق للانضمام إلى مساحة العمل هذه مع تحديد الدور.",
+      "nameLabel": "الاسم (اختياري)",
+      "nameMaxLength": "لا يمكن أن يتجاوز الاسم 100 حرف",
+      "namePlaceholder": "مثال: سارة أحمد",
       "emailLabel": "بريد العمل الإلكتروني",
       "emailPlaceholder": "colleague@company.com",
       "emailRequired": "البريد الإلكتروني مطلوب",
@@ -667,6 +688,12 @@
         "contactEmailLabel": "البريد الإلكتروني لجهة الاتصال",
         "contactEmailPlaceholder": "مثلاً: sales@supplier.com (اختياري)",
         "contactEmailInvalid": "يرجى إدخال عنوان بريد إلكتروني صالح",
+        "emailLanguageLabel": "لغة البريد الإلكتروني",
+        "emailLanguageHint": "تُرسل طلبات عروض الأسعار إلى هذا المورّد بهذه اللغة.",
+        "emailLanguageDefault": "لغة مساحة العمل ({{language}})",
+        "emailLanguageDefaultPlain": "لغة مساحة العمل",
+        "languageArabic": "العربية",
+        "languageEnglish": "الإنجليزية",
         "paymentTermsLabel": "شروط الدفع",
         "paymentTermsPlaceholder": "مثلاً: الدفع بعد 30 يوماً (اختياري)",
         "leadTimeLabel": "مدة التوريد (بالأيام)",
@@ -888,6 +915,18 @@
       "bulkRefuseConfirm": "رفض {{count}} عرض(ات)؟ سيتم تمييزها كمرفوضة.",
       "bulkReprioritiseButton": "تعيين الأولوية",
       "bulkClear": "إلغاء التحديد",
+      "bulk": {
+        "result": {
+          "allSucceeded": "تم تحديث {{count}} مهمة",
+          "allSucceededSkipped": "تم تحديث {{count}} مهمة، تم تخطي {{skipped}} (مكتملة)",
+          "all": "تم تحديث {{count}} مهمة",
+          "partial": "تم تحديث {{succeeded}}، وفشل {{failed}} — تظل المهام الفاشلة محددة لإعادة المحاولة",
+          "partialSkipped": "تم تحديث {{succeeded}}، وفشل {{failed}} — تظل المهام الفاشلة محددة لإعادة المحاولة، تم تخطي {{skipped}} (مكتملة)",
+          "allFailed": "لم يتم تحديث أي مهام (فشل {{failed}})",
+          "allFailedSkipped": "لم يتم تحديث أي مهام (فشل {{failed}})، تم تخطي {{skipped}} (مكتملة)",
+          "skipped": "تم تخطي {{skipped}} (مكتملة)"
+        }
+      },
       "selectAllLabel": "تحديد كل مهام المراجعة",
       "selectTaskLabel": "تحديد عرض السعر {{id}}",
       "readOnlyBadge": "صلاحية قراءة فقط",
@@ -899,6 +938,18 @@
       "clearFilters": "مسح عوامل التصفية"
     },
     "review": {
+      "loadError": {
+        "title": "تعذر تحميل عرض السعر",
+        "notFound": "لم يتم العثور على عرض السعر",
+        "retry": "إعادة المحاولة",
+        "backToInbox": "العودة إلى الوارد"
+      },
+      "nextStep": {
+        "title": "الخطوة التالية",
+        "description": "تم تأكيد عرض السعر هذا. قم بمطابقة البنود المستخرجة مع منتجات الكتالوج لمقارنة الأسعار.",
+        "matchLines": "مطابقة البنود",
+        "backToInbox": "العودة إلى الوارد"
+      },
       "title": "مراجعة واعتماد عرض السعر",
       "currencyFallbackReview": "تم تعيين العملة من العملة الأساسية. يُرجى تأكيدها أو تصحيحها.",
       "subtitle": "فحص الحقول المستخرجة جنباً إلى جنب مع المستند الأصلي. تحقق من المورد وعالج أي فروقات.",
@@ -951,6 +1002,9 @@
         "pickDateToConfirm": "اختر تاريخًا لتأكيد هذه القيمة.",
         "statedTotalLabel": "إجمالي المبلغ المذكور",
         "statedTotalCurrency": "عملة المبلغ المذكور",
+        "pricesIncludeVatLabel": "الأسعار شاملة ضريبة القيمة المضافة",
+        "vatRateLabel": "نسبة الضريبة (%)",
+        "invalidVatRate": "أدخل نسبة ضريبة بين ٠ و١٠٠٪.",
         "statusLabel": "الحالة"
       },
       "supplierMatch": {
@@ -971,6 +1025,7 @@
         "colPack": "تفاصيل العبوة",
         "colUnitPrice": "سعر الوحدة",
         "colVat": "ضريبة القيمة المضافة %",
+        "vatInclusiveSuffix": "(شامل)",
         "colDeliveryFee": "رسوم التوصيل",
         "colDiscount": "الخصم",
         "colConfidence": "مستوى الثقة",
@@ -1019,6 +1074,7 @@
         "cancelCorrection": "إلغاء",
         "editTooltip": "تصحيح قيمة هذا الحقل",
         "correctedBadge": "تم التصحيح يدوياً",
+        "confirmedBadge": "مؤكد",
         "confirmAsIsTooltip": "تأكيد أن هذه القيمة صحيحة كما استُخرجت"
       },
       "arithmetic": {
@@ -1098,7 +1154,8 @@
         "extracted": "تم الاستخراج (بانتظار المراجعة)",
         "in_review": "قيد المراجعة",
         "reviewed": "تمت المراجعة والاعتماد",
-        "refused": "مرفوض"
+        "refused": "مرفوض",
+        "authorizing": "جارٍ الاعتماد…"
       },
       "confirmBlocked": {
         "quotation_not_confirmable": "حالة عرض السعر لا تسمح بتأكيده حالياً.",
@@ -1131,6 +1188,7 @@
         "confirmAsIs": "تأكيد القيمة كما هي"
       },
       "fieldLabels": {
+        "prices_include_vat": "الأسعار شاملة ضريبة القيمة المضافة",
         "supplier_name": "اسم المورد",
         "issue_date": "تاريخ الإصدار",
         "expiry_date": "تاريخ الانتهاء",
@@ -1214,6 +1272,9 @@
         "fuzzy_match_review": "تطابق قريب — يحتاج إلى تأكيد",
         "no_candidate": "لا يوجد مرشح",
         "alias_conflict": "تعارض في الاسم المرادف",
+        "auto_accepted": "مطابق تلقائياً",
+        "corrected": "تم التصحيح",
+        "human_decided": "حدده المشتري",
         "all": "جميع الأسباب"
       },
       "columns": {
@@ -1239,8 +1300,10 @@
       },
       "actions": {
         "resolve": "تسوية المطابقة",
-        "view": "عرض التفاصيل"
+        "view": "عرض التفاصيل",
+        "correctMatch": "تصحيح المطابقة"
       },
+      "fromRfqLine": "من بند طلب التسعير {{position}}",
       "groupsLabel": "مهام مطابقة عروض الأسعار",
       "collapseGroup": "طي مجموعة عرض السعر",
       "expandGroup": "توسيع مجموعة عرض السعر",
@@ -1261,6 +1324,8 @@
       "loadMore": "تحميل المزيد",
       "emptyTitle": "لا توجد مهام مطابقة",
       "emptyMessage": "لا توجد بنود عروض أسعار بانتظار تسوية المطابقة حالياً.",
+      "allLinesMatchedTitle": "تمت مطابقة جميع بنود عرض السعر هذا",
+      "compareResponses": "مقارنة الردود",
       "badgeAutoAccepted": "مطابق تلقائياً",
       "badgeResolved": "تمت التسوية",
       "autoAcceptedBanner": "تمت المطابقة تلقائياً فوق الحد دون مراجعة بشرية. للعرض فقط.",
@@ -1284,6 +1349,13 @@
         "confirmed": "تم تأكيد {{count}} تطابق.",
         "skipped": "تعذّر تأكيد {{count}} (تعارض في الاسم البديل أو تم حلها مسبقًا). افتحها فرديًا لحلها."
       }
+    },
+    "sweptLines": {
+      "one": "تمت أيضًا مطابقة بند إضافي واحد بنفس الصياغة",
+      "two": "تمت أيضًا مطابقة بندين إضافيين بنفس الصياغة",
+      "few": "تمت أيضًا مطابقة {{count}} بنود إضافية بنفس الصياغة",
+      "many": "تمت أيضًا مطابقة {{count}} بندًا إضافيًا بنفس الصياغة",
+      "other": "تمت أيضًا مطابقة {{count}} بند إضافي بنفس الصياغة"
     },
     "resolution": {
       "title": "تسوية المطابقة",
@@ -1313,7 +1385,7 @@
       },
       "candidates": {
         "title": "المنتجات المرشحة حسب الأولوية",
-        "subtitle": "تم التقييم عبر المفاتيح المحددة، التشابه اللفظي (pg_trgm)، التشابه الدلالي (pgvector)، ومعقولية السمات.",
+        "subtitle": "تم الترتيب حسب مدى مطابقة كل منتج في الكتالوج لبند المورد.",
         "rank": "الترتيب #{{rank}}",
         "confidence": "درجة المطابقة",
         "scoreExplainer": "هذه الدرجة لترتيب المرشحين، وليست احتمالاً معايراً بعد.",
@@ -1322,15 +1394,21 @@
         "selectLabel": "اختيار المرشح رقم {{rank}}: {{name}}",
         "signalsTitle": "تفاصيل أسباب المطابقة",
         "signals": {
-          "aliasHit": "تطابق مرادف مباشر",
+          "rfqLine": "بند طلب التسعير {{position}}",
+          "packConflict": "العبوة تختلف عن طلب التسعير (مطلوب {{asked}}، معروض {{quoted}})",
+          "notInRfq": "ليس في طلب التسعير",
+          "multiFittingRfqLines": "قد يطابق أكثر من بند في طلب التسعير",
+          "aliasHit": "نفس الصياغة المعتمدة مسبقاً",
           "aliasHitDesc": "يطابق اسماً مرادفاً معتمداً مسبقاً للمورد",
-          "gtinMatch": "تطابق الباركود GTIN",
+          "gtinMatch": "تطابق الباركود",
           "gtinMatchDesc": "يطابق الباركود الدولي للمنتج في الدليل",
           "supplierCodeMatch": "تطابق كود المورد",
           "supplierCodeMatchDesc": "يطابق كود المنتج الخاص بالمورد",
           "lexicalSimilarity": "التشابه اللفظي",
+          "lexicalMeasured": "الاسم متشابه بنسبة {{percent}} %",
           "semanticSimilarity": "التشابه الدلالي",
-          "unavailableForStub": "غير متاح",
+          "packMatches": "العبوة متطابقة",
+          "packDiffers": "العبوة مختلفة",
           "featureScores": "تفاصيل معقولية السمات",
           "brandMatch": "تطابق العلامة التجارية",
           "variantMatch": "تطابق الصنف",
@@ -1412,7 +1490,8 @@
         "noPreferredSupplier": "لا يوجد (بدون مورد مفضل)"
       },
       "landedCost": {
-        "title": "التكلفة الإجمالية الواصلة (US3)",
+        "title": "التكلفة الواصلة",
+        "details": "التفاصيل",
         "subtitle": "تكلفة واصلة قابلة لإعادة الاحتساب وموحدة حسب الوحدة الأساسية في الدليل.",
         "unitPrice": "سعر الوحدة",
         "vatAmount": "ضريبة القيمة المضافة المحسوبة",
@@ -1436,18 +1515,37 @@
         "decidedAt": "تاريخ التسوية:",
         "automatic": "مطابقة تلقائية",
         "human": "تسوية يدوية",
-        "confidence": "درجة المطابقة:"
+        "confidence": "درجة المطابقة:",
+        "fromRfqLine": "من بند طلب التسعير {{position}}"
       },
       "actions": {
         "confirm": "تأكيد قرار المطابقة",
         "confirmAndNext": "تسوية والانتقال للتالي",
         "confirming": "جاري التأكيد...",
-        "saveSuccess": "تم تأكيد قرار المطابقة وحفظ الاسم المرادف بنجاح.",
+        "saveSuccess": "تم حفظ المطابقة. ستتم مطابقة هذا النص تلقائياً في المرات القادمة.",
         "queueCleared": "تمت تسوية جميع مهام المطابقة — القائمة خالية.",
         "candidateRequired": "يُرجى اختيار منتج مرشح قبل التأكيد.",
-        "formInvalid": "يُرجى تصحيح أخطاء إنشاء المنتج قبل التأكيد."
+        "formInvalid": "يُرجى تصحيح أخطاء إنشاء المنتج قبل التأكيد.",
+        "correctMatch": "تصحيح المطابقة",
+        "correctSuccess": "تم تصحيح المطابقة"
+      },
+      "correction": {
+        "dialogTitle": "تصحيح المطابقة",
+        "dialogSubtitle": "اختر منتجاً مرشحاً آخر أو أنشئ منتجاً جديداً في الدليل.",
+        "currentMatch": "المطابقة الحالية",
+        "candidatesTitle": "المرشحون المتاحون",
+        "learnAlias": "تذكّر هذه الصياغة للمطابقات القادمة",
+        "submit": "حفظ التصحيح",
+        "cancel": "إلغاء",
+        "dependentLinesNotice": "تمت مطابقة {{count}} بنود أخرى بالصياغة القديمة — راجعها",
+        "reviewQueue": "مراجعة قائمة الانتظار",
+        "aliasConflictNotice": "الصياغة تشير بالفعل إلى منتج آخر؛ لم يتم تغييرها"
       },
       "errors": {
+        "lineOnPurchaseRequest": "هذه المطابقة تسعّر طلب الشراء {{shortId}} — اسحبه أولاً",
+        "decisionChanged": "قام شخص آخر بتغيير هذه المطابقة — أعد التحميل",
+        "viewRequest": "عرض الطلب",
+        "reload": "إعادة التحميل",
         "aliasConflict": "تعارض في المرادفات: صياغة المورد هذه مرتبطة بالفعل بمنتج مختلف في دليلك.",
         "notReviewed": "عرض السعر لم يصل إلى حالة المراجعة والاعتماد بعد.",
         "invalidCandidate": "المرشح المختار غير صالح لبند عرض السعر هذا.",
@@ -1587,11 +1685,15 @@
     }
   },
   "basketSplit": {
-    "title": "تقسيم السلة بين موردين",
-    "subtitle": "تحسين المشتريات عبر موردين اثنين للحصول على أدنى إجمالي تكلفة واصلة.",
+    "title": "تقسيم السلة",
+    "subtitle": "تحسين المشتريات عبر {{min}} إلى {{max}} موردين للحصول على أدنى إجمالي تكلفة واصلة.",
     "readOnlyNotice": "لديك صلاحية عرض فقط. يمكن لمالكي ومشتري مساحة العمل إعداد وإرسال طلبات تقسيم السلة.",
+    "fromRfq": "من طلب عروض الأسعار {{id}} (أُرسل في {{date}})",
+    "rfqScope": "أصناف ومورّدو طلب عروض الأسعار",
+    "rfqSuppliers": "المورّدون",
+    "rfqItems": "الأصناف المطلوبة",
     "form": {
-      "suppliersSectionTitle": "اختر موردين اثنين",
+      "suppliersSectionTitle": "تحديد الموردين",
       "supplier1": "المورد الأول",
       "supplier2": "المورد الثاني",
       "selectSupplier": "اختر المورد...",
@@ -1602,8 +1704,12 @@
       "packHint": "{{count}} عبوة × {{size}} {{unit}} = {{total}} {{unit}}",
       "unitLabel": "الوحدة: {{unit}}",
       "addItem": "إضافة منتج",
-      "addSupplier": "إضافة مورّد (٢-١٠)",
+      "addSupplier": "إضافة مورد ({{min}}–{{max}})",
       "removeItem": "حذف المنتج",
+      "selectProduct": "اختر منتجًا",
+      "duplicateProduct": "هذا المنتج مضاف إلى السلة بالفعل.",
+      "productRequired": "اختر منتجاً.",
+      "quantityRequired": "أدخل كمية أكبر من صفر.",
       "submitButton": "تحسين تقسيم السلة",
       "submitting": "جاري إرسال السلة...",
       "validationError": "يُرجى تحديد موردين مختلفين ومنتج واحد على الأقل بكمية موجبة."
@@ -1647,11 +1753,66 @@
       "solverVersion": "إصدار نظام التحسين: {{version}}",
       "computedAt": "تم الحساب في {{time}}",
       "packQuantity": "{{count}} × {{size}} {{unit}}",
-      "baseEquivalent": "الإجمالي {{total}} {{unit}}"
+      "baseEquivalent": "الإجمالي {{total}} {{unit}}",
+      "splitTotal": "إجمالي التقسيم",
+      "saving": "التوفير مقارنةً بمورّد واحد",
+      "singleSupplierTotal": "إجمالي المورّد الواحد",
+      "infeasible": "غير قابل للتنفيذ"
     },
     "actions": {
       "newSplit": "بدء تقسيم سلة جديد",
       "viewCompare": "مقارنة عروض المنتج"
+    },
+    "prepareRequests": {
+      "button": {
+        "zero": "إعداد طلبات الشراء",
+        "one": "إعداد طلب واحد",
+        "two": "إعداد طلبين",
+        "few": "إعداد {{count}} طلبات",
+        "many": "إعداد {{count}} طلباً",
+        "other": "إعداد {{count}} طلب"
+      },
+      "dialog": {
+        "title": "إعداد طلبات الشراء",
+        "branchLabel": "الفرع",
+        "branchPlaceholder": "اختر فرعاً",
+        "branchRequired": "الفرع مطلوب",
+        "requiredByLabel": "تاريخ الحاجة للطلب",
+        "requiredByRequired": "تاريخ الحاجة مطلوب",
+        "costCentreLabel": "مركز التكلفة (اختياري)",
+        "costCentrePlaceholder": "اختر مركز تكلفة",
+        "expiredSectionTitle": "عروض أسعار منتهية الصلاحية",
+        "expiredDescription": "تحتوي الردود التالية على عروض أسعار منتهية الصلاحية. يرجى تأكيد المتابعة بها:",
+        "confirmExpired": "تأكيد استخدام عرض السعر المنتهي من {{supplier}}",
+        "confirmExpiredGeneric": "تأكيد استخدام عرض السعر المنتهي ({{id}})",
+        "cancel": "إلغاء",
+        "submit": "إعداد الطلبات",
+        "submitting": "جارٍ إعداد الطلبات..."
+      },
+      "summary": {
+        "title": "طلبات الشراء المعدّة",
+        "description": "تم إنشاء {{count}} طلبات شراء مسودة من هذا التقسيم.",
+        "supplierColumn": "المورد",
+        "totalColumn": "الإجمالي التقديري",
+        "budgetStatusColumn": "حالة الميزانية",
+        "viewRequest": "عرض الطلب",
+        "budgetWithin": "ضمن الميزانية",
+        "budgetOver": "تجاوز الميزانية",
+        "budgetNone": "لا توجد ميزانية محددة"
+      },
+      "errors": {
+        "splitStale": "نتيجة التقسيم قديمة نظراً لتغير أسعار عروض الأسعار أو الردود المؤهلة.",
+        "rerunSplit": "إعادة تشغيل التقسيم",
+        "rfqAlreadyConverted": "تم بالفعل تحويل طلب التسعير هذا إلى طلبات شراء.",
+        "viewExistingRequest": "عرض الطلب {{id}}",
+        "expiredUnconfirmed": "انتهت صلاحية عرض سعر واحد أو أكثر. يرجى تأكيدها للمتابعة.",
+        "notRfqSplit": "هذا التقسيم غير مرتبط بطلب تسعير.",
+        "splitNotCompleted": "لم تكتمل عملية تحسين التقسيم بعد.",
+        "allocationNotWholePacks": "يحتوي التوزيع على كميات لا يمكن تحويلها إلى عبوات كاملة.",
+        "packDefinitionRequired": "تعريف العبوة مطلوب للبنود الموزعة.",
+        "idempotencyKeyReused": "تم استخدام مفتاح التكرار هذا بمعاملات مختلفة مسبقاً.",
+        "generic": "تعذر إعداد طلبات الشراء."
+      }
     }
   },
   "alerts": {
@@ -1841,6 +2002,7 @@
       "quantityLabel": "الكمية ({{unit}})",
       "totalLabel": "إجمالي المدفوع دون الضريبة ({{currency}})",
       "unitPriceHint": "{{price}} لكل {{unit}}",
+      "taxExcludedHint": "لا يشمل الضريبة {{tax}}",
       "submit": "حفظ {{count}} من النتائج",
       "success": "تم تسجيل {{count}} من نتائج الشراء.",
       "loadError": "تعذّر تحميل هذا الأمر.",
@@ -2106,11 +2268,17 @@
     },
     "columns": {
       "branch": "الفرع",
+      "supplier": "المورد",
       "costCentre": "مركز التكلفة",
       "requiredByDate": "مطلوب بحلول",
       "status": "الحالة",
       "estimatedTotal": "الإجمالي المقدر",
       "actions": "إجراءات"
+    },
+    "source": {
+      "from": "من",
+      "rfq": "طلب تسعير",
+      "quote": "عرض سعر"
     },
     "actions": {
       "view": "عرض الطلب",
@@ -2143,6 +2311,8 @@
       "submitButton": "إرسال الطلب",
       "submittingButton": "جاري الإرسال...",
       "createOrderButton": "إنشاء أمر شراء",
+      "purchaseOrders": "أوامر الشراء",
+      "fullyOrdered": "تم طلب كل ما في هذا الطلب.",
       "atLeastOneLineRequired": "مطلوب بند واحد على الأقل."
     },
     "empty": "لا توجد طلبات شراء بعد. أنشئ أول طلب للبدء.",
@@ -2179,7 +2349,22 @@
     },
     "withdrawConfirmTitle": "سحب طلب الشراء؟",
     "withdrawConfirmMessage": "هل تريد سحب هذا الطلب؟ سيُحرَّر المبلغ الملتزم به من الميزانية. لا يمكن سحب طلب مرتبط بأمر شراء غير ملغى.",
-    "purchaseOrderExists": "ألغِ أمر الشراء المرتبط قبل سحب هذا الطلب."
+    "purchaseOrderExists": "ألغِ أمر الشراء المرتبط قبل سحب هذا الطلب.",
+    "split": {
+      "partOfSplit": "جزء من تقسيم · {{position}} من {{size}} · {{total}}",
+      "marker": "تقسيم {{position}} من {{size}}",
+      "siblingsLabel": "الطلبات الأخرى في هذا التقسيم",
+      "siblingLink": "طلب {{id}}",
+      "readOnlyReason": "جزء من تقسيم: يتم إرسال هذه الطلبات واعتمادها معًا",
+      "submitBoth": "إرسال كلا طلبي هذا التقسيم",
+      "submitAll": "إرسال جميع الطلبات الـ {{count}} لهذا التقسيم",
+      "withdrawBoth": "سحب كلا طلبي هذا التقسيم",
+      "withdrawAll": "سحب جميع الطلبات الـ {{count}} لهذا التقسيم",
+      "withdrawConfirmMessageBoth": "سحب كلا طلبي هذا التقسيم؟ سيتم تحرير أي ميزانية محجوزة.",
+      "withdrawConfirmTitle": "سحب هذا التقسيم؟",
+      "withdrawConfirmMessageAll": "سحب جميع الطلبات الـ {{count}} لهذا التقسيم؟ سيتم تحرير أي ميزانية محجوزة."
+    },
+    "partOfSplitError": "هذا الطلب جزء من تقسيم. يرجى استخدام إجراء التقسيم لإرسال كافة الطلبات أو اعتمادها أو سحبها معًا."
   },
   "delivery": {
     "title": "تأكيد الاستلام",
@@ -2230,16 +2415,39 @@
     },
     "actions": {
       "approve": "اعتماد",
-      "reject": "رفض"
+      "reject": "رفض",
+      "createOrder": "إنشاء أمر شراء"
     },
+    "createOrderAction": "إنشاء أمر شراء",
     "decisionDialog": {
-      "approveTitle": "اعتماد طلب الشراء",
+      "approveTitle": "اعتماد {{amount}} لـ {{branchName}}؟",
+      "approveTitleBranchOnly": "اعتماد الطلب لـ {{branchName}}؟",
+      "approveTitleDefault": "اعتماد طلب الشراء",
       "rejectTitle": "رفض طلب الشراء",
       "commentLabel": "تعليق (اختياري)",
       "commentPlaceholder": "أضف تعليقًا لمقدم الطلب...",
+      "reasonLabel": "سبب الرفض",
+      "reasonPlaceholder": "وضح سبب رفض هذا الطلب...",
+      "reasonRequired": "سبب الرفض مطلوب.",
       "confirmButton": "تأكيد",
       "cancelButton": "إلغاء"
     },
+    "splitGroup": {
+      "summary": "تقسيم من طلب تسعير {{short}} · {{requests}} · {{total}} · يوفر {{saving}}",
+      "summaryNoSaving": "تقسيم من طلب تسعير {{short}} · {{requests}} · {{total}}",
+      "splitFromRfq": "تقسيم من طلب تسعير {{short}}",
+      "saves": "يوفر {{saving}}"
+    },
+    "requestCount": {
+      "zero": "لا توجد طلبات",
+      "one": "طلب واحد",
+      "two": "طلبان",
+      "few": "{{count}} طلبات",
+      "many": "{{count}} طلبًا",
+      "other": "{{count}} طلب"
+    },
+    "partOfSplitError": "هذا الطلب جزء من تقسيم ويجب اعتماده أو رفضه كطلب مجمع.",
+    "notAssigned": "لست المعتمد المعيّن لهذا الطلب.",
     "approveSuccess": "تم اعتماد الطلب.",
     "rejectSuccess": "تم رفض الطلب.",
     "genericError": "تعذر تسجيل القرار. يرجى المحاولة مرة أخرى.",
@@ -3394,6 +3602,7 @@
     "backToOrders": "العودة إلى الطلبات",
     "open": "فتح الطلب",
     "orderDate": "تم الطلب في {{date}}",
+    "createdDate": "تم الإنشاء في {{date}}",
     "lineCount": "{{count}} بند",
     "notProvided": "غير متوفر",
     "createButton": "إنشاء طلب",
@@ -3402,6 +3611,8 @@
     "create": {
       "title": "إنشاء أمر شراء",
       "subtitle": "تسجيل أمر شراء داخلي يدويًا.",
+      "fromRequestSubtitle": "راجع أمر الشراء ثم قم بإنشائه.",
+      "fromApprovedRequestBanner": "من طلب شراء معتمد — {{supplier}}، {{branch}}",
       "orderNumber": "رقم الطلب",
       "orderNumberPlaceholder": "مثال: PO-2026-001",
       "supplier": "المورد",
@@ -3434,15 +3645,20 @@
         "nonNegativePrice": "يجب أن يكون >= 0",
         "maxQuantity": "لا يمكن تجاوز الكمية المتبقية",
         "orderNumberExists": "رقم الطلب موجود بالفعل. يُرجى استخدام رقم طلب مختلف.",
-        "idempotencyKeyExists": "تم إرسال هذا الطلب بالفعل أو لا يزال قيد المعالجة."
+        "idempotencyKeyExists": "تم إرسال هذا الطلب بالفعل أو لا يزال قيد المعالجة.",
+        "quantityExceedsAllocation": "تم طلب جزء من هذا الطلب بعد فتح هذا النموذج. أعِد تحميل الصفحة لمعرفة ما يتبقى لطلبه."
       },
+      "createdNotice": "تم إنشاء أمر الشراء {{orderNumber}}.",
+      "openOrder": "فتح الأمر",
+      "fullyOrderedNotice": "تم طلب كل ما في هذا الطلب.",
       "creatingFromRequest": "الإنشاء من الطلب",
       "estimateReference": "التقدير",
       "quotedMixedCurrencies": "بنود عرض المورّد في هذا الطلب بأكثر من عملة، لذلك لم تُعبّأ أسعار الوحدات تلقائيًا. أدخل الأسعار يدويًا.",
       "quotedCurrencyMismatch": "عملة أمر الشراء ({{order}}) تختلف عن عملة عرض المورّد ({{quoted}}). استخدم {{quoted}} أو عدّل الأسعار.",
       "packUnit": "عبوة {{size}} {{unit}}",
       "baseUnitPrice": "لكل {{unit}}",
-      "remainingQuantity": "الكمية المتبقية للتخصيص"
+      "vatInclusiveHint": "صافي بعد خصم ضريبة القيمة المضافة {{rate}}% · سعر العرض {{gross}} شامل الضريبة",
+      "remainingQuantity": "المتبقي للطلب"
     },
     "status": {
       "draft": "مسودة",
@@ -3465,6 +3681,7 @@
     "detail": {
       "eyebrow": "أمر شراء",
       "createdAt": "تم الإنشاء {{date}}",
+      "fromRequest": "من الطلب",
       "orderDate": "تاريخ الطلب",
       "expectedDelivery": "التسليم المتوقع",
       "total": "إجمالي الطلب",
@@ -3855,8 +4072,14 @@
       "quantity": "الكمية",
       "unitPrice": "سعر الوحدة",
       "totalValue": "القيمة الإجمالية",
+      "total": "الإجمالي",
+      "lowestTotal": "أقل إجمالي",
       "pendingMatch": "في انتظار المطابقة",
       "pendingMatchExplanation": "غير مرتبط بمنتج في الكتالوج بعد.",
+      "matchLine": "مطابقة بند واحد",
+      "matchLines": "مطابقة {{count}} بنود",
+      "matchLinesTwo": "مطابقة بندين",
+      "chooseBranchFirst": "اختر فرع التوصيل أولاً",
       "prepareRequest": "إعداد طلب",
       "cannotPreparePending": "لا يمكن إعداد الطلب بينما توجد بنود غير مطابقة",
       "prepareSuccess": "تم إعداد مسودة طلب الشراء بنجاح.",
@@ -3878,7 +4101,17 @@
       "editDraft": "تعديل",
       "sendDraft": "إرسال",
       "refused": "مرفوض",
-      "refusedExplanation": "رُفض عرض السعر الوارد في هذا الرد، ولا يمكن استخدامه لإعداد طلب شراء."
+      "refusedExplanation": "رُفض عرض السعر الوارد في هذا الرد، ولا يمكن استخدامه لإعداد طلب شراء.",
+      "splitBetweenSuppliers": "تقسيم بين المورّدين",
+      "needsTwoMatched": "يتطلب ردّين مطابقين",
+      "differentCurrencies": "الردود بعملات مختلفة",
+      "alreadyConverted": "تم تحويل طلب عروض الأسعار بالفعل",
+      "splitError": "فشل بدء التقسيم. يُرجى المحاولة مرة أخرى.",
+      "lowestLinePrice": "أقل تكلفة واصلة",
+      "splitSavingHint": "تقسيم هذا الطلب بين الموردين قد يوفّر {{money}}.",
+      "openPreparedRequest": "فتح مسودة الطلب",
+      "openRequest": "فتح الطلب",
+      "convertedReason": "تم تحويل طلب عروض الأسعار بالفعل إلى طلب شراء."
     },
     "history": {
       "title": "سجل طلبات عروض الأسعار",
@@ -3930,6 +4163,17 @@
     "detail": {
       "title": "تفاصيل طلب عرض الأسعار",
       "subtitle": "ما تم طلبه، وإلى من أُرسل، وما هي الردود الواردة.",
+      "responsesReceivedTitle": "تم استلام {{count}} من الردود",
+      "responsesReceived": {
+        "zero": "لم يتم استلام أي ردود",
+        "one": "تم استلام رد واحد",
+        "two": "تم استلام ردين",
+        "few": "تم استلام {{count}} ردود",
+        "many": "تم استلام {{count}} ردًا",
+        "other": "تم استلام {{count}} رد"
+      },
+      "responsesReceivedDescription": "ردود الموردين جاهزة للمقارنة. راجع البنود وقارن الإجماليات وأعد طلب شراء.",
+      "compareResponses": "مقارنة الردود",
       "breadcrumbRfqSent": "طلب عرض أسعار · أُرسل {{date}} · {{time}}",
       "breadcrumbRfqDraft": "طلب عرض أسعار · مسودة",
       "tabDetails": "التفاصيل",
@@ -3957,7 +4201,17 @@
       "loadError": "فشل تحميل تفاصيل طلب عرض الأسعار.",
       "recipientStatus_sent": "مرسل",
       "recipientStatus_failed": "فاشل",
-      "recipientStatus_draft": "لم يُرسل"
+      "recipientStatus_draft": "لم يُرسل",
+      "convertedIntoRequest": "تم التحويل إلى الطلب",
+      "convertedCount": {
+        "zero": "لم يتم التحويل إلى أي طلبات",
+        "one": "تم التحويل إلى طلب واحد",
+        "two": "تم التحويل إلى طلبين",
+        "few": "تم التحويل إلى {{count}} طلبات",
+        "many": "تم التحويل إلى {{count}} طلبًا",
+        "other": "تم التحويل إلى {{count}} طلب"
+      },
+      "approvedTogether": "تُقدَّم هذه الطلبات وتُعتمد معًا"
     },
     "guardrails": {
       "title": "إعدادات الضوابط",
@@ -3992,7 +4246,8 @@
         "save": "تعذر حفظ إعدادات الضابط."
       },
       "reasons": {
-        "rfq_not_open": "طلب عروض الأسعار غير مفتوح.",
+        "rfq_not_open": "لم يُطبَّق: طلب عروض الأسعار لا يستقبل ردودًا (مسودة أو منتهي الصلاحية).",
+        "rfq_converted": "لم يُطبَّق: تم تحويل طلب عروض الأسعار بالفعل إلى طلب شراء.",
         "min_response_count_not_met": "لم يتحقق الحد الأدنى للردود.",
         "responses_pending": "لا تزال هناك ردود أخرى قيد المراجعة.",
         "captured_before_guardrail": "هذا الرد أسبق من الضابط.",

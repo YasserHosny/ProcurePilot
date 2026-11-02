@@ -13,13 +13,54 @@
         <span class="breadcrumb-current">{{ truncateId(q.id) }}</span>
       </nav>
 
+      @if (showNextStep() || q.status === 'reviewed') {
+        <mat-card class="next-step-card" data-testid="next-step-card">
+          <div class="next-step-body">
+            <div class="next-step-info">
+              <mat-icon class="next-step-icon" aria-hidden="true">task_alt</mat-icon>
+              <div>
+                <h2 class="next-step-title">{{ 'quotations.review.nextStep.title' | translate }}</h2>
+                <p class="next-step-description">{{ 'quotations.review.nextStep.description' | translate }}</p>
+              </div>
+            </div>
+            <div class="next-step-actions">
+              <a
+                mat-flat-button
+                color="primary"
+                [routerLink]="['/matching']"
+                [queryParams]="{ quotation_id: q.id }"
+                data-testid="next-step-match-lines"
+              >
+                {{ 'quotations.review.nextStep.matchLines' | translate }}
+              </a>
+              <a
+                mat-stroked-button
+                routerLink="/quotations"
+                data-testid="next-step-back-inbox"
+              >
+                {{ 'quotations.review.nextStep.backToInbox' | translate }}
+              </a>
+            </div>
+          </div>
+        </mat-card>
+      }
+
       <!-- Page Header -->
     <header class="page-header">
       <div class="header-titles">
         <div class="title-row">
           <h1 class="page-title">{{ 'quotations.review.title' | translate }}</h1>
-          <span class="status-pill status-{{ q.status }}">
-            {{ 'quotations.review.status.' + q.status | translate }}
+          <span
+            class="status-pill status-{{ q.status }}"
+            role="status"
+            aria-live="polite"
+          >
+            @if (isConfirming()) {
+              <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="14"></mat-spinner>
+              <span>{{ 'quotations.review.status.authorizing' | translate }}</span>
+            } @else {
+              {{ 'quotations.review.status.' + q.status | translate }}
+            }
           </span>
         </div>
         <p class="page-subtitle">{{ 'quotations.review.subtitle' | translate }}</p>
@@ -40,7 +81,7 @@
             mat-stroked-button
             type="button"
             (click)="retryExtraction()"
-            [disabled]="isRetryingExtraction()"
+            [disabled]="isRetryingExtraction() || isConfirming()"
           >
             <mat-icon aria-hidden="true">refresh</mat-icon>
             <span>{{ 'quotations.review.actions.retryExtraction' | translate }}</span>
@@ -51,6 +92,7 @@
             mat-stroked-button
             type="button"
             (click)="createRequote()"
+            [disabled]="isConfirming()"
           >
             <mat-icon aria-hidden="true">content_copy</mat-icon>
             <span>{{ 'quotations.review.actions.createRequote' | translate }}</span>
@@ -62,7 +104,7 @@
             color="warn" class="pp-danger"
             type="button"
             (click)="archiveQuotation()"
-            [disabled]="isArchiving()"
+            [disabled]="isArchiving() || isConfirming()"
           >
             <mat-icon aria-hidden="true">archive</mat-icon>
             <span>{{ 'quotations.review.actions.archive' | translate }}</span>
@@ -107,7 +149,7 @@
                 <span>{{ 'quotations.review.flagged.chooseSupplier' | translate }}</span>
               }
               <button mat-button type="button" (click)="goToFlaggedField(field)">{{ 'quotations.review.flagged.goToField' | translate }}</button>
-            } @else if (['currency', 'issue_date', 'expiry_date', 'stated_total', 'quantity', 'unit_price'].includes(field.fieldName)) {
+            } @else if (['currency', 'issue_date', 'expiry_date', 'stated_total', 'quantity', 'unit_price', 'prices_include_vat', 'vat_rate'].includes(field.fieldName)) {
               <button mat-button type="button" (click)="goToFlaggedField(field)">{{ 'quotations.review.flagged.goToField' | translate }}</button>
             }
             <button mat-stroked-button type="button" (click)="confirmFieldAsIs(field.entityType, field.entityId, field.fieldName)">{{ 'quotations.review.flagged.confirmAsIs' | translate }}</button>
@@ -125,13 +167,17 @@
         [documentFileName]="documentFileName()"
         [activeExtraction]="activeExtraction()"
         [isWriter]="isWriter()"
-        [isReplacingDocument]="isReplacingDocument()"
+        [isReplacingDocument]="isReplacingDocument() || isConfirming()"
         (replaceDocumentSelected)="onReplaceDocumentSelected($event)"
         (download)="downloadDocument()"
       ></app-quotation-doc-preview>
 
       <!-- Right Panel: Extracted Commercial Data -->
-      <section class="data-panel" [attr.aria-label]="'quotations.review.panels.extractedData' | translate">
+      <section
+        class="data-panel review-section"
+        [attr.aria-label]="'quotations.review.panels.extractedData' | translate"
+        [attr.aria-busy]="isConfirming() ? 'true' : null"
+      >
         <mat-card class="panel-card information-card">
           <mat-card-header>
             <mat-card-title class="panel-title">
@@ -299,8 +345,10 @@
                     }
                   </mat-select>
                 </mat-form-field>
-                @if (isFieldCorrected('quotation', q.id, 'currency')) {
+                @if (isFieldChanged('quotation', q.id, 'currency')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation', q.id, 'currency')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
                 }
                 @if (getFieldExtraction('quotation', q.id, 'currency'); as fe) {
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'currency') < 0.85">
@@ -357,8 +405,10 @@
                     (closed)="reviewFieldValue('quotation', q.id, 'issue_date', canonicalDateValue(q, 'issue_date'))"
                   ></mat-datepicker>
                 </mat-form-field>
-                @if (isFieldCorrected('quotation', q.id, 'issue_date')) {
+                @if (isFieldChanged('quotation', q.id, 'issue_date')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation', q.id, 'issue_date')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
                 }
                 @if (getFieldExtraction('quotation', q.id, 'issue_date'); as fe) {
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'issue_date') < 0.85">
@@ -420,8 +470,10 @@
                     {{ badge.labelKey | translate:{ count: badge.count } }}
                   </span>
                 }
-                @if (isFieldCorrected('quotation', q.id, 'expiry_date')) {
+                @if (isFieldChanged('quotation', q.id, 'expiry_date')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation', q.id, 'expiry_date')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
                 }
                 @if (getFieldExtraction('quotation', q.id, 'expiry_date'); as fe) {
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'expiry_date') < 0.85">
@@ -466,8 +518,10 @@
                   />
                   <span matTextSuffix class="currency-suffix">{{ (q.stated_total?.currency || effectiveQuotationCurrency()) | currencySymbol }}</span>
                 </mat-form-field>
-                @if (isFieldCorrected('quotation', q.id, 'stated_total')) {
+                @if (isFieldChanged('quotation', q.id, 'stated_total')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation', q.id, 'stated_total')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
                 }
                 @if (getFieldExtraction('quotation', q.id, 'stated_total'); as fe) {
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'stated_total') < 0.85">
@@ -479,6 +533,104 @@
                     mat-icon-button
                     type="button"
                     (click)="confirmFieldAsIs('quotation', q.id, 'stated_total'); $event.stopPropagation()"
+                    [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    class="confirm-as-is-btn"
+                  >
+                    <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  </button>
+                }
+              </div>
+
+              <!-- Prices Include VAT -->
+              <div
+                class="field-box vat-inclusive-field"
+                [class.field-needs-review]="getFieldConfidence('quotation', q.id, 'prices_include_vat') < 0.85 && !isFieldCorrected('quotation', q.id, 'prices_include_vat')"
+                [id]="'field-' + (getFieldExtraction('quotation', q.id, 'prices_include_vat')?.id || 'prices_include_vat')"
+                tabindex="0"
+                role="button"
+                (click)="selectField('quotation', q.id, 'prices_include_vat')"
+                (keydown.enter)="selectField('quotation', q.id, 'prices_include_vat')"
+                (keydown.space)="selectField('quotation', q.id, 'prices_include_vat')"
+              >
+                <div class="checkbox-control-wrapper">
+                  <mat-checkbox
+                    [checked]="effectivePricesIncludeVat(q)"
+                    (change)="pricesIncludeVatToggled($event.checked)"
+                    (blur)="reviewFieldValue('quotation', q.id, 'prices_include_vat', effectivePricesIncludeVat(q))"
+                    [disabled]="!isWriter() || q.status === 'reviewed'"
+                  >
+                    {{ 'quotations.review.header.pricesIncludeVatLabel' | translate }}
+                  </mat-checkbox>
+                </div>
+                @if (isFieldChanged('quotation', q.id, 'prices_include_vat')) {
+                  <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation', q.id, 'prices_include_vat')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
+                }
+                @if (getFieldExtraction('quotation', q.id, 'prices_include_vat'); as fe) {
+                  <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'prices_include_vat') < 0.85">
+                    {{ formatConfidence(fe.confidence) }}%
+                  </span>
+                }
+                @if (getFieldConfidence('quotation', q.id, 'prices_include_vat') < 0.85 && !isFieldCorrected('quotation', q.id, 'prices_include_vat')) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="confirmFieldAsIs('quotation', q.id, 'prices_include_vat'); $event.stopPropagation()"
+                    [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    class="confirm-as-is-btn"
+                  >
+                    <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  </button>
+                }
+              </div>
+
+              <!-- VAT Rate (%) -->
+              <div
+                class="field-box"
+                [id]="'field-' + (getFieldExtraction('quotation', q.id, 'vat_rate')?.id || 'vat_rate')"
+                [class.field-needs-review]="getFieldConfidence('quotation', q.id, 'vat_rate') < 0.85 && !isFieldCorrected('quotation', q.id, 'vat_rate')"
+                tabindex="0"
+                role="button"
+                (click)="selectField('quotation', q.id, 'vat_rate')"
+                (keydown.enter)="selectField('quotation', q.id, 'vat_rate')"
+                (keydown.space)="selectField('quotation', q.id, 'vat_rate')"
+              >
+                <mat-form-field appearance="outline" class="field-control">
+                  <mat-label>{{ 'quotations.review.header.vatRateLabel' | translate }}</mat-label>
+                  <input
+                    matInput
+                    #vatRateInput
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    [value]="formatVatRatePercent(effectiveVatRate(q))"
+                    (input)="vatRateInputChanged(vatRateInput.value)"
+                    (change)="vatRateInputChanged(vatRateInput.value)"
+                    (blur)="reviewFieldValue('quotation', q.id, 'vat_rate', effectiveVatRate(q))"
+                    [readonly]="!isWriter() || q.status === 'reviewed'"
+                  />
+                  <span matTextSuffix class="percent-suffix">%</span>
+                  @if (invalidVatRate()) {
+                    <mat-hint>{{ 'quotations.review.header.invalidVatRate' | translate }}</mat-hint>
+                  }
+                </mat-form-field>
+                @if (isFieldChanged('quotation', q.id, 'vat_rate')) {
+                  <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                } @else if (isFieldConfirmedAsIs('quotation', q.id, 'vat_rate')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
+                }
+                @if (getFieldExtraction('quotation', q.id, 'vat_rate'); as fe) {
+                  <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'vat_rate') < 0.85">
+                    {{ formatConfidence(fe.confidence) }}%
+                  </span>
+                }
+                @if (getFieldConfidence('quotation', q.id, 'vat_rate') < 0.85 && !isFieldCorrected('quotation', q.id, 'vat_rate')) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="confirmFieldAsIs('quotation', q.id, 'vat_rate'); $event.stopPropagation()"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
@@ -537,6 +689,7 @@
           [effectiveCurrency]="effectiveQuotationCurrency()"
           [activeExtraction]="activeExtraction()"
           [isWriter]="isWriter()"
+          [isConfirming]="isConfirming()"
           [pendingRemoveLineIds]="pendingRemoveLineIds()"
           [pendingCorrections]="pendingCorrections()"
           [pendingNewLines]="pendingNewLines()"
@@ -616,7 +769,7 @@
               mat-stroked-button
               type="button"
               (click)="saveCorrections()"
-              [disabled]="isSaving() || isConfirming() || !hasPendingReviewChanges()"
+              [disabled]="isSaving() || isConfirming() || invalidVatRate() || !hasPendingReviewChanges()"
               class="save-btn"
             >
               @if (isSaving()) {
@@ -636,7 +789,7 @@
               color="primary"
               type="button"
               (click)="requestConfirm()"
-              [disabled]="isConfirming() || isSaving() || !selectedSupplierId() || (hasArithmeticMismatch() && !mismatchAcknowledged())"
+              [disabled]="isConfirming() || isSaving() || invalidVatRate() || !selectedSupplierId() || (hasArithmeticMismatch() && !mismatchAcknowledged())"
               class="confirm-btn"
             >
               @if (isConfirming()) {
@@ -713,6 +866,31 @@
       [auditTrail]="auditTrail()"
       [isLoading]="isLoadingAudit()"
     ></app-quotation-audit-trail>
+  } @else if (loadFailed()) {
+    <div class="load-error-state" data-testid="quotation-load-error">
+      <mat-icon class="load-error-icon" aria-hidden="true">{{ isNotFound() ? 'search_off' : 'error_outline' }}</mat-icon>
+      <h1 class="load-error-title">{{ 'quotations.review.loadError.title' | translate }}</h1>
+      <p class="load-error-message">
+        @if (isNotFound()) {
+          {{ 'quotations.review.loadError.notFound' | translate }}
+        } @else {
+          {{ errorMessage() }}
+        }
+      </p>
+      @if (errorTraceId()) {
+        <span class="load-error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
+      }
+      <div class="load-error-actions">
+        <button mat-flat-button color="primary" type="button" (click)="loadQuotation(quotationId())">
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          <span>{{ 'quotations.review.loadError.retry' | translate }}</span>
+        </button>
+        <a mat-stroked-button routerLink="/quotations" class="back-link">
+          <mat-icon aria-hidden="true">arrow_back</mat-icon>
+          <span>{{ 'quotations.review.loadError.backToInbox' | translate }}</span>
+        </a>
+      </div>
+    </div>
   }
 }
 </div>

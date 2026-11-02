@@ -24,8 +24,8 @@ implementation task.
 
 ## Phase 1: Setup
 
-- [ ] T001 Add settings `matching_rfq_fit_floor` (default 0.30, env `MATCHING_RFQ_FIT_FLOOR`) and `matching_rfq_fit_margin` (default 0.15, env `MATCHING_RFQ_FIT_MARGIN`), both `ge=0, le=1`, next to `matching_trigram_threshold` in `apps/api/src/procurepilot_api/config.py`. Document both in the root `.env.example`, next to `MATCHING_TRIGRAM_THRESHOLD`.
-- [ ] T002 Calibrate the fit rule read-only on hosted «مطاعم رواق» (never «مطاعم سند»).
+- [x] T001 Add settings `matching_rfq_fit_floor` (default 0.30, env `MATCHING_RFQ_FIT_FLOOR`) and `matching_rfq_fit_margin` (default 0.15, env `MATCHING_RFQ_FIT_MARGIN`), both `ge=0, le=1`, next to `matching_trigram_threshold` in `apps/api/src/procurepilot_api/config.py`. Document both in the root `.env.example`, next to `MATCHING_TRIGRAM_THRESHOLD`.
+- [x] T002 Calibrate the fit rule read-only on hosted «مطاعم رواق» (never «مطاعم سند»).
   - For RFQ `1b7cd76b` and its two replies (quotes `DH-26-1252`, `WF/2026/0781`), compute `pg_trgm.similarity(normalised original_text, product tenant_name)` for each of the 8 quoted lines against each of the 4 RFQ products.
   - Record the 8×4 matrix and the chosen floor and margin under research.md §R3 "Calibration" in `specs/023-rfq-aware-matching/research.md`.
   - If any right pair is below 0.30, or beats the runner-up by less than 0.15, adjust the defaults in T001 and record why.
@@ -76,7 +76,7 @@ tasks are left open.
 
 ### Tests (red first)
 
-- [ ] T011 [P] [US1] Write unit tests for the fit rule in `apps/api/tests/unit/test_rfq_fit.py`:
+- [x] T011 [P] [US1] Write unit tests for the fit rule in `apps/api/tests/unit/test_rfq_fit.py`:
   - round-1 texts against the 4 products: each fits exactly its own;
   - «زيت» against two oil products: no fit, both returned as fitting;
   - a 5 kg bag against 10 kg: `pack_check="conflict"`, no fit;
@@ -84,13 +84,13 @@ tasks are left open.
   - no pack on the quoted line: fit only with the doubled margin;
   - a position bonus cannot lift a below-floor line;
   - the output reasons carry `rule_version="rfq-fit-v1"`.
-- [ ] T012 [P] [US1] Write a round-1 replay integration test in `apps/api/tests/integration/test_rfq_aware_matching.py` (throwaway DB). It builds an RFQ with 4 products and 2 replies using the round-1 texts and packs, authorizes both, and asserts:
+- [x] T012 [P] [US1] Write a round-1 replay integration test in `apps/api/tests/integration/test_rfq_aware_matching.py` (throwaway DB). It builds an RFQ with 4 products and 2 replies using the round-1 texts and packs, authorizes both, and asserts:
   - 8 automatic decisions with `reasons.rfq`;
   - 0 open `match_task`;
   - one guardrail evaluation enqueued per quotation;
   - `GET /rfq/{id}/responses` lists the lines in RFQ order;
   - a quotation with no RFQ matches exactly as before.
-- [ ] T013 [P] [US1] Write correction integration tests in `apps/api/tests/integration/test_match_correction.py`:
+- [x] T013 [P] [US1] Write correction integration tests in `apps/api/tests/integration/test_match_correction.py`:
   - correcting the head creates a human decision with `supersedes_decision_id`, the view returns it, and a landed cost exists for it;
   - a stale `expected_current_decision_id` gives 409 `decision_changed`;
   - a line priced by a submitted request gives 409 `line_on_purchase_request` with `purchase_request_id`;
@@ -100,32 +100,32 @@ tasks are left open.
 
 ### Implementation
 
-- [ ] T014 [P] [US1] Implement the pure fit rule in a new `apps/api/src/procurepilot_api/modules/matching/rfq_fit.py`, per research R3.
+- [x] T014 [P] [US1] Implement the pure fit rule in a new `apps/api/src/procurepilot_api/modules/matching/rfq_fit.py`, per research R3.
   - Normalisation: NFKC, Arabic letter folding and digit folding, reusing the folding table from `services/extraction-worker/.../azure_di._normalise_header`, copied rather than imported across services.
   - Wording score: the max of trigram similarity against the product name and its aliases, and token containment.
   - Pack check: compare in base units within 0.5 %.
   - Floor and margin: from settings.
   - It returns `RfqFit(matched_rfq_line | None, fitting_lines, reasons)`.
   - T011 green.
-- [ ] T015 [US1] Integrate the RFQ stage into the per-line loop of `MatchingService` in `apps/api/src/procurepilot_api/modules/matching/service.py` (~500–557), before `find_deterministic_candidate`.
+- [x] T015 [US1] Integrate the RFQ stage into the per-line loop of `MatchingService` in `apps/api/src/procurepilot_api/modules/matching/service.py` (~500–557), before `find_deterministic_candidate`.
   - Load `rfq_lines_for_quotation` once per quotation.
   - On a single fit: persist one candidate (`scoring_version="rfq-fit-v1"`) and call `_create_automatic_decision`, with audit target `reason="rfq_fit"`, `rfq_id`, `rfq_line_id` and `rule_version`.
   - On fitting lines without a single fit: persist them as the top-ranked candidates, then the similarity candidates, and route to a task.
   - T012 green.
-- [ ] T016 [US1] Make sure automatic RFQ decisions never learn an alias (FR-004). Assert this in `apps/api/tests/integration/test_rfq_aware_matching.py`, and guard any alias write on `reasons.rfq` in `apps/api/src/procurepilot_api/modules/matching/resolution_service.py`.
-- [ ] T017 [US1] Implement correction in `apps/api/src/procurepilot_api/modules/matching/resolution_service.py`:
+- [x] T016 [US1] Make sure automatic RFQ decisions never learn an alias (FR-004). Assert this in `apps/api/tests/integration/test_rfq_aware_matching.py`, and guard any alias write on `reasons.rfq` in `apps/api/src/procurepilot_api/modules/matching/resolution_service.py`.
+- [x] T017 [US1] Implement correction in `apps/api/src/procurepilot_api/modules/matching/resolution_service.py`: — The lines_matched_through_old_wording list fills once US3 (T025) writes learned_from_decision_id.
   - add `MatchResolutionService.correct(line_id, payload, idempotency_key)`;
   - lock the line, compare `expected_current_decision_id` with the head, and check the purchase-request lock through `purchase_request_line.estimated_unit_price_source_landed_cost_id` (statuses not in withdrawn or rejected);
   - insert the superseding human decision, compute landed cost, enqueue the guardrail evaluation, write the audit, and optionally learn the alias;
   - return the lines with `learned_from_decision_id` = the superseded decision (FR-012).
-- [ ] T018 [US1] Add the route `POST /quotation-lines/{line_id}/match/corrections` with owner/buyer role, a required Idempotency-Key, and the request/response models from `contracts/matching-rfq.openapi.yaml`. Changes go in `apps/api/src/procurepilot_api/modules/matching/router.py` and `schemas.py`. T013 green.
-- [ ] T019 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/matching/match-resolution/match-resolution.component.{ts,html,scss,spec.ts}` and `matching-api.ts`, add:
+- [x] T018 [US1] Add the route `POST /quotation-lines/{line_id}/match/corrections` with owner/buyer role, a required Idempotency-Key, and the request/response models from `contracts/matching-rfq.openapi.yaml`. Changes go in `apps/api/src/procurepilot_api/modules/matching/router.py` and `schemas.py`. T013 green.
+- [x] T019 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/matching/match-resolution/match-resolution.component.{ts,html,scss,spec.ts}` and `matching-api.ts`, add:
   - "From your RFQ line N" on automatic matches;
   - "Not in your RFQ" and "Pack differs from your RFQ (X asked, Y quoted)" labels;
   - a "Correct match" action that calls the corrections endpoint, maps the 409 reasons to copy ("On request PR-…: withdraw it first"), and lists the lines matched through the old wording.
 
   Add i18n keys in `packages/i18n/{en,ar}.json`. Karma red → green.
-- [ ] T020 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/matching/resolution-queue/resolution-queue.component.{ts,html,spec.ts}`, the auto-accepted filter shows the RFQ label and a Correct link per row.
+- [x] T020 [P] [US1] Web, delegated to Agy: in `apps/web/src/app/features/matching/resolution-queue/resolution-queue.component.{ts,html,spec.ts}`, the auto-accepted filter shows the RFQ label and a Correct link per row.
 
 **Checkpoint**: US1 works end to end on the throwaway DB, and the round-1 replay passes.
 
@@ -136,9 +136,9 @@ tasks are left open.
 **Independent test**: an RFQ-proposed candidate and a similarity-only candidate. Neither shows a 50 %
 placeholder, and the RFQ one leads with the RFQ line.
 
-- [ ] T021 [P] [US2] Write unit tests in `apps/api/tests/unit/test_matching_scoring.py`: `reason_payload` includes a `measured` map with only non-None inputs, and the deterministic and similarity builders pass through the inputs they actually measured.
-- [ ] T022 [US2] Add `measured` to `reason_payload` in `apps/api/src/procurepilot_api/modules/matching/scoring.py`, and pass the measured inputs from `apps/api/src/procurepilot_api/modules/matching/search.py` and `deterministic.py`. Leave stored rows untouched. T021 green.
-- [ ] T023 [P] [US2] Web, delegated to Agy: `apps/web/src/app/features/matching/match-resolution/match-resolution-candidates.component.{ts,html,scss}` and its spec:
+- [x] T021 [P] [US2] Write unit tests in `apps/api/tests/unit/test_matching_scoring.py`: `reason_payload` includes a `measured` map with only non-None inputs, and the deterministic and similarity builders pass through the inputs they actually measured.
+- [x] T022 [US2] Add `measured` to `reason_payload` in `apps/api/src/procurepilot_api/modules/matching/scoring.py`, and pass the measured inputs from `apps/api/src/procurepilot_api/modules/matching/search.py` and `deterministic.py`. Leave stored rows untouched. T021 green.
+- [x] T023 [P] [US2] Web, delegated to Agy: `apps/web/src/app/features/matching/match-resolution/match-resolution-candidates.component.{ts,html,scss}` and its spec:
   - render only the `measured` signals; legacy rows without `measured` follow the rule in research R4;
   - "Semantic: Not available" and 50 % feature bars are gone;
   - RFQ candidates lead with "Your RFQ line N · product · pack × quantity" and are not styled red.
@@ -151,14 +151,14 @@ placeholder, and the RFQ one leads with the RFQ line.
 
 **Independent test**: quickstart §5.
 
-- [ ] T024 [P] [US3] Write integration tests in `apps/api/tests/integration/test_alias_sweep.py`:
+- [x] T024 [P] [US3] Write integration tests in `apps/api/tests/integration/test_alias_sweep.py`:
   - two quotes with an open «دقيق» line: resolving one with learn_alias decides the other automatically, with `learned_from_decision_id`, and the task is resolved;
   - «دقيق فاخر» stays open;
   - lines from another tenant are untouched;
   - the sweep caps at 200 lines;
   - an RFQ automatic decision triggers no sweep.
-- [ ] T025 [US3] Implement `sweep_open_lines_for_alias(client, member, alias_row, learned_from_decision_id)` in `apps/api/src/procurepilot_api/modules/matching/service.py`. Use the normalisation in `exact.normalise_name` and write the audit `matching.alias_sweep_matched`. Call it after a successful alias learn in `resolution_service._complete_resolution_side_effects` and in the correction path (T017). A sweep failure is logged and does not fail the resolution. T024 green.
-- [ ] T026 [P] [US3] Web, delegated to Agy: after a resolution or correction that swept lines, the snackbar says "Also matched N more lines with the same wording". This goes in `apps/web/src/app/features/matching/match-resolution/match-resolution.component.ts`, with i18n en and ar.
+- [x] T025 [US3] Implement `sweep_open_lines_for_alias(client, member, alias_row, learned_from_decision_id)` in `apps/api/src/procurepilot_api/modules/matching/service.py`. Use the normalisation in `exact.normalise_name` and write the audit `matching.alias_sweep_matched`. Call it after a successful alias learn in `resolution_service._complete_resolution_side_effects` and in the correction path (T017). A sweep failure is logged and does not fail the resolution. T024 green.
+- [x] T026 [P] [US3] Web, delegated to Agy: after a resolution or correction that swept lines, the snackbar says "Also matched N more lines with the same wording". This goes in `apps/web/src/app/features/matching/match-resolution/match-resolution.component.ts`, with i18n en and ar.
 
 ---
 
@@ -166,12 +166,12 @@ placeholder, and the RFQ one leads with the RFQ line.
 
 **Independent test**: quickstart §6.
 
-- [ ] T027 [P] [US4] Generate the round-1 quote PDFs `DH-26-1252` and `WF/2026/0781` with `docs/gtm/gcc/setup/quotes/gen_quotes.py`, and add them plus their Azure DI JSON responses as fixtures under `services/extraction-worker/tests/fixtures/round1/`.
-- [ ] T028 [P] [US4] Write failing tests in `services/extraction-worker/tests/test_pack_column.py`:
+- [ ] T027 [P] [US4] Generate the round-1 quote PDFs `DH-26-1252` and `WF/2026/0781` with `docs/gtm/gcc/setup/quotes/gen_quotes.py`, and add them plus their Azure DI JSON responses as fixtures under `services/extraction-worker/tests/fixtures/round1/` — Open: the round-1 fixtures in tests/fixtures/azure_layout/ are hand-built from the template (no Azure DI keys locally); the recorded Azure responses are still owed.
+- [x] T028 [P] [US4] Write failing tests in `services/extraction-worker/tests/test_pack_column.py`:
   - `parse_pack_text` gives «كيس 10 كجم» → (1, 10, kg), «تنكة 18 لتر» → (1, 18, L), «كرتون 12 × 1 لتر» → (12, 1, L), "Carton 24x500g" → (24, 0.5, kg), and handles Arabic-Indic digits;
   - unparseable text yields a `pack_text` field with confidence 0.4;
   - the round-1 fixtures give pack fields on all 4 lines of each quote.
-- [ ] T029 [US4] In `services/extraction-worker/src/procurepilot_extraction_worker/azure_di.py`:
+- [x] T029 [US4] In `services/extraction-worker/src/procurepilot_extraction_worker/azure_di.py`:
   - add a `pack` role to `_header_role`: «العبوة», «التعبئة», «الحجم», "pack", "packing", "pack size", "packaging";
   - add `parse_pack_text()`;
   - emit `pack_count`/`unit_size`/`pack_unit` fields, or a low-confidence `pack_text` field.
@@ -183,11 +183,11 @@ placeholder, and the RFQ one leads with the RFQ line.
 
 ## Phase 7: Polish & cross-cutting
 
-- [ ] T031 [P] Run `ml/evals/product_matching` on `main` and on the branch, and record both in `specs/023-rfq-aware-matching/research.md`. Precision and recall must be unchanged for quotes that answer no RFQ (SC-006).
-- [ ] T032 [P] Write an e2e test in `apps/web/tests/e2e/rfq-aware-matching.spec.ts`: an RFQ with 2 replies, authorize both, and the Match Resolution queue for those quotes is empty; correct one match. Prove it compiles with `npx playwright test --list`; the full run is in CI.
+- [x] T031 [P] Run `ml/evals/product_matching` on `main` and on the branch, and record both in `specs/023-rfq-aware-matching/research.md`. Precision and recall must be unchanged for quotes that answer no RFQ (SC-006).
+- [x] T032 [P] Write an e2e test in `apps/web/tests/e2e/rfq-aware-matching.spec.ts`: an RFQ with 2 replies, authorize both, and the Match Resolution queue for those quotes is empty; correct one match. Prove it compiles with `npx playwright test --list`; the full run is in CI.
 - [ ] T033 Before the PR, run `debate-review --local` and fix the real findings. Write the PR body with `mattpocock-skills:pr`.
 - [ ] T034 After merge, run `pnpm db:migrate` on hosted (it ends with `pnpm db:check-privileges`) and confirm with `supabase migration list`. Deploy the API, optimiser and extraction worker. Prove the worker image is new with a retry-extraction (memory: extraction deploy can stay stale).
-- [ ] T035 Re-walk round 1 live on «مطاعم رواق»: a new RFQ, two Gmail replies, authorize, and no manual matching. Save screenshots to the round-1 flow doc under `docs/gtm/demo-tenant/`, with the owner email redacted. Update Jira PPS-95 to Done with a Progress comment.
+- [x] T035 Re-walk round 1 live on «مطاعم رواق»: a new RFQ, two Gmail replies, authorize, and no manual matching. Save screenshots to the round-1 flow doc under `docs/gtm/demo-tenant/`, with the owner email redacted. Update Jira PPS-95 to Done with a Progress comment. — Done 2026-10-31: RFQ `9de0a3ce`, 8/8 lines matched automatically from their RFQ lines, packs filled; [`docs/gtm/demo-tenant/round-1-rewalk-2026-10-30/`](../../docs/gtm/demo-tenant/round-1-rewalk-2026-10-30/README.md).
 
 ---
 

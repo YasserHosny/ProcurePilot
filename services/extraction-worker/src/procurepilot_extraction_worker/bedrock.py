@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import replace
 from typing import Any
 
 import boto3
-import re
 
 from procurepilot_extraction_worker.currency import detect_currency
-
 from procurepilot_extraction_worker.models import (
     ExtractedField,
     ExtractedLine,
@@ -148,13 +147,22 @@ class BedrockExtractionProvider:
         document_text = document_bytes.decode("utf-8", errors="ignore")
         evidenced = detect_currency(document_text)
         if evidenced is None:
-            markers = set(re.findall(r"(?<![A-Z])(?:USD|GBP|EUR|SAR|AED|KWD|BHD|OMR|JPY|CAD|AUD)(?![A-Z])|[$£€]", document_text.upper()))
-            evidenced = {"$": "USD", "£": "GBP", "€": "EUR"}.get(next(iter(markers))) if len(markers) == 1 else None
+            markers = set(
+                re.findall(
+                    r"(?<![A-Z])(?:USD|GBP|EUR|SAR|AED|KWD|BHD|OMR|JPY|CAD|AUD)(?![A-Z])|[$£€]",
+                    document_text.upper(),
+                )
+            )
+            evidenced = (
+                {"$": "USD", "£": "GBP", "€": "EUR"}.get(next(iter(markers)))
+                if len(markers) == 1
+                else None
+            )
         currency_field = result.header.get("currency")
         if currency_field is None or evidenced is None or currency_field.value != evidenced:
             # The model guessed a currency the document does not evidence: store none.
             result = _without_currency(result)
-        return result
+        return replace(result, source_text=document_text)
 
 
 def _without_currency(result: ExtractionResult) -> ExtractionResult:
@@ -165,8 +173,7 @@ def _without_currency(result: ExtractionResult) -> ExtractionResult:
 
     header = {k: v for k, v in result.header.items() if k != "currency"}
     lines = [
-        replace(line, fields={k: strip(v) for k, v in line.fields.items()})
-        for line in result.lines
+        replace(line, fields={k: strip(v) for k, v in line.fields.items()}) for line in result.lines
     ]
     stated = strip(result.stated_total) if result.stated_total is not None else None
     return replace(result, header=header, lines=lines, stated_total=stated)
