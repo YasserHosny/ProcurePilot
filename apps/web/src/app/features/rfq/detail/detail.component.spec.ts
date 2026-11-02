@@ -6,13 +6,15 @@ import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/h
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { DetailComponent } from './detail.component';
 import { RfqApi, RfqDetail, RfqResponseComparisonList } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
+import { FormatService } from '../../../core/format/format.service';
+import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 
@@ -196,7 +198,9 @@ describe('DetailComponent (RFQ Details)', () => {
           },
         },
       ],
-    }).compileComponents();
+    })
+      .overrideProvider(MatDialog, { useValue: dialogSpy })
+      .compileComponents();
 
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', enCatalog, true);
@@ -488,5 +492,36 @@ describe('DetailComponent (RFQ Details)', () => {
     expect(banner?.textContent).toContain('تم التحويل إلى طلبين');
     // Group line in Arabic: "تُقدَّم هذه الطلبات وتُعتمد معًا"
     expect(banner?.textContent).toContain('تُقدَّم هذه الطلبات وتُعتمد معًا');
+  });
+
+  it('opens send confirmation dialog with count and formatted needed-by date in messageParams', async () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of(false),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+    rfqApiSpy.getRfq.and.returnValue(of(mockDraftDetail));
+    paramMapSubject.next(convertToParamMap({ id: 'rfq-draft-1' }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const sendBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-detail-send-button"]');
+    sendBtn?.click();
+
+    const formatService = TestBed.inject(FormatService);
+    const expectedDate = formatService.formatDate(mockDraftDetail.rfq.needed_by_date);
+
+    expect(dialogSpy.open).toHaveBeenCalledWith(
+      CatalogueConfirmDialogComponent,
+      jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          messageParams: jasmine.objectContaining({
+            count: mockDraftDetail.recipients.length,
+            date: expectedDate,
+          }),
+        }),
+      }),
+    );
   });
 });
