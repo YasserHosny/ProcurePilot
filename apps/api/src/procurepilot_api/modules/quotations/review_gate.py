@@ -24,9 +24,34 @@ def blocking_low_confidence_fields(
         )
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    rows = live_line_evidence(client, quotation_id, rows)
     return [
         {key: row[key] for key in ("id", "entity_type", "entity_id", "field_name")}
         for row in rows
         if row.get("field_name") != "suggested_currency"
         and not (row.get("field_name") == "supplier_name" and supplier_id is not None)
+    ]
+
+
+def live_line_evidence(
+    client: object, quotation_id: UUID, fields: list[dict[str, object]]
+) -> list[dict[str, object]]:
+    """Keep removed-line evidence in storage, outside live review and validation."""
+    if not any(field.get("entity_type") == "quotation_line" for field in fields):
+        return fields
+    try:
+        lines = (
+            client.table("quotation_line")
+            .select("id")
+            .eq("quotation_id", str(quotation_id))
+            .execute()
+            .data
+        )
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    ids = {str(line["id"]) for line in lines}
+    return [
+        field
+        for field in fields
+        if field.get("entity_type") != "quotation_line" or str(field.get("entity_id")) in ids
     ]

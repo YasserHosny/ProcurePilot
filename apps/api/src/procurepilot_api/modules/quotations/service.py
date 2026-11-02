@@ -15,7 +15,10 @@ from procurepilot_api.errors import ConflictError, NotFoundError, ServiceUnavail
 from procurepilot_api.modules.documents.schemas import Document
 from procurepilot_api.modules.documents.service import DOCUMENT_COLUMNS
 from procurepilot_api.modules.members.service import authenticated_client
-from procurepilot_api.modules.quotations.review_gate import blocking_low_confidence_fields
+from procurepilot_api.modules.quotations.review_gate import (
+    blocking_low_confidence_fields,
+    live_line_evidence,
+)
 from procurepilot_api.modules.quotations.schemas import (
     STICKY_REVIEW_REASONS,
     AuditTrailEntry,
@@ -866,7 +869,7 @@ def _field_rows(client: object, quotation_id: UUID) -> list[dict[str, object]]:
         )
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-    return _rows(response.data)
+    return live_line_evidence(client, quotation_id, _rows(response.data))
 
 
 def _open_or_latest_task(client: object, quotation_id: UUID) -> dict[str, object] | None:
