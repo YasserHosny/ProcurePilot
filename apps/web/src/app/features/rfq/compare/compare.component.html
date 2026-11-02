@@ -208,7 +208,11 @@
                     {{ { amount: (line.quoted_quantity * line.quoted_unit_price_amount), currency: line.quoted_unit_price_currency } | formatMoney }}
                   </td>
                   <td mat-footer-cell *matFooterCellDef class="pp-figures total-value-cell">
-                    {{ { amount: responseTotal(response), currency: responseCurrency(response) } | formatMoney }}
+                    @if (!hasMixedCurrencies(response)) {
+                      {{ { amount: responseTotal(response) ?? 0, currency: responseCurrency(response) ?? '' } | formatMoney }}
+                    } @else {
+                      <span class="mixed-currencies-dash">—</span>
+                    }
                   </td>
                 </ng-container>
                 <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
@@ -216,7 +220,7 @@
                 <tr mat-footer-row *matFooterRowDef="displayedColumns" class="total-row"></tr>
               </table>
             }
-            @if (response.quotation_status !== 'refused' && !isEligible(response)) {
+            @if (response.quotation_status !== 'refused' && unmatchedCount(response) > 0) {
               <div class="pending-warning">
                 <mat-icon color="warn" aria-hidden="true">info</mat-icon>
                 <a
@@ -226,6 +230,12 @@
                 >
                   {{ matchLinesLabel(unmatchedCount(response)) }}
                 </a>
+              </div>
+            }
+            @if (response.quotation_status !== 'refused' && hasMixedCurrencies(response)) {
+              <div class="mixed-currency-notice" data-testid="mixed-currency-notice">
+                <mat-icon color="warn" aria-hidden="true">info</mat-icon>
+                <span>{{ 'rfq.compare.mixedCurrenciesNotice' | translate }}</span>
               </div>
             }
             @if (response.guardrail_evaluations?.length) {
@@ -273,8 +283,14 @@
                   </button>
                 }
               </div>
-              @if (!isConverted() && isEligible(response) && !selectedBranchId()) {
-                <span class="disabled-reason">{{ 'rfq.compare.chooseBranchFirst' | translate }}</span>
+              @if (!isConverted()) {
+                @if (!isEligible(response)) {
+                  <span class="disabled-reason" data-testid="ineligible-reason">{{ ineligibilityReason(response) | translate }}</span>
+                } @else if (hasMixedCurrencies(response)) {
+                  <span class="disabled-reason" data-testid="mixed-currencies-reason">{{ 'rfq.compare.mixedCurrenciesNotice' | translate }}</span>
+                } @else if (!selectedBranchId()) {
+                  <span class="disabled-reason">{{ 'rfq.compare.chooseBranchFirst' | translate }}</span>
+                }
               }
               @if (isConverted() && !convertedPurchaseRequestId()) {
                 <span class="disabled-reason" data-testid="converted-reason">

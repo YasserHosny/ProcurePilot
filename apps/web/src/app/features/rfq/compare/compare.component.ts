@@ -85,6 +85,7 @@ export class CompareComponent implements OnInit, OnChanges {
   readonly guardrails = signal<readonly RfqGuardrail[]>([]);
   readonly currentMembershipId = signal<string | null>(null);
   readonly isSplitting = signal<boolean>(false);
+  readonly preparing = signal<string | null>(null);
   private splitIdempotencyKey: string | null = null;
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
@@ -143,7 +144,19 @@ export class CompareComponent implements OnInit, OnChanges {
 
   formatQuantity(value: string | number): string { return this.formatService.formatExactQuantity(value); }
 
-  responseTotal(response: RfqResponseComparison): number {
+  hasMixedCurrencies(response: RfqResponseComparison): boolean {
+    const currencies = new Set(
+      response.lines
+        .map((line) => line.quoted_unit_price_currency?.trim().toUpperCase())
+        .filter((c): c is string => Boolean(c)),
+    );
+    return currencies.size > 1;
+  }
+
+  responseTotal(response: RfqResponseComparison): number | null {
+    if (this.hasMixedCurrencies(response)) {
+      return null;
+    }
     return response.lines.reduce((sum, line) => {
       const qty = Number(line.quoted_quantity) || 0;
       const price = Number(line.quoted_unit_price_amount) || 0;
@@ -151,7 +164,10 @@ export class CompareComponent implements OnInit, OnChanges {
     }, 0);
   }
 
-  responseCurrency(response: RfqResponseComparison): string {
+  responseCurrency(response: RfqResponseComparison): string | null {
+    if (this.hasMixedCurrencies(response)) {
+      return null;
+    }
     return response.lines[0]?.quoted_unit_price_currency || '';
   }
 
@@ -217,7 +233,7 @@ export class CompareComponent implements OnInit, OnChanges {
       return new Set<string>();
     }
 
-    const totals = eligible.map((r) => ({ id: r.id, total: this.responseTotal(r) }));
+    const totals = eligible.map((r) => ({ id: r.id, total: this.responseTotal(r) ?? 0 }));
     const minTotal = Math.min(...totals.map((t) => t.total));
     const ids = new Set<string>();
     for (const t of totals) {
@@ -528,24 +544,58 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   isEligible(response: RfqResponseComparison): boolean {
-    return response.quotation_status !== 'refused' && response.lines.every((l) => !l.pending_match);
+    return (
+      response.lines.length > 0 &&
+      response.quotation_status === 'reviewed' &&
+      response.lines.every((l) => !l.pending_match)
+    );
+  }
+
+  ineligibilityReason(response: RfqResponseComparison): string | null {
+    if (this.isEligible(response)) {
+      return null;
+    }
+    if (response.quotation_status === 'refused') {
+      return 'rfq.compare.refused';
+    }
+    if (response.lines.length === 0) {
+      return 'rfq.compare.stillBeingRead';
+    }
+    if (response.quotation_status !== 'reviewed') {
+      return 'rfq.compare.awaitingReview';
+    }
+    if (response.lines.some((l) => l.pending_match)) {
+      return 'rfq.compare.pendingMatch';
+    }
+    return null;
+  }
+
+  isPreparing(responseId?: string): boolean {
+    const cur = this.preparing();
+    return responseId ? cur === responseId : Boolean(cur);
   }
 
   canPrepare(response: RfqResponseComparison): boolean {
     return (
       !this.isConverted() &&
       this.isEligible(response) &&
+      !this.hasMixedCurrencies(response) &&
       Boolean(this.selectedBranchId()) &&
-      Boolean(this.requiredByDate())
+      Boolean(this.requiredByDate()) &&
+      !this.isPreparing(response.id)
     );
   }
 
   prepareRequest(response: RfqResponseComparison): void {
     if (this.isConverted()) return;
     if (response.quotation_status === 'refused') return;
-    if (!this.isEligible(response)) {
+    if (this.isPreparing(response.id)) return;
+    if (!this.isEligible(response) || this.hasMixedCurrencies(response)) {
+      const key = this.hasMixedCurrencies(response)
+        ? 'rfq.compare.mixedCurrenciesNotice'
+        : 'rfq.compare.cannotPreparePending';
       this.snackBar.open(
-        this.translate.instant('rfq.compare.cannotPreparePending'),
+        this.translate.instant(key),
         this.translate.instant('rfq.history.dismiss'),
         { duration: 3000 },
       );
@@ -576,8 +626,11 @@ export class CompareComponent implements OnInit, OnChanges {
       required_by_date: requiredBy,
     };
 
+    this.preparing.set(response.id);
+
     this.rfqApi.prepareRequest(this.rfqId(), payload).subscribe({
       next: (res) => {
+        this.preparing.set(null);
         const snackRef = this.snackBar.open(
           this.translate.instant('rfq.compare.prepareSuccess'),
           this.translate.instant('rfq.compare.openDraft'),
@@ -596,26 +649,42 @@ export class CompareComponent implements OnInit, OnChanges {
         navigateToDraft();
       },
       error: (err: unknown) => {
-        if (err instanceof HttpErrorResponse && err.status === 409) {
-          const reason = (err.error as ApiError | undefined)?.details?.['reason'];
-          if (reason === 'rfq_already_converted') {
-            this.snackBar.open(
-              this.translate.instant('rfq.compare.alreadyConverted'),
-              this.translate.instant('rfq.history.dismiss'),
-              { duration: 5000 },
-            );
-            const id = this.rfqId();
-            if (id) {
-              this.loadData(id);
-            }
-            return;
-          }
-        }
-        const message =
+        this.preparing.set(null);
+        const reason =
           err instanceof HttpErrorResponse
-            ? ((err.error as ApiError | undefined)?.message ??
-              this.translate.instant('rfq.compare.prepareError'))
-            : this.translate.instant('rfq.compare.prepareError');
+            ? (err.error as ApiError | undefined)?.details?.['reason']
+            : undefined;
+
+        if (reason === 'rfq_already_converted') {
+          this.snackBar.open(
+            this.translate.instant('rfq.compare.alreadyConverted'),
+            this.translate.instant('rfq.history.dismiss'),
+            { duration: 5000 },
+          );
+          const id = this.rfqId();
+          if (id) {
+            this.loadData(id);
+          }
+          return;
+        }
+
+        let message = this.translate.instant('rfq.compare.prepareError');
+        if (reason === 'pending_matches') {
+          message = this.translate.instant('rfq.compare.prepareErrorPendingMatches');
+        } else if (reason === 'no_quotation_lines') {
+          message = this.translate.instant('rfq.compare.prepareErrorNoQuotationLines');
+        } else if (reason === 'no_matched_lines') {
+          message = this.translate.instant('rfq.compare.prepareErrorNoMatchedLines');
+        } else if (reason === 'no_pricing_for_rfq_products') {
+          message = this.translate.instant('rfq.compare.prepareErrorNoPricingForRfqProducts');
+        } else if (reason === 'quotation_archived') {
+          message = this.translate.instant('rfq.compare.prepareErrorQuotationArchived');
+        } else if (reason === 'quotation_refused') {
+          message = this.translate.instant('rfq.compare.prepareErrorQuotationRefused');
+        } else if (reason === 'mixed_currencies') {
+          message = this.translate.instant('rfq.compare.prepareErrorMixedCurrencies');
+        }
+
         this.snackBar.open(
           message,
           this.translate.instant('rfq.history.dismiss'),

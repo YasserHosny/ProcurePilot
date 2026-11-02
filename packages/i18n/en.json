@@ -4137,7 +4137,17 @@
       "splitSavingHint": "Splitting this order between suppliers could save {{money}}.",
       "openPreparedRequest": "Open draft request",
       "openRequest": "Open request",
-      "convertedReason": "This RFQ is already converted into a request."
+      "convertedReason": "This RFQ is already converted into a request.",
+      "stillBeingRead": "Still being read",
+      "awaitingReview": "Awaiting review",
+      "mixedCurrenciesNotice": "Prices in more than one currency — this reply cannot be turned into a request",
+      "prepareErrorPendingMatches": "Cannot prepare request while lines are unmatched.",
+      "prepareErrorNoQuotationLines": "This reply has no lines to turn into a request.",
+      "prepareErrorNoMatchedLines": "None of the lines in this reply are matched to catalogue products.",
+      "prepareErrorNoPricingForRfqProducts": "This reply does not contain prices for the requested products.",
+      "prepareErrorQuotationArchived": "This quotation has been archived and cannot be converted.",
+      "prepareErrorQuotationRefused": "This quotation was refused and cannot be used to prepare a request.",
+      "prepareErrorMixedCurrencies": "Prices in this reply are in more than one currency."
     },
     "history": {
       "title": "RFQ History",
