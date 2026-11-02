@@ -133,25 +133,50 @@ describe('RequestFormComponent — approver name display (PPS-145 / P-114)', () 
     expect(section?.textContent).not.toContain('approver@example.com');
   });
 
-  it('shows approver email when assigned_name is null', () => {
-    const requestWithNullName: PurchaseRequest = {
+  it('shows approver email from step and never membership id when members list cannot be loaded by non-owner', () => {
+    api.members.and.returnValue(of({ items: [], next_cursor: null }));
+
+    const requestWithStepEmail: PurchaseRequest = {
       ...baseMockRequest,
       approval_step: {
-        id: 'as2',
-        assigned_membership_id: 'm-approver',
+        id: 'as-non-owner',
+        assigned_membership_id: 'm-approver-uuid',
         assigned_name: null,
-        assigned_email: 'approver@example.com',
+        assigned_email: 'approver@example.test',
         source: 'threshold_match',
         status: 'pending',
       },
     };
 
-    const fixture = createComponentWithRequest(requestWithNullName);
+    const fixture = createComponentWithRequest(requestWithStepEmail);
+    const compiled = fixture.nativeElement as HTMLElement;
+    const section = compiled.querySelector('.approval-step');
+
+    expect(section).toBeTruthy();
+    expect(section?.textContent).toContain('approver@example.test');
+    expect(section?.textContent).not.toContain('m-approver-uuid');
+  });
+
+  it('shows email from members list when both assigned_name and assigned_email are missing', () => {
+    const requestWithMissingStepFields: PurchaseRequest = {
+      ...baseMockRequest,
+      approval_step: {
+        id: 'as-members-fallback',
+        assigned_membership_id: 'm-approver',
+        assigned_name: null,
+        assigned_email: null,
+        source: 'threshold_match',
+        status: 'pending',
+      },
+    };
+
+    const fixture = createComponentWithRequest(requestWithMissingStepFields);
     const compiled = fixture.nativeElement as HTMLElement;
     const section = compiled.querySelector('.approval-step');
 
     expect(section).toBeTruthy();
     expect(section?.textContent).toContain('approver@example.com');
+    expect(section?.textContent).not.toContain('m-approver');
   });
 
   it('shows approver email when assigned_name is empty string', () => {
