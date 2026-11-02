@@ -188,8 +188,15 @@ class QuotationService:
                 query = query.gte("created_at", date_from)
             if date_to is not None:
                 query = query.lte("created_at", date_to)
+            descending = sort_order == "desc"
+            sort_column = sort_by
+            if sort_by == "stated_total":
+                sort_column = f"quotation(stated_total_amount).{sort_order}"
+                if descending:
+                    sort_column += ".nullslast"
+                descending = False
             response = (
-                query.order(sort_by, desc=sort_order == "desc")
+                query.order(sort_column, desc=descending)
                 .order("id")
                 .range(offset, offset + capped_limit)
                 .execute()
