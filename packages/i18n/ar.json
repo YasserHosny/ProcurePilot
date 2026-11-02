@@ -4140,7 +4140,17 @@
       "splitSavingHint": "تقسيم هذا الطلب بين الموردين قد يوفّر {{money}}.",
       "openPreparedRequest": "فتح مسودة الطلب",
       "openRequest": "فتح الطلب",
-      "convertedReason": "تم تحويل طلب عروض الأسعار بالفعل إلى طلب شراء."
+      "convertedReason": "تم تحويل طلب عروض الأسعار بالفعل إلى طلب شراء.",
+      "stillBeingRead": "قيد القراءة حالياً",
+      "awaitingReview": "بانتظار المراجعة",
+      "mixedCurrenciesNotice": "الأسعار بأكثر من عملة واحدة — لا يمكن تحويل هذا الرد إلى طلب شراء",
+      "prepareErrorPendingMatches": "لا يمكن إعداد الطلب بينما توجد بنود غير مطابقة.",
+      "prepareErrorNoQuotationLines": "لا يحتوي هذا الرد على أي بنود لتحويلها إلى طلب شراء.",
+      "prepareErrorNoMatchedLines": "لم تتم مطابقة أي من البنود الواردة في هذا الرد مع منتجات الكتالوج.",
+      "prepareErrorNoPricingForRfqProducts": "لا يتضمن هذا الرد أسعاراً للمنتجات المطلوبة في طلب عروض الأسعار.",
+      "prepareErrorQuotationArchived": "تمت أرشفة عرض السعر هذا ولا يمكن تحويله إلى طلب شراء.",
+      "prepareErrorQuotationRefused": "رُفض عرض السعر هذا ولا يمكن استخدامه لإعداد طلب شراء.",
+      "prepareErrorMixedCurrencies": "الأسعار في هذا الرد واردة بأكثر من عملة واحدة."
     },
     "history": {
       "title": "سجل طلبات عروض الأسعار",
