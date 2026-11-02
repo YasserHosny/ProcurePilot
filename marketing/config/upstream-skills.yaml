@@ -1,0 +1,59 @@
+# Upstream marketing skills used by the Marketing OS.
+#
+# Source: https://github.com/coreyhaines31/marketingskills (MIT, Corey Haines)
+# Method: the repository's documented "Clone and Copy" install (README, Option 4), pinned to one commit and
+#         copied into .claude/skills/ (the project-level folder Claude Code reads). No upstream code is executed.
+# Sync:   npm run skills:sync          (installs exactly what this file lists, at `ref`)
+#         npm run skills:sync -- --ref main   (try the latest upstream; then copy the printed commit into `ref`)
+# Record: integrations/marketingskills/upstream-lock.json (commit, version, sha256 of every installed file)
+#
+# Upstream skill folders are never edited in place. Company rules live in CLAUDE.md and the custom skills
+# (marketing-orchestrator, product-discovery, campaign-operations, campaign-review), which take precedence.
+
+repository: https://github.com/coreyhaines31/marketingskills.git
+ref: 17772c7a80b7b8c7a47af30f648374cd8bd8adc5   # main on 2026-10-27, plugin version 2.13.5
+install_dir: .claude/skills
+license_copy: integrations/marketingskills/LICENSE
+lock_file: integrations/marketingskills/upstream-lock.json
+
+# Selected for organic B2B SaaS marketing. Grouped for reading; the installer treats them as one list.
+skills:
+  # Foundation and research
+  - product-marketing        # writes the shared context file .agents/product-marketing.md that every skill reads first
+  - customer-research        # voice of customer, JTBD, personas from real evidence
+  - competitor-profiling     # competitor dossiers from their URLs
+  - competitors              # comparison and alternative pages (SEO, buyer-facing)
+  - marketing-plan           # structured plans; market sizing only with sourced numbers
+  - marketing-ideas          # idea generation, filtered by our organic scope
+  - marketing-psychology     # persuasion principles, used without dark patterns
+  # Content, copy and creative
+  - content-strategy         # pillars, topic clusters, editorial planning
+  - copywriting              # website, product, landing page copy
+  - copy-editing             # editing and refreshing existing copy
+  - social                   # LinkedIn, Facebook, Instagram content (drafts only; no scheduling without approval)
+  - video                    # video briefs, scripts, production approach (rendering needs tools we may not have)
+  - image                    # image briefs and specs (generation needs a connected tool)
+  # Website, SEO and organic search
+  - seo-audit                # technical and on-page audits
+  - ai-seo                   # visibility in AI answers (AEO/GEO)
+  - site-architecture        # page hierarchy, URLs, internal linking
+  - schema                   # structured data recommendations
+  - link-building            # earned links and mentions (outreach needs approval)
+  # Conversion and measurement
+  - cro                      # landing page and form conversion reviews
+  - analytics                # tracking plans and measurement
+  - ab-testing               # experiment design
+  # Go-to-market support
+  - launch                   # product and feature announcements
+  - sales-enablement         # one-pagers, objection handling, battlecards
+  - lead-magnets             # organic demand generation assets
+
+# Deliberately not installed (out of the initial organic scope, or not relevant yet). Add one by moving it into
+# `skills` above and running npm run skills:sync. Paid media stays out until it is explicitly requested.
+not_installed:
+  paid_media: [ads, ad-creative, attribution]
+  outbound_contact: [cold-email, prospecting, sms]          # contacting people needs explicit authorization first
+  product_led_growth: [signup, onboarding, paywalls, popups, churn-prevention, referrals]
+  later_if_needed: [emails, pricing, offers, public-relations, events, community-marketing, co-marketing,
+                    influencer-marketing, directory-submissions, free-tools, programmatic-seo, conversion-tracking, revops, aso]
+  autonomous_or_simulated: [marketing-loops, marketing-council]  # recurring self-running loops conflict with our approval gates
