@@ -249,3 +249,34 @@ async def test_rfq_response_isolation() -> None:
             
             cur.execute("select count(*) from rfq_response where tenant_id = %s", (tenant_B,))
             assert cur.fetchone()[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_late_reply_kept_without_changing_stored_sent_status() -> None:
+    settings = get_settings()
+    test_db = settings.database_url.get_secret_value()
+    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, supplier_id = _seed_tenant_and_supplier(cur)
+            rfq_id, rec_id, msg_id = _seed_rfq_with_recipient(cur, tenant_id, supplier_id)
+            cur.execute(
+                "update rfq set needed_by_date = current_date - 1 where id = %s", (rfq_id,)
+            )
+        conn.commit()
+    result = process_inbound_email(
+        settings, tenant_id=tenant_id,
+        raw_email_bytes=_create_email_bytes(f"<{uuid.uuid4()}@mail.com>", in_reply_to=msg_id),
+        raw_email_ref="s3://path",
+    )
+    assert result["status"] == "completed"
+    assert result["match_method"] == "rfq_reply"
+    with psycopg.connect(test_db) as conn:
+        row = conn.execute(
+            "select r.status, resp.quotation_id from rfq r "
+            "join rfq_recipient rec on rec.rfq_id = r.id "
+            "join rfq_response resp on resp.rfq_recipient_id = rec.id "
+            "where r.id = %s and rec.id = %s", (rfq_id, rec_id),
+        ).fetchone()
+        assert row is not None
+        assert str(row[1]) == result["quotation_id"]
+        assert row[0] == "sent"

@@ -2990,7 +2990,8 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
   request it produced. Each `RfqSummary` also carries `converted_purchase_request_ids` (every
   purchase request prepared from the RFQ — one per supplier in a split) and `request_group_id`
   (the split's group, once prepared) (spec 024).
-- Optional `status` filter.
+- Expiry is derived at read time: a stored `sent` RFQ with `needed_by_date < current_date` reads
+  as `expired`, including in the optional `status` filter.
 - Scoped per FR-016, same creator-plus-owner/buyer pattern as every list endpoint in this release.
 - Returns `200` with an `RfqList`.
 
