@@ -353,6 +353,17 @@ class PsycopgTableQuery:
         self._where.append((column, "<", value))
         return self
 
+    def or_(self, expression: str) -> PsycopgTableQuery:
+        """Support the approval queue's timestamp/UUID keyset predicate."""
+        match = re.fullmatch(
+            r"created_at.lt.([^,]+),and\(created_at.eq.([^,]+),id.gt.([^)]+)\)",
+            expression,
+        )
+        if match is None or match[1] != match[2]:
+            raise NotImplementedError(f"test adapter does not support or_ {expression!r}")
+        self._where.append(("created_at", "keyset", (match[1].strip('"'), match[3])))
+        return self
+
     def gte(self, column: str, value: object) -> PsycopgTableQuery:
         self._where.append((column, ">=", value))
         return self
@@ -508,6 +519,11 @@ class PsycopgTableQuery:
         clauses: list[sql.SQL] = []
         params: list[object] = []
         for column, operator, value in self._where:
+            if operator == "keyset":
+                timestamp, step_id = value
+                clauses.append(sql.SQL("(created_at < %s or (created_at = %s and id > %s))"))
+                params.extend([timestamp, timestamp, step_id])
+                continue
             relation = None
             if "." in column:
                 embed, column = column.split(".", maxsplit=1)
