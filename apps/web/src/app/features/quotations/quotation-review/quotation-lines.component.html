@@ -78,7 +78,7 @@
                 <span class="line-original-text">{{ line.original_text }}</span>
               </mat-panel-title>
               <mat-panel-description class="line-panel-desc">
-                @if (computeLineTotal(line); as total) {
+                @if (lineTotals[line.id]; as total) {
                   <span class="line-summary-total">{{ { amount: total, currency: line.unit_price?.currency || effectiveCurrency } | formatMoney }}</span>
                 }
                 @if (isWriter && quotation.status !== 'reviewed' && !pendingRemoveLineIds.has(line.id)) {

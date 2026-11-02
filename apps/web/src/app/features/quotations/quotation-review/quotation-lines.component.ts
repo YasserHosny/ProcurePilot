@@ -12,7 +12,6 @@ import { TranslatePipe } from '@ngx-translate/core';
 
 import type {
   FieldExtraction,
-  Money,
   NewQuotationLine,
   QuotationDetail,
   QuotationLine,
@@ -20,6 +19,7 @@ import type {
 import { CurrencySymbolPipe } from '../../../core/format/currency-symbol.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { FormatService } from '../../../core/format/format.service';
+import { parseMoneyInput } from '../../../core/format/money-input';
 import { sameReviewedValue } from './reviewed-value';
 
 export function trimDecimalZeros(value: string): string {
@@ -55,6 +55,7 @@ export class QuotationLinesComponent {
   readonly trimDecimalZeros = trimDecimalZeros;
 
   @Input({ required: true }) quotation!: QuotationDetail;
+  @Input({ required: true }) lineTotals: Record<string, string | null> = {};
   @Input({ required: true }) effectiveCurrency = 'USD';
   @Input({ required: true }) activeExtraction: FieldExtraction | null = null;
   @Input({ required: true }) isWriter = false;
@@ -172,8 +173,9 @@ export class QuotationLinesComponent {
 
   formatUnitPrice(value: string | number | null | undefined): string {
     if (value === null || value === undefined || value === '') return '0';
-    const num = typeof value === 'number' ? value : parseFloat(value);
-    if (isNaN(num)) return '0';
+    const parsed = parseMoneyInput(value);
+    if (parsed === null) return '0';
+    const num = Number(parsed);
     const rounded = Math.round(num * 100) / 100;
     return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
   }
@@ -205,9 +207,12 @@ export class QuotationLinesComponent {
     if (!trimmedA || !trimmedB) {
       return false;
     }
-    const na = Number(trimmedA);
-    const nb = Number(trimmedB);
-    return !isNaN(na) && !isNaN(nb) && na === nb;
+    const parsedA = parseMoneyInput(trimmedA);
+    const parsedB = parseMoneyInput(trimmedB);
+    if (parsedA === null || parsedB === null) {
+      return false;
+    }
+    return Number(parsedA) === Number(parsedB);
   }
 
   onUnitPriceChange(line: QuotationLine, targetValue: string): void {
@@ -260,12 +265,13 @@ export class QuotationLinesComponent {
   }
 
   formatLineTotalDisplay(line: QuotationLine): string {
-    const rawTotal = this.computeLineTotal(line);
+    const rawTotal = this.lineTotals[line.id];
     if (rawTotal === null || rawTotal === undefined || rawTotal === '') {
       return '—';
     }
-    const num = parseFloat(rawTotal);
-    if (isNaN(num)) return '—';
+    const parsed = parseMoneyInput(rawTotal);
+    if (parsed === null) return '—';
+    const num = Number(parsed);
 
     const isZero = Math.abs(num) < 0.005;
     const normalized = isZero ? 0 : num;
@@ -287,26 +293,6 @@ export class QuotationLinesComponent {
   ): number {
     const fe = this.getFieldExtraction(entityType, entityId, fieldName);
     return fe ? parseFloat(fe.confidence) : 1;
-  }
-
-  computeLineTotal(line: QuotationLine): string | null {
-    const qtyVal = this.getEffectiveValue(
-      'quotation_line',
-      line.id,
-      'quantity',
-      line.quantity || '1',
-    );
-    const priceVal = this.getEffectiveValue(
-      'quotation_line',
-      line.id,
-      'unit_price',
-      line.unit_price,
-    );
-    const qty = parseFloat(String(qtyVal));
-    const priceObj = priceVal as Money | null | undefined;
-    const price = priceObj ? parseFloat(priceObj.amount) : 0;
-    if (isNaN(qty) || isNaN(price)) return null;
-    return (qty * price).toFixed(2);
   }
 
   formatConfidence(score: string | number): number {

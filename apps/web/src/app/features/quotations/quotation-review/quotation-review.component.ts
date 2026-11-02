@@ -41,6 +41,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { CurrencySymbolPipe } from '../../../core/format/currency-symbol.pipe';
 import { FormatExtractionPipe } from '../../../core/format/extraction-value.pipe';
+import { parseMoneyInput } from '../../../core/format/money-input';
 import { QuotationReviewBannersComponent } from './quotation-review-banners.component';
 import { QuotationDocPreviewComponent } from './quotation-doc-preview.component';
 import { QuotationLinesComponent } from './quotation-lines.component';
@@ -319,15 +320,47 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     };
   });
 
+  readonly lineTotals = computed<Record<string, string | null>>(() => {
+    const q = this.quotation();
+    if (!q) return {};
+    const totals: Record<string, string | null> = {};
+    for (const line of q.lines) {
+      totals[line.id] = this.computeLineTotal(line);
+    }
+    return totals;
+  });
+
+  readonly effectiveStatedTotal = computed<Money | null>(() => {
+    const q = this.quotation();
+    if (!q) return null;
+    const fe = this.getFieldExtraction('quotation', q.id, 'stated_total');
+    if (fe && this.pendingCorrections().has(fe.id)) {
+      const correction = this.pendingCorrections().get(fe.id);
+      if (correction && typeof correction === 'object' && 'amount' in correction) {
+        const parsed = parseMoneyInput((correction as { amount: unknown }).amount);
+        if (parsed !== null) {
+          return {
+            amount: parsed,
+            currency:
+              (correction as { currency?: string }).currency ||
+              this.effectiveQuotationCurrency(),
+          };
+        }
+      }
+    }
+    return q.stated_total ?? null;
+  });
+
   // Whether there is an arithmetic mismatch (client-side authoritative)
   readonly hasArithmeticMismatch = computed<boolean>(() => {
     const q = this.quotation();
     if (!q) return false;
 
     const computedTotal = this.computedLinesTotal();
-    if (!q.stated_total?.amount || !computedTotal) return false;
+    const statedTotal = this.effectiveStatedTotal();
+    if (!statedTotal?.amount || !computedTotal) return false;
 
-    const stated = parseFloat(q.stated_total.amount);
+    const stated = parseFloat(statedTotal.amount);
     const computed = parseFloat(computedTotal.amount);
     if (Math.abs(stated - computed) <= 0.01) return false;
 
@@ -348,7 +381,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const q = this.quotation();
     if (!q) return false;
     const computedTotal = this.computedLinesTotal();
-    if (!q.stated_total?.amount || !computedTotal) return false;
+    const statedTotal = this.effectiveStatedTotal();
+    if (!statedTotal?.amount || !computedTotal) return false;
     return !this.hasArithmeticMismatch();
   });
 
@@ -356,8 +390,9 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const q = this.quotation();
     if (!q) return null;
     const computedTotal = this.computedLinesTotal();
-    if (!q.stated_total?.amount || !computedTotal) return null;
-    const stated = parseFloat(q.stated_total.amount);
+    const statedTotal = this.effectiveStatedTotal();
+    if (!statedTotal?.amount || !computedTotal) return null;
+    const stated = parseFloat(statedTotal.amount);
     const computed = parseFloat(computedTotal.amount);
     if (Math.abs(stated - computed) <= 0.01) return null;
     const hasLineVat = this.hasEffectiveLineVat();
@@ -374,10 +409,12 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   readonly arithmeticDifference = computed<string | null>(() => {
     const q = this.quotation();
     const computedTotal = this.computedLinesTotal();
-    if (!q?.stated_total?.amount || !computedTotal) return null;
+    const statedTotal = this.effectiveStatedTotal();
+    if (!q || !statedTotal?.amount || !computedTotal) return null;
 
-    const diff = parseFloat(computedTotal.amount) - parseFloat(q.stated_total.amount);
-    return diff.toFixed(2);
+    const diff = parseFloat(computedTotal.amount) - parseFloat(statedTotal.amount);
+    const normalizedDiff = Math.abs(diff) < 0.0001 ? 0 : diff;
+    return normalizedDiff.toFixed(2);
   });
 
   readonly hasPendingReviewChanges = computed<boolean>(() => {
@@ -781,9 +818,19 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     return !!fe && fe.field_name === 'currency' && parseFloat(fe.confidence) < 0.85;
   }
 
-  normalizeMoneyInput(value: string): string {
-    const normalised = value.replace(/[^0-9.-]/g, '');
-    return normalised || '0';
+  onStatedTotalInput(q: QuotationDetail, rawValue: unknown, commit = false): void {
+    const parsed = parseMoneyInput(rawValue);
+    if (parsed === null) return;
+    const fe = this.getFieldExtraction('quotation', q.id, 'stated_total');
+    if (!fe) return;
+    const value: Money = {
+      amount: parsed,
+      currency: this.effectiveQuotationCurrency(),
+    };
+    this.updateCorrection(fe.id, value);
+    if (commit) {
+      this.reviewFieldValue('quotation', q.id, 'stated_total', value);
+    }
   }
 
   selectField(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): void {
@@ -1384,9 +1431,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   }
 
   private parseNumericInput(value: unknown, fallback: number): number {
-    const rawValue = this.moneyAmount(value);
-    const parsed = typeof rawValue === 'number' ? rawValue : parseFloat(String(rawValue ?? ''));
-    return Number.isFinite(parsed) ? parsed : fallback;
+    const parsed = parseMoneyInput(this.moneyAmount(value));
+    return parsed !== null ? Number(parsed) : fallback;
   }
 
   private moneyAmount(value: unknown): string | number | null {
@@ -1525,11 +1571,13 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const text = this.newLineText().trim();
     if (!text) return;
     const currency = this.effectiveQuotationCurrency();
+    const quantity = parseMoneyInput(this.newLineQuantity());
+    const unitPriceAmount = parseMoneyInput(this.newLinePriceAmount());
     const newLine: NewQuotationLine = {
       original_text: text,
-      quantity: this.newLineQuantity() || null,
-      unit_price_amount: this.newLinePriceAmount() || null,
-      unit_price_currency: this.newLinePriceAmount() ? currency : null,
+      quantity,
+      unit_price_amount: unitPriceAmount,
+      unit_price_currency: unitPriceAmount ? currency : null,
     };
     this.pendingNewLines.update(lines => [...lines, newLine]);
     this.isAddingLine.set(false);

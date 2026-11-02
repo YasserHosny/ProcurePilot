@@ -11,7 +11,7 @@ import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { ApiError, AuditTrailEntry, FieldExtraction, Quotation, QuotationDetail, Role, Supplier } from '../../../core/api/models';
+import type { ApiError, AuditTrailEntry, FieldExtraction, Money, Quotation, QuotationDetail, Role, Supplier } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { QuotationReviewComponent } from './quotation-review.component';
@@ -2052,6 +2052,202 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       expect(apiService.getQuotation).not.toHaveBeenCalledWith('quote-A');
       expect(component.quotation()?.id).toBe('quote-B');
       expect(component.isRetryingExtraction()).toBeFalse();
+    });
+  });
+
+  describe('Money parsing and totals (PPS-157 / P-125)', () => {
+    it('(a) with lines totalling 1234.56 and a pending stated-total correction {amount: "1234.56"} the arithmetic banner is reconciled and arithmeticDifference() is "0.00"', () => {
+      const q: QuotationDetail = {
+        ...mockQuotationDetail,
+        currency: 'GBP',
+        prices_include_vat: true,
+        vat_rate: null,
+        stated_total: { amount: '999.00', currency: 'GBP' },
+        lines: [
+          {
+            ...mockQuotationDetail.lines[0],
+            quantity: '1',
+            unit_price: { amount: '1234.56', currency: 'GBP' },
+            vat_rate: null,
+            delivery_fee: null,
+            discount: null,
+          },
+        ],
+        field_extractions: [
+          {
+            ...mockQuotationDetail.field_extractions[0],
+            id: 'fe-stated-total',
+            entity_type: 'quotation',
+            entity_id: 'q-review-1',
+            field_name: 'stated_total',
+            extracted_value: { amount: '999.00', currency: 'GBP' },
+            confidence: '0.9000',
+            corrected_value: null,
+          },
+        ],
+      };
+      component.quotation.set(q);
+      fixture.detectChanges();
+
+      expect(component.hasArithmeticMismatch()).toBeTrue();
+      expect(component.isArithmeticReconciled()).toBeFalse();
+
+      component.updateCorrection('fe-stated-total', { amount: '1234.56', currency: 'GBP' });
+      fixture.detectChanges();
+
+      expect(component.hasArithmeticMismatch()).toBeFalse();
+      expect(component.isArithmeticReconciled()).toBeTrue();
+      expect(component.arithmeticDifference()).toBe('0.00');
+
+      component.revertToAiValue('fe-stated-total');
+      fixture.detectChanges();
+
+      expect(component.hasArithmeticMismatch()).toBeTrue();
+      expect(component.isArithmeticReconciled()).toBeFalse();
+    });
+
+    it('(b) typing "٣٠٠" into the stated-total handler writes amount "300", typing "abc" writes nothing', () => {
+      const feStatedTotal: FieldExtraction = {
+        ...mockQuotationDetail.field_extractions[0],
+        id: 'fe-stated-total',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'stated_total',
+        extracted_value: { amount: '250.00', currency: 'GBP' },
+      };
+      const q: QuotationDetail = {
+        ...mockQuotationDetail,
+        field_extractions: [feStatedTotal],
+      };
+      component.quotation.set(q);
+      fixture.detectChanges();
+
+      component.onStatedTotalInput(q, '٣٠٠');
+      expect(component.pendingCorrections().get('fe-stated-total')).toEqual({
+        amount: '300',
+        currency: 'GBP',
+      });
+
+      // Clear pending corrections and verify 'abc' writes nothing
+      component.pendingCorrections.set(new Map());
+      component.onStatedTotalInput(q, 'abc');
+      expect(component.pendingCorrections().has('fe-stated-total')).toBeFalse();
+    });
+
+    it('(c) typing "1.234,56" writes "1234.56"', () => {
+      const feStatedTotal: FieldExtraction = {
+        ...mockQuotationDetail.field_extractions[0],
+        id: 'fe-stated-total',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'stated_total',
+        extracted_value: { amount: '250.00', currency: 'GBP' },
+      };
+      const q: QuotationDetail = {
+        ...mockQuotationDetail,
+        field_extractions: [feStatedTotal],
+      };
+      component.quotation.set(q);
+      fixture.detectChanges();
+
+      component.onStatedTotalInput(q, '1.234,56');
+      expect(component.pendingCorrections().get('fe-stated-total')).toEqual({
+        amount: '1234.56',
+        currency: 'GBP',
+      });
+    });
+
+    it('(d) a line with quantity 2, unit price 10, delivery 5, discount 3, VAT 0.15 on a VAT-exclusive quote shows a line total equal to the parent computeLineTotal (25.30) and on prices_include_vat quote 22.00', () => {
+      const line = {
+        ...mockQuotationDetail.lines[0],
+        id: 'line-test-1',
+        quantity: '2',
+        unit_price: { amount: '10.00', currency: 'GBP' },
+        delivery_fee: { amount: '5.00', currency: 'GBP' },
+        discount: { amount: '3.00', currency: 'GBP' },
+        vat_rate: '0.15',
+      };
+      const exclusiveQuote: QuotationDetail = {
+        ...mockQuotationDetail,
+        prices_include_vat: false,
+        lines: [line],
+      };
+      component.quotation.set(exclusiveQuote);
+      fixture.detectChanges();
+
+      const exclusiveLineTotal = component.computeLineTotal(line);
+      expect(exclusiveLineTotal).toBe('25.30');
+      expect(component.lineTotals()['line-test-1']).toBe('25.30');
+
+      const inclusiveQuote: QuotationDetail = {
+        ...mockQuotationDetail,
+        prices_include_vat: true,
+        lines: [line],
+      };
+      component.quotation.set(inclusiveQuote);
+      fixture.detectChanges();
+
+      const inclusiveLineTotal = component.computeLineTotal(line);
+      expect(inclusiveLineTotal).toBe('22.00');
+      expect(component.lineTotals()['line-test-1']).toBe('22.00');
+    });
+
+    it('(e) addNewLine with quantity "٢" and price "١٢٫٥" calls the API with "2" and "12.5"', () => {
+      component.quotation.set(mockQuotationDetail);
+      fixture.detectChanges();
+
+      component.newLineText.set('Arabic Digit Item');
+      component.newLineQuantity.set('٢');
+      component.newLinePriceAmount.set('١٢٫٥');
+      component.addNewLine();
+
+      expect(component.pendingNewLines()).toEqual([
+        jasmine.objectContaining({
+          original_text: 'Arabic Digit Item',
+          quantity: '2',
+          unit_price_amount: '12.5',
+          unit_price_currency: 'GBP',
+        }),
+      ]);
+
+      apiService.patchQuotation.and.returnValue(of(mockQuotationDetail));
+      component.saveCorrections();
+
+      expect(apiService.patchQuotation).toHaveBeenCalledWith(
+        'q-review-1',
+        jasmine.objectContaining({
+          add_lines: [
+            jasmine.objectContaining({
+              quantity: '2',
+              unit_price_amount: '12.5',
+            }),
+          ],
+        }),
+      );
+    });
+
+    it('(f) after pendingQuotationCurrency (or the currency correction) changes to "EGP" a stated-total edit carries currency "EGP"', () => {
+      const feStatedTotal: FieldExtraction = {
+        ...mockQuotationDetail.field_extractions[0],
+        id: 'fe-stated-total',
+        entity_type: 'quotation',
+        entity_id: 'q-review-1',
+        field_name: 'stated_total',
+        extracted_value: { amount: '250.00', currency: 'GBP' },
+      };
+      const q: QuotationDetail = {
+        ...mockQuotationDetail,
+        field_extractions: [feStatedTotal],
+      };
+      component.quotation.set(q);
+      fixture.detectChanges();
+
+      component.currencySelectionChanged('EGP');
+      component.onStatedTotalInput(q, '500');
+
+      const corr = component.pendingCorrections().get('fe-stated-total') as Money;
+      expect(corr.currency).toBe('EGP');
+      expect(corr.amount).toBe('500');
     });
   });
 });
