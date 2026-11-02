@@ -383,3 +383,51 @@
     flex-wrap: wrap;
   }
 }
+
+.load-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-block: 4rem;
+  padding-inline: 1.5rem;
+  text-align: center;
+  gap: 1rem;
+  max-width: 540px;
+  margin-inline: auto;
+
+  .load-error-icon {
+    font-size: 48px;
+    inline-size: 48px;
+    block-size: 48px;
+    color: var(--pp-error);
+  }
+
+  .load-error-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--pp-text-strong);
+  }
+
+  .load-error-message {
+    font-size: 1rem;
+    color: var(--pp-text-muted);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .load-error-trace {
+    font-size: 0.75rem;
+    font-family: monospace;
+    color: var(--pp-text-muted);
+  }
+
+  .load-error-actions {
+    display: flex;
+    gap: 1rem;
+    margin-block-start: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}

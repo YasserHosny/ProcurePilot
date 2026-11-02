@@ -926,6 +926,12 @@
       "clearFilters": "Clear filters"
     },
     "review": {
+      "loadError": {
+        "title": "Unable to load quotation",
+        "notFound": "Quotation not found",
+        "retry": "Retry",
+        "backToInbox": "Back to the inbox"
+      },
       "nextStep": {
         "title": "Next step",
         "description": "This quotation is confirmed. Match the extracted lines to your catalogue products to compare prices.",
