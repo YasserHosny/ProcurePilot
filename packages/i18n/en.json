@@ -1387,10 +1387,10 @@
       "readOnlyBanner": "You have view-only access. Only workspace owners and buyers can resolve matches and create catalogue products.",
       "keyboardShortcutsTitle": "Keyboard Controls",
       "shortcuts": {
-        "selectCandidate": "1–9: Select Candidate",
-        "navigate": "↑ / ↓: Navigate Candidates",
-        "confirm": "Enter: Confirm Decision",
-        "toggleOutcome": "O: Cycle Outcomes"
+        "selectCandidate": "Select candidate",
+        "navigate": "Navigate candidates",
+        "confirm": "Confirm decision",
+        "toggleOutcome": "Cycle outcomes"
       },
       "lineDetails": {
         "title": "Quotation Line Details",
