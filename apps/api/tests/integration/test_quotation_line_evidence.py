@@ -415,3 +415,77 @@ def test_removal_snapshot_includes_same_patch_corrections(review: ReviewContext)
             next(e for e in events if e.action == "quotation.line_removed").target["quantity"]
             == "3.000000"
         )
+
+
+@pytest.mark.parametrize(
+    ("name", "invalid", "valid"),
+    [
+        (
+            "stated_total",
+            {"amount": "12,5", "currency": "GBP"},
+            {"amount": "12.5", "currency": "USD"},
+        ),
+        ("stated_total", {"amount": "12.5"}, {"amount": "12.5", "currency": "USD"}),
+        (
+            "stated_total",
+            {"amount": "12.5", "currency": "ZZZ"},
+            {"amount": "12.5", "currency": "USD"},
+        ),
+        ("currency", "ZZZ", "USD"),
+        ("currency", None, "USD"),
+    ],
+)
+def test_rejected_header_correction_preserves_evidence_and_allows_retry(
+    review: ReviewContext, name: str, invalid: object, valid: object
+) -> None:
+    conn, ws, q, _, events, apply = review
+    with conn.cursor() as cur:
+        field = (
+            q.field_id
+            if name == "currency"
+            else make_field(cur, ws, q.quotation_id, field_name=name)
+        )
+        cur.execute(
+            "update quotation set stated_total_amount=24,stated_total_currency='GBP' where id=%s",
+            (q.quotation_id,),
+        )
+        cur.execute("select * from field_extraction where id=%s", (field,))
+        evidence_before = cur.fetchone()
+        cur.execute("select * from quotation where id=%s", (q.quotation_id,))
+        quotation_before = cur.fetchone()
+        with pytest.raises(ConflictError) as error:
+            apply(
+                QuotationReviewPatch(
+                    reviewer_notes="must not persist",
+                    corrections=[
+                        FieldCorrection(field_extraction_id=field, corrected_value=invalid)
+                    ],
+                )
+            )
+        assert error.value.details == {"reason": f"invalid_{name}_correction"}
+        cur.execute("select * from field_extraction where id=%s", (field,))
+        assert cur.fetchone() == evidence_before
+        cur.execute("select * from quotation where id=%s", (q.quotation_id,))
+        assert cur.fetchone() == quotation_before
+        assert events == []
+
+        apply(
+            QuotationReviewPatch(
+                corrections=[FieldCorrection(field_extraction_id=field, corrected_value=valid)]
+            )
+        )
+        cur.execute(
+            "select corrected_value,corrected_by,corrected_at from field_extraction where id=%s",
+            (field,),
+        )
+        corrected_value, corrected_by, corrected_at = cur.fetchone()
+        assert corrected_value == valid
+        assert corrected_by == ws.membership_id
+        assert corrected_at is not None
+        cur.execute(
+            "select currency,stated_total_amount,stated_total_currency from quotation where id=%s",
+            (q.quotation_id,),
+        )
+        assert cur.fetchone() == (
+            ("USD", Decimal("24"), "GBP") if name == "currency" else ("GBP", Decimal("12.5"), "USD")
+        )

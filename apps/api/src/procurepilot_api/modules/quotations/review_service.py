@@ -131,6 +131,12 @@ class QuotationReviewService:
                     QuotationReviewPatch(**{str(field_name): correction.corrected_value})
                 except ValidationError as exc:
                     raise ConflictError(details={"reason": "invalid_vat_correction"}) from exc
+            if (
+                field.get("corrected_by") is None
+                and field.get("entity_type") == "quotation"
+                and field_name in {"stated_total", "currency"}
+            ):
+                _validate_header_correction(client, str(field_name), correction.corrected_value)
             is_date_field = field_name in {"issue_date", "expiry_date"}
             if (
                 field.get("corrected_by") is None
@@ -603,52 +609,69 @@ def _line_correction_payload(name: str, value: object) -> dict[str, object]:
     return {}
 
 
+def _check_number(raw: object, *, scale: int, precision: int, reason: str) -> Decimal:
+    if isinstance(raw, bool) or not isinstance(raw, (str, int, float, Decimal)):
+        raise ConflictError(details={"reason": reason})
+    try:
+        result = Decimal(str(raw))
+    except InvalidOperation as exc:
+        raise ConflictError(details={"reason": reason}) from exc
+    if not result.is_finite():
+        raise ConflictError(details={"reason": reason})
+    if abs(result) >= Decimal(10) ** (precision - scale):
+        raise ConflictError(details={"reason": reason})
+    if result != result.quantize(Decimal(10) ** -scale):
+        raise ConflictError(details={"reason": reason})
+    return result
+
+
+def _check_reference(client: object, table: str, code: object, *, reason: str) -> None:
+    if not isinstance(code, str) or not _rows(
+        client.table(table).select("code").eq("code", code).limit(1).execute().data
+    ):
+        raise ConflictError(details={"reason": reason})
+
+
+def _validate_money(client: object, value: object, *, reason: str) -> None:
+    if not isinstance(value, dict) or set(value) != {"amount", "currency"}:
+        raise ConflictError(details={"reason": reason})
+    _check_number(value["amount"], scale=4, precision=18, reason=reason)
+    _check_reference(client, "supported_currency", value["currency"], reason=reason)
+
+
+def _validate_header_correction(client: object, name: str, value: object) -> None:
+    reason = f"invalid_{name}_correction"
+    if name == "stated_total":
+        _validate_money(client, value, reason=reason)
+    elif name == "currency":
+        _check_reference(client, "supported_currency", value, reason=reason)
+    else:
+        raise ConflictError(details={"reason": reason})
+
+
 def _validate_line_correction(client: object, name: str, value: object) -> None:
     reason = f"invalid_{name}_correction"
 
     def reject() -> NoReturn:
         raise ConflictError(details={"reason": reason})
 
-    def number(raw: object, *, scale: int, precision: int) -> Decimal:
-        if isinstance(raw, bool) or not isinstance(raw, (str, int, float, Decimal)):
-            reject()
-        try:
-            result = Decimal(str(raw))
-        except InvalidOperation:
-            reject()
-        if not result.is_finite():
-            reject()
-        if abs(result) >= Decimal(10) ** (precision - scale):
-            reject()
-        if result != result.quantize(Decimal(10) ** -scale):
-            reject()
-        return result
-
-    def reference(table: str, code: object) -> None:
-        if not isinstance(code, str) or not _rows(
-            client.table(table).select("code").eq("code", code).limit(1).execute().data
-        ):
-            reject()
-
     if name in {"unit_price", "delivery_fee", "discount", "line_total"}:
-        if not isinstance(value, dict) or set(value) != {"amount", "currency"}:
-            reject()
-        number(value["amount"], scale=4, precision=18)
-        reference("supported_currency", value["currency"])
+        _validate_money(client, value, reason=reason)
     elif name in {"quantity", "unit_size", "pack_count"}:
-        result = number(
+        result = _check_number(
             value,
             scale=0 if name == "pack_count" else 6,
             precision=10 if name == "pack_count" else 18,
+            reason=reason,
         )
         if result <= 0 or (name == "pack_count" and result > 2147483647):
             reject()
     elif name == "vat_rate":
-        result = number(value, scale=4, precision=5)
+        result = _check_number(value, scale=4, precision=5, reason=reason)
         if not 0 <= result <= 1:
             reject()
     elif name == "pack_unit":
-        reference("supported_base_unit", value)
+        _check_reference(client, "supported_base_unit", value, reason=reason)
     elif name in {"description", "original_text", "pack_text"}:
         if not isinstance(value, str) or not value.strip():
             reject()
