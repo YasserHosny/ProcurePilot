@@ -140,6 +140,10 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-113 | PPS-144 | P-114 | PPS-145 | P-115 | PPS-146 |
 | P-116 | PPS-147 | P-117 | PPS-148 | P-118 | PPS-149 |
 | P-119 | PPS-150 | P-120 | PPS-151 | P-121 | PPS-152 |
+| P-122 | PPS-154 | P-123 | PPS-155 | P-124 | PPS-156 |
+| P-125 | PPS-157 | P-126 | PPS-158 | P-127 | PPS-159 |
+| P-128 | PPS-160 | P-129 | PPS-161 | P-130 | PPS-162 |
+| P-131 | PPS-163 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -319,6 +323,16 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-119 | — | Submitting a split shows the single-request toast «تم إرسال طلب الشراء للاعتماد.» instead of one for the split (W4). Low | — | — | To Do (PPS-150) |
 | [ ] P-120 | — | Phone: a split's requests are shown by their full UUID and the queue card has no card frame (W5). Low | — | — | To Do (PPS-151) |
 | [ ] P-121 | — | The split enqueue 503 hides the Redis cause: `_enqueue_redis_job` in `basket_service.py` now logs the job id, queue and exception before raising (found in the round-1 run on «مطاعم رواق» 2026-10-31, `POST /rfq/{id}/split` → 503 `dependency=redis`; likely cause PPS-146). Twin of P-116. Low | Orch (Claude) | — | In Review (PPS-152, #386) |
+| [ ] P-122 | — | Quotation queue: «All Statuses» returns nothing (UI sends no status, API defaults to open) and sorting by Stated Total returns 503 (reproduced live on «مطاعم رواق» 2026-11-02, B1/B4). High | — | — | To Do (PPS-154) |
+| [ ] P-123 | — | Quotation queue: search runs after one DB page, To-date drops the last day, filter responses race (B2/B3/B6, Codex static review). High | — | — | To Do (PPS-155) |
+| [ ] P-124 | — | Quotation detail: unknown ID renders a blank page (reproduced live), prior-version link keeps the old quotation (B7/B8). High | — | — | To Do (PPS-156) |
+| [ ] P-125 | — | Quotation review: pending totals and money parsing disagree, `1.234,56` and Arabic digits mis-parsed (B11). High | — | — | To Do (PPS-157) |
+| [ ] P-126 | — | Quotation review: not every extracted field is correctable, line removal deletes evidence, no source highlight, supplier-only Save disabled (B10/B12). High, owner scope call first | — | — | To Do (PPS-158) |
+| [ ] P-127 | — | Quotation bulk actions swallow failures; retry/replace-document leave the page on «extracting» (B5/B13). High | — | — | To Do (PPS-159) |
+| [ ] P-128 | — | «Create re-quote» loses its source link and is hidden on reviewed quotations (B9). High | — | — | To Do (PPS-160) |
+| [ ] P-129 | — | Quotation CSV export: spreadsheet formula injection, missing currency/status columns (B14). Medium; neutral commit text, repo is public | — | — | To Do (PPS-161) |
+| [ ] P-130 | — | Quotation screens: confirm dialog a11y, hardcoded English labels, no result/sort announcements (B15). Medium; run axe + RTL first | — | — | To Do (PPS-162) |
+| [ ] P-131 | — | Quotation inbox UX: URL-backed filters, chips, result count, supplier/reason/lifecycle filters, one next-step prompt. Medium, owner scope call first | — | — | To Do (PPS-163) |
 
 ### E — Pilot environment
 
