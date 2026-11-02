@@ -181,43 +181,45 @@ class QuotationService:
         client = authenticated_client(self._settings, bearer_token)
         capped_limit = max(1, min(limit, 100))
         offset = _decode_cursor(cursor)
-        clean_search = search.strip()[:200].lower() if search else None
+        clean_search = search.strip()[:200].lower() if search else ""
         try:
-            search_filters: list[str] = []
+            supplier_ids: list[str] = []
+            id_bounds: tuple[str, str] | None = None
             if clean_search:
-                supplier_term = clean_search.translate(str.maketrans("", "", ",()"))
-                if supplier_term.strip():
-                    escaped = (
-                        supplier_term.replace("\\", "\\\\")
-                        .replace("%", "\\%")
-                        .replace("_", "\\_")
-                        .replace("*", "\\*")
-                    )
-                    supplier_matches = (
-                        client.table("quotation")
-                        .select("id,supplier!quotation_supplier_id_fkey!inner(name)")
-                        .ilike("supplier.name", f"*{escaped}*")
-                        .limit(150)
-                        .execute()
-                    )
-                    quotation_ids = [str(row["id"]) for row in _rows(supplier_matches.data)]
-                    if quotation_ids:
-                        search_filters.append(f"quotation_id.in.({','.join(quotation_ids)})")
-                prefix = clean_search.replace("-", "")
-                if 1 <= len(prefix) <= 32 and all(c in "0123456789abcdef" for c in prefix):
-                    lo = UUID(hex=prefix.ljust(32, "0"))
-                    hi = UUID(hex=prefix.ljust(32, "f"))
-                    search_filters.append(f"and(quotation_id.gte.{lo},quotation_id.lte.{hi})")
-                if not search_filters:
-                    return ReviewTaskList(items=[], next_cursor=None)
+                escaped = (
+                    clean_search.replace("\\", "\\\\")
+                    .replace("%", "\\%")
+                    .replace("_", "\\_")
+                    .replace("*", "\\*")
+                )
+                supplier_matches = (
+                    client.table("supplier")
+                    .select("id")
+                    .ilike("name", f"*{escaped}*")
+                    .order("name")
+                    .limit(500)
+                    .execute()
+                )
+                supplier_ids = [str(row["id"]) for row in _rows(supplier_matches.data)]
+                if not supplier_ids:
+                    prefix = clean_search.replace("-", "")
+                    if 1 <= len(prefix) <= 32 and all(c in "0123456789abcdef" for c in prefix):
+                        id_bounds = (
+                            str(UUID(hex=prefix.ljust(32, "0"))),
+                            str(UUID(hex=prefix.ljust(32, "f"))),
+                        )
+                    else:
+                        return ReviewTaskList(items=[], next_cursor=None)
             _sync_open_review_tasks(client, self._settings.extraction_confidence_threshold)
             query = (
                 client.table("review_task")
                 .select(TASK_LIST_COLUMNS)
                 .filter("quotation.deleted_at", "is", "null")
             )
-            if search_filters:
-                query = query.or_(",".join(search_filters))
+            if supplier_ids:
+                query = query.in_("quotation.supplier_id", supplier_ids)
+            elif id_bounds is not None:
+                query = query.gte("quotation_id", id_bounds[0]).lte("quotation_id", id_bounds[1])
             if status != "all":
                 query = query.eq("status", status)
             if priority is not None:

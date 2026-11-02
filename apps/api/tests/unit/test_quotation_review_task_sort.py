@@ -67,17 +67,26 @@ class FakeQuery:
 
     def execute(self) -> SimpleNamespace:
         self.executed = True
-        return SimpleNamespace(data=self.data)
+        data = self.data
+        if self.limit_count is not None:
+            data = data[: self.limit_count]
+        if self.range_args is not None:
+            start, end = self.range_args
+            data = data[start : end + 1]
+        return SimpleNamespace(data=data)
 
 
 class FakeClient:
     def __init__(self) -> None:
         self.review_task_query = FakeQuery()
         self.quotation_query = FakeQuery()
+        self.supplier_query = FakeQuery()
         self.tables: list[str] = []
 
     def table(self, name: str) -> FakeQuery:
         self.tables.append(name)
+        if name == "supplier":
+            return self.supplier_query
         if name == "quotation":
             return self.quotation_query
         assert name == "review_task"
@@ -154,9 +163,6 @@ def test_status_filter_preserves_all_resolved_and_default_open(
         assert ("eq", "status", status or "open") in filters
 
 
-SUPPLIER_QUOTATION_ID = "12345678-1234-1234-1234-123456789abc"
-
-
 def test_list_uses_inner_quotation_and_database_archive_filter(client: FakeClient) -> None:
     QuotationService().list_review_tasks(bearer_token="dummy")
 
@@ -169,42 +175,56 @@ def test_list_uses_inner_quotation_and_database_archive_filter(client: FakeClien
     assert "quotation!inner" not in quotation_service_module.TASK_COLUMNS
 
 
-def test_supplier_search_looks_up_quotations_before_filtering_tasks(client: FakeClient) -> None:
-    client.quotation_query.data = [{"id": SUPPLIER_QUOTATION_ID}]
+SUPPLIER_IDS = ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
+
+
+def test_supplier_search_filters_embedded_supplier_without_quotation_lookup(
+    client: FakeClient,
+) -> None:
+    client.supplier_query.data = [{"id": supplier_id} for supplier_id in SUPPLIER_IDS]
 
     QuotationService().list_review_tasks(bearer_token="dummy", search="  FRESH  ")
 
-    assert client.tables == ["quotation", "review_task"]
-    assert client.quotation_query.columns == "id,supplier!quotation_supplier_id_fkey!inner(name)"
-    assert client.quotation_query.filters == [("ilike", "supplier.name", "*fresh*")]
-    assert client.quotation_query.limit_count == 150
-    assert client.quotation_query.executed
-    assert client.review_task_query.or_filters == [f"quotation_id.in.({SUPPLIER_QUOTATION_ID})"]
+    assert client.tables == ["supplier", "review_task"]
+    assert client.supplier_query.columns == "id"
+    assert client.supplier_query.filters == [("ilike", "name", "*fresh*")]
+    assert client.supplier_query.orders == [("name", False)]
+    assert client.supplier_query.limit_count == 500
+    assert client.supplier_query.executed
+    assert ("in", "quotation.supplier_id", SUPPLIER_IDS) in client.review_task_query.filters
+    assert client.review_task_query.or_filters == []
+    assert "quotation" not in client.tables
 
 
-@pytest.mark.parametrize("supplier_match", [False, True])
 @pytest.mark.parametrize(
     "prefix",
     ["c4cf2e80", "c", "c4cf2e80-1234", "c4cf2e80-1234-5678-9abc-def012345678"],
 )
-def test_uuid_prefix_search_uses_range_in_same_or(
-    client: FakeClient, supplier_match: bool, prefix: str
-) -> None:
-    if supplier_match:
-        client.quotation_query.data = [{"id": SUPPLIER_QUOTATION_ID}]
-
+def test_uuid_prefix_without_supplier_uses_id_range(client: FakeClient, prefix: str) -> None:
     QuotationService().list_review_tasks(bearer_token="dummy", search=prefix.upper())
 
     hex_prefix = prefix.replace("-", "")
     lo = str(UUID(hex=hex_prefix.ljust(32, "0")))
     hi = str(UUID(hex=hex_prefix.ljust(32, "f")))
-    expected = f"and(quotation_id.gte.{lo},quotation_id.lte.{hi})"
-    if supplier_match:
-        expected = f"quotation_id.in.({SUPPLIER_QUOTATION_ID}),{expected}"
-    assert client.review_task_query.or_filters == [expected]
+    assert ("gte", "quotation_id", lo) in client.review_task_query.filters
+    assert ("lte", "quotation_id", hi) in client.review_task_query.filters
+    assert all(operator != "in" for operator, _, _ in client.review_task_query.filters)
+    assert client.review_task_query.or_filters == []
+    assert client.tables == ["supplier", "review_task"]
 
 
-@pytest.mark.parametrize("term", ["no such supplier", "g123", "a" * 33, ",()", "---"])
+def test_hex_supplier_match_takes_precedence_over_id_range(client: FakeClient) -> None:
+    client.supplier_query.data = [{"id": SUPPLIER_IDS[0]}]
+
+    QuotationService().list_review_tasks(bearer_token="dummy", search="ace")
+
+    assert ("in", "quotation.supplier_id", SUPPLIER_IDS[:1]) in client.review_task_query.filters
+    assert all(column != "quotation_id" for _, column, _ in client.review_task_query.filters)
+    assert client.review_task_query.or_filters == []
+    assert client.tables == ["supplier", "review_task"]
+
+
+@pytest.mark.parametrize("term", ["no such supplier", "g123", "a" * 33, "---"])
 def test_unmatched_search_returns_empty_without_listing_tasks(
     client: FakeClient, term: str
 ) -> None:
@@ -212,28 +232,59 @@ def test_unmatched_search_returns_empty_without_listing_tasks(
 
     assert result.items == []
     assert result.next_cursor is None
+    assert client.tables == ["supplier"]
+    assert client.supplier_query.executed
     assert not client.review_task_query.executed
-    assert "review_task" not in client.tables
 
 
-@pytest.mark.parametrize("term", [",()", "( , )"])
-def test_search_stripped_to_empty_never_looks_up_all_suppliers(
-    client: FakeClient, term: str
+@pytest.mark.parametrize(
+    "term, pattern",
+    [("Acme (UK)", "*acme (uk)*"), ("Smith, Jones", "*smith, jones*")],
+)
+def test_supplier_search_preserves_name_punctuation(
+    client: FakeClient, term: str, pattern: str
 ) -> None:
-    client.quotation_query.data = [{"id": SUPPLIER_QUOTATION_ID}]
+    client.supplier_query.data = [{"id": SUPPLIER_IDS[0]}]
 
+    QuotationService().list_review_tasks(bearer_token="dummy", search=term)
+
+    assert client.supplier_query.filters == [("ilike", "name", pattern)]
+    assert client.supplier_query.executed
+    assert ("in", "quotation.supplier_id", SUPPLIER_IDS[:1]) in client.review_task_query.filters
+
+
+@pytest.mark.parametrize("term", ["()", ",()", "( , )"])
+def test_unmatched_punctuation_search_returns_empty(client: FakeClient, term: str) -> None:
     result = QuotationService().list_review_tasks(bearer_token="dummy", search=term)
 
+    assert client.supplier_query.filters == [("ilike", "name", f"*{term}*")]
+    assert client.supplier_query.executed
     assert result.items == []
     assert result.next_cursor is None
-    assert not client.quotation_query.executed
+    assert client.tables == ["supplier"]
     assert not client.review_task_query.executed
+
+
+@pytest.mark.parametrize("term", ["   ", "", None])
+def test_search_cleaned_to_empty_lists_tasks_without_search_filter(
+    client: FakeClient, term: str | None
+) -> None:
+    QuotationService().list_review_tasks(bearer_token="dummy", search=term)
+
+    assert client.tables == ["review_task"]
+    assert not client.supplier_query.executed
+    assert client.review_task_query.executed
+    assert client.review_task_query.or_filters == []
+    assert all(
+        column not in {"quotation.supplier_id", "quotation_id"}
+        for _, column, _ in client.review_task_query.filters
+    )
 
 
 @pytest.mark.parametrize(
     "term, escaped",
     [
-        (r"fresh\%_ supplier,(x)", r"fresh\\\%\_ supplierx"),
+        (r"fresh\%_ supplier,(x)", r"fresh\\\%\_ supplier,(x)"),
         ("x" * 201, "x" * 200),
         ("*", r"\*"),
     ],
@@ -241,39 +292,55 @@ def test_search_stripped_to_empty_never_looks_up_all_suppliers(
 def test_supplier_search_escapes_pattern_and_keeps_term_out_of_or(
     client: FakeClient, term: str, escaped: str
 ) -> None:
-    client.quotation_query.data = [{"id": SUPPLIER_QUOTATION_ID}]
+    client.supplier_query.data = [{"id": SUPPLIER_IDS[0]}]
 
     QuotationService().list_review_tasks(bearer_token="dummy", search=term)
 
-    assert client.quotation_query.filters == [("ilike", "supplier.name", f"*{escaped}*")]
-    assert client.review_task_query.or_filters == [f"quotation_id.in.({SUPPLIER_QUOTATION_ID})"]
+    assert client.supplier_query.filters == [("ilike", "name", f"*{escaped}*")]
+    assert client.review_task_query.or_filters == []
+    assert ("in", "quotation.supplier_id", SUPPLIER_IDS[:1]) in client.review_task_query.filters
+    assert "quotation" not in client.tables
 
 
-def test_database_page_is_not_filtered_again_in_python(client: FakeClient) -> None:
-    client.quotation_query.data = [{"id": SUPPLIER_QUOTATION_ID}]
-    # Deliberately inconsistent embeds: the fake returns a database-filtered page.
-    # Neither archive nor search checks should discard its rows after pagination.
+def test_supplier_with_400_quotations_keeps_all_tasks_and_pagination(client: FakeClient) -> None:
+    client.supplier_query.data = [{"id": SUPPLIER_IDS[0]}]
+    # Deliberately inconsistent embeds: database-filtered rows must survive pagination.
+    # Each task belongs to a distinct quotation from the same supplier.
     client.review_task_query.data = [
         {
-            "id": f"00000000-0000-0000-0000-{i:012d}",
-            "quotation_id": SUPPLIER_QUOTATION_ID,
+            "id": str(UUID(int=i)),
+            "quotation_id": str(UUID(int=1000 + i)),
             "status": "open",
             "priority": "normal",
             "reason": "low_confidence",
             "created_at": "2026-02-28T12:00:00Z",
             "quotation": {"deleted_at": "2026-02-28T13:00:00Z"},
         }
-        for i in range(1, 4)
+        for i in range(1, 401)
     ]
 
-    result = QuotationService().list_review_tasks(bearer_token="dummy", search="fresh", limit=2)
+    service = QuotationService()
+    cursor = None
+    seen: list[UUID] = []
+    for page in range(4):
+        result = service.list_review_tasks(
+            bearer_token="dummy", search="fresh", limit=100, cursor=cursor
+        )
+        assert len(result.items) == 100
+        assert client.review_task_query.range_args == (page * 100, (page + 1) * 100)
+        cursor = result.next_cursor
+        assert cursor == (
+            quotation_service_module._encode_cursor((page + 1) * 100) if page < 3 else None
+        )
+        seen.extend(item.id for item in result.items)
 
-    assert len(result.items) == 2
-    assert result.next_cursor == quotation_service_module._encode_cursor(2)
-    assert client.review_task_query.range_args == (0, 2)
-
-    QuotationService().list_review_tasks(bearer_token="dummy", cursor=result.next_cursor, limit=2)
-    assert client.review_task_query.range_args == (2, 4)
+    assert seen == [UUID(int=i) for i in range(1, 401)]
+    assert ("in", "quotation.supplier_id", SUPPLIER_IDS[:1]) in client.review_task_query.filters
+    assert client.review_task_query.or_filters == []
+    assert client.review_task_query.limit_count is None
+    assert "quotation" not in client.tables
+    assert client.quotation_query.limit_count is None
+    assert not client.quotation_query.executed
 
 
 @pytest.mark.parametrize(

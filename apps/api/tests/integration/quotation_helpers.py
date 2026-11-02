@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -286,6 +287,10 @@ _RPC_PARAM_TYPES = {
 }
 
 
+# (related table, local foreign key, related key), keyed by parent table and embed.
+_EMBED_RELATIONS = {("review_task", "quotation"): ("quotation", "quotation_id", "id")}
+
+
 class PsycopgTableQuery:
     def __init__(
         self,
@@ -327,6 +332,15 @@ class PsycopgTableQuery:
     def eq(self, column: str, value: object) -> PsycopgTableQuery:
         self._where.append((column, "=", value))
         return self
+
+    def filter(self, column: str, operator: str, value: object) -> PsycopgTableQuery:
+        if operator == "is" and value == "null":
+            return self.is_(column, "null")
+        if operator == "eq":
+            return self.eq(column, value)
+        if operator == "in" and isinstance(value, list):
+            return self.in_(column, value)
+        raise NotImplementedError(f"test adapter does not support filter {operator!r}: {value!r}")
 
     def neq(self, column: str, value: object) -> PsycopgTableQuery:
         self._where.append((column, "!=", value))
@@ -408,8 +422,7 @@ class PsycopgTableQuery:
             query += sql.SQL(" where ") + where_sql
         if self._order:
             query += sql.SQL(" order by ") + sql.SQL(",").join(
-                sql.SQL("{} {}").format(sql.Identifier(column), sql.SQL("desc" if desc else "asc"))
-                for column, desc in self._order
+                self._order_sql(column, desc) for column, desc in self._order
             )
         if self._limit is not None:
             query += sql.SQL(" limit %s")
@@ -418,6 +431,37 @@ class PsycopgTableQuery:
             query += sql.SQL(" offset %s")
             params.append(self._offset)
         return _Response(self._fetch(query, params))
+
+    def _relation_sql(self, embed: str) -> tuple[sql.Identifier, sql.SQL]:
+        relation = _EMBED_RELATIONS.get((self._table, embed))
+        if relation is None:
+            raise NotImplementedError(f"unknown embed {embed!r} on {self._table!r}")
+        table, local_key, related_key = relation
+        join = sql.SQL("{} = {}").format(
+            sql.Identifier(self._table, local_key), sql.Identifier(table, related_key)
+        )
+        return sql.Identifier(table), join
+
+    def _order_sql(self, column: str, desc: bool) -> sql.SQL:
+        embedded = re.fullmatch(
+            r"(\w+)\((\w+)\)(?:\.(asc|desc))?(?:\.(nullslast|nullsfirst))?", column
+        )
+        nulls = ""
+        if embedded:
+            embed, related_column, direction, null_order = embedded.groups()
+            table, join = self._relation_sql(embed)
+            expression = sql.SQL("(select {} from {} where {})").format(
+                sql.Identifier(related_column), table, join
+            )
+            if direction is not None:
+                desc = direction == "desc"
+            if null_order is not None:
+                nulls = " nulls last" if null_order == "nullslast" else " nulls first"
+        else:
+            expression = sql.Identifier(column)
+        return sql.SQL("{} {}{}").format(
+            expression, sql.SQL("desc" if desc else "asc"), sql.SQL(nulls)
+        )
 
     def _execute_insert(self) -> object:
         if self._payload is None:
@@ -461,26 +505,39 @@ class PsycopgTableQuery:
         clauses: list[sql.SQL] = []
         params: list[object] = []
         for column, operator, value in self._where:
+            relation = None
+            if "." in column:
+                embed, column = column.split(".", maxsplit=1)
+                relation = self._relation_sql(embed)
             column_sql = _column_sql(column)
             if operator == "is":
-                clauses.append(sql.SQL("{} is null").format(column_sql))
+                clause = sql.SQL("{} is null").format(column_sql)
             elif operator == "in":
                 values = list(value) if isinstance(value, list) else []
                 placeholders = sql.SQL(",").join(sql.Placeholder() for _item in values)
-                clauses.append(sql.SQL("{} in ({})").format(column_sql, placeholders))
+                clause = (
+                    sql.SQL("{} in ({})").format(column_sql, placeholders)
+                    if values
+                    else sql.SQL("false")
+                )
                 params.extend(values)
             elif operator == "ilike":
-                clauses.append(sql.SQL("{} ilike {}").format(column_sql, sql.Placeholder()))
-                params.append(value)
+                clause = sql.SQL("{} ilike {}").format(column_sql, sql.Placeholder())
+                # PostgREST accepts * as a % alias, but preserves escaped characters.
+                params.append(re.sub(r"\\.|\*", lambda m: "%" if m[0] == "*" else m[0], str(value)))
             else:
-                clauses.append(
-                    sql.SQL("{} {} {}").format(
-                        column_sql,
-                        sql.SQL(operator),
-                        sql.Placeholder(),
-                    )
+                clause = sql.SQL("{} {} {}").format(
+                    column_sql,
+                    sql.SQL(operator),
+                    sql.Placeholder(),
                 )
                 params.append(value)
+            if relation is not None:
+                table, join = relation
+                clause = sql.SQL("exists (select 1 from {} where {} and {})").format(
+                    table, join, clause
+                )
+            clauses.append(clause)
         if not clauses:
             return None, params
         return sql.SQL(" and ").join(clauses), params
