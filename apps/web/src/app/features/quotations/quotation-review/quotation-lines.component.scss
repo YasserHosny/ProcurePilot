@@ -155,6 +155,10 @@
   font-weight: 700;
 }
 
+input:read-only {
+  cursor: default;
+}
+
 .revert-btn {
   width: 24px !important;
   height: 24px !important;

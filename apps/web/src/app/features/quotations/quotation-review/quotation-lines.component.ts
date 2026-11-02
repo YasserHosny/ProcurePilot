@@ -765,6 +765,23 @@ export class QuotationLinesComponent {
     const parsed = parsePackInput(rawValue);
     if (parsed === null) return;
 
+    const effectiveCount = this.getEffectivePackCount(line);
+    const effectiveSize = this.getEffectiveUnitSize(line);
+    const effectiveUnit = this.getEffectivePackUnit(line);
+
+    const countMatches = effectiveCount !== null && parsed.pack_count === effectiveCount;
+    const trimmedTargetSize = trimDecimalZeros(parsed.unit_size);
+    const trimmedEffectiveSize = trimDecimalZeros(effectiveSize.trim());
+    const sizeMatches =
+      parsed.unit_size === effectiveSize ||
+      trimmedTargetSize === trimmedEffectiveSize ||
+      this.isNumericEqual(parsed.unit_size, effectiveSize);
+    const unitMatches = (parsed.pack_unit?.trim() ?? '') === effectiveUnit.trim();
+
+    if (countMatches && sizeMatches && unitMatches) {
+      return;
+    }
+
     const feCount = this.getFieldExtraction('quotation_line', line.id, 'pack_count');
     const feSize = this.getFieldExtraction('quotation_line', line.id, 'unit_size');
     const feUnit = this.getFieldExtraction('quotation_line', line.id, 'pack_unit');
@@ -991,8 +1008,8 @@ export class QuotationLinesComponent {
     const parsed = parseMoneyInput(rawValue);
     if (parsed === null) return;
     const num = Number(parsed);
-    if (num < 0 || num > 100) return;
-    const fraction = num > 1 ? (num / 100).toString() : (num <= 1 && num > 0 ? num.toString() : '0');
+    if (!Number.isFinite(num) || num < 0 || num > 100) return;
+    const fraction = (num / 100).toString();
     const effective = this.getEffectiveVatRate(line);
 
     if (fraction === effective || this.isNumericEqual(fraction, effective)) {

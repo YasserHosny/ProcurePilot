@@ -138,7 +138,7 @@
                     (input)="onDescriptionInput(line, descInput.value)"
                     (change)="onDescriptionChange(line, descInput.value)"
                     (blur)="onDescriptionBlur(line, descInput.value)"
-                    [readonly]="!isWriter || quotation.status === 'reviewed'"
+                    [readonly]="!isWriter || quotation.status === 'reviewed' || !getLineTextExtraction(line)"
                   />
                 </mat-form-field>
                 @if (isLineTextChanged(line)) {
@@ -333,7 +333,7 @@
                     (input)="onDeliveryFeeInput(line, deliveryInput.value)"
                     (change)="onDeliveryFeeChange(line, deliveryInput.value)"
                     (blur)="onDeliveryFeeBlur(line, deliveryInput.value)"
-                    [readonly]="!isWriter || quotation.status === 'reviewed'"
+                    [readonly]="!isWriter || quotation.status === 'reviewed' || !getFieldExtraction('quotation_line', line.id, 'delivery_fee')"
                   />
                   @if (getEffectiveDeliveryFeeCurrency(line); as cur) {
                     <span matTextSuffix class="currency-suffix">{{ cur | currencySymbol }}</span>
@@ -385,7 +385,7 @@
                     (input)="onDiscountInput(line, discountInput.value)"
                     (change)="onDiscountChange(line, discountInput.value)"
                     (blur)="onDiscountBlur(line, discountInput.value)"
-                    [readonly]="!isWriter || quotation.status === 'reviewed'"
+                    [readonly]="!isWriter || quotation.status === 'reviewed' || !getFieldExtraction('quotation_line', line.id, 'discount')"
                   />
                   @if (getEffectiveDiscountCurrency(line); as cur) {
                     <span matTextSuffix class="currency-suffix">{{ cur | currencySymbol }}</span>
@@ -437,7 +437,7 @@
                     (input)="onVatRateInput(line, vatInput.value)"
                     (change)="onVatRateChange(line, vatInput.value)"
                     (blur)="onVatRateBlur(line, vatInput.value)"
-                    [readonly]="!isWriter || quotation.status === 'reviewed'"
+                    [readonly]="!isWriter || quotation.status === 'reviewed' || !getFieldExtraction('quotation_line', line.id, 'vat_rate')"
                   />
                   <span matTextSuffix class="currency-suffix">%</span>
                 </mat-form-field>
