@@ -83,7 +83,7 @@ describe('ReviewQueueComponent (T052)', () => {
   it('should reload tasks when filter changes', () => {
     component.onStatusChange('all');
     expect(apiService.getReviewTasks).toHaveBeenCalledWith({
-      status: undefined,
+      status: 'all',
       priority: undefined,
       search: undefined,
       date_from: undefined,
@@ -94,8 +94,28 @@ describe('ReviewQueueComponent (T052)', () => {
 
     component.onPriorityChange('high');
     expect(apiService.getReviewTasks).toHaveBeenCalledWith({
-      status: undefined,
+      status: 'all',
       priority: 'high',
+      search: undefined,
+      date_from: undefined,
+      date_to: undefined,
+      sort_by: 'created_at',
+      sort_order: 'desc',
+    });
+  });
+
+  it('should load more tasks with status all and cursor', () => {
+    apiService.getReviewTasks.and.returnValue(
+      of({ items: mockTasks, next_cursor: 'cursor-123' }),
+    );
+    component.onStatusChange('all');
+
+    component.loadMore();
+
+    expect(apiService.getReviewTasks).toHaveBeenCalledWith({
+      cursor: 'cursor-123',
+      status: 'all',
+      priority: undefined,
       search: undefined,
       date_from: undefined,
       date_to: undefined,

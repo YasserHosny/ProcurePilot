@@ -131,7 +131,7 @@ export class ReviewQueueComponent implements OnInit {
 
     this.api
       .getReviewTasks({
-        status: status === 'all' ? undefined : status,
+        status,
         priority: priority === 'all' ? undefined : priority,
         search,
         date_from: this.dateFrom() ?? undefined,
@@ -166,7 +166,7 @@ export class ReviewQueueComponent implements OnInit {
     this.api
       .getReviewTasks({
         cursor,
-        status: status === 'all' ? undefined : status,
+        status,
         priority: priority === 'all' ? undefined : priority,
         search,
         date_from: this.dateFrom() ?? undefined,
