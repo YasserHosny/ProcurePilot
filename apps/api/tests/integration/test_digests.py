@@ -351,3 +351,33 @@ def test_digest_worker_execution_and_skip_inactive(
                     )
                     cur.execute("delete from auth.users where id = %s", (second_user_id,))
                 conn.commit()
+
+
+@pytest.mark.parametrize("status", ["withdrawn", "rejected", "delivered"])
+def test_digest_pending_approvals_excludes_terminal_requests(
+    monkeypatch: pytest.MonkeyPatch, status: str
+) -> None:
+    from integration.test_approvals import (
+        _make_branch,
+        _make_pending_step,
+        _make_submitted_request,
+        _set_request_status,
+    )
+
+    with committed_smart_context("digest-terminal") as context:
+        ws = context.workspace
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with conn.cursor() as cur:
+                act_as(cur, ws)
+                branch = _make_branch(cur, ws)
+                live = _make_submitted_request(cur, ws, branch)
+                terminal = _make_submitted_request(cur, ws, branch)
+                for request in (live, terminal):
+                    _make_pending_step(cur, ws.tenant_id, request, ws.membership_id)
+                _set_request_status(cur, terminal, ws.membership_id, status)
+        client = TestClient(_app(monkeypatch, member_from_workspace(ws)))
+        response = client.get("/api/v1/digests/latest")
+        assert response.status_code == 200, response.text
+        section = next(s for s in response.json()["sections"] if s["kind"] == "pending_approvals")
+        assert len(section["items"]) == 1
+        assert str(live)[:8] in section["items"][0]["label"]
