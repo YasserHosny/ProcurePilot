@@ -7,7 +7,7 @@ fields, one-per-request unique), cascading deletes, and FK enforcement.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID, uuid4
 
 import psycopg
@@ -30,7 +30,11 @@ from integration.quotation_helpers import (
     _Response,
 )
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import PermissionDeniedError
+from procurepilot_api.errors import (
+    ConflictError,
+    PermissionDeniedError,
+    UnprocessableEntityError,
+)
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.requests import service as requests_service_module
 from procurepilot_api.modules.requests.schemas import (
@@ -52,13 +56,10 @@ def conn() -> object:
     yield from connection()
 
 
-def _make_branch(
-    cur: psycopg.Cursor, workspace: Workspace
-) -> UUID:
+def _make_branch(cur: psycopg.Cursor, workspace: Workspace) -> UUID:
     branch_id = uuid4()
     cur.execute(
-        "insert into branch (id,tenant_id,name,region) "
-        "values (%s,%s,'Test Branch','GB')",
+        "insert into branch (id,tenant_id,name,region) values (%s,%s,'Test Branch','GB')",
         (branch_id, workspace.tenant_id),
     )
     return branch_id
@@ -154,8 +155,7 @@ def test_a_draft_line_has_no_estimated_at(conn: object) -> None:
         request_id = _make_request(cur, ws, branch_id)
         line_id = _add_line_no_estimate(cur, ws, request_id, product_id)
         cur.execute(
-            "select estimated_at from purchase_request_line "
-            "where id = %s",
+            "select estimated_at from purchase_request_line where id = %s",
             (line_id,),
         )
         assert cur.fetchone() == (None,)
@@ -194,9 +194,7 @@ def test_request_estimated_total_paired_nullability(
         request_id = _make_request(cur, ws, branch_id)
         with pytest.raises(psycopg.errors.CheckViolation):
             cur.execute(
-                "update purchase_request "
-                "set estimated_total_amount = 100 "
-                "where id = %s",
+                "update purchase_request set estimated_total_amount = 100 where id = %s",
                 (request_id,),
             )
 
@@ -257,9 +255,7 @@ def test_withdraw_from_submitted(conn: object) -> None:
         ws = make_workspace(cur, "pr-withdraw-submitted")
         act_as(cur, ws)
         branch_id = _make_branch(cur, ws)
-        request_id = _make_request(
-            cur, ws, branch_id, status="submitted"
-        )
+        request_id = _make_request(cur, ws, branch_id, status="submitted")
         cur.execute(
             "update purchase_request "
             "set status = 'withdrawn', withdrawn_at = now() "
@@ -279,9 +275,7 @@ def test_approval_step_decision_fields_paired_rejects_pending_with_decided(
         ws = make_workspace(cur, "pr-step-paired-pending")
         act_as(cur, ws)
         branch_id = _make_branch(cur, ws)
-        request_id = _make_request(
-            cur, ws, branch_id, status="submitted"
-        )
+        request_id = _make_request(cur, ws, branch_id, status="submitted")
         with pytest.raises(psycopg.errors.CheckViolation):
             cur.execute(
                 "insert into approval_step "
@@ -307,9 +301,7 @@ def test_approval_step_decision_fields_paired_rejects_approved_without_decided(
         ws = make_workspace(cur, "pr-step-paired-approved")
         act_as(cur, ws)
         branch_id = _make_branch(cur, ws)
-        request_id = _make_request(
-            cur, ws, branch_id, status="submitted"
-        )
+        request_id = _make_request(cur, ws, branch_id, status="submitted")
         with pytest.raises(psycopg.errors.CheckViolation):
             cur.execute(
                 "insert into approval_step "
@@ -332,9 +324,7 @@ def test_approval_step_accepts_approved_with_decided(
         ws = make_workspace(cur, "pr-step-valid-approved")
         act_as(cur, ws)
         branch_id = _make_branch(cur, ws)
-        request_id = _make_request(
-            cur, ws, branch_id, status="submitted"
-        )
+        request_id = _make_request(cur, ws, branch_id, status="submitted")
         step_id = uuid4()
         cur.execute(
             "insert into approval_step "
@@ -363,9 +353,7 @@ def test_approval_step_one_per_request(conn: object) -> None:
         ws = make_workspace(cur, "pr-step-unique")
         act_as(cur, ws)
         branch_id = _make_branch(cur, ws)
-        request_id = _make_request(
-            cur, ws, branch_id, status="submitted"
-        )
+        request_id = _make_request(cur, ws, branch_id, status="submitted")
         cur.execute(
             "insert into approval_step "
             "(id,tenant_id,purchase_request_id,"
@@ -399,12 +387,8 @@ def test_deleting_a_request_cascades_to_lines_and_steps(
         act_as(cur, ws)
         branch_id = _make_branch(cur, ws)
         product_id = make_workspace_product(cur, ws, name="Widget")
-        request_id = _make_request(
-            cur, ws, branch_id, status="submitted"
-        )
-        line_id = _add_line_no_estimate(
-            cur, ws, request_id, product_id
-        )
+        request_id = _make_request(cur, ws, branch_id, status="submitted")
+        line_id = _add_line_no_estimate(cur, ws, request_id, product_id)
         step_id = uuid4()
         cur.execute(
             "insert into approval_step "
@@ -418,8 +402,7 @@ def test_deleting_a_request_cascades_to_lines_and_steps(
             (request_id,),
         )
         cur.execute(
-            "select count(*) from purchase_request_line "
-            "where id = %s",
+            "select count(*) from purchase_request_line where id = %s",
             (line_id,),
         )
         assert cur.fetchone() == (0,)
@@ -494,9 +477,7 @@ def test_db_allows_update_of_submitted_request(
         ws = make_workspace(cur, "pr-fr004-boundary")
         act_as(cur, ws)
         branch_id = _make_branch(cur, ws)
-        request_id = _make_request(
-            cur, ws, branch_id, status="submitted"
-        )
+        request_id = _make_request(cur, ws, branch_id, status="submitted")
         cur.execute(
             "update purchase_request "
             "set required_by_date = current_date + interval '30 days' "
@@ -511,9 +492,7 @@ def test_db_allows_withdraw_from_approved(conn: object) -> None:
         ws = make_workspace(cur, "pr-withdraw-approved-boundary")
         act_as(cur, ws)
         branch_id = _make_branch(cur, ws)
-        request_id = _make_request(
-            cur, ws, branch_id, status="approved"
-        )
+        request_id = _make_request(cur, ws, branch_id, status="approved")
         cur.execute(
             "update purchase_request "
             "set status = 'withdrawn', withdrawn_at = now() "
@@ -528,9 +507,7 @@ def test_db_allows_withdraw_from_rejected(conn: object) -> None:
         ws = make_workspace(cur, "pr-withdraw-rejected-boundary")
         act_as(cur, ws)
         branch_id = _make_branch(cur, ws)
-        request_id = _make_request(
-            cur, ws, branch_id, status="rejected"
-        )
+        request_id = _make_request(cur, ws, branch_id, status="rejected")
         cur.execute(
             "update purchase_request "
             "set status = 'withdrawn', withdrawn_at = now() "
@@ -542,18 +519,17 @@ def test_db_allows_withdraw_from_rejected(conn: object) -> None:
 # ── branch write authorization (create_request & update_request) ──────
 
 
-def _make_member(
-    cur: psycopg.Cursor, tenant_id: UUID, label: str, role: str
-) -> Workspace:
+def _make_member(cur: psycopg.Cursor, tenant_id: UUID, label: str, role: str) -> Workspace:
     user_id, membership_id = uuid4(), uuid4()
+    email = f"{label}-{user_id.hex[:8]}@example.test"
     cur.execute(
         "insert into auth.users (id,email) values (%s,%s)",
-        (user_id, f"{label}@example.test"),
+        (user_id, email),
     )
     cur.execute(
         "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
         "values (%s,%s,%s,%s,%s,true)",
-        (membership_id, tenant_id, user_id, f"{label}@example.test", role),
+        (membership_id, tenant_id, user_id, email, role),
     )
     return Workspace(tenant_id, user_id, membership_id, role, label)
 
@@ -579,9 +555,7 @@ def _current_member(workspace: Workspace, member_ws: Workspace) -> CurrentMember
 
 
 class _TestTableQuery(PsycopgTableQuery):
-    def insert(
-        self, payload: dict[str, object] | list[dict[str, object]]
-    ) -> _TestTableQuery:
+    def insert(self, payload: dict[str, object] | list[dict[str, object]]) -> _TestTableQuery:
         self._operation = "insert"
         self._payload = payload  # type: ignore[assignment]
         return self
@@ -597,24 +571,20 @@ class _TestTableQuery(PsycopgTableQuery):
                 sql.Identifier(self._table),
                 sql.SQL(",").join(sql.Identifier(key) for key in keys),
                 sql.SQL(",").join(
-                    sql.SQL("({})").format(
-                        sql.SQL(",").join(sql.Placeholder() for _ in keys)
-                    )
+                    sql.SQL("({})").format(sql.SQL(",").join(sql.Placeholder() for _ in keys))
                     for _ in self._payload
                 ),
             )
-            params = [
-                _adapt_value(key, row[key])
-                for row in self._payload
-                for key in keys
-            ]
+            params = [_adapt_value(key, row[key]) for row in self._payload for key in keys]
             return _Response(self._fetch(query, params))
         return super()._execute_insert()
 
 
 class _TestSupabaseClient(PsycopgSupabaseClient):
     def table(self, table: str) -> _TestTableQuery:
-        return _TestTableQuery(self._conn, table)
+        return _TestTableQuery(
+            self._conn, table, service_role=self._service_role, claims=self._claims
+        )
 
 
 def _service(
@@ -625,7 +595,9 @@ def _service(
     monkeypatch.setattr(
         requests_service_module,
         "authenticated_client",
-        lambda _settings, _token: _TestSupabaseClient(conn),
+        lambda _settings, token: _TestSupabaseClient(
+            conn, claims=token if (token and token.startswith("{")) else None
+        ),
     )
     monkeypatch.setattr(
         service,
@@ -649,9 +621,7 @@ def test_create_request_rejects_unassigned_branch_for_scoped_member(
 ) -> None:
     with conn.cursor() as cur:
         owner = make_workspace(cur, "pr-auth-create-denied")
-        requester = _make_member(
-            cur, owner.tenant_id, "pr-create-denied-req", "branch_manager"
-        )
+        requester = _make_member(cur, owner.tenant_id, "pr-create-denied-req", "branch_manager")
         branch_a = _make_branch(cur, owner)
         branch_b = _make_branch(cur, owner)
         _assign_branch(cur, owner, requester, branch_a)
@@ -662,7 +632,7 @@ def test_create_request_rejects_unassigned_branch_for_scoped_member(
     service = _service(conn, monkeypatch)
     payload = PurchaseRequestCreate(
         branch_id=branch_b,
-        required_by_date=date.today() + timedelta(days=7),
+        required_by_date=datetime.now(UTC).date() + timedelta(days=7),
         lines=[
             PurchaseRequestLineInput(
                 workspace_product_id=product_id,
@@ -686,9 +656,7 @@ def test_create_request_allows_assigned_branch_for_scoped_member(
 ) -> None:
     with conn.cursor() as cur:
         owner = make_workspace(cur, "pr-auth-create-allowed")
-        requester = _make_member(
-            cur, owner.tenant_id, "pr-create-allowed-req", "branch_manager"
-        )
+        requester = _make_member(cur, owner.tenant_id, "pr-create-allowed-req", "branch_manager")
         branch_a = _make_branch(cur, owner)
         _branch_b = _make_branch(cur, owner)
         _assign_branch(cur, owner, requester, branch_a)
@@ -699,7 +667,7 @@ def test_create_request_allows_assigned_branch_for_scoped_member(
     service = _service(conn, monkeypatch)
     payload = PurchaseRequestCreate(
         branch_id=branch_a,
-        required_by_date=date.today() + timedelta(days=7),
+        required_by_date=datetime.now(UTC).date() + timedelta(days=7),
         lines=[
             PurchaseRequestLineInput(
                 workspace_product_id=product_id,
@@ -724,9 +692,7 @@ def test_create_request_allows_any_branch_for_owner_and_unscoped_member(
 ) -> None:
     with conn.cursor() as cur:
         owner = make_workspace(cur, "pr-auth-unscoped")
-        unscoped_member = _make_member(
-            cur, owner.tenant_id, "pr-unscoped-member", "branch_manager"
-        )
+        unscoped_member = _make_member(cur, owner.tenant_id, "pr-unscoped-member", "branch_manager")
         branch = _make_branch(cur, owner)
         product_id = make_workspace_product(cur, owner, name="Staples")
         reset_role(cur)
@@ -744,7 +710,7 @@ def test_create_request_allows_any_branch_for_owner_and_unscoped_member(
     )
     owner_payload = PurchaseRequestCreate(
         branch_id=branch,
-        required_by_date=date.today() + timedelta(days=7),
+        required_by_date=datetime.now(UTC).date() + timedelta(days=7),
         lines=[
             PurchaseRequestLineInput(
                 workspace_product_id=product_id,
@@ -764,7 +730,7 @@ def test_create_request_allows_any_branch_for_owner_and_unscoped_member(
     unscoped_cm = _current_member(owner, unscoped_member)
     unscoped_payload = PurchaseRequestCreate(
         branch_id=branch,
-        required_by_date=date.today() + timedelta(days=7),
+        required_by_date=datetime.now(UTC).date() + timedelta(days=7),
         lines=[
             PurchaseRequestLineInput(
                 workspace_product_id=product_id,
@@ -786,9 +752,7 @@ def test_update_request_branch_authorization(
 ) -> None:
     with conn.cursor() as cur:
         owner = make_workspace(cur, "pr-auth-update")
-        requester = _make_member(
-            cur, owner.tenant_id, "pr-update-req", "branch_manager"
-        )
+        requester = _make_member(cur, owner.tenant_id, "pr-update-req", "branch_manager")
         branch_a = _make_branch(cur, owner)
         branch_b = _make_branch(cur, owner)
         _assign_branch(cur, owner, requester, branch_a)
@@ -832,3 +796,673 @@ def test_update_request_branch_authorization(
     assert updated.required_by_date == new_date
     assert updated.branch_id == branch_a
 
+
+# ── atomicity and validation integration tests (PPS-184 / PPS-186) ────
+
+
+def _make_cost_centre(
+    cur: psycopg.Cursor, workspace: Workspace, branch_id: UUID | None = None
+) -> UUID:
+    cc_id = uuid4()
+    cur.execute(
+        "insert into cost_centre (id, tenant_id, code, name, branch_id) "
+        "values (%s, %s, %s, 'Test Cost Centre', %s)",
+        (cc_id, workspace.tenant_id, f"CC-{cc_id.hex[:6]}", branch_id),
+    )
+    return cc_id
+
+
+def test_create_request_atomicity_line_failure_leaves_no_header(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-atom-create")
+        branch = _make_branch(cur, owner)
+        product_id = make_workspace_product(cur, owner, name="Widgets")
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner.tenant_id,),
+        )
+        count_before = cur.fetchone()[0]
+    conn.commit()
+
+    service = _service(conn, monkeypatch)
+    # Simulate a failure during line insertion inside the transaction
+    monkeypatch.setattr(
+        service,
+        "_insert_lines_db",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            UnprocessableEntityError(details={"reason": "database_constraint"})
+        ),
+    )
+
+    payload = PurchaseRequestCreate(
+        branch_id=branch,
+        required_by_date=datetime.now(UTC).date() + timedelta(days=7),
+        lines=[PurchaseRequestLineInput(workspace_product_id=product_id, quantity="10.000000")],
+    )
+
+    with pytest.raises(UnprocessableEntityError):
+        service.create_request(
+            bearer_token="token",
+            member=_current_member(owner, owner),
+            payload=payload,
+        )
+
+    with conn.cursor() as cur:
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner.tenant_id,),
+        )
+        count_after = cur.fetchone()[0]
+    assert count_after == count_before, "Failed create must leave NO purchase_request header row"
+
+
+def test_update_request_atomicity_invalid_line_leaves_original_lines(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-atom-update")
+        branch = _make_branch(cur, owner)
+        product_a = make_workspace_product(cur, owner, name="Prod A")
+        product_b = make_workspace_product(cur, owner, name="Prod B")
+        reset_role(cur)
+        request_id = _make_request(cur, owner, branch, status="draft")
+        line_id = _add_line_no_estimate(cur, owner, request_id, product_a)
+    conn.commit()
+
+    service = _service(conn, monkeypatch)
+    # Simulate a failure during new line insertion inside update transaction
+    monkeypatch.setattr(
+        service,
+        "_insert_lines_db",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            UnprocessableEntityError(details={"reason": "database_constraint"})
+        ),
+    )
+
+    patch = PurchaseRequestUpdate(
+        lines=[PurchaseRequestLineInput(workspace_product_id=product_b, quantity="20.000000")]
+    )
+
+    with pytest.raises(UnprocessableEntityError):
+        service.update_request(
+            bearer_token="token",
+            member=_current_member(owner, owner),
+            request_id=request_id,
+            patch=patch,
+        )
+
+    with conn.cursor() as cur:
+        reset_role(cur)
+        cur.execute(
+            "select id, workspace_product_id from purchase_request_line "
+            "where purchase_request_id = %s",
+            (request_id,),
+        )
+        lines = cur.fetchall()
+        assert len(lines) == 1
+        assert lines[0][0] == line_id
+        assert lines[0][1] == product_a, "Original lines must remain intact after update failure"
+
+
+def test_concurrent_update_vs_withdraw_loser_gets_conflict(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-conc-upd-wth")
+        branch = _make_branch(cur, owner)
+        product_id = make_workspace_product(cur, owner, name="Prod C")
+        reset_role(cur)
+        request_id = _make_request(cur, owner, branch, status="draft")
+        _add_line_no_estimate(cur, owner, request_id, product_id)
+    conn.commit()
+
+    thread_state = threading.local()
+
+    def client_factory(_settings: object, token: str) -> _TestSupabaseClient:
+        return _TestSupabaseClient(
+            thread_state.conn, claims=token if (token and token.startswith("{")) else owner.claims()
+        )
+
+    monkeypatch.setattr(requests_service_module, "authenticated_client", client_factory)
+
+    service = RequestsService()
+    monkeypatch.setattr(service, "_budget_status_for", lambda _client, _row: None)
+    monkeypatch.setattr(service, "_record", lambda **kwargs: None)
+    monkeypatch.setattr(
+        service,
+        "_estimate_products",
+        lambda product_ids, **_kw: [
+            LineEstimate(
+                unit_price_amount=None,
+                unit_price_currency=None,
+                source_landed_cost_id=None,
+            )
+            for _ in product_ids
+        ],
+    )
+
+    barrier = threading.Barrier(2)
+    results: dict[str, object] = {}
+
+    def do_withdraw() -> None:
+        thread_state.conn = psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None)
+        try:
+            with thread_state.conn.cursor() as cur:
+                act_as(cur, owner)
+            barrier.wait()
+            res = service.withdraw_request(
+                bearer_token=owner.claims(),
+                member=_current_member(owner, owner),
+                request_id=request_id,
+            )
+            results["withdraw"] = res
+        except Exception as exc:
+            results["withdraw"] = exc
+        finally:
+            thread_state.conn.close()
+
+    def do_update() -> None:
+        thread_state.conn = psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None)
+        try:
+            with thread_state.conn.cursor() as cur:
+                act_as(cur, owner)
+            barrier.wait()
+            patch = PurchaseRequestUpdate(
+                lines=[
+                    PurchaseRequestLineInput(workspace_product_id=product_id, quantity="9.000000")
+                ]
+            )
+            res = service.update_request(
+                bearer_token=owner.claims(),
+                member=_current_member(owner, owner),
+                request_id=request_id,
+                patch=patch,
+            )
+            results["update"] = res
+        except Exception as exc:
+            results["update"] = exc
+        finally:
+            thread_state.conn.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        f1 = executor.submit(do_withdraw)
+        f2 = executor.submit(do_update)
+        f1.result()
+        f2.result()
+
+    # Exactly one must succeed, and the loser must get ConflictError (not_draft)
+    withdraw_res = results.get("withdraw")
+    update_res = results.get("update")
+
+    if isinstance(update_res, ConflictError):
+        assert update_res.status_code == 409
+        assert update_res.details == {"reason": "not_draft"}
+        assert not isinstance(withdraw_res, Exception)
+    elif isinstance(withdraw_res, ConflictError):
+        assert withdraw_res.status_code == 409
+        assert not isinstance(update_res, Exception)
+    else:
+        pytest.fail(f"Expected one ConflictError, got withdraw={withdraw_res}, update={update_res}")
+
+
+def test_concurrent_update_vs_submit_loser_gets_conflict(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-conc-upd-sub")
+        branch = _make_branch(cur, owner)
+        product_id = make_workspace_product(cur, owner, name="Prod D")
+        reset_role(cur)
+        request_id = _make_request(cur, owner, branch, status="draft")
+        _add_line_no_estimate(cur, owner, request_id, product_id)
+    conn.commit()
+
+    thread_state = threading.local()
+
+    def client_factory(_settings: object, token: str) -> _TestSupabaseClient:
+        return _TestSupabaseClient(
+            thread_state.conn, claims=token if (token and token.startswith("{")) else owner.claims()
+        )
+
+    monkeypatch.setattr(requests_service_module, "authenticated_client", client_factory)
+
+    service = RequestsService()
+    monkeypatch.setattr(service, "_budget_status_for", lambda _client, _row: None)
+    monkeypatch.setattr(service, "_record", lambda **kwargs: None)
+    monkeypatch.setattr(
+        service,
+        "_fetch_owner_membership_id",
+        lambda _client: owner.membership_id,
+    )
+    monkeypatch.setattr(
+        service,
+        "_estimate_products",
+        lambda product_ids, **_kw: [
+            LineEstimate(
+                unit_price_amount=None,
+                unit_price_currency=None,
+                source_landed_cost_id=None,
+            )
+            for _ in product_ids
+        ],
+    )
+
+    barrier = threading.Barrier(2)
+    results: dict[str, object] = {}
+
+    def do_submit() -> None:
+        thread_state.conn = psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None)
+        try:
+            with thread_state.conn.cursor() as cur:
+                act_as(cur, owner)
+            barrier.wait()
+            res = service.submit_request(
+                bearer_token=owner.claims(),
+                member=_current_member(owner, owner),
+                request_id=request_id,
+            )
+            results["submit"] = res
+        except Exception as exc:
+            results["submit"] = exc
+        finally:
+            thread_state.conn.close()
+
+    def do_update() -> None:
+        thread_state.conn = psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None)
+        try:
+            with thread_state.conn.cursor() as cur:
+                act_as(cur, owner)
+            barrier.wait()
+            patch = PurchaseRequestUpdate(
+                lines=[
+                    PurchaseRequestLineInput(workspace_product_id=product_id, quantity="9.000000")
+                ]
+            )
+            res = service.update_request(
+                bearer_token=owner.claims(),
+                member=_current_member(owner, owner),
+                request_id=request_id,
+                patch=patch,
+            )
+            results["update"] = res
+        except Exception as exc:
+            results["update"] = exc
+        finally:
+            thread_state.conn.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        f1 = executor.submit(do_submit)
+        f2 = executor.submit(do_update)
+        f1.result()
+        f2.result()
+
+    submit_res = results.get("submit")
+    update_res = results.get("update")
+
+    if isinstance(update_res, ConflictError):
+        assert update_res.status_code == 409
+        assert update_res.details == {"reason": "not_draft"}
+        assert not isinstance(submit_res, Exception)
+    elif isinstance(submit_res, ConflictError):
+        assert submit_res.status_code == 409
+        assert not isinstance(update_res, Exception)
+    else:
+        pytest.fail(f"Expected one ConflictError, got submit={submit_res}, update={update_res}")
+
+
+def test_validation_rejects_past_date(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-val-past-date")
+        branch = _make_branch(cur, owner)
+        product_id = make_workspace_product(cur, owner, name="Prod")
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner.tenant_id,),
+        )
+        count_before = cur.fetchone()[0]
+    conn.commit()
+
+    service = _service(conn, monkeypatch)
+    past_date = datetime.now(UTC).date() - timedelta(days=2)
+    payload = PurchaseRequestCreate(
+        branch_id=branch,
+        required_by_date=past_date,
+        lines=[PurchaseRequestLineInput(workspace_product_id=product_id, quantity="1.000000")],
+    )
+
+    with pytest.raises(UnprocessableEntityError) as exc_info:
+        service.create_request(
+            bearer_token="token",
+            member=_current_member(owner, owner),
+            payload=payload,
+        )
+
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.details == {
+        "field": "required_by_date",
+        "reason": "required_by_in_the_past",
+    }
+
+    with conn.cursor() as cur:
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner.tenant_id,),
+        )
+        assert cur.fetchone()[0] == count_before, "Nothing must be written on validation failure"
+
+
+def test_validation_rejects_duplicate_product(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-val-dup-prod")
+        branch = _make_branch(cur, owner)
+        product_id = make_workspace_product(cur, owner, name="Prod")
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner.tenant_id,),
+        )
+        count_before = cur.fetchone()[0]
+    conn.commit()
+
+    service = _service(conn, monkeypatch)
+    payload = PurchaseRequestCreate(
+        branch_id=branch,
+        required_by_date=datetime.now(UTC).date() + timedelta(days=7),
+        lines=[
+            PurchaseRequestLineInput(workspace_product_id=product_id, quantity="1.000000"),
+            PurchaseRequestLineInput(workspace_product_id=product_id, quantity="2.000000"),
+        ],
+    )
+
+    with pytest.raises(UnprocessableEntityError) as exc_info:
+        service.create_request(
+            bearer_token="token",
+            member=_current_member(owner, owner),
+            payload=payload,
+        )
+
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.details == {
+        "field": "lines[1].workspace_product_id",
+        "reason": "duplicate_product",
+    }
+
+    with conn.cursor() as cur:
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner.tenant_id,),
+        )
+        assert cur.fetchone()[0] == count_before
+
+
+def test_validation_rejects_cost_centre_not_found(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-val-cc-notfound")
+        branch = _make_branch(cur, owner)
+        product_id = make_workspace_product(cur, owner, name="Prod")
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner.tenant_id,),
+        )
+        count_before = cur.fetchone()[0]
+    conn.commit()
+
+    service = _service(conn, monkeypatch)
+    payload = PurchaseRequestCreate(
+        branch_id=branch,
+        cost_centre_id=uuid4(),
+        required_by_date=datetime.now(UTC).date() + timedelta(days=7),
+        lines=[PurchaseRequestLineInput(workspace_product_id=product_id, quantity="1.000000")],
+    )
+
+    with pytest.raises(UnprocessableEntityError) as exc_info:
+        service.create_request(
+            bearer_token="token",
+            member=_current_member(owner, owner),
+            payload=payload,
+        )
+
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.details == {
+        "field": "cost_centre_id",
+        "reason": "cost_centre_not_found",
+    }
+
+    with conn.cursor() as cur:
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner.tenant_id,),
+        )
+        assert cur.fetchone()[0] == count_before
+
+
+def test_validation_rejects_cost_centre_branch_mismatch(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-val-cc-mismatch")
+        branch_a = _make_branch(cur, owner)
+        branch_b = _make_branch(cur, owner)
+        product_id = make_workspace_product(cur, owner, name="Prod")
+        cc_b = _make_cost_centre(cur, owner, branch_id=branch_b)
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner.tenant_id,),
+        )
+        count_before = cur.fetchone()[0]
+    conn.commit()
+
+    service = _service(conn, monkeypatch)
+    payload = PurchaseRequestCreate(
+        branch_id=branch_a,
+        cost_centre_id=cc_b,
+        required_by_date=datetime.now(UTC).date() + timedelta(days=7),
+        lines=[PurchaseRequestLineInput(workspace_product_id=product_id, quantity="1.000000")],
+    )
+
+    with pytest.raises(UnprocessableEntityError) as exc_info:
+        service.create_request(
+            bearer_token="token",
+            member=_current_member(owner, owner),
+            payload=payload,
+        )
+
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.details == {
+        "field": "cost_centre_id",
+        "reason": "cost_centre_branch_mismatch",
+    }
+
+    with conn.cursor() as cur:
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner.tenant_id,),
+        )
+        assert cur.fetchone()[0] == count_before
+
+
+def test_validation_rejects_quantity_zero(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-val-qty-zero")
+        branch = _make_branch(cur, owner)
+        product_id = make_workspace_product(cur, owner, name="Prod")
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner.tenant_id,),
+        )
+        count_before = cur.fetchone()[0]
+    conn.commit()
+
+    service = _service(conn, monkeypatch)
+    payload = PurchaseRequestCreate(
+        branch_id=branch,
+        required_by_date=datetime.now(UTC).date() + timedelta(days=7),
+        lines=[PurchaseRequestLineInput(workspace_product_id=product_id, quantity="0")],
+    )
+
+    with pytest.raises(UnprocessableEntityError) as exc_info:
+        service.create_request(
+            bearer_token="token",
+            member=_current_member(owner, owner),
+            payload=payload,
+        )
+
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.details == {
+        "field": "lines[0].quantity",
+        "reason": "quantity_not_positive",
+    }
+
+    with conn.cursor() as cur:
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner.tenant_id,),
+        )
+        assert cur.fetchone()[0] == count_before, "No header must remain when quantity is 0"
+
+
+def test_validation_rejects_foreign_tenant_product(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner_a = make_workspace(cur, "pr-val-foreign-a")
+        branch_a = _make_branch(cur, owner_a)
+        owner_b = make_workspace(cur, "pr-val-foreign-b")
+        foreign_product_id = make_workspace_product(cur, owner_b, name="Foreign Prod")
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner_a.tenant_id,),
+        )
+        count_before = cur.fetchone()[0]
+    conn.commit()
+
+    service = _service(conn, monkeypatch)
+    payload = PurchaseRequestCreate(
+        branch_id=branch_a,
+        required_by_date=datetime.now(UTC).date() + timedelta(days=7),
+        lines=[
+            PurchaseRequestLineInput(
+                workspace_product_id=foreign_product_id,
+                quantity="1.000000",
+            )
+        ],
+    )
+
+    with pytest.raises(UnprocessableEntityError) as exc_info:
+        service.create_request(
+            bearer_token=owner_a.claims(),
+            member=_current_member(owner_a, owner_a),
+            payload=payload,
+        )
+
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.details == {
+        "field": "lines[0].workspace_product_id",
+        "reason": "product_not_found",
+    }
+
+    with conn.cursor() as cur:
+        reset_role(cur)
+        cur.execute(
+            "select count(*) from purchase_request where tenant_id = %s",
+            (owner_a.tenant_id,),
+        )
+        assert cur.fetchone()[0] == count_before
+
+
+def test_create_and_update_happy_paths_preserve_response_shapes(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-happy-shapes")
+        branch = _make_branch(cur, owner)
+        cc_id = _make_cost_centre(cur, owner, branch_id=branch)
+        product_1 = make_workspace_product(cur, owner, name="Prod 1")
+        product_2 = make_workspace_product(cur, owner, name="Prod 2")
+        reset_role(cur)
+    conn.commit()
+
+    service = _service(conn, monkeypatch)
+    owner_cm = _current_member(owner, owner)
+
+    # 1. Create request
+    create_payload = PurchaseRequestCreate(
+        branch_id=branch,
+        cost_centre_id=cc_id,
+        required_by_date=datetime.now(UTC).date() + timedelta(days=10),
+        lines=[
+            PurchaseRequestLineInput(workspace_product_id=product_1, quantity="2.000000"),
+            PurchaseRequestLineInput(workspace_product_id=product_2, quantity="4.000000"),
+        ],
+    )
+    req, created = service.create_request(
+        bearer_token="token",
+        member=owner_cm,
+        payload=create_payload,
+    )
+    assert created is True
+    assert req.branch_id == branch
+    assert req.cost_centre_id == cc_id
+    assert req.status == "draft"
+    assert len(req.lines) == 2
+
+    # 2. Update request
+    new_required_date = datetime.now(UTC).date() + timedelta(days=15)
+    update_payload = PurchaseRequestUpdate(
+        required_by_date=new_required_date,
+        lines=[PurchaseRequestLineInput(workspace_product_id=product_1, quantity="5.000000")],
+    )
+    updated_req = service.update_request(
+        bearer_token="token",
+        member=owner_cm,
+        request_id=req.id,
+        patch=update_payload,
+    )
+    assert updated_req.id == req.id
+    assert updated_req.required_by_date == new_required_date
+    assert len(updated_req.lines) == 1
+    assert updated_req.lines[0].quantity == "5.000000"
+
+    # 3. Submit request
+    monkeypatch.setattr(
+        service,
+        "_fetch_owner_membership_id",
+        lambda _client: owner.membership_id,
+    )
+    submitted_req = service.submit_request(
+        bearer_token="token",
+        member=owner_cm,
+        request_id=req.id,
+    )
+    assert submitted_req.id == req.id
+    assert submitted_req.status == "submitted"
+    assert submitted_req.approval_step is not None
+    assert submitted_req.approval_step.status == "pending"
