@@ -1,11 +1,13 @@
 import base64
 import json
+import logging
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
+import httpx
 import psycopg
 from psycopg.rows import dict_row
 
@@ -13,6 +15,7 @@ from procurepilot_api import db
 from procurepilot_api.config import Settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (  # noqa: E501
+    ConflictError,
     NotFoundError,
     PermissionDeniedError,
     ServiceUnavailableError,
@@ -45,6 +48,8 @@ from procurepilot_api.modules.rfq.schemas import (
 )
 from procurepilot_api.shared.i18n import t
 from procurepilot_api.shared.mailer import get_mailer
+
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -378,6 +383,7 @@ class RfqService:
         rfq_id: uuid.UUID,
         idempotency_key: uuid.UUID,
     ) -> tuple[Rfq, list[RfqRecipient]]:
+        # TODO(PPS-174): add durable outbox send record
         mailer = get_mailer()
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
@@ -392,7 +398,9 @@ class RfqService:
 
                 rfq_row = _lock_rfq_for_creator(cur, member, rfq_id)
                 rfq = Rfq(**rfq_row)
-                if rfq.status == "draft" and rfq.needed_by_date < date.today():
+                if rfq.status not in ("draft", "sent", "responded"):
+                    raise ConflictError(details={"resource": "rfq", "reason": "not_sendable"})
+                if rfq.needed_by_date < date.today():
                     raise UnprocessableEntityError(
                         details={"reason": "needed_by_in_past", "field": "needed_by_date"}
                     )
@@ -403,6 +411,8 @@ class RfqService:
                 )
                 line_rows = cur.fetchall()
                 lines = [RfqLine(**r) for r in line_rows]
+                if not lines:
+                    raise UnprocessableEntityError(details={"reason": "nothing_to_send"})
 
                 # Supplier emails use each supplier's preferred language, falling back
                 # to the workspace default, independently of the sender's UI language.
@@ -428,12 +438,31 @@ class RfqService:
                 product_by_id = {r["workspace_product_id"]: r for r in cur.fetchall()}
 
                 cur.execute(
-                    "select * from rfq_recipient where rfq_id = %s and status = 'draft' "
+                    "select * from rfq_recipient where rfq_id = %s "
+                    "and status in ('draft', 'failed') "
                     "order by created_at, id",
                     (rfq_id,),
                 )
                 recipient_rows = cur.fetchall()
-                draft_recipients = [RfqRecipient(**r) for r in recipient_rows]
+                candidate_recipients = [RfqRecipient(**r) for r in recipient_rows]
+
+                supplier_ids = [r.supplier_id for r in candidate_recipients]
+                suppliers_by_id: dict[uuid.UUID, dict] = {}
+                if supplier_ids:
+                    cur.execute(
+                        "select id, contact_email, preferred_locale "
+                        "from supplier where id = any(%s)",
+                        (supplier_ids,),
+                    )
+                    suppliers_by_id = {s["id"]: s for s in cur.fetchall()}
+
+                deliverable_count = sum(
+                    1
+                    for r in candidate_recipients
+                    if bool((suppliers_by_id.get(r.supplier_id) or {}).get("contact_email"))
+                )
+                if deliverable_count == 0:
+                    raise UnprocessableEntityError(details={"reason": "nothing_to_send"})
 
                 cur.execute(
                     "select * from tenant_email_config where tenant_id = %s",
@@ -445,16 +474,14 @@ class RfqService:
                     reply_to = email_config_row["forwarding_address"]
 
                 any_sent = False
-                updated_recipients = []
 
-                for recipient in draft_recipients:
-                    cur.execute(
-                        "select contact_email, preferred_locale from supplier where id = %s",
-                        (recipient.supplier_id,),  # noqa: E501
-                    )
-                    supp_row = cur.fetchone()
+                for recipient in candidate_recipients:
+                    supp_row = suppliers_by_id.get(recipient.supplier_id)
                     if not supp_row or not supp_row.get("contact_email"):
-                        updated_recipients.append(recipient)
+                        cur.execute(
+                            "update rfq_recipient set status = 'failed' where id = %s",
+                            (recipient.id,),
+                        )
                         continue
 
                     contact_email = supp_row["contact_email"]
@@ -496,22 +523,26 @@ class RfqService:
 
                     try:
                         res = mailer.send(**send_kwargs)
-                        # On success
-                        sent_msg_id = res.message_id
-                        cur.execute(
-                            """
-                            update rfq_recipient
-                            set status = 'sent', outbound_message_id = %s, sent_at = now()
-                            where id = %s
-                            returning *
-                            """,
-                            (sent_msg_id, recipient.id),
+                    except (httpx.HTTPError, RuntimeError):
+                        logger.exception(
+                            "RFQ recipient email delivery failed",
+                            extra={"rfq_id": str(rfq_id), "recipient_id": str(recipient.id)},
                         )
-                        updated_recipients.append(RfqRecipient(**cur.fetchone()))
-                        any_sent = True
-                    except Exception:
-                        # On failure, leave draft
-                        updated_recipients.append(recipient)
+                        cur.execute(
+                            "update rfq_recipient set status = 'failed' where id = %s",
+                            (recipient.id,),
+                        )
+                        continue
+
+                    cur.execute(
+                        """
+                        update rfq_recipient
+                        set status = 'sent', outbound_message_id = %s, sent_at = now()
+                        where id = %s
+                        """,
+                        (res.message_id, recipient.id),
+                    )
+                    any_sent = True
 
                 # Fetch all recipients to return
                 cur.execute(

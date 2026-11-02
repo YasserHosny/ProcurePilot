@@ -51,7 +51,7 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
     ScorecardV2PanelComponent
 ],
   template: `
-    <main role="main" aria-labelledby="scorecard-heading" class="scorecard-page">
+    <section aria-labelledby="scorecard-heading" class="scorecard-page">
       <!-- Back navigation -->
       <nav [attr.aria-label]="'supplierIq.backToSupplier' | translate">
         <a
@@ -335,7 +335,7 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
           </footer>
         </div>
       }
-    </main>
+    </section>
     `,
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: [

@@ -34,6 +34,7 @@ class FakeQuery:
     def __init__(self, client: FakeClient, table: str) -> None:
         self.client = client
         self.table = table
+        self.excluded_request_statuses: list[str] = []
         self.insert_body: dict[str, object] | None = None
         self.update_body: dict[str, object] | None = None
 
@@ -49,6 +50,11 @@ class FakeQuery:
         return self
 
     def eq(self, _column: str, _value: object) -> FakeQuery:
+        return self
+
+    def neq(self, column: str, value: str) -> FakeQuery:
+        assert column == "purchase_request.status"
+        self.excluded_request_statuses.append(value)
         return self
 
     def in_(self, _column: str, _value: object) -> FakeQuery:
@@ -87,6 +93,8 @@ class FakeQuery:
             raise AssertionError(f"unexpected update of {self.table}")
 
         if self.table == "approval_step":
+            if self.client.request_row["status"] in self.excluded_request_statuses:
+                return Response([])
             return Response(self.client.step_rows)
         return Response([])
 

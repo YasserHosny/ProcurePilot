@@ -27,7 +27,12 @@
     "cancel": "إلغاء",
     "retry": "إعادة المحاولة",
     "notAvailable": "غير متوفر",
-    "breadcrumbLabel": "مسار التنقل"
+    "breadcrumbLabel": "مسار التنقل",
+    "a11y": {
+      "skipToContent": "الانتقال إلى المحتوى الرئيسي",
+      "mainNavigation": "التنقل الرئيسي",
+      "homeLink": "بروكيور بايلوت"
+    }
   },
   "auth": {
     "signin": {
@@ -935,7 +940,25 @@
       "emptyTitle": "لا توجد مهام مراجعة",
       "emptyMessage": "لا توجد مهام مراجعة لعروض الأسعار تطابق خيارات التصفية الحالية.",
       "noFilterResults": "لا توجد نتائج تطابق عوامل التصفية",
-      "clearFilters": "مسح عوامل التصفية"
+      "clearFilters": "مسح عوامل التصفية",
+      "activeFiltersLabel": "عوامل التصفية النشطة",
+      "filterChips": {
+        "status": "الحالة: {{value}}",
+        "priority": "الأولوية: {{value}}",
+        "search": "البحث: {{query}}",
+        "dateRange": "التاريخ: {{from}} – {{to}}",
+        "dateFrom": "من: {{from}}",
+        "dateTo": "إلى: {{to}}",
+        "removeStatus": "إزالة تصفية الحالة",
+        "removePriority": "إزالة تصفية الأولوية",
+        "removeSearch": "إزالة تصفية البحث",
+        "removeDateRange": "إزالة تصفية نطاق التاريخ"
+      },
+      "resultsCount": {
+        "one": "نتيجة واحدة",
+        "other": "{{count}} نتيجة",
+        "more": "+{{count}} نتيجة"
+      }
     },
     "review": {
       "loadError": {
@@ -2256,6 +2279,9 @@
   "requests": {
     "list": {
       "newRequestButton": "طلب جديد"
+    },
+    "table": {
+      "caption": "طلبات الشراء"
     },
     "title": "طلبات الشراء",
     "subtitle": "أنشئ وتابع طلبات الشراء لفروعك ومراكز التكلفة.",
@@ -4214,7 +4240,22 @@
         "many": "تم التحويل إلى {{count}} طلبًا",
         "other": "تم التحويل إلى {{count}} طلب"
       },
-      "approvedTogether": "تُقدَّم هذه الطلبات وتُعتمد معًا"
+      "approvedTogether": "تُقدَّم هذه الطلبات وتُعتمد معًا",
+      "unsentRecipientsTitle": "{{count}} من الموردين لم يستلموا طلب عرض الأسعار",
+      "unsentRecipients": {
+        "zero": "استلم جميع الموردين طلب عرض الأسعار",
+        "one": "مورد واحد لم يستلم طلب عرض الأسعار",
+        "two": "موردان لم يستلما طلب عرض الأسعار",
+        "few": "{{count}} موردين لم يستلموا طلب عرض الأسعار",
+        "many": "{{count}} موردًا لم يستلموا طلب عرض الأسعار",
+        "other": "{{count}} مورد لم يستلموا طلب عرض الأسعار"
+      },
+      "unsentRecipientsHelp": "فشل التسليم أو لم يتم الإرسال إلى هؤلاء الموردين. يمكنك إعادة محاولة الإرسال إليهم الآن.",
+      "retryUnsentRecipients": "إعادة المحاولة للمستلمين الذين لم يستلموا",
+      "confirmRetryTitle": "إعادة إرسال للمستلمين الذين لم يستلموا",
+      "confirmRetryMessage": "هل تريد إعادة إرسال طلب عرض الأسعار هذا إلى {{count}} من الموردين الذين لم يستلموه؟",
+      "confirmRetryButton": "إعادة المحاولة للمستلمين الذين لم يستلموا",
+      "cancelRetryButton": "إلغاء"
     },
     "guardrails": {
       "title": "إعدادات الضوابط",

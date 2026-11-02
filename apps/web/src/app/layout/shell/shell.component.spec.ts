@@ -1,13 +1,24 @@
-import { Component, signal } from '@angular/core';
+import { Component, Type, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Router, provideRouter } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
 import enCatalog from '../../../../../../packages/i18n/en.json';
+import { ApiService } from '../../core/api/api.service';
 import { SessionService } from '../../core/auth/session.service';
 import { I18nService } from '../../core/i18n';
+import { AnalystApiService } from '../../features/analyst/analyst-api';
+import { AnalystConversationComponent } from '../../features/analyst/conversation/conversation.component';
+import { ForecastingApiService } from '../../features/forecasting/forecasting-api';
+import { ReorderQueueComponent } from '../../features/forecasting/reorder-queue/reorder-queue.component';
+import { BriefDetailComponent } from '../../features/supplier-risk/brief-detail/brief-detail.component';
+import { SupplierScorecardComponent } from '../../features/catalogue/supplier-scorecard/supplier-scorecard.component';
+import { RiskQueueComponent } from '../../features/supplier-risk/risk-queue/risk-queue.component';
+import { SupplierRiskApiService } from '../../features/supplier-risk/supplier-risk-api';
 import { ShellComponent } from './shell.component';
 
 @Component({
@@ -407,6 +418,261 @@ describe('ShellComponent account menu', () => {
         expect(titles.length).toBe(5);
         errorFixture.destroy();
       }).not.toThrow();
+    });
+  });
+
+  describe('accessibility and landmarks (PPS-162 / P-130)', () => {
+    it('renders a "Skip to main content" link as the first focusable element targeting #main-content', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const skipLink = root.querySelector<HTMLAnchorElement>('a.skip-to-content, a[href="#main-content"]');
+      expect(skipLink).not.toBeNull();
+      expect(skipLink!.getAttribute('href')).toBe('#main-content');
+      expect(skipLink!.textContent?.trim()).toBe(enCatalog.common.a11y.skipToContent);
+
+      const focusableSelectors = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      const firstFocusable = root.querySelector<HTMLElement>(focusableSelectors);
+      expect(firstFocusable).toBe(skipLink);
+    });
+
+    it('wraps the routed content in exactly one <main id="main-content"> landmark', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const mainLandmarks = root.querySelectorAll('main, [role="main"]');
+      expect(mainLandmarks.length).toBe(1);
+
+      const mainEl = root.querySelector<HTMLElement>('main#main-content');
+      expect(mainEl).not.toBeNull();
+
+      const outletInsideMain = mainEl!.querySelector('router-outlet');
+      expect(outletInsideMain).not.toBeNull();
+    });
+
+    it('renders the sidebar navigation inside a <nav> landmark with aria-label from i18n', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const sidenav = root.querySelector<HTMLElement>('.shell-sidenav')!;
+      const navLandmark = sidenav.querySelector<HTMLElement>('nav');
+      expect(navLandmark).not.toBeNull();
+      expect(navLandmark!.getAttribute('aria-label')).toBe(enCatalog.common.a11y.mainNavigation);
+
+      const groupInNav = navLandmark!.querySelector('.nav-group');
+      expect(groupInNav).not.toBeNull();
+    });
+
+    it('provides an accessible name for the brand link to /home from i18n', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const brandLink = root.querySelector<HTMLAnchorElement>('a.brand-section');
+      expect(brandLink).not.toBeNull();
+      const ariaLabel = brandLink!.getAttribute('aria-label');
+      expect(ariaLabel).toBe(enCatalog.common.brandName);
+    });
+
+    it('renders sidebar group titles as non-heading elements to preserve page heading hierarchy', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const sidenav = root.querySelector<HTMLElement>('.shell-sidenav')!;
+      const headings = sidenav.querySelectorAll('h1, h2, h3, h4, h5, h6, [role="heading"]');
+      expect(headings.length).toBe(0);
+
+      const toggles = sidenav.querySelectorAll<HTMLButtonElement>('.nav-group-toggle');
+      expect(toggles.length).toBe(5);
+      toggles.forEach((toggle) => {
+        expect(toggle.getAttribute('aria-expanded')).not.toBeNull();
+        expect(toggle.querySelector('.nav-group-title-text')?.textContent?.trim().length).toBeGreaterThan(0);
+      });
+    });
+
+    it('prevents navigation away from current route and moves document.activeElement to #main-content when skip link is clicked (H1)', async () => {
+      document.body.appendChild(fixture.nativeElement);
+      try {
+        const router = TestBed.inject(Router);
+        await router.navigateByUrl('/quotations');
+        const initialUrl = router.url;
+
+        const root = fixture.nativeElement as HTMLElement;
+        const skipLink = root.querySelector<HTMLAnchorElement>('a.skip-to-content')!;
+        const mainEl = root.querySelector<HTMLElement>('#main-content')!;
+
+        const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+        skipLink.dispatchEvent(clickEvent);
+        fixture.detectChanges();
+
+        expect(clickEvent.defaultPrevented).toBeTrue();
+        expect(router.url).toBe(initialUrl);
+        expect(document.activeElement).toBe(mainEl);
+      } finally {
+        fixture.nativeElement.remove();
+      }
+    });
+
+
+    it('guards against missing #main-content element when focusMainContent is called (H1)', () => {
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+      spyOn(event, 'preventDefault').and.callThrough();
+
+      const mainEl = fixture.nativeElement.querySelector('#main-content');
+      mainEl?.remove();
+
+      expect(() => {
+        fixture.componentInstance.focusMainContent(event);
+      }).not.toThrow();
+      expect(event.preventDefault).toHaveBeenCalled();
+    });
+  });
+});
+
+describe('ShellComponent nested route landmarks (PPS-162 / H2)', () => {
+  beforeEach(async () => {
+    TestBed.resetTestingModule();
+    localStorage.removeItem('pp.sidebar.collapsed');
+
+    const session = {
+      currentMember: signal({ email: 'buyer@example.test', role: 'buyer' }),
+      tenant: signal(null),
+      role: signal('buyer'),
+      workspaces: () => of({ items: [] }),
+      logout: jasmine.createSpy('logout'),
+      hasRole: () => true,
+      isAuthenticated: signal(true),
+      activeLocale: signal<'en' | 'ar'>('en'),
+    };
+    const i18n = {
+      currentLocale: signal('en'),
+      isRtl: signal(false),
+      setLocale: () => of(undefined),
+    };
+    const analystApi = {
+      ask: () => of({}),
+      getConversation: () => of({ id: '1', turns: [] }),
+    };
+    const forecastingApi = {
+      listProposals: () => of({ items: [] }),
+    };
+    const supplierRiskApi = {
+      listRisks: () => of({ items: [], next_cursor: null }),
+      getBrief: () =>
+        of({
+          id: 'brief-1',
+          supplier_id: 'supplier-1',
+          snapshot_id: 'snapshot-1',
+          brief_version: 'negotiation-brief-v1',
+          source_fingerprint: 'fp-1',
+          release_posture: 'g3_unmet',
+          valid_from: '2026-09-24T00:00:00Z',
+          valid_until: '2099-09-24T00:00:00Z',
+          status: 'prepared',
+          items: [],
+          recommended_actions: [],
+          evidence: [],
+        }),
+    };
+    const api = {
+      listBranches: () => of({ items: [] }),
+      supplier: () =>
+        of({
+          id: 'supplier-1',
+          name: 'Acme Supplies',
+          status: 'active',
+          created_at: '2026-08-01T00:00:00Z',
+        }),
+      getSupplierScorecard: () =>
+        of({
+          supplier_id: 'supplier-1',
+          window_start: '2026-03-01',
+          window_end: '2026-09-01',
+          metrics: {},
+          source_counts: {},
+          insufficient_evidence: false,
+          confidence: 'high' as const,
+        }),
+    };
+    const snackBar = {
+      open: jasmine.createSpy('open'),
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [
+        ShellComponent,
+        AnalystConversationComponent,
+        ReorderQueueComponent,
+        RiskQueueComponent,
+        BriefDetailComponent,
+        SupplierScorecardComponent,
+      ],
+      providers: [
+        provideTranslateService(),
+        provideNoopAnimations(),
+        provideRouter([
+          {
+            path: '',
+            component: ShellComponent,
+            children: [
+              { path: 'analyst', component: AnalystConversationComponent },
+              { path: 'forecasting', component: ReorderQueueComponent },
+              { path: 'supplier-risk', component: RiskQueueComponent },
+              { path: 'negotiation-briefs/:id', component: BriefDetailComponent },
+              { path: 'suppliers/:id/scorecard', component: SupplierScorecardComponent },
+            ],
+          },
+        ]),
+        { provide: SessionService, useValue: session },
+        { provide: I18nService, useValue: i18n },
+        { provide: AnalystApiService, useValue: analystApi },
+        { provide: ForecastingApiService, useValue: forecastingApi },
+        { provide: SupplierRiskApiService, useValue: supplierRiskApi },
+        { provide: ApiService, useValue: api },
+        { provide: MatSnackBar, useValue: snackBar },
+      ],
+    }).compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.use('en');
+  });
+
+  afterEach(() => {
+    localStorage.removeItem('pp.sidebar.collapsed');
+    TestBed.resetTestingModule();
+  });
+
+  const routesToTest = [
+    { path: '/analyst', name: 'AnalystConversationComponent' },
+    { path: '/forecasting', name: 'ReorderQueueComponent' },
+    { path: '/supplier-risk', name: 'RiskQueueComponent' },
+    { path: '/negotiation-briefs/brief-1', name: 'BriefDetailComponent' },
+    { path: '/suppliers/supplier-1/scorecard', name: 'SupplierScorecardComponent' },
+  ];
+
+  routesToTest.forEach(({ path, name }) => {
+    it(`renders exactly one <main id="main-content"> with no nested <main> landmark when routed to ${path} (${name})`, async () => {
+      const harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl(path);
+
+      const root = harness.fixture.nativeElement as HTMLElement;
+      const mainLandmarks = root.querySelectorAll('main, [role="main"]');
+      expect(mainLandmarks.length).toBe(1);
+
+      const shellMain = root.querySelector<HTMLElement>('main#main-content');
+      expect(shellMain).not.toBeNull();
+
+      const nestedMains = shellMain!.querySelectorAll('main, [role="main"]');
+      expect(nestedMains.length).toBe(0);
+    });
+  });
+
+  const componentsToTest: { component: Type<unknown>; name: string }[] = [
+    { component: AnalystConversationComponent, name: 'AnalystConversationComponent' },
+    { component: ReorderQueueComponent, name: 'ReorderQueueComponent' },
+    { component: RiskQueueComponent, name: 'RiskQueueComponent' },
+    { component: BriefDetailComponent, name: 'BriefDetailComponent' },
+    { component: SupplierScorecardComponent, name: 'SupplierScorecardComponent' },
+  ];
+
+  componentsToTest.forEach(({ component, name }) => {
+    it(`ensures ${name} contains no <main> landmark in its own template`, () => {
+      const compFixture = TestBed.createComponent(component);
+      compFixture.detectChanges();
+      const root = compFixture.nativeElement as HTMLElement;
+      expect(root.tagName.toLowerCase()).not.toBe('main');
+      expect(root.querySelector('main, [role="main"]')).toBeNull();
+      compFixture.destroy();
     });
   });
 });

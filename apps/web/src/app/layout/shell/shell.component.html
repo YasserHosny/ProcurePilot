@@ -1,4 +1,12 @@
 <div class="shell-container">
+  <a
+    href="#main-content"
+    class="skip-to-content"
+    (click)="focusMainContent($event)"
+  >
+    {{ 'common.a11y.skipToContent' | translate }}
+  </a>
+
   <mat-toolbar class="shell-toolbar">
     <button
       mat-icon-button
@@ -9,7 +17,7 @@
       <mat-icon aria-hidden="true">menu</mat-icon>
     </button>
 
-    <a routerLink="/home" class="brand-section">
+    <a routerLink="/home" class="brand-section" [attr.aria-label]="'common.brandName' | translate">
       <app-brand-logo [height]="36" />
     </a>
 
@@ -134,75 +142,77 @@
 
   <mat-sidenav-container class="sidenav-container">
     <mat-sidenav #sidenav [mode]="sidenavMode()" [opened]="sidenavOpened()" class="shell-sidenav">
-      <div class="nav-home-wrap">
-        <a
-          mat-list-item
-          [routerLink]="homeItem.route"
-          routerLinkActive="active"
-          class="nav-item"
-        >
-          <mat-icon aria-hidden="true">{{ homeItem.icon }}</mat-icon>
-          <span class="nav-label">{{ homeItem.labelKey | translate }}</span>
-        </a>
-      </div>
-
-      @for (group of navGroups; track group.id) {
-        <div class="nav-group" [class.nav-group--active]="isGroupActive(group.id)">
-          <h2 class="nav-group-heading">
-            <button
-              type="button"
-              class="nav-section-title nav-group-toggle"
-              [id]="'nav-group-header-' + group.id"
-              [attr.aria-expanded]="!isGroupCollapsed(group.id)"
-              [attr.aria-controls]="'nav-group-' + group.id"
-              [attr.aria-label]="
-                (!isGroupCollapsed(group.id) ? 'shell.hideGroup' : 'shell.showGroup')
-                  | translate: { group: (group.labelKey | translate) }
-              "
-              [disabled]="isGroupActive(group.id)"
-              (click)="toggleGroup(group.id)"
-            >
-              <span class="nav-group-title-text" [id]="'nav-group-title-' + group.id">{{ group.labelKey | translate }}</span>
-              <mat-icon class="nav-group-chevron" [class.rtl-chevron]="isRtl()" aria-hidden="true">expand_more</mat-icon>
-            </button>
-          </h2>
-
-          <div
-            [id]="'nav-group-' + group.id"
-            class="nav-group-items"
-            role="group"
-            [attr.aria-labelledby]="'nav-group-title-' + group.id"
-            [hidden]="isGroupCollapsed(group.id)"
+      <nav class="sidebar-nav" [attr.aria-label]="'common.a11y.mainNavigation' | translate">
+        <div class="nav-home-wrap">
+          <a
+            mat-list-item
+            [routerLink]="homeItem.route"
+            routerLinkActive="active"
+            class="nav-item"
           >
-            @for (item of group.items; track item.route) {
-              @if (!item.roles) {
-                <a
-                  mat-list-item
-                  [routerLink]="item.route"
-                  routerLinkActive="active"
-                  [routerLinkActiveOptions]="item.exact ? { exact: true } : { exact: false }"
-                  class="nav-item"
-                >
-                  <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
-                  <span class="nav-label">{{ item.labelKey | translate }}</span>
-                </a>
-              } @else {
-                <a
-                  mat-list-item
-                  [routerLink]="item.route"
-                  routerLinkActive="active"
-                  [routerLinkActiveOptions]="item.exact ? { exact: true } : { exact: false }"
-                  class="nav-item"
-                  *appRole="item.roles"
-                >
-                  <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
-                  <span class="nav-label">{{ item.labelKey | translate }}</span>
-                </a>
-              }
-            }
-          </div>
+            <mat-icon aria-hidden="true">{{ homeItem.icon }}</mat-icon>
+            <span class="nav-label">{{ homeItem.labelKey | translate }}</span>
+          </a>
         </div>
-      }
+
+        @for (group of navGroups; track group.id) {
+          <div class="nav-group" [class.nav-group--active]="isGroupActive(group.id)">
+            <div class="nav-group-heading">
+              <button
+                type="button"
+                class="nav-section-title nav-group-toggle"
+                [id]="'nav-group-header-' + group.id"
+                [attr.aria-expanded]="!isGroupCollapsed(group.id)"
+                [attr.aria-controls]="'nav-group-' + group.id"
+                [attr.aria-label]="
+                  (!isGroupCollapsed(group.id) ? 'shell.hideGroup' : 'shell.showGroup')
+                    | translate: { group: (group.labelKey | translate) }
+                "
+                [disabled]="isGroupActive(group.id)"
+                (click)="toggleGroup(group.id)"
+              >
+                <span class="nav-group-title-text" [id]="'nav-group-title-' + group.id">{{ group.labelKey | translate }}</span>
+                <mat-icon class="nav-group-chevron" [class.rtl-chevron]="isRtl()" aria-hidden="true">expand_more</mat-icon>
+              </button>
+            </div>
+
+            <div
+              [id]="'nav-group-' + group.id"
+              class="nav-group-items"
+              role="group"
+              [attr.aria-labelledby]="'nav-group-title-' + group.id"
+              [hidden]="isGroupCollapsed(group.id)"
+            >
+              @for (item of group.items; track item.route) {
+                @if (!item.roles) {
+                  <a
+                    mat-list-item
+                    [routerLink]="item.route"
+                    routerLinkActive="active"
+                    [routerLinkActiveOptions]="item.exact ? { exact: true } : { exact: false }"
+                    class="nav-item"
+                  >
+                    <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
+                    <span class="nav-label">{{ item.labelKey | translate }}</span>
+                  </a>
+                } @else {
+                  <a
+                    mat-list-item
+                    [routerLink]="item.route"
+                    routerLinkActive="active"
+                    [routerLinkActiveOptions]="item.exact ? { exact: true } : { exact: false }"
+                    class="nav-item"
+                    *appRole="item.roles"
+                  >
+                    <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
+                    <span class="nav-label">{{ item.labelKey | translate }}</span>
+                  </a>
+                }
+              }
+            </div>
+          </div>
+        }
+      </nav>
     </mat-sidenav>
 
     <!--
@@ -211,7 +221,9 @@
       the container itself focusable gives them arrow-key access.
     -->
     <mat-sidenav-content class="main-content" tabindex="0">
-      <router-outlet></router-outlet>
+      <main id="main-content" tabindex="-1">
+        <router-outlet></router-outlet>
+      </main>
     </mat-sidenav-content>
   </mat-sidenav-container>
 </div>

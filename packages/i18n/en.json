@@ -27,7 +27,12 @@
     "cancel": "Cancel",
     "retry": "Retry",
     "notAvailable": "Not available",
-    "breadcrumbLabel": "Breadcrumb"
+    "breadcrumbLabel": "Breadcrumb",
+    "a11y": {
+      "skipToContent": "Skip to main content",
+      "mainNavigation": "Main navigation",
+      "homeLink": "ProcurePilot"
+    }
   },
   "auth": {
     "signin": {
@@ -935,7 +940,25 @@
       "emptyTitle": "No Review Tasks Found",
       "emptyMessage": "There are no quotation review tasks matching your current filters.",
       "noFilterResults": "No results match your filters",
-      "clearFilters": "Clear filters"
+      "clearFilters": "Clear filters",
+      "activeFiltersLabel": "Active filters",
+      "filterChips": {
+        "status": "Status: {{value}}",
+        "priority": "Priority: {{value}}",
+        "search": "Search: {{query}}",
+        "dateRange": "Date: {{from}} – {{to}}",
+        "dateFrom": "From: {{from}}",
+        "dateTo": "To: {{to}}",
+        "removeStatus": "Remove status filter",
+        "removePriority": "Remove priority filter",
+        "removeSearch": "Remove search filter",
+        "removeDateRange": "Remove date range filter"
+      },
+      "resultsCount": {
+        "one": "{{count}} result",
+        "other": "{{count}} results",
+        "more": "{{count}}+ results"
+      }
     },
     "review": {
       "loadError": {
@@ -2256,6 +2279,9 @@
   "requests": {
     "list": {
       "newRequestButton": "New request"
+    },
+    "table": {
+      "caption": "Purchase requests"
     },
     "title": "Purchase Requests",
     "subtitle": "Create and track purchase requests for your branches and cost centres.",
@@ -4214,7 +4240,22 @@
         "many": "Converted into {{count}} requests",
         "other": "Converted into {{count}} requests"
       },
-      "approvedTogether": "These requests are submitted and approved together"
+      "approvedTogether": "These requests are submitted and approved together",
+      "unsentRecipientsTitle": "{{count}} suppliers have not received this RFQ",
+      "unsentRecipients": {
+        "zero": "0 suppliers have not received this RFQ",
+        "one": "1 supplier has not received this RFQ",
+        "two": "2 suppliers have not received this RFQ",
+        "few": "{{count}} suppliers have not received this RFQ",
+        "many": "{{count}} suppliers have not received this RFQ",
+        "other": "{{count}} suppliers have not received this RFQ"
+      },
+      "unsentRecipientsHelp": "Delivery failed or was not sent for these suppliers. You can retry sending to them now.",
+      "retryUnsentRecipients": "Retry unsent recipients",
+      "confirmRetryTitle": "Retry unsent recipients",
+      "confirmRetryMessage": "Retry sending this RFQ to {{count}} unsent supplier(s)?",
+      "confirmRetryButton": "Retry unsent recipients",
+      "cancelRetryButton": "Cancel"
     },
     "guardrails": {
       "title": "Guardrail settings",
