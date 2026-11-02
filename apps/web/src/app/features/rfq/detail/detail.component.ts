@@ -12,7 +12,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { RfqApi, RfqDetail } from '../rfq-api';
+import { RfqApi, RfqDetail, RfqRecipient } from '../rfq-api';
 import { FormatService } from '../../../core/format/format.service';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
@@ -68,6 +68,7 @@ export class DetailComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly selectedTabIndex = signal<number>(0);
   readonly currentMembershipId = signal<string | null>(null);
+  readonly retrying = signal<boolean>(false);
 
   readonly displayedItemColumns = ['product', 'quantity'];
   readonly displayedRecipientColumns = ['supplier', 'contactEmail', 'status', 'sentAt'];
@@ -222,6 +223,88 @@ export class DetailComponent implements OnInit {
     return this.rfqDetail()?.rfq.created_by_membership_id === this.currentMembershipId();
   }
 
+  unsentRecipients(): RfqRecipient[] {
+    const recipients = this.rfqDetail()?.recipients ?? [];
+    return recipients.filter((r) => r.status === 'draft' || r.status === 'failed');
+  }
+
+  showRetryNotice(): boolean {
+    const status = this.rfqDetail()?.rfq.status;
+    return (status === 'sent' || status === 'responded') && this.isCreator() && this.unsentRecipients().length > 0;
+  }
+
+  unsentRecipientsTitle(): string {
+    const count = this.unsentRecipients().length;
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    const key = `rfq.detail.unsentRecipients.${category}`;
+    const formatted = this.formatService.formatNumber(count);
+    const translated = this.translate.instant(key, { count: formatted });
+    if (translated && translated !== key) {
+      return translated;
+    }
+    return this.translate.instant('rfq.detail.unsentRecipientsTitle', { count: formatted });
+  }
+
+  onRetryUnsent(): void {
+    if (this.retrying() || !this.isCreator()) return;
+    const detail = this.rfqDetail();
+    const id = this.rfqId();
+    if (!id || !detail) return;
+    const unsent = this.unsentRecipients();
+    if (unsent.length === 0) return;
+
+    const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
+      width: '440px',
+      data: {
+        titleKey: 'rfq.detail.confirmRetryTitle',
+        messageKey: 'rfq.detail.confirmRetryMessage',
+        messageParams: { count: unsent.length },
+        count: unsent.length,
+        confirmKey: 'rfq.detail.confirmRetryButton',
+        cancelKey: 'rfq.detail.cancelRetryButton',
+        isDestructive: false,
+      },
+    });
+
+    dialogRef.afterClosed().subscribe((confirmed: boolean | undefined) => {
+      if (confirmed) {
+        if (this.retrying()) return;
+        this.retrying.set(true);
+        this.rfqApi.sendRfq(id).subscribe({
+          next: (res) => {
+            this.retrying.set(false);
+            const total = res.recipients.length;
+            const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
+            const key = sent === total && total > 0 ? 'rfq.history.sentSuccess' : sent > 0 ? 'rfq.create.sentPartial' : 'rfq.create.sentNone';
+            const params = sent === total && total > 0 ? { count: sent } : { sent, total, failed: total - sent };
+            this.snackBar.open(this.translate.instant(key, params), this.translate.instant('rfq.history.dismiss'), { duration: 5000 });
+            this.loadRfq(id);
+          },
+          error: (err: unknown) => {
+            this.retrying.set(false);
+            let key = 'rfq.history.sendError';
+            if (err instanceof HttpErrorResponse) {
+              if (err.status === 403) {
+                key = 'rfq.creatorOnly';
+              } else if (err.status === 422) {
+                const envelope = err.error as { details?: { reason?: string }; reason?: string } | null;
+                if (envelope?.details?.reason === 'needed_by_in_past' || envelope?.reason === 'needed_by_in_past') {
+                  key = 'rfq.create.neededByPastError';
+                }
+              }
+            }
+            this.snackBar.open(
+              this.translate.instant(key),
+              this.translate.instant('rfq.history.dismiss'),
+              { duration: 5000 },
+            );
+          },
+        });
+      }
+    });
+  }
+
   onEditDraft(): void {
     const id = this.rfqId();
     if (!id || !this.isCreator()) return;
@@ -234,13 +317,15 @@ export class DetailComponent implements OnInit {
     const id = this.rfqId();
     if (!id) return;
     const recipientCount = detail?.recipients.length ?? 0;
+    const formattedDate = this.formatService.formatDate(detail?.rfq.needed_by_date);
 
     const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
       width: '440px',
       data: {
         titleKey: 'rfq.history.confirmSendTitle',
         messageKey: 'rfq.history.confirmSendMessage',
-        messageParams: { count: recipientCount },
+        messageParams: { count: recipientCount, date: formattedDate },
+        date: formattedDate,
         confirmKey: 'rfq.history.confirmSendButton',
         cancelKey: 'rfq.history.cancelSendButton',
         isDestructive: false,
