@@ -363,24 +363,29 @@ export class ReviewQueueComponent implements OnInit {
     }
     this.isBulkArchiving.set(true);
     const tasks = this.tasks().filter((task) => selected.has(task.id));
-    if (tasks.length === 0) {
-      this.isBulkArchiving.set(false);
+    const eligibleTasks = tasks.filter((task) => !this.isResolvedTask(task));
+    const skippedTasks = tasks.filter((task) => this.isResolvedTask(task));
+    const skippedIds = skippedTasks.map((t) => t.id);
+
+    if (eligibleTasks.length === 0) {
+      this.finishBulkAction('archive', [], [], skippedIds);
       return;
     }
+
     const succeededIds: string[] = [];
     const failedTasks: ReviewTask[] = [];
-    for (const task of tasks) {
+    for (const task of eligibleTasks) {
       this.api.archiveQuotation(task.quotation_id).subscribe({
         next: () => {
           succeededIds.push(task.id);
-          if (succeededIds.length + failedTasks.length === tasks.length) {
-            this.finishBulkAction('archive', succeededIds, failedTasks, []);
+          if (succeededIds.length + failedTasks.length === eligibleTasks.length) {
+            this.finishBulkAction('archive', succeededIds, failedTasks, skippedIds);
           }
         },
         error: () => {
           failedTasks.push(task);
-          if (succeededIds.length + failedTasks.length === tasks.length) {
-            this.finishBulkAction('archive', succeededIds, failedTasks, []);
+          if (succeededIds.length + failedTasks.length === eligibleTasks.length) {
+            this.finishBulkAction('archive', succeededIds, failedTasks, skippedIds);
           }
         },
       });
@@ -535,34 +540,43 @@ export class ReviewQueueComponent implements OnInit {
 
     let message: string;
     if (succeeded > 0 && failed === 0) {
-      message = this.translate.instant('quotations.queue.bulk.result.allSucceeded', {
-        count: succeeded,
-        succeeded,
-      });
+      message =
+        skipped > 0
+          ? this.translate.instant('quotations.queue.bulk.result.allSucceededSkipped', {
+              count: succeeded,
+              succeeded,
+              skipped,
+            })
+          : this.translate.instant('quotations.queue.bulk.result.allSucceeded', {
+              count: succeeded,
+              succeeded,
+            });
     } else if (succeeded > 0 && failed > 0) {
-      message = this.translate.instant('quotations.queue.bulk.result.partial', {
-        succeeded,
-        failed,
-        count: succeeded + failed,
-      });
+      message =
+        skipped > 0
+          ? this.translate.instant('quotations.queue.bulk.result.partialSkipped', {
+              succeeded,
+              failed,
+              count: succeeded + failed,
+              skipped,
+            })
+          : this.translate.instant('quotations.queue.bulk.result.partial', {
+              succeeded,
+              failed,
+              count: succeeded + failed,
+            });
     } else {
-      message = this.translate.instant('quotations.queue.bulk.result.allFailed', {
-        failed,
-        count: failed,
-      });
-    }
-
-    if (skipped > 0) {
-      const isArabic =
-        typeof this.translate.currentLang === 'function'
-          ? this.translate.currentLang() === 'ar'
-          : this.translate.getCurrentLang?.() === 'ar';
-      const separator = isArabic ? '، ' : ', ';
-      const skippedPart = this.translate.instant('quotations.queue.bulk.result.skipped', {
-        skipped,
-        count: skipped,
-      });
-      message = `${message}${separator}${skippedPart}`;
+      message =
+        skipped > 0
+          ? this.translate.instant('quotations.queue.bulk.result.allFailedSkipped', {
+              failed,
+              count: failed,
+              skipped,
+            })
+          : this.translate.instant('quotations.queue.bulk.result.allFailed', {
+              failed,
+              count: failed,
+            });
     }
 
     this.snackBar.open(message, undefined, { duration: 4000 });

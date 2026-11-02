@@ -918,9 +918,12 @@
       "bulk": {
         "result": {
           "allSucceeded": "تم تحديث {{count}} مهمة",
+          "allSucceededSkipped": "تم تحديث {{count}} مهمة، تم تخطي {{skipped}} (مكتملة)",
           "all": "تم تحديث {{count}} مهمة",
           "partial": "تم تحديث {{succeeded}}، وفشل {{failed}} — تظل المهام الفاشلة محددة لإعادة المحاولة",
+          "partialSkipped": "تم تحديث {{succeeded}}، وفشل {{failed}} — تظل المهام الفاشلة محددة لإعادة المحاولة، تم تخطي {{skipped}} (مكتملة)",
           "allFailed": "لم يتم تحديث أي مهام (فشل {{failed}})",
+          "allFailedSkipped": "لم يتم تحديث أي مهام (فشل {{failed}})، تم تخطي {{skipped}} (مكتملة)",
           "skipped": "تم تخطي {{skipped}} (مكتملة)"
         }
       },

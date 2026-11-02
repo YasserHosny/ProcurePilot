@@ -431,6 +431,134 @@ describe('ReviewQueueComponent (T052)', () => {
       );
     });
 
+    it('bulk archive: skips resolved tasks without sending request and counts as skipped', () => {
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      spyOn(snackBar, 'open');
+      spyOn(window, 'confirm').and.returnValue(true);
+      const resolvedTask: ReviewTask = {
+        ...mockTasks[1],
+        id: 'task-resolved',
+        quotation_id: 'q-resolved',
+        status: 'resolved',
+      };
+      component.tasks.set([mockTasks[0], mockTasks[1], resolvedTask]);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-2', 'task-resolved']));
+
+      apiService.archiveQuotation.and.returnValue(of(mockQuotation));
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: [resolvedTask], next_cursor: null }),
+      );
+
+      component.bulkArchive();
+
+      expect(apiService.archiveQuotation).toHaveBeenCalledWith('q-101');
+      expect(apiService.archiveQuotation).toHaveBeenCalledWith('q-102');
+      expect(apiService.archiveQuotation).not.toHaveBeenCalledWith('q-resolved');
+      expect(apiService.archiveQuotation).toHaveBeenCalledTimes(2);
+      expect(component.selectedTaskIds().size).toBe(0);
+      expect(snackBar.open).toHaveBeenCalledWith(
+        jasmine.stringMatching(/2.*tasks updated.*1.*skipped.*resolved/),
+        undefined,
+        jasmine.any(Object),
+      );
+    });
+
+    it('bulk result translation: requests the exact combined key and params for each combination with no string concatenation', () => {
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      const snackBarSpy = spyOn(snackBar, 'open');
+      const translate = TestBed.inject(TranslateService);
+      const recordedCalls: { key: string; params: unknown }[] = [];
+      spyOn(translate, 'instant').and.callFake((key: string, params?: unknown) => {
+        recordedCalls.push({ key, params });
+        return `TRANSLATED:${key}`;
+      });
+
+      interface BulkCaller {
+        finishBulkAction: (
+          action: 'archive' | 'refuse' | 'reprioritise',
+          succeededIds: string[],
+          failedTasks: ReviewTask[],
+          skippedIds: string[],
+        ) => void;
+      }
+      const caller = component as unknown as BulkCaller;
+
+      const combinations: {
+        name: string;
+        succeededIds: string[];
+        failedTasks: ReviewTask[];
+        skippedIds: string[];
+        expectedKey: string;
+        expectedParams: Record<string, unknown>;
+      }[] = [
+        {
+          name: 'all succeeded without skipped',
+          succeededIds: ['task-1', 'task-2'],
+          failedTasks: [],
+          skippedIds: [],
+          expectedKey: 'quotations.queue.bulk.result.allSucceeded',
+          expectedParams: { count: 2, succeeded: 2 },
+        },
+        {
+          name: 'all succeeded with skipped',
+          succeededIds: ['task-1', 'task-2'],
+          failedTasks: [],
+          skippedIds: ['task-3'],
+          expectedKey: 'quotations.queue.bulk.result.allSucceededSkipped',
+          expectedParams: { count: 2, succeeded: 2, skipped: 1 },
+        },
+        {
+          name: 'partial without skipped',
+          succeededIds: ['task-1'],
+          failedTasks: [mockTasks[1]],
+          skippedIds: [],
+          expectedKey: 'quotations.queue.bulk.result.partial',
+          expectedParams: { succeeded: 1, failed: 1, count: 2 },
+        },
+        {
+          name: 'partial with skipped',
+          succeededIds: ['task-1'],
+          failedTasks: [mockTasks[1]],
+          skippedIds: ['task-3'],
+          expectedKey: 'quotations.queue.bulk.result.partialSkipped',
+          expectedParams: { succeeded: 1, failed: 1, count: 2, skipped: 1 },
+        },
+        {
+          name: 'all failed without skipped',
+          succeededIds: [],
+          failedTasks: [mockTasks[0], mockTasks[1]],
+          skippedIds: [],
+          expectedKey: 'quotations.queue.bulk.result.allFailed',
+          expectedParams: { failed: 2, count: 2 },
+        },
+        {
+          name: 'all failed with skipped',
+          succeededIds: [],
+          failedTasks: [mockTasks[0]],
+          skippedIds: ['task-3'],
+          expectedKey: 'quotations.queue.bulk.result.allFailedSkipped',
+          expectedParams: { failed: 1, count: 1, skipped: 1 },
+        },
+      ];
+
+      for (const c of combinations) {
+        recordedCalls.length = 0;
+        snackBarSpy.calls.reset();
+
+        caller.finishBulkAction('archive', c.succeededIds, c.failedTasks, c.skippedIds);
+
+        expect(recordedCalls.length).withContext(`${c.name}: translate.instant call count`).toBe(1);
+        expect(recordedCalls[0].key).withContext(`${c.name}: key`).toBe(c.expectedKey);
+        expect(recordedCalls[0].params).withContext(`${c.name}: params`).toEqual(c.expectedParams);
+        expect(snackBarSpy).toHaveBeenCalledWith(
+          `TRANSLATED:${c.expectedKey}`,
+          undefined,
+          jasmine.any(Object),
+        );
+      }
+    });
+
     it('non-writer: bulk controls and selection checkboxes are not rendered', () => {
       mockRole.set('viewer');
       component.selectedTaskIds.set(new Set(['task-1']));

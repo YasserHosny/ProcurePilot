@@ -918,9 +918,12 @@
       "bulk": {
         "result": {
           "allSucceeded": "{{count}} tasks updated",
+          "allSucceededSkipped": "{{count}} tasks updated, {{skipped}} skipped (resolved)",
           "all": "{{count}} tasks updated",
           "partial": "{{succeeded}} updated, {{failed}} failed - the failed ones stay selected so you can retry",
+          "partialSkipped": "{{succeeded}} updated, {{failed}} failed - the failed ones stay selected so you can retry, {{skipped}} skipped (resolved)",
           "allFailed": "No tasks were updated ({{failed}} failed)",
+          "allFailedSkipped": "No tasks were updated ({{failed}} failed), {{skipped}} skipped (resolved)",
           "skipped": "{{skipped}} skipped (resolved)"
         }
       },
