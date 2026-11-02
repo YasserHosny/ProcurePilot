@@ -625,6 +625,21 @@ describe('MatchResolutionComponent (T039)', () => {
       expect(component.selectedCandidateId()).withContext('rtl: right is previous').toBe('cand-2');
     });
 
+    it('leaves arrow keys to the outcome radio group when it has focus', () => {
+      const outcomeRadio = fixture.nativeElement.querySelector(
+        '.outcomes-radio-group input[type="radio"]',
+      ) as HTMLElement;
+      expect(outcomeRadio).not.toBeNull();
+      expect(component.selectedCandidateId()).toBe('cand-1');
+
+      const down = keydown(outcomeRadio, { key: 'ArrowDown' });
+      const right = keydown(outcomeRadio, { key: 'ArrowRight' });
+
+      expect(down.defaultPrevented).toBeFalse();
+      expect(right.defaultPrevented).toBeFalse();
+      expect(component.selectedCandidateId()).toBe('cand-1');
+    });
+
     it('sends an Idempotency-Key, reuses it on retry and renews it after success', () => {
       apiService.resolveMatch.and.returnValues(
         throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'busy' } })),
