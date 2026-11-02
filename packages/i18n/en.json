@@ -1813,6 +1813,9 @@
         "idempotencyKeyReused": "This idempotency key has already been used with different parameters.",
         "generic": "Failed to prepare requests."
       }
+    },
+    "submit": {
+      "successSplit": "{{count}} purchase requests submitted for approval as one split."
     }
   },
   "alerts": {
