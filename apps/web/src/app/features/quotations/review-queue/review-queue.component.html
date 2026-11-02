@@ -112,7 +112,109 @@
         <mat-datepicker-toggle matIconSuffix [for]="dateToPicker"></mat-datepicker-toggle>
         <mat-datepicker #dateToPicker></mat-datepicker>
       </mat-form-field>
+
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="clearFilters()"
+        class="clear-filters-btn"
+        [disabled]="!hasActiveFilters()"
+        data-testid="clear-filters-btn"
+      >
+        <mat-icon aria-hidden="true">clear</mat-icon>
+        <span>{{ 'quotations.queue.clearFilters' | translate }}</span>
+      </button>
     </mat-card-content>
+
+    @if (hasActiveFilters()) {
+      <div class="active-filters-row" data-testid="active-filter-chips">
+        <mat-chip-set class="active-chips" [attr.aria-label]="'quotations.queue.activeFiltersLabel' | translate">
+          @if (statusFilter() !== 'open') {
+            <mat-chip class="active-filter-chip" data-testid="chip-status">
+              <span>
+                {{ 'quotations.queue.columns.status' | translate }}:
+                @switch (statusFilter()) {
+                  @case ('in_progress') { {{ 'quotations.queue.status.in_progress' | translate }} }
+                  @case ('resolved') { {{ 'quotations.queue.status.resolved' | translate }} }
+                  @case ('all') { {{ 'quotations.queue.status.all' | translate }} }
+                }
+              </span>
+              <button
+                matChipRemove
+                type="button"
+                (click)="removeStatusFilter()"
+                [attr.aria-label]="'quotations.queue.filterChips.removeStatus' | translate"
+                data-testid="remove-status-chip"
+              >
+                <mat-icon aria-hidden="true">cancel</mat-icon>
+              </button>
+            </mat-chip>
+          }
+
+          @if (priorityFilter() !== 'all') {
+            <mat-chip class="active-filter-chip" data-testid="chip-priority">
+              <span>
+                {{ 'quotations.queue.columns.priority' | translate }}:
+                @switch (priorityFilter()) {
+                  @case ('high') { {{ 'quotations.queue.priority.high' | translate }} }
+                  @case ('normal') { {{ 'quotations.queue.priority.normal' | translate }} }
+                  @case ('low') { {{ 'quotations.queue.priority.low' | translate }} }
+                }
+              </span>
+              <button
+                matChipRemove
+                type="button"
+                (click)="removePriorityFilter()"
+                [attr.aria-label]="'quotations.queue.filterChips.removePriority' | translate"
+                data-testid="remove-priority-chip"
+              >
+                <mat-icon aria-hidden="true">cancel</mat-icon>
+              </button>
+            </mat-chip>
+          }
+
+          @if (searchQuery().trim().length > 0) {
+            <mat-chip class="active-filter-chip" data-testid="chip-search">
+              <span>
+                {{ 'quotations.queue.filterChips.search' | translate:{ query: searchQuery().trim() } }}
+              </span>
+              <button
+                matChipRemove
+                type="button"
+                (click)="removeSearchFilter()"
+                [attr.aria-label]="'quotations.queue.filterChips.removeSearch' | translate"
+                data-testid="remove-search-chip"
+              >
+                <mat-icon aria-hidden="true">cancel</mat-icon>
+              </button>
+            </mat-chip>
+          }
+
+          @if (dateFrom() !== null || dateTo() !== null) {
+            <mat-chip class="active-filter-chip" data-testid="chip-date-range">
+              <span>
+                @if (dateFrom() && dateTo()) {
+                  {{ 'quotations.queue.filterChips.dateRange' | translate:{ from: dateFrom(), to: dateTo() } }}
+                } @else if (dateFrom()) {
+                  {{ 'quotations.queue.filterChips.dateFrom' | translate:{ from: dateFrom() } }}
+                } @else {
+                  {{ 'quotations.queue.filterChips.dateTo' | translate:{ to: dateTo() } }}
+                }
+              </span>
+              <button
+                matChipRemove
+                type="button"
+                (click)="removeDateRangeFilter()"
+                [attr.aria-label]="'quotations.queue.filterChips.removeDateRange' | translate"
+                data-testid="remove-date-range-chip"
+              >
+                <mat-icon aria-hidden="true">cancel</mat-icon>
+              </button>
+            </mat-chip>
+          }
+        </mat-chip-set>
+      </div>
+    }
   </mat-card>
 
   <!-- Tasks Table / Loading / Empty -->
@@ -122,22 +224,27 @@
         <div class="loading-state">
           <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
         </div>
-      } @else if (tasks().length === 0 && hasActiveFilters()) {
-        <div class="empty-state">
-          <mat-icon class="empty-icon" aria-hidden="true">filter_alt_off</mat-icon>
-          <h2 class="empty-title">{{ 'quotations.queue.noFilterResults' | translate }}</h2>
-          <button mat-stroked-button type="button" (click)="clearFilters()" class="clear-filters-btn">
-            <mat-icon aria-hidden="true">clear</mat-icon>
-            <span>{{ 'quotations.queue.clearFilters' | translate }}</span>
-          </button>
-        </div>
-      } @else if (tasks().length === 0) {
-        <div class="empty-state">
-          <mat-icon class="empty-icon" aria-hidden="true">inbox</mat-icon>
-          <h2 class="empty-title">{{ 'quotations.queue.emptyTitle' | translate }}</h2>
-          <p class="empty-message">{{ 'quotations.queue.emptyMessage' | translate }}</p>
-        </div>
       } @else {
+        <div class="table-meta-bar">
+          <span class="result-count results-count" data-testid="result-count">{{ resultCountText() }}</span>
+        </div>
+
+        @if (tasks().length === 0 && hasActiveFilters()) {
+          <div class="empty-state">
+            <mat-icon class="empty-icon" aria-hidden="true">filter_alt_off</mat-icon>
+            <h2 class="empty-title">{{ 'quotations.queue.noFilterResults' | translate }}</h2>
+            <button mat-stroked-button type="button" (click)="clearFilters()" class="clear-filters-btn">
+              <mat-icon aria-hidden="true">clear</mat-icon>
+              <span>{{ 'quotations.queue.clearFilters' | translate }}</span>
+            </button>
+          </div>
+        } @else if (tasks().length === 0) {
+          <div class="empty-state">
+            <mat-icon class="empty-icon" aria-hidden="true">inbox</mat-icon>
+            <h2 class="empty-title">{{ 'quotations.queue.emptyTitle' | translate }}</h2>
+            <p class="empty-message">{{ 'quotations.queue.emptyMessage' | translate }}</p>
+          </div>
+        } @else {
         @if (isWriter() && hasSelection()) {
           <div class="bulk-actions-bar" data-testid="bulk-actions-bar">
             <span class="bulk-count">
@@ -402,6 +509,7 @@
           </div>
         }
       }
+    }
     </mat-card-content>
   </mat-card>
 </div>

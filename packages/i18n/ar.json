@@ -940,7 +940,25 @@
       "emptyTitle": "لا توجد مهام مراجعة",
       "emptyMessage": "لا توجد مهام مراجعة لعروض الأسعار تطابق خيارات التصفية الحالية.",
       "noFilterResults": "لا توجد نتائج تطابق عوامل التصفية",
-      "clearFilters": "مسح عوامل التصفية"
+      "clearFilters": "مسح عوامل التصفية",
+      "activeFiltersLabel": "عوامل التصفية النشطة",
+      "filterChips": {
+        "status": "الحالة: {{value}}",
+        "priority": "الأولوية: {{value}}",
+        "search": "البحث: {{query}}",
+        "dateRange": "التاريخ: {{from}} – {{to}}",
+        "dateFrom": "من: {{from}}",
+        "dateTo": "إلى: {{to}}",
+        "removeStatus": "إزالة تصفية الحالة",
+        "removePriority": "إزالة تصفية الأولوية",
+        "removeSearch": "إزالة تصفية البحث",
+        "removeDateRange": "إزالة تصفية نطاق التاريخ"
+      },
+      "resultsCount": {
+        "one": "نتيجة واحدة",
+        "other": "{{count}} نتيجة",
+        "more": "+{{count}} نتيجة"
+      }
     },
     "review": {
       "loadError": {
