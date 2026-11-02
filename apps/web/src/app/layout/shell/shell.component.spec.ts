@@ -409,4 +409,63 @@ describe('ShellComponent account menu', () => {
       }).not.toThrow();
     });
   });
+
+  describe('accessibility and landmarks (PPS-162 / P-130)', () => {
+    it('renders a "Skip to main content" link as the first focusable element targeting #main-content', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const skipLink = root.querySelector<HTMLAnchorElement>('a.skip-to-content, a[href="#main-content"]');
+      expect(skipLink).not.toBeNull();
+      expect(skipLink!.getAttribute('href')).toBe('#main-content');
+      expect(skipLink!.textContent?.trim()).toBe(enCatalog.common.a11y.skipToContent);
+
+      const focusableSelectors = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      const firstFocusable = root.querySelector<HTMLElement>(focusableSelectors);
+      expect(firstFocusable).toBe(skipLink);
+    });
+
+    it('wraps the routed content in exactly one <main id="main-content"> landmark', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const mainLandmarks = root.querySelectorAll('main, [role="main"]');
+      expect(mainLandmarks.length).toBe(1);
+
+      const mainEl = root.querySelector<HTMLElement>('main#main-content');
+      expect(mainEl).not.toBeNull();
+
+      const outletInsideMain = mainEl!.querySelector('router-outlet');
+      expect(outletInsideMain).not.toBeNull();
+    });
+
+    it('renders the sidebar navigation inside a <nav> landmark with aria-label from i18n', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const sidenav = root.querySelector<HTMLElement>('.shell-sidenav')!;
+      const navLandmark = sidenav.querySelector<HTMLElement>('nav');
+      expect(navLandmark).not.toBeNull();
+      expect(navLandmark!.getAttribute('aria-label')).toBe(enCatalog.common.a11y.mainNavigation);
+
+      const groupInNav = navLandmark!.querySelector('.nav-group');
+      expect(groupInNav).not.toBeNull();
+    });
+
+    it('provides an accessible name for the brand link to /home from i18n', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const brandLink = root.querySelector<HTMLAnchorElement>('a.brand-section');
+      expect(brandLink).not.toBeNull();
+      const ariaLabel = brandLink!.getAttribute('aria-label');
+      expect(ariaLabel).toBe(enCatalog.common.brandName);
+    });
+
+    it('renders sidebar group titles as non-heading elements to preserve page heading hierarchy', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const sidenav = root.querySelector<HTMLElement>('.shell-sidenav')!;
+      const headings = sidenav.querySelectorAll('h1, h2, h3, h4, h5, h6, [role="heading"]');
+      expect(headings.length).toBe(0);
+
+      const toggles = sidenav.querySelectorAll<HTMLButtonElement>('.nav-group-toggle');
+      expect(toggles.length).toBe(5);
+      toggles.forEach((toggle) => {
+        expect(toggle.getAttribute('aria-expanded')).not.toBeNull();
+        expect(toggle.querySelector('.nav-group-title-text')?.textContent?.trim().length).toBeGreaterThan(0);
+      });
+    });
+  });
 });

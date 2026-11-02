@@ -27,7 +27,12 @@
     "cancel": "Cancel",
     "retry": "Retry",
     "notAvailable": "Not available",
-    "breadcrumbLabel": "Breadcrumb"
+    "breadcrumbLabel": "Breadcrumb",
+    "a11y": {
+      "skipToContent": "Skip to main content",
+      "mainNavigation": "Main navigation",
+      "homeLink": "ProcurePilot"
+    }
   },
   "auth": {
     "signin": {
