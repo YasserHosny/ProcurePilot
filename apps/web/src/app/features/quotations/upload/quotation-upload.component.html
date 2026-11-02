@@ -258,6 +258,8 @@
                   mat-flat-button
                   color="primary"
                   [routerLink]="['/quotations', q.id, 'review']"
+                  [queryParams]="requoteQueryParams()"
+                  (click)="goToReview(q.id); $event.preventDefault()"
                   class="action-btn"
                 >
                   <mat-icon aria-hidden="true">visibility</mat-icon>

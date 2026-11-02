@@ -1,9 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, ParamMap, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
@@ -15,6 +15,8 @@ describe('QuotationUploadComponent (T036)', () => {
   let component: QuotationUploadComponent;
   let fixture: ComponentFixture<QuotationUploadComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  let queryParamMapSubject: BehaviorSubject<ParamMap>;
+  let router: Router;
 
   const mockPresignResponse: PresignResponse = {
     document_id: 'doc-123',
@@ -64,6 +66,8 @@ describe('QuotationUploadComponent (T036)', () => {
       activeLocale: signal('en'),
     };
 
+    queryParamMapSubject = new BehaviorSubject<ParamMap>(convertToParamMap({}));
+
     await TestBed.configureTestingModule({
       imports: [QuotationUploadComponent],
       providers: [
@@ -71,8 +75,22 @@ describe('QuotationUploadComponent (T036)', () => {
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
         { provide: SessionService, useValue: mockSession },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            queryParamMap: queryParamMapSubject.asObservable(),
+            snapshot: {
+              get queryParamMap() {
+                return queryParamMapSubject.value;
+              },
+            },
+          },
+        },
       ],
     }).compileComponents();
+
+    router = TestBed.inject(Router);
+    spyOn(router, 'navigate');
 
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', enCatalog);
@@ -187,4 +205,42 @@ describe('QuotationUploadComponent (T036)', () => {
     expect(component.errorMessage()).toBe('Format error');
     expect(component.errorTraceId()).toBe('tr-999');
   }));
+
+  describe('Re-quote source linking (PPS-160 / P-128)', () => {
+    const validUuid = 'c49d6c29-373f-4e02-9844-33d3d7890abc';
+
+    it('reads requote_from query param if UUID-shaped and passes it to review route on continue', () => {
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      fixture.detectChanges();
+
+      expect(component.requoteFrom()).toBe(validUuid);
+
+      component.createdQuotation.set(mockQuotation);
+      component.uploadState.set('extracted');
+      fixture.detectChanges();
+
+      component.goToReview();
+
+      expect(router.navigate).toHaveBeenCalledWith(['/quotations', mockQuotation.id, 'review'], {
+        queryParams: { requote_from: validUuid },
+      });
+    });
+
+    it('ignores non-UUID requote_from query param and does not pass it to review route', () => {
+      queryParamMapSubject.next(convertToParamMap({ requote_from: 'not-a-valid-uuid' }));
+      fixture.detectChanges();
+
+      expect(component.requoteFrom()).toBeNull();
+
+      component.createdQuotation.set(mockQuotation);
+      component.uploadState.set('extracted');
+      fixture.detectChanges();
+
+      component.goToReview();
+
+      expect(router.navigate).toHaveBeenCalledWith(['/quotations', mockQuotation.id, 'review'], {
+        queryParams: undefined,
+      });
+    });
+  });
 });

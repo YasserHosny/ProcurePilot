@@ -48,6 +48,11 @@ import { QuotationAuditTrailComponent } from './quotation-audit-trail.component'
 import { sameReviewedValue } from './reviewed-value';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(val: unknown): val is string {
+  return typeof val === 'string' && UUID_REGEX.test(val.trim());
+}
+
 interface FlaggedField {
   readonly id: string;
   readonly entityType: 'quotation' | 'quotation_line';
@@ -419,6 +424,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.selectedSupplierId.set(null);
     this.isRequote.set(false);
     this.selectedPreviousQuotationId.set(null);
+    this.priorQuotations.set([]);
     this.isCreatingSupplierFromExtraction.set(false);
 
     this.activeExtraction.set(null);
@@ -461,6 +467,9 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
         this.loadPriorQuotations();
       }
     });
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.applyRequoteFromParam();
+    });
   }
 
   ngOnDestroy(): void {
@@ -493,6 +502,11 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
         if (q.previous_quotation_id) {
           this.isRequote.set(true);
           this.selectedPreviousQuotationId.set(q.previous_quotation_id);
+        } else {
+          this.applyRequoteFromParam(q);
+        }
+        if (q.supplier_id) {
+          this.loadPriorQuotations();
         }
 
         if (!silent) {
@@ -547,10 +561,40 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     });
   }
 
+  private applyRequoteFromParam(q = this.quotation()): void {
+    if (!q || q.previous_quotation_id || q.status === 'reviewed') {
+      return;
+    }
+    const requoteFrom = this.route.snapshot.queryParamMap.get('requote_from');
+    if (requoteFrom && isUuid(requoteFrom) && requoteFrom !== q.id) {
+      this.isRequote.set(true);
+      this.selectedPreviousQuotationId.set(requoteFrom);
+    } else {
+      this.isRequote.set(false);
+      this.selectedPreviousQuotationId.set(null);
+    }
+  }
+
+  getCurrentSupplierName(): string | null {
+    const supplierId = this.selectedSupplierId() ?? this.quotation()?.supplier_id;
+    if (supplierId) {
+      const match = this.suppliers().find((s) => s.id === supplierId);
+      if (match?.name) return match.name;
+    }
+    const q = this.quotation();
+    if (q?.review_task?.supplier_name) {
+      return q.review_task.supplier_name;
+    }
+    return null;
+  }
+
   loadSuppliers(): void {
     this.api.suppliers({ limit: 100 }).subscribe({
       next: (res) => {
         this.suppliers.set(res.items);
+        if (this.getCurrentSupplierName()) {
+          this.loadPriorQuotations();
+        }
       },
       error: () => {
         // Non-fatal, suppliers dropdown will be empty
@@ -559,25 +603,37 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   }
 
   loadPriorQuotations(): void {
-    this.api.getReviewTasks({ status: 'all', limit: 100 }).subscribe({
+    const supplierName = this.getCurrentSupplierName();
+    if (!supplierName) {
+      this.priorQuotations.set([]);
+      return;
+    }
+    this.api.getReviewTasks({ status: 'all', limit: 100, search: supplierName }).subscribe({
       next: (res) => {
         const currentId = this.quotationId();
         const seen = new Set<string>();
         const items: { id: string; created_at: string; supplier_name: string | null }[] = [];
         for (const task of res.items) {
-          if (task.quotation_id !== currentId && !seen.has(task.quotation_id)) {
+          if (
+            task.quotation_id !== currentId &&
+            task.supplier_name === supplierName &&
+            !seen.has(task.quotation_id)
+          ) {
             seen.add(task.quotation_id);
             items.push({
               id: task.quotation_id,
               created_at: task.created_at,
-              supplier_name: task.supplier_name ?? null,
+              supplier_name: task.supplier_name,
             });
           }
         }
-        this.priorQuotations.set(items);
+        items.sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+        this.priorQuotations.set(items.slice(0, 100));
       },
       error: () => {
-        // Non-fatal
+        this.priorQuotations.set([]);
       },
     });
   }

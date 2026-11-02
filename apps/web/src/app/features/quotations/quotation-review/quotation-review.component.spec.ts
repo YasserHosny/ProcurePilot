@@ -21,6 +21,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
   let fixture: ComponentFixture<QuotationReviewComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
   let paramMapSubject: BehaviorSubject<ParamMap>;
+  let queryParamMapSubject: BehaviorSubject<ParamMap>;
   const homeCurrency = signal<string | undefined>('EGP');
 
   const mockQuotationDetail: QuotationDetail = {
@@ -145,6 +146,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     );
 
     paramMapSubject = new BehaviorSubject<ParamMap>(convertToParamMap({ id: 'q-review-1' }));
+    queryParamMapSubject = new BehaviorSubject<ParamMap>(convertToParamMap({}));
 
     const mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
@@ -167,9 +169,13 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
           provide: ActivatedRoute,
           useValue: {
             paramMap: paramMapSubject.asObservable(),
+            queryParamMap: queryParamMapSubject.asObservable(),
             snapshot: {
               get paramMap() {
                 return paramMapSubject.value;
+              },
+              get queryParamMap() {
+                return queryParamMapSubject.value;
               },
             },
           },
@@ -2052,6 +2058,212 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       expect(apiService.getQuotation).not.toHaveBeenCalledWith('quote-A');
       expect(component.quotation()?.id).toBe('quote-B');
       expect(component.isRetryingExtraction()).toBeFalse();
+    });
+  });
+
+  describe('Re-quote linking, reviewed button, and prior quotations selector (PPS-160 / P-128)', () => {
+    const validUuid = 'c49d6c29-373f-4e02-9844-33d3d7890abc';
+
+    it('(1) presets isRequote and selectedPreviousQuotationId from valid UUID requote_from param on quotation load', () => {
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      paramMapSubject.next(convertToParamMap({ id: 'q-review-1' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeTrue();
+      expect(component.selectedPreviousQuotationId()).toBe(validUuid);
+    });
+
+    it('(2) does not preset isRequote when requote_from equals current quotation id', () => {
+      queryParamMapSubject.next(convertToParamMap({ requote_from: 'q-review-1' }));
+      paramMapSubject.next(convertToParamMap({ id: 'q-review-1' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeFalse();
+      expect(component.selectedPreviousQuotationId()).toBeNull();
+    });
+
+    it('(3) does not preset isRequote when requote_from is not a UUID', () => {
+      queryParamMapSubject.next(convertToParamMap({ requote_from: 'not-a-valid-uuid' }));
+      paramMapSubject.next(convertToParamMap({ id: 'q-review-1' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeFalse();
+      expect(component.selectedPreviousQuotationId()).toBeNull();
+    });
+
+    it('(4) does not preset isRequote when quotation is already reviewed', () => {
+      const reviewedQuote: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'q-reviewed-1',
+        status: 'reviewed',
+      };
+      apiService.getQuotation.and.returnValue(of(reviewedQuote));
+
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      paramMapSubject.next(convertToParamMap({ id: 'q-reviewed-1' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeFalse();
+      expect(component.selectedPreviousQuotationId()).toBeNull();
+    });
+
+    it('(5) does not overwrite previous_quotation_id when quotation already has its own previous quotation linked', () => {
+      const alreadyLinkedQuote: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'q-linked-1',
+        previous_quotation_id: 'q-existing-prior',
+      };
+      apiService.getQuotation.and.returnValue(of(alreadyLinkedQuote));
+
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      paramMapSubject.next(convertToParamMap({ id: 'q-linked-1' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeTrue();
+      expect(component.selectedPreviousQuotationId()).toBe('q-existing-prior');
+    });
+
+    it('(6) a second quotation without the param does not inherit it', () => {
+      const quoteA: QuotationDetail = { ...mockQuotationDetail, id: 'quote-A' };
+      const quoteB: QuotationDetail = { ...mockQuotationDetail, id: 'quote-B' };
+      apiService.getQuotation.and.callFake((id: string) => of(id === 'quote-A' ? quoteA : quoteB));
+
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeTrue();
+      expect(component.selectedPreviousQuotationId()).toBe(validUuid);
+
+      queryParamMapSubject.next(convertToParamMap({}));
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeFalse();
+      expect(component.selectedPreviousQuotationId()).toBeNull();
+    });
+
+    it('(7) offers Create re-quote button on reviewed quotations and clicking it navigates with queryParams', () => {
+      const reviewedQuote: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'q-reviewed-77',
+        status: 'reviewed',
+      };
+      apiService.getQuotation.and.returnValue(of(reviewedQuote));
+      paramMapSubject.next(convertToParamMap({ id: 'q-reviewed-77' }));
+      fixture.detectChanges();
+
+      const buttons = Array.from(fixture.nativeElement.querySelectorAll('header.page-header button')) as HTMLButtonElement[];
+      const requoteBtn = buttons.find(
+        (b) =>
+          b.textContent?.includes('Create re-quote') ||
+          b.textContent?.includes('إنشاء طلب إعادة عرض') ||
+          b.querySelector('mat-icon')?.textContent?.trim() === 'content_copy',
+      );
+      expect(requoteBtn).toBeTruthy();
+
+      const router = TestBed.inject(Router);
+      spyOn(router, 'navigate');
+
+      requoteBtn?.click();
+      expect(router.navigate).toHaveBeenCalledWith(['/quotations/upload'], {
+        queryParams: { requote_from: 'q-reviewed-77' },
+      });
+    });
+
+    it('(8) makes selector request with supplier name search and filters out other suppliers and current quotation, newest first', () => {
+      const quoteWithSupplier: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'current-quote-id',
+        supplier_id: 'sup-1',
+      };
+      apiService.getQuotation.and.returnValue(of(quoteWithSupplier));
+      component.suppliers.set([
+        { id: 'sup-1', name: 'Dairy Direct Ltd', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+      ]);
+      apiService.getReviewTasks.and.returnValue(
+        of({
+          items: [
+            {
+              id: 'task-1',
+              quotation_id: 'current-quote-id',
+              supplier_name: 'Dairy Direct Ltd',
+              status: 'open',
+              priority: 'normal',
+              reason: 'review_required',
+              created_at: '2026-08-10T00:00:00Z',
+            },
+            {
+              id: 'task-2',
+              quotation_id: 'quote-other-supplier',
+              supplier_name: 'Other Supplier Ltd',
+              status: 'open',
+              priority: 'normal',
+              reason: 'review_required',
+              created_at: '2026-08-15T00:00:00Z',
+            },
+            {
+              id: 'task-3',
+              quotation_id: 'quote-prior-older',
+              supplier_name: 'Dairy Direct Ltd',
+              status: 'open',
+              priority: 'normal',
+              reason: 'review_required',
+              created_at: '2026-08-05T00:00:00Z',
+            },
+            {
+              id: 'task-4',
+              quotation_id: 'quote-prior-newer',
+              supplier_name: 'Dairy Direct Ltd',
+              status: 'open',
+              priority: 'normal',
+              reason: 'review_required',
+              created_at: '2026-08-20T00:00:00Z',
+            },
+            {
+              id: 'task-5',
+              quotation_id: 'quote-prior-newer',
+              supplier_name: 'Dairy Direct Ltd',
+              status: 'open',
+              priority: 'normal',
+              reason: 'review_required',
+              created_at: '2026-08-20T00:00:00Z',
+            },
+          ],
+          next_cursor: null,
+        }),
+      );
+
+      paramMapSubject.next(convertToParamMap({ id: 'current-quote-id' }));
+      fixture.detectChanges();
+      component.loadPriorQuotations();
+
+      expect(apiService.getReviewTasks).toHaveBeenCalledWith({
+        status: 'all',
+        limit: 100,
+        search: 'Dairy Direct Ltd',
+      });
+      expect(component.priorQuotations()).toEqual([
+        { id: 'quote-prior-newer', created_at: '2026-08-20T00:00:00Z', supplier_name: 'Dairy Direct Ltd' },
+        { id: 'quote-prior-older', created_at: '2026-08-05T00:00:00Z', supplier_name: 'Dairy Direct Ltd' },
+      ]);
+    });
+
+    it('(9) lists none and keeps empty state when current quotation has no supplier', () => {
+      const quoteWithoutSupplier: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-no-sup',
+        supplier_id: null,
+      };
+      apiService.getQuotation.and.returnValue(of(quoteWithoutSupplier));
+      apiService.getReviewTasks.calls.reset();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-no-sup' }));
+      fixture.detectChanges();
+      component.loadPriorQuotations();
+
+      expect(apiService.getReviewTasks).not.toHaveBeenCalled();
+      expect(component.priorQuotations()).toEqual([]);
     });
   });
 });
