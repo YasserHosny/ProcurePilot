@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 · 2026-11-02
+
+- PR #326 merged into `main`. Marketing work now goes on the long-lived `marketing` branch, kept up to date with `main` (rule in `CLAUDE.md`).
+- B2B focus (G-15, PPS-153): `strategy/b2b-focus-2026-11.md` with decisions B-1 to B-6, the website session prompt `strategy/website/website-enhancement-prompt-2026-11.md`, and the outreach plan `ProcurePilot/planning/outreach-plan-2026-11.md` (draft).
+- All 10 LinkedIn posts scheduled on the Iron Systems page (1 to 22 Nov, 10:00 Cairo), each ending with its website link.
+
 ## 2.0.0 · 2026-10-29
 
 - **Posts approved** by Yasser (MD-14): A-01..A-06 and CP-01..CP-04 with their v2 images, moved to `assets/approved/`; posting 2026-11-01 to 2026-11-22 (`content-calendar.md`, `POSTING.md` in each campaign). Yasser posts.

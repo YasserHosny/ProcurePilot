@@ -7,6 +7,11 @@ Systems workspace outside the repo, written `<workspace>/Branding/` (brand) and 
 (website repo); the brand files that production needs are copied in `brand/iron-systems/`. Read them; don't change
 them from here. The repo's own rules (root `CLAUDE.md`: Jira PPS tracking, branch + PR) apply to marketing changes too.
 
+**Branch (owner, 2026-11-02):** all marketing work goes on the long-lived `marketing` branch, never straight to `main`.
+Before each session: `git checkout marketing`, `git pull`, then `git merge origin/main` so it carries the latest product docs and
+code. Marketing reaches `main` through a PR from `marketing` when Yasser asks; the repo squash-merges, so merge `main`
+back into `marketing` right after that PR merges.
+
 ## Before any marketing work
 
 0. `git pull` the repo, then run `npm run sources:sync`. It lists what changed in the product (this repo's docs and app copy), the website and the brand since the last review, and warns if the checkout is behind origin (`research/source-updates/latest.md`). If something changed, update the affected knowledge and claims first, then `npm run sources:sync -- --mark-reviewed`.
