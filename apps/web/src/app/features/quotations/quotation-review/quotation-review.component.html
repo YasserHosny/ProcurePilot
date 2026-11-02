@@ -120,6 +120,7 @@
     <!-- Review Banners (Versioning, Mismatch, Reconciled, Error, Keyboard Nav, Legend) -->
     <app-quotation-review-banners
       [quotation]="q"
+      [statedTotal]="effectiveStatedTotal()"
       [hasArithmeticMismatch]="hasArithmeticMismatch()"
       [isReconciled]="isArithmeticReconciled()"
       [computedLinesTotal]="computedLinesTotal()"
@@ -511,12 +512,12 @@
                   <input
                     matInput
                     [value]="q.stated_total | formatMoney"
-                    (input)="getFieldExtraction('quotation', q.id, 'stated_total') && updateCorrection(getFieldExtraction('quotation', q.id, 'stated_total')!.id, { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || effectiveQuotationCurrency() })"
-                    (change)="getFieldExtraction('quotation', q.id, 'stated_total') && updateCorrection(getFieldExtraction('quotation', q.id, 'stated_total')!.id, { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || effectiveQuotationCurrency() })"
-                    (blur)="reviewFieldValue('quotation', q.id, 'stated_total', { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || effectiveQuotationCurrency() })"
+                    (input)="onStatedTotalInput(q, $any($event.target).value, false)"
+                    (change)="onStatedTotalInput(q, $any($event.target).value, false)"
+                    (blur)="onStatedTotalInput(q, $any($event.target).value, true)"
                     [readonly]="!isWriter() || q.status === 'reviewed'"
                   />
-                  <span matTextSuffix class="currency-suffix">{{ (q.stated_total?.currency || effectiveQuotationCurrency()) | currencySymbol }}</span>
+                  <span matTextSuffix class="currency-suffix">{{ effectiveQuotationCurrency() | currencySymbol }}</span>
                 </mat-form-field>
                 @if (isFieldChanged('quotation', q.id, 'stated_total')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
@@ -686,6 +687,7 @@
         <!-- Line Items Card -->
         <app-quotation-lines
           [quotation]="q"
+          [lineTotals]="lineTotals()"
           [effectiveCurrency]="effectiveQuotationCurrency()"
           [activeExtraction]="activeExtraction()"
           [isWriter]="isWriter()"

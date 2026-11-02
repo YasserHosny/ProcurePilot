@@ -28,6 +28,7 @@ import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 })
 export class QuotationReviewBannersComponent {
   @Input({ required: true }) quotation!: QuotationDetail | null;
+  @Input() statedTotal: Money | null = null;
   @Input({ required: true }) hasArithmeticMismatch = false;
   @Input({ required: true }) isReconciled = false;
   @Input({ required: true }) computedLinesTotal: Money | null = null;
