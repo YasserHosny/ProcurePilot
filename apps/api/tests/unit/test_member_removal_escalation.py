@@ -9,6 +9,7 @@ import pytest
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.requests import service as requests_module
+from procurepilot_api.modules.requests.schemas import PurchaseRequestStatus
 from procurepilot_api.modules.requests.service import RequestsService
 
 
@@ -27,6 +28,7 @@ class ApprovalStepTable:
         self.update_calls: list[dict[str, Any]] = []
         self._payload: dict[str, object] | None = None
         self._filters: list[tuple[str, str]] = []
+        self._excluded_request_statuses: list[str] = []
 
     def select(self, _columns: str) -> ApprovalStepTable:
         return self
@@ -39,19 +41,30 @@ class ApprovalStepTable:
         self._filters.append((column, str(value)))
         return self
 
+    def neq(self, column: str, value: object) -> ApprovalStepTable:
+        assert column == "purchase_request.status"
+        self._excluded_request_statuses.append(str(value))
+        return self
+
     def execute(self) -> SimpleNamespace:
         if self._payload is None:
+            rows = []
+            for row in self.pending:
+                request = row["purchase_request"]
+                assert isinstance(request, dict)
+                if request["status"] not in self._excluded_request_statuses:
+                    rows.append(dict(row))
             self._filters = []
-            return SimpleNamespace(data=[dict(row) for row in self.pending])
+            self._excluded_request_statuses = []
+            return SimpleNamespace(data=rows)
 
         index = len(self.update_calls)
-        self.update_calls.append(
-            {"payload": self._payload, "filters": self._filters}
-        )
+        self.update_calls.append({"payload": self._payload, "filters": self._filters})
         if self._update_results is not None:
             data = self._update_results[index]
         else:
-            data = [{**self.pending[index], **self._payload}]
+            step_id = next(value for column, value in self._filters if column == "id")
+            data = [{**row, **self._payload} for row in self.pending if str(row["id"]) == step_id]
         self._payload = None
         self._filters = []
         return SimpleNamespace(data=data)
@@ -78,10 +91,13 @@ def actor() -> CurrentMember:
     )
 
 
-def pending_step(request_id: UUID | None = None) -> dict[str, object]:
+def pending_step(
+    request_id: UUID | None = None, *, request_status: PurchaseRequestStatus = "submitted"
+) -> dict[str, object]:
     return {
         "id": uuid4(),
         "purchase_request_id": request_id or uuid4(),
+        "purchase_request": {"status": request_status},
     }
 
 
@@ -95,9 +111,7 @@ def _prepare(
     client = FakeClient(step_table)
     service = RequestsService()
     recorded: list[dict[str, Any]] = []
-    monkeypatch.setattr(
-        requests_module, "authenticated_client", lambda _settings, _token: client
-    )
+    monkeypatch.setattr(requests_module, "authenticated_client", lambda _settings, _token: client)
 
     def _fetch_owner(_client: object) -> UUID:
         if owner_raises:
@@ -116,9 +130,7 @@ def test_escalates_every_pending_step_to_the_owner(
     removed_id = uuid4()
     steps = [pending_step(), pending_step()]
     table = ApprovalStepTable(steps)
-    service, _client, recorded = _prepare(
-        monkeypatch, step_table=table, owner_id=owner_id
-    )
+    service, _client, recorded = _prepare(monkeypatch, step_table=table, owner_id=owner_id)
 
     escalated = service.escalate_pending_steps_for_removed_member(
         bearer_token="token",
@@ -142,18 +154,44 @@ def test_escalates_every_pending_step_to_the_owner(
     ]
     assert recorded[0]["target"]["reason"] == "assigned_approver_removed"
     assert recorded[0]["target"]["assigned_membership_id"] == str(owner_id)
-    assert recorded[0]["target"]["purchase_request_id"] == str(
-        steps[0]["purchase_request_id"]
+    assert recorded[0]["target"]["purchase_request_id"] == str(steps[0]["purchase_request_id"])
+
+
+@pytest.mark.parametrize("request_status", ["withdrawn", "rejected", "delivered"])
+def test_escalation_skips_terminal_requests_and_escalates_live_steps(
+    monkeypatch: pytest.MonkeyPatch, request_status: PurchaseRequestStatus
+) -> None:
+    owner_id = uuid4()
+    terminal_step = pending_step(request_status=request_status)
+    live_steps = [pending_step(), pending_step(request_status="approved")]
+    table = ApprovalStepTable([terminal_step, *live_steps])
+    service, _client, recorded = _prepare(monkeypatch, step_table=table, owner_id=owner_id)
+
+    escalated = service.escalate_pending_steps_for_removed_member(
+        bearer_token="token",
+        actor=actor(),
+        removed_membership_id=uuid4(),
     )
+
+    assert escalated == len(live_steps)
+    assert len(table.update_calls) == len(live_steps)
+    for call, step in zip(table.update_calls, live_steps, strict=True):
+        assert ("id", str(step["id"])) in call["filters"]
+        assert ("status", "pending") in call["filters"]
+        assert call["payload"] == {
+            "assigned_membership_id": str(owner_id),
+            "source": "owner_fallback",
+        }
+    assert [entry["target"]["approval_step_id"] for entry in recorded] == [
+        str(step["id"]) for step in live_steps
+    ]
 
 
 def test_no_pending_steps_is_a_noop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     table = ApprovalStepTable([])
-    service, _client, recorded = _prepare(
-        monkeypatch, step_table=table, owner_raises=True
-    )
+    service, _client, recorded = _prepare(monkeypatch, step_table=table, owner_raises=True)
 
     escalated = service.escalate_pending_steps_for_removed_member(
         bearer_token="token",
@@ -176,9 +214,7 @@ def test_step_decided_concurrently_is_skipped_not_overwritten(
         steps,
         update_results=[[], [{"id": str(steps[1]["id"])}]],
     )
-    service, _client, recorded = _prepare(
-        monkeypatch, step_table=table, owner_id=uuid4()
-    )
+    service, _client, recorded = _prepare(monkeypatch, step_table=table, owner_id=uuid4())
 
     escalated = service.escalate_pending_steps_for_removed_member(
         bearer_token="token",
