@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subject, takeUntil } from 'rxjs';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -142,6 +143,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   private readonly translate = inject(TranslateService);
   private readonly sanitizer = inject(DomSanitizer);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly cancelLoads$ = new Subject<void>();
 
   readonly isLoading = signal<boolean>(true);
   readonly loadFailed = signal<boolean>(false);
@@ -396,6 +398,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   };
 
   private resetPerQuotationState(): void {
+    this.cancelLoads$.next();
     this.quotation.set(null);
     this.loadFailed.set(false);
     this.isNotFound.set(false);
@@ -462,6 +465,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     window.removeEventListener('keydown', this.onKeyDownCapture, { capture: true });
+    this.cancelLoads$.next();
+    this.cancelLoads$.complete();
   }
 
   loadQuotation(id: string, options?: { silent?: boolean }): void {
@@ -474,7 +479,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
 
-    this.api.getQuotation(id).subscribe({
+    this.api
+      .getQuotation(id)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: (q) => {
         this.quotation.set(q);
         this.loadFailed.set(false);
@@ -511,15 +519,25 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
           }
         }
         this.handleError(err);
-        if (!silent && err instanceof HttpErrorResponse && err.status === 404) {
-          this.errorMessage.set(this.translate.instant('quotations.review.loadError.notFound'));
+        if (!silent) {
+          if (err instanceof HttpErrorResponse && err.status === 404) {
+            this.errorMessage.set(this.translate.instant('quotations.review.loadError.notFound'));
+          } else {
+            const apiError = err instanceof HttpErrorResponse ? (err.error as ApiError | undefined) : null;
+            if (!apiError?.message) {
+              this.errorMessage.set(this.translate.instant('quotations.review.actions.genericError'));
+            }
+          }
         }
       },
     });
   }
 
   private loadDocumentPreview(documentId: string): void {
-    this.api.getDocumentDownloadUrl(documentId).subscribe({
+    this.api
+      .getDocumentDownloadUrl(documentId)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: ({ download_url }) => {
         this.documentPreviewUrl.set(download_url);
       },
@@ -568,7 +586,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     if (!quotationId) return;
     this.isLoadingAudit.set(true);
 
-    this.api.getAuditTrail(quotationId).subscribe({
+    this.api
+      .getAuditTrail(quotationId)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: (res) => {
         this.auditTrail.set(res.items);
         this.isLoadingAudit.set(false);
@@ -1447,7 +1468,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     if (!quotationId) return;
     this.matchingSetupStatus.set('loading');
     this.matchingSetupError.set(null);
-    this.api.getQuotationMatches(quotationId).subscribe({
+    this.api
+      .getQuotationMatches(quotationId)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: () => this.matchingSetupStatus.set('ready'),
       error: (err: unknown) => {
         this.matchingSetupStatus.set('error');

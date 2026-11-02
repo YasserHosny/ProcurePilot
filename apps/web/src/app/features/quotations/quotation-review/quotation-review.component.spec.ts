@@ -11,7 +11,7 @@ import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { ApiError, FieldExtraction, Quotation, QuotationDetail, Role, Supplier } from '../../../core/api/models';
+import type { ApiError, AuditTrailEntry, FieldExtraction, Quotation, QuotationDetail, Role, Supplier } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { QuotationReviewComponent } from './quotation-review.component';
@@ -1803,6 +1803,124 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       expect(component.pendingNewLines().length).toBe(0);
       expect(component.pendingRemoveLineIds().size).toBe(0);
       expect(component.reviewerNotes()).toBe('Initial notes for second quote');
+    });
+
+    it('(f) paramMap emits id A, getQuotation(A) pending; paramMap emits id B and getQuotation(B) responds; then A response arrives -> quotation().id is still B', () => {
+      const quoteASubject = new Subject<QuotationDetail>();
+      const quoteBSubject = new Subject<QuotationDetail>();
+      apiService.getQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return quoteASubject.asObservable();
+        if (id === 'quote-B') return quoteBSubject.asObservable();
+        return of(mockQuotationDetail);
+      });
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+
+      const quoteB: QuotationDetail = { ...mockQuotationDetail, id: 'quote-B' };
+      quoteBSubject.next(quoteB);
+      fixture.detectChanges();
+
+      expect(component.quotation()?.id).toBe('quote-B');
+
+      const quoteA: QuotationDetail = { ...mockQuotationDetail, id: 'quote-A' };
+      quoteASubject.next(quoteA);
+      fixture.detectChanges();
+
+      expect(component.quotation()?.id).toBe('quote-B');
+    });
+
+    it('(g) A audit reply arriving after switching to B must not populate auditTrail', () => {
+      const auditASubject = new Subject<{ items: AuditTrailEntry[] }>();
+      const quoteA: QuotationDetail = { ...mockQuotationDetail, id: 'quote-A' };
+      const quoteB: QuotationDetail = { ...mockQuotationDetail, id: 'quote-B' };
+
+      apiService.getQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return of(quoteA);
+        if (id === 'quote-B') return of(quoteB);
+        return of(mockQuotationDetail);
+      });
+      apiService.getAuditTrail.and.callFake((id: string) => {
+        if (id === 'quote-A') return auditASubject.asObservable();
+        return of({ items: [] });
+      });
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+
+      const auditA: AuditTrailEntry = {
+        id: 1,
+        action: 'quotation.reviewed',
+        actor_email: 'user@example.com',
+        outcome: 'success',
+        target: null,
+        trace_id: null,
+        occurred_at: '2026-10-30T10:00:00Z',
+      };
+      auditASubject.next({ items: [auditA] });
+      fixture.detectChanges();
+
+      expect(component.auditTrail()).toEqual([]);
+    });
+
+    it('(h) A document download URL arriving after switching to B must not populate documentPreviewUrl', () => {
+      const docASubject = new Subject<{ download_url: string }>();
+      const quoteA: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-A',
+        document: { ...mockQuotationDetail.document, id: 'doc-A' },
+      };
+      const quoteB: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-B',
+        document: { ...mockQuotationDetail.document, id: 'doc-B' },
+      };
+
+      apiService.getQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return of(quoteA);
+        if (id === 'quote-B') return of(quoteB);
+        return of(mockQuotationDetail);
+      });
+      apiService.getDocumentDownloadUrl.and.callFake((id: string) => {
+        if (id === 'doc-A') return docASubject.asObservable();
+        return of({ download_url: 'https://storage.example.com/doc-B.pdf' });
+      });
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+
+      docASubject.next({ download_url: 'https://storage.example.com/doc-A-stale.pdf' });
+      fixture.detectChanges();
+
+      expect(component.documentPreviewUrl()).not.toBe('https://storage.example.com/doc-A-stale.pdf');
+    });
+
+    it('(i) a first-load HttpErrorResponse with status 0 and no ApiError body shows the translated generic message, not err.message', () => {
+      const translate = TestBed.inject(TranslateService);
+      const genericError = translate.instant('quotations.review.actions.genericError');
+
+      const rawHttpError = new HttpErrorResponse({
+        status: 0,
+        statusText: 'Unknown Error',
+        url: 'http://localhost/api/v1/quotations/quote-err-0',
+      });
+      apiService.getQuotation.and.returnValue(throwError(() => rawHttpError));
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-err-0' }));
+      fixture.detectChanges();
+
+      expect(component.loadFailed()).toBeTrue();
+      expect(component.errorMessage()).toBe(genericError);
+      expect(component.errorMessage()).not.toBe(rawHttpError.message);
     });
   });
 });
