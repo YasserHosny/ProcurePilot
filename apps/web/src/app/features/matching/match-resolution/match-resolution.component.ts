@@ -392,7 +392,9 @@ export class MatchResolutionComponent implements OnInit {
       tagName === 'select';
 
     const isInsideSelectOrList = Boolean(
-      targetEl?.closest?.('[role="combobox"], [role="listbox"], [role="option"], mat-select')
+      targetEl?.closest?.(
+        '[role="combobox"], [role="listbox"], [role="option"], mat-select, mat-radio-group.outcomes-radio-group, .outcomes-radio-group'
+      )
     );
 
     if (isTextInput || isInsideSelectOrList) {

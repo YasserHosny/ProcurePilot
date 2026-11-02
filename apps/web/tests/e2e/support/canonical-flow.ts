@@ -297,7 +297,7 @@ export async function resolveLineAsNewProduct(
  *
  * `trigger` defaults to clicking the primary flat confirm button (class-based, so it works
  * regardless of the active locale); pass a callback to drive the confirm another way, e.g. press
- * Enter in the keyboard-only spec. Returns the resolved line's id, parsed from the POST URL.
+ * Control+Enter in the keyboard-only spec. Returns the resolved line's id, parsed from the POST URL.
  */
 export async function confirmMatchAndReturnToQueue(
   page: Page,
