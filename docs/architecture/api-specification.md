@@ -2927,6 +2927,8 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
   workspace (`rfq_select` RLS policy); another workspace's RFQ returns `404`.
 - Returns the `Rfq` with its lines and recipients (`RfqDetail`), so a saved draft can be reopened
   for editing.
+- Each recipient includes `response_count` (integer, default `0`): the number of `rfq_response`
+  rows with that recipient's `rfq_recipient_id` and `tenant_id`.
 - Also carries `converted_purchase_request_ids` (every purchase request prepared from this RFQ —
   one per supplier in a split) and `request_group_id` (the split's group, once prepared)
   (spec 024; rolling out).

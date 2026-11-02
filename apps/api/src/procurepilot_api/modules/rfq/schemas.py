@@ -48,6 +48,7 @@ class RfqRecipient(BaseModel):
     supplier_id: UUID
     supplier_name: str | None = None
     supplier_contact_email: str | None = None
+    response_count: int = 0
     status: RfqRecipientStatus
     outbound_message_id: str | None = None
     sent_at: datetime | None = None
