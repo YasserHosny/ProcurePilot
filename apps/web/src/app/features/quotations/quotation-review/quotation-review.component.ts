@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, Subscription, takeUntil } from 'rxjs';
+import { Subject, Subscription, takeUntil, Observable, of, switchMap } from 'rxjs';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -170,9 +170,24 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   readonly auditTrail = signal<AuditTrailEntry[]>([]);
   readonly isLoadingAudit = signal<boolean>(false);
   readonly suppliers = signal<Supplier[]>([]);
+  readonly suppliersLoadError = signal<boolean>(false);
+  readonly isLoadingSuppliers = signal<boolean>(false);
+  readonly supplierSearchQuery = signal<string>('');
+  private suppliersSub: Subscription | null = null;
   readonly priorQuotations = signal<{ id: string; created_at: string; supplier_name: string | null }[]>([]);
 
   readonly selectedSupplierId = signal<string | null>(null);
+
+  setSupplierSearch(term: string): void {
+    this.supplierSearchQuery.set(term);
+  }
+
+  readonly filteredSuppliers = computed<Supplier[]>(() => {
+    const query = this.supplierSearchQuery().trim().toLowerCase();
+    const all = this.suppliers();
+    if (!query) return all;
+    return all.filter((s) => s.name.toLowerCase().includes(query));
+  });
   readonly pendingQuotationCurrency = signal<string | undefined>(undefined);
   readonly pendingPricesIncludeVat = signal<boolean | undefined>(undefined);
   readonly pendingVatRate = signal<string | null | undefined>(undefined);
@@ -437,7 +452,9 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   readonly hasPendingReviewChanges = computed<boolean>(() => {
     const q = this.quotation();
+    const supplierNeedsSaving = (q?.supplier_id || null) !== (this.selectedSupplierId() || null);
     return (
+      supplierNeedsSaving ||
       this.pendingCorrections().size > 0 ||
       this.pendingQuotationCurrency() !== undefined ||
       this.pendingPricesIncludeVat() !== undefined ||
@@ -639,18 +656,57 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     return null;
   }
 
+  onSupplierSearchInput(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.supplierSearchQuery.set(target?.value || '');
+  }
+
+  clearSupplierSearch(event: Event): void {
+    event.stopPropagation();
+    this.supplierSearchQuery.set('');
+  }
+
+  onSupplierSelectOpened(opened: boolean): void {
+    if (!opened) {
+      this.supplierSearchQuery.set('');
+    }
+  }
+
   loadSuppliers(): void {
-    this.api.suppliers({ limit: 100 }).subscribe({
-      next: (res) => {
-        this.suppliers.set(res.items);
-        if (this.getCurrentSupplierName()) {
-          this.loadPriorQuotations();
-        }
-      },
-      error: () => {
-        // Non-fatal, suppliers dropdown will be empty
-      },
-    });
+    this.isLoadingSuppliers.set(true);
+    this.suppliersLoadError.set(false);
+    this.suppliersSub?.unsubscribe();
+
+    const fetchPage = (cursor?: string, accumulated: Supplier[] = []): Observable<Supplier[]> => {
+      const params: { limit: number; cursor?: string } = { limit: 100 };
+      if (cursor) params.cursor = cursor;
+      return this.api.suppliers(params).pipe(
+        switchMap((res) => {
+          const next = [...accumulated, ...res.items];
+          if (res.next_cursor) {
+            return fetchPage(res.next_cursor, next);
+          }
+          return of(next);
+        }),
+      );
+    };
+
+    this.suppliersSub = fetchPage()
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
+        next: (allSuppliers) => {
+          this.suppliers.set(allSuppliers);
+          this.isLoadingSuppliers.set(false);
+          this.suppliersLoadError.set(false);
+          if (this.getCurrentSupplierName()) {
+            this.loadPriorQuotations();
+          }
+        },
+        error: () => {
+          this.isLoadingSuppliers.set(false);
+          this.suppliersLoadError.set(true);
+        },
+      });
   }
 
   loadPriorQuotations(): void {
@@ -1055,6 +1111,19 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
             ? reviewedValue.currency
             : this.effectiveQuotationCurrency();
         reviewedValue = { amount: canonical, currency };
+      } else if (fieldName === 'delivery_fee' || fieldName === 'discount') {
+        const amount = this.moneyAmount(reviewedValue);
+        const canonical = parseMoneyInput(amount);
+        if (canonical === null) return;
+        const currency =
+          this.isMoney(reviewedValue) && reviewedValue.currency
+            ? reviewedValue.currency
+            : this.effectiveQuotationCurrency();
+        reviewedValue = { amount: canonical, currency };
+      } else if (fieldName === 'vat_rate') {
+        const canonical = parseMoneyInput(reviewedValue);
+        if (canonical === null) return;
+        reviewedValue = canonical;
       }
     }
     const fe = this.getFieldExtraction(entityType, entityId, fieldName);
@@ -1091,6 +1160,23 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
               ? current.currency
               : this.effectiveQuotationCurrency();
           this.updateCorrection(fe.id, { amount: canonical, currency });
+          return;
+        }
+      } else if (fieldName === 'delivery_fee' || fieldName === 'discount') {
+        const amount = this.moneyAmount(current);
+        const canonical = parseMoneyInput(amount);
+        if (canonical !== null) {
+          const currency =
+            this.isMoney(current) && current.currency
+              ? current.currency
+              : this.effectiveQuotationCurrency();
+          this.updateCorrection(fe.id, { amount: canonical, currency });
+          return;
+        }
+      } else if (fieldName === 'vat_rate') {
+        const canonical = parseMoneyInput(current);
+        if (canonical !== null) {
+          this.updateCorrection(fe.id, canonical);
           return;
         }
       }
@@ -1263,6 +1349,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (updated) => {
           this.quotation.set(updated);
+          this.selectedSupplierId.set(updated.supplier_id || null);
           this.pendingCorrections.set(new Map());
           this.pendingQuotationCurrency.set(undefined);
           this.pendingPricesIncludeVat.set(undefined);

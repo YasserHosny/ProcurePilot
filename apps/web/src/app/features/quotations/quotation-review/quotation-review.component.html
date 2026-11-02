@@ -150,7 +150,7 @@
                 <span>{{ 'quotations.review.flagged.chooseSupplier' | translate }}</span>
               }
               <button mat-button type="button" (click)="goToFlaggedField(field)">{{ 'quotations.review.flagged.goToField' | translate }}</button>
-            } @else if (['currency', 'issue_date', 'expiry_date', 'stated_total', 'quantity', 'unit_price', 'prices_include_vat', 'vat_rate'].includes(field.fieldName)) {
+            } @else if (['currency', 'issue_date', 'expiry_date', 'stated_total', 'quantity', 'unit_price', 'prices_include_vat', 'vat_rate', 'pack_count', 'unit_size', 'pack_unit', 'pack_details', 'description', 'original_text', 'delivery_fee', 'discount'].includes(field.fieldName)) {
               <button mat-button type="button" (click)="goToFlaggedField(field)">{{ 'quotations.review.flagged.goToField' | translate }}</button>
             }
             <button mat-stroked-button type="button" (click)="confirmFieldAsIs(field.entityType, field.entityId, field.fieldName)">{{ 'quotations.review.flagged.confirmAsIs' | translate }}</button>
@@ -252,11 +252,43 @@
                   [value]="selectedSupplierId()"
                   (selectionChange)="selectedSupplierId.set($event.value); loadPriorQuotations()"
                   [disabled]="!isWriter() || q.status === 'reviewed'"
+                  (openedChange)="onSupplierSelectOpened($event)"
                   required
                 >
+                  <mat-select-trigger>
+                    {{ getCurrentSupplierName() || ('quotations.review.header.supplierPlaceholder' | translate) }}
+                  </mat-select-trigger>
+                  <div class="supplier-search-wrapper">
+                    <mat-icon class="supplier-search-icon" aria-hidden="true">search</mat-icon>
+                    <input
+                      class="supplier-search-input"
+                      type="search"
+                      [placeholder]="'quotations.review.header.supplierSearchPlaceholder' | translate"
+                      [value]="supplierSearchQuery()"
+                      (input)="onSupplierSearchInput($event)"
+                      (keydown)="$event.stopPropagation()"
+                      data-testid="supplier-search-input"
+                    />
+                    @if (supplierSearchQuery()) {
+                      <button
+                        type="button"
+                        class="supplier-search-clear"
+                        (click)="clearSupplierSearch($event)"
+                        (keydown)="$event.stopPropagation()"
+                        [attr.aria-label]="'quotations.review.header.supplierSearchClear' | translate"
+                      >
+                        <mat-icon aria-hidden="true">close</mat-icon>
+                      </button>
+                    }
+                  </div>
                   <mat-option [value]="null">{{ 'quotations.review.header.supplierPlaceholder' | translate }}</mat-option>
-                  @for (s of suppliers(); track s.id) {
+                  @for (s of filteredSuppliers(); track s.id) {
                     <mat-option [value]="s.id">{{ s.name }}</mat-option>
+                  }
+                  @if (filteredSuppliers().length === 0 && supplierSearchQuery().trim()) {
+                    <mat-option disabled class="no-suppliers-match">
+                      {{ 'quotations.review.header.supplierNoMatches' | translate }}
+                    </mat-option>
                   }
                 </mat-select>
                 @if (!selectedSupplierId()) {
@@ -270,7 +302,16 @@
                   </mat-hint>
                 }
               </mat-form-field>
-              @if (suppliers().length === 0) {
+              @if (suppliersLoadError()) {
+                <div class="supplier-error-state" role="alert" data-testid="supplier-load-error">
+                  <mat-icon class="supplier-error-icon" aria-hidden="true">error_outline</mat-icon>
+                  <span>{{ 'quotations.review.header.supplierLoadError' | translate }}</span>
+                  <button mat-button type="button" (click)="loadSuppliers()" data-testid="supplier-retry-button">
+                    <mat-icon aria-hidden="true">refresh</mat-icon>
+                    <span>{{ 'quotations.review.header.supplierRetryAction' | translate }}</span>
+                  </button>
+                </div>
+              } @else if (suppliers().length === 0 && !isLoadingSuppliers()) {
                 <div class="supplier-empty-state">
                   <span>{{ 'quotations.review.header.supplierEmptyState' | translate }}</span>
                   <a mat-button routerLink="/suppliers/new">
@@ -706,6 +747,7 @@
           (lineMarkedForRemoval)="markLineForRemoval($event)"
           (lineUnmarkedForRemoval)="unmarkLineForRemoval($event)"
           (correctionUpdated)="updateCorrection($event.feId, $event.newValue)"
+          (correctionReverted)="revertToAiValue($event)"
           (fieldReviewed)="reviewFieldValue($event.entityType, $event.entityId, $event.fieldName, $event.reviewedValue)"
           (fieldConfirmedAsIs)="confirmFieldAsIs($event.entityType, $event.entityId, $event.fieldName)"
           (showAddLine)="showAddLineForm()"

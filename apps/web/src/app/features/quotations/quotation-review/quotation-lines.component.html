@@ -122,6 +122,55 @@
 
             <!-- Line Fields Grid (expanded content) -->
             <div class="line-fields-grid">
+              <!-- Description / Line Text -->
+              <div
+                class="line-field line-description-field"
+                [id]="'field-' + (getLineTextExtraction(line)?.id || (line.id + '-desc'))"
+                tabindex="0"
+              >
+                <mat-form-field appearance="outline" class="dense-field">
+                  <mat-label>{{ 'quotations.review.lines.colOriginalText' | translate }}</mat-label>
+                  <input
+                    matInput
+                    #descInput
+                    [value]="getDisplayDescription(line)"
+                    (focus)="onFieldFocus(line, 'description', descInput.value)"
+                    (input)="onDescriptionInput(line, descInput.value)"
+                    (change)="onDescriptionChange(line, descInput.value)"
+                    (blur)="onDescriptionBlur(line, descInput.value)"
+                    [readonly]="!isWriter || quotation.status === 'reviewed'"
+                  />
+                </mat-form-field>
+                @if (isLineTextChanged(line)) {
+                  <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                  @if (getLineTextExtraction(line); as fe) {
+                    <button
+                      mat-icon-button
+                      type="button"
+                      (click)="revertField(fe.id)"
+                      [matTooltip]="'quotations.review.corrections.revertTooltip' | translate"
+                      [attr.aria-label]="'quotations.review.corrections.revertTooltip' | translate"
+                      class="revert-btn"
+                    >
+                      <mat-icon aria-hidden="true">undo</mat-icon>
+                    </button>
+                  }
+                } @else if (isLineTextConfirmedAsIs(line)) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
+                }
+                @if (getLineTextConfidence(line) < 0.85 && !isLineTextCorrected(line)) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="confirmLineTextAsIs(line)"
+                    [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    class="confirm-as-is-btn"
+                  >
+                    <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  </button>
+                }
+              </div>
+
               <!-- Quantity Field -->
               <div
                 class="line-field"
@@ -132,16 +181,29 @@
                   <mat-label>{{ 'quotations.review.lines.colQuantity' | translate }}</mat-label>
                   <input
                     matInput
+                    #qtyInput
                     [value]="getDisplayQuantity(line)"
-                    (focus)="onFieldFocus(line, 'quantity', $any($event.target).value)"
-                    (input)="onQuantityInput(line, $any($event.target).value)"
-                    (change)="onQuantityChange(line, $any($event.target).value)"
-                    (blur)="onQuantityBlur(line, $any($event.target).value)"
+                    (focus)="onFieldFocus(line, 'quantity', qtyInput.value)"
+                    (input)="onQuantityInput(line, qtyInput.value)"
+                    (change)="onQuantityChange(line, qtyInput.value)"
+                    (blur)="onQuantityBlur(line, qtyInput.value)"
                     [readonly]="!isWriter || quotation.status === 'reviewed'"
                   />
                 </mat-form-field>
                 @if (isFieldChanged('quotation_line', line.id, 'quantity')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                  @if (getFieldExtraction('quotation_line', line.id, 'quantity'); as fe) {
+                    <button
+                      mat-icon-button
+                      type="button"
+                      (click)="revertField(fe.id)"
+                      [matTooltip]="'quotations.review.corrections.revertTooltip' | translate"
+                      [attr.aria-label]="'quotations.review.corrections.revertTooltip' | translate"
+                      class="revert-btn"
+                    >
+                      <mat-icon aria-hidden="true">undo</mat-icon>
+                    </button>
+                  }
                 } @else if (isFieldConfirmedAsIs('quotation_line', line.id, 'quantity')) {
                   <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
                 }
@@ -159,15 +221,50 @@
               </div>
 
               <!-- Pack Details -->
-              <div class="line-field">
+              <div
+                class="line-field"
+                [id]="'field-' + (getFieldExtraction('quotation_line', line.id, 'pack_count')?.id || getFieldExtraction('quotation_line', line.id, 'pack')?.id || (line.id + '-pack'))"
+                tabindex="0"
+              >
                 <mat-form-field appearance="outline" class="dense-field">
                   <mat-label>{{ 'quotations.review.lines.colPack' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="line.pack ? (line.pack.pack_count + ' × ' + line.pack.unit_size + ' ' + (line.pack.unit || '')) : '—'"
-                    readonly
+                    #packInput
+                    [value]="getDisplayPack(line)"
+                    (focus)="onFieldFocus(line, 'pack', packInput.value)"
+                    (input)="onPackInput(line, packInput.value)"
+                    (change)="onPackChange(line, packInput.value)"
+                    (blur)="onPackBlur(line, packInput.value)"
+                    [readonly]="!isWriter || quotation.status === 'reviewed'"
                   />
                 </mat-form-field>
+                @if (isPackChanged(line)) {
+                  <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="revertPack(line)"
+                    [matTooltip]="'quotations.review.corrections.revertTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.revertTooltip' | translate"
+                    class="revert-btn"
+                  >
+                    <mat-icon aria-hidden="true">undo</mat-icon>
+                  </button>
+                } @else if (isPackConfirmedAsIs(line)) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
+                }
+                @if (getPackConfidence(line) < 0.85 && !isPackCorrected(line)) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="confirmPackAsIs(line)"
+                    [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    class="confirm-as-is-btn"
+                  >
+                    <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  </button>
+                }
               </div>
 
               <!-- Unit Price Field -->
@@ -180,17 +277,30 @@
                   <mat-label>{{ 'quotations.review.lines.colUnitPrice' | translate }}</mat-label>
                   <input
                     matInput
+                    #unitPriceInput
                     [value]="getDisplayUnitPrice(line)"
-                    (focus)="onFieldFocus(line, 'unit_price', $any($event.target).value)"
-                    (input)="onUnitPriceInput(line, $any($event.target).value)"
-                    (change)="onUnitPriceChange(line, $any($event.target).value)"
-                    (blur)="onUnitPriceBlur(line, $any($event.target).value)"
+                    (focus)="onFieldFocus(line, 'unit_price', unitPriceInput.value)"
+                    (input)="onUnitPriceInput(line, unitPriceInput.value)"
+                    (change)="onUnitPriceChange(line, unitPriceInput.value)"
+                    (blur)="onUnitPriceBlur(line, unitPriceInput.value)"
                     [readonly]="!isWriter || quotation.status === 'reviewed'"
                   />
                   <span matTextSuffix class="currency-suffix">{{ (line.unit_price?.currency || effectiveCurrency) | currencySymbol }}</span>
                 </mat-form-field>
                 @if (isFieldChanged('quotation_line', line.id, 'unit_price')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                  @if (getFieldExtraction('quotation_line', line.id, 'unit_price'); as fe) {
+                    <button
+                      mat-icon-button
+                      type="button"
+                      (click)="revertField(fe.id)"
+                      [matTooltip]="'quotations.review.corrections.revertTooltip' | translate"
+                      [attr.aria-label]="'quotations.review.corrections.revertTooltip' | translate"
+                      class="revert-btn"
+                    >
+                      <mat-icon aria-hidden="true">undo</mat-icon>
+                    </button>
+                  }
                 } @else if (isFieldConfirmedAsIs('quotation_line', line.id, 'unit_price')) {
                   <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
                 }
@@ -208,45 +318,157 @@
               </div>
 
               <!-- Delivery Fee -->
-              <div class="line-field">
+              <div
+                class="line-field"
+                [id]="'field-' + (getFieldExtraction('quotation_line', line.id, 'delivery_fee')?.id || (line.id + '-delivery-fee'))"
+                tabindex="0"
+              >
                 <mat-form-field appearance="outline" class="dense-field">
                   <mat-label>{{ 'quotations.review.lines.colDeliveryFee' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="line.delivery_fee?.amount || '—'"
-                    readonly
+                    #deliveryInput
+                    [value]="getDisplayDeliveryFee(line)"
+                    (focus)="onFieldFocus(line, 'delivery_fee', deliveryInput.value)"
+                    (input)="onDeliveryFeeInput(line, deliveryInput.value)"
+                    (change)="onDeliveryFeeChange(line, deliveryInput.value)"
+                    (blur)="onDeliveryFeeBlur(line, deliveryInput.value)"
+                    [readonly]="!isWriter || quotation.status === 'reviewed'"
                   />
-                  @if (line.delivery_fee; as df) {
-                    <span matTextSuffix class="currency-suffix">{{ df.currency | currencySymbol }}</span>
+                  @if (getEffectiveDeliveryFeeCurrency(line); as cur) {
+                    <span matTextSuffix class="currency-suffix">{{ cur | currencySymbol }}</span>
                   }
                 </mat-form-field>
+                @if (isFieldChanged('quotation_line', line.id, 'delivery_fee')) {
+                  <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                  @if (getFieldExtraction('quotation_line', line.id, 'delivery_fee'); as fe) {
+                    <button
+                      mat-icon-button
+                      type="button"
+                      (click)="revertField(fe.id)"
+                      [matTooltip]="'quotations.review.corrections.revertTooltip' | translate"
+                      [attr.aria-label]="'quotations.review.corrections.revertTooltip' | translate"
+                      class="revert-btn"
+                    >
+                      <mat-icon aria-hidden="true">undo</mat-icon>
+                    </button>
+                  }
+                } @else if (isFieldConfirmedAsIs('quotation_line', line.id, 'delivery_fee')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
+                }
+                @if (getFieldConfidence('quotation_line', line.id, 'delivery_fee') < 0.85 && !isFieldCorrected('quotation_line', line.id, 'delivery_fee')) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="fieldConfirmedAsIs.emit({ entityType: 'quotation_line', entityId: line.id, fieldName: 'delivery_fee' })"
+                    [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    class="confirm-as-is-btn"
+                  >
+                    <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  </button>
+                }
               </div>
 
               <!-- Discount -->
-              <div class="line-field">
+              <div
+                class="line-field"
+                [id]="'field-' + (getFieldExtraction('quotation_line', line.id, 'discount')?.id || (line.id + '-discount'))"
+                tabindex="0"
+              >
                 <mat-form-field appearance="outline" class="dense-field">
                   <mat-label>{{ 'quotations.review.lines.colDiscount' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="line.discount?.amount || '—'"
-                    readonly
+                    #discountInput
+                    [value]="getDisplayDiscount(line)"
+                    (focus)="onFieldFocus(line, 'discount', discountInput.value)"
+                    (input)="onDiscountInput(line, discountInput.value)"
+                    (change)="onDiscountChange(line, discountInput.value)"
+                    (blur)="onDiscountBlur(line, discountInput.value)"
+                    [readonly]="!isWriter || quotation.status === 'reviewed'"
                   />
-                  @if (line.discount; as disc) {
-                    <span matTextSuffix class="currency-suffix">{{ disc.currency | currencySymbol }}</span>
+                  @if (getEffectiveDiscountCurrency(line); as cur) {
+                    <span matTextSuffix class="currency-suffix">{{ cur | currencySymbol }}</span>
                   }
                 </mat-form-field>
+                @if (isFieldChanged('quotation_line', line.id, 'discount')) {
+                  <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                  @if (getFieldExtraction('quotation_line', line.id, 'discount'); as fe) {
+                    <button
+                      mat-icon-button
+                      type="button"
+                      (click)="revertField(fe.id)"
+                      [matTooltip]="'quotations.review.corrections.revertTooltip' | translate"
+                      [attr.aria-label]="'quotations.review.corrections.revertTooltip' | translate"
+                      class="revert-btn"
+                    >
+                      <mat-icon aria-hidden="true">undo</mat-icon>
+                    </button>
+                  }
+                } @else if (isFieldConfirmedAsIs('quotation_line', line.id, 'discount')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
+                }
+                @if (getFieldConfidence('quotation_line', line.id, 'discount') < 0.85 && !isFieldCorrected('quotation_line', line.id, 'discount')) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="fieldConfirmedAsIs.emit({ entityType: 'quotation_line', entityId: line.id, fieldName: 'discount' })"
+                    [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    class="confirm-as-is-btn"
+                  >
+                    <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  </button>
+                }
               </div>
 
               <!-- VAT % -->
-              <div class="line-field">
+              <div
+                class="line-field"
+                [id]="'field-' + (getFieldExtraction('quotation_line', line.id, 'vat_rate')?.id || (line.id + '-vat-rate'))"
+                tabindex="0"
+              >
                 <mat-form-field appearance="outline" class="dense-field">
                   <mat-label>{{ 'quotations.review.lines.colVat' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="line.vat_rate ? (((line.vat_rate | percent) || line.vat_rate) + (quotation.prices_include_vat ? ' ' + ('quotations.review.lines.vatInclusiveSuffix' | translate) : '')) : '—'"
-                    readonly
+                    #vatInput
+                    [value]="getDisplayVatRate(line)"
+                    (focus)="onFieldFocus(line, 'vat_rate', vatInput.value)"
+                    (input)="onVatRateInput(line, vatInput.value)"
+                    (change)="onVatRateChange(line, vatInput.value)"
+                    (blur)="onVatRateBlur(line, vatInput.value)"
+                    [readonly]="!isWriter || quotation.status === 'reviewed'"
                   />
+                  <span matTextSuffix class="currency-suffix">%</span>
                 </mat-form-field>
+                @if (isFieldChanged('quotation_line', line.id, 'vat_rate')) {
+                  <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                  @if (getFieldExtraction('quotation_line', line.id, 'vat_rate'); as fe) {
+                    <button
+                      mat-icon-button
+                      type="button"
+                      (click)="revertField(fe.id)"
+                      [matTooltip]="'quotations.review.corrections.revertTooltip' | translate"
+                      [attr.aria-label]="'quotations.review.corrections.revertTooltip' | translate"
+                      class="revert-btn"
+                    >
+                      <mat-icon aria-hidden="true">undo</mat-icon>
+                    </button>
+                  }
+                } @else if (isFieldConfirmedAsIs('quotation_line', line.id, 'vat_rate')) {
+                  <span class="confirmed-tag" data-testid="confirmed-badge">{{ 'quotations.review.corrections.confirmedBadge' | translate }}</span>
+                }
+                @if (getFieldConfidence('quotation_line', line.id, 'vat_rate') < 0.85 && !isFieldCorrected('quotation_line', line.id, 'vat_rate')) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="fieldConfirmedAsIs.emit({ entityType: 'quotation_line', entityId: line.id, fieldName: 'vat_rate' })"
+                    [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    class="confirm-as-is-btn"
+                  >
+                    <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  </button>
+                }
               </div>
 
               <!-- Line Total -->

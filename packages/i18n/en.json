@@ -998,6 +998,11 @@
         "supplierRequired": "Supplier confirmation is required before authorizing this quotation",
         "supplierEmptyState": "No suppliers in this workspace yet.",
         "supplierEmptyAction": "Add a supplier",
+        "supplierLoadError": "Failed to load suppliers.",
+        "supplierRetryAction": "Retry",
+        "supplierSearchPlaceholder": "Search suppliers...",
+        "supplierSearchClear": "Clear search",
+        "supplierNoMatches": "No suppliers match your search.",
         "currencyLabel": "Currency",
         "currencyPlaceholder": "e.g. {{currency}}",
         "currencyRequired": "Currency is required",
@@ -1046,8 +1051,8 @@
         "addLinePrice": "Unit Price",
         "confirmAdd": "Add",
         "cancelAdd": "Cancel",
-        "removeLine": "Remove this line",
-        "markedForRemoval": "Will be removed on save",
+        "removeLine": "Remove this line (extraction evidence is kept)",
+        "markedForRemoval": "Will be removed on save (extraction evidence is kept)",
         "undoRemove": "Undo removal",
         "pendingAdd": "New — will be added on save"
       },
@@ -1080,7 +1085,8 @@
         "editTooltip": "Correct this field value",
         "correctedBadge": "Corrected by Human",
         "confirmedBadge": "Confirmed",
-        "confirmAsIsTooltip": "Confirm this value is correct as extracted"
+        "confirmAsIsTooltip": "Confirm this value is correct as extracted",
+        "revertTooltip": "Revert to extracted value"
       },
       "arithmetic": {
         "mismatchTitle": "Arithmetic discrepancy detected",

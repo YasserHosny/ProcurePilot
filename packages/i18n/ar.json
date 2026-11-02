@@ -998,6 +998,11 @@
         "supplierRequired": "تأكيد المورد إلزامي قبل اعتماد عرض السعر",
         "supplierEmptyState": "لا يوجد موردون في مساحة العمل هذه حتى الآن.",
         "supplierEmptyAction": "إضافة مورد",
+        "supplierLoadError": "فشل في تحميل الموردين.",
+        "supplierRetryAction": "إعادة المحاولة",
+        "supplierSearchPlaceholder": "البحث عن موردين...",
+        "supplierSearchClear": "مسح البحث",
+        "supplierNoMatches": "لا يوجد موردون يطابقون بحثك.",
         "currencyLabel": "العملة",
         "currencyPlaceholder": "مثال: {{currency}}",
         "currencyRequired": "العملة مطلوبة",
@@ -1046,8 +1051,8 @@
         "addLinePrice": "سعر الوحدة",
         "confirmAdd": "إضافة",
         "cancelAdd": "إلغاء",
-        "removeLine": "إزالة هذا العنصر",
-        "markedForRemoval": "سيتم إزالته عند الحفظ",
+        "removeLine": "إزالة هذا العنصر (يتم الاحتفاظ بأدلة الاستخراج)",
+        "markedForRemoval": "سيتم إزالته عند الحفظ (يتم الاحتفاظ بأدلة الاستخراج)",
         "undoRemove": "التراجع عن الإزالة",
         "pendingAdd": "جديد — سيتم إضافته عند الحفظ"
       },
@@ -1080,7 +1085,8 @@
         "editTooltip": "تصحيح قيمة هذا الحقل",
         "correctedBadge": "تم التصحيح يدوياً",
         "confirmedBadge": "مؤكد",
-        "confirmAsIsTooltip": "تأكيد أن هذه القيمة صحيحة كما استُخرجت"
+        "confirmAsIsTooltip": "تأكيد أن هذه القيمة صحيحة كما استُخرجت",
+        "revertTooltip": "استعادة القيمة المستخرجة"
       },
       "arithmetic": {
         "mismatchTitle": "تم اكتشاف فرق حسابي",
