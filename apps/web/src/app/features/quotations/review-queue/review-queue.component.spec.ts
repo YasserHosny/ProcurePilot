@@ -1,12 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { signal, type WritableSignal } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { Subject, of } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { ReviewTask, Role } from '../../../core/api/models';
+import type { Quotation, ReviewTask, ReviewTaskPriority, Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { ReviewQueueComponent } from './review-queue.component';
 
@@ -14,6 +15,14 @@ describe('ReviewQueueComponent (T052)', () => {
   let component: ReviewQueueComponent;
   let fixture: ComponentFixture<ReviewQueueComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  let mockRole: WritableSignal<Role | null>;
+
+  const mockQuotation: Quotation = {
+    id: 'q-101',
+    document_id: 'doc-1',
+    status: 'reviewed',
+    created_at: '2026-08-21T01:00:00Z',
+  };
 
   const mockTasks: ReviewTask[] = [
     {
@@ -34,13 +43,39 @@ describe('ReviewQueueComponent (T052)', () => {
     },
   ];
 
-  beforeEach(async () => {
-    apiService = jasmine.createSpyObj('ApiService', ['getReviewTasks']);
-    apiService.getReviewTasks.and.returnValue(of({ items: mockTasks, next_cursor: null }));
+  function createMockTasks(count: number, offset = 1): ReviewTask[] {
+    return Array.from({ length: count }, (_, i) => {
+      const num = offset + i;
+      return {
+        id: `task-${num}`,
+        quotation_id: `q-${num}`,
+        status: 'open' as const,
+        priority: 'normal' as const,
+        reason: 'arithmetic_mismatch' as const,
+        created_at: `2026-08-21T01:${String(num % 60).padStart(2, '0')}:00Z`,
+      };
+    });
+  }
 
+  beforeEach(async () => {
+    apiService = jasmine.createSpyObj('ApiService', [
+      'getReviewTasks',
+      'archiveQuotation',
+      'refuseQuotation',
+      'updateReviewTaskPriority',
+    ]);
+    apiService.getReviewTasks.and.returnValue(of({ items: mockTasks, next_cursor: null }));
+    apiService.archiveQuotation.and.returnValue(of(mockQuotation));
+    apiService.refuseQuotation.and.returnValue(of(mockQuotation));
+    apiService.updateReviewTaskPriority.and.returnValue(of(mockTasks[0]));
+
+    mockRole = signal<Role | null>('buyer');
     const mockSession = {
-      hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
-      role: signal<Role | null>('buyer'),
+      hasRole: jasmine.createSpy('hasRole').and.callFake((...roles: Role[]) => {
+        const current = mockRole();
+        return current !== null && roles.includes(current);
+      }),
+      role: mockRole,
       currentMember: signal(null),
       isAuthenticated: signal(true),
       tenant: signal(null),
@@ -266,5 +301,356 @@ describe('ReviewQueueComponent (T052)', () => {
         date_to: expectedDateTo,
       }),
     );
+  });
+
+  describe('Bulk actions & queue failure handling (PPS-159 / P-127)', () => {
+    it('partial failure: retains failed ids, reports counts, and reloads list', () => {
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      spyOn(snackBar, 'open');
+      spyOn(window, 'confirm').and.returnValue(true);
+      const task3: ReviewTask = {
+        id: 'task-3',
+        quotation_id: 'q-103',
+        status: 'open',
+        priority: 'low',
+        reason: 'arithmetic_mismatch',
+        created_at: '2026-08-21T02:00:00Z',
+      };
+      component.tasks.set([...mockTasks, task3]);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-2', 'task-3']));
+
+      apiService.archiveQuotation.and.callFake((qId: string) => {
+        if (qId === 'q-101') {
+          return of(mockQuotation);
+        }
+        return throwError(() => new Error('Archive failed for ' + qId));
+      });
+
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: [mockTasks[1], task3], next_cursor: null }),
+      );
+
+      component.bulkArchive();
+
+      expect(apiService.archiveQuotation).toHaveBeenCalledTimes(3);
+      expect(apiService.getReviewTasks).toHaveBeenCalled();
+      expect(component.selectedTaskIds().has('task-1')).toBeFalse();
+      expect(component.selectedTaskIds().has('task-2')).toBeTrue();
+      expect(component.selectedTaskIds().has('task-3')).toBeTrue();
+      expect(component.selectedTaskIds().size).toBe(2);
+      expect(snackBar.open).toHaveBeenCalledWith(
+        jasmine.stringMatching(/1.*updated.*2.*failed/),
+        undefined,
+        jasmine.any(Object),
+      );
+    });
+
+    it('all fail: retains all failed ids and reports failure count', () => {
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      spyOn(snackBar, 'open');
+      spyOn(window, 'confirm').and.returnValue(true);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-2']));
+
+      apiService.archiveQuotation.and.returnValue(
+        throwError(() => new Error('Network failure')),
+      );
+
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: mockTasks, next_cursor: null }),
+      );
+
+      component.bulkArchive();
+
+      expect(apiService.archiveQuotation).toHaveBeenCalledTimes(2);
+      expect(apiService.getReviewTasks).toHaveBeenCalled();
+      expect(component.selectedTaskIds().has('task-1')).toBeTrue();
+      expect(component.selectedTaskIds().has('task-2')).toBeTrue();
+      expect(component.selectedTaskIds().size).toBe(2);
+      expect(snackBar.open).toHaveBeenCalledWith(
+        jasmine.stringMatching(/No tasks were updated.*2.*failed/),
+        undefined,
+        jasmine.any(Object),
+      );
+    });
+
+    it('all succeed: empties selection, reports updated count, and reloads list', () => {
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      spyOn(snackBar, 'open');
+      spyOn(window, 'confirm').and.returnValue(true);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-2']));
+
+      apiService.archiveQuotation.and.returnValue(of(mockQuotation));
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: [], next_cursor: null }),
+      );
+
+      component.bulkArchive();
+
+      expect(apiService.archiveQuotation).toHaveBeenCalledTimes(2);
+      expect(apiService.getReviewTasks).toHaveBeenCalled();
+      expect(component.selectedTaskIds().size).toBe(0);
+      expect(snackBar.open).toHaveBeenCalledWith(
+        jasmine.stringMatching(/2.*tasks updated/),
+        undefined,
+        jasmine.any(Object),
+      );
+    });
+
+    it('bulk refuse: skips resolved tasks without sending request and counts as skipped', () => {
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      spyOn(snackBar, 'open');
+      spyOn(window, 'confirm').and.returnValue(true);
+      const resolvedTask: ReviewTask = {
+        ...mockTasks[1],
+        id: 'task-resolved',
+        quotation_id: 'q-resolved',
+        status: 'resolved',
+      };
+      component.tasks.set([mockTasks[0], resolvedTask]);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-resolved']));
+
+      apiService.refuseQuotation.and.returnValue(of(mockQuotation));
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: [resolvedTask], next_cursor: null }),
+      );
+
+      component.bulkRefuse();
+
+      expect(apiService.refuseQuotation).toHaveBeenCalledWith('q-101');
+      expect(apiService.refuseQuotation).not.toHaveBeenCalledWith('q-resolved');
+      expect(apiService.refuseQuotation).toHaveBeenCalledTimes(1);
+      expect(component.selectedTaskIds().size).toBe(0);
+      expect(snackBar.open).toHaveBeenCalledWith(
+        jasmine.stringMatching(/1.*tasks updated.*1.*skipped.*resolved/),
+        undefined,
+        jasmine.any(Object),
+      );
+    });
+
+    it('bulk archive: skips resolved tasks without sending request and counts as skipped', () => {
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      spyOn(snackBar, 'open');
+      spyOn(window, 'confirm').and.returnValue(true);
+      const resolvedTask: ReviewTask = {
+        ...mockTasks[1],
+        id: 'task-resolved',
+        quotation_id: 'q-resolved',
+        status: 'resolved',
+      };
+      component.tasks.set([mockTasks[0], mockTasks[1], resolvedTask]);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-2', 'task-resolved']));
+
+      apiService.archiveQuotation.and.returnValue(of(mockQuotation));
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: [resolvedTask], next_cursor: null }),
+      );
+
+      component.bulkArchive();
+
+      expect(apiService.archiveQuotation).toHaveBeenCalledWith('q-101');
+      expect(apiService.archiveQuotation).toHaveBeenCalledWith('q-102');
+      expect(apiService.archiveQuotation).not.toHaveBeenCalledWith('q-resolved');
+      expect(apiService.archiveQuotation).toHaveBeenCalledTimes(2);
+      expect(component.selectedTaskIds().size).toBe(0);
+      expect(snackBar.open).toHaveBeenCalledWith(
+        jasmine.stringMatching(/2.*tasks updated.*1.*skipped.*resolved/),
+        undefined,
+        jasmine.any(Object),
+      );
+    });
+
+    it('bulk result translation: requests the exact combined key and params for each combination with no string concatenation', () => {
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      const snackBarSpy = spyOn(snackBar, 'open');
+      const translate = TestBed.inject(TranslateService);
+      const recordedCalls: { key: string; params: unknown }[] = [];
+      spyOn(translate, 'instant').and.callFake((key: string, params?: unknown) => {
+        recordedCalls.push({ key, params });
+        return `TRANSLATED:${key}`;
+      });
+
+      interface BulkCaller {
+        finishBulkAction: (
+          action: 'archive' | 'refuse' | 'reprioritise',
+          succeededIds: string[],
+          failedTasks: ReviewTask[],
+          skippedIds: string[],
+        ) => void;
+      }
+      const caller = component as unknown as BulkCaller;
+
+      const combinations: {
+        name: string;
+        succeededIds: string[];
+        failedTasks: ReviewTask[];
+        skippedIds: string[];
+        expectedKey: string;
+        expectedParams: Record<string, unknown>;
+      }[] = [
+        {
+          name: 'all succeeded without skipped',
+          succeededIds: ['task-1', 'task-2'],
+          failedTasks: [],
+          skippedIds: [],
+          expectedKey: 'quotations.queue.bulk.result.allSucceeded',
+          expectedParams: { count: 2, succeeded: 2 },
+        },
+        {
+          name: 'all succeeded with skipped',
+          succeededIds: ['task-1', 'task-2'],
+          failedTasks: [],
+          skippedIds: ['task-3'],
+          expectedKey: 'quotations.queue.bulk.result.allSucceededSkipped',
+          expectedParams: { count: 2, succeeded: 2, skipped: 1 },
+        },
+        {
+          name: 'partial without skipped',
+          succeededIds: ['task-1'],
+          failedTasks: [mockTasks[1]],
+          skippedIds: [],
+          expectedKey: 'quotations.queue.bulk.result.partial',
+          expectedParams: { succeeded: 1, failed: 1, count: 2 },
+        },
+        {
+          name: 'partial with skipped',
+          succeededIds: ['task-1'],
+          failedTasks: [mockTasks[1]],
+          skippedIds: ['task-3'],
+          expectedKey: 'quotations.queue.bulk.result.partialSkipped',
+          expectedParams: { succeeded: 1, failed: 1, count: 2, skipped: 1 },
+        },
+        {
+          name: 'all failed without skipped',
+          succeededIds: [],
+          failedTasks: [mockTasks[0], mockTasks[1]],
+          skippedIds: [],
+          expectedKey: 'quotations.queue.bulk.result.allFailed',
+          expectedParams: { failed: 2, count: 2 },
+        },
+        {
+          name: 'all failed with skipped',
+          succeededIds: [],
+          failedTasks: [mockTasks[0]],
+          skippedIds: ['task-3'],
+          expectedKey: 'quotations.queue.bulk.result.allFailedSkipped',
+          expectedParams: { failed: 1, count: 1, skipped: 1 },
+        },
+      ];
+
+      for (const c of combinations) {
+        recordedCalls.length = 0;
+        snackBarSpy.calls.reset();
+
+        caller.finishBulkAction('archive', c.succeededIds, c.failedTasks, c.skippedIds);
+
+        expect(recordedCalls.length).withContext(`${c.name}: translate.instant call count`).toBe(1);
+        expect(recordedCalls[0].key).withContext(`${c.name}: key`).toBe(c.expectedKey);
+        expect(recordedCalls[0].params).withContext(`${c.name}: params`).toEqual(c.expectedParams);
+        expect(snackBarSpy).toHaveBeenCalledWith(
+          `TRANSLATED:${c.expectedKey}`,
+          undefined,
+          jasmine.any(Object),
+        );
+      }
+    });
+
+    it('non-writer: bulk controls and selection checkboxes are not rendered', () => {
+      mockRole.set('viewer');
+      component.selectedTaskIds.set(new Set(['task-1']));
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(component.isWriter()).toBeFalse();
+      expect(el.querySelector('.bulk-actions-bar')).toBeNull();
+      expect(el.querySelector('[data-testid="bulk-actions-bar"]')).toBeNull();
+      expect(el.querySelectorAll('mat-checkbox').length).toBe(0);
+      expect(el.querySelectorAll('.select-cell').length).toBe(0);
+      expect(el.querySelector('.read-only-banner')).not.toBeNull();
+    });
+
+    it('single archive: removes the archived task id from selectedTaskIds', () => {
+      spyOn(window, 'confirm').and.returnValue(true);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-2']));
+      apiService.archiveQuotation.and.returnValue(of(mockQuotation));
+
+      component.archiveTask(mockTasks[0], new MouseEvent('click'));
+
+      expect(apiService.archiveQuotation).toHaveBeenCalledWith('q-101');
+      expect(component.selectedTaskIds().has('task-1')).toBeFalse();
+      expect(component.selectedTaskIds().has('task-2')).toBeTrue();
+      expect(component.tasks().some((t) => t.id === 'task-1')).toBeFalse();
+    });
+
+    it('prepends failed rows not in first refreshed page, keeps failed ids selected, and prevents loadMore duplicates', () => {
+      const tasks1To50 = createMockTasks(50, 1);
+      const tasks51To100 = createMockTasks(50, 51);
+      const all100Tasks = [...tasks1To50, ...tasks51To100];
+
+      component.tasks.set(all100Tasks);
+      component.selectedTaskIds.set(new Set(all100Tasks.map((t) => t.id)));
+
+      apiService.updateReviewTaskPriority.and.callFake((taskId: string, priority: ReviewTaskPriority) => {
+        const match = taskId.match(/task-(\d+)/);
+        const index = match ? parseInt(match[1], 10) : 0;
+        if (index <= 50) {
+          return of({
+            ...tasks1To50[index - 1],
+            priority,
+          });
+        }
+        return throwError(() => new Error(`Priority update failed for ${taskId}`));
+      });
+
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: tasks1To50, next_cursor: 'cursor-page-2' }),
+      );
+
+      component.bulkReprioritise('high');
+
+      expect(component.selectedTaskIds().size).toBe(50);
+      for (const failedTask of tasks51To100) {
+        expect(component.selectedTaskIds().has(failedTask.id)).toBeTrue();
+      }
+
+      expect(component.tasks().length).toBe(100);
+      for (const failedTask of tasks51To100) {
+        expect(component.tasks().some((t) => t.id === failedTask.id)).toBeTrue();
+      }
+
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: tasks51To100, next_cursor: null }),
+      );
+
+      component.loadMore();
+
+      expect(component.tasks().length).toBe(100);
+      expect(component.nextCursor()).toBeNull();
+    });
+
+    it('normal bulk success path leaves the refreshed list exactly as returned with empty selection', () => {
+      const refreshedTasks = [mockTasks[0]];
+      component.tasks.set(mockTasks);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-2']));
+
+      apiService.updateReviewTaskPriority.and.returnValue(
+        of({ ...mockTasks[0], priority: 'high' }),
+      );
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: refreshedTasks, next_cursor: null }),
+      );
+
+      component.bulkReprioritise('high');
+
+      expect(component.selectedTaskIds().size).toBe(0);
+      expect(component.tasks()).toEqual(refreshedTasks);
+    });
   });
 });
