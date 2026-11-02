@@ -1,9 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, type WritableSignal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Router, convertToParamMap, provideRouter } from '@angular/router';
+import { Router, type ParamMap, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { Subject, of, throwError } from 'rxjs';
+import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
@@ -677,6 +677,7 @@ describe('ReviewQueueComponent (T052)', () => {
           snapshot: {
             queryParamMap: convertToParamMap(queryParams),
           },
+          queryParamMap: of(convertToParamMap(queryParams)),
         };
 
         const initFixture = TestBed.createComponent(ReviewQueueComponent);
@@ -722,6 +723,7 @@ describe('ReviewQueueComponent (T052)', () => {
           snapshot: {
             queryParamMap: convertToParamMap(invalidParams),
           },
+          queryParamMap: of(convertToParamMap(invalidParams)),
         };
 
         const initFixture = TestBed.createComponent(ReviewQueueComponent);
@@ -748,6 +750,141 @@ describe('ReviewQueueComponent (T052)', () => {
           sort_by: 'created_at',
           sort_order: 'desc',
         });
+      });
+    });
+
+    describe('URL queryParamMap reactive subscription', () => {
+      it('loads tasks exactly once on init', () => {
+        const queryParamMap$ = new BehaviorSubject<ParamMap>(
+          convertToParamMap({ status: 'in_progress', priority: 'high' }),
+        );
+        const stubRoute = {
+          snapshot: { queryParamMap: queryParamMap$.value },
+          queryParamMap: queryParamMap$,
+        };
+
+        const testFixture = TestBed.createComponent(ReviewQueueComponent);
+        (testFixture.componentInstance as unknown as { route: typeof stubRoute }).route = stubRoute;
+        apiService.getReviewTasks.calls.reset();
+
+        testFixture.detectChanges();
+
+        expect(apiService.getReviewTasks).toHaveBeenCalledTimes(1);
+        expect(testFixture.componentInstance.statusFilter()).toBe('in_progress');
+        expect(testFixture.componentInstance.priorityFilter()).toBe('high');
+      });
+
+      it('does not reload when emitted params are equal to current state', () => {
+        const queryParamMap$ = new BehaviorSubject<ParamMap>(
+          convertToParamMap({ status: 'resolved', priority: 'low' }),
+        );
+        const stubRoute = {
+          snapshot: { queryParamMap: queryParamMap$.value },
+          queryParamMap: queryParamMap$,
+        };
+
+        const testFixture = TestBed.createComponent(ReviewQueueComponent);
+        (testFixture.componentInstance as unknown as { route: typeof stubRoute }).route = stubRoute;
+        testFixture.detectChanges();
+
+        expect(testFixture.componentInstance.statusFilter()).toBe('resolved');
+        expect(testFixture.componentInstance.priorityFilter()).toBe('low');
+
+        apiService.getReviewTasks.calls.reset();
+        queryParamMap$.next(convertToParamMap({ status: 'resolved', priority: 'low' }));
+
+        expect(apiService.getReviewTasks).not.toHaveBeenCalled();
+      });
+
+      it('restores state and reloads once when different params are emitted (e.g. browser back)', () => {
+        const queryParamMap$ = new BehaviorSubject<ParamMap>(
+          convertToParamMap({ status: 'resolved', priority: 'high' }),
+        );
+        const stubRoute = {
+          snapshot: { queryParamMap: queryParamMap$.value },
+          queryParamMap: queryParamMap$,
+        };
+
+        const testFixture = TestBed.createComponent(ReviewQueueComponent);
+        (testFixture.componentInstance as unknown as { route: typeof stubRoute }).route = stubRoute;
+        testFixture.detectChanges();
+
+        apiService.getReviewTasks.calls.reset();
+        queryParamMap$.next(
+          convertToParamMap({
+            status: 'in_progress',
+            priority: 'low',
+            search: 'Widget',
+            sort: 'stated_total',
+            order: 'asc',
+          }),
+        );
+
+        const comp = testFixture.componentInstance;
+        expect(comp.statusFilter()).toBe('in_progress');
+        expect(comp.priorityFilter()).toBe('low');
+        expect(comp.searchQuery()).toBe('Widget');
+        expect(comp.sortBy()).toBe('stated_total');
+        expect(comp.sortOrder()).toBe('asc');
+        expect(apiService.getReviewTasks).toHaveBeenCalledTimes(1);
+        expect(apiService.getReviewTasks).toHaveBeenCalledWith(
+          jasmine.objectContaining({
+            status: 'in_progress',
+            priority: 'low',
+            search: 'Widget',
+            sort_by: 'stated_total',
+            sort_order: 'asc',
+          }),
+        );
+      });
+
+      it('resets filters to defaults and reloads once when params with no filters are emitted after filtered state', () => {
+        const queryParamMap$ = new BehaviorSubject<ParamMap>(
+          convertToParamMap({
+            status: 'resolved',
+            priority: 'high',
+            search: 'Acme',
+            date_from: '2026-08-01',
+            date_to: '2026-08-31',
+            sort: 'stated_total',
+            order: 'asc',
+          }),
+        );
+        const stubRoute = {
+          snapshot: { queryParamMap: queryParamMap$.value },
+          queryParamMap: queryParamMap$,
+        };
+
+        const testFixture = TestBed.createComponent(ReviewQueueComponent);
+        (testFixture.componentInstance as unknown as { route: typeof stubRoute }).route = stubRoute;
+        testFixture.detectChanges();
+
+        const comp = testFixture.componentInstance;
+        expect(comp.statusFilter()).toBe('resolved');
+        expect(comp.priorityFilter()).toBe('high');
+
+        apiService.getReviewTasks.calls.reset();
+        queryParamMap$.next(convertToParamMap({}));
+
+        expect(comp.statusFilter()).toBe('open');
+        expect(comp.priorityFilter()).toBe('all');
+        expect(comp.searchQuery()).toBe('');
+        expect(comp.dateFrom()).toBeNull();
+        expect(comp.dateTo()).toBeNull();
+        expect(comp.sortBy()).toBe('created_at');
+        expect(comp.sortOrder()).toBe('desc');
+        expect(apiService.getReviewTasks).toHaveBeenCalledTimes(1);
+        expect(apiService.getReviewTasks).toHaveBeenCalledWith(
+          jasmine.objectContaining({
+            status: 'open',
+            priority: undefined,
+            search: undefined,
+            date_from: undefined,
+            date_to: undefined,
+            sort_by: 'created_at',
+            sort_order: 'desc',
+          }),
+        );
       });
     });
 

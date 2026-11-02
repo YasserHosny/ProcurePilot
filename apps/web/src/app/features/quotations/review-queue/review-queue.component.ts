@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -16,9 +17,9 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSortModule, type Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink, convertToParamMap, type ParamMap } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { Subscription } from 'rxjs';
+import { Subscription, of } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, ReviewTask, ReviewTaskPriority, ReviewTaskStatus } from '../../../core/api/models';
@@ -70,6 +71,7 @@ export class ReviewQueueComponent implements OnInit {
   private readonly translate = inject(TranslateService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly isLoading = signal<boolean>(true);
   readonly isLoadingMore = signal<boolean>(false);
@@ -95,6 +97,8 @@ export class ReviewQueueComponent implements OnInit {
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
   private loadTasksSub: Subscription | null = null;
   private loadMoreSub: Subscription | null = null;
+  private isInitialLoad = true;
+  private queryParamSub: Subscription | null = null;
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
   readonly hasSelection = computed<boolean>(() => this.selectedTaskIds().size > 0);
@@ -139,8 +143,14 @@ export class ReviewQueueComponent implements OnInit {
   );
 
   ngOnInit(): void {
-    this.restoreFiltersFromUrl();
-    this.loadTasks();
+    this.queryParamSub?.unsubscribe();
+    const queryParamMap$ =
+      this.route.queryParamMap ?? of(this.route.snapshot?.queryParamMap ?? convertToParamMap({}));
+    this.queryParamSub = queryParamMap$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        this.handleQueryParamChange(params);
+      });
   }
 
   loadTasks(preserveFailedTasks?: readonly ReviewTask[]): void {
@@ -607,29 +617,94 @@ export class ReviewQueueComponent implements OnInit {
     return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
   }
 
-  private restoreFiltersFromUrl(): void {
-    const params = this.route.snapshot.queryParamMap;
-
+  private parseFiltersFromParams(params: ParamMap): {
+    status: ReviewTaskStatus | 'all';
+    priority: ReviewTaskPriority | 'all';
+    search: string;
+    dateFrom: string | null;
+    dateTo: string | null;
+    sortBy: ReviewTaskSortBy;
+    sortOrder: ReviewTaskSortOrder;
+  } {
     const status = params.get('status');
-    this.statusFilter.set(status && this.isValidStatus(status) ? status : 'open');
-
     const priority = params.get('priority');
-    this.priorityFilter.set(priority && this.isValidPriority(priority) ? priority : 'all');
-
     const search = params.get('search');
-    this.searchQuery.set(search ? search.trim() : '');
-
     const dateFrom = params.get('date_from');
-    this.dateFrom.set(dateFrom && this.isValidDateString(dateFrom) ? dateFrom : null);
-
     const dateTo = params.get('date_to');
-    this.dateTo.set(dateTo && this.isValidDateString(dateTo) ? dateTo : null);
-
     const sort = params.get('sort');
-    this.sortBy.set(sort && this.isSortableColumn(sort) ? sort : 'created_at');
-
     const order = params.get('order');
-    this.sortOrder.set(order === 'asc' || order === 'desc' ? order : 'desc');
+
+    return {
+      status: status && this.isValidStatus(status) ? status : 'open',
+      priority: priority && this.isValidPriority(priority) ? priority : 'all',
+      search: search ? search.trim() : '',
+      dateFrom: dateFrom && this.isValidDateString(dateFrom) ? dateFrom : null,
+      dateTo: dateTo && this.isValidDateString(dateTo) ? dateTo : null,
+      sortBy: sort && this.isSortableColumn(sort) ? sort : 'created_at',
+      sortOrder: order === 'asc' || order === 'desc' ? order : 'desc',
+    };
+  }
+
+  private hasFilterStateChanged(target: {
+    status: ReviewTaskStatus | 'all';
+    priority: ReviewTaskPriority | 'all';
+    search: string;
+    dateFrom: string | null;
+    dateTo: string | null;
+    sortBy: ReviewTaskSortBy;
+    sortOrder: ReviewTaskSortOrder;
+  }): boolean {
+    return (
+      this.statusFilter() !== target.status ||
+      this.priorityFilter() !== target.priority ||
+      this.searchQuery().trim() !== target.search ||
+      this.dateFrom() !== target.dateFrom ||
+      this.dateTo() !== target.dateTo ||
+      this.sortBy() !== target.sortBy ||
+      this.sortOrder() !== target.sortOrder
+    );
+  }
+
+  private applyFilterState(target: {
+    status: ReviewTaskStatus | 'all';
+    priority: ReviewTaskPriority | 'all';
+    search: string;
+    dateFrom: string | null;
+    dateTo: string | null;
+    sortBy: ReviewTaskSortBy;
+    sortOrder: ReviewTaskSortOrder;
+  }): void {
+    this.statusFilter.set(target.status);
+    this.priorityFilter.set(target.priority);
+    this.searchQuery.set(target.search);
+    this.dateFrom.set(target.dateFrom);
+    this.dateTo.set(target.dateTo);
+    this.sortBy.set(target.sortBy);
+    this.sortOrder.set(target.sortOrder);
+  }
+
+  private handleQueryParamChange(params: ParamMap): void {
+    const target = this.parseFiltersFromParams(params);
+    if (this.isInitialLoad) {
+      this.isInitialLoad = false;
+      this.applyFilterState(target);
+      this.loadTasks();
+      return;
+    }
+
+    if (this.hasFilterStateChanged(target)) {
+      if (this.searchDebounce) {
+        clearTimeout(this.searchDebounce);
+        this.searchDebounce = null;
+      }
+      this.applyFilterState(target);
+      this.loadTasks();
+    }
+  }
+
+  private restoreFiltersFromUrl(): void {
+    const params = this.route.snapshot?.queryParamMap ?? convertToParamMap({});
+    this.applyFilterState(this.parseFiltersFromParams(params));
   }
 
   private buildQueryParams(): Record<string, string | null> {
