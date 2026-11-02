@@ -327,6 +327,63 @@ describe('OrderCreateComponent', () => {
     expect(component.form.controls.supplier_id.value).toBe('');
   });
 
+  // P-183: a failed source load used to fall through to a blank manual order with no link.
+  it('does not offer a manual order when the source request cannot be loaded', () => {
+    fixture.destroy();
+    routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-99' });
+    requestsApiService.getRequest.and.returnValue(throwError(() => new Error('Failed')));
+    ordersApiService.getAllocations.and.returnValue(of({ source_request_id: 'req-99', lines: [] }));
+    ordersApiService.getRequestPrefill.and.returnValue(of({ source_request_id: 'req-99', supplier: null }));
+    fixture = TestBed.createComponent(OrderCreateComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.errorMessage()).toBeTruthy();
+    expect(component.lines.length).toBe(0);
+    component.form.patchValue({ order_number: 'PO-X', supplier_id: 's1', order_date: new Date('2026-09-29T12:00:00Z') });
+    component.submit();
+    expect(ordersApiService.createOrder).not.toHaveBeenCalled();
+  });
+
+  // P-183: «Creating from Request: <uuid>» stayed on screen until a supplier was chosen.
+  it('never shows the raw request id in the banner', () => {
+    fixture.destroy();
+    routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-4242' });
+    requestsApiService.getRequest.and.returnValue(of({
+      id: 'req-4242', branch_id: 'b1', requested_by_membership_id: 'm1', required_by_date: '2026-10-01',
+      status: 'approved', lines: [{ id: 'rl-1', workspace_product_id: 'p1', quantity: '3.000000' }],
+      has_incomplete_estimate: false, created_at: '2026-09-29T00:00:00Z',
+    } as unknown as import('../../../core/api/models').PurchaseRequest));
+    ordersApiService.getAllocations.and.returnValue(of({
+      source_request_id: 'req-4242',
+      lines: [{ source_request_line_id: 'rl-1', requested_quantity: '3', allocated_quantity: '0', remaining_quantity: '3' }],
+    }));
+    ordersApiService.getRequestPrefill.and.returnValue(of({ source_request_id: 'req-4242', supplier: null }));
+    fixture = TestBed.createComponent(OrderCreateComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const banner = (fixture.nativeElement as HTMLElement).querySelector('.source-request-banner');
+    expect(banner).toBeTruthy();
+    expect(banner?.textContent).not.toContain('req-4242');
+  });
+
+  // P-183: the header tax is the sum of the line taxes, never a separate number.
+  it('submits a header tax equal to the sum of the line taxes', () => {
+    component.form.patchValue({
+      order_number: 'PO-TAX', supplier_id: 's1', order_date: new Date('2026-09-29T12:00:00Z'), currency: 'USD', order_tax: 99,
+    });
+    component.lines.at(0).patchValue({ description: 'A', quantity: 2, base_unit: 'EA', unit_price: 10, line_tax: 3 });
+    component.addLine();
+    component.lines.at(1).patchValue({ description: 'B', quantity: 1, base_unit: 'EA', unit_price: 5, line_tax: 1.5 });
+    ordersApiService.createOrder.and.returnValue(of({ id: 'order-1' } as import('../orders-api').PurchaseOrder));
+
+    component.submit();
+
+    const payload = ordersApiService.createOrder.calls.mostRecent().args[0];
+    expect(payload.tax.amount).toBe('4.5000');
+  });
+
   it('shows specific i18n error messages on 409 for order_number_exists and idempotency_key_exists', () => {
     component.form.patchValue({
       order_number: 'PO-DUP-1',
@@ -671,7 +728,7 @@ describe('OrderCreateComponent', () => {
     expect(payload.lines[0].description).toBe('Test Item');
     
     expect(payload.total.amount).toBe('22.0000');
-    expect(payload.tax.amount).toBe('5.0000');
+    expect(payload.tax.amount).toBe('2.0000');
     expect(payload.lines[0].line_total.amount).toBe('22.0000');
 
     expect(router.navigate).toHaveBeenCalledWith(['/orders', 'order-123']);

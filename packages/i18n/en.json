@@ -3687,7 +3687,9 @@
       "packUnit": "pack of {{size}} {{unit}}",
       "baseUnitPrice": "per {{unit}}",
       "vatInclusiveHint": "Net of {{rate}}% VAT · quoted {{gross}} incl. VAT",
-      "remainingQuantity": "Still to order"
+      "remainingQuantity": "Still to order",
+      "sourceLoadError": "The approved request could not be loaded, so no order can be created from it. Go back and try again.",
+      "fromApprovedRequestPlain": "From an approved request"
     },
     "status": {
       "draft": "Draft",
@@ -3745,6 +3747,28 @@
       "cancelConfirmMessage": "Are you sure you want to cancel this order? Any received quantity will remain consumed, and any unreceived quantity will be released back to the source request.",
       "cancelOrder": "Yes, Cancel Order",
       "recordOutcome": "Record outcome"
+    },
+    "resultCount": "{{count}} orders",
+    "loadMoreError": "More orders could not be loaded. The orders above are still shown.",
+    "filters": {
+      "search": "Search",
+      "searchPlaceholder": "Order number or supplier",
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "sort": "Sort by",
+      "apply": "Search",
+      "noMatchTitle": "No orders match",
+      "noMatchDescription": "Change the search or the status filter to see more orders."
+    },
+    "sort": {
+      "created_at_desc": "Newest first",
+      "created_at_asc": "Oldest first",
+      "order_date_desc": "Order date, latest",
+      "order_date_asc": "Order date, earliest",
+      "total_desc": "Total, highest",
+      "total_asc": "Total, lowest",
+      "order_number_asc": "Order number, A to Z",
+      "order_number_desc": "Order number, Z to A"
     }
   },
   "accounting": {

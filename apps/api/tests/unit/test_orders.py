@@ -385,6 +385,8 @@ class _FakeCursor:
         self.executed.append((statement, params))
         if statement.startswith("select status from purchase_request"):
             self.last_row = {"status": "ordered"}
+        elif statement.startswith("select id from purchase_order "):
+            self.last_row = None  # no earlier create under this idempotency key
         elif statement.startswith("select status::text as status"):
             self.last_row = {"status": "submitted", "confirmed": False}
         elif "record_audit_event" not in statement:
@@ -878,7 +880,7 @@ def test_update_draft_order_idempotency_and_allocations(monkeypatch: pytest.Monk
         order_number="PO-link",
         supplier_id=UUID(int=6),
         order_date=date(2026, 9, 19),
-        total=Money(amount=Decimal("10"), currency="USD"),
+        total=Money(amount=Decimal("16"), currency="USD"),
         tax=Money(amount=Decimal("0"), currency="USD"),
         source_reference="manual:link",
         source_request_id=req_id,
@@ -890,7 +892,7 @@ def test_update_draft_order_idempotency_and_allocations(monkeypatch: pytest.Monk
                 base_unit="each",
                 unit_price=Money(amount=Decimal("2"), currency="USD"),
                 tax=Money(amount=Decimal("0"), currency="USD"),
-                line_total=Money(amount=Decimal("10"), currency="USD"),
+                line_total=Money(amount=Decimal("16"), currency="USD"),
                 source_request_line_id=line_id,
                 workspace_product_id=product_id,
             ),

@@ -9,6 +9,7 @@ from procurepilot_api.modules.orders.schemas import (
     DeliveryReceipt,
     DeliveryReceiptLine,
     PurchaseOrder,
+    PurchaseOrderCreate,
     PurchaseOrderLine,
     SupplierConfirmation,
     SupplierConfirmationLine,
@@ -36,9 +37,7 @@ def _line(line_id: UUID, number: int, quantity: str, total: str) -> PurchaseOrde
     )
 
 
-def _order(
-    lines: tuple[PurchaseOrderLine, ...] = (), status: str = "submitted"
-) -> PurchaseOrder:
+def _order(lines: tuple[PurchaseOrderLine, ...] = (), status: str = "submitted") -> PurchaseOrder:
     actual_lines = lines or (_line(LINE_ONE, 1, "2", "20"), _line(LINE_TWO, 2, "3", "30"))
     total_amount = sum((line.line_total.amount for line in actual_lines), Decimal("0"))
     return PurchaseOrder(
@@ -76,9 +75,7 @@ def test_valid_two_line_order() -> None:
 def test_invalid_money_currency_pairs(total: dict[str, str], tax: dict[str, str]) -> None:
     with pytest.raises(ValidationError):
         _order()
-        PurchaseOrder(
-            **_order().model_dump(exclude={"total", "tax"}), total=total, tax=tax
-        )
+        PurchaseOrder(**_order().model_dump(exclude={"total", "tax"}), total=total, tax=tax)
 
 
 @pytest.mark.parametrize("quantity", ["-1", "-0.001"])
@@ -332,4 +329,60 @@ def test_boundary_rejects_boolean_coercions() -> None:
         PurchaseOrderLine(
             **_line(LINE_ONE, 1, "2", "20").model_dump(exclude={"ordered_quantity"}),
             ordered_quantity=True,
+        )
+
+
+def _create_payload(**overrides: object) -> dict[str, object]:
+    line: dict[str, object] = {
+        "line_number": 1,
+        "description": "Rice",
+        "ordered_quantity": "3",
+        "base_unit": "each",
+        "unit_price": {"amount": "10.00", "currency": "SAR"},
+        "tax": {"amount": "4.50", "currency": "SAR"},
+        "line_total": {"amount": "34.50", "currency": "SAR"},
+    }
+    payload: dict[str, object] = {
+        "order_number": "PO-1",
+        "supplier_id": str(SUPPLIER),
+        "order_date": "2026-11-02",
+        "source_reference": "manual:PO-1",
+        "total": {"amount": "34.50", "currency": "SAR"},
+        "tax": {"amount": "4.50", "currency": "SAR"},
+        "lines": [line],
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_order_create_accepts_consistent_arithmetic() -> None:
+    assert PurchaseOrderCreate.model_validate(_create_payload()).total.amount == Decimal("34.50")
+
+
+def test_order_create_rejects_a_line_total_that_is_not_quantity_times_price_plus_tax() -> None:
+    # P-183: 10 x 100 + 0 tax cannot be a line total of 1, even when the header agrees.
+    line = {
+        "line_number": 1,
+        "description": "Rice",
+        "ordered_quantity": "10",
+        "base_unit": "each",
+        "unit_price": {"amount": "100.00", "currency": "SAR"},
+        "tax": {"amount": "0.00", "currency": "SAR"},
+        "line_total": {"amount": "1.00", "currency": "SAR"},
+    }
+    with pytest.raises(ValidationError, match="line total"):
+        PurchaseOrderCreate.model_validate(
+            _create_payload(
+                lines=[line],
+                total={"amount": "1.00", "currency": "SAR"},
+                tax={"amount": "0.00", "currency": "SAR"},
+            )
+        )
+
+
+def test_order_create_rejects_a_header_tax_that_differs_from_the_line_taxes() -> None:
+    # P-183: line tax 4.50 with a header tax of 0 is the VAT-inclusive prefill mismatch.
+    with pytest.raises(ValidationError, match="tax"):
+        PurchaseOrderCreate.model_validate(
+            _create_payload(tax={"amount": "0.00", "currency": "SAR"})
         )

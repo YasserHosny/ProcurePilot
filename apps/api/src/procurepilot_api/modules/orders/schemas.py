@@ -246,6 +246,10 @@ class OrderEvidenceProjection(StrictModel):
     lifecycle: LifecycleSummary
 
 
+# Prices carry up to four decimals and quantities six; stored totals are rounded to cents.
+_LINE_ARITHMETIC_TOLERANCE = Decimal("0.01")
+
+
 class PurchaseOrderLineInput(StrictModel):
     line_number: int = Field(gt=0)
     workspace_product_id: UUID | None = None
@@ -293,6 +297,16 @@ class PurchaseOrderCreate(StrictModel):
             raise ValueError("all line totals must use the order currency")
         if sum((line.line_total.amount for line in self.lines), Decimal("0")) != self.total.amount:
             raise ValueError("order total must equal the sum of line totals")
+        for line in self.lines:
+            expected = line.ordered_quantity * line.unit_price.amount + line.tax.amount
+            if abs(expected - line.line_total.amount) > _LINE_ARITHMETIC_TOLERANCE:
+                raise ValueError(
+                    f"line total of line {line.line_number} must equal quantity x unit price + tax"
+                )
+        if abs(sum((line.tax.amount for line in self.lines), Decimal("0")) - self.tax.amount) > (
+            _LINE_ARITHMETIC_TOLERANCE
+        ):
+            raise ValueError("order tax must equal the sum of line taxes")
         line_numbers = [line.line_number for line in self.lines]
         if len(set(line_numbers)) != len(line_numbers):
             raise ValueError("order line numbers must be unique")
@@ -346,6 +360,7 @@ class DeliveryReceiptCreate(StrictModel):
 class PurchaseOrderList(StrictModel):
     items: tuple[PurchaseOrder, ...]
     next_cursor: str | None = None
+    total_count: int = 0
 
 
 class RequestLineAllocation(StrictModel):

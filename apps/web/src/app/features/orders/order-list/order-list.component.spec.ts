@@ -40,7 +40,7 @@ describe('OrderListComponent', () => {
       orders: {
         title: 'Order Tracking', subtitle: 'Orders', refresh: 'Refresh', retry: 'Retry', loadMore: 'Load more',
         loadError: 'Load failed', open: 'Open', orderDate: 'Ordered {{date}}', createdDate: 'Created {{date}}', lineCount: '{{count}} line(s)',
-        createButton: 'Create Order', fromApprovedRequest: 'From approved request',
+        createButton: 'Create Order', fromApprovedRequest: 'From approved request', resultCount: '{{count}} orders',
         fromApprovedRequestEmpty: 'No approved requests available.',
         status: { submitted: 'Submitted', draft: 'Draft' }, empty: { title: 'Empty', description: 'No orders' },
       },
@@ -272,5 +272,100 @@ describe('OrderListComponent', () => {
     expect(cards[0]?.querySelector('.order-date')?.textContent).toContain('Created');
     expect(cards[0]?.querySelector('.order-date')?.textContent).not.toContain('Ordered');
     expect(cards[1]?.querySelector('.order-date')?.textContent).toContain('Ordered');
+  });
+  const orderRow = (id: string, number: string) => ({
+    id, tenant_id: 'tenant-1', order_number: number, supplier_id: 'supplier-1', supplier_name: 'Acme',
+    status: 'submitted', order_date: '2026-09-20', expected_delivery_date: null,
+    total: { amount: '120.00', currency: 'GBP' }, tax: { amount: '0.00', currency: 'GBP' },
+    source_kind: 'manual', source_reference: number, source_hash: null, created_by: 'member-1',
+    created_at: '2026-09-20T10:00:00Z', updated_at: '2026-09-20T10:00:00Z', lines: [],
+  });
+  const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+
+  // P-182: search, status, sort and a result count; the server does the work.
+  it('searches, filters and sorts through the API and shows the result count', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: null, total_count: 14 });
+    fixture.detectChanges();
+    expect(el().querySelector('[data-testid="orders-result-count"]')?.textContent).toContain('14');
+
+    const search = el().querySelector('[data-testid="orders-search"]') as HTMLInputElement;
+    search.value = 'alpha';
+    search.dispatchEvent(new Event('input'));
+    (el().querySelector('[data-testid="orders-search-form"]') as HTMLFormElement)
+      .dispatchEvent(new Event('submit'));
+    http.expectOne('/api/v1/orders?limit=50&q=alpha').flush({ items: [], next_cursor: null, total_count: 0 });
+    fixture.detectChanges();
+
+    const status = el().querySelector('[data-testid="orders-status-filter"]') as HTMLSelectElement;
+    status.value = 'submitted';
+    status.dispatchEvent(new Event('change'));
+    http.expectOne('/api/v1/orders?limit=50&q=alpha&status=submitted')
+      .flush({ items: [], next_cursor: null, total_count: 0 });
+    fixture.detectChanges();
+
+    const sort = el().querySelector('[data-testid="orders-sort"]') as HTMLSelectElement;
+    sort.value = 'total:asc';
+    sort.dispatchEvent(new Event('change'));
+    http.expectOne('/api/v1/orders?limit=50&q=alpha&status=submitted&sort=total&dir=asc')
+      .flush({ items: [], next_cursor: null, total_count: 0 });
+  });
+
+  it('says when filters match nothing instead of showing the empty-workspace message', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: null, total_count: 1 });
+    fixture.detectChanges();
+    const status = el().querySelector('[data-testid="orders-status-filter"]') as HTMLSelectElement;
+    status.value = 'cancelled';
+    status.dispatchEvent(new Event('change'));
+    http.expectOne('/api/v1/orders?limit=50&status=cancelled').flush({ items: [], next_cursor: null, total_count: 0 });
+    fixture.detectChanges();
+    expect(el().querySelector('[data-testid="orders-no-match"]')).toBeTruthy();
+  });
+
+  // P-182: a failed «Load more» used to replace the rows already loaded with an error card.
+  it('keeps the loaded orders and offers a retry when Load more fails', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: '50', total_count: 80 });
+    fixture.detectChanges();
+
+    component.loadMore();
+    http.expectOne('/api/v1/orders?limit=50&cursor=50').flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+
+    expect(el().querySelector('[data-testid="orders-list"]')?.textContent).toContain('PO-1');
+    expect(el().querySelector('[data-testid="load-more-error"]')).toBeTruthy();
+  });
+
+  // P-182: an order created between two page loads shifts the offset and repeats a row.
+  it('does not list an order twice when the next page repeats it', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1'), orderRow('o2', 'PO-2')], next_cursor: '2', total_count: 3 });
+    component.loadMore();
+    http.expectOne('/api/v1/orders?limit=50&cursor=2').flush({ items: [orderRow('o2', 'PO-2'), orderRow('o3', 'PO-3')], next_cursor: null, total_count: 3 });
+    fixture.detectChanges();
+    expect(component.orders().map((o) => o.id)).toEqual(['o1', 'o2', 'o3']);
+  });
+
+  // P-182: the approved-request menu named requests only by date and total.
+  it('names the supplier and line count of each approved request in the picker', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [], next_cursor: null, total_count: 0 });
+    (el().querySelector('[data-testid="order-from-approved-request-btn"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    http.expectOne('/api/v1/requests?limit=100&eligible_for_order=true').flush({
+      next_cursor: null,
+      items: [{
+        id: 'req-1', branch_id: 'b1', requested_by_membership_id: 'm1', required_by_date: '2026-11-05',
+        status: 'ordered', source: { supplier_name: 'Al Dhahabi' },
+        approval_step: { id: 's', assigned_membership_id: 'm1', source: 'owner_fallback', status: 'approved', decided_by_membership_id: 'm1', decided_at: '2026-10-01T00:00:00Z' },
+        lines: [{ id: 'l1' }, { id: 'l2' }], estimated_total: { amount: '200', currency: 'SAR' },
+        has_incomplete_estimate: false, created_at: '2026-10-01T00:00:00Z',
+      }],
+    });
+    fixture.detectChanges();
+    const option = document.querySelector('[data-testid="approved-request-option-req-1"]');
+    expect(option?.textContent).toContain('Al Dhahabi');
+    expect(option?.textContent).toContain('2');
   });
 });

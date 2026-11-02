@@ -3687,7 +3687,9 @@
       "packUnit": "عبوة {{size}} {{unit}}",
       "baseUnitPrice": "لكل {{unit}}",
       "vatInclusiveHint": "صافي بعد خصم ضريبة القيمة المضافة {{rate}}% · سعر العرض {{gross}} شامل الضريبة",
-      "remainingQuantity": "المتبقي للطلب"
+      "remainingQuantity": "المتبقي للطلب",
+      "sourceLoadError": "تعذّر تحميل الطلب المعتمد، لذلك لا يمكن إنشاء أمر شراء منه. ارجع وحاول مرة أخرى.",
+      "fromApprovedRequestPlain": "من طلب معتمد"
     },
     "status": {
       "draft": "مسودة",
@@ -3745,6 +3747,28 @@
       "cancelConfirmMessage": "هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟ ستبقى أي كمية مستلمة مستهلكة، وسيتم إعادة أي كمية غير مستلمة إلى طلب المصدر.",
       "cancelOrder": "نعم، إلغاء الطلب",
       "recordOutcome": "تسجيل النتيجة"
+    },
+    "resultCount": "{{count}} أمر شراء",
+    "loadMoreError": "تعذّر تحميل المزيد من الأوامر. الأوامر الظاهرة أعلاه ما زالت معروضة.",
+    "filters": {
+      "search": "بحث",
+      "searchPlaceholder": "رقم الأمر أو المورّد",
+      "status": "الحالة",
+      "allStatuses": "كل الحالات",
+      "sort": "ترتيب حسب",
+      "apply": "بحث",
+      "noMatchTitle": "لا توجد أوامر مطابقة",
+      "noMatchDescription": "غيّر البحث أو فلتر الحالة لعرض المزيد من الأوامر."
+    },
+    "sort": {
+      "created_at_desc": "الأحدث أولاً",
+      "created_at_asc": "الأقدم أولاً",
+      "order_date_desc": "تاريخ الأمر، الأحدث",
+      "order_date_asc": "تاريخ الأمر، الأقدم",
+      "total_desc": "الإجمالي، الأعلى",
+      "total_asc": "الإجمالي، الأدنى",
+      "order_number_asc": "رقم الأمر، تصاعدي",
+      "order_number_desc": "رقم الأمر، تنازلي"
     }
   },
   "accounting": {
