@@ -14,7 +14,7 @@ import { ApiService } from '../../../core/api/api.service';
 import { ActivatedRoute, Router, UrlTree } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
@@ -1688,6 +1688,212 @@ describe('CompareComponent (RFQ)', () => {
         { duration: 5000 },
       );
       expect(component.loadData).toHaveBeenCalledWith('rfq-1');
+    });
+  });
+
+  describe('PPS-175: RFQ Compare Prepare Eligibility and Error Handling', () => {
+    it('empty-lines reply is not eligible and shows "still being read" reason', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const emptyLinesReply: RfqResponseComparison = {
+        ...dummyResponses.items[0],
+        id: 'resp-empty',
+        quotation_status: 'reviewed',
+        lines: [],
+      };
+
+      expect(component.isEligible(emptyLinesReply)).toBeFalse();
+      expect(component.ineligibilityReason(emptyLinesReply)).toBe('rfq.compare.stillBeingRead');
+
+      component.responses.set([emptyLinesReply]);
+      component.selectedBranchId.set('branch-1');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const card = compiled.querySelector('.response-card');
+      const prepareBtn = card?.querySelector<HTMLButtonElement>('.prepare-buttons-row button');
+      expect(prepareBtn?.disabled).toBeTrue();
+      expect(card?.querySelector('.prepare-actions')?.textContent).toContain(
+        enCatalog.rfq.compare.stillBeingRead,
+      );
+    });
+
+    it('unreviewed reply is not eligible and shows awaiting review reason', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const unreviewedReply: RfqResponseComparison = {
+        ...dummyResponses.items[0],
+        id: 'resp-unreviewed',
+        quotation_status: 'extracted',
+      };
+
+      expect(component.isEligible(unreviewedReply)).toBeFalse();
+      expect(component.ineligibilityReason(unreviewedReply)).toBe('rfq.compare.awaitingReview');
+
+      component.responses.set([unreviewedReply]);
+      component.selectedBranchId.set('branch-1');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const card = compiled.querySelector('.response-card');
+      const prepareBtn = card?.querySelector<HTMLButtonElement>('.prepare-buttons-row button');
+      expect(prepareBtn?.disabled).toBeTrue();
+      expect(card?.querySelector('.prepare-actions')?.textContent).toContain(
+        enCatalog.rfq.compare.awaitingReview,
+      );
+    });
+
+    it('mixed-currency reply shows notice, no single total, and button is disabled', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const mixedReply: RfqResponseComparison = {
+        ...dummyResponses.items[0],
+        id: 'resp-mixed',
+        quotation_status: 'reviewed',
+        lines: [
+          {
+            workspace_product_id: 'prod-1',
+            original_text: 'Item 1 USD',
+            quoted_quantity: '2',
+            quoted_unit_price_amount: '10.00',
+            quoted_unit_price_currency: 'USD',
+            pending_match: false,
+          },
+          {
+            workspace_product_id: 'prod-2',
+            original_text: 'Item 2 EUR',
+            quoted_quantity: '1',
+            quoted_unit_price_amount: '20.00',
+            quoted_unit_price_currency: 'EUR',
+            pending_match: false,
+          },
+        ],
+      };
+
+      expect(component.hasMixedCurrencies(mixedReply)).toBeTrue();
+      expect(component.canPrepare(mixedReply)).toBeFalse();
+      expect(component.responseTotal(mixedReply)).toBeNull();
+
+      component.responses.set([mixedReply]);
+      component.selectedBranchId.set('branch-1');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const card = compiled.querySelector('.response-card');
+      const prepareBtn = card?.querySelector<HTMLButtonElement>('.prepare-buttons-row button');
+      expect(prepareBtn?.disabled).toBeTrue();
+
+      const expectedNotice = enCatalog.rfq.compare.mixedCurrenciesNotice;
+      expect(card?.textContent).toContain(expectedNotice);
+
+      const totalCell = card?.querySelector('.total-value-cell');
+      expect(totalCell?.textContent).not.toContain('40');
+      expect(totalCell?.textContent).not.toContain('USD');
+      expect(totalCell?.textContent).not.toContain('EUR');
+    });
+
+    it('each mapped API reason shows its translated message', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const testReasons: { reason: string; fallbackText: string }[] = [
+        { reason: 'mixed_currencies', fallbackText: enCatalog.rfq.compare.prepareErrorMixedCurrencies },
+        { reason: 'no_quotation_lines', fallbackText: enCatalog.rfq.compare.prepareErrorNoQuotationLines },
+        { reason: 'pending_matches', fallbackText: enCatalog.rfq.compare.prepareErrorPendingMatches },
+        { reason: 'no_matched_lines', fallbackText: enCatalog.rfq.compare.prepareErrorNoMatchedLines },
+        { reason: 'no_pricing_for_rfq_products', fallbackText: enCatalog.rfq.compare.prepareErrorNoPricingForRfqProducts },
+        { reason: 'quotation_archived', fallbackText: enCatalog.rfq.compare.prepareErrorQuotationArchived },
+        { reason: 'quotation_refused', fallbackText: enCatalog.rfq.compare.prepareErrorQuotationRefused },
+      ];
+
+      component.rfqDetail.set(sentDetail);
+      component.selectedBranchId.set('branch-1');
+
+      for (const { reason, fallbackText } of testReasons) {
+        mockSnackBar.open.calls.reset();
+        mockRfqApi.prepareRequest.and.returnValue(
+          throwError(
+            () =>
+              new HttpErrorResponse({
+                status: 422,
+                error: {
+                  message: 'Backend raw message should never be printed',
+                  details: { reason },
+                },
+              }),
+          ),
+        );
+
+        component.prepareRequest(dummyResponses.items[0]);
+
+        expect(mockSnackBar.open).toHaveBeenCalledWith(
+          fallbackText,
+          enCatalog.rfq.history.dismiss,
+          { duration: 5000 },
+        );
+      }
+    });
+
+    it('double click on an eligible reply calls rfqApi.prepareRequest exactly once', () => {
+      component.rfqDetail.set(sentDetail);
+      component.selectedBranchId.set('branch-1');
+
+      const pendingSubject = new Subject<PrepareRequestResponse>();
+      mockRfqApi.prepareRequest.and.returnValue(pendingSubject.asObservable());
+
+      // First click
+      component.prepareRequest(dummyResponses.items[0]);
+      // Second click while in-flight
+      component.prepareRequest(dummyResponses.items[0]);
+
+      expect(mockRfqApi.prepareRequest).toHaveBeenCalledTimes(1);
+
+      // Verify preparing state clears on completion
+      pendingSubject.next({ purchase_request_id: 'pr-1' } as PrepareRequestResponse);
+      pendingSubject.complete();
+      expect(component.preparing()).toBeNull();
+    });
+
+    it('an unknown error shows the generic message, not err.error.message', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      component.rfqDetail.set(sentDetail);
+      component.selectedBranchId.set('branch-1');
+
+      mockRfqApi.prepareRequest.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 500,
+              error: {
+                message: 'Fatal Postgres connection error',
+                details: { reason: 'unknown_database_failure' },
+              },
+            }),
+        ),
+      );
+
+      component.prepareRequest(dummyResponses.items[0]);
+
+      expect(mockSnackBar.open).toHaveBeenCalledWith(
+        enCatalog.rfq.compare.prepareError,
+        enCatalog.rfq.history.dismiss,
+        { duration: 5000 },
+      );
+      expect(mockSnackBar.open).not.toHaveBeenCalledWith(
+        jasmine.stringMatching(/Fatal Postgres connection error/),
+        jasmine.any(String),
+        jasmine.any(Object),
+      );
     });
   });
 });

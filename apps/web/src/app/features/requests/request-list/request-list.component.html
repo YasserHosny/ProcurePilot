@@ -60,6 +60,7 @@
     } @else {
       <div class="table-responsive">
         <table mat-table [dataSource]="requests()" class="requests-table">
+          <caption class="visually-hidden">{{ 'requests.table.caption' | translate }}</caption>
           <ng-container matColumnDef="requiredByDate">
             <th mat-header-cell *matHeaderCellDef>
               {{ 'requests.columns.requiredByDate' | translate }}
@@ -128,7 +129,7 @@
                 <button
                   mat-icon-button
                   type="button"
-                  (click)="navigateToDetail(req)"
+                  (click)="navigateToDetail(req); $event.stopPropagation()"
                   [attr.aria-label]="'requests.actions.view' | translate"
                   [matTooltip]="'requests.actions.view' | translate"
                 >
@@ -153,7 +154,7 @@
                   <button
                     mat-icon-button
                     type="button"
-                    (click)="withdrawRequest(req)"
+                    (click)="withdrawRequest(req); $event.stopPropagation()"
                     class="danger-action"
                     [attr.aria-label]="'requests.actions.withdraw' | translate"
                     [matTooltip]="'requests.actions.withdraw' | translate"
@@ -170,6 +171,8 @@
             mat-row
             *matRowDef="let row; columns: displayedColumns"
             (click)="navigateToDetail(row)"
+            (keydown.enter)="onRowKey($event, row)"
+            tabindex="0"
             class="clickable-row"
           ></tr>
         </table>

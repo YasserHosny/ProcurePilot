@@ -5,6 +5,7 @@ import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } fr
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -40,6 +41,7 @@ import {
   type RequestAllocation,
   type RequestAllocationOrder,
 } from '../../orders/orders-api';
+import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 const I18N = 'requests';
@@ -65,6 +67,7 @@ interface LineFormGroup {
     MatIconModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
+    MatDialogModule,
     TranslatePipe,
     FormatDatePipe,
     RouterLink,
@@ -83,6 +86,7 @@ export class RequestFormComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
   private readonly translate = inject(TranslateService);
   private readonly ordersApi = inject(OrdersApiService);
 
@@ -358,6 +362,38 @@ export class RequestFormComponent implements OnInit {
     if (!req) {
       return;
     }
+    const isGroup = !!req.request_group;
+    const size = req.request_group?.size ?? 1;
+
+    const titleKey = isGroup ? `${I18N}.split.withdrawConfirmTitle` : `${I18N}.withdrawConfirmTitle`;
+    const messageKey = isGroup
+      ? size === 2
+        ? `${I18N}.split.withdrawConfirmMessageBoth`
+        : `${I18N}.split.withdrawConfirmMessageAll`
+      : `${I18N}.withdrawConfirmMessage`;
+    const confirmKey = isGroup
+      ? size === 2
+        ? `${I18N}.split.withdrawBoth`
+        : `${I18N}.split.withdrawAll`
+      : `${I18N}.actions.withdraw`;
+
+    this.dialog.open(CatalogueConfirmDialogComponent, {
+      data: {
+        titleKey,
+        messageKey,
+        messageParams: isGroup ? { count: size } : undefined,
+        confirmKey,
+        confirmParams: isGroup ? { count: size } : undefined,
+        isDestructive: true,
+      },
+    }).afterClosed().subscribe((confirmed: boolean) => {
+      if (confirmed) {
+        this.performWithdrawal(req);
+      }
+    });
+  }
+
+  private performWithdrawal(req: PurchaseRequest): void {
     const isGroup = !!req.request_group;
 
     if (!this.withdrawIdempotencyKey) {
