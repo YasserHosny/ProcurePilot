@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CompareComponent } from './compare.component';
-import { formatExactQuantity, formatLocaleNumber } from '../../../core/format/format.service';
+import { formatExactQuantity, formatLocaleNumber, FormatService } from '../../../core/format/format.service';
 import {
   RfqApi,
   RfqDetail,
@@ -352,6 +352,38 @@ describe('CompareComponent (RFQ)', () => {
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-compare-send-button"]')).toBeNull();
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-compare-edit-button"]')).toBeNull();
+  });
+
+  it('opens send confirmation dialog with count and formatted needed-by date in messageParams', async () => {
+    mockDialog.open.and.returnValue({
+      afterClosed: () => of(false),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+    mockRfqApi.getRfq.and.returnValue(of(draftDetail));
+    component.loadData('rfq-1');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const sendBtn = compiled.querySelector<HTMLButtonElement>(
+      '[data-testid="rfq-compare-send-button"]',
+    );
+    sendBtn?.click();
+
+    const formatService = TestBed.inject(FormatService);
+    const expectedDate = formatService.formatDate(draftDetail.rfq.needed_by_date);
+
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      CatalogueConfirmDialogComponent,
+      jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          messageParams: jasmine.objectContaining({
+            count: draftDetail.recipients.length,
+            date: expectedDate,
+          }),
+        }),
+      }),
+    );
   });
 
   it('should disable prepare action for responses with pending match lines', () => {

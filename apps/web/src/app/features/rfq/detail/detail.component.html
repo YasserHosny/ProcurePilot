@@ -140,6 +140,29 @@
             </mat-card>
           }
 
+          @if (showRetryNotice()) {
+            <mat-card class="draft-notice-card retry-notice-card" data-testid="rfq-detail-retry-notice">
+              <div class="draft-notice-content">
+                <div class="draft-notice-text">
+                  <h2>{{ unsentRecipientsTitle() }}</h2>
+                  <p>{{ 'rfq.detail.unsentRecipientsHelp' | translate }}</p>
+                </div>
+                <div class="draft-notice-actions">
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    [disabled]="retrying()"
+                    (click)="onRetryUnsent()"
+                    data-testid="rfq-detail-retry-button"
+                  >
+                    {{ 'rfq.detail.retryUnsentRecipients' | translate }}
+                  </button>
+                </div>
+              </div>
+            </mat-card>
+          }
+
           <mat-card class="details-card">
             <dl class="details-grid">
               <div class="detail-field">
