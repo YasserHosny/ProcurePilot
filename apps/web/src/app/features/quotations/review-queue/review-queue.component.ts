@@ -16,7 +16,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSortModule, type Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
 
@@ -68,6 +68,8 @@ export class ReviewQueueComponent implements OnInit {
   private readonly session = inject(SessionService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly isLoading = signal<boolean>(true);
   readonly isLoadingMore = signal<boolean>(false);
@@ -107,6 +109,7 @@ export class ReviewQueueComponent implements OnInit {
       this.dateFrom() !== null ||
       this.dateTo() !== null,
   );
+  readonly resultCountLabel = computed<string>(() => this.resultCountText());
 
   readonly displayedColumns = computed<readonly string[]>(() =>
     this.isWriter()
@@ -136,6 +139,7 @@ export class ReviewQueueComponent implements OnInit {
   );
 
   ngOnInit(): void {
+    this.restoreFiltersFromUrl();
     this.loadTasks();
   }
 
@@ -253,16 +257,19 @@ export class ReviewQueueComponent implements OnInit {
 
   onStatusChange(status: ReviewTaskStatus | 'all'): void {
     this.statusFilter.set(status);
+    this.updateQueryParams();
     this.loadTasks();
   }
 
   onPriorityChange(priority: ReviewTaskPriority | 'all'): void {
     this.priorityFilter.set(priority);
+    this.updateQueryParams();
     this.loadTasks();
   }
 
   onSearchChange(value: string): void {
     this.searchQuery.set(value);
+    this.updateQueryParams();
     if (this.searchDebounce) {
       clearTimeout(this.searchDebounce);
     }
@@ -275,6 +282,7 @@ export class ReviewQueueComponent implements OnInit {
     const next = toIsoDateOrNull(value);
     if (this.dateFrom() !== next) {
       this.dateFrom.set(next);
+      this.updateQueryParams();
       this.loadTasks();
     }
   }
@@ -283,6 +291,7 @@ export class ReviewQueueComponent implements OnInit {
     const next = toIsoDateOrNull(value);
     if (this.dateTo() !== next) {
       this.dateTo.set(next);
+      this.updateQueryParams();
       this.loadTasks();
     }
   }
@@ -292,16 +301,80 @@ export class ReviewQueueComponent implements OnInit {
       this.sortBy.set(sort.active);
     }
     this.sortOrder.set(sort.direction === 'asc' ? 'asc' : 'desc');
+    this.updateQueryParams();
     this.loadTasks();
   }
 
   clearFilters(): void {
+    if (this.searchDebounce) {
+      clearTimeout(this.searchDebounce);
+      this.searchDebounce = null;
+    }
     this.statusFilter.set('open');
     this.priorityFilter.set('all');
     this.searchQuery.set('');
     this.dateFrom.set(null);
     this.dateTo.set(null);
+    this.updateQueryParams();
     this.loadTasks();
+  }
+
+  removeStatusFilter(): void {
+    this.statusFilter.set('open');
+    this.updateQueryParams();
+    this.loadTasks();
+  }
+
+  removePriorityFilter(): void {
+    this.priorityFilter.set('all');
+    this.updateQueryParams();
+    this.loadTasks();
+  }
+
+  removeSearchFilter(): void {
+    if (this.searchDebounce) {
+      clearTimeout(this.searchDebounce);
+      this.searchDebounce = null;
+    }
+    this.searchQuery.set('');
+    this.updateQueryParams();
+    this.loadTasks();
+  }
+
+  removeDateRangeFilter(): void {
+    this.dateFrom.set(null);
+    this.dateTo.set(null);
+    this.updateQueryParams();
+    this.loadTasks();
+  }
+
+  removeFilter(filter: 'status' | 'priority' | 'search' | 'date_range' | 'date'): void {
+    switch (filter) {
+      case 'status':
+        this.removeStatusFilter();
+        break;
+      case 'priority':
+        this.removePriorityFilter();
+        break;
+      case 'search':
+        this.removeSearchFilter();
+        break;
+      case 'date_range':
+      case 'date':
+        this.removeDateRangeFilter();
+        break;
+    }
+  }
+
+  resultCountText(): string {
+    const count = this.tasks().length;
+    if (this.nextCursor()) {
+      return this.translate.instant('quotations.queue.resultsCount.more', { count });
+    }
+    if (count === 1) {
+      return this.translate.instant('quotations.queue.resultsCount.one', { count });
+    }
+    return this.translate.instant('quotations.queue.resultsCount.other', { count });
   }
 
   archiveTask(task: ReviewTask, event: MouseEvent): void {
@@ -517,6 +590,74 @@ export class ReviewQueueComponent implements OnInit {
 
   private isSortableColumn(value: string): value is ReviewTaskSortBy {
     return ['created_at', 'stated_total', 'priority', 'status'].includes(value);
+  }
+
+  private isValidStatus(val: string): val is ReviewTaskStatus | 'all' {
+    return ['open', 'in_progress', 'resolved', 'all'].includes(val);
+  }
+
+  private isValidPriority(val: string): val is ReviewTaskPriority | 'all' {
+    return ['all', 'high', 'normal', 'low'].includes(val);
+  }
+
+  private isValidDateString(val: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) return false;
+    const [y, m, d] = val.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+  }
+
+  private restoreFiltersFromUrl(): void {
+    const params = this.route.snapshot.queryParamMap;
+
+    const status = params.get('status');
+    this.statusFilter.set(status && this.isValidStatus(status) ? status : 'open');
+
+    const priority = params.get('priority');
+    this.priorityFilter.set(priority && this.isValidPriority(priority) ? priority : 'all');
+
+    const search = params.get('search');
+    this.searchQuery.set(search ? search.trim() : '');
+
+    const dateFrom = params.get('date_from');
+    this.dateFrom.set(dateFrom && this.isValidDateString(dateFrom) ? dateFrom : null);
+
+    const dateTo = params.get('date_to');
+    this.dateTo.set(dateTo && this.isValidDateString(dateTo) ? dateTo : null);
+
+    const sort = params.get('sort');
+    this.sortBy.set(sort && this.isSortableColumn(sort) ? sort : 'created_at');
+
+    const order = params.get('order');
+    this.sortOrder.set(order === 'asc' || order === 'desc' ? order : 'desc');
+  }
+
+  private buildQueryParams(): Record<string, string | null> {
+    const status = this.statusFilter();
+    const priority = this.priorityFilter();
+    const search = this.searchQuery().trim();
+    const dateFrom = this.dateFrom();
+    const dateTo = this.dateTo();
+    const sort = this.sortBy();
+    const order = this.sortOrder();
+
+    return {
+      status: status !== 'open' ? status : null,
+      priority: priority !== 'all' ? priority : null,
+      search: search.length > 0 ? search : null,
+      date_from: dateFrom ? dateFrom : null,
+      date_to: dateTo ? dateTo : null,
+      sort: sort !== 'created_at' ? sort : null,
+      order: order !== 'desc' ? order : null,
+    };
+  }
+
+  private updateQueryParams(): void {
+    void this.router.navigate([], {
+      queryParams: this.buildQueryParams(),
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   private finishBulkAction(

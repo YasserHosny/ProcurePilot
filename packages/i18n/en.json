@@ -935,7 +935,25 @@
       "emptyTitle": "No Review Tasks Found",
       "emptyMessage": "There are no quotation review tasks matching your current filters.",
       "noFilterResults": "No results match your filters",
-      "clearFilters": "Clear filters"
+      "clearFilters": "Clear filters",
+      "activeFiltersLabel": "Active filters",
+      "filterChips": {
+        "status": "Status: {{value}}",
+        "priority": "Priority: {{value}}",
+        "search": "Search: {{query}}",
+        "dateRange": "Date: {{from}} – {{to}}",
+        "dateFrom": "From: {{from}}",
+        "dateTo": "To: {{to}}",
+        "removeStatus": "Remove status filter",
+        "removePriority": "Remove priority filter",
+        "removeSearch": "Remove search filter",
+        "removeDateRange": "Remove date range filter"
+      },
+      "resultsCount": {
+        "one": "{{count}} result",
+        "other": "{{count}} results",
+        "more": "{{count}}+ results"
+      }
     },
     "review": {
       "loadError": {

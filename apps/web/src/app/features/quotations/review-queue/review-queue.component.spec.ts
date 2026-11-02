@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, type WritableSignal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { provideRouter } from '@angular/router';
+import { Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Subject, of, throwError } from 'rxjs';
 
@@ -651,6 +651,392 @@ describe('ReviewQueueComponent (T052)', () => {
 
       expect(component.selectedTaskIds().size).toBe(0);
       expect(component.tasks()).toEqual(refreshedTasks);
+    });
+  });
+
+  describe('URL query parameter synchronization & filters (PPS-163 / P-131)', () => {
+    let router: Router;
+
+    beforeEach(() => {
+      router = TestBed.inject(Router);
+      spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+    });
+
+    describe('URL restore on init', () => {
+      it('restores filters, search, sort, and date range from query params on load', async () => {
+        const queryParams = {
+          status: 'resolved',
+          priority: 'high',
+          search: 'Acme',
+          date_from: '2026-08-01',
+          date_to: '2026-08-31',
+          sort: 'stated_total',
+          order: 'asc',
+        };
+        const mockActivatedRoute = {
+          snapshot: {
+            queryParamMap: convertToParamMap(queryParams),
+          },
+        };
+
+        const initFixture = TestBed.createComponent(ReviewQueueComponent);
+        // Replace injected route before ngOnInit
+        (initFixture.componentInstance as unknown as { route: typeof mockActivatedRoute }).route = mockActivatedRoute;
+        apiService.getReviewTasks.calls.reset();
+        initFixture.componentInstance.ngOnInit();
+        initFixture.detectChanges();
+
+        const comp = initFixture.componentInstance;
+        expect(comp.statusFilter()).toBe('resolved');
+        expect(comp.priorityFilter()).toBe('high');
+        expect(comp.searchQuery()).toBe('Acme');
+        expect(comp.dateFrom()).toBe('2026-08-01');
+        expect(comp.dateTo()).toBe('2026-08-31');
+        expect(comp.sortBy()).toBe('stated_total');
+        expect(comp.sortOrder()).toBe('asc');
+
+        const expectedDateFrom = new Date(2026, 7, 1, 0, 0, 0, 0).toISOString();
+        const expectedDateTo = new Date(2026, 7, 31, 23, 59, 59, 999).toISOString();
+        expect(apiService.getReviewTasks).toHaveBeenCalledWith({
+          status: 'resolved',
+          priority: 'high',
+          search: 'Acme',
+          date_from: expectedDateFrom,
+          date_to: expectedDateTo,
+          sort_by: 'stated_total',
+          sort_order: 'asc',
+        });
+      });
+
+      it('falls back to defaults when query params contain invalid values', () => {
+        const invalidParams = {
+          status: 'unknown_status',
+          priority: 'urgent',
+          search: '   ',
+          date_from: 'invalid-date',
+          date_to: '2026-13-45',
+          sort: 'unsupported_column',
+          order: 'sideways',
+        };
+        const mockActivatedRoute = {
+          snapshot: {
+            queryParamMap: convertToParamMap(invalidParams),
+          },
+        };
+
+        const initFixture = TestBed.createComponent(ReviewQueueComponent);
+        (initFixture.componentInstance as unknown as { route: typeof mockActivatedRoute }).route = mockActivatedRoute;
+        apiService.getReviewTasks.calls.reset();
+        initFixture.componentInstance.ngOnInit();
+        initFixture.detectChanges();
+
+        const comp = initFixture.componentInstance;
+        expect(comp.statusFilter()).toBe('open');
+        expect(comp.priorityFilter()).toBe('all');
+        expect(comp.searchQuery()).toBe('');
+        expect(comp.dateFrom()).toBeNull();
+        expect(comp.dateTo()).toBeNull();
+        expect(comp.sortBy()).toBe('created_at');
+        expect(comp.sortOrder()).toBe('desc');
+
+        expect(apiService.getReviewTasks).toHaveBeenCalledWith({
+          status: 'open',
+          priority: undefined,
+          search: undefined,
+          date_from: undefined,
+          date_to: undefined,
+          sort_by: 'created_at',
+          sort_order: 'desc',
+        });
+      });
+    });
+
+    describe('URL update on change', () => {
+      it('navigates with queryParams, queryParamsHandling: merge, and replaceUrl: true on status change', () => {
+        component.onStatusChange('resolved');
+
+        expect(router.navigate).toHaveBeenCalledWith([], {
+          queryParams: {
+            status: 'resolved',
+            priority: null,
+            search: null,
+            date_from: null,
+            date_to: null,
+            sort: null,
+            order: null,
+          },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+
+        // Changing back to default 'open' omits status from URL (sets to null)
+        (router.navigate as jasmine.Spy).calls.reset();
+        component.onStatusChange('open');
+
+        expect(router.navigate).toHaveBeenCalledWith([], {
+          queryParams: {
+            status: null,
+            priority: null,
+            search: null,
+            date_from: null,
+            date_to: null,
+            sort: null,
+            order: null,
+          },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      });
+
+      it('navigates with updated queryParams on priority change', () => {
+        component.onPriorityChange('high');
+
+        expect(router.navigate).toHaveBeenCalledWith([], {
+          queryParams: {
+            status: null,
+            priority: 'high',
+            search: null,
+            date_from: null,
+            date_to: null,
+            sort: null,
+            order: null,
+          },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      });
+
+      it('navigates with updated queryParams on search change', () => {
+        component.onSearchChange('Supplier A');
+
+        expect(router.navigate).toHaveBeenCalledWith([], {
+          queryParams: {
+            status: null,
+            priority: null,
+            search: 'Supplier A',
+            date_from: null,
+            date_to: null,
+            sort: null,
+            order: null,
+          },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      });
+
+      it('navigates with updated queryParams on date range change', () => {
+        component.onDateFromChange('2026-10-01');
+
+        expect(router.navigate).toHaveBeenCalledWith([], {
+          queryParams: {
+            status: null,
+            priority: null,
+            search: null,
+            date_from: '2026-10-01',
+            date_to: null,
+            sort: null,
+            order: null,
+          },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+
+        (router.navigate as jasmine.Spy).calls.reset();
+        component.onDateToChange('2026-10-15');
+
+        expect(router.navigate).toHaveBeenCalledWith([], {
+          queryParams: {
+            status: null,
+            priority: null,
+            search: null,
+            date_from: '2026-10-01',
+            date_to: '2026-10-15',
+            sort: null,
+            order: null,
+          },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      });
+
+      it('navigates with sort and order queryParams on sort change', () => {
+        component.onSortChange({ active: 'stated_total', direction: 'asc' });
+
+        expect(router.navigate).toHaveBeenCalledWith([], {
+          queryParams: {
+            status: null,
+            priority: null,
+            search: null,
+            date_from: null,
+            date_to: null,
+            sort: 'stated_total',
+            order: 'asc',
+          },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      });
+    });
+
+    describe('Always-visible Clear filters control and active filter chips', () => {
+      it('renders Clear filters button always, disabled when no filters active', () => {
+        const el = fixture.nativeElement as HTMLElement;
+        const clearBtn = el.querySelector<HTMLButtonElement>('[data-testid="clear-filters-btn"], .filter-row .clear-filters-btn');
+        expect(clearBtn).not.toBeNull();
+        expect(clearBtn?.disabled).toBeTrue();
+        expect(component.hasActiveFilters()).toBeFalse();
+      });
+
+      it('enables Clear filters button when any filter is active and clears all on click', () => {
+        component.onPriorityChange('high');
+        component.onSearchChange('Widget');
+        fixture.detectChanges();
+
+        expect(component.hasActiveFilters()).toBeTrue();
+        const el = fixture.nativeElement as HTMLElement;
+        const clearBtn = el.querySelector<HTMLButtonElement>('[data-testid="clear-filters-btn"], .filter-row .clear-filters-btn');
+        expect(clearBtn?.disabled).toBeFalse();
+
+        (router.navigate as jasmine.Spy).calls.reset();
+        apiService.getReviewTasks.calls.reset();
+
+        clearBtn?.click();
+        fixture.detectChanges();
+
+        expect(component.statusFilter()).toBe('open');
+        expect(component.priorityFilter()).toBe('all');
+        expect(component.searchQuery()).toBe('');
+        expect(component.dateFrom()).toBeNull();
+        expect(component.dateTo()).toBeNull();
+        expect(component.hasActiveFilters()).toBeFalse();
+        expect(clearBtn?.disabled).toBeTrue();
+
+        expect(router.navigate).toHaveBeenCalledWith([], {
+          queryParams: {
+            status: null,
+            priority: null,
+            search: null,
+            date_from: null,
+            date_to: null,
+            sort: null,
+            order: null,
+          },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+        expect(apiService.getReviewTasks).toHaveBeenCalled();
+      });
+
+      it('renders active filter chips and removing each reloads the list and updates URL', () => {
+        component.onStatusChange('resolved');
+        component.onPriorityChange('low');
+        component.onSearchChange('Delta');
+        component.onDateFromChange('2026-09-01');
+        component.onDateToChange('2026-09-30');
+        fixture.detectChanges();
+
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="chip-status"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="chip-priority"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="chip-search"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="chip-date-range"]')).not.toBeNull();
+
+        // 1. Remove status chip
+        (router.navigate as jasmine.Spy).calls.reset();
+        apiService.getReviewTasks.calls.reset();
+        el.querySelector<HTMLButtonElement>('[data-testid="remove-status-chip"]')!.click();
+        fixture.detectChanges();
+
+        expect(component.statusFilter()).toBe('open');
+        expect(apiService.getReviewTasks).toHaveBeenCalled();
+        expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({
+          queryParams: jasmine.objectContaining({ status: null }),
+        }));
+        expect(el.querySelector('[data-testid="chip-status"]')).toBeNull();
+
+        // 2. Remove priority chip
+        (router.navigate as jasmine.Spy).calls.reset();
+        apiService.getReviewTasks.calls.reset();
+        el.querySelector<HTMLButtonElement>('[data-testid="remove-priority-chip"]')!.click();
+        fixture.detectChanges();
+
+        expect(component.priorityFilter()).toBe('all');
+        expect(apiService.getReviewTasks).toHaveBeenCalled();
+        expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({
+          queryParams: jasmine.objectContaining({ priority: null }),
+        }));
+        expect(el.querySelector('[data-testid="chip-priority"]')).toBeNull();
+
+        // 3. Remove search chip
+        (router.navigate as jasmine.Spy).calls.reset();
+        apiService.getReviewTasks.calls.reset();
+        el.querySelector<HTMLButtonElement>('[data-testid="remove-search-chip"]')!.click();
+        fixture.detectChanges();
+
+        expect(component.searchQuery()).toBe('');
+        expect(apiService.getReviewTasks).toHaveBeenCalled();
+        expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({
+          queryParams: jasmine.objectContaining({ search: null }),
+        }));
+        expect(el.querySelector('[data-testid="chip-search"]')).toBeNull();
+
+        // 4. Remove date range chip
+        (router.navigate as jasmine.Spy).calls.reset();
+        apiService.getReviewTasks.calls.reset();
+        el.querySelector<HTMLButtonElement>('[data-testid="remove-date-range-chip"]')!.click();
+        fixture.detectChanges();
+
+        expect(component.dateFrom()).toBeNull();
+        expect(component.dateTo()).toBeNull();
+        expect(apiService.getReviewTasks).toHaveBeenCalled();
+        expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({
+          queryParams: jasmine.objectContaining({ date_from: null, date_to: null }),
+        }));
+        expect(el.querySelector('[data-testid="chip-date-range"]')).toBeNull();
+      });
+    });
+
+    describe('Result count text', () => {
+      it('displays correct pluralized count when list is loaded', () => {
+        component.tasks.set(mockTasks); // 2 tasks
+        component.nextCursor.set(null);
+        fixture.detectChanges();
+
+        const el = fixture.nativeElement as HTMLElement;
+        const countEl = el.querySelector('[data-testid="result-count"], .result-count');
+        expect(countEl?.textContent?.trim()).toBe('2 results');
+        expect(component.resultCountText()).toBe('2 results');
+      });
+
+      it('displays "1 result" for a single loaded item', () => {
+        component.tasks.set([mockTasks[0]]);
+        component.nextCursor.set(null);
+        fixture.detectChanges();
+
+        const el = fixture.nativeElement as HTMLElement;
+        const countEl = el.querySelector('[data-testid="result-count"], .result-count');
+        expect(countEl?.textContent?.trim()).toBe('1 result');
+        expect(component.resultCountText()).toBe('1 result');
+      });
+
+      it('displays "N+" when more pages exist', () => {
+        component.tasks.set(mockTasks); // 2 tasks
+        component.nextCursor.set('next-cursor-xyz');
+        fixture.detectChanges();
+
+        const el = fixture.nativeElement as HTMLElement;
+        const countEl = el.querySelector('[data-testid="result-count"], .result-count');
+        expect(countEl?.textContent?.trim()).toBe('2+ results');
+        expect(component.resultCountText()).toBe('2+ results');
+      });
+
+      it('displays "0 results" when empty list is loaded without more pages', () => {
+        component.tasks.set([]);
+        component.nextCursor.set(null);
+        fixture.detectChanges();
+
+        expect(component.resultCountText()).toBe('0 results');
+      });
     });
   });
 });
