@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -140,8 +141,11 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
   private readonly sanitizer = inject(DomSanitizer);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly isLoading = signal<boolean>(true);
+  readonly loadFailed = signal<boolean>(false);
+  readonly isNotFound = signal<boolean>(false);
   readonly isSaving = signal<boolean>(false);
   readonly isConfirming = signal<boolean>(false);
   readonly showNextStep = signal<boolean>(false);
@@ -391,15 +395,69 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.handleKeyboardEvent(event);
   };
 
+  private resetPerQuotationState(): void {
+    this.quotation.set(null);
+    this.loadFailed.set(false);
+    this.isNotFound.set(false);
+
+    this.pendingCorrections.set(new Map());
+    this.pendingNewLines.set([]);
+    this.pendingRemoveLineIds.set(new Set());
+    this.isAddingLine.set(false);
+    this.newLineText.set('');
+    this.newLineQuantity.set('');
+    this.newLinePriceAmount.set('');
+
+    this.pendingQuotationCurrency.set(undefined);
+    this.pendingPricesIncludeVat.set(undefined);
+    this.pendingVatRate.set(undefined);
+
+    this.reviewerNotes.set('');
+    this.selectedSupplierId.set(null);
+    this.isRequote.set(false);
+    this.selectedPreviousQuotationId.set(null);
+    this.isCreatingSupplierFromExtraction.set(false);
+
+    this.activeExtraction.set(null);
+    this.documentPreviewUrl.set(null);
+    this.currentFlaggedIndex.set(0);
+
+    this.auditTrail.set([]);
+    this.isLoadingAudit.set(false);
+
+    this.matchingSetupStatus.set('idle');
+    this.matchingSetupError.set(null);
+
+    this.errorMessage.set(null);
+    this.errorTraceId.set(null);
+    this.confirmBlockedReason.set(null);
+
+    this.isSaving.set(false);
+    this.isConfirming.set(false);
+    this.showNextStep.set(false);
+    this.isRefusing.set(false);
+    this.isArchiving.set(false);
+    this.isRetryingExtraction.set(false);
+    this.isReplacingDocument.set(false);
+    this.isExporting.set(false);
+    this.mismatchAcknowledged.set(false);
+    this.confirmDialogVisible.set(false);
+  }
+
   ngOnInit(): void {
     window.addEventListener('keydown', this.onKeyDownCapture, { capture: true });
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      this.quotationId.set(id);
-      this.loadQuotation(id);
-      this.loadSuppliers();
-      this.loadPriorQuotations();
-    }
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const id = params.get('id');
+      if (id) {
+        this.quotationId.set(id);
+        this.resetPerQuotationState();
+        this.loadQuotation(id);
+        if (this.suppliers().length === 0) {
+          this.loadSuppliers();
+        }
+        this.loadPriorQuotations();
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -410,6 +468,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const silent = options?.silent ?? false;
     if (!silent) {
       this.isLoading.set(true);
+      this.loadFailed.set(false);
+      this.isNotFound.set(false);
     }
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
@@ -417,6 +477,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.api.getQuotation(id).subscribe({
       next: (q) => {
         this.quotation.set(q);
+        this.loadFailed.set(false);
+        this.isNotFound.set(false);
         this.reviewerNotes.set(q.reviewer_notes || '');
         this.selectedSupplierId.set(q.supplier_id || null);
         this.pendingQuotationCurrency.set(undefined);
@@ -443,8 +505,15 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       error: (err: unknown) => {
         if (!silent) {
           this.isLoading.set(false);
+          this.loadFailed.set(true);
+          if (err instanceof HttpErrorResponse && err.status === 404) {
+            this.isNotFound.set(true);
+          }
         }
         this.handleError(err);
+        if (!silent && err instanceof HttpErrorResponse && err.status === 404) {
+          this.errorMessage.set(this.translate.instant('quotations.review.loadError.notFound'));
+        }
       },
     });
   }

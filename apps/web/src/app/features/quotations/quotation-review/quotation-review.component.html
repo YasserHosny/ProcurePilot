@@ -866,6 +866,31 @@
       [auditTrail]="auditTrail()"
       [isLoading]="isLoadingAudit()"
     ></app-quotation-audit-trail>
+  } @else if (loadFailed()) {
+    <div class="load-error-state" data-testid="quotation-load-error">
+      <mat-icon class="load-error-icon" aria-hidden="true">{{ isNotFound() ? 'search_off' : 'error_outline' }}</mat-icon>
+      <h1 class="load-error-title">{{ 'quotations.review.loadError.title' | translate }}</h1>
+      <p class="load-error-message">
+        @if (isNotFound()) {
+          {{ 'quotations.review.loadError.notFound' | translate }}
+        } @else {
+          {{ errorMessage() }}
+        }
+      </p>
+      @if (errorTraceId()) {
+        <span class="load-error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
+      }
+      <div class="load-error-actions">
+        <button mat-flat-button color="primary" type="button" (click)="loadQuotation(quotationId())">
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          <span>{{ 'quotations.review.loadError.retry' | translate }}</span>
+        </button>
+        <a mat-stroked-button routerLink="/quotations" class="back-link">
+          <mat-icon aria-hidden="true">arrow_back</mat-icon>
+          <span>{{ 'quotations.review.loadError.backToInbox' | translate }}</span>
+        </a>
+      </div>
+    </div>
   }
 }
 </div>

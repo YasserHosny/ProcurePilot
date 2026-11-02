@@ -4,14 +4,14 @@ import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { MatDatepicker } from '@angular/material/datepicker';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ActivatedRoute, provideRouter } from '@angular/router';
+import { ActivatedRoute, ParamMap, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { Subject, of, throwError } from 'rxjs';
+import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { FieldExtraction, Quotation, QuotationDetail, Role, Supplier } from '../../../core/api/models';
+import type { ApiError, FieldExtraction, Quotation, QuotationDetail, Role, Supplier } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { QuotationReviewComponent } from './quotation-review.component';
@@ -20,6 +20,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
   let component: QuotationReviewComponent;
   let fixture: ComponentFixture<QuotationReviewComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  let paramMapSubject: BehaviorSubject<ParamMap>;
   const homeCurrency = signal<string | undefined>('EGP');
 
   const mockQuotationDetail: QuotationDetail = {
@@ -137,6 +138,8 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       }),
     );
 
+    paramMapSubject = new BehaviorSubject<ParamMap>(convertToParamMap({ id: 'q-review-1' }));
+
     const mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
       role: signal<Role | null>('buyer'),
@@ -157,9 +160,10 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
         {
           provide: ActivatedRoute,
           useValue: {
+            paramMap: paramMapSubject.asObservable(),
             snapshot: {
-              paramMap: {
-                get: (k: string) => (k === 'id' ? 'q-review-1' : null),
+              get paramMap() {
+                return paramMapSubject.value;
               },
             },
           },
@@ -1680,6 +1684,125 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
           prices_include_vat: true,
         }),
       );
+    });
+  });
+
+  describe('Error state and route param changes (PPS-156 / B7 & B8)', () => {
+    it('(a) getQuotation errors with HttpErrorResponse 404 -> shows not-found error state, back link and retry control, and hides review form', () => {
+      apiService.getQuotation.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 404, statusText: 'Not Found' })),
+      );
+      paramMapSubject.next(convertToParamMap({ id: 'missing-quote-id' }));
+      fixture.detectChanges();
+
+      const errorEl = fixture.nativeElement.querySelector('[data-testid="quotation-load-error"]');
+      expect(errorEl).toBeTruthy();
+      expect(errorEl.textContent).toContain('Quotation not found');
+
+      const backLink = errorEl.querySelector('a.back-link') ?? errorEl.querySelector('a');
+      expect(backLink).toBeTruthy();
+      expect(backLink?.getAttribute('routerLink') ?? backLink?.getAttribute('href')).toBe('/quotations');
+
+      const buttons = Array.from(errorEl.querySelectorAll('button')) as HTMLButtonElement[];
+      const retryBtn = buttons.find((b) => b.textContent?.includes('Retry'));
+      expect(retryBtn).toBeTruthy();
+
+      expect(fixture.nativeElement.querySelector('.page-header')).toBeFalsy();
+      expect(fixture.nativeElement.querySelector('app-quotation-review-banners')).toBeFalsy();
+    });
+
+    it('(b) clicking Retry calls getQuotation again and on success renders the quotation', () => {
+      apiService.getQuotation.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 500, error: { message: 'Server error' } })),
+      );
+      paramMapSubject.next(convertToParamMap({ id: 'retry-quote-id' }));
+      fixture.detectChanges();
+
+      const errorEl = fixture.nativeElement.querySelector('[data-testid="quotation-load-error"]');
+      expect(errorEl).toBeTruthy();
+
+      const buttons = Array.from(errorEl.querySelectorAll('button')) as HTMLButtonElement[];
+      const retryBtn = buttons.find((b) => b.textContent?.includes('Retry'));
+      expect(retryBtn).toBeTruthy();
+
+      apiService.getQuotation.and.returnValue(of(mockQuotationDetail));
+      retryBtn?.click();
+      fixture.detectChanges();
+
+      expect(apiService.getQuotation).toHaveBeenCalledWith('retry-quote-id');
+      expect(fixture.nativeElement.querySelector('[data-testid="quotation-load-error"]')).toBeFalsy();
+      expect(fixture.nativeElement.querySelector('.page-header')).toBeTruthy();
+      expect(component.quotation()?.id).toBe('q-review-1');
+    });
+
+    it('(c) a non-404 failure (500 with an ApiError body incl. trace_id) shows the message and the trace id', () => {
+      const apiError: ApiError = {
+        code: 'internal_error',
+        message: 'Database connection failed',
+        details: {},
+        trace_id: 'trace-test-12345',
+      };
+      apiService.getQuotation.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 500, statusText: 'Internal Server Error', error: apiError })),
+      );
+      paramMapSubject.next(convertToParamMap({ id: 'error-quote-id' }));
+      fixture.detectChanges();
+
+      const errorEl = fixture.nativeElement.querySelector('[data-testid="quotation-load-error"]');
+      expect(errorEl).toBeTruthy();
+      expect(errorEl.textContent).toContain('Database connection failed');
+      expect(errorEl.textContent).toContain('trace-test-12345');
+    });
+
+    it('(d) a failed silent reload keeps the quotation visible (no load-error state)', () => {
+      expect(component.quotation()).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('[data-testid="quotation-load-error"]')).toBeFalsy();
+
+      apiService.getQuotation.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 500, error: { message: 'Background failure' } })),
+      );
+      component.loadQuotation('q-review-1', { silent: true });
+      fixture.detectChanges();
+
+      expect(component.quotation()).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('[data-testid="quotation-load-error"]')).toBeFalsy();
+      expect(fixture.nativeElement.querySelector('.page-header')).toBeTruthy();
+    });
+
+    it('(e) paramMap emitting a second id calls getQuotation with the new id, replaces the displayed quotation, and clears pending corrections and pending new lines left from the first', () => {
+      component.pendingCorrections.set(new Map([['fe-line1-price', { amount: '30.00', currency: 'GBP' }]]));
+      component.pendingNewLines.set([
+        {
+          original_text: 'Extra delivery charge',
+          quantity: '1',
+          unit_price_amount: '15.00',
+          unit_price_currency: 'GBP',
+        },
+      ]);
+      component.pendingRemoveLineIds.set(new Set(['line-1']));
+      component.reviewerNotes.set('Notes for first quote');
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections().size).toBe(1);
+      expect(component.pendingNewLines().length).toBe(1);
+      expect(component.pendingRemoveLineIds().size).toBe(1);
+
+      const secondQuotation: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'q-review-2',
+        reviewer_notes: 'Initial notes for second quote',
+      };
+      apiService.getQuotation.and.returnValue(of(secondQuotation));
+
+      paramMapSubject.next(convertToParamMap({ id: 'q-review-2' }));
+      fixture.detectChanges();
+
+      expect(apiService.getQuotation).toHaveBeenCalledWith('q-review-2');
+      expect(component.quotation()?.id).toBe('q-review-2');
+      expect(component.pendingCorrections().size).toBe(0);
+      expect(component.pendingNewLines().length).toBe(0);
+      expect(component.pendingRemoveLineIds().size).toBe(0);
+      expect(component.reviewerNotes()).toBe('Initial notes for second quote');
     });
   });
 });
