@@ -2286,6 +2286,9 @@
     "list": {
       "newRequestButton": "New request"
     },
+    "table": {
+      "caption": "Purchase requests"
+    },
     "title": "Purchase Requests",
     "subtitle": "Create and track purchase requests for your branches and cost centres.",
     "status": {
