@@ -51,6 +51,12 @@ from procurepilot_api.shared.mailer import get_mailer
 
 logger = logging.getLogger(__name__)
 
+# Read-time expiry only: stored lifecycle states are never rewritten by a read.
+_EFFECTIVE_STATUS_SQL = (
+    "case when r.status = 'sent' and r.needed_by_date < current_date "
+    "then 'expired' else r.status end"
+)
+
 
 @contextmanager
 def _authenticated_db(settings: Settings, member: CurrentMember) -> Iterator[psycopg.Connection]:
@@ -256,7 +262,12 @@ class RfqService:
     def get_detail(self, *, member: CurrentMember, rfq_id: uuid.UUID) -> RfqDetail:
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute("select * from rfq where id = %s", (rfq_id,))
+                cur.execute(
+                    f"select r.id, r.tenant_id, r.created_by_membership_id, "
+                    f"{_EFFECTIVE_STATUS_SQL} as status, r.needed_by_date, "
+                    "r.tenant_terms, r.idempotency_key, r.created_at from rfq r where r.id = %s",
+                    (rfq_id,),
+                )
                 row = cur.fetchone()
                 if row is None:
                     raise NotFoundError(details={"resource": "rfq"})
@@ -728,6 +739,14 @@ class RfqService:
         with _authenticated_db(self.settings, member) as lock_conn:
             with lock_conn.cursor(row_factory=dict_row) as cur:
                 status = lock_rfq_for_preparation(cur, tenant_id=member.tenant_id, rfq_id=rfq_id)
+                if status is not None:
+                    cur.execute(
+                        f"select {_EFFECTIVE_STATUS_SQL} as status from rfq r "
+                        "where r.id = %s and r.tenant_id = %s",
+                        (rfq_id, member.tenant_id),
+                    )
+                    if cur.fetchone()["status"] == "expired":
+                        raise UnprocessableEntityError(details={"reason": "rfq_expired"})
                 if status == "converted":
                     # A retry of the preparation that converted it gets that request back -- only a
                     # request with this key that was prepared from one of this RFQ's responses.
@@ -1137,14 +1156,18 @@ class RfqService:
         query_filters = ["tenant_id = %s"]
         params: list[str | uuid.UUID | int] = [member.tenant_id]
 
-        if status:
-            query_filters.append("status = %s")
+        if status is not None:
+            if status not in ("draft", "sent", "responded", "expired", "converted"):
+                raise UnprocessableEntityError(
+                    details={"reason": "invalid_status", "field": "status"}
+                )
+            query_filters.append(f"({_EFFECTIVE_STATUS_SQL}) = %s")
             params.append(status)
 
         query = f"""
             SELECT
                 r.id,
-                r.status,
+                {_EFFECTIVE_STATUS_SQL} as status,
                 r.needed_by_date,
                 r.created_at,
                 r.created_by_membership_id,
