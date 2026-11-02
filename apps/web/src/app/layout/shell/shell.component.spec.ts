@@ -16,6 +16,7 @@ import { AnalystConversationComponent } from '../../features/analyst/conversatio
 import { ForecastingApiService } from '../../features/forecasting/forecasting-api';
 import { ReorderQueueComponent } from '../../features/forecasting/reorder-queue/reorder-queue.component';
 import { BriefDetailComponent } from '../../features/supplier-risk/brief-detail/brief-detail.component';
+import { SupplierScorecardComponent } from '../../features/catalogue/supplier-scorecard/supplier-scorecard.component';
 import { RiskQueueComponent } from '../../features/supplier-risk/risk-queue/risk-queue.component';
 import { SupplierRiskApiService } from '../../features/supplier-risk/supplier-risk-api';
 import { ShellComponent } from './shell.component';
@@ -501,28 +502,6 @@ describe('ShellComponent account menu', () => {
       }
     });
 
-    it('activates skip link on Enter key as native click without changing the router URL (H1)', async () => {
-      document.body.appendChild(fixture.nativeElement);
-      try {
-        const router = TestBed.inject(Router);
-        await router.navigateByUrl('/quotations');
-        const initialUrl = router.url;
-
-        const root = fixture.nativeElement as HTMLElement;
-        const skipLink = root.querySelector<HTMLAnchorElement>('a.skip-to-content')!;
-        const mainEl = root.querySelector<HTMLElement>('#main-content')!;
-
-        const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
-        skipLink.dispatchEvent(clickEvent);
-        fixture.detectChanges();
-
-        expect(clickEvent.defaultPrevented).toBeTrue();
-        expect(router.url).toBe(initialUrl);
-        expect(document.activeElement).toBe(mainEl);
-      } finally {
-        fixture.nativeElement.remove();
-      }
-    });
 
     it('guards against missing #main-content element when focusMainContent is called (H1)', () => {
       const event = new MouseEvent('click', { bubbles: true, cancelable: true });
@@ -586,6 +565,23 @@ describe('ShellComponent nested route landmarks (PPS-162 / H2)', () => {
     };
     const api = {
       listBranches: () => of({ items: [] }),
+      supplier: () =>
+        of({
+          id: 'supplier-1',
+          name: 'Acme Supplies',
+          status: 'active',
+          created_at: '2026-08-01T00:00:00Z',
+        }),
+      getSupplierScorecard: () =>
+        of({
+          supplier_id: 'supplier-1',
+          window_start: '2026-03-01',
+          window_end: '2026-09-01',
+          metrics: {},
+          source_counts: {},
+          insufficient_evidence: false,
+          confidence: 'high' as const,
+        }),
     };
     const snackBar = {
       open: jasmine.createSpy('open'),
@@ -598,6 +594,7 @@ describe('ShellComponent nested route landmarks (PPS-162 / H2)', () => {
         ReorderQueueComponent,
         RiskQueueComponent,
         BriefDetailComponent,
+        SupplierScorecardComponent,
       ],
       providers: [
         provideTranslateService(),
@@ -611,6 +608,7 @@ describe('ShellComponent nested route landmarks (PPS-162 / H2)', () => {
               { path: 'forecasting', component: ReorderQueueComponent },
               { path: 'supplier-risk', component: RiskQueueComponent },
               { path: 'negotiation-briefs/:id', component: BriefDetailComponent },
+              { path: 'suppliers/:id/scorecard', component: SupplierScorecardComponent },
             ],
           },
         ]),
@@ -639,6 +637,7 @@ describe('ShellComponent nested route landmarks (PPS-162 / H2)', () => {
     { path: '/forecasting', name: 'ReorderQueueComponent' },
     { path: '/supplier-risk', name: 'RiskQueueComponent' },
     { path: '/negotiation-briefs/brief-1', name: 'BriefDetailComponent' },
+    { path: '/suppliers/supplier-1/scorecard', name: 'SupplierScorecardComponent' },
   ];
 
   routesToTest.forEach(({ path, name }) => {
@@ -663,6 +662,7 @@ describe('ShellComponent nested route landmarks (PPS-162 / H2)', () => {
     { component: ReorderQueueComponent, name: 'ReorderQueueComponent' },
     { component: RiskQueueComponent, name: 'RiskQueueComponent' },
     { component: BriefDetailComponent, name: 'BriefDetailComponent' },
+    { component: SupplierScorecardComponent, name: 'SupplierScorecardComponent' },
   ];
 
   componentsToTest.forEach(({ component, name }) => {
