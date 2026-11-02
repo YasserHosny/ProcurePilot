@@ -10,7 +10,7 @@ import { of, Subject, throwError } from 'rxjs';
 
 import ar from '../../../../../../../packages/i18n/ar.json';
 import en from '../../../../../../../packages/i18n/en.json';
-import type { Product, PurchaseRequest, Role, Supplier } from '../../../core/api/models';
+import type { Branch, CostCentre, Product, PurchaseRequest, Role, Supplier } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { RfqApi, type RfqDetail } from '../../rfq/rfq-api';
 import { RequestsApiService } from '../../requests/requests-api';
@@ -969,6 +969,141 @@ describe('BasketSplitResultsComponent — packs and constraint copy', () => {
         const req = httpTesting.expectOne('/api/v1/baskets/basket-date-test/prepare-requests');
         expect(req.request.method).toBe('POST');
         expect(req.request.body.required_by_date).toBe('2026-11-06');
+      });
+    });
+
+    describe('Dialog cost centre branch filtering (PPS-149)', () => {
+      const mockBranches: Branch[] = [
+        { id: 'branch-1', name: 'Branch 1', is_active: true, created_at: '' },
+        { id: 'branch-2', name: 'Branch 2', is_active: true, created_at: '' },
+      ];
+      const mockCostCentres: CostCentre[] = [
+        { id: 'cc-b1', name: 'Operations B1', code: 'CC1', branch_id: 'branch-1', is_orphaned: false, is_archived: false, created_at: '' },
+        { id: 'cc-b2', name: 'Logistics B2', code: 'CC2', branch_id: 'branch-2', is_orphaned: false, is_archived: false, created_at: '' },
+        { id: 'cc-global', name: 'HQ General', code: 'CCG', branch_id: null, is_orphaned: false, is_archived: false, created_at: '' },
+      ];
+
+      beforeEach(() => {
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({
+          imports: [PrepareSplitRequestsDialogComponent],
+          providers: [
+            provideHttpClient(),
+            provideHttpClientTesting(),
+            provideNoopAnimations(),
+            provideTranslateService(),
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: {
+                basketId: 'basket-cc-test',
+                rfqId: 'rfq-abcdef12-3456',
+                rfqNeededByDate: '2026-11-06',
+                branchId: 'branch-1',
+                suppliers: [supplier, s2],
+              },
+            },
+            { provide: MatDialogRef, useValue: { close: jasmine.createSpy('close') } },
+          ],
+        });
+      });
+
+      it('with cost centres of two branches only the request\'s branch\'s centres are offered', () => {
+        const httpTesting = TestBed.inject(HttpTestingController);
+        const dialogFixture = TestBed.createComponent(PrepareSplitRequestsDialogComponent);
+        const dialogComp = dialogFixture.componentInstance;
+        dialogFixture.detectChanges();
+
+        const branchReq = httpTesting.expectOne('/api/v1/organisation/branches?is_active=true&limit=100');
+        branchReq.flush({ items: mockBranches, next_cursor: null });
+        const ccReq = httpTesting.expectOne('/api/v1/organisation/cost-centres?is_archived=false&limit=100');
+        ccReq.flush({
+          items: [mockCostCentres[0], mockCostCentres[1]],
+          next_cursor: null,
+        });
+
+        // Request branch is branch-1: only cc-b1 should be offered
+        expect(dialogComp.costCentres().map((c) => c.id)).toEqual(['cc-b1']);
+        expect(dialogComp.costCentres().some((c) => c.id === 'cc-b2')).toBeFalse();
+
+        // Switch to branch-2: only cc-b2 should be offered
+        dialogComp.form.controls.branch_id.setValue('branch-2');
+        dialogFixture.detectChanges();
+        expect(dialogComp.costCentres().map((c) => c.id)).toEqual(['cc-b2']);
+        expect(dialogComp.costCentres().some((c) => c.id === 'cc-b1')).toBeFalse();
+      });
+
+      it('a centre without a branch is still offered because branch-less centres are company-wide', () => {
+        const httpTesting = TestBed.inject(HttpTestingController);
+        const dialogFixture = TestBed.createComponent(PrepareSplitRequestsDialogComponent);
+        const dialogComp = dialogFixture.componentInstance;
+        dialogFixture.detectChanges();
+
+        const branchReq = httpTesting.expectOne('/api/v1/organisation/branches?is_active=true&limit=100');
+        branchReq.flush({ items: mockBranches, next_cursor: null });
+        const ccReq = httpTesting.expectOne('/api/v1/organisation/cost-centres?is_archived=false&limit=100');
+        ccReq.flush({ items: mockCostCentres, next_cursor: null });
+
+        // Branch 1 should offer branch-1 centre and company-wide centre, but not branch-2
+        const offeredIds = dialogComp.costCentres().map((c) => c.id);
+        expect(offeredIds).toContain('cc-b1');
+        expect(offeredIds).toContain('cc-global');
+        expect(offeredIds).not.toContain('cc-b2');
+
+        // Switch to Branch 2: offers branch-2 centre and company-wide centre, but not branch-1
+        dialogComp.form.controls.branch_id.setValue('branch-2');
+        dialogFixture.detectChanges();
+        const branch2OfferedIds = dialogComp.costCentres().map((c) => c.id);
+        expect(branch2OfferedIds).toContain('cc-b2');
+        expect(branch2OfferedIds).toContain('cc-global');
+        expect(branch2OfferedIds).not.toContain('cc-b1');
+      });
+
+      it('the preselected value, if any, is never a centre of another branch', () => {
+        const httpTesting = TestBed.inject(HttpTestingController);
+        const dialogFixture = TestBed.createComponent(PrepareSplitRequestsDialogComponent);
+        const dialogComp = dialogFixture.componentInstance;
+
+        // Preselect a cost centre from branch-2 while request branch is branch-1
+        dialogComp.form.controls.cost_centre_id.setValue('cc-b2');
+        dialogFixture.detectChanges();
+
+        const branchReq = httpTesting.expectOne('/api/v1/organisation/branches?is_active=true&limit=100');
+        branchReq.flush({ items: mockBranches, next_cursor: null });
+        const ccReq = httpTesting.expectOne('/api/v1/organisation/cost-centres?is_archived=false&limit=100');
+        ccReq.flush({ items: mockCostCentres, next_cursor: null });
+
+        // Must be cleared because cc-b2 belongs to branch-2, not branch-1
+        expect(dialogComp.form.controls.cost_centre_id.value).toBeNull();
+
+        // If user selects cc-b1 and then switches branch to branch-2, it must also be cleared
+        dialogComp.form.controls.cost_centre_id.setValue('cc-b1');
+        dialogComp.form.controls.branch_id.setValue('branch-2');
+        dialogFixture.detectChanges();
+        expect(dialogComp.form.controls.cost_centre_id.value).toBeNull();
+      });
+
+      it('when the request\'s branch has no centres the existing empty state is shown', () => {
+        const httpTesting = TestBed.inject(HttpTestingController);
+        const dialogFixture = TestBed.createComponent(PrepareSplitRequestsDialogComponent);
+        const dialogComp = dialogFixture.componentInstance;
+        dialogFixture.detectChanges();
+
+        const branchReq = httpTesting.expectOne('/api/v1/organisation/branches?is_active=true&limit=100');
+        branchReq.flush({ items: mockBranches, next_cursor: null });
+        const ccReq = httpTesting.expectOne('/api/v1/organisation/cost-centres?is_archived=false&limit=100');
+        // Only branch-2 has cost centres, branch-1 has none and there are no global centres
+        ccReq.flush({
+          items: [mockCostCentres[1]],
+          next_cursor: null,
+        });
+
+        // branch-1 has no matching cost centres
+        expect(dialogComp.costCentres().length).toBe(0);
+
+        dialogFixture.detectChanges();
+        const selectEl = dialogFixture.nativeElement.querySelector('mat-select[formcontrolname="cost_centre_id"]');
+        expect(selectEl).not.toBeNull();
+        expect(dialogComp.form.controls.cost_centre_id.value).toBeNull();
       });
     });
     });
