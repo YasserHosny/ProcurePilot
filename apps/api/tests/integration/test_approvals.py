@@ -31,6 +31,10 @@ from integration.catalogue_helpers import (
     connection,
     make_workspace,
 )
+from integration.quotation_helpers import PsycopgSupabaseClient
+from integration.smart_compare_helpers import member_from_workspace
+from procurepilot_api.modules.requests import service as module
+from procurepilot_api.modules.requests.service import RequestsService
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL,
@@ -43,9 +47,7 @@ def conn() -> object:
     yield from connection()
 
 
-def _make_member(
-    cur: psycopg.Cursor, tenant_id: UUID, label: str, role: str
-) -> Workspace:
+def _make_member(cur: psycopg.Cursor, tenant_id: UUID, label: str, role: str) -> Workspace:
     """A second/third membership in an already-created tenant — elevated-role inserts happen
     before any act_as, same as make_workspace's own rows."""
     user_id, membership_id = uuid4(), uuid4()
@@ -70,9 +72,7 @@ def _make_branch(cur: psycopg.Cursor, ws: Workspace) -> UUID:
     return branch_id
 
 
-def _make_submitted_request(
-    cur: psycopg.Cursor, requester: Workspace, branch_id: UUID
-) -> UUID:
+def _make_submitted_request(cur: psycopg.Cursor, requester: Workspace, branch_id: UUID) -> UUID:
     request_id = uuid4()
     cur.execute(
         "insert into purchase_request "
@@ -112,9 +112,7 @@ def test_a_step_cannot_be_decided_without_recording_who_and_when(conn: object) -
         act_as(cur, owner)
         branch_id = _make_branch(cur, owner)
         request_id = _make_submitted_request(cur, owner, branch_id)
-        step_id = _make_pending_step(
-            cur, owner.tenant_id, request_id, approver.membership_id
-        )
+        step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
         with pytest.raises(psycopg.errors.CheckViolation):
             cur.execute(
@@ -130,9 +128,7 @@ def test_a_pending_step_cannot_carry_a_decider_or_a_decided_at(conn: object) -> 
         act_as(cur, owner)
         branch_id = _make_branch(cur, owner)
         request_id = _make_submitted_request(cur, owner, branch_id)
-        step_id = _make_pending_step(
-            cur, owner.tenant_id, request_id, approver.membership_id
-        )
+        step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
         with pytest.raises(psycopg.errors.CheckViolation):
             cur.execute(
@@ -148,9 +144,7 @@ def test_a_full_decision_pair_satisfies_the_constraint(conn: object) -> None:
         act_as(cur, owner)
         branch_id = _make_branch(cur, owner)
         request_id = _make_submitted_request(cur, owner, branch_id)
-        step_id = _make_pending_step(
-            cur, owner.tenant_id, request_id, approver.membership_id
-        )
+        step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
         cur.execute(
             "update approval_step set status = 'approved', "
@@ -174,9 +168,7 @@ def test_owner_override_decider_may_differ_from_the_assignee(conn: object) -> No
         act_as(cur, owner)
         branch_id = _make_branch(cur, owner)
         request_id = _make_submitted_request(cur, owner, branch_id)
-        step_id = _make_pending_step(
-            cur, owner.tenant_id, request_id, approver.membership_id
-        )
+        step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
         cur.execute(
             "update approval_step set status = 'rejected', "
@@ -201,9 +193,7 @@ def test_only_one_approval_step_per_request(conn: object) -> None:
         _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
         with pytest.raises(psycopg.errors.UniqueViolation):
-            _make_pending_step(
-                cur, owner.tenant_id, request_id, owner.membership_id
-            )
+            _make_pending_step(cur, owner.tenant_id, request_id, owner.membership_id)
 
 
 # ── approve / reject move the request and step together ───────────────
@@ -216,9 +206,7 @@ def test_approving_moves_request_and_step_to_approved(conn: object) -> None:
         act_as(cur, owner)
         branch_id = _make_branch(cur, owner)
         request_id = _make_submitted_request(cur, owner, branch_id)
-        step_id = _make_pending_step(
-            cur, owner.tenant_id, request_id, approver.membership_id
-        )
+        step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
         cur.execute(
             "update purchase_request set status = 'approved' "
@@ -253,9 +241,7 @@ def _seed_step_for_visibility(
     act_as(cur, owner)
     branch_id = _make_branch(cur, owner)
     request_id = _make_submitted_request(cur, requester, branch_id)
-    step_id = _make_pending_step(
-        cur, owner.tenant_id, request_id, approver.membership_id
-    )
+    step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
     return owner, requester, approver, other, step_id
 
 
@@ -309,3 +295,113 @@ def test_a_decided_step_is_still_visible_but_out_of_the_pending_queue(conn: obje
             (approver.membership_id,),
         )
         assert cur.fetchone() == (0,)
+
+
+# P-113: pending steps on terminal requests are not live approval work.
+@pytest.mark.parametrize("status", ["withdrawn", "rejected", "delivered"])
+def test_pending_queue_excludes_terminal_requests(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, status: str
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "queue-terminal")
+        act_as(cur, owner)
+        branch = _make_branch(cur, owner)
+        request = _make_submitted_request(cur, owner, branch)
+        _make_pending_step(cur, owner.tenant_id, request, owner.membership_id)
+        _set_request_status(cur, request, owner.membership_id, status)
+    service = _queue_service(conn, monkeypatch, owner)
+    result = service.list_pending_approvals(
+        bearer_token="test", member=member_from_workspace(owner)
+    )
+    assert result.items == []
+    assert result.next_cursor is None
+
+
+def _queue_service(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, workspace: Workspace
+) -> RequestsService:
+    client = PsycopgSupabaseClient(conn, claims=workspace.claims())
+    monkeypatch.setattr(module, "authenticated_client", lambda *_: client)
+    service = module.RequestsService()
+    # These enrichments do not affect visibility; the queue and request reads use real RLS.
+    for method in (
+        "_fetch_auto_prepared_batch",
+        "_fetch_sources_batch",
+        "_fetch_request_groups_batch",
+    ):
+        monkeypatch.setattr(service, method, lambda *_: {})
+    monkeypatch.setattr(service, "_budget_status_for", lambda *_: None)
+    monkeypatch.setattr(service, "_quoted_prices_for", lambda *_: {})
+    return service
+
+
+def test_pending_queue_paginates_only_visible_requests_and_preserves_tenant_scope(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "queue-page")
+        other = make_workspace(cur, "queue-other")
+        act_as(cur, other)
+        other_branch = _make_branch(cur, other)
+        foreign = _make_submitted_request(cur, other, other_branch)
+        _make_pending_step(cur, other.tenant_id, foreign, other.membership_id)
+        act_as(cur, owner)
+        branch = _make_branch(cur, owner)
+        live = []
+        for index, status in enumerate(["submitted", "withdrawn", "submitted", "withdrawn"]):
+            request = _make_submitted_request(cur, owner, branch)
+            step = _make_pending_step(cur, owner.tenant_id, request, owner.membership_id)
+            _set_request_status(cur, request, owner.membership_id, status)
+            cur.execute(
+                "update approval_step set created_at='2026-10-01'::timestamptz + "
+                "%s * interval '1 second' where id=%s",
+                (index, step),
+            )
+            if status == "submitted":
+                live.insert(0, request)
+    service = _queue_service(conn, monkeypatch, owner)
+    member = member_from_workspace(owner)
+    first = service.list_pending_approvals(bearer_token="test", member=member, limit=1)
+    assert [item.id for item in first.items] == live[:1]
+    assert first.next_cursor is not None
+    second = service.list_pending_approvals(
+        bearer_token="test", member=member, limit=1, cursor=first.next_cursor
+    )
+    assert [item.id for item in second.items] == live[1:]
+    assert second.next_cursor is None
+    all_visible = service.list_pending_approvals(bearer_token="test", member=member)
+    assert len(all_visible.items) == 2
+    assert {item.id for item in all_visible.items} == set(live)
+
+
+def _set_request_status(cur: psycopg.Cursor, request: UUID, membership: UUID, status: str) -> None:
+    cur.execute(
+        "update purchase_request set status=%s, "
+        "delivered_at=case when %s='delivered' then now() else null end, "
+        "delivery_confirmed_by_membership_id=case when %s='delivered' then %s::uuid else null end "
+        "where id=%s",
+        (status, status, status, membership, request),
+    )
+
+
+@pytest.mark.parametrize("status", ["withdrawn", "rejected", "delivered"])
+def test_member_removal_escalates_only_live_pending_steps(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, status: str
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "escalate-terminal")
+        removed = _make_member(cur, owner.tenant_id, "escalate-removed", "approver")
+        act_as(cur, owner)
+        branch = _make_branch(cur, owner)
+        for request_status in ("submitted", status):
+            request = _make_submitted_request(cur, owner, branch)
+            _make_pending_step(cur, owner.tenant_id, request, removed.membership_id)
+            _set_request_status(cur, request, owner.membership_id, request_status)
+    service = _queue_service(conn, monkeypatch, owner)
+    monkeypatch.setattr(service, "_record", lambda **_: None)
+    count = service.escalate_pending_steps_for_removed_member(
+        bearer_token="test",
+        actor=member_from_workspace(owner),
+        removed_membership_id=removed.membership_id,
+    )
+    assert count == 1

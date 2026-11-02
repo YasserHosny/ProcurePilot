@@ -47,6 +47,10 @@ class SelectQuery:
         self.filters.append((column, value))
         return self
 
+    def neq(self, column: str, value: str) -> SelectQuery:
+        self.rows = [row for row in self.rows if str(row.get(column)) != value]
+        return self
+
     def in_(self, column: str, values: list[str]) -> SelectQuery:
         allowed = set(values)
         self.rows = [row for row in self.rows if str(row.get(column)) in allowed]
@@ -566,3 +570,23 @@ def test_validate_approved_request_for_order_rejects_missing_evidence(
     with pytest.raises(ConflictError) as exc_info:
         service.validate_approved_request_for_order(bearer_token="token", request_id=req["id"])
     assert exc_info.value.details == {"reason": "request_not_approved"}
+
+
+@pytest.mark.parametrize("status", ["withdrawn", "rejected", "delivered"])
+def test_terminal_request_response_does_not_show_pending_assignee(status: str) -> None:
+    request_id = uuid4()
+    row = request_row(request_id, uuid4(), status=status)
+    step = step_row(request_id, uuid4())
+    result = requests_module._purchase_request(row, [], step)
+    assert result.approval_step is None
+
+
+@pytest.mark.parametrize("status", ["approved", "rejected"])
+def test_terminal_request_response_preserves_recorded_decision(status: str) -> None:
+    request_id = uuid4()
+    step = step_row(request_id, uuid4(), status=status)
+    result = requests_module._purchase_request(
+        request_row(request_id, uuid4(), status="withdrawn"), [], step
+    )
+    assert result.approval_step is not None
+    assert result.approval_step.status == status
