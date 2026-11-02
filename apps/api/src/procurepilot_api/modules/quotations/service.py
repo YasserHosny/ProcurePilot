@@ -64,11 +64,6 @@ TASK_LIST_COLUMNS = (
 )
 
 
-def _csv_text(value: object) -> str:
-    text = str(value) if value is not None else ""
-    return "'" + text if text.startswith(("=", "+", "-", "@", "\t", "\r")) else text
-
-
 class QuotationService:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
@@ -683,14 +678,13 @@ class QuotationService:
 
         output = StringIO()
         writer = csv.writer(output)
-        writer.writerow(["supplier_name", _csv_text(supplier_name)])
-        writer.writerow(["issue_date", _csv_text(quote.get("issue_date"))])
-        writer.writerow(["status", _csv_text(quote.get("status"))])
+        writer.writerow(["supplier_name", supplier_name])
+        writer.writerow(["issue_date", quote.get("issue_date") or ""])
         writer.writerow(["stated_total", decimal_string(quote.get("stated_total_amount")) or ""])
         writer.writerow(
             [
                 "currency",
-                _csv_text(quote.get("stated_total_currency") or quote.get("currency")),
+                quote.get("stated_total_currency") or quote.get("currency") or "",
             ]
         )
         writer.writerow([])
@@ -703,24 +697,20 @@ class QuotationService:
                 "unit_price_currency",
                 "vat_rate",
                 "delivery_fee_amount",
-                "delivery_fee_currency",
                 "discount_amount",
-                "discount_currency",
             ]
         )
         for line in lines:
             writer.writerow(
                 [
                     line.get("line_number") or "",
-                    _csv_text(line.get("original_text")),
+                    line.get("original_text") or "",
                     decimal_string(line.get("quantity")) or "",
                     decimal_string(line.get("unit_price_amount")) or "",
-                    _csv_text(line.get("unit_price_currency")),
+                    line.get("unit_price_currency") or "",
                     decimal_string(line.get("vat_rate")) or "",
                     decimal_string(line.get("delivery_fee_amount")) or "",
-                    _csv_text(line.get("delivery_fee_currency")),
                     decimal_string(line.get("discount_amount")) or "",
-                    _csv_text(line.get("discount_currency")),
                 ]
             )
         self._record(

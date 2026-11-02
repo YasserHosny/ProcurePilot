@@ -133,13 +133,6 @@ export class QuotationUploadComponent {
       });
   }
 
-  goToReview(id?: string): void {
-    const quotationId = id ?? this.createdQuotation()?.id;
-    if (!quotationId) return;
-    const queryParams = this.requoteQueryParams() ?? undefined;
-    this.router.navigate(['/quotations', quotationId, 'review'], { queryParams });
-  }
-
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
@@ -359,6 +352,13 @@ export class QuotationUploadComponent {
     this.pendingPresign.set(null);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
+    this.requoteFrom.set(null);
+    void this.router.navigate([], {
+      queryParams: { requote_from: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+      relativeTo: this.route,
+    });
   }
 
   formatFileSize(bytes: number): string {
