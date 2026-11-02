@@ -40,6 +40,7 @@ from procurepilot_api.modules.requests.routing import (
     resolve_approver,
 )
 from procurepilot_api.modules.requests.schemas import (
+    TERMINAL_REQUEST_STATUSES,
     ApprovalDecisionInput,
     ApprovalDelegation,
     ApprovalDelegationCreate,
@@ -582,7 +583,13 @@ class RequestsService:
         offset = _decode_cursor(cursor)
 
         try:
-            query = client.table("approval_step").select(STEP_COLUMNS).eq("status", "pending")
+            query = (
+                client.table("approval_step")
+                .select(f"{STEP_COLUMNS},purchase_request!inner(status)")
+                .eq("status", "pending")
+            )
+            for status in TERMINAL_REQUEST_STATUSES:
+                query = query.neq("purchase_request.status", status)
             if member.role is not MemberRole.owner:
                 query = query.eq("assigned_membership_id", str(member.membership_id))
             response = (
@@ -2456,13 +2463,15 @@ class RequestsService:
         """
         client = authenticated_client(self._settings, bearer_token)
         try:
-            pending_response = (
+            query = (
                 client.table("approval_step")
-                .select("id,purchase_request_id")
+                .select("id,purchase_request_id,purchase_request!inner(status)")
                 .eq("assigned_membership_id", str(removed_membership_id))
                 .eq("status", "pending")
-                .execute()
             )
+            for status in TERMINAL_REQUEST_STATUSES:
+                query = query.neq("purchase_request.status", status)
+            pending_response = query.execute()
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -3059,6 +3068,9 @@ def _purchase_request(
     source: RequestSource | None = None,
     request_group: RequestGroupSummary | None = None,
 ) -> PurchaseRequest:
+    # Keep recorded decisions as history, but never advertise a stale pending assignee.
+    if step_row and step_row["status"] == "pending" and row["status"] in TERMINAL_REQUEST_STATUSES:
+        step_row = None
     return PurchaseRequest(
         id=UUID(str(row["id"])),
         source_rfq_response_id=(

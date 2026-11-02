@@ -288,7 +288,10 @@ _RPC_PARAM_TYPES = {
 
 
 # (related table, local foreign key, related key), keyed by parent table and embed.
-_EMBED_RELATIONS = {("review_task", "quotation"): ("quotation", "quotation_id", "id")}
+_EMBED_RELATIONS = {
+    ("review_task", "quotation"): ("quotation", "quotation_id", "id"),
+    ("approval_step", "purchase_request"): ("purchase_request", "purchase_request_id", "id"),
+}
 
 
 class PsycopgTableQuery:

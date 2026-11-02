@@ -38,6 +38,7 @@ from procurepilot_api.modules.reports.schedules import (
     derive_weekly_window,
     next_run_after,
 )
+from procurepilot_api.modules.requests.schemas import TERMINAL_REQUEST_STATUSES
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.i18n import t
 from procurepilot_api.shared.logging import get_trace_id
@@ -544,6 +545,7 @@ class DigestsService:
                 where ast.tenant_id = %(tenant_id)s
                   and ast.assigned_membership_id = %(membership_id)s
                   and ast.status = 'pending'
+                  and not (pr.status = any(%(terminal_statuses)s::purchase_request_status[]))
                   and (%(branch_id)s::uuid is null or pr.branch_id = %(branch_id)s)
                 order by ast.created_at desc, ast.id desc
                 """,
@@ -551,6 +553,7 @@ class DigestsService:
                     "tenant_id": tenant_id,
                     "membership_id": membership_id,
                     "branch_id": branch_id,
+                    "terminal_statuses": list(TERMINAL_REQUEST_STATUSES),
                 },
             )
             approval_rows = [dict(r) for r in cur.fetchall()]
