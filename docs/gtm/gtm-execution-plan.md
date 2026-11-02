@@ -148,7 +148,10 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-140 | PPS-174 | P-141 | PPS-175 | P-142 | PPS-176 |
 | P-143 | PPS-177 | P-144 | PPS-178 | P-145 | PPS-179 |
 | P-146 | PPS-180 | P-147 | PPS-181 | P-148 | PPS-182 |
-| P-149 | PPS-183 | | | | |
+| P-149 | PPS-183 | P-180 | PPS-204 | P-181 | PPS-205 |
+| P-182 | PPS-206 | P-183 | PPS-207 | P-184 | PPS-208 |
+| P-185 | PPS-209 | P-186 | PPS-210 | P-187 | PPS-211 |
+| P-188 | PPS-212 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -350,6 +353,15 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-147 | — | RFQ screens a11y: dialog semantics, no live regions, colour-only errors, static page title. Medium; run axe first | — | — | To Do (PPS-181) |
 | [ ] P-148 | — | RFQ i18n/RTL: raw `{{date}}` in the Detail send dialog (live), hardcoded date hints, mixed numerals, reversed counter. High | — | — | To Do (PPS-182) |
 | [ ] P-149 | — | RFQ UX: reference number, richer list, filters/search/sort, email preview, reply tracking. Medium, owner scope call first | — | — | To Do (PPS-183) |
+| [ ] P-180 | — | PO receipts: a blank or zero receipt moves the order to «Partially received» (reproduced live on PO-000014); receipts and confirmations accepted on draft and cancelled orders (B1–B3). High | — | — | To Do (PPS-204) |
+| [ ] P-181 | — | PO lifecycle: submit has no confirm or undo, cancel is draft-only in the UI, `closed` can never be set, a failed save replaces the whole page, timeline misses submit/cancel (B4–B8). High, owner scope call first | — | — | To Do (PPS-205) |
+| [ ] P-182 | — | PO list: no search, filter or sort, offset cursor duplicates rows, one query per row, failed Load more replaces the list, approved-request menu shows only date and total (B9–B13). Medium-High | — | — | To Do (PPS-206) |
+| [ ] P-183 | — | PO create from a request: raw UUID banner, silent unlinked fallback, header tax and line totals unchecked, replay and re-link failures, label clash (B14–B20). Medium | — | — | To Do (PPS-207) |
+| [ ] P-184 | — | Basket-split optimiser: archived quotations still compete, baseline omits delivery fees, urgency ignored, results expire on creation, converted RFQ still advertises a saving (B21–B26). Medium-High | — | — | To Do (PPS-208) |
+| [ ] P-185 | — | Basket split web: unknown job shows the form with a footer error, one poll error stalls the spinner, job-navigation races, standalone rerun after refresh, no next step or history, 100-row pickers (B27–B34). Medium | — | — | To Do (PPS-209) |
+| [ ] P-186 | — | Database grants on basket-split and purchase-order tables are wider than the API's role and lifecycle checks (B35–B36). Medium-High; owner decision, then migration; neutral commit text, repo is public | — | — | To Do (PPS-210) |
+| [ ] P-187 | — | PO and split a11y/i18n/RTL: no live regions, hardcoded plural, locale flips between loads, date input format (B37–B43). Medium; run axe and RTL first | — | — | To Do (PPS-211) |
+| [ ] P-188 | — | PO and split UX: PO PDF/print and CSV export, receive-all and remaining hints, overdue/progress chips, linked documents, split next step and history (E1–E7). Medium, owner scope call first | — | — | To Do (PPS-212) |
 
 ### E — Pilot environment
 
@@ -439,3 +451,4 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-11-01 | Claude | Round-1 run on «مطاعم رواق» (RFQ `2094fcc9`): both replies sent and matched; Split failed with 503 `dependency=redis`, which the API did not explain. Filed P-121 (PPS-152) and opened #386 (log the enqueue failure). Redis answers `PING` without a password from outside; the backend's `REDIS_URL` is still PPS-146 (owner). Next: merge #386, deploy, split again and read the logged cause. |
 | 2026-11-02 | Claude | Quotations audit (live Chrome pass on «مطاعم رواق» + Codex static review) filed as P-122–P-131 (PPS-154–PPS-163). P-122, P-123, P-124 fixed test-first (Codex API, Agy web), reviewed by two models, merged (#389, #390, #391, #392) and checked live. The integration test stand-in (`PsycopgTableQuery`) now supports embedded filters and PostgREST `*` wildcards. Leftovers from these three are listed on PPS-163. Next: P-125 (money parsing and totals); P-126 and P-131 need an owner scope call. | |
 | 2026-11-02 | Claude | RFQ audit (live Chrome pass on «مطاعم رواق» + Codex static review) filed as P-140–P-149 (PPS-174–PPS-183). Live-confirmed: raw `{{date}}` in the Detail send dialog, history capped at 50 rows with no filters, empty-submit gives no text on Quantity/Suppliers, malformed RFQ id has no recovery, RFQs never expire. Not exercised: an actual send (no supplier emails), 390px width (window could not be resized), Guardrails page. One test draft (`cb133982`, needed by 9 Nov) was left on «مطاعم رواق»; RFQs cannot be deleted (P-142). Nothing fixed. | |
+| 2026-11-02 | Claude | Purchase-order and basket-split audit (live Chrome pass on «مطاعم رواق» + Codex static review) filed as P-180–P-188 (PPS-204–PPS-212). Live findings: a blank receipt on a submitted PO flips it to «Partially received» (test PO-000014, mine, left in that state); submit has no confirm and the UI cannot cancel a submitted PO; the PO list has no search/filter/sort; unknown split job id shows the form with a footer error; a converted RFQ shows a saving hint with no Split action. The RFQ split and Prepare dialog could not be driven live (every RFQ with replies is Converted: P-117). No code changed. Test data created: PO-000014, split job 4c6c7a48. Plan IDs P-150–P-169 belong to other sessions. |
