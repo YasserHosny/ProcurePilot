@@ -46,8 +46,8 @@
         <div class="breakdown-item">
           <span class="breakdown-label">{{ 'quotations.review.arithmetic.statedTotal' | translate }}</span>
           <span class="breakdown-val">
-            @if (q.stated_total) {
-              {{ q.stated_total | formatMoney }}
+            @if (statedTotal ?? q.stated_total; as st) {
+              {{ st | formatMoney }}
             } @else {
               —
             }
@@ -65,7 +65,7 @@
         </div>
         <div class="breakdown-item diff-item">
           <span class="breakdown-label">{{ 'quotations.review.arithmetic.difference' | translate }}</span>
-          <span class="breakdown-val diff-val">{{ { amount: arithmeticDifference ?? '0.00', currency: q.currency || 'USD' } | formatMoney }}</span>
+          <span class="breakdown-val diff-val">{{ { amount: arithmeticDifference ?? '0.00', currency: (statedTotal ?? q.stated_total)?.currency || q.currency || 'USD' } | formatMoney }}</span>
         </div>
       </div>
 
@@ -102,7 +102,13 @@
       <div class="reconciled-breakdown">
         <div class="breakdown-item">
           <span class="breakdown-label">{{ 'quotations.review.arithmetic.statedTotal' | translate }}</span>
-          <span class="breakdown-val">{{ q.stated_total | formatMoney }}</span>
+          <span class="breakdown-val">
+            @if (statedTotal ?? q.stated_total; as st) {
+              {{ st | formatMoney }}
+            } @else {
+              —
+            }
+          </span>
         </div>
         <div class="breakdown-item">
           <span class="breakdown-label">{{ 'quotations.review.arithmetic.computedLinesTotal' | translate }}</span>

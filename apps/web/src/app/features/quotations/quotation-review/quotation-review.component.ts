@@ -41,6 +41,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { CurrencySymbolPipe } from '../../../core/format/currency-symbol.pipe';
 import { FormatExtractionPipe } from '../../../core/format/extraction-value.pipe';
+import { parseMoneyInput } from '../../../core/format/money-input';
 import { QuotationReviewBannersComponent } from './quotation-review-banners.component';
 import { QuotationDocPreviewComponent } from './quotation-doc-preview.component';
 import { QuotationLinesComponent } from './quotation-lines.component';
@@ -70,8 +71,8 @@ interface ExpiryBadge {
 }
 
 interface EffectiveLineAmounts {
-  readonly quantity: number;
-  readonly unitPrice: number;
+  readonly quantity: number | null;
+  readonly unitPrice: number | null;
   readonly deliveryFee: number;
   readonly discount: number;
   readonly vatRate: number;
@@ -305,24 +306,67 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     if (q.lines.length === 0 && pendingNewLines.length === 0) return null;
 
     let total = 0;
+    let hasLineTotal = false;
     const currency = this.effectiveQuotationCurrency();
 
     for (const line of q.lines) {
       if (this.pendingRemoveLineIds().has(line.id)) continue;
+      const amounts = this.effectiveLineAmounts(line);
+      if (amounts.quantity === null || amounts.unitPrice === null) continue;
 
-      total += this.calculateLineTotal(this.effectiveLineAmounts(line));
+      hasLineTotal = true;
+      total += this.calculateLineTotal({
+        ...amounts,
+        quantity: amounts.quantity,
+        unitPrice: amounts.unitPrice,
+      });
     }
 
     for (const line of pendingNewLines) {
-      const qty = this.parseNumericInput(line.quantity, 1);
-      const price = this.parseNumericInput(line.unit_price_amount, 0);
-      total += qty * price;
+      const parsedQty = parseMoneyInput(line.quantity);
+      const parsedPrice = parseMoneyInput(line.unit_price_amount);
+      if (parsedQty === null || parsedPrice === null) continue;
+      hasLineTotal = true;
+      total += Number(parsedQty) * Number(parsedPrice);
     }
+
+    if (!hasLineTotal) return null;
 
     return {
       amount: total.toFixed(2),
       currency,
     };
+  });
+
+  readonly lineTotals = computed<Record<string, string | null>>(() => {
+    const q = this.quotation();
+    if (!q) return {};
+    const totals: Record<string, string | null> = {};
+    for (const line of q.lines) {
+      totals[line.id] = this.computeLineTotal(line);
+    }
+    return totals;
+  });
+
+  readonly effectiveStatedTotal = computed<Money | null>(() => {
+    const q = this.quotation();
+    if (!q) return null;
+    const fe = this.getFieldExtraction('quotation', q.id, 'stated_total');
+    if (fe && this.pendingCorrections().has(fe.id)) {
+      const correction = this.pendingCorrections().get(fe.id);
+      if (correction && typeof correction === 'object' && 'amount' in correction) {
+        const parsed = parseMoneyInput((correction as { amount: unknown }).amount);
+        if (parsed !== null) {
+          return {
+            amount: parsed,
+            currency:
+              (correction as { currency?: string }).currency ||
+              this.effectiveQuotationCurrency(),
+          };
+        }
+      }
+    }
+    return q.stated_total ?? null;
   });
 
   // Whether there is an arithmetic mismatch (client-side authoritative)
@@ -331,9 +375,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     if (!q) return false;
 
     const computedTotal = this.computedLinesTotal();
-    if (!q.stated_total?.amount || !computedTotal) return false;
+    const statedTotal = this.effectiveStatedTotal();
+    if (!statedTotal?.amount || !computedTotal) return false;
 
-    const stated = parseFloat(q.stated_total.amount);
+    const stated = parseFloat(statedTotal.amount);
     const computed = parseFloat(computedTotal.amount);
     if (Math.abs(stated - computed) <= 0.01) return false;
 
@@ -354,7 +399,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const q = this.quotation();
     if (!q) return false;
     const computedTotal = this.computedLinesTotal();
-    if (!q.stated_total?.amount || !computedTotal) return false;
+    const statedTotal = this.effectiveStatedTotal();
+    if (!statedTotal?.amount || !computedTotal) return false;
     return !this.hasArithmeticMismatch();
   });
 
@@ -362,8 +408,9 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const q = this.quotation();
     if (!q) return null;
     const computedTotal = this.computedLinesTotal();
-    if (!q.stated_total?.amount || !computedTotal) return null;
-    const stated = parseFloat(q.stated_total.amount);
+    const statedTotal = this.effectiveStatedTotal();
+    if (!statedTotal?.amount || !computedTotal) return null;
+    const stated = parseFloat(statedTotal.amount);
     const computed = parseFloat(computedTotal.amount);
     if (Math.abs(stated - computed) <= 0.01) return null;
     const hasLineVat = this.hasEffectiveLineVat();
@@ -380,10 +427,12 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   readonly arithmeticDifference = computed<string | null>(() => {
     const q = this.quotation();
     const computedTotal = this.computedLinesTotal();
-    if (!q?.stated_total?.amount || !computedTotal) return null;
+    const statedTotal = this.effectiveStatedTotal();
+    if (!q || !statedTotal?.amount || !computedTotal) return null;
 
-    const diff = parseFloat(computedTotal.amount) - parseFloat(q.stated_total.amount);
-    return diff.toFixed(2);
+    const diff = parseFloat(computedTotal.amount) - parseFloat(statedTotal.amount);
+    const normalizedDiff = Math.abs(diff) < 0.0001 ? 0 : diff;
+    return normalizedDiff.toFixed(2);
   });
 
   readonly hasPendingReviewChanges = computed<boolean>(() => {
@@ -853,9 +902,36 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     return !!fe && fe.field_name === 'currency' && parseFloat(fe.confidence) < 0.85;
   }
 
-  normalizeMoneyInput(value: string): string {
-    const normalised = value.replace(/[^0-9.-]/g, '');
-    return normalised || '0';
+  onStatedTotalInput(q: QuotationDetail, rawValue: unknown, commit = false): void {
+    const parsed = parseMoneyInput(rawValue);
+    const fe = this.getFieldExtraction('quotation', q.id, 'stated_total');
+    if (parsed === null) {
+      if (fe && this.pendingCorrections().has(fe.id)) {
+        this.revertToAiValue(fe.id);
+      }
+      return;
+    }
+    if (!fe) return;
+    const value: Money = {
+      amount: parsed,
+      currency: this.effectiveQuotationCurrency(),
+    };
+    if (commit) {
+      this.reviewFieldValue('quotation', q.id, 'stated_total', value);
+      return;
+    }
+    const currentCorrection = this.pendingCorrections().get(fe.id);
+    if (
+      currentCorrection &&
+      typeof currentCorrection === 'object' &&
+      'amount' in currentCorrection &&
+      (currentCorrection as { amount: unknown }).amount === value.amount &&
+      'currency' in currentCorrection &&
+      (currentCorrection as { currency: unknown }).currency === value.currency
+    ) {
+      return;
+    }
+    this.updateCorrection(fe.id, value);
   }
 
   selectField(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): void {
@@ -965,6 +1041,22 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       typeof reviewedValue === 'string' &&
       !/^\d{4}-\d{2}-\d{2}$/.test(reviewedValue)
     ) return;
+    if (entityType === 'quotation_line') {
+      if (fieldName === 'quantity') {
+        const canonical = parseMoneyInput(reviewedValue);
+        if (canonical === null) return;
+        reviewedValue = canonical;
+      } else if (fieldName === 'unit_price') {
+        const amount = this.moneyAmount(reviewedValue);
+        const canonical = parseMoneyInput(amount);
+        if (canonical === null) return;
+        const currency =
+          this.isMoney(reviewedValue) && reviewedValue.currency
+            ? reviewedValue.currency
+            : this.effectiveQuotationCurrency();
+        reviewedValue = { amount: canonical, currency };
+      }
+    }
     const fe = this.getFieldExtraction(entityType, entityId, fieldName);
     if (!fe || fe.corrected_by || parseFloat(fe.confidence) >= 0.85) return;
     if (this.pendingCorrections().has(fe.id)) return;
@@ -983,6 +1075,26 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const current = this.pendingCorrections().has(fe.id)
       ? this.pendingCorrections().get(fe.id)
       : fe.extracted_value;
+    if (entityType === 'quotation_line') {
+      if (fieldName === 'quantity') {
+        const canonical = parseMoneyInput(current);
+        if (canonical !== null) {
+          this.updateCorrection(fe.id, canonical);
+          return;
+        }
+      } else if (fieldName === 'unit_price') {
+        const amount = this.moneyAmount(current);
+        const canonical = parseMoneyInput(amount);
+        if (canonical !== null) {
+          const currency =
+            this.isMoney(current) && current.currency
+              ? current.currency
+              : this.effectiveQuotationCurrency();
+          this.updateCorrection(fe.id, { amount: canonical, currency });
+          return;
+        }
+      }
+    }
     this.updateCorrection(fe.id, current);
   }
 
@@ -1416,8 +1528,12 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   computeLineTotal(line: QuotationDetail['lines'][number]): string | null {
     const amounts = this.effectiveLineAmounts(line);
-    if (amounts.unitPrice === 0 && !line.unit_price?.amount) return null;
-    return this.calculateLineTotal(amounts).toFixed(2);
+    if (amounts.quantity === null || amounts.unitPrice === null) return null;
+    return this.calculateLineTotal({
+      ...amounts,
+      quantity: amounts.quantity,
+      unitPrice: amounts.unitPrice,
+    }).toFixed(2);
   }
 
   private hasEffectiveLineVat(): boolean {
@@ -1431,11 +1547,11 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   private effectiveLineAmounts(line: QuotationDetail['lines'][number]): EffectiveLineAmounts {
     return {
-      quantity: this.effectiveNumericLineValue(line, 'quantity', line.quantity, 1),
-      unitPrice: this.effectiveNumericLineValue(line, ['unit_price_amount', 'unit_price'], line.unit_price, 0),
-      deliveryFee: this.effectiveNumericLineValue(line, ['delivery_fee_amount', 'delivery_fee'], line.delivery_fee, 0),
-      discount: this.effectiveNumericLineValue(line, ['discount_amount', 'discount'], line.discount, 0),
-      vatRate: this.effectiveNumericLineValue(line, 'vat_rate', line.vat_rate, 0),
+      quantity: this.effectiveNumericLineValue(line, 'quantity', line.quantity, null),
+      unitPrice: this.effectiveNumericLineValue(line, ['unit_price_amount', 'unit_price'], line.unit_price, null),
+      deliveryFee: this.effectiveNumericLineValue(line, ['delivery_fee_amount', 'delivery_fee'], line.delivery_fee, 0) ?? 0,
+      discount: this.effectiveNumericLineValue(line, ['discount_amount', 'discount'], line.discount, 0) ?? 0,
+      vatRate: this.effectiveNumericLineValue(line, 'vat_rate', line.vat_rate, 0) ?? 0,
     };
   }
 
@@ -1443,22 +1559,24 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     line: QuotationDetail['lines'][number],
     fieldNames: string | readonly string[],
     defaultValue: unknown,
-    fallback: number,
-  ): number {
+    fallback: number | null,
+  ): number | null {
     const names = typeof fieldNames === 'string' ? [fieldNames] : fieldNames;
     for (const fieldName of names) {
       const extraction = this.getFieldExtraction('quotation_line', line.id, fieldName);
       if (extraction && this.pendingCorrections().has(extraction.id)) {
         return this.parseNumericInput(this.pendingCorrections().get(extraction.id), fallback);
       }
+      if (extraction && extraction.corrected_value !== null && extraction.corrected_value !== undefined) {
+        return this.parseNumericInput(extraction.corrected_value, fallback);
+      }
     }
     return this.parseNumericInput(defaultValue, fallback);
   }
 
-  private parseNumericInput(value: unknown, fallback: number): number {
-    const rawValue = this.moneyAmount(value);
-    const parsed = typeof rawValue === 'number' ? rawValue : parseFloat(String(rawValue ?? ''));
-    return Number.isFinite(parsed) ? parsed : fallback;
+  private parseNumericInput(value: unknown, fallback: number | null): number | null {
+    const parsed = parseMoneyInput(this.moneyAmount(value));
+    return parsed !== null ? Number(parsed) : fallback;
   }
 
   private moneyAmount(value: unknown): string | number | null {
@@ -1475,7 +1593,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     );
   }
 
-  private calculateLineTotal(amounts: EffectiveLineAmounts): number {
+  private calculateLineTotal(amounts: EffectiveLineAmounts & { quantity: number; unitPrice: number }): number {
     const lineNet = amounts.quantity * amounts.unitPrice + amounts.deliveryFee - amounts.discount;
     // A VAT-inclusive quote's prices already contain the rate (ADR-021): mirror the server.
     if (this.effectivePricesIncludeVat(this.quotation())) return lineNet;
@@ -1597,11 +1715,13 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const text = this.newLineText().trim();
     if (!text) return;
     const currency = this.effectiveQuotationCurrency();
+    const quantity = parseMoneyInput(this.newLineQuantity());
+    const unitPriceAmount = parseMoneyInput(this.newLinePriceAmount());
     const newLine: NewQuotationLine = {
       original_text: text,
-      quantity: this.newLineQuantity() || null,
-      unit_price_amount: this.newLinePriceAmount() || null,
-      unit_price_currency: this.newLinePriceAmount() ? currency : null,
+      quantity,
+      unit_price_amount: unitPriceAmount,
+      unit_price_currency: unitPriceAmount ? currency : null,
     };
     this.pendingNewLines.update(lines => [...lines, newLine]);
     this.isAddingLine.set(false);

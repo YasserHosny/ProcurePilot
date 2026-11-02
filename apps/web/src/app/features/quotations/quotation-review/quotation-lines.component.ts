@@ -12,7 +12,6 @@ import { TranslatePipe } from '@ngx-translate/core';
 
 import type {
   FieldExtraction,
-  Money,
   NewQuotationLine,
   QuotationDetail,
   QuotationLine,
@@ -20,6 +19,7 @@ import type {
 import { CurrencySymbolPipe } from '../../../core/format/currency-symbol.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { FormatService } from '../../../core/format/format.service';
+import { parseMoneyInput } from '../../../core/format/money-input';
 import { sameReviewedValue } from './reviewed-value';
 
 export function trimDecimalZeros(value: string): string {
@@ -54,7 +54,53 @@ export class QuotationLinesComponent {
   private readonly formatService = inject(FormatService);
   readonly trimDecimalZeros = trimDecimalZeros;
 
+  private readonly drafts = new Map<string, string>();
+  private activeFieldKey: string | null = null;
+
+  private fieldKey(lineId: string, fieldName: string): string {
+    return `${lineId}:${fieldName}`;
+  }
+
+  getDisplayQuantity(line: QuotationLine): string {
+    const key = this.fieldKey(line.id, 'quantity');
+    if (this.activeFieldKey === key && this.drafts.has(key)) {
+      return this.drafts.get(key)!;
+    }
+    return this.getEffectiveQuantity(line);
+  }
+
+  getDisplayUnitPrice(line: QuotationLine): string {
+    const key = this.fieldKey(line.id, 'unit_price');
+    if (this.activeFieldKey === key && this.drafts.has(key)) {
+      return this.drafts.get(key)!;
+    }
+    const amount = this.getEffectiveUnitPriceAmount(line);
+    if (!this.isWriter || this.quotation.status === 'reviewed') {
+      return this.formatUnitPrice(amount);
+    }
+    return trimDecimalZeros(amount);
+  }
+
+  onFieldFocus(line: QuotationLine, fieldName: 'quantity' | 'unit_price', currentValue: string): void {
+    const key = this.fieldKey(line.id, fieldName);
+    this.activeFieldKey = key;
+    this.drafts.set(key, currentValue);
+  }
+
+  onQuantityInput(line: QuotationLine, targetValue: string): void {
+    const key = this.fieldKey(line.id, 'quantity');
+    this.activeFieldKey = key;
+    this.drafts.set(key, targetValue);
+  }
+
+  onUnitPriceInput(line: QuotationLine, targetValue: string): void {
+    const key = this.fieldKey(line.id, 'unit_price');
+    this.activeFieldKey = key;
+    this.drafts.set(key, targetValue);
+  }
+
   @Input({ required: true }) quotation!: QuotationDetail;
+  @Input({ required: true }) lineTotals: Record<string, string | null> = {};
   @Input({ required: true }) effectiveCurrency = 'USD';
   @Input({ required: true }) activeExtraction: FieldExtraction | null = null;
   @Input({ required: true }) isWriter = false;
@@ -172,8 +218,9 @@ export class QuotationLinesComponent {
 
   formatUnitPrice(value: string | number | null | undefined): string {
     if (value === null || value === undefined || value === '') return '0';
-    const num = typeof value === 'number' ? value : parseFloat(value);
-    if (isNaN(num)) return '0';
+    const parsed = parseMoneyInput(value);
+    if (parsed === null) return '0';
+    const num = Number(parsed);
     const rounded = Math.round(num * 100) / 100;
     return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
   }
@@ -196,6 +243,11 @@ export class QuotationLinesComponent {
     return line.unit_price?.amount ?? '';
   }
 
+  getEffectiveQuantity(line: QuotationLine): string {
+    const val = this.getEffectiveValue('quotation_line', line.id, 'quantity', line.quantity ?? '');
+    return val !== null && val !== undefined ? String(val) : '';
+  }
+
   private isNumericEqual(a: string, b: string): boolean {
     const trimmedA = a.trim();
     const trimmedB = b.trim();
@@ -205,67 +257,142 @@ export class QuotationLinesComponent {
     if (!trimmedA || !trimmedB) {
       return false;
     }
-    const na = Number(trimmedA);
-    const nb = Number(trimmedB);
-    return !isNaN(na) && !isNaN(nb) && na === nb;
+    const parsedA = parseMoneyInput(trimmedA);
+    const parsedB = parseMoneyInput(trimmedB);
+    if (parsedA === null || parsedB === null) {
+      return false;
+    }
+    return Number(parsedA) === Number(parsedB);
+  }
+
+  onQuantityChange(line: QuotationLine, targetValue: string): void {
+    const key = this.fieldKey(line.id, 'quantity');
+    this.drafts.delete(key);
+    this.commitQuantity(line, targetValue);
+  }
+
+  onQuantityBlur(line: QuotationLine, targetValue?: string): void {
+    const key = this.fieldKey(line.id, 'quantity');
+    const raw = targetValue !== undefined ? targetValue : (this.drafts.get(key) ?? '');
+    this.drafts.delete(key);
+    if (this.activeFieldKey === key) {
+      this.activeFieldKey = null;
+    }
+    this.commitQuantity(line, raw);
+  }
+
+  private commitQuantity(line: QuotationLine, rawValue: string): void {
+    const parsed = parseMoneyInput(rawValue);
+    if (parsed === null) {
+      return;
+    }
+    const effective = this.getEffectiveQuantity(line);
+    const trimmedTarget = trimDecimalZeros(parsed);
+    const trimmedEffective = trimDecimalZeros(effective.trim());
+
+    if (
+      parsed === effective ||
+      trimmedTarget === trimmedEffective ||
+      this.isNumericEqual(parsed, effective)
+    ) {
+      return;
+    }
+
+    const fe = this.getFieldExtraction('quotation_line', line.id, 'quantity');
+    if (fe) {
+      this.pendingCorrections.set(fe.id, parsed);
+      this.correctionUpdated.emit({
+        feId: fe.id,
+        newValue: parsed,
+      });
+    }
+    this.fieldReviewed.emit({
+      entityType: 'quotation_line',
+      entityId: line.id,
+      fieldName: 'quantity',
+      reviewedValue: parsed,
+    });
+  }
+
+  getEffectiveUnitPriceCurrency(line: QuotationLine): string {
+    const fe = this.getFieldExtraction('quotation_line', line.id, 'unit_price');
+    if (fe && this.pendingCorrections.has(fe.id)) {
+      const pending = this.pendingCorrections.get(fe.id);
+      if (pending && typeof pending === 'object' && 'currency' in pending) {
+        const c = (pending as { currency: unknown }).currency;
+        if (typeof c === 'string' && c) return c;
+      }
+    }
+    if (fe?.corrected_value && typeof fe.corrected_value === 'object' && 'currency' in fe.corrected_value) {
+      const c = (fe.corrected_value as { currency: unknown }).currency;
+      if (typeof c === 'string' && c) return c;
+    }
+    return line.unit_price?.currency || this.effectiveCurrency || 'USD';
   }
 
   onUnitPriceChange(line: QuotationLine, targetValue: string): void {
+    const key = this.fieldKey(line.id, 'unit_price');
+    this.drafts.delete(key);
+    this.commitUnitPrice(line, targetValue);
+  }
+
+  onUnitPriceBlur(line: QuotationLine, targetValue?: string): void {
+    const key = this.fieldKey(line.id, 'unit_price');
+    const raw = targetValue !== undefined ? targetValue : (this.drafts.get(key) ?? '');
+    this.drafts.delete(key);
+    if (this.activeFieldKey === key) {
+      this.activeFieldKey = null;
+    }
+    this.commitUnitPrice(line, raw);
+  }
+
+  private commitUnitPrice(line: QuotationLine, rawValue: string): void {
+    const parsed = parseMoneyInput(rawValue);
+    if (parsed === null) {
+      return;
+    }
     const effective = this.getEffectiveUnitPriceAmount(line);
-    const trimmedTarget = trimDecimalZeros(targetValue.trim());
+    const trimmedTarget = trimDecimalZeros(parsed);
     const trimmedEffective = trimDecimalZeros(effective.trim());
 
     if (
-      targetValue === effective ||
+      parsed === effective ||
       trimmedTarget === trimmedEffective ||
-      this.isNumericEqual(targetValue, effective)
+      this.isNumericEqual(parsed, effective)
     ) {
       return;
     }
+
+    const currency = this.getEffectiveUnitPriceCurrency(line);
+    const newValue = {
+      amount: parsed,
+      currency,
+    };
 
     const fe = this.getFieldExtraction('quotation_line', line.id, 'unit_price');
     if (fe) {
+      this.pendingCorrections.set(fe.id, newValue);
       this.correctionUpdated.emit({
         feId: fe.id,
-        newValue: {
-          amount: targetValue,
-          currency: line.unit_price?.currency || this.effectiveCurrency,
-        },
+        newValue,
       });
     }
-  }
-
-  onUnitPriceBlur(line: QuotationLine, targetValue: string): void {
-    const effective = this.getEffectiveUnitPriceAmount(line);
-    const trimmedTarget = trimDecimalZeros(targetValue.trim());
-    const trimmedEffective = trimDecimalZeros(effective.trim());
-
-    if (
-      targetValue === effective ||
-      trimmedTarget === trimmedEffective ||
-      this.isNumericEqual(targetValue, effective)
-    ) {
-      return;
-    }
-
     this.fieldReviewed.emit({
       entityType: 'quotation_line',
       entityId: line.id,
       fieldName: 'unit_price',
-      reviewedValue: {
-        amount: targetValue,
-        currency: line.unit_price?.currency || this.effectiveCurrency,
-      },
+      reviewedValue: newValue,
     });
   }
 
   formatLineTotalDisplay(line: QuotationLine): string {
-    const rawTotal = this.computeLineTotal(line);
+    const rawTotal = this.lineTotals[line.id];
     if (rawTotal === null || rawTotal === undefined || rawTotal === '') {
       return '—';
     }
-    const num = parseFloat(rawTotal);
-    if (isNaN(num)) return '—';
+    const parsed = parseMoneyInput(rawTotal);
+    if (parsed === null) return '—';
+    const num = Number(parsed);
 
     const isZero = Math.abs(num) < 0.005;
     const normalized = isZero ? 0 : num;
@@ -287,26 +414,6 @@ export class QuotationLinesComponent {
   ): number {
     const fe = this.getFieldExtraction(entityType, entityId, fieldName);
     return fe ? parseFloat(fe.confidence) : 1;
-  }
-
-  computeLineTotal(line: QuotationLine): string | null {
-    const qtyVal = this.getEffectiveValue(
-      'quotation_line',
-      line.id,
-      'quantity',
-      line.quantity || '1',
-    );
-    const priceVal = this.getEffectiveValue(
-      'quotation_line',
-      line.id,
-      'unit_price',
-      line.unit_price,
-    );
-    const qty = parseFloat(String(qtyVal));
-    const priceObj = priceVal as Money | null | undefined;
-    const price = priceObj ? parseFloat(priceObj.amount) : 0;
-    if (isNaN(qty) || isNaN(price)) return null;
-    return (qty * price).toFixed(2);
   }
 
   formatConfidence(score: string | number): number {

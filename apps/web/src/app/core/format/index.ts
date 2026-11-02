@@ -6,3 +6,4 @@ export * from './iso-date';
 export * from './unit-label';
 export * from './quantity.pipe';
 export * from './extraction-value.pipe';
+export * from './money-input';
