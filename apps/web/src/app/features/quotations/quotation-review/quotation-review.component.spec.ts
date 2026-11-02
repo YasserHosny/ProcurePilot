@@ -11,7 +11,7 @@ import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { ApiError, AuditTrailEntry, FieldExtraction, Quotation, QuotationDetail, Role, Supplier } from '../../../core/api/models';
+import type { ApiError, AuditTrailEntry, FieldExtraction, Quotation, QuotationDetail, ReviewTask, Role, Supplier } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { QuotationReviewComponent } from './quotation-review.component';
@@ -21,6 +21,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
   let fixture: ComponentFixture<QuotationReviewComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
   let paramMapSubject: BehaviorSubject<ParamMap>;
+  let queryParamMapSubject: BehaviorSubject<ParamMap>;
   const homeCurrency = signal<string | undefined>('EGP');
 
   const mockQuotationDetail: QuotationDetail = {
@@ -145,6 +146,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     );
 
     paramMapSubject = new BehaviorSubject<ParamMap>(convertToParamMap({ id: 'q-review-1' }));
+    queryParamMapSubject = new BehaviorSubject<ParamMap>(convertToParamMap({}));
 
     const mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
@@ -167,9 +169,13 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
           provide: ActivatedRoute,
           useValue: {
             paramMap: paramMapSubject.asObservable(),
+            queryParamMap: queryParamMapSubject.asObservable(),
             snapshot: {
               get paramMap() {
                 return paramMapSubject.value;
+              },
+              get queryParamMap() {
+                return queryParamMapSubject.value;
               },
             },
           },
@@ -2052,6 +2058,519 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       expect(apiService.getQuotation).not.toHaveBeenCalledWith('quote-A');
       expect(component.quotation()?.id).toBe('quote-B');
       expect(component.isRetryingExtraction()).toBeFalse();
+    });
+  });
+
+  describe('Re-quote linking, reviewed button, and prior quotations selector (PPS-160 / P-128)', () => {
+    const validUuid = 'c49d6c29-373f-4e02-9844-33d3d7890abc';
+
+    it('(1) presets isRequote and selectedPreviousQuotationId from valid UUID requote_from param on quotation load', () => {
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      paramMapSubject.next(convertToParamMap({ id: 'q-review-1' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeTrue();
+      expect(component.selectedPreviousQuotationId()).toBe(validUuid);
+    });
+
+    it('(2) does not preset isRequote when requote_from equals current quotation id', () => {
+      const sameQuoteId = validUuid;
+      apiService.getQuotation.and.returnValue(
+        of({
+          ...mockQuotationDetail,
+          id: sameQuoteId,
+        }),
+      );
+      queryParamMapSubject.next(convertToParamMap({ requote_from: sameQuoteId }));
+      paramMapSubject.next(convertToParamMap({ id: sameQuoteId }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeFalse();
+      expect(component.selectedPreviousQuotationId()).toBeNull();
+    });
+
+    it('(3) does not preset isRequote when requote_from is not a UUID', () => {
+      queryParamMapSubject.next(convertToParamMap({ requote_from: 'not-a-valid-uuid' }));
+      paramMapSubject.next(convertToParamMap({ id: 'q-review-1' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeFalse();
+      expect(component.selectedPreviousQuotationId()).toBeNull();
+    });
+
+    it('(4) does not preset isRequote when quotation is already reviewed', () => {
+      const reviewedQuote: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'q-reviewed-1',
+        status: 'reviewed',
+      };
+      apiService.getQuotation.and.returnValue(of(reviewedQuote));
+
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      paramMapSubject.next(convertToParamMap({ id: 'q-reviewed-1' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeFalse();
+      expect(component.selectedPreviousQuotationId()).toBeNull();
+    });
+
+    it('(5) does not overwrite previous_quotation_id when quotation already has its own previous quotation linked', () => {
+      const alreadyLinkedQuote: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'q-linked-1',
+        previous_quotation_id: 'q-existing-prior',
+      };
+      apiService.getQuotation.and.returnValue(of(alreadyLinkedQuote));
+
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      paramMapSubject.next(convertToParamMap({ id: 'q-linked-1' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeTrue();
+      expect(component.selectedPreviousQuotationId()).toBe('q-existing-prior');
+    });
+
+    it('(6) a second quotation without the param does not inherit it', () => {
+      const quoteA: QuotationDetail = { ...mockQuotationDetail, id: 'quote-A' };
+      const quoteB: QuotationDetail = { ...mockQuotationDetail, id: 'quote-B' };
+      apiService.getQuotation.and.callFake((id: string) => of(id === 'quote-A' ? quoteA : quoteB));
+
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeTrue();
+      expect(component.selectedPreviousQuotationId()).toBe(validUuid);
+
+      queryParamMapSubject.next(convertToParamMap({}));
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeFalse();
+      expect(component.selectedPreviousQuotationId()).toBeNull();
+    });
+
+    it('(7) offers Create re-quote button on reviewed quotations and clicking it navigates with queryParams', () => {
+      const reviewedQuote: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'q-reviewed-77',
+        status: 'reviewed',
+      };
+      apiService.getQuotation.and.returnValue(of(reviewedQuote));
+      paramMapSubject.next(convertToParamMap({ id: 'q-reviewed-77' }));
+      fixture.detectChanges();
+
+      const buttons = Array.from(fixture.nativeElement.querySelectorAll('header.page-header button')) as HTMLButtonElement[];
+      const requoteBtn = buttons.find(
+        (b) =>
+          b.textContent?.includes('Create re-quote') ||
+          b.textContent?.includes('إنشاء طلب إعادة عرض') ||
+          b.querySelector('mat-icon')?.textContent?.trim() === 'content_copy',
+      );
+      expect(requoteBtn).toBeTruthy();
+
+      const router = TestBed.inject(Router);
+      spyOn(router, 'navigate');
+
+      requoteBtn?.click();
+      expect(router.navigate).toHaveBeenCalledWith(['/quotations/upload'], {
+        queryParams: { requote_from: 'q-reviewed-77' },
+      });
+    });
+
+    it('(8) makes selector request with supplier name search and filters out other suppliers and current quotation, newest first', () => {
+      const quoteWithSupplier: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'current-quote-id',
+        supplier_id: 'sup-1',
+      };
+      apiService.getQuotation.and.returnValue(of(quoteWithSupplier));
+      component.suppliers.set([
+        { id: 'sup-1', name: 'Dairy Direct Ltd', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+      ]);
+      apiService.getReviewTasks.and.returnValue(
+        of({
+          items: [
+            {
+              id: 'task-1',
+              quotation_id: 'current-quote-id',
+              supplier_name: 'Dairy Direct Ltd',
+              status: 'open',
+              priority: 'normal',
+              reason: 'review_required',
+              created_at: '2026-08-10T00:00:00Z',
+            },
+            {
+              id: 'task-2',
+              quotation_id: 'quote-other-supplier',
+              supplier_name: 'Other Supplier Ltd',
+              status: 'open',
+              priority: 'normal',
+              reason: 'review_required',
+              created_at: '2026-08-15T00:00:00Z',
+            },
+            {
+              id: 'task-3',
+              quotation_id: 'quote-prior-older',
+              supplier_name: 'Dairy Direct Ltd',
+              status: 'open',
+              priority: 'normal',
+              reason: 'review_required',
+              created_at: '2026-08-05T00:00:00Z',
+            },
+            {
+              id: 'task-4',
+              quotation_id: 'quote-prior-newer',
+              supplier_name: 'Dairy Direct Ltd',
+              status: 'open',
+              priority: 'normal',
+              reason: 'review_required',
+              created_at: '2026-08-20T00:00:00Z',
+            },
+            {
+              id: 'task-5',
+              quotation_id: 'quote-prior-newer',
+              supplier_name: 'Dairy Direct Ltd',
+              status: 'open',
+              priority: 'normal',
+              reason: 'review_required',
+              created_at: '2026-08-20T00:00:00Z',
+            },
+          ],
+          next_cursor: null,
+        }),
+      );
+
+      paramMapSubject.next(convertToParamMap({ id: 'current-quote-id' }));
+      fixture.detectChanges();
+      component.loadPriorQuotations();
+
+      expect(apiService.getReviewTasks).toHaveBeenCalledWith({
+        status: 'all',
+        limit: 100,
+        search: 'Dairy Direct Ltd',
+      });
+      expect(component.priorQuotations()).toEqual([
+        { id: 'quote-prior-newer', created_at: '2026-08-20T00:00:00Z', supplier_name: 'Dairy Direct Ltd' },
+        { id: 'quote-prior-older', created_at: '2026-08-05T00:00:00Z', supplier_name: 'Dairy Direct Ltd' },
+      ]);
+    });
+
+    it('(9) lists none and keeps empty state when current quotation has no supplier', () => {
+      const quoteWithoutSupplier: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-no-sup',
+        supplier_id: null,
+      };
+      apiService.getQuotation.and.returnValue(of(quoteWithoutSupplier));
+      apiService.getReviewTasks.calls.reset();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-no-sup' }));
+      fixture.detectChanges();
+      component.loadPriorQuotations();
+
+      expect(apiService.getReviewTasks).not.toHaveBeenCalled();
+      expect(component.priorQuotations()).toEqual([]);
+    });
+
+    it('(10) cancels pending prior quotations request when switching quotations so late reply does not fill selector', () => {
+      const quoteX: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-X',
+        supplier_id: 'sup-x',
+      };
+      const quoteY: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-Y',
+        supplier_id: 'sup-y',
+      };
+      component.suppliers.set([
+        { id: 'sup-x', name: 'Supplier X', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+        { id: 'sup-y', name: 'Supplier Y', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+      ]);
+
+      const tasksXSubject = new Subject<{ items: ReviewTask[]; next_cursor: string | null }>();
+      const tasksYSubject = new Subject<{ items: ReviewTask[]; next_cursor: string | null }>();
+
+      apiService.getQuotation.and.callFake((id: string) => of(id === 'quote-X' ? quoteX : quoteY));
+      apiService.getReviewTasks.and.callFake((params: { search?: string }) => {
+        if (params.search === 'Supplier X') {
+          return tasksXSubject.asObservable();
+        }
+        return tasksYSubject.asObservable();
+      });
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-X' }));
+      fixture.detectChanges();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-Y' }));
+      fixture.detectChanges();
+
+      // Late reply for supplier X arrives after switching to quotation of supplier Y
+      tasksXSubject.next({
+        items: [
+          {
+            id: 'task-x1',
+            quotation_id: 'quote-x-prior',
+            supplier_name: 'Supplier X',
+            status: 'open',
+            priority: 'normal',
+            reason: 'review_required',
+            created_at: '2026-08-10T00:00:00Z',
+          },
+        ],
+        next_cursor: null,
+      });
+
+      expect(component.priorQuotations()).toEqual([]);
+    });
+
+    it('(11) drops stale prior quotations reply if supplier changes on the same quotation', () => {
+      const quote: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-same',
+        supplier_id: 'sup-x',
+      };
+      apiService.getQuotation.and.returnValue(of(quote));
+      component.suppliers.set([
+        { id: 'sup-x', name: 'Supplier X', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+        { id: 'sup-y', name: 'Supplier Y', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+      ]);
+
+      const tasksXSubject = new Subject<{ items: ReviewTask[]; next_cursor: string | null }>();
+      apiService.getReviewTasks.and.returnValue(tasksXSubject.asObservable());
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-same' }));
+      fixture.detectChanges();
+
+      expect(apiService.getReviewTasks).toHaveBeenCalledWith({
+        status: 'all',
+        limit: 100,
+        search: 'Supplier X',
+      });
+
+      // Supplier changes on the same quotation before response arrives
+      component.selectedSupplierId.set('sup-y');
+
+      // Stale reply for Supplier X arrives
+      tasksXSubject.next({
+        items: [
+          {
+            id: 'task-x1',
+            quotation_id: 'quote-x-prior',
+            supplier_name: 'Supplier X',
+            status: 'open',
+            priority: 'normal',
+            reason: 'review_required',
+            created_at: '2026-08-10T00:00:00Z',
+          },
+        ],
+        next_cursor: null,
+      });
+
+      // Dropped because current supplier name is Supplier Y, not Supplier X
+      expect(component.priorQuotations()).toEqual([]);
+    });
+
+    it('keeps supplier Y prior quotations when supplier changes X -> Y quickly with X reply arriving last (success variant)', () => {
+      const quote: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-interleave-1',
+        supplier_id: 'sup-x',
+      };
+      apiService.getQuotation.and.returnValue(of(quote));
+      component.suppliers.set([
+        { id: 'sup-x', name: 'Supplier X', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+        { id: 'sup-y', name: 'Supplier Y', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+      ]);
+
+      const tasksXSubject = new Subject<{ items: ReviewTask[]; next_cursor: string | null }>();
+      const tasksYSubject = new Subject<{ items: ReviewTask[]; next_cursor: string | null }>();
+
+      apiService.getReviewTasks.and.callFake((params?: { search?: string }) => {
+        if (params?.search === 'Supplier X') {
+          return tasksXSubject.asObservable();
+        }
+        if (params?.search === 'Supplier Y') {
+          return tasksYSubject.asObservable();
+        }
+        return of({ items: [], next_cursor: null });
+      });
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-interleave-1' }));
+      fixture.detectChanges();
+
+      expect(apiService.getReviewTasks).toHaveBeenCalledWith({
+        status: 'all',
+        limit: 100,
+        search: 'Supplier X',
+      });
+
+      // Quick change to Supplier Y:
+      component.selectedSupplierId.set('sup-y');
+      component.loadPriorQuotations();
+
+      expect(apiService.getReviewTasks).toHaveBeenCalledWith({
+        status: 'all',
+        limit: 100,
+        search: 'Supplier Y',
+      });
+
+      // Supplier Y reply arrives first:
+      tasksYSubject.next({
+        items: [
+          {
+            id: 'task-y1',
+            quotation_id: 'quote-y-prior',
+            supplier_name: 'Supplier Y',
+            status: 'open',
+            priority: 'normal',
+            reason: 'review_required',
+            created_at: '2026-08-15T00:00:00Z',
+          },
+        ],
+        next_cursor: null,
+      });
+
+      expect(component.priorQuotations()).toEqual([
+        { id: 'quote-y-prior', created_at: '2026-08-15T00:00:00Z', supplier_name: 'Supplier Y' },
+      ]);
+
+      // Superseded Supplier X reply arrives last (success):
+      tasksXSubject.next({
+        items: [
+          {
+            id: 'task-x1',
+            quotation_id: 'quote-x-prior',
+            supplier_name: 'Supplier X',
+            status: 'open',
+            priority: 'normal',
+            reason: 'review_required',
+            created_at: '2026-08-10T00:00:00Z',
+          },
+        ],
+        next_cursor: null,
+      });
+
+      // List stays Y's:
+      expect(component.priorQuotations()).toEqual([
+        { id: 'quote-y-prior', created_at: '2026-08-15T00:00:00Z', supplier_name: 'Supplier Y' },
+      ]);
+    });
+
+    it('keeps supplier Y prior quotations when supplier changes X -> Y quickly with X reply arriving last (error variant)', () => {
+      const quote: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-interleave-2',
+        supplier_id: 'sup-x',
+      };
+      apiService.getQuotation.and.returnValue(of(quote));
+      component.suppliers.set([
+        { id: 'sup-x', name: 'Supplier X', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+        { id: 'sup-y', name: 'Supplier Y', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+      ]);
+
+      const tasksXSubject = new Subject<{ items: ReviewTask[]; next_cursor: string | null }>();
+      const tasksYSubject = new Subject<{ items: ReviewTask[]; next_cursor: string | null }>();
+
+      apiService.getReviewTasks.and.callFake((params?: { search?: string }) => {
+        if (params?.search === 'Supplier X') {
+          return tasksXSubject.asObservable();
+        }
+        if (params?.search === 'Supplier Y') {
+          return tasksYSubject.asObservable();
+        }
+        return of({ items: [], next_cursor: null });
+      });
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-interleave-2' }));
+      fixture.detectChanges();
+
+      // Quick change to Supplier Y:
+      component.selectedSupplierId.set('sup-y');
+      component.loadPriorQuotations();
+
+      // Supplier Y reply arrives first:
+      tasksYSubject.next({
+        items: [
+          {
+            id: 'task-y1',
+            quotation_id: 'quote-y-prior',
+            supplier_name: 'Supplier Y',
+            status: 'open',
+            priority: 'normal',
+            reason: 'review_required',
+            created_at: '2026-08-15T00:00:00Z',
+          },
+        ],
+        next_cursor: null,
+      });
+
+      expect(component.priorQuotations()).toEqual([
+        { id: 'quote-y-prior', created_at: '2026-08-15T00:00:00Z', supplier_name: 'Supplier Y' },
+      ]);
+
+      // Superseded Supplier X reply arrives last (error):
+      tasksXSubject.error(new Error('Stale network failure'));
+
+      // List stays Y's (not cleared by error callback):
+      expect(component.priorQuotations()).toEqual([
+        { id: 'quote-y-prior', created_at: '2026-08-15T00:00:00Z', supplier_name: 'Supplier Y' },
+      ]);
+    });
+
+    it('(12) calls getReviewTasks with supplier name and populates prior quotations when accepting supplier suggestion on quote opened with requote_from and no supplier_id', () => {
+      const quoteNoSupplier: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-no-supplier',
+        supplier_id: null,
+        suggested_supplier_id: 'sup-sugg',
+        suggested_supplier_name: 'Acme Suggested Ltd',
+        supplier_match_confidence: '0.95',
+      };
+      apiService.getQuotation.and.returnValue(of(quoteNoSupplier));
+      component.suppliers.set([
+        { id: 'sup-sugg', name: 'Acme Suggested Ltd', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+      ]);
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({
+          items: [
+            {
+              id: 'task-sugg-1',
+              quotation_id: 'quote-prior-acme',
+              supplier_name: 'Acme Suggested Ltd',
+              status: 'open',
+              priority: 'normal',
+              reason: 'review_required',
+              created_at: '2026-08-15T00:00:00Z',
+            },
+          ],
+          next_cursor: null,
+        }),
+      );
+
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      paramMapSubject.next(convertToParamMap({ id: 'quote-no-supplier' }));
+      fixture.detectChanges();
+
+      expect(component.isRequote()).toBeTrue();
+      expect(component.selectedPreviousQuotationId()).toBe(validUuid);
+      expect(apiService.getReviewTasks).not.toHaveBeenCalled();
+      expect(component.priorQuotations()).toEqual([]);
+
+      component.acceptSupplierSuggestion();
+      fixture.detectChanges();
+
+      expect(component.selectedSupplierId()).toBe('sup-sugg');
+      expect(apiService.getReviewTasks).toHaveBeenCalledWith({
+        status: 'all',
+        limit: 100,
+        search: 'Acme Suggested Ltd',
+      });
+      expect(component.priorQuotations()).toEqual([
+        { id: 'quote-prior-acme', created_at: '2026-08-15T00:00:00Z', supplier_name: 'Acme Suggested Ltd' },
+      ]);
     });
   });
 });
