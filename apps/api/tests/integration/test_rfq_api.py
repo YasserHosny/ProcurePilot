@@ -206,7 +206,7 @@ async def test_create_rfq_replays_on_idempotency_key_not_duplicates(
 
 
 @pytest.mark.asyncio
-async def test_send_rfq_partial_failure_leaves_failed_draft(
+async def test_send_rfq_partial_failure_marks_recipient_failed(
     auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     settings = get_settings()
@@ -293,7 +293,7 @@ async def test_send_rfq_partial_failure_leaves_failed_draft(
             cur.execute("select outbound_message_id from rfq_recipient where id = %s", (r1["id"],))
             assert cur.fetchone()[0] == r1["outbound_message_id"]
 
-    assert r2["status"] == "draft"
+    assert r2["status"] == "failed"
     assert r2["outbound_message_id"] is None
 
     app.dependency_overrides.clear()
