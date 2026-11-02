@@ -4231,6 +4231,31 @@
       "recipientStatus_sent": "مرسل",
       "recipientStatus_failed": "فاشل",
       "recipientStatus_draft": "لم يُرسل",
+      "reply": "الرد",
+      "replyStatus_notDelivered": "لم يتم التسليم",
+      "replyStatus_replied": "تم الرد",
+      "replyStatus_repliedCount": "تم الرد ({{count}})",
+      "replyStatus_noReply": "لا يوجد رد",
+      "replyStatus_overdue": "متأخر — مطلوب بحلول {{date}}",
+      "replyStatus_awaiting": "بانتظار الرد",
+      "suppliersRepliedTitle": "رد {{replied}} من أصل {{total}} من الموردين",
+      "suppliersReplied": {
+        "zero": "لم يرد أي مورد من أصل {{total}}",
+        "one": "رد مورد واحد من أصل {{total}}",
+        "two": "رد موردان من أصل {{total}}",
+        "few": "رد {{replied}} من أصل {{total}} موردين",
+        "many": "رد {{replied}} من أصل {{total}} موردًا",
+        "other": "رد {{replied}} من أصل {{total}} مورد"
+      },
+      "suppliersOverdueTitle": "{{count}} متأخر",
+      "suppliersOverdue": {
+        "zero": "0 متأخر",
+        "one": "1 متأخر",
+        "two": "2 متأخر",
+        "few": "{{count}} متأخرة",
+        "many": "{{count}} متأخرًا",
+        "other": "{{count}} متأخر"
+      },
       "convertedIntoRequest": "تم التحويل إلى الطلب",
       "convertedCount": {
         "zero": "لم يتم التحويل إلى أي طلبات",
