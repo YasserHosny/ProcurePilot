@@ -12,6 +12,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSortModule, type Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -49,6 +50,7 @@ type ReviewTaskSortOrder = 'asc' | 'desc';
     MatFormFieldModule,
     MatMenuModule,
     MatSelectModule,
+    MatSnackBarModule,
     MatSortModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
@@ -64,6 +66,7 @@ type ReviewTaskSortOrder = 'asc' | 'desc';
 export class ReviewQueueComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly session = inject(SessionService);
+  private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
 
   readonly isLoading = signal<boolean>(true);
@@ -105,24 +108,38 @@ export class ReviewQueueComponent implements OnInit {
       this.dateTo() !== null,
   );
 
-  readonly displayedColumns: readonly string[] = [
-    'select',
-    'quotation_id',
-    'supplier_name',
-    'reason',
-    'priority',
-    'status',
-    'stated_total',
-    'created_at',
-    'age',
-    'actions',
-  ];
+  readonly displayedColumns = computed<readonly string[]>(() =>
+    this.isWriter()
+      ? [
+          'select',
+          'quotation_id',
+          'supplier_name',
+          'reason',
+          'priority',
+          'status',
+          'stated_total',
+          'created_at',
+          'age',
+          'actions',
+        ]
+      : [
+          'quotation_id',
+          'supplier_name',
+          'reason',
+          'priority',
+          'status',
+          'stated_total',
+          'created_at',
+          'age',
+          'actions',
+        ],
+  );
 
   ngOnInit(): void {
     this.loadTasks();
   }
 
-  loadTasks(): void {
+  loadTasks(preserveIds?: Set<string>): void {
     this.loadTasksSub?.unsubscribe();
     this.loadTasksSub = null;
     if (this.loadMoreSub) {
@@ -154,7 +171,18 @@ export class ReviewQueueComponent implements OnInit {
       .subscribe({
         next: (res) => {
           this.tasks.set(res.items);
-          this.selectedTaskIds.set(new Set());
+          if (preserveIds && preserveIds.size > 0) {
+            const currentItemIds = new Set(res.items.map((item) => item.id));
+            const retained = new Set<string>();
+            for (const id of preserveIds) {
+              if (currentItemIds.has(id)) {
+                retained.add(id);
+              }
+            }
+            this.selectedTaskIds.set(retained);
+          } else {
+            this.selectedTaskIds.set(new Set());
+          }
           this.nextCursor.set(res.next_cursor);
           this.isLoading.set(false);
           this.loadTasksSub = null;
@@ -288,6 +316,10 @@ export class ReviewQueueComponent implements OnInit {
     this.api.archiveQuotation(task.quotation_id).subscribe({
       next: () => {
         this.tasks.set(this.tasks().filter((item) => item.id !== task.id));
+        const selected = new Set(this.selectedTaskIds());
+        if (selected.delete(task.id)) {
+          this.selectedTaskIds.set(selected);
+        }
         this.archivingTaskId.set(null);
       },
       error: (err: unknown) => {
@@ -331,20 +363,24 @@ export class ReviewQueueComponent implements OnInit {
     }
     this.isBulkArchiving.set(true);
     const tasks = this.tasks().filter((task) => selected.has(task.id));
-    let completed = 0;
-    let errors = 0;
+    if (tasks.length === 0) {
+      this.isBulkArchiving.set(false);
+      return;
+    }
+    const succeededIds: string[] = [];
+    const failedIds: string[] = [];
     for (const task of tasks) {
       this.api.archiveQuotation(task.quotation_id).subscribe({
         next: () => {
-          completed++;
-          if (completed + errors === tasks.length) {
-            this.finishBulkArchive();
+          succeededIds.push(task.id);
+          if (succeededIds.length + failedIds.length === tasks.length) {
+            this.finishBulkAction('archive', succeededIds, failedIds, []);
           }
         },
         error: () => {
-          errors++;
-          if (completed + errors === tasks.length) {
-            this.finishBulkArchive();
+          failedIds.push(task.id);
+          if (succeededIds.length + failedIds.length === tasks.length) {
+            this.finishBulkAction('archive', succeededIds, failedIds, []);
           }
         },
       });
@@ -363,20 +399,29 @@ export class ReviewQueueComponent implements OnInit {
     }
     this.isBulkRefusing.set(true);
     const tasks = this.tasks().filter((task) => selected.has(task.id));
-    let completed = 0;
-    let errors = 0;
-    for (const task of tasks) {
+    const eligibleTasks = tasks.filter((task) => !this.isResolvedTask(task));
+    const skippedTasks = tasks.filter((task) => this.isResolvedTask(task));
+    const skippedIds = skippedTasks.map((t) => t.id);
+
+    if (eligibleTasks.length === 0) {
+      this.finishBulkAction('refuse', [], [], skippedIds);
+      return;
+    }
+
+    const succeededIds: string[] = [];
+    const failedIds: string[] = [];
+    for (const task of eligibleTasks) {
       this.api.refuseQuotation(task.quotation_id).subscribe({
         next: () => {
-          completed++;
-          if (completed + errors === tasks.length) {
-            this.finishBulkRefuse();
+          succeededIds.push(task.id);
+          if (succeededIds.length + failedIds.length === eligibleTasks.length) {
+            this.finishBulkAction('refuse', succeededIds, failedIds, skippedIds);
           }
         },
         error: () => {
-          errors++;
-          if (completed + errors === tasks.length) {
-            this.finishBulkRefuse();
+          failedIds.push(task.id);
+          if (succeededIds.length + failedIds.length === eligibleTasks.length) {
+            this.finishBulkAction('refuse', succeededIds, failedIds, skippedIds);
           }
         },
       });
@@ -389,20 +434,29 @@ export class ReviewQueueComponent implements OnInit {
     this.isBulkReprioritising.set(true);
     this.bulkPriorityTarget.set(priority);
     const tasks = this.tasks().filter((task) => selected.has(task.id));
-    let completed = 0;
-    let errors = 0;
-    for (const task of tasks) {
+    const eligibleTasks = tasks.filter((task) => !this.isResolvedTask(task));
+    const skippedTasks = tasks.filter((task) => this.isResolvedTask(task));
+    const skippedIds = skippedTasks.map((t) => t.id);
+
+    if (eligibleTasks.length === 0) {
+      this.finishBulkAction('reprioritise', [], [], skippedIds);
+      return;
+    }
+
+    const succeededIds: string[] = [];
+    const failedIds: string[] = [];
+    for (const task of eligibleTasks) {
       this.api.updateReviewTaskPriority(task.id, priority).subscribe({
         next: () => {
-          completed++;
-          if (completed + errors === tasks.length) {
-            this.finishBulkReprioritise();
+          succeededIds.push(task.id);
+          if (succeededIds.length + failedIds.length === eligibleTasks.length) {
+            this.finishBulkAction('reprioritise', succeededIds, failedIds, skippedIds);
           }
         },
         error: () => {
-          errors++;
-          if (completed + errors === tasks.length) {
-            this.finishBulkReprioritise();
+          failedIds.push(task.id);
+          if (succeededIds.length + failedIds.length === eligibleTasks.length) {
+            this.finishBulkAction('reprioritise', succeededIds, failedIds, skippedIds);
           }
         },
       });
@@ -460,23 +514,62 @@ export class ReviewQueueComponent implements OnInit {
     return ['created_at', 'stated_total', 'priority', 'status'].includes(value);
   }
 
-  private finishBulkArchive(): void {
-    this.isBulkArchiving.set(false);
-    this.selectedTaskIds.set(new Set());
-    this.loadTasks();
-  }
+  private finishBulkAction(
+    action: 'archive' | 'refuse' | 'reprioritise',
+    succeededIds: string[],
+    failedIds: string[],
+    skippedIds: string[],
+  ): void {
+    if (action === 'archive') {
+      this.isBulkArchiving.set(false);
+    } else if (action === 'refuse') {
+      this.isBulkRefusing.set(false);
+    } else if (action === 'reprioritise') {
+      this.isBulkReprioritising.set(false);
+      this.bulkPriorityTarget.set(null);
+    }
 
-  private finishBulkRefuse(): void {
-    this.isBulkRefusing.set(false);
-    this.selectedTaskIds.set(new Set());
-    this.loadTasks();
-  }
+    const succeeded = succeededIds.length;
+    const failed = failedIds.length;
+    const skipped = skippedIds.length;
 
-  private finishBulkReprioritise(): void {
-    this.isBulkReprioritising.set(false);
-    this.bulkPriorityTarget.set(null);
-    this.selectedTaskIds.set(new Set());
-    this.loadTasks();
+    let message: string;
+    if (succeeded > 0 && failed === 0) {
+      message = this.translate.instant('quotations.queue.bulk.result.allSucceeded', {
+        count: succeeded,
+        succeeded,
+      });
+    } else if (succeeded > 0 && failed > 0) {
+      message = this.translate.instant('quotations.queue.bulk.result.partial', {
+        succeeded,
+        failed,
+        count: succeeded + failed,
+      });
+    } else {
+      message = this.translate.instant('quotations.queue.bulk.result.allFailed', {
+        failed,
+        count: failed,
+      });
+    }
+
+    if (skipped > 0) {
+      const isArabic =
+        typeof this.translate.currentLang === 'function'
+          ? this.translate.currentLang() === 'ar'
+          : this.translate.getCurrentLang?.() === 'ar';
+      const separator = isArabic ? '، ' : ', ';
+      const skippedPart = this.translate.instant('quotations.queue.bulk.result.skipped', {
+        skipped,
+        count: skipped,
+      });
+      message = `${message}${separator}${skippedPart}`;
+    }
+
+    this.snackBar.open(message, undefined, { duration: 4000 });
+
+    const failedSet = new Set(failedIds);
+    this.selectedTaskIds.set(failedSet);
+    this.loadTasks(failedSet);
   }
 
   private handleError(err: unknown): void {

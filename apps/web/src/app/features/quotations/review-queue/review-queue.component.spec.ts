@@ -1,8 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { signal, type WritableSignal } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { Subject, of } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
@@ -14,6 +15,7 @@ describe('ReviewQueueComponent (T052)', () => {
   let component: ReviewQueueComponent;
   let fixture: ComponentFixture<ReviewQueueComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  let mockRole: WritableSignal<Role | null>;
 
   const mockTasks: ReviewTask[] = [
     {
@@ -35,12 +37,24 @@ describe('ReviewQueueComponent (T052)', () => {
   ];
 
   beforeEach(async () => {
-    apiService = jasmine.createSpyObj('ApiService', ['getReviewTasks']);
+    apiService = jasmine.createSpyObj('ApiService', [
+      'getReviewTasks',
+      'archiveQuotation',
+      'refuseQuotation',
+      'updateReviewTaskPriority',
+    ]);
     apiService.getReviewTasks.and.returnValue(of({ items: mockTasks, next_cursor: null }));
+    apiService.archiveQuotation.and.returnValue(of(undefined as any));
+    apiService.refuseQuotation.and.returnValue(of(undefined as any));
+    apiService.updateReviewTaskPriority.and.returnValue(of(undefined as any));
 
+    mockRole = signal<Role | null>('buyer');
     const mockSession = {
-      hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
-      role: signal<Role | null>('buyer'),
+      hasRole: jasmine.createSpy('hasRole').and.callFake((...roles: Role[]) => {
+        const current = mockRole();
+        return current !== null && roles.includes(current);
+      }),
+      role: mockRole,
       currentMember: signal(null),
       isAuthenticated: signal(true),
       tenant: signal(null),
@@ -266,5 +280,161 @@ describe('ReviewQueueComponent (T052)', () => {
         date_to: expectedDateTo,
       }),
     );
+  });
+
+  describe('Bulk actions & queue failure handling (PPS-159 / P-127)', () => {
+    it('partial failure: retains failed ids, reports counts, and reloads list', () => {
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      spyOn(snackBar, 'open');
+      spyOn(window, 'confirm').and.returnValue(true);
+      const task3: ReviewTask = {
+        id: 'task-3',
+        quotation_id: 'q-103',
+        status: 'open',
+        priority: 'low',
+        reason: 'arithmetic_mismatch',
+        created_at: '2026-08-21T02:00:00Z',
+      };
+      component.tasks.set([...mockTasks, task3]);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-2', 'task-3']));
+
+      apiService.archiveQuotation.and.callFake((qId: string) => {
+        if (qId === 'q-101') {
+          return of(undefined as any);
+        }
+        return throwError(() => new Error('Archive failed for ' + qId));
+      });
+
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: [mockTasks[1], task3], next_cursor: null }),
+      );
+
+      component.bulkArchive();
+
+      expect(apiService.archiveQuotation).toHaveBeenCalledTimes(3);
+      expect(apiService.getReviewTasks).toHaveBeenCalled();
+      expect(component.selectedTaskIds().has('task-1')).toBeFalse();
+      expect(component.selectedTaskIds().has('task-2')).toBeTrue();
+      expect(component.selectedTaskIds().has('task-3')).toBeTrue();
+      expect(component.selectedTaskIds().size).toBe(2);
+      expect(snackBar.open).toHaveBeenCalledWith(
+        jasmine.stringMatching(/1.*updated.*2.*failed/),
+        undefined,
+        jasmine.any(Object),
+      );
+    });
+
+    it('all fail: retains all failed ids and reports failure count', () => {
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      spyOn(snackBar, 'open');
+      spyOn(window, 'confirm').and.returnValue(true);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-2']));
+
+      apiService.archiveQuotation.and.returnValue(
+        throwError(() => new Error('Network failure')),
+      );
+
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: mockTasks, next_cursor: null }),
+      );
+
+      component.bulkArchive();
+
+      expect(apiService.archiveQuotation).toHaveBeenCalledTimes(2);
+      expect(apiService.getReviewTasks).toHaveBeenCalled();
+      expect(component.selectedTaskIds().has('task-1')).toBeTrue();
+      expect(component.selectedTaskIds().has('task-2')).toBeTrue();
+      expect(component.selectedTaskIds().size).toBe(2);
+      expect(snackBar.open).toHaveBeenCalledWith(
+        jasmine.stringMatching(/No tasks were updated.*2.*failed/),
+        undefined,
+        jasmine.any(Object),
+      );
+    });
+
+    it('all succeed: empties selection, reports updated count, and reloads list', () => {
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      spyOn(snackBar, 'open');
+      spyOn(window, 'confirm').and.returnValue(true);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-2']));
+
+      apiService.archiveQuotation.and.returnValue(of(undefined as any));
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: [], next_cursor: null }),
+      );
+
+      component.bulkArchive();
+
+      expect(apiService.archiveQuotation).toHaveBeenCalledTimes(2);
+      expect(apiService.getReviewTasks).toHaveBeenCalled();
+      expect(component.selectedTaskIds().size).toBe(0);
+      expect(snackBar.open).toHaveBeenCalledWith(
+        jasmine.stringMatching(/2.*tasks updated/),
+        undefined,
+        jasmine.any(Object),
+      );
+    });
+
+    it('bulk refuse: skips resolved tasks without sending request and counts as skipped', () => {
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      spyOn(snackBar, 'open');
+      spyOn(window, 'confirm').and.returnValue(true);
+      const resolvedTask: ReviewTask = {
+        ...mockTasks[1],
+        id: 'task-resolved',
+        quotation_id: 'q-resolved',
+        status: 'resolved',
+      };
+      component.tasks.set([mockTasks[0], resolvedTask]);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-resolved']));
+
+      apiService.refuseQuotation.and.returnValue(of(undefined as any));
+      apiService.getReviewTasks.calls.reset();
+      apiService.getReviewTasks.and.returnValue(
+        of({ items: [resolvedTask], next_cursor: null }),
+      );
+
+      component.bulkRefuse();
+
+      expect(apiService.refuseQuotation).toHaveBeenCalledWith('q-101');
+      expect(apiService.refuseQuotation).not.toHaveBeenCalledWith('q-resolved');
+      expect(apiService.refuseQuotation).toHaveBeenCalledTimes(1);
+      expect(component.selectedTaskIds().size).toBe(0);
+      expect(snackBar.open).toHaveBeenCalledWith(
+        jasmine.stringMatching(/1.*tasks updated.*1.*skipped.*resolved/),
+        undefined,
+        jasmine.any(Object),
+      );
+    });
+
+    it('non-writer: bulk controls and selection checkboxes are not rendered', () => {
+      mockRole.set('viewer');
+      component.selectedTaskIds.set(new Set(['task-1']));
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(component.isWriter()).toBeFalse();
+      expect(el.querySelector('.bulk-actions-bar')).toBeNull();
+      expect(el.querySelector('[data-testid="bulk-actions-bar"]')).toBeNull();
+      expect(el.querySelectorAll('mat-checkbox').length).toBe(0);
+      expect(el.querySelectorAll('.select-cell').length).toBe(0);
+      expect(el.querySelector('.read-only-banner')).not.toBeNull();
+    });
+
+    it('single archive: removes the archived task id from selectedTaskIds', () => {
+      spyOn(window, 'confirm').and.returnValue(true);
+      component.selectedTaskIds.set(new Set(['task-1', 'task-2']));
+      apiService.archiveQuotation.and.returnValue(of(undefined as any));
+
+      component.archiveTask(mockTasks[0], new MouseEvent('click'));
+
+      expect(apiService.archiveQuotation).toHaveBeenCalledWith('q-101');
+      expect(component.selectedTaskIds().has('task-1')).toBeFalse();
+      expect(component.selectedTaskIds().has('task-2')).toBeTrue();
+      expect(component.tasks().some((t) => t.id === 'task-1')).toBeFalse();
+    });
   });
 });

@@ -915,6 +915,15 @@
       "bulkRefuseConfirm": "رفض {{count}} عرض(ات)؟ سيتم تمييزها كمرفوضة.",
       "bulkReprioritiseButton": "تعيين الأولوية",
       "bulkClear": "إلغاء التحديد",
+      "bulk": {
+        "result": {
+          "allSucceeded": "تم تحديث {{count}} مهمة",
+          "all": "تم تحديث {{count}} مهمة",
+          "partial": "تم تحديث {{succeeded}}، وفشل {{failed}} — تظل المهام الفاشلة محددة لإعادة المحاولة",
+          "allFailed": "لم يتم تحديث أي مهام (فشل {{failed}})",
+          "skipped": "تم تخطي {{skipped}} (مكتملة)"
+        }
+      },
       "selectAllLabel": "تحديد كل مهام المراجعة",
       "selectTaskLabel": "تحديد عرض السعر {{id}}",
       "readOnlyBadge": "صلاحية قراءة فقط",

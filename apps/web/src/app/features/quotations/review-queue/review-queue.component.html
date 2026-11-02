@@ -138,8 +138,8 @@
           <p class="empty-message">{{ 'quotations.queue.emptyMessage' | translate }}</p>
         </div>
       } @else {
-        @if (hasSelection()) {
-          <div class="bulk-actions-bar">
+        @if (isWriter() && hasSelection()) {
+          <div class="bulk-actions-bar" data-testid="bulk-actions-bar">
             <span class="bulk-count">
               {{ 'quotations.queue.bulkSelected' | translate:{ count: selectedTaskIds().size } }}
             </span>
@@ -219,6 +219,7 @@
             <ng-container matColumnDef="select">
               <th mat-header-cell *matHeaderCellDef class="select-cell">
                 <mat-checkbox
+                  data-testid="select-all-checkbox"
                   [checked]="allSelected()"
                   [indeterminate]="hasSelection() && !allSelected()"
                   (change)="toggleAll()"
@@ -230,6 +231,7 @@
               </th>
               <td mat-cell *matCellDef="let task" class="select-cell">
                 <mat-checkbox
+                  data-testid="select-task-checkbox"
                   [checked]="selectedTaskIds().has(task.id)"
                   (change)="toggleTask(task.id)"
                   (click)="$event.stopPropagation()"
@@ -372,10 +374,10 @@
               </td>
             </ng-container>
 
-            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
             <tr
               mat-row
-              *matRowDef="let row; columns: displayedColumns"
+              *matRowDef="let row; columns: displayedColumns()"
               [routerLink]="['/quotations', row.quotation_id, 'review']"
               class="clickable-row"
             ></tr>
