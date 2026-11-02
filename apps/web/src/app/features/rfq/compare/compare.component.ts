@@ -433,13 +433,15 @@ export class CompareComponent implements OnInit, OnChanges {
     const id = this.rfqId();
     if (!id) return;
     const recipientCount = detail?.recipients.length ?? 0;
+    const formattedDate = this.formatService.formatDate(detail?.rfq.needed_by_date);
 
     const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
       width: '440px',
       data: {
         titleKey: 'rfq.history.confirmSendTitle',
         messageKey: 'rfq.history.confirmSendMessage',
-        messageParams: { count: recipientCount },
+        messageParams: { count: recipientCount, date: formattedDate },
+        date: formattedDate,
         confirmKey: 'rfq.history.confirmSendButton',
         cancelKey: 'rfq.history.cancelSendButton',
         isDestructive: false,
