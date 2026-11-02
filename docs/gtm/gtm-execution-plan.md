@@ -149,6 +149,10 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-143 | PPS-177 | P-144 | PPS-178 | P-145 | PPS-179 |
 | P-146 | PPS-180 | P-147 | PPS-181 | P-148 | PPS-182 |
 | P-149 | PPS-183 | | | | |
+| P-160 | PPS-184 | P-161 | PPS-185 | P-162 | PPS-186 |
+| P-163 | PPS-187 | P-164 | PPS-188 | P-165 | PPS-189 |
+| P-166 | PPS-190 | P-167 | PPS-191 | P-168 | PPS-192 |
+| P-169 | PPS-193 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -350,6 +354,16 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-147 | — | RFQ screens a11y: dialog semantics, no live regions, colour-only errors, static page title. Medium; run axe first | — | — | To Do (PPS-181) |
 | [ ] P-148 | — | RFQ i18n/RTL: raw `{{date}}` in the Detail send dialog (live), hardcoded date hints, mixed numerals, reversed counter. High | — | — | To Do (PPS-182) |
 | [ ] P-149 | — | RFQ UX: reference number, richer list, filters/search/sort, email preview, reply tracking. Medium, owner scope call first | — | — | To Do (PPS-183) |
+| [ ] P-160 | — | Requests: create/edit/submit not atomic — a failed create leaves an empty draft (reproduced live: quantity 0 left a SAR 0 draft with Submit enabled), a failed edit deletes the lines, edit/submit/withdraw race. High | — | — | To Do (PPS-184) |
+| [ ] P-161 | — | Requests: the line-product estimate lookup should run inside the caller's workspace scope; verify in a throwaway DB first. High until verified; neutral commit text, repo is public | — | — | To Do (PPS-185) |
+| [ ] P-162 | — | Request validation: past required-by date and duplicate product lines accepted (live), quantity 0 gives only «Request validation failed», branch/cost-centre pair unchecked. High/Medium | — | — | To Do (PPS-186) |
+| [ ] P-163 | — | Request list: stops at 50 rows, filter responses race, offset cursor repeats rows, no Ordered/Delivered filter, filtered-empty says «No requests yet» (live). Medium | — | — | To Do (PPS-187) |
+| [ ] P-164 | — | Request actions: Withdraw in the list also opens the request (live), form withdraw has no confirm (live), Withdraw offered on Ordered rows, rows not keyboard-operable. Medium | — | — | To Do (PPS-188) |
+| [ ] P-165 | — | Request form: totals and estimates stale while editing (live), estimate shown against the wrong line, product list capped at 100, split sibling link keeps the old request (verify). Medium | — | — | To Do (PPS-189) |
+| [ ] P-166 | — | Request lifecycle: withdrawn/rejected dead ends, no discard-draft, approved-unordered cannot be cancelled, submit/withdraw ignore Idempotency-Key, audit after commit. Medium, owner scope call first | — | — | To Do (PPS-190) |
+| [ ] P-167 | — | Requests a11y/i18n/RTL: no inline field errors, banner off-screen with no focus (live), disabled Save with no reason, raw English API errors, repeated «Remove line». Medium; run axe + RTL first | — | — | To Do (PPS-191) |
+| [ ] P-168 | — | Guardrail-prepared drafts: cap uses quoted not requested quantities, completeness counts lines not products, budget remaining depends on viewer scope (static). Medium | — | — | To Do (PPS-192) |
+| [ ] P-169 | — | Requests UX: pack/unit on quantity (ADR-020), product search, list search/sort/columns, history and requester in the view, attachments decision. Medium, owner scope call first | — | — | To Do (PPS-193) |
 
 ### E — Pilot environment
 
@@ -439,3 +453,5 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-11-01 | Claude | Round-1 run on «مطاعم رواق» (RFQ `2094fcc9`): both replies sent and matched; Split failed with 503 `dependency=redis`, which the API did not explain. Filed P-121 (PPS-152) and opened #386 (log the enqueue failure). Redis answers `PING` without a password from outside; the backend's `REDIS_URL` is still PPS-146 (owner). Next: merge #386, deploy, split again and read the logged cause. |
 | 2026-11-02 | Claude | Quotations audit (live Chrome pass on «مطاعم رواق» + Codex static review) filed as P-122–P-131 (PPS-154–PPS-163). P-122, P-123, P-124 fixed test-first (Codex API, Agy web), reviewed by two models, merged (#389, #390, #391, #392) and checked live. The integration test stand-in (`PsycopgTableQuery`) now supports embedded filters and PostgREST `*` wildcards. Leftovers from these three are listed on PPS-163. Next: P-125 (money parsing and totals); P-126 and P-131 need an owner scope call. | |
 | 2026-11-02 | Claude | RFQ audit (live Chrome pass on «مطاعم رواق» + Codex static review) filed as P-140–P-149 (PPS-174–PPS-183). Live-confirmed: raw `{{date}}` in the Detail send dialog, history capped at 50 rows with no filters, empty-submit gives no text on Quantity/Suppliers, malformed RFQ id has no recovery, RFQs never expire. Not exercised: an actual send (no supplier emails), 390px width (window could not be resized), Guardrails page. One test draft (`cb133982`, needed by 9 Nov) was left on «مطاعم رواق»; RFQs cannot be deleted (P-142). Nothing fixed. | |
+
+| 2026-11-02 | Claude | Purchase-requests audit (live Chrome pass on «مطاعم رواق» + Codex static review) filed as P-160–P-169 (PPS-184–PPS-193). Live-confirmed: past required-by date saves; duplicate product lines save; quantity 0 gives a generic error and leaves an empty draft; Withdraw in the list also opens the request; form withdraw has no confirm; totals stay stale while editing; filtered-empty shows «No requests yet»; no Ordered/Delivered filter. Not driven live: Arabic/RTL and axe (locale persists on the shared account), budget status (none configured), split-sibling navigation and guardrail drafts (not mine to change), a real approval. Overlaps already filed: submission stranding = PPS-165 (P-171), DB write-policy parity = PPS-166 (P-172), self-approval = PPS-167 (P-173), prepare atomicity and mixed currencies = PPS-175 (P-141). Test requests created and withdrawn: `a044dec8`, `4f61b4b0`. |
