@@ -284,7 +284,10 @@ class RfqService:
                 lines = [RfqLine(**item) for item in cur.fetchall()]
                 cur.execute(
                     """select r.*, s.name as supplier_name,
-                              s.contact_email as supplier_contact_email
+                              s.contact_email as supplier_contact_email,
+                              (select count(*) from rfq_response resp
+                               where resp.tenant_id = r.tenant_id
+                                 and resp.rfq_recipient_id = r.id) as response_count
                        from rfq_recipient r
                        left join supplier s on s.id = r.supplier_id and s.tenant_id = r.tenant_id
                        where r.rfq_id = %s

@@ -254,6 +254,12 @@ table {
   color: var(--mat-sys-on-surface-variant);
 }
 
+.status-summary-line {
+  margin-block-start: 6px;
+  font-size: 13px;
+  color: var(--pp-text-muted);
+}
+
 .recipient-status-wrap {
   display: inline-flex;
   align-items: center;
@@ -270,6 +276,40 @@ table {
   &.dot-sent { background: var(--pp-success); }
   &.dot-failed { background: var(--pp-error); }
   &.dot-draft { background: var(--pp-text-muted); }
+}
+
+.recipient-reply-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--mat-sys-on-surface);
+
+  .reply-icon {
+    font-size: 16px;
+    inline-size: 16px;
+    block-size: 16px;
+    color: var(--pp-text-muted);
+  }
+
+  &.reply-replied {
+    .reply-icon {
+      color: var(--pp-success);
+    }
+  }
+
+  &.reply-overdue {
+    color: var(--pp-warning);
+    background-color: var(--pp-warning-container);
+    padding-block: 2px;
+    padding-inline: 6px;
+    border-radius: 4px;
+    font-weight: 500;
+
+    .reply-icon {
+      color: var(--pp-warning);
+    }
+  }
 }
 
 .status-badge {
