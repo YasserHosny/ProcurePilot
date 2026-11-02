@@ -236,7 +236,7 @@
                     (input)="onPackInput(line, packInput.value)"
                     (change)="onPackChange(line, packInput.value)"
                     (blur)="onPackBlur(line, packInput.value)"
-                    [readonly]="!isWriter || quotation.status === 'reviewed'"
+                    [readonly]="!isWriter || quotation.status === 'reviewed' || !hasPersistablePackExtraction(line)"
                   />
                 </mat-form-field>
                 @if (isPackChanged(line)) {

@@ -537,6 +537,39 @@ describe('QuotationLinesComponent', () => {
       expect(component.pendingCorrections.get('fe-vat-1')).toBe('0.005');
     });
 
+    it('(3f) line VAT: typing 1.1 stages 0.011 without float artifact', () => {
+      const input = fixture.nativeElement.querySelector('#field-fe-vat-1 input') as HTMLInputElement;
+      input.value = '1.1';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-vat-1')).toBe('0.011');
+    });
+
+    it('(3g) line VAT: typing 8.2 stages 0.082 without float artifact', () => {
+      const input = fixture.nativeElement.querySelector('#field-fe-vat-1 input') as HTMLInputElement;
+      input.value = '8.2';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-vat-1')).toBe('0.082');
+    });
+
+    it('(3h) line VAT: typing 14 stages 0.14', () => {
+      const input = fixture.nativeElement.querySelector('#field-fe-vat-1 input') as HTMLInputElement;
+      input.value = '14';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-vat-1')).toBe('0.14');
+    });
+
     it('(4) pack field is editable and stages pack corrections', () => {
       const input = fixture.nativeElement.querySelector('#field-fe-pack-count-1 input') as HTMLInputElement;
       expect(input).toBeTruthy();
@@ -562,6 +595,120 @@ describe('QuotationLinesComponent', () => {
       fixture.detectChanges();
 
       expect(component.pendingCorrections.size).toBe(0);
+    });
+
+    it('(4c) pack field: evidence unit "kg", changing only count stages only pack_count, no pack_unit', () => {
+      component.quotation = {
+        ...component.quotation,
+        field_extractions: [
+          ...(component.quotation.field_extractions || []),
+          {
+            id: 'fe-pack-unit-1',
+            quotation_id: 'q-1',
+            entity_type: 'quotation_line',
+            entity_id: 'line-1',
+            field_name: 'pack_unit',
+            extracted_value: 'kg',
+            confidence: '0.90',
+            extraction_method: 'structured_parse',
+            model_version: 'v1',
+            corrected_value: null,
+            corrected_by: null,
+            corrected_at: null,
+          },
+        ],
+      };
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-pack-count-1 input') as HTMLInputElement;
+      input.value = '12 × 5 kg';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-pack-count-1')).toBe(12);
+      expect(component.pendingCorrections.has('fe-unit-size-1')).toBeFalse();
+      expect(component.pendingCorrections.has('fe-pack-unit-1')).toBeFalse();
+    });
+
+    it('(4d) pack field: changing pack unit stages typed pack_unit correction', () => {
+      component.quotation = {
+        ...component.quotation,
+        field_extractions: [
+          ...(component.quotation.field_extractions || []),
+          {
+            id: 'fe-pack-unit-1',
+            quotation_id: 'q-1',
+            entity_type: 'quotation_line',
+            entity_id: 'line-1',
+            field_name: 'pack_unit',
+            extracted_value: 'kg',
+            confidence: '0.90',
+            extraction_method: 'structured_parse',
+            model_version: 'v1',
+            corrected_value: null,
+            corrected_by: null,
+            corrected_at: null,
+          },
+        ],
+      };
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-pack-count-1 input') as HTMLInputElement;
+      input.value = '6 × 5 box';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.has('fe-pack-count-1')).toBeFalse();
+      expect(component.pendingCorrections.has('fe-unit-size-1')).toBeFalse();
+      expect(component.pendingCorrections.get('fe-pack-unit-1')).toBe('box');
+    });
+
+    it('(4e) pack field: no pack rows -> input readonly; rows -> editable', () => {
+      // With rows present from beforeEach:
+      const editableInput = fixture.nativeElement.querySelector('#field-fe-pack-count-1 input') as HTMLInputElement;
+      expect(editableInput).toBeTruthy();
+      expect(editableInput.readOnly).toBeFalse();
+
+      // Remove all persistable pack rows:
+      component.quotation = {
+        ...component.quotation,
+        field_extractions: component.quotation.field_extractions?.filter(
+          (fe) => !['pack', 'pack_count', 'unit_size', 'pack_unit'].includes(fe.field_name),
+        ) || [],
+      };
+      fixture.detectChanges();
+
+      const readonlyInput = fixture.nativeElement.querySelector('#field-line-1-pack input') as HTMLInputElement;
+      expect(readonlyInput).toBeTruthy();
+      expect(readonlyInput.readOnly).toBeTrue();
+    });
+
+    it('(4f) pack field: only some constituents have rows -> only stages existing rows', () => {
+      // Line only has fe-pack-count-1, remove fe-unit-size-1
+      component.quotation = {
+        ...component.quotation,
+        field_extractions: component.quotation.field_extractions?.filter(
+          (fe) => fe.field_name !== 'unit_size' && fe.field_name !== 'pack_unit',
+        ) || [],
+      };
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-pack-count-1 input') as HTMLInputElement;
+      expect(input.readOnly).toBeFalse();
+
+      input.value = '12 × 10 kg';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-pack-count-1')).toBe(12);
+      expect(component.pendingCorrections.has('fe-unit-size-1')).toBeFalse();
+      expect(component.pendingCorrections.has('fe-pack-unit-1')).toBeFalse();
     });
 
     it('(5) line text: no row -> input readonly', () => {

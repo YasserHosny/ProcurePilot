@@ -716,6 +716,15 @@ export class QuotationLinesComponent {
     );
   }
 
+  hasPersistablePackExtraction(line: QuotationLine): boolean {
+    return Boolean(
+      this.getFieldExtraction('quotation_line', line.id, 'pack_count') ||
+      this.getFieldExtraction('quotation_line', line.id, 'unit_size') ||
+      this.getFieldExtraction('quotation_line', line.id, 'pack_unit') ||
+      this.getFieldExtraction('quotation_line', line.id, 'pack'),
+    );
+  }
+
   getPackConfidence(line: QuotationLine): number {
     const fe =
       this.getFieldExtraction('quotation_line', line.id, 'pack') ??
@@ -787,7 +796,7 @@ export class QuotationLinesComponent {
     const feUnit = this.getFieldExtraction('quotation_line', line.id, 'pack_unit');
     const fePack = this.getFieldExtraction('quotation_line', line.id, 'pack');
 
-    if (feCount) {
+    if (feCount && !countMatches) {
       this.pendingCorrections.set(feCount.id, parsed.pack_count);
       this.correctionUpdated.emit({ feId: feCount.id, newValue: parsed.pack_count });
       this.fieldReviewed.emit({
@@ -798,7 +807,7 @@ export class QuotationLinesComponent {
       });
     }
 
-    if (feSize) {
+    if (feSize && !sizeMatches) {
       this.pendingCorrections.set(feSize.id, parsed.unit_size);
       this.correctionUpdated.emit({ feId: feSize.id, newValue: parsed.unit_size });
       this.fieldReviewed.emit({
@@ -809,7 +818,7 @@ export class QuotationLinesComponent {
       });
     }
 
-    if (feUnit && parsed.pack_unit) {
+    if (feUnit && !unitMatches && parsed.pack_unit) {
       this.pendingCorrections.set(feUnit.id, parsed.pack_unit);
       this.correctionUpdated.emit({ feId: feUnit.id, newValue: parsed.pack_unit });
       this.fieldReviewed.emit({
@@ -1009,7 +1018,7 @@ export class QuotationLinesComponent {
     if (parsed === null) return;
     const num = Number(parsed);
     if (!Number.isFinite(num) || num < 0 || num > 100) return;
-    const fraction = (num / 100).toString();
+    const fraction = Number((num / 100).toFixed(4)).toString();
     const effective = this.getEffectiveVatRate(line);
 
     if (fraction === effective || this.isNumericEqual(fraction, effective)) {
