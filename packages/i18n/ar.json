@@ -27,7 +27,12 @@
     "cancel": "إلغاء",
     "retry": "إعادة المحاولة",
     "notAvailable": "غير متوفر",
-    "breadcrumbLabel": "مسار التنقل"
+    "breadcrumbLabel": "مسار التنقل",
+    "a11y": {
+      "skipToContent": "الانتقال إلى المحتوى الرئيسي",
+      "mainNavigation": "التنقل الرئيسي",
+      "homeLink": "بروكيور بايلوت"
+    }
   },
   "auth": {
     "signin": {

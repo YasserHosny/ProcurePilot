@@ -5,6 +5,30 @@
   block-size: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.skip-to-content {
+  position: absolute;
+  inset-block-start: -9999px;
+  inset-inline-start: 1rem;
+  z-index: 1000;
+  padding-block: 0.5rem;
+  padding-inline: 1rem;
+  background-color: var(--pp-surface-card);
+  color: var(--pp-primary);
+  border: 2px solid var(--pp-primary);
+  border-radius: var(--pp-radius-control, 8px);
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-decoration: none;
+
+  &:focus,
+  &:focus-visible {
+    inset-block-start: 1rem;
+    outline: 2px solid var(--pp-focus);
+    outline-offset: 2px;
+  }
 }
 
 .shell-toolbar {
@@ -121,6 +145,12 @@
   border-inline-end: 1px solid var(--pp-border);
   display: flex;
   flex-direction: column;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  inline-size: 100%;
 }
 
 .nav-section-title {
@@ -276,6 +306,11 @@
   padding: 1.5rem;
   box-sizing: border-box;
   overflow-y: auto;
+}
+
+main#main-content {
+  display: block;
+  outline: none;
 }
 
 .menu-header {

@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
@@ -75,6 +75,7 @@ export class ShellComponent implements OnInit {
   readonly isMobile = signal(false);
   readonly workspaces = signal<WorkspaceSummary[]>([]);
   readonly isSwitchingWorkspace = signal<boolean>(false);
+  private readonly elementRef = inject(ElementRef<HTMLElement>);
 
   readonly sidenavMode = computed(() => this.isMobile() ? 'over' as const : 'side' as const);
   readonly sidenavOpened = computed(() => !this.isMobile());
@@ -299,5 +300,19 @@ export class ShellComponent implements OnInit {
   onSignOut(): void {
     this.session.logout();
     void this.router.navigate(['/auth/sign-in']);
+  }
+
+  focusMainContent(event: Event): void {
+    event.preventDefault();
+    const nativeEl = this.elementRef.nativeElement as HTMLElement;
+    const main =
+      document.getElementById('main-content') ??
+      nativeEl.querySelector<HTMLElement>('#main-content');
+    if (main) {
+      main.focus();
+      if (typeof main.scrollIntoView === 'function') {
+        main.scrollIntoView({ block: 'start' });
+      }
+    }
   }
 }
