@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, ChangeDetectionStrategy, inject, signal, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, DestroyRef, inject, signal, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -31,6 +32,8 @@ export interface PrepareSplitRequestsDialogData {
   readonly rfqNeededByDate?: string | null;
   readonly suppliers?: readonly Supplier[];
   readonly branchId?: string | null;
+  readonly costCentreId?: string | null;
+  readonly cost_centre_id?: string | null;
 }
 
 export interface PrepareSplitRequestsDialogResult {
@@ -67,6 +70,7 @@ export const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
   changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class PrepareSplitRequestsDialogComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   readonly fb = inject(FormBuilder);
   readonly dialogRef = inject(MatDialogRef<PrepareSplitRequestsDialogComponent, PrepareSplitRequestsDialogResult>);
   readonly data: PrepareSplitRequestsDialogData = inject(MAT_DIALOG_DATA);
@@ -77,7 +81,17 @@ export class PrepareSplitRequestsDialogComponent implements OnInit {
   readonly translate = inject(TranslateService);
 
   readonly branches = signal<readonly Branch[]>([]);
-  readonly costCentres = signal<readonly CostCentre[]>([]);
+  readonly allCostCentres = signal<readonly CostCentre[]>([]);
+  readonly costCentresLoaded = signal<boolean>(false);
+  readonly selectedBranchId = signal<string>(this.data?.branchId ?? '');
+
+  readonly costCentres = computed<readonly CostCentre[]>(() => {
+    const branchId = this.selectedBranchId();
+    return this.allCostCentres().filter(
+      (cc) => !cc.branch_id || (branchId ? cc.branch_id === branchId : false),
+    );
+  });
+
   readonly isSubmitting = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
   readonly expiredQuotations = signal<{ id: string; supplier_name?: string; confirmed: boolean }[]>([]);
@@ -90,10 +104,16 @@ export class PrepareSplitRequestsDialogComponent implements OnInit {
       this.data.rfqNeededByDate ? parseIsoDateLocal(this.data.rfqNeededByDate) : null,
       [Validators.required],
     ),
-    cost_centre_id: [null as string | null],
+    cost_centre_id: [this.data.costCentreId ?? this.data.cost_centre_id ?? null as string | null],
   });
 
   ngOnInit(): void {
+    this.form.controls.branch_id.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((branchId) => {
+        this.selectedBranchId.set(branchId ?? '');
+        this.sanitizeSelectedCostCentre();
+      });
     this.loadBranches();
     this.loadCostCentres();
   }
@@ -135,12 +155,22 @@ export class PrepareSplitRequestsDialogComponent implements OnInit {
   loadCostCentres(): void {
     this.api.listCostCentres({ is_archived: false, limit: 100 }).subscribe({
       next: (res) => {
-        this.costCentres.set(res.items);
+        this.allCostCentres.set(res.items);
+        this.costCentresLoaded.set(true);
+        this.sanitizeSelectedCostCentre();
       },
       error: () => {
         // Soft fail
       },
     });
+  }
+
+  private sanitizeSelectedCostCentre(): void {
+    if (!this.costCentresLoaded()) return;
+    const selected = this.form.controls.cost_centre_id.value;
+    if (selected && !this.costCentres().some((cc) => cc.id === selected)) {
+      this.form.controls.cost_centre_id.setValue(null);
+    }
   }
 
   applyBranchPreselection(): void {
@@ -150,16 +180,22 @@ export class PrepareSplitRequestsDialogComponent implements OnInit {
 
     if (items.length === 1) {
       this.form.patchValue({ branch_id: items[0].id });
+      this.selectedBranchId.set(items[0].id);
+      this.sanitizeSelectedCostCentre();
       return;
     }
     const saved = this.readSavedBranchId();
     if (saved && items.some((b) => b.id === saved)) {
       this.form.patchValue({ branch_id: saved });
+      this.selectedBranchId.set(saved);
+      this.sanitizeSelectedCostCentre();
     }
   }
 
   onBranchChange(branchId: string): void {
+    this.selectedBranchId.set(branchId ?? '');
     this.saveBranchId(branchId);
+    this.sanitizeSelectedCostCentre();
   }
 
   toggleExpiredQuotation(id: string, confirmed: boolean): void {
