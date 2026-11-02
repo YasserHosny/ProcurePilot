@@ -46,6 +46,11 @@ def compute_guardrail_evaluation(
     if not rfq_row:
         return None
 
+    # Match service.py's read-time expiry without importing it (it imports this module).
+    rfq_status = rfq_row["status"]
+    if rfq_status == "sent" and rfq_row["needed_by_date"] < date.today():
+        rfq_status = "expired"
+
     cur.execute(
         "select id, tenant_id, enabled, min_response_count, max_order_value_amount, "
         "max_order_value_currency, max_price_variance_pct, supplier_allowlist, "
@@ -57,7 +62,7 @@ def compute_guardrail_evaluation(
     guardrails = [AutoPreparationGuardrail(**row) for row in cur.fetchall()]
     if not guardrails:
         return GuardrailEvaluationSnapshot(
-            rfq_status=rfq_row["status"],
+            rfq_status=rfq_status,
             needed_by_date=rfq_row["needed_by_date"],
             guardrails=[],
             total_response_count=0,
@@ -243,7 +248,7 @@ def compute_guardrail_evaluation(
             decisions[guardrail.id] = evaluate_guardrail(
                 GuardrailEvaluationInput(
                     guardrail=guardrail,
-                    rfq_status=rfq_row["status"],
+                    rfq_status=rfq_status,
                     total_response_count=total_responses,
                     candidates=[item for item in candidates if item.response_state == "active"],
                     recent_average_price_by_product=baseline,
@@ -251,7 +256,7 @@ def compute_guardrail_evaluation(
             )
 
     return GuardrailEvaluationSnapshot(
-        rfq_status=rfq_row["status"],
+        rfq_status=rfq_status,
         needed_by_date=rfq_row["needed_by_date"],
         guardrails=guardrails,
         total_response_count=total_responses,
