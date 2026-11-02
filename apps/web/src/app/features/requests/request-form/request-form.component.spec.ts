@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, RouterLink, provideRouter } from '@angular/router';
 import { By } from '@angular/platform-browser';
@@ -48,6 +49,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
   let api: jasmine.SpyObj<ApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
   let routerSpy: jasmine.SpyObj<Router>;
+  let dialogSpy: jasmine.SpyObj<MatDialog>;
 
   beforeEach(async () => {
     requestsApi = jasmine.createSpyObj('RequestsApiService', [
@@ -55,6 +57,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
       'updateRequest',
       'submitRequest',
       'submitGroup',
+      'withdrawRequest',
       'withdrawGroup',
       'getRequest',
     ]);
@@ -80,6 +83,8 @@ describe('RequestFormComponent — create mode (T017)', () => {
     api = jasmine.createSpyObj('ApiService', ['members', 'products']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
+    dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as ReturnType<MatDialog['open']>);
 
     organisationApi.listBranches.and.returnValue(of({ items: [], next_cursor: null }));
     organisationApi.listCostCentres.and.returnValue(of({ items: [], next_cursor: null }));
@@ -107,6 +112,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
             provideAppDateAdapter(),
             { provide: MatSnackBar, useValue: snackBarSpy },
             { provide: Router, useValue: routerSpy },
+            { provide: MatDialog, useValue: dialogSpy },
           ],
         },
       })
@@ -238,6 +244,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
   let api: jasmine.SpyObj<ApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
   let routerSpy: jasmine.SpyObj<Router>;
+  let dialogSpy: jasmine.SpyObj<MatDialog>;
 
   beforeEach(async () => {
     requestsApi = jasmine.createSpyObj('RequestsApiService', [
@@ -245,6 +252,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       'updateRequest',
       'submitRequest',
       'submitGroup',
+      'withdrawRequest',
       'withdrawGroup',
       'getRequest',
     ]);
@@ -270,6 +278,8 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     api = jasmine.createSpyObj('ApiService', ['members', 'products']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
+    dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as ReturnType<MatDialog['open']>);
 
     organisationApi.listBranches.and.returnValue(of({ items: [], next_cursor: null }));
     organisationApi.listCostCentres.and.returnValue(of({ items: [], next_cursor: null }));
@@ -314,6 +324,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
             provideAppDateAdapter(),
             { provide: MatSnackBar, useValue: snackBarSpy },
             { provide: Router, useValue: routerSpy },
+            { provide: MatDialog, useValue: dialogSpy },
           ],
         },
       })
@@ -938,6 +949,119 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       expect(requestsApi.withdrawGroup).toHaveBeenCalledTimes(2);
       const retryKey = requestsApi.withdrawGroup.calls.mostRecent().args[1];
       expect(retryKey).toBe(firstKey);
+    });
+
+    it('opens confirm dialog on withdraw click and does not withdraw if cancelled (PPS-188)', () => {
+      requestsApi.withdrawRequest.calls.reset();
+      dialogSpy.open.calls.reset();
+      dialogSpy.open.and.returnValue({ afterClosed: () => of(false) } as ReturnType<MatDialog['open']>);
+      requestsApi.getRequest.and.returnValue(of({ ...mockRequest, status: 'submitted' }));
+
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const withdrawBtn = hostFixture.nativeElement.querySelector('.withdraw-request-btn') as HTMLButtonElement;
+      expect(withdrawBtn).toBeTruthy();
+      withdrawBtn.click();
+      hostFixture.detectChanges();
+
+      expect(dialogSpy.open).toHaveBeenCalled();
+      expect(requestsApi.withdrawRequest).not.toHaveBeenCalled();
+    });
+
+    it('withdraws request only after confirmation in dialog (PPS-188)', () => {
+      requestsApi.withdrawRequest.calls.reset();
+      dialogSpy.open.calls.reset();
+      dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as ReturnType<MatDialog['open']>);
+      requestsApi.getRequest.and.returnValue(of({ ...mockRequest, status: 'submitted' }));
+      requestsApi.withdrawRequest.and.returnValue(of({ ...mockRequest, status: 'withdrawn' }));
+
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const withdrawBtn = hostFixture.nativeElement.querySelector('.withdraw-request-btn') as HTMLButtonElement;
+      expect(withdrawBtn).toBeTruthy();
+      withdrawBtn.click();
+      hostFixture.detectChanges();
+
+      expect(dialogSpy.open).toHaveBeenCalled();
+      const dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as {
+        titleKey?: string;
+        messageKey?: string;
+        confirmKey?: string;
+        isDestructive?: boolean;
+      };
+      expect(dialogData?.titleKey).toBe('requests.withdrawConfirmTitle');
+      expect(dialogData?.messageKey).toBe('requests.withdrawConfirmMessage');
+      expect(dialogData?.confirmKey).toBe('requests.actions.withdraw');
+      expect(dialogData?.isDestructive).toBeTrue();
+      expect(requestsApi.withdrawRequest).toHaveBeenCalledWith('r1', jasmine.any(String));
+    });
+
+    it('withdraws group with split confirmation dialog when request is part of a split (PPS-188)', () => {
+      requestsApi.withdrawGroup.calls.reset();
+      dialogSpy.open.calls.reset();
+      const submittedGrouped = { ...groupedRequest, status: 'submitted' as const };
+      requestsApi.getRequest.and.returnValue(of(submittedGrouped));
+      requestsApi.withdrawGroup.and.returnValue(of([submittedGrouped]));
+      dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as ReturnType<MatDialog['open']>);
+
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const withdrawBtn = hostFixture.nativeElement.querySelector('.withdraw-request-btn') as HTMLButtonElement;
+      expect(withdrawBtn).toBeTruthy();
+      withdrawBtn.click();
+      hostFixture.detectChanges();
+
+      expect(dialogSpy.open).toHaveBeenCalled();
+      const dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as {
+        titleKey?: string;
+        messageKey?: string;
+        confirmKey?: string;
+        confirmParams?: Record<string, unknown>;
+        messageParams?: Record<string, unknown>;
+        isDestructive?: boolean;
+      };
+      expect(dialogData?.titleKey).toBe('requests.split.withdrawConfirmTitle');
+      expect(dialogData?.messageKey).toBe('requests.split.withdrawConfirmMessageBoth');
+      expect(dialogData?.confirmKey).toBe('requests.split.withdrawBoth');
+      expect(dialogData?.isDestructive).toBeTrue();
+      expect(requestsApi.withdrawGroup).toHaveBeenCalledWith('grp-001', jasmine.any(String));
+    });
+
+    it('uses split wording with count for size 3 split in confirm dialog (PPS-188)', () => {
+      dialogSpy.open.calls.reset();
+      const threeWay = {
+        ...groupedRequest,
+        status: 'submitted' as const,
+        request_group: { ...groupedRequest.request_group!, size: 3 },
+      };
+      requestsApi.getRequest.and.returnValue(of(threeWay));
+      requestsApi.withdrawGroup.and.returnValue(of([threeWay]));
+      dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as ReturnType<MatDialog['open']>);
+
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+
+      const withdrawBtn = hostFixture.nativeElement.querySelector('.withdraw-request-btn') as HTMLButtonElement;
+      expect(withdrawBtn).toBeTruthy();
+      withdrawBtn.click();
+      hostFixture.detectChanges();
+
+      expect(dialogSpy.open).toHaveBeenCalled();
+      const dialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as {
+        titleKey?: string;
+        messageKey?: string;
+        confirmKey?: string;
+        confirmParams?: Record<string, unknown>;
+        messageParams?: Record<string, unknown>;
+      };
+      expect(dialogData?.titleKey).toBe('requests.split.withdrawConfirmTitle');
+      expect(dialogData?.messageKey).toBe('requests.split.withdrawConfirmMessageAll');
+      expect(dialogData?.confirmKey).toBe('requests.split.withdrawAll');
+      expect(dialogData?.messageParams).toEqual({ count: 3 });
+      expect(dialogData?.confirmParams).toEqual({ count: 3 });
     });
 
     it('part_of_split shows the message pointing to the group action', () => {
