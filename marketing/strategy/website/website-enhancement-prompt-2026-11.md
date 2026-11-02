@@ -44,7 +44,7 @@ material (our own screens and video) and no claims we can't show.
   - **WhatsApp:** `https://wa.me/201027354140` with a short prefilled message
     (EN "Hi, I'd like to talk about a project with Iron Systems." · AR «مرحبًا، أودّ التحدث معكم عن مشروع.»).
     Add the number to `lib/site.ts` next to `EMAILS` so it's set in one place. It's the same number shown in the
-    ProcurePilot demo video. Show it as `+20 102 735 4140` (LTR in the Arabic page).
+    ProcurePilot demo video (confirmed by Yasser, 2026-11-03). Show it as `+20 102 735 4140` (LTR in the Arabic page).
   - **Email:** `hello@iron-sys.com` (already in `lib/site.ts`).
 - The form can stay underneath as a secondary option, or be removed. Ask Yasser.
 - **No booking link.** Add a reply-time line ("We reply within one working day") only if Yasser confirms he can

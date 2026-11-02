@@ -1,6 +1,6 @@
 ---
 scope: ProcurePilot, first customer
-status: draft, awaiting Yasser's approval (decision B-5); nothing is sent by Claude
+status: draft, on hold until Yasser confirms (2026-11-03: "keep this now until my confirmation"); nothing is sent by Claude
 created: 2026-11-02
 based_on: strategy/b2b-focus-2026-11.md §3 · docs/gtm/first-customer-gtm-plan.md (Phase 1–2, the product's plan stays the source of truth) · approved DM script (PPS-14, rev 6) · D-2 pricing · MD-07
 ---
@@ -196,5 +196,5 @@ follow-ups with no reply, stop and move the lead to "Not now".
 ## What Claude needs from Yasser
 
 1. OK on this plan (B-5).
-2. Confirm the WhatsApp number +20 102 735 4140 is the one to use for outreach and on the website.
+2. ~~Confirm the WhatsApp number~~ confirmed 2026-11-03: +20 102 735 4140 for outreach and the website.
 3. Each evening, or whenever it suits you: who you messaged and who replied, so the pipeline stays current.
