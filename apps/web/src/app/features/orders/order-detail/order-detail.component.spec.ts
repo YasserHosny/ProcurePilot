@@ -375,4 +375,23 @@ describe('OrderDetailComponent', () => {
     expect(api.recordReceipt).not.toHaveBeenCalled();
     expect(byTestId('receipt-quantity-error')).toBeTruthy();
   });
+  it('clears an earlier failure message once a confirmation saves', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.receiptReference.set('GRN-7');
+    component.receiptDate.set('2026-10-25');
+    component.setQuantity('receipt', 'line-1', '4');
+    api.recordReceipt.and.returnValue(throwError(() => ({ status: 503 })));
+    component.recordReceipt();
+    fixture.detectChanges();
+    expect(byTestId('action-error')).toBeTruthy();
+
+    component.confirmationReference.set('SO-1');
+    component.onConfirmationDateChange(new Date(2026, 9, 25));
+    api.recordConfirmation.and.returnValue(of(component.evidence()!));
+    component.recordConfirmation();
+    fixture.detectChanges();
+
+    expect(byTestId('action-error')).toBeNull();
+  });
 });

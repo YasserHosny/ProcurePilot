@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 import psycopg
@@ -785,7 +786,13 @@ class OrdersService:
         except ValueError as exc:
             raise UnprocessableEntityError(details={"reason": "invalid_confirmation"}) from exc
         with self._transaction(member) as cur:
-            self._lock_order_cursor(cur, member.tenant_id, order_id)
+            self._lock_order_cursor(
+                cur,
+                member.tenant_id,
+                order_id,
+                evidence_table="supplier_confirmation",
+                idempotency_key=idempotency_key,
+            )
             cur.execute(
                 "insert into supplier_confirmation (tenant_id,purchase_order_id,supplier_reference,"
                 "confirmed_at,expected_delivery_date,source_kind,source_reference,source_hash,"
@@ -881,7 +888,13 @@ class OrdersService:
         except ValueError as exc:
             raise UnprocessableEntityError(details={"reason": "invalid_receipt"}) from exc
         with self._transaction(member) as cur:
-            self._lock_order_cursor(cur, member.tenant_id, order_id)
+            self._lock_order_cursor(
+                cur,
+                member.tenant_id,
+                order_id,
+                evidence_table="delivery_receipt",
+                idempotency_key=idempotency_key,
+            )
             cur.execute(
                 "insert into delivery_receipt (tenant_id,purchase_order_id,receipt_reference,"
                 "receipt_date,"
@@ -977,11 +990,20 @@ class OrdersService:
             raise _database_error(exc) from exc
 
     @staticmethod
-    def _lock_order_cursor(cur: psycopg.Cursor, tenant_id: UUID, order_id: UUID) -> None:
+    def _lock_order_cursor(
+        cur: psycopg.Cursor,
+        tenant_id: UUID,
+        order_id: UUID,
+        *,
+        evidence_table: Literal["delivery_receipt", "supplier_confirmation"] | None = None,
+        idempotency_key: UUID | None = None,
+    ) -> None:
         """Serialize evidence writes with each other and with submit/cancel on this order.
 
-        Evidence belongs to an order that was sent: a draft, cancelled or closed order refuses it,
-        decided under the lock so a racing cancel cannot slip a receipt past the check.
+        Evidence belongs to an order that was sent: a draft, cancelled or closed order refuses
+        new evidence, decided under the lock so a racing cancel cannot slip a receipt past the
+        check. A retry of evidence already recorded under the same key is a replay, not new
+        evidence, so it still gets its original answer after the order was cancelled.
         """
         cur.execute(
             "select status::text as status from purchase_order "
@@ -991,8 +1013,17 @@ class OrdersService:
         row = cur.fetchone()
         if row is None:
             raise NotFoundError(details={"resource": "purchase_order"})
-        if row["status"] in ("draft", "cancelled", "closed"):
-            raise ConflictError(details={"reason": "order_not_open_for_evidence"})
+        if row["status"] not in ("draft", "cancelled", "closed"):
+            return
+        if evidence_table is not None and idempotency_key is not None:
+            cur.execute(
+                f"select 1 from {evidence_table} "  # noqa: S608 - literal table names only
+                "where tenant_id = %s and purchase_order_id = %s and idempotency_key = %s",
+                (tenant_id, order_id, idempotency_key),
+            )
+            if cur.fetchone() is not None:
+                return
+        raise ConflictError(details={"reason": "order_not_open_for_evidence"})
 
     def _progress_status_cursor(
         self, cur: psycopg.Cursor, member: CurrentMember, order_id: UUID

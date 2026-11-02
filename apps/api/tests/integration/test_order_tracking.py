@@ -1026,3 +1026,54 @@ def test_evidence_is_refused_on_draft_and_cancelled_orders(
                 (order_id, order_id),
             )
             assert cur.fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("path", ["receipts", "confirmations"])
+def test_retried_evidence_after_the_order_was_cancelled_replays_instead_of_refusing(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    """P-180: a lost response must stay retryable even if the order was cancelled meanwhile."""
+    with (
+        committed_smart_context(f"order-replay-{path}") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+        payload = _base_order_payload(
+            context.supplier_ids[0], req_id, line_id, context.product_id, qty="10"
+        )
+        created = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert created.status_code == 201, created.text
+        order_id = created.json()["id"]
+        order_line_id = created.json()["lines"][0]["id"]
+        submitted = client.post(
+            f"/api/v1/orders/{order_id}/submit", headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert submitted.status_code == 200, submitted.text
+        receipt, confirmation = _evidence_bodies(order_line_id)
+        body = receipt if path == "receipts" else confirmation
+        key = str(uuid4())
+        first = client.post(
+            f"/api/v1/orders/{order_id}/{path}", json=body, headers={"Idempotency-Key": key}
+        )
+        assert first.status_code == 200, first.text
+        cancelled = client.post(
+            f"/api/v1/orders/{order_id}/cancel", headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert cancelled.status_code == 200, cancelled.text
+
+        retry = client.post(
+            f"/api/v1/orders/{order_id}/{path}", json=body, headers={"Idempotency-Key": key}
+        )
+
+        assert retry.status_code == 200, retry.text
+        assert retry.json()["order"]["status"] == "cancelled"
+        table = "delivery_receipt" if path == "receipts" else "supplier_confirmation"
+        with psycopg.connect(TEST_DATABASE_URL) as conn, conn.cursor() as cur:
+            cur.execute(f"select count(*) from {table} where purchase_order_id = %s", (order_id,))
+            assert cur.fetchone()[0] == 1

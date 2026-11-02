@@ -199,6 +199,7 @@ export class OrderDetailComponent implements OnInit {
   recordConfirmation(): void {
     const current = this.evidence();
     if (!current || !this.confirmationReference().trim() || !this.confirmationDate()) return;
+    this.actionError.set(null);
     this.isSaving.set(true);
     this.ordersApi.recordConfirmation(this.orderId, {
       supplier_reference: this.confirmationReference().trim(),
