@@ -646,7 +646,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     if (!name) return;
     this.isCreatingSupplierFromExtraction.set(true);
     this.errorMessage.set(null);
-    this.api.createSupplier({ name }).subscribe({
+    this.api
+      .createSupplier({ name })
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: (supplier) => {
         this.suppliers.update((items) => [...items, supplier]);
         this.selectedSupplierId.set(supplier.id);
@@ -1072,6 +1075,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
     this.api
       .patchQuotation(q.id, this.buildReviewPatch(corrections))
+      .pipe(takeUntil(this.cancelLoads$))
       .subscribe({
         next: (updated) => {
           this.quotation.set(updated);
@@ -1143,6 +1147,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
       this.api
         .patchQuotation(q.id, this.buildReviewPatch(corrections))
+        .pipe(takeUntil(this.cancelLoads$))
         .subscribe({
           next: (updated) => {
             this.quotation.set(updated);
@@ -1171,7 +1176,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.isRefusing.set(true);
     this.errorMessage.set(null);
 
-    this.api.refuseQuotation(q.id).subscribe({
+    this.api
+      .refuseQuotation(q.id)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: () => {
         this.isRefusing.set(false);
         this.loadQuotation(q.id);
@@ -1198,7 +1206,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.isArchiving.set(true);
     this.errorMessage.set(null);
 
-    this.api.archiveQuotation(q.id).subscribe({
+    this.api
+      .archiveQuotation(q.id)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: () => {
         this.isArchiving.set(false);
         this.snackBar.open(this.translate.instant('quotations.review.archived'), undefined, {
@@ -1223,7 +1234,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.isRetryingExtraction.set(true);
     this.errorMessage.set(null);
 
-    this.api.retryExtraction(q.id).subscribe({
+    this.api
+      .retryExtraction(q.id)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: (updated) => {
         this.isRetryingExtraction.set(false);
         this.loadQuotation(updated.id);
@@ -1254,11 +1268,20 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.isReplacingDocument.set(true);
     this.errorMessage.set(null);
 
-    this.api.presignDocument({ filename: file.name, mime_type: mimeType, size_bytes: file.size }).subscribe({
+    this.api
+      .presignDocument({ filename: file.name, mime_type: mimeType, size_bytes: file.size })
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: (presign) => {
-        this.api.uploadFileToStorage(presign.upload_url, file, presign.upload_fields).subscribe({
+        this.api
+          .uploadFileToStorage(presign.upload_url, file, presign.upload_fields)
+          .pipe(takeUntil(this.cancelLoads$))
+          .subscribe({
           next: () => {
-            this.api.replaceDocument(q.id, presign.document_id).subscribe({
+            this.api
+              .replaceDocument(q.id, presign.document_id)
+              .pipe(takeUntil(this.cancelLoads$))
+              .subscribe({
               next: () => {
                 this.isReplacingDocument.set(false);
                 this.loadQuotation(q.id);
@@ -1294,7 +1317,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     this.isExporting.set(true);
     this.errorMessage.set(null);
 
-    this.api.exportQuotation(q.id).subscribe({
+    this.api
+      .exportQuotation(q.id)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe({
       next: (blob) => {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1421,6 +1447,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
         previous_quotation_id: previousQuotationId,
         acknowledge_mismatch: this.mismatchAcknowledged() || undefined,
       })
+      .pipe(takeUntil(this.cancelLoads$))
       .subscribe({
         next: (confirmed) => {
           this.isConfirming.set(false);

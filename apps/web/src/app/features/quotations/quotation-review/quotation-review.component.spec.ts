@@ -4,7 +4,7 @@ import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { MatDatepicker } from '@angular/material/datepicker';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ActivatedRoute, ParamMap, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, ParamMap, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 
@@ -120,9 +120,15 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       'presignDocument',
       'uploadFileToStorage',
       'replaceDocument',
+      'refuseQuotation',
+      'archiveQuotation',
+      'retryExtraction',
     ]);
     apiService.getQuotation.and.returnValue(of(mockQuotationDetail));
     apiService.suppliers.and.returnValue(of({ items: mockSuppliers, next_cursor: null }));
+    apiService.refuseQuotation.and.returnValue(of(mockQuotationDetail));
+    apiService.archiveQuotation.and.returnValue(of(mockQuotationDetail));
+    apiService.retryExtraction.and.returnValue(of(mockQuotationDetail));
     apiService.getQuotationMatches.and.returnValue(of({ quotation_id: 'q-review-1', lines: [] }));
     apiService.getDocumentDownloadUrl.and.returnValue(of({ download_url: 'https://storage.example.com/doc-1.pdf' }));
     apiService.getAuditTrail.and.returnValue(of({ items: [] }));
@@ -1921,6 +1927,131 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       expect(component.loadFailed()).toBeTrue();
       expect(component.errorMessage()).toBe(genericError);
       expect(component.errorMessage()).not.toBe(rawHttpError.message);
+    });
+
+    it('(j) saveCorrections for A pending, paramMap switches to B, B loads, then A PATCH response arrives -> quotation().id is still B, pendingCorrections for B untouched, getQuotation was not called again for A', () => {
+      const quoteA: QuotationDetail = { ...mockQuotationDetail, id: 'quote-A' };
+      const quoteB: QuotationDetail = {
+        ...mockQuotationDetail,
+        id: 'quote-B',
+        field_extractions: [
+          {
+            ...mockQuotationDetail.field_extractions[0],
+            id: 'fe-quote-B-1',
+            quotation_id: 'quote-B',
+          },
+        ],
+      };
+      const patchASubject = new Subject<QuotationDetail>();
+
+      apiService.getQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return of(quoteA);
+        if (id === 'quote-B') return of(quoteB);
+        return of(mockQuotationDetail);
+      });
+      apiService.patchQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return patchASubject.asObservable();
+        return of(quoteB);
+      });
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+      expect(component.quotation()?.id).toBe('quote-A');
+
+      component.pendingCorrections.set(new Map([['fe-quote-A-1', 'corrected-A']]));
+      component.saveCorrections();
+      expect(component.isSaving()).toBeTrue();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+      expect(component.quotation()?.id).toBe('quote-B');
+      expect(component.isSaving()).toBeFalse();
+
+      component.pendingCorrections.set(new Map([['fe-quote-B-1', 'corrected-B']]));
+      apiService.getQuotation.calls.reset();
+
+      patchASubject.next({ ...quoteA, reviewer_notes: 'Updated note A' });
+      fixture.detectChanges();
+
+      expect(component.quotation()?.id).toBe('quote-B');
+      expect(component.pendingCorrections().get('fe-quote-B-1')).toBe('corrected-B');
+      expect(apiService.getQuotation).not.toHaveBeenCalledWith('quote-A');
+    });
+
+    it('(k) refuse for A pending then switch -> late response does not call loadQuotation/navigate/snackbar for A', () => {
+      const quoteA: QuotationDetail = { ...mockQuotationDetail, id: 'quote-A' };
+      const quoteB: QuotationDetail = { ...mockQuotationDetail, id: 'quote-B' };
+      const refuseASubject = new Subject<Quotation>();
+
+      apiService.getQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return of(quoteA);
+        if (id === 'quote-B') return of(quoteB);
+        return of(mockQuotationDetail);
+      });
+      apiService.refuseQuotation.and.returnValue(refuseASubject.asObservable());
+
+      const router = TestBed.inject(Router);
+      spyOn(router, 'navigate');
+      const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+      spyOn(snackBar, 'open');
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+      expect(component.quotation()?.id).toBe('quote-A');
+
+      component.refuseQuotation();
+      expect(component.isRefusing()).toBeTrue();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+      expect(component.quotation()?.id).toBe('quote-B');
+      expect(component.isRefusing()).toBeFalse();
+
+      apiService.getQuotation.calls.reset();
+
+      refuseASubject.next({ ...quoteA, status: 'refused' });
+      fixture.detectChanges();
+
+      expect(apiService.getQuotation).not.toHaveBeenCalledWith('quote-A');
+      expect(router.navigate).not.toHaveBeenCalled();
+      expect(snackBar.open).not.toHaveBeenCalled();
+      expect(component.quotation()?.id).toBe('quote-B');
+      expect(component.isRefusing()).toBeFalse();
+    });
+
+    it('(l) retryExtraction for A pending then switch -> late response does not reload A', () => {
+      const quoteA: QuotationDetail = { ...mockQuotationDetail, id: 'quote-A', status: 'in_review' };
+      const quoteB: QuotationDetail = { ...mockQuotationDetail, id: 'quote-B' };
+      const retryASubject = new Subject<Quotation>();
+
+      apiService.getQuotation.and.callFake((id: string) => {
+        if (id === 'quote-A') return of(quoteA);
+        if (id === 'quote-B') return of(quoteB);
+        return of(mockQuotationDetail);
+      });
+      apiService.retryExtraction.and.returnValue(retryASubject.asObservable());
+      spyOn(window, 'confirm').and.returnValue(true);
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-A' }));
+      fixture.detectChanges();
+      expect(component.quotation()?.id).toBe('quote-A');
+
+      component.retryExtraction();
+      expect(component.isRetryingExtraction()).toBeTrue();
+
+      paramMapSubject.next(convertToParamMap({ id: 'quote-B' }));
+      fixture.detectChanges();
+      expect(component.quotation()?.id).toBe('quote-B');
+      expect(component.isRetryingExtraction()).toBeFalse();
+
+      apiService.getQuotation.calls.reset();
+
+      retryASubject.next({ ...quoteA, status: 'extracted' });
+      fixture.detectChanges();
+
+      expect(apiService.getQuotation).not.toHaveBeenCalledWith('quote-A');
+      expect(component.quotation()?.id).toBe('quote-B');
+      expect(component.isRetryingExtraction()).toBeFalse();
     });
   });
 });
