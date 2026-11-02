@@ -4247,6 +4247,31 @@
       "recipientStatus_sent": "Sent",
       "recipientStatus_failed": "Failed",
       "recipientStatus_draft": "Not sent",
+      "reply": "Reply",
+      "replyStatus_notDelivered": "Not delivered",
+      "replyStatus_replied": "Replied",
+      "replyStatus_repliedCount": "Replied ({{count}})",
+      "replyStatus_noReply": "No reply",
+      "replyStatus_overdue": "Overdue — needed by {{date}}",
+      "replyStatus_awaiting": "Awaiting reply",
+      "suppliersRepliedTitle": "{{replied}} of {{total}} suppliers replied",
+      "suppliersReplied": {
+        "zero": "0 of {{total}} suppliers replied",
+        "one": "1 of {{total}} suppliers replied",
+        "two": "2 of {{total}} suppliers replied",
+        "few": "{{replied}} of {{total}} suppliers replied",
+        "many": "{{replied}} of {{total}} suppliers replied",
+        "other": "{{replied}} of {{total}} suppliers replied"
+      },
+      "suppliersOverdueTitle": "{{count}} overdue",
+      "suppliersOverdue": {
+        "zero": "0 overdue",
+        "one": "1 overdue",
+        "two": "2 overdue",
+        "few": "{{count}} overdue",
+        "many": "{{count}} overdue",
+        "other": "{{count}} overdue"
+      },
       "convertedIntoRequest": "Converted into request",
       "convertedCount": {
         "zero": "Converted into {{count}} requests",
