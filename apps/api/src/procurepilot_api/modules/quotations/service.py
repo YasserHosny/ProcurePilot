@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import csv
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from io import StringIO
 from typing import Literal
 from uuid import UUID
@@ -55,6 +55,11 @@ FIELD_COLUMNS = (
 TASK_COLUMNS = (
     "id,quotation_id,status,priority,reason,created_at,resolved_at,"
     "quotation(deleted_at,stated_total_amount,stated_total_currency,"
+    "supplier!quotation_supplier_id_fkey(name))"
+)
+TASK_LIST_COLUMNS = (
+    "id,quotation_id,status,priority,reason,created_at,resolved_at,"
+    "quotation!inner(deleted_at,stated_total_amount,stated_total_currency,"
     "supplier!quotation_supplier_id_fkey(name))"
 )
 
@@ -178,8 +183,41 @@ class QuotationService:
         offset = _decode_cursor(cursor)
         clean_search = search.strip()[:200].lower() if search else None
         try:
+            search_filters: list[str] = []
+            if clean_search:
+                supplier_term = clean_search.translate(str.maketrans("", "", ",()"))
+                if supplier_term.strip():
+                    escaped = (
+                        supplier_term.replace("\\", "\\\\")
+                        .replace("%", "\\%")
+                        .replace("_", "\\_")
+                        .replace("*", "\\*")
+                    )
+                    supplier_matches = (
+                        client.table("quotation")
+                        .select("id,supplier!quotation_supplier_id_fkey!inner(name)")
+                        .ilike("supplier.name", f"*{escaped}*")
+                        .limit(150)
+                        .execute()
+                    )
+                    quotation_ids = [str(row["id"]) for row in _rows(supplier_matches.data)]
+                    if quotation_ids:
+                        search_filters.append(f"quotation_id.in.({','.join(quotation_ids)})")
+                prefix = clean_search.replace("-", "")
+                if 1 <= len(prefix) <= 32 and all(c in "0123456789abcdef" for c in prefix):
+                    lo = UUID(hex=prefix.ljust(32, "0"))
+                    hi = UUID(hex=prefix.ljust(32, "f"))
+                    search_filters.append(f"and(quotation_id.gte.{lo},quotation_id.lte.{hi})")
+                if not search_filters:
+                    return ReviewTaskList(items=[], next_cursor=None)
             _sync_open_review_tasks(client, self._settings.extraction_confidence_threshold)
-            query = client.table("review_task").select(TASK_COLUMNS)
+            query = (
+                client.table("review_task")
+                .select(TASK_LIST_COLUMNS)
+                .filter("quotation.deleted_at", "is", "null")
+            )
+            if search_filters:
+                query = query.or_(",".join(search_filters))
             if status != "all":
                 query = query.eq("status", status)
             if priority is not None:
@@ -187,7 +225,16 @@ class QuotationService:
             if date_from is not None:
                 query = query.gte("created_at", date_from)
             if date_to is not None:
-                query = query.lte("created_at", date_to)
+                next_day = None
+                if "T" not in date_to:
+                    try:
+                        next_day = date.fromisoformat(date_to) + timedelta(days=1)
+                    except (ValueError, OverflowError):
+                        pass
+                if next_day is not None:
+                    query = query.lt("created_at", f"{next_day.isoformat()}T00:00:00+00:00")
+                else:
+                    query = query.lte("created_at", date_to)
             descending = sort_order == "desc"
             sort_column = sort_by
             if sort_by == "stated_total":
@@ -204,14 +251,6 @@ class QuotationService:
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         rows = _rows(response.data)
-        rows = [row for row in rows if not _task_quotation_deleted(row)]
-        if clean_search:
-            rows = [
-                r
-                for r in rows
-                if clean_search in str(r.get("quotation_id", "")).lower()
-                or clean_search in _nested_supplier_name(r).lower()
-            ]
         visible = rows[:capped_limit]
         return ReviewTaskList(
             items=[_task(row) for row in visible],
@@ -916,20 +955,6 @@ def _field(row: dict[str, object]) -> FieldExtraction:
         corrected_by=UUID(str(row["corrected_by"])) if row.get("corrected_by") else None,
         corrected_at=row.get("corrected_at"),
     )
-
-
-def _nested_supplier_name(row: dict[str, object]) -> str:
-    q = row.get("quotation")
-    if isinstance(q, dict):
-        s = q.get("supplier")
-        if isinstance(s, dict):
-            return str(s.get("name", ""))
-    return ""
-
-
-def _task_quotation_deleted(row: dict[str, object]) -> bool:
-    q = row.get("quotation")
-    return isinstance(q, dict) and q.get("deleted_at") is not None
 
 
 def _task(row: dict[str, object]) -> ReviewTask:

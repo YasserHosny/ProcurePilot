@@ -17,6 +17,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { Subscription } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, ReviewTask, ReviewTaskPriority, ReviewTaskStatus } from '../../../core/api/models';
@@ -87,6 +88,8 @@ export class ReviewQueueComponent implements OnInit {
   readonly isBulkReprioritising = signal<boolean>(false);
   readonly bulkPriorityTarget = signal<ReviewTaskPriority | null>(null);
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
+  private loadTasksSub: Subscription | null = null;
+  private loadMoreSub: Subscription | null = null;
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
   readonly hasSelection = computed<boolean>(() => this.selectedTaskIds().size > 0);
@@ -120,6 +123,14 @@ export class ReviewQueueComponent implements OnInit {
   }
 
   loadTasks(): void {
+    this.loadTasksSub?.unsubscribe();
+    this.loadTasksSub = null;
+    if (this.loadMoreSub) {
+      this.loadMoreSub.unsubscribe();
+      this.loadMoreSub = null;
+    }
+    this.isLoadingMore.set(false);
+
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
@@ -128,14 +139,15 @@ export class ReviewQueueComponent implements OnInit {
     const status = this.statusFilter();
     const priority = this.priorityFilter();
     const search = this.sanitizedSearch();
+    const { date_from, date_to } = this.formatFilterDates();
 
-    this.api
+    this.loadTasksSub = this.api
       .getReviewTasks({
         status,
         priority: priority === 'all' ? undefined : priority,
         search,
-        date_from: this.dateFrom() ?? undefined,
-        date_to: this.dateTo() ?? undefined,
+        date_from,
+        date_to,
         sort_by: this.sortBy(),
         sort_order: this.sortOrder(),
       })
@@ -145,15 +157,18 @@ export class ReviewQueueComponent implements OnInit {
           this.selectedTaskIds.set(new Set());
           this.nextCursor.set(res.next_cursor);
           this.isLoading.set(false);
+          this.loadTasksSub = null;
         },
         error: (err: unknown) => {
           this.isLoading.set(false);
+          this.loadTasksSub = null;
           this.handleError(err);
         },
       });
   }
 
   loadMore(): void {
+    if (this.isLoading()) return;
     const cursor = this.nextCursor();
     if (!cursor) return;
 
@@ -162,15 +177,16 @@ export class ReviewQueueComponent implements OnInit {
     const status = this.statusFilter();
     const priority = this.priorityFilter();
     const search = this.sanitizedSearch();
+    const { date_from, date_to } = this.formatFilterDates();
 
-    this.api
+    this.loadMoreSub = this.api
       .getReviewTasks({
         cursor,
         status,
         priority: priority === 'all' ? undefined : priority,
         search,
-        date_from: this.dateFrom() ?? undefined,
-        date_to: this.dateTo() ?? undefined,
+        date_from,
+        date_to,
         sort_by: this.sortBy(),
         sort_order: this.sortOrder(),
       })
@@ -179,9 +195,11 @@ export class ReviewQueueComponent implements OnInit {
           this.tasks.set([...this.tasks(), ...res.items]);
           this.nextCursor.set(res.next_cursor);
           this.isLoadingMore.set(false);
+          this.loadMoreSub = null;
         },
         error: (err: unknown) => {
           this.isLoadingMore.set(false);
+          this.loadMoreSub = null;
           this.handleError(err);
         },
       });
@@ -420,6 +438,22 @@ export class ReviewQueueComponent implements OnInit {
   private sanitizedSearch(): string | undefined {
     const search = this.searchQuery().trim();
     return search ? search : undefined;
+  }
+
+  private formatFilterDates(): { date_from?: string; date_to?: string } {
+    const toBoundaryIso = (value: string | null, isEnd: boolean): string | undefined => {
+      if (!value) return undefined;
+      const [y, m, d] = value.split('-').map(Number);
+      if (isNaN(y) || isNaN(m) || isNaN(d)) return undefined;
+      return isEnd
+        ? new Date(y, m - 1, d, 23, 59, 59, 999).toISOString()
+        : new Date(y, m - 1, d, 0, 0, 0, 0).toISOString();
+    };
+
+    return {
+      date_from: toBoundaryIso(this.dateFrom(), false),
+      date_to: toBoundaryIso(this.dateTo(), true),
+    };
   }
 
   private isSortableColumn(value: string): value is ReviewTaskSortBy {
