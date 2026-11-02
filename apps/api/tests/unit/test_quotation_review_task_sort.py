@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from typing import Literal
 
 import pytest
+from postgrest import SyncPostgrestClient
 
 from procurepilot_api.modules.quotations import service as quotation_service_module
 from procurepilot_api.modules.quotations.service import QuotationService
@@ -55,16 +56,26 @@ def client(monkeypatch: pytest.MonkeyPatch) -> FakeClient:
     return client
 
 
-@pytest.mark.parametrize("sort_order, descending", [("asc", False), ("desc", True)])
+@pytest.mark.parametrize(
+    "sort_order, expected_order",
+    [
+        ("asc", "quotation(stated_total_amount).asc,id"),
+        ("desc", "quotation(stated_total_amount).desc.nullslast,id"),
+    ],
+)
 def test_stated_total_orders_parent_tasks_by_quotation_amount(
-    client: FakeClient, sort_order: Literal["asc", "desc"], descending: bool
+    client: FakeClient, sort_order: Literal["asc", "desc"], expected_order: str
 ) -> None:
     QuotationService().list_review_tasks(
         bearer_token="dummy", sort_by="stated_total", sort_order=sort_order
     )
 
     orders = client.review_task_query.orders
-    assert ("quotation(stated_total_amount)", descending) in orders
+    with SyncPostgrestClient("http://x/rest/v1") as postgrest:
+        query = postgrest.table("review_task").select("id")
+        for column, descending in orders:
+            query = query.order(column, desc=descending)
+        assert query.params["order"] == expected_order
     assert all(column != "stated_total" for column, _ in orders)
     assert orders[-1] == ("id", False)
 
