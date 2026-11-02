@@ -101,10 +101,51 @@
 }
 
 .clear-filters-btn {
-  margin-block-start: 1rem;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+
+  .empty-state & {
+    margin-block-start: 1rem;
+  }
+
+  .filter-row & {
+    height: 56px;
+    align-self: flex-start;
+  }
+}
+
+.active-filters-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-inline: 1rem;
+  padding-block-end: 1rem;
+  flex-wrap: wrap;
+}
+
+.active-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.active-filter-chip {
+  --mat-chip-container-height: 28px;
+  font-size: var(--pp-text-12, 0.75rem);
+}
+
+.table-meta-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-block-end: 0.75rem;
+}
+
+.result-count {
+  font-size: var(--pp-text-14, 0.875rem);
+  font-weight: 500;
+  color: var(--pp-text-muted);
 }
 
 .table-responsive {
