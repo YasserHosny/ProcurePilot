@@ -1,5 +1,9 @@
 <div class="shell-container">
-  <a href="#main-content" class="skip-to-content">
+  <a
+    href="#main-content"
+    class="skip-to-content"
+    (click)="focusMainContent($event)"
+  >
     {{ 'common.a11y.skipToContent' | translate }}
   </a>
 
