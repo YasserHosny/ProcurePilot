@@ -7,10 +7,10 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { BehaviorSubject, of, throwError } from 'rxjs';
+import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { DetailComponent } from './detail.component';
-import { RfqApi, RfqDetail, RfqResponseComparisonList } from '../rfq-api';
+import { RfqApi, RfqDetail, RfqResponseComparisonList, RfqSendResponse } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatService } from '../../../core/format/format.service';
@@ -200,6 +200,7 @@ describe('DetailComponent (RFQ Details)', () => {
       ],
     })
       .overrideProvider(MatDialog, { useValue: dialogSpy })
+      .overrideProvider(MatSnackBar, { useValue: snackBarSpy })
       .compileComponents();
 
     const translate = TestBed.inject(TranslateService);
@@ -523,5 +524,279 @@ describe('DetailComponent (RFQ Details)', () => {
         }),
       }),
     );
+  });
+
+  it('shows retry notice card for sent RFQ with failed recipient when viewer is creator', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const retryNotice = compiled.querySelector('[data-testid="rfq-detail-retry-notice"]');
+    expect(retryNotice).not.toBeNull();
+    expect(retryNotice?.querySelector('h2')?.textContent).toContain('1 supplier has not received this RFQ');
+    const retryBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-detail-retry-button"]');
+    expect(retryBtn).not.toBeNull();
+    expect(retryBtn?.textContent?.trim()).toBe('Retry unsent recipients');
+  });
+
+  it('hides retry notice card when all recipients are sent', async () => {
+    const allSentDetail: RfqDetail = {
+      ...mockSentDetail,
+      recipients: mockSentDetail.recipients.map((r) => ({ ...r, status: 'sent' as const })),
+    };
+    rfqApiSpy.getRfq.and.returnValue(of(allSentDetail));
+    component.loadRfq('rfq-sent-all');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('[data-testid="rfq-detail-retry-notice"]')).toBeNull();
+  });
+
+  it('hides retry notice card when viewer is not creator', async () => {
+    component.currentMembershipId.set('m-other-user');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('[data-testid="rfq-detail-retry-notice"]')).toBeNull();
+  });
+
+  it('hides retry notice card for draft and converted RFQs', async () => {
+    // 1. draft status
+    rfqApiSpy.getRfq.and.returnValue(of(mockDraftDetail));
+    component.loadRfq('rfq-draft-1');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('[data-testid="rfq-detail-retry-notice"]')).toBeNull();
+
+    // 2. converted status
+    const convertedDetail: RfqDetail = {
+      ...mockSentDetail,
+      rfq: { ...mockSentDetail.rfq, status: 'converted' },
+    };
+    rfqApiSpy.getRfq.and.returnValue(of(convertedDetail));
+    component.loadRfq('rfq-conv-1');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('[data-testid="rfq-detail-retry-notice"]')).toBeNull();
+  });
+
+  it('opens confirm dialog and calls sendRfq exactly once even on double click', async () => {
+    const sendSubject = new Subject<RfqSendResponse>();
+    rfqApiSpy.sendRfq.and.returnValue(sendSubject);
+
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of(true),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const retryBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-detail-retry-button"]');
+    expect(retryBtn).not.toBeNull();
+
+    // First click triggers dialog -> confirm -> sendRfq
+    retryBtn?.click();
+    fixture.detectChanges();
+
+    // In flight: button should now be disabled, and a second click must not trigger sendRfq again
+    expect(retryBtn?.disabled).toBeTrue();
+    retryBtn?.click();
+    (component as unknown as { onRetryUnsent?: () => void }).onRetryUnsent?.();
+
+    expect(rfqApiSpy.sendRfq).toHaveBeenCalledTimes(1);
+    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-sent-1');
+
+    // Complete the in-flight request
+    sendSubject.next({ rfq: mockSentDetail.rfq, recipients: mockSentDetail.recipients });
+    sendSubject.complete();
+    fixture.detectChanges();
+  });
+
+  it('reloads RFQ and displays success snackbar on successful retry', async () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of(true),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+    const successResponse: RfqSendResponse = {
+      rfq: mockSentDetail.rfq,
+      recipients: [
+        { ...mockSentDetail.recipients[0], status: 'sent' },
+        { ...mockSentDetail.recipients[1], status: 'sent' },
+      ],
+    };
+    rfqApiSpy.sendRfq.and.returnValue(of(successResponse));
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const retryBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-detail-retry-button"]');
+    expect(retryBtn).not.toBeNull();
+    const initialGetCalls = rfqApiSpy.getRfq.calls.count();
+    retryBtn?.click();
+    fixture.detectChanges();
+
+    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-sent-1');
+    expect(rfqApiSpy.getRfq).toHaveBeenCalledTimes(initialGetCalls + 1);
+
+    const translate = TestBed.inject(TranslateService);
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      translate.instant('rfq.history.sentSuccess', { count: 2 }),
+      translate.instant('rfq.history.dismiss'),
+      jasmine.objectContaining({ duration: 5000 }),
+    );
+  });
+
+  it('shows translated message for HTTP 422 needed_by_in_past and re-enables button', async () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of(true),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+    const errorResponse = new HttpErrorResponse({
+      status: 422,
+      error: { details: { reason: 'needed_by_in_past' } },
+    });
+    rfqApiSpy.sendRfq.and.returnValue(throwError(() => errorResponse));
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const retryBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-detail-retry-button"]');
+    expect(retryBtn).not.toBeNull();
+    retryBtn?.click();
+    fixture.detectChanges();
+
+    const translate = TestBed.inject(TranslateService);
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      translate.instant('rfq.create.neededByPastError'),
+      translate.instant('rfq.history.dismiss'),
+      jasmine.objectContaining({ duration: 5000 }),
+    );
+
+    // Button should be re-enabled after error
+    expect((component as unknown as { retrying?: () => boolean }).retrying?.()).toBeFalse();
+    expect(retryBtn?.disabled).toBeFalse();
+  });
+
+  it('shows translated message for HTTP 403 error', async () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of(true),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+    rfqApiSpy.sendRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const retryBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-detail-retry-button"]');
+    expect(retryBtn).not.toBeNull();
+    retryBtn?.click();
+    fixture.detectChanges();
+
+    const translate = TestBed.inject(TranslateService);
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      translate.instant('rfq.creatorOnly'),
+      translate.instant('rfq.history.dismiss'),
+      jasmine.objectContaining({ duration: 5000 }),
+    );
+  });
+
+  it('shows generic send error for other HTTP errors', async () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of(true),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+    rfqApiSpy.sendRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const retryBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-detail-retry-button"]');
+    expect(retryBtn).not.toBeNull();
+    retryBtn?.click();
+    fixture.detectChanges();
+
+    const translate = TestBed.inject(TranslateService);
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      translate.instant('rfq.history.sendError'),
+      translate.instant('rfq.history.dismiss'),
+      jasmine.objectContaining({ duration: 5000 }),
+    );
+  });
+
+  it('proves no placeholder is left unfilled by interpolating real en and ar strings for confirm dialog', async () => {
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of(false),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const retryBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-detail-retry-button"]');
+    expect(retryBtn).not.toBeNull();
+    retryBtn?.click();
+    fixture.detectChanges();
+
+    expect(dialogSpy.open).toHaveBeenCalledWith(
+      CatalogueConfirmDialogComponent,
+      jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          titleKey: 'rfq.detail.confirmRetryTitle',
+          messageKey: 'rfq.detail.confirmRetryMessage',
+          confirmKey: 'rfq.detail.confirmRetryButton',
+          cancelKey: 'rfq.detail.cancelRetryButton',
+        }),
+      }),
+    );
+
+    const callArgs = dialogSpy.open.calls.mostRecent().args;
+    const data = callArgs[1]?.data as {
+      messageKey: string;
+      messageParams?: Record<string, unknown>;
+    };
+
+    expect(data.messageParams).toBeDefined();
+
+    const getNested = (obj: Record<string, unknown>, path: string): string => {
+      return path.split('.').reduce<unknown>((acc, part) => (acc as Record<string, unknown>)?.[part], obj) as string;
+    };
+
+    const enTemplate = getNested(enCatalog as Record<string, unknown>, data.messageKey);
+    const arTemplate = getNested(arCatalog as Record<string, unknown>, data.messageKey);
+
+    expect(typeof enTemplate).toBe('string');
+    expect(typeof arTemplate).toBe('string');
+
+    const interpolate = (template: string, params: Record<string, unknown>) =>
+      template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, key) =>
+        params[key] !== undefined ? String(params[key]) : _match,
+      );
+
+    const enResult = interpolate(enTemplate, data.messageParams ?? {});
+    const arResult = interpolate(arTemplate, data.messageParams ?? {});
+
+    expect(enResult).not.toMatch(/\{\{.*?\}\}/);
+    expect(arResult).not.toMatch(/\{\{.*?\}\}/);
   });
 });
