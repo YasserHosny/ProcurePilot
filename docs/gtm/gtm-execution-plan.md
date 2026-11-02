@@ -139,7 +139,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-110 | PPS-141 | P-111 | PPS-142 | P-112 | PPS-143 |
 | P-113 | PPS-144 | P-114 | PPS-145 | P-115 | PPS-146 |
 | P-116 | PPS-147 | P-117 | PPS-148 | P-118 | PPS-149 |
-| P-119 | PPS-150 | P-120 | PPS-151 | | |
+| P-119 | PPS-150 | P-120 | PPS-151 | P-121 | PPS-152 |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -318,6 +318,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-118 | — | The Prepare requests dialog offers every branch's cost centres, not the request's branch's (W3). Medium | — | — | To Do (PPS-149) |
 | [ ] P-119 | — | Submitting a split shows the single-request toast «تم إرسال طلب الشراء للاعتماد.» instead of one for the split (W4). Low | — | — | To Do (PPS-150) |
 | [ ] P-120 | — | Phone: a split's requests are shown by their full UUID and the queue card has no card frame (W5). Low | — | — | To Do (PPS-151) |
+| [ ] P-121 | — | The split enqueue 503 hides the Redis cause: `_enqueue_redis_job` in `basket_service.py` now logs the job id, queue and exception before raising (found in the round-1 run on «مطاعم رواق» 2026-10-31, `POST /rfq/{id}/split` → 503 `dependency=redis`; likely cause PPS-146). Twin of P-116. Low | Orch (Claude) | — | In Review (PPS-152, #386) |
 
 ### E — Pilot environment
 
@@ -402,3 +403,4 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-30 | Claude | Sales-skill assessment → three tasks. P-83 (PPS-114): status-quo battlecard `battlecards/whatsapp-excel.md` + `outreach/discovery-demo-call-script.md` (AR + EN, `sales-enablement`). P-84 (PPS-115): `community/g7-community-plan.md` for G-7 (`community-marketing`, installed 2026-10-30 from coreyhaines31/marketingskills). P-85 (PPS-116): `research/` call-notes template + synthesis method (`customer-research`); filled notes local in `research/calls/` (excluded); phase 2 synthesis blocked by G-9. Skipped: Apify OSM leads, social scraping, outbound-prospecting. | Owner: review the Arabic copy; pick the first 3 communities. |
 | | | | |
 | 2026-10-31 | Claude | Docs audit against code and merged work. Plan: P-102, P-105, P-107, P-108, P-109, P-111, P-112 ticked (their PRs are merged); P-117–P-120 (PPS-148–PPS-151) added for round-1 re-walk findings W2–W5. `CLAUDE.md`, roadmap, data dictionary, API spec updated for 023/024 and the VAT change; ADR-022 (match supersession) and ADR-023 (request groups) added; 023 T023 and 024 T029 ticked. PPS-139 was the only one of those still In Review on the Jira board; moved to Done the same day. | |
+| 2026-11-01 | Claude | Round-1 run on «مطاعم رواق» (RFQ `2094fcc9`): both replies sent and matched; Split failed with 503 `dependency=redis`, which the API did not explain. Filed P-121 (PPS-152) and opened #386 (log the enqueue failure). Redis answers `PING` without a password from outside; the backend's `REDIS_URL` is still PPS-146 (owner). Next: merge #386, deploy, split again and read the logged cause. |

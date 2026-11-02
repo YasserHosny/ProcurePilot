@@ -167,3 +167,30 @@ def test_enqueue_payload_carries_the_attempt_token(monkeypatch: pytest.MonkeyPat
     assert captured["payload"]["attempt"] == NOW.isoformat()  # type: ignore[index]
     assert captured["job_id"] != str(job_id)
     assert str(captured["job_id"]).startswith(str(job_id))
+
+
+def test_failed_enqueue_logs_the_cause_and_not_the_redis_url(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    import redis
+    from redis.exceptions import AuthenticationError
+
+    from procurepilot_api.errors import ServiceUnavailableError
+
+    def refuse(*_: object) -> object:
+        raise AuthenticationError("AUTH called without any password configured")
+
+    monkeypatch.setattr(redis.Redis, "from_url", staticmethod(refuse))
+    job_id = uuid4()
+    row = {"id": job_id, "created_at": NOW, "request_snapshot": None}
+    member = type("M", (), {"tenant_id": uuid4()})()
+    url = "redis://:s3cret@203.0.113.9:6379/0"
+    settings = type("S", (), {"basket_split_queue_name": "q", "redis_url": url})()
+
+    with caplog.at_level("ERROR"), pytest.raises(ServiceUnavailableError):
+        basket_service._enqueue_redis_job(settings, row, member)  # type: ignore[arg-type]
+
+    assert "AuthenticationError" in caplog.text
+    assert "AUTH called without any password configured" in caplog.text
+    assert str(job_id) in caplog.text
+    assert "s3cret" not in caplog.text

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -37,6 +38,9 @@ from procurepilot_api.shared.logging import get_trace_id
 
 ADVANCED_BASKET_RULE_VERSION = "advanced-basket-v1"
 BasketRequest = BasketOptimiseRequest | AdvancedBasketOptimiseRequest
+
+
+logger = logging.getLogger(__name__)
 
 
 class BasketService:
@@ -597,6 +601,15 @@ def _enqueue_redis_job(settings: Settings, row: dict[str, object], member: Curre
             job_id=rq_job_id(row),
         )
     except Exception as exc:
+        # The client sees only «redis unavailable»; the cause (refused, timeout, AUTH, a bad
+        # payload) goes to the log. Never log settings.redis_url: it can carry the password.
+        logger.exception(
+            "Could not enqueue basket-split job %s on queue %s: %s: %s",
+            row.get("id"),
+            settings.basket_split_queue_name,
+            type(exc).__name__,
+            exc,
+        )
         raise ServiceUnavailableError(details={"dependency": "redis"}) from exc
 
 
