@@ -315,8 +315,11 @@ export class RequestFormComponent implements OnInit {
     }
     const key = this.submitIdempotencyKey;
 
-    const submitObs$: Observable<unknown> = existing.request_group
-      ? this.requestsApi.submitGroup(existing.request_group.id, key)
+    const isSplit = Boolean(existing.request_group);
+    const splitCount = existing.request_group?.size;
+
+    const submitObs$: Observable<unknown> = isSplit
+      ? this.requestsApi.submitGroup(existing.request_group!.id, key)
       : this.requestsApi.updateRequest(existing.id, this.buildRequestPayload()).pipe(
           tap((saved) => {
             this.existingRequest.set(saved);
@@ -326,12 +329,21 @@ export class RequestFormComponent implements OnInit {
         );
 
     submitObs$.subscribe({
-      next: () => {
+      next: (res) => {
         this.submitIdempotencyKey = null;
         this.isSubmitting.set(false);
-        this.snackBar.open(this.translate.instant(`${I18N}.submitSuccess`), undefined, {
-          duration: 3500,
-        });
+        if (isSplit) {
+          const count = splitCount || (Array.isArray(res) && res.length ? res.length : 1);
+          this.snackBar.open(
+            this.translate.instant('basketSplit.submit.successSplit', { count }),
+            undefined,
+            { duration: 3500 },
+          );
+        } else {
+          this.snackBar.open(this.translate.instant(`${I18N}.submitSuccess`), undefined, {
+            duration: 3500,
+          });
+        }
         this.router.navigate(['/requests']);
       },
       error: (err: unknown) => {

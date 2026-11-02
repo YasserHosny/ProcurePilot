@@ -244,7 +244,7 @@
 
               <div class="approval-meta">
                 <span>{{ 'requests.approval.assignedTo' | translate }}</span>
-                <span>{{ memberEmailById().get(step.assigned_membership_id) ?? step.assigned_membership_id }}</span>
+                <span>{{ step.assigned_name?.trim() || (memberEmailById().get(step.assigned_membership_id) ?? step.assigned_membership_id) }}</span>
               </div>
 
               @if (step.status !== 'pending') {
