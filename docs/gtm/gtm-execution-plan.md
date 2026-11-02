@@ -149,6 +149,10 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-143 | PPS-177 | P-144 | PPS-178 | P-145 | PPS-179 |
 | P-146 | PPS-180 | P-147 | PPS-181 | P-148 | PPS-182 |
 | P-149 | PPS-183 | | | | |
+| P-170 | PPS-164 | P-171 | PPS-165 | P-172 | PPS-166 |
+| P-173 | PPS-167 | P-174 | PPS-168 | P-175 | PPS-169 |
+| P-176 | PPS-170 | P-177 | PPS-171 | P-178 | PPS-172 |
+| P-179 | PPS-173 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -350,6 +354,16 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-147 | — | RFQ screens a11y: dialog semantics, no live regions, colour-only errors, static page title. Medium; run axe first | — | — | To Do (PPS-181) |
 | [ ] P-148 | — | RFQ i18n/RTL: raw `{{date}}` in the Detail send dialog (live), hardcoded date hints, mixed numerals, reversed counter. High | — | — | To Do (PPS-182) |
 | [ ] P-149 | — | RFQ UX: reference number, richer list, filters/search/sort, email preview, reply tracking. Medium, owner scope call first | — | — | To Do (PPS-183) |
+| [ ] P-170 | — | Approval queue: first page only (web 50, phone default), offset cursor skips rows, web can approve a split group whose siblings are not loaded, line fetch capped at 1000 rows (approvals audit, APR-02/07/08/09). High | — | — | To Do (PPS-164) |
+| [ ] P-171 | — | Approval decisions: single-request audit written after commit, reject reason enforced only in the UI, no idempotency key, submission can leave a request without a step (APR-03/04/05). High | — | — | To Do (PPS-165) |
+| [ ] P-172 | — | Approval step: decision writes through one guarded path, database policy parity with the API rules (APR-01). High; neutral commit text, repo is public; tenancy work stays in house | — | — | To Do (PPS-166) |
+| [ ] P-173 | — | Requester and approver are not separated: the owner approved their own request (reproduced live). Medium; owner confirmed 2026-11-02: requester ≠ approver, single-owner workspace allowed with a «self-approved» mark; ADR + spec next | — | — | To Do (PPS-167) |
+| [ ] P-174 | — | After approval the request reads «Ordered» and still offers «Create purchase order»; rejected requests are a dead end; stale tests assert `approved` (reproduced live). High; owner confirmed 2026-11-02: distinct `approved` status, `ordered` only once a PO exists; migration stays in house | — | — | To Do (PPS-168) |
+| [ ] P-175 | — | Routing, delegation, escalation: approver may not see the request, failed escalation only logged, delegation changes do not re-route (APR-06/10). Medium | — | — | To Do (PPS-169) |
+| [ ] P-176 | — | Approval digest: links go to a route that does not exist, labels are UUID prefixes, a split is N items (APR-11). Medium | — | — | To Do (PPS-170) |
+| [ ] P-177 | — | Approval queue UX: filters, sort, search, bulk decisions, detail view with comments and audit trail. Medium; owner confirmed 2026-11-02: three stages (sort/filter/count, detail route, bulk), after P-170 and P-171 | — | — | To Do (PPS-171) |
+| [ ] P-178 | — | Approval queue (web): load failure looks empty, shared in-flight state, product/pack context lost, a11y and RTL gaps (live DOM check). Medium; owner confirmed Latin digits and one date format in Arabic; Arabic queue checked live; axe blocked by the site's content policy; Approve/Reject scroll off-screen at phone width | — | — | To Do (PPS-172) |
+| [ ] P-179 | — | Phone approvals: empty state on load failure, no refresh or paging, one-tap approve, reload on every dependency change, errors not announced. Medium; needs a device pass | — | — | To Do (PPS-173) |
 
 ### E — Pilot environment
 
@@ -439,3 +453,4 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-11-01 | Claude | Round-1 run on «مطاعم رواق» (RFQ `2094fcc9`): both replies sent and matched; Split failed with 503 `dependency=redis`, which the API did not explain. Filed P-121 (PPS-152) and opened #386 (log the enqueue failure). Redis answers `PING` without a password from outside; the backend's `REDIS_URL` is still PPS-146 (owner). Next: merge #386, deploy, split again and read the logged cause. |
 | 2026-11-02 | Claude | Quotations audit (live Chrome pass on «مطاعم رواق» + Codex static review) filed as P-122–P-131 (PPS-154–PPS-163). P-122, P-123, P-124 fixed test-first (Codex API, Agy web), reviewed by two models, merged (#389, #390, #391, #392) and checked live. The integration test stand-in (`PsycopgTableQuery`) now supports embedded filters and PostgREST `*` wildcards. Leftovers from these three are listed on PPS-163. Next: P-125 (money parsing and totals); P-126 and P-131 need an owner scope call. | |
 | 2026-11-02 | Claude | RFQ audit (live Chrome pass on «مطاعم رواق» + Codex static review) filed as P-140–P-149 (PPS-174–PPS-183). Live-confirmed: raw `{{date}}` in the Detail send dialog, history capped at 50 rows with no filters, empty-submit gives no text on Quantity/Suppliers, malformed RFQ id has no recovery, RFQs never expire. Not exercised: an actual send (no supplier emails), 390px width (window could not be resized), Guardrails page. One test draft (`cb133982`, needed by 9 Nov) was left on «مطاعم رواق»; RFQs cannot be deleted (P-142). Nothing fixed. | |
+| 2026-11-02 | Claude | Approvals audit (live Chrome pass on «مطاعم رواق» with own AUDIT-TEST requests, code read, Codex static review; one Codex claim, a translation-key typo, was checked and dropped) filed as P-170–P-179 (PPS-164–PPS-173). Nothing fixed. Not covered: axe (blocked by the site's content policy) and a device pass (no phone), live delegation and escalation, digest and push content. | Yasser: none open; P-173, P-174, P-177 confirmed |
