@@ -1,0 +1,103 @@
+# Organic channels supported by the Marketing OS. Every channel here is organic; scripts/validate.mjs fails if a
+# channel is marked paid. Specs are working guidance; check the platform's current limits before final export.
+
+common_quality:
+  - one message and one call to action per piece
+  - every claim traceable to an approved proof point
+  - synthetic or sample data labelled
+  - brand identity v3.3 (or the product sub-brand) used as supplied
+  - English and Arabic planned together; Arabic written, not translated
+  - alt text for every image; captions for every video with speech or on-screen text
+  - links carry UTM parameters (analytics/measurement-framework.md)
+
+channels:
+  website:
+    type: owned
+    paid: false
+    formats: [product-page, feature-page, solution-page, use-case-page, landing-page, article]
+    use_for: [home of record, conversion to inquiry or pilot request, SEO landing]
+    upstream_skills: [copywriting, copy-editing, cro, site-architecture, schema]
+    quality:
+      - follows the website's own patterns (copy in lib/i18n/en.ts and ar.ts, products via registry)
+      - changes to the live site are proposed as briefs or diffs and need explicit approval
+      - WCAG 2.2 AA, dark default theme
+    templates: [templates/landing-page-template.md, templates/content-brief-template.md]
+
+  seo:
+    type: owned
+    paid: false
+    formats: [keyword-research, search-intent-map, seo-content-brief, metadata-recommendations, internal-linking-plan, on-page-audit, technical-audit, ai-answer-visibility]
+    use_for: [organic demand capture, problem and solution searches, AI answer citations]
+    upstream_skills: [seo-audit, ai-seo, site-architecture, schema, content-strategy, link-building, competitors]
+    quality:
+      - search volume and difficulty only from a named tool or source, with date; otherwise mark as unmeasured
+      - one primary intent per page; no thin or duplicated pages
+      - English and Arabic keywords researched separately
+    templates: [templates/content-brief-template.md]
+
+  linkedin:
+    type: owned-social
+    paid: false
+    account: https://www.linkedin.com/company/iron-sys/
+    formats: [text-post, image-post, document-carousel, short-video, article, page-update]
+    content_types: [thought-leadership, product-education, industry-insight, problem-solution, use-case-story, product-announcement, founder-perspective, educational-series]
+    specs: { carousel: "1080x1350 PDF pages", image: "1080x1080 or 1080x1350", video: "9:16 or 1:1, captions burned in or uploaded", cover: "2256x382 (current page cover)" }
+    upstream_skills: [social, copywriting, content-strategy, video]
+    quality:
+      - hook in the first two lines; no clickbait
+      - 3 to 5 relevant hashtags at most
+      - founder or employee posts only with that person's consent and in their voice
+    templates: [templates/social-post-template.md]
+
+  facebook:
+    type: owned-social
+    paid: false
+    account: unknown           # no page found in the workspace
+    formats: [image-post, carousel, short-video, reel]
+    content_types: [educational, brand-awareness, product-use-case, repurposed-campaign-message]
+    upstream_skills: [social, copywriting]
+    quality:
+      - adapted from the LinkedIn or website source, more visual and shorter
+      - Arabic-first where the target audience is Arabic-speaking (decide per campaign)
+    templates: [templates/social-post-template.md]
+
+  x:
+    type: owned-social
+    paid: false
+    account: unknown           # Twitter/X; added 2026-10-28 at the owner's request; account to be created by the owner
+    formats: [short-post, thread, image-post, short-video]
+    content_types: [short-insight, thread-from-article-or-carousel, product-use-case, announcement]
+    upstream_skills: [social, copywriting]
+    quality:
+      - adapted, not pasted: one idea per post, the hook in the first line, threads for anything longer
+      - stays within the platform's post length for the account type (check before export)
+      - same claims rules as every channel; no replies or DMs sent by Claude
+    templates: [templates/social-post-template.md]
+
+  instagram:
+    type: owned-social
+    paid: false
+    account: unknown           # no account found in the workspace
+    formats: [carousel, reel, single-image, story]
+    specs: { feed: "1080x1350", reel: "1080x1920, safe zones respected", carousel: "up to 10 slides 1080x1350" }
+    content_types: [educational, brand-awareness, product-use-case, reels-script]
+    upstream_skills: [social, video, image]
+    quality:
+      - the first slide or first second carries the message
+      - text on image follows brand type rules (Archivo Expanded display, Inter, Readex Pro)
+    templates: [templates/social-post-template.md, templates/video-brief-template.md]
+
+  video:
+    type: format
+    paid: false
+    formats: [creative-concept, video-brief, script, storyboard, scene-breakdown, on-screen-text, voice-over-script, motion-direction, short-form-cut]
+    use_for: [product demos, explainers, social shorts, video end frames]
+    upstream_skills: [video, social, copywriting]
+    conventions:
+      - versions in vMAJOR.MINOR-<name>_<date>/ with CHANGES.md, never overwrite (ProcurePilot/demo-video/VERSIONS.md)
+      - Iron Systems end frame uses the metal logo without glow on Iron Dark; product videos close with "Developed by Iron Systems"
+      - loudness around -14 LUFS for social (precedent v2.3)
+    quality:
+      - a brief or script is not a finished video; say which one was delivered
+      - rendering only with a tool that is actually available (no ffmpeg on this machine as of 2026-10-25)
+    templates: [templates/video-brief-template.md]

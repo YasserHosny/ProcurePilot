@@ -915,6 +915,18 @@
       "bulkRefuseConfirm": "Refuse {{count}} quotation(s)? This action marks them as refused.",
       "bulkReprioritiseButton": "Set Priority",
       "bulkClear": "Clear Selection",
+      "bulk": {
+        "result": {
+          "allSucceeded": "{{count}} tasks updated",
+          "allSucceededSkipped": "{{count}} tasks updated, {{skipped}} skipped (resolved)",
+          "all": "{{count}} tasks updated",
+          "partial": "{{succeeded}} updated, {{failed}} failed - the failed ones stay selected so you can retry",
+          "partialSkipped": "{{succeeded}} updated, {{failed}} failed - the failed ones stay selected so you can retry, {{skipped}} skipped (resolved)",
+          "allFailed": "No tasks were updated ({{failed}} failed)",
+          "allFailedSkipped": "No tasks were updated ({{failed}} failed), {{skipped}} skipped (resolved)",
+          "skipped": "{{skipped}} skipped (resolved)"
+        }
+      },
       "selectAllLabel": "Select all review tasks",
       "selectTaskLabel": "Select quotation {{id}}",
       "readOnlyBadge": "Read-Only Access",
@@ -1801,6 +1813,9 @@
         "idempotencyKeyReused": "This idempotency key has already been used with different parameters.",
         "generic": "Failed to prepare requests."
       }
+    },
+    "submit": {
+      "successSplit": "{{count}} purchase requests submitted for approval as one split."
     }
   },
   "alerts": {

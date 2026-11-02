@@ -87,7 +87,7 @@
             <span>{{ 'quotations.review.actions.retryExtraction' | translate }}</span>
           </button>
         }
-        @if (isWriter() && q.status !== 'reviewed') {
+        @if (isWriter()) {
           <button
             mat-stroked-button
             type="button"
@@ -250,7 +250,7 @@
                 <mat-select
                   id="supplier-select"
                   [value]="selectedSupplierId()"
-                  (selectionChange)="selectedSupplierId.set($event.value)"
+                  (selectionChange)="selectedSupplierId.set($event.value); loadPriorQuotations()"
                   [disabled]="!isWriter() || q.status === 'reviewed'"
                   required
                 >

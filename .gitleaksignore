@@ -64,3 +64,7 @@ e96bf3fdfa6b1638d4defcc8acba665490e97736:apps/api/src/procurepilot_api/modules/o
 # Same placeholder JWT, re-pinned to the squash-merge commit of #224 (the entry above names the
 # PR-branch commit, which a squash merge does not carry onto main).
 e1980f707d1b508bcdee36ec301500ebd462c51d:apps/api/tests/integration/test_capture_service.py:generic-api-key:219
+# Upstream marketing skill eval (coreyhaines31/marketingskills): the prompt contains a made-up example
+# key "sk_live_123abc" to test that the skill refuses pasted keys. Not a real secret; the evals/ folders
+# were removed from marketing/.claude/skills in a later commit of the same PR (#326).
+821ba3f157bf78ab45f2aa62edc96d3b0b200733:marketing/.claude/skills/video/evals/evals.json:generic-api-key:104

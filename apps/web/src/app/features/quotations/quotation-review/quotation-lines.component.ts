@@ -54,6 +54,51 @@ export class QuotationLinesComponent {
   private readonly formatService = inject(FormatService);
   readonly trimDecimalZeros = trimDecimalZeros;
 
+  private readonly drafts = new Map<string, string>();
+  private activeFieldKey: string | null = null;
+
+  private fieldKey(lineId: string, fieldName: string): string {
+    return `${lineId}:${fieldName}`;
+  }
+
+  getDisplayQuantity(line: QuotationLine): string {
+    const key = this.fieldKey(line.id, 'quantity');
+    if (this.activeFieldKey === key && this.drafts.has(key)) {
+      return this.drafts.get(key)!;
+    }
+    return this.getEffectiveQuantity(line);
+  }
+
+  getDisplayUnitPrice(line: QuotationLine): string {
+    const key = this.fieldKey(line.id, 'unit_price');
+    if (this.activeFieldKey === key && this.drafts.has(key)) {
+      return this.drafts.get(key)!;
+    }
+    const amount = this.getEffectiveUnitPriceAmount(line);
+    if (!this.isWriter || this.quotation.status === 'reviewed') {
+      return this.formatUnitPrice(amount);
+    }
+    return trimDecimalZeros(amount);
+  }
+
+  onFieldFocus(line: QuotationLine, fieldName: 'quantity' | 'unit_price', currentValue: string): void {
+    const key = this.fieldKey(line.id, fieldName);
+    this.activeFieldKey = key;
+    this.drafts.set(key, currentValue);
+  }
+
+  onQuantityInput(line: QuotationLine, targetValue: string): void {
+    const key = this.fieldKey(line.id, 'quantity');
+    this.activeFieldKey = key;
+    this.drafts.set(key, targetValue);
+  }
+
+  onUnitPriceInput(line: QuotationLine, targetValue: string): void {
+    const key = this.fieldKey(line.id, 'unit_price');
+    this.activeFieldKey = key;
+    this.drafts.set(key, targetValue);
+  }
+
   @Input({ required: true }) quotation!: QuotationDetail;
   @Input({ required: true }) lineTotals: Record<string, string | null> = {};
   @Input({ required: true }) effectiveCurrency = 'USD';
@@ -221,7 +266,23 @@ export class QuotationLinesComponent {
   }
 
   onQuantityChange(line: QuotationLine, targetValue: string): void {
-    const parsed = parseMoneyInput(targetValue);
+    const key = this.fieldKey(line.id, 'quantity');
+    this.drafts.delete(key);
+    this.commitQuantity(line, targetValue);
+  }
+
+  onQuantityBlur(line: QuotationLine, targetValue?: string): void {
+    const key = this.fieldKey(line.id, 'quantity');
+    const raw = targetValue !== undefined ? targetValue : (this.drafts.get(key) ?? '');
+    this.drafts.delete(key);
+    if (this.activeFieldKey === key) {
+      this.activeFieldKey = null;
+    }
+    this.commitQuantity(line, raw);
+  }
+
+  private commitQuantity(line: QuotationLine, rawValue: string): void {
+    const parsed = parseMoneyInput(rawValue);
     if (parsed === null) {
       return;
     }
@@ -239,30 +300,12 @@ export class QuotationLinesComponent {
 
     const fe = this.getFieldExtraction('quotation_line', line.id, 'quantity');
     if (fe) {
+      this.pendingCorrections.set(fe.id, parsed);
       this.correctionUpdated.emit({
         feId: fe.id,
         newValue: parsed,
       });
     }
-  }
-
-  onQuantityBlur(line: QuotationLine, targetValue: string): void {
-    const parsed = parseMoneyInput(targetValue);
-    if (parsed === null) {
-      return;
-    }
-    const effective = this.getEffectiveQuantity(line);
-    const trimmedTarget = trimDecimalZeros(parsed);
-    const trimmedEffective = trimDecimalZeros(effective.trim());
-
-    if (
-      parsed === effective ||
-      trimmedTarget === trimmedEffective ||
-      this.isNumericEqual(parsed, effective)
-    ) {
-      return;
-    }
-
     this.fieldReviewed.emit({
       entityType: 'quotation_line',
       entityId: line.id,
@@ -271,8 +314,40 @@ export class QuotationLinesComponent {
     });
   }
 
+  getEffectiveUnitPriceCurrency(line: QuotationLine): string {
+    const fe = this.getFieldExtraction('quotation_line', line.id, 'unit_price');
+    if (fe && this.pendingCorrections.has(fe.id)) {
+      const pending = this.pendingCorrections.get(fe.id);
+      if (pending && typeof pending === 'object' && 'currency' in pending) {
+        const c = (pending as { currency: unknown }).currency;
+        if (typeof c === 'string' && c) return c;
+      }
+    }
+    if (fe?.corrected_value && typeof fe.corrected_value === 'object' && 'currency' in fe.corrected_value) {
+      const c = (fe.corrected_value as { currency: unknown }).currency;
+      if (typeof c === 'string' && c) return c;
+    }
+    return line.unit_price?.currency || this.effectiveCurrency || 'USD';
+  }
+
   onUnitPriceChange(line: QuotationLine, targetValue: string): void {
-    const parsed = parseMoneyInput(targetValue);
+    const key = this.fieldKey(line.id, 'unit_price');
+    this.drafts.delete(key);
+    this.commitUnitPrice(line, targetValue);
+  }
+
+  onUnitPriceBlur(line: QuotationLine, targetValue?: string): void {
+    const key = this.fieldKey(line.id, 'unit_price');
+    const raw = targetValue !== undefined ? targetValue : (this.drafts.get(key) ?? '');
+    this.drafts.delete(key);
+    if (this.activeFieldKey === key) {
+      this.activeFieldKey = null;
+    }
+    this.commitUnitPrice(line, raw);
+  }
+
+  private commitUnitPrice(line: QuotationLine, rawValue: string): void {
+    const parsed = parseMoneyInput(rawValue);
     if (parsed === null) {
       return;
     }
@@ -287,44 +362,26 @@ export class QuotationLinesComponent {
     ) {
       return;
     }
+
+    const currency = this.getEffectiveUnitPriceCurrency(line);
+    const newValue = {
+      amount: parsed,
+      currency,
+    };
 
     const fe = this.getFieldExtraction('quotation_line', line.id, 'unit_price');
     if (fe) {
+      this.pendingCorrections.set(fe.id, newValue);
       this.correctionUpdated.emit({
         feId: fe.id,
-        newValue: {
-          amount: parsed,
-          currency: line.unit_price?.currency || this.effectiveCurrency,
-        },
+        newValue,
       });
     }
-  }
-
-  onUnitPriceBlur(line: QuotationLine, targetValue: string): void {
-    const parsed = parseMoneyInput(targetValue);
-    if (parsed === null) {
-      return;
-    }
-    const effective = this.getEffectiveUnitPriceAmount(line);
-    const trimmedTarget = trimDecimalZeros(parsed);
-    const trimmedEffective = trimDecimalZeros(effective.trim());
-
-    if (
-      parsed === effective ||
-      trimmedTarget === trimmedEffective ||
-      this.isNumericEqual(parsed, effective)
-    ) {
-      return;
-    }
-
     this.fieldReviewed.emit({
       entityType: 'quotation_line',
       entityId: line.id,
       fieldName: 'unit_price',
-      reviewedValue: {
-        amount: parsed,
-        currency: line.unit_price?.currency || this.effectiveCurrency,
-      },
+      reviewedValue: newValue,
     });
   }
 

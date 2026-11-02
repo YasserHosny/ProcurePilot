@@ -11,7 +11,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Subscription, interval, switchMap } from 'rxjs';
 
@@ -61,6 +61,11 @@ const EXTENSION_MIME_MAP: Record<string, PresignMimeType> = {
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(val: unknown): val is string {
+  return typeof val === 'string' && UUID_REGEX.test(val.trim());
+}
+
 @Component({
   selector: 'app-quotation-upload',
   standalone: true,
@@ -88,6 +93,7 @@ export class QuotationUploadComponent {
   private readonly api = inject(ApiService);
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
   private readonly destroyRef = inject(DestroyRef);
@@ -102,10 +108,30 @@ export class QuotationUploadComponent {
   readonly currentJob = signal<Job | null>(null);
   readonly potentialDuplicates = signal<readonly PotentialDuplicate[]>([]);
 
+  readonly requoteFrom = signal<string | null>(null);
+
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
+
+  readonly requoteQueryParams = computed<Record<string, string> | null>(() => {
+    const from = this.requoteFrom();
+    return from ? { requote_from: from } : null;
+  });
 
   private pollSubscription: Subscription | null = null;
   private pendingPresign = signal<PresignResponse | null>(null);
+
+  constructor() {
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        const requote = params.get('requote_from');
+        if (requote && isUuid(requote)) {
+          this.requoteFrom.set(requote.trim());
+        } else {
+          this.requoteFrom.set(null);
+        }
+      });
+  }
 
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -326,6 +352,13 @@ export class QuotationUploadComponent {
     this.pendingPresign.set(null);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
+    this.requoteFrom.set(null);
+    void this.router.navigate([], {
+      queryParams: { requote_from: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+      relativeTo: this.route,
+    });
   }
 
   formatFileSize(bytes: number): string {

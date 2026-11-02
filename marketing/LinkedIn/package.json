@@ -1,0 +1,4 @@
+{
+  "//": "The LinkedIn cover renderers in company-page/*/source/*.js are CommonJS (require, __dirname). This scope keeps them runnable under marketing/package.json \"type\": \"module\" (Codex review on PR #326).",
+  "type": "commonjs"
+}

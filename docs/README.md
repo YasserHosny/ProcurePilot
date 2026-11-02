@@ -55,6 +55,7 @@
 
 - [`gtm/README.md`](gtm/README.md) — First-customer plan, execution tracker, demo tenant, demo video, one-pager, company formation research.
 - [`brand/README.md`](brand/README.md) — Logo, lockups and brand assets.
+- [`../marketing/README.md`](../marketing/README.md) — Organic marketing for ProcurePilot and Iron Systems: positioning, claims, campaigns, images, skills and checks (G-14).
 
 ## Historical working notes
 

@@ -132,8 +132,9 @@
                   <mat-label>{{ 'quotations.review.lines.colQuantity' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="getEffectiveQuantity(line)"
-                    (input)="onQuantityChange(line, $any($event.target).value)"
+                    [value]="getDisplayQuantity(line)"
+                    (focus)="onFieldFocus(line, 'quantity', $any($event.target).value)"
+                    (input)="onQuantityInput(line, $any($event.target).value)"
                     (change)="onQuantityChange(line, $any($event.target).value)"
                     (blur)="onQuantityBlur(line, $any($event.target).value)"
                     [readonly]="!isWriter || quotation.status === 'reviewed'"
@@ -179,8 +180,9 @@
                   <mat-label>{{ 'quotations.review.lines.colUnitPrice' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="(!isWriter || quotation.status === 'reviewed') ? formatUnitPrice(getEffectiveUnitPriceAmount(line)) : trimDecimalZeros(getEffectiveUnitPriceAmount(line))"
-                    (input)="onUnitPriceChange(line, $any($event.target).value)"
+                    [value]="getDisplayUnitPrice(line)"
+                    (focus)="onFieldFocus(line, 'unit_price', $any($event.target).value)"
+                    (input)="onUnitPriceInput(line, $any($event.target).value)"
                     (change)="onUnitPriceChange(line, $any($event.target).value)"
                     (blur)="onUnitPriceBlur(line, $any($event.target).value)"
                     [readonly]="!isWriter || quotation.status === 'reviewed'"

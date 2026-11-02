@@ -1,9 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, ParamMap, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
@@ -15,6 +15,8 @@ describe('QuotationUploadComponent (T036)', () => {
   let component: QuotationUploadComponent;
   let fixture: ComponentFixture<QuotationUploadComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  let queryParamMapSubject: BehaviorSubject<ParamMap>;
+  let router: Router;
 
   const mockPresignResponse: PresignResponse = {
     document_id: 'doc-123',
@@ -64,6 +66,8 @@ describe('QuotationUploadComponent (T036)', () => {
       activeLocale: signal('en'),
     };
 
+    queryParamMapSubject = new BehaviorSubject<ParamMap>(convertToParamMap({}));
+
     await TestBed.configureTestingModule({
       imports: [QuotationUploadComponent],
       providers: [
@@ -71,8 +75,23 @@ describe('QuotationUploadComponent (T036)', () => {
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
         { provide: SessionService, useValue: mockSession },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            queryParamMap: queryParamMapSubject.asObservable(),
+            snapshot: {
+              get queryParamMap() {
+                return queryParamMapSubject.value;
+              },
+            },
+          },
+        },
       ],
     }).compileComponents();
+
+    router = TestBed.inject(Router);
+    spyOn(router, 'navigate');
+    spyOn(router, 'navigateByUrl').and.returnValue(Promise.resolve(true));
 
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', enCatalog);
@@ -187,4 +206,171 @@ describe('QuotationUploadComponent (T036)', () => {
     expect(component.errorMessage()).toBe('Format error');
     expect(component.errorTraceId()).toBe('tr-999');
   }));
+
+  describe('Re-quote source linking (PPS-160 / P-128)', () => {
+    const validUuid = 'c49d6c29-373f-4e02-9844-33d3d7890abc';
+
+    it('reads requote_from query param if UUID-shaped and renders review anchor with requote_from query param', () => {
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      fixture.detectChanges();
+
+      expect(component.requoteFrom()).toBe(validUuid);
+
+      component.createdQuotation.set(mockQuotation);
+      component.uploadState.set('extracted');
+      fixture.detectChanges();
+
+      const anchor = fixture.nativeElement.querySelector('a.action-btn') as HTMLAnchorElement;
+      expect(anchor).not.toBeNull();
+      const href = anchor.getAttribute('href') ?? '';
+      expect(href).toContain(`/quotations/${mockQuotation.id}/review`);
+      expect(href).toContain(`requote_from=${validUuid}`);
+    });
+
+    it('ignores non-UUID requote_from query param and renders review anchor without requote_from', () => {
+      queryParamMapSubject.next(convertToParamMap({ requote_from: 'not-a-valid-uuid' }));
+      fixture.detectChanges();
+
+      expect(component.requoteFrom()).toBeNull();
+
+      component.createdQuotation.set(mockQuotation);
+      component.uploadState.set('extracted');
+      fixture.detectChanges();
+
+      const anchor = fixture.nativeElement.querySelector('a.action-btn') as HTMLAnchorElement;
+      expect(anchor).not.toBeNull();
+      const href = anchor.getAttribute('href') ?? '';
+      expect(href).toContain(`/quotations/${mockQuotation.id}/review`);
+      expect(href).not.toContain('requote_from');
+    });
+
+    it('clears requoteFrom and removes requote_from query param on resetUpload so next upload carries no requote_from', () => {
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      fixture.detectChanges();
+
+      expect(component.requoteFrom()).toBe(validUuid);
+
+      component.createdQuotation.set(mockQuotation);
+      component.uploadState.set('extracted');
+      fixture.detectChanges();
+
+      const anchor1 = fixture.nativeElement.querySelector('a.action-btn') as HTMLAnchorElement;
+      expect(anchor1.getAttribute('href')).toContain(`requote_from=${validUuid}`);
+
+      const activatedRoute = TestBed.inject(ActivatedRoute);
+      component.resetUpload();
+
+      expect(component.requoteFrom()).toBeNull();
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        queryParams: { requote_from: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+        relativeTo: activatedRoute,
+      });
+
+      // Next upload and review link
+      component.createdQuotation.set({ ...mockQuotation, id: 'q-999' });
+      component.uploadState.set('extracted');
+      fixture.detectChanges();
+
+      const anchor2 = fixture.nativeElement.querySelector('a.action-btn') as HTMLAnchorElement;
+      expect(anchor2).not.toBeNull();
+      const href2 = anchor2.getAttribute('href') ?? '';
+      expect(href2).toContain('/quotations/q-999/review');
+      expect(href2).not.toContain('requote_from');
+    });
+
+    it('handles unmodified click on review link via router.navigateByUrl and prevents default navigation', () => {
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      fixture.detectChanges();
+
+      component.createdQuotation.set(mockQuotation);
+      component.uploadState.set('extracted');
+      fixture.detectChanges();
+
+      const anchor = fixture.nativeElement.querySelector('a.action-btn') as HTMLAnchorElement;
+      expect(anchor).not.toBeNull();
+
+      let recordedDefaultPrevented: boolean | null = null;
+      const clickListener = (event: MouseEvent): void => {
+        recordedDefaultPrevented = event.defaultPrevented;
+        event.preventDefault();
+      };
+
+      document.addEventListener('click', clickListener, false);
+      try {
+        const clickEvent = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+        });
+        anchor.dispatchEvent(clickEvent);
+      } finally {
+        document.removeEventListener('click', clickListener, false);
+      }
+
+      expect(recordedDefaultPrevented).toBeTrue();
+      expect(router.navigateByUrl).toHaveBeenCalled();
+      const calledUrl = (router.navigateByUrl as jasmine.Spy).calls.mostRecent().args[0].toString();
+      expect(calledUrl).toContain(`/quotations/${mockQuotation.id}/review`);
+      expect(calledUrl).toContain(`requote_from=${validUuid}`);
+    });
+
+    it('does not prevent default on review link when clicked with ctrlKey, metaKey, or shiftKey', () => {
+      queryParamMapSubject.next(convertToParamMap({ requote_from: validUuid }));
+      fixture.detectChanges();
+
+      component.createdQuotation.set(mockQuotation);
+      component.uploadState.set('extracted');
+      fixture.detectChanges();
+
+      const anchor = fixture.nativeElement.querySelector('a.action-btn') as HTMLAnchorElement;
+      expect(anchor).not.toBeNull();
+
+      let recordedCtrlDefaultPrevented: boolean | null = null;
+      let recordedMetaDefaultPrevented: boolean | null = null;
+      let recordedShiftDefaultPrevented: boolean | null = null;
+
+      const clickListener = (event: MouseEvent): void => {
+        if (event.ctrlKey) {
+          recordedCtrlDefaultPrevented = event.defaultPrevented;
+        } else if (event.metaKey) {
+          recordedMetaDefaultPrevented = event.defaultPrevented;
+        } else if (event.shiftKey) {
+          recordedShiftDefaultPrevented = event.defaultPrevented;
+        }
+        // Neutralise actual browser navigation so Karma does not follow the href and reload
+        event.preventDefault();
+      };
+
+      document.addEventListener('click', clickListener, false);
+      try {
+        const ctrlClickEvent = new MouseEvent('click', {
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        });
+        anchor.dispatchEvent(ctrlClickEvent);
+
+        const metaClickEvent = new MouseEvent('click', {
+          metaKey: true,
+          bubbles: true,
+          cancelable: true,
+        });
+        anchor.dispatchEvent(metaClickEvent);
+
+        const shiftClickEvent = new MouseEvent('click', {
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        });
+        anchor.dispatchEvent(shiftClickEvent);
+      } finally {
+        document.removeEventListener('click', clickListener, false);
+      }
+
+      expect(recordedCtrlDefaultPrevented).toBeFalse();
+      expect(recordedMetaDefaultPrevented).toBeFalse();
+      expect(recordedShiftDefaultPrevented).toBeFalse();
+    });
+  });
 });

@@ -258,6 +258,7 @@
                   mat-flat-button
                   color="primary"
                   [routerLink]="['/quotations', q.id, 'review']"
+                  [queryParams]="requoteQueryParams()"
                   class="action-btn"
                 >
                   <mat-icon aria-hidden="true">visibility</mat-icon>
