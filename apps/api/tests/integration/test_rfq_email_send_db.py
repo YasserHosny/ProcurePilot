@@ -365,6 +365,36 @@ def test_send_retry_only_dispatches_failed_or_draft_recipients(
         assert all(r.status == "sent" for r in recipients2)
 
 
+def test_send_retry_when_rfq_responded_dispatches_only_failed_recipient(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_url = TEST_DATABASE_URL or ""
+    monkeypatch.setattr(rfq_service_module, "get_mailer", FakeMailer)
+    with _rfq_fixture(
+        supplier_emails=["supp-sent@example.test", "supp-failed@example.test"]
+    ) as (service, member, rfq_id, supplier_ids):
+        with psycopg.connect(db_url) as conn, conn.cursor() as cur:
+            cur.execute(
+                "update rfq_recipient set status = 'sent', sent_at = now(), "
+                "outbound_message_id = %s where rfq_id = %s and supplier_id = %s",
+                (f"msg-{uuid4().hex}", rfq_id, supplier_ids[0]),
+            )
+            cur.execute(
+                "update rfq_recipient set status = 'failed' where rfq_id = %s and supplier_id = %s",
+                (rfq_id, supplier_ids[1]),
+            )
+            cur.execute("update rfq set status = 'responded' where id = %s", (rfq_id,))
+
+        FakeMailer.clear()
+        rfq, recipients = service.send(member=member, rfq_id=rfq_id, idempotency_key=uuid4())
+        assert rfq.status == "responded"
+        assert len(FakeMailer.sent_messages) == 1
+        assert FakeMailer.sent_messages[0].to == "supp-failed@example.test"
+        rec_by_supplier = {r.supplier_id: r for r in recipients}
+        assert rec_by_supplier[supplier_ids[0]].status == "sent"
+        assert rec_by_supplier[supplier_ids[1]].status == "sent"
+
+
 def test_send_rejected_when_rfq_converted(monkeypatch: pytest.MonkeyPatch) -> None:
     db_url = TEST_DATABASE_URL or ""
     monkeypatch.setattr(rfq_service_module, "get_mailer", FakeMailer)

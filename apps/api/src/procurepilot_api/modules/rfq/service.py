@@ -398,7 +398,7 @@ class RfqService:
 
                 rfq_row = _lock_rfq_for_creator(cur, member, rfq_id)
                 rfq = Rfq(**rfq_row)
-                if rfq.status not in ("draft", "sent"):
+                if rfq.status not in ("draft", "sent", "responded"):
                     raise ConflictError(details={"resource": "rfq", "reason": "not_sendable"})
                 if rfq.needed_by_date < date.today():
                     raise UnprocessableEntityError(
