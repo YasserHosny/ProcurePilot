@@ -215,10 +215,12 @@
       </div>
 
       <div class="actions actions-start">
-        <button mat-stroked-button type="button" (click)="addLine()">
-          <mat-icon>add</mat-icon>
-          {{ 'orders.create.addLine' | translate }}
-        </button>
+        @if (!sourceLoadFailed()) {
+          <button mat-stroked-button type="button" (click)="addLine()" data-testid="add-line">
+            <mat-icon>add</mat-icon>
+            {{ 'orders.create.addLine' | translate }}
+          </button>
+        }
       </div>
 
       <mat-card class="totals-card">

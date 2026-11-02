@@ -368,4 +368,21 @@ describe('OrderListComponent', () => {
     expect(option?.textContent).toContain('Al Dhahabi');
     expect(option?.textContent).toContain('2');
   });
+  // P-182 review: a late «Load more» answer must not land in a newer filter's result set.
+  it('ignores a Load more response that arrives after the filter changed', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: '50', total_count: 80 });
+    component.loadMore();
+    const late = http.expectOne('/api/v1/orders?limit=50&cursor=50');
+
+    const status = el().querySelector('[data-testid="orders-status-filter"]') as HTMLSelectElement;
+    status.value = 'draft';
+    status.dispatchEvent(new Event('change'));
+    http.expectOne('/api/v1/orders?limit=50&status=draft').flush({ items: [orderRow('d1', 'PO-D1')], next_cursor: null, total_count: 1 });
+    late.flush({ items: [orderRow('o2', 'PO-2')], next_cursor: '100', total_count: 80 });
+
+    expect(component.orders().map((o) => o.id)).toEqual(['d1']);
+    expect(component.nextCursor()).toBeNull();
+    expect(component.totalCount()).toBe(1);
+  });
 });

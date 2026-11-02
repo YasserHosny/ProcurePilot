@@ -112,6 +112,8 @@ export class OrderCreateComponent implements OnInit {
   readonly savedOrder = signal<PurchaseOrder | null>(null);
   readonly navigationFailed = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
+  // The approved request this page was opened for could not be loaded: nothing may be saved.
+  readonly sourceLoadFailed = signal(false);
   readonly sourceRequest = signal<PurchaseRequest | null>(null);
   // Currency of the supplier quote the unit prices were pre-filled from; the order must use it.
   private readonly quotedCurrency = signal<string | null>(null);
@@ -316,6 +318,7 @@ export class OrderCreateComponent implements OnInit {
         // Without the request there is nothing to link or to cap quantities against: refuse to
         // fall back to a blank manual order that would be saved unlinked.
         this.lines.clear();
+        this.sourceLoadFailed.set(true);
         this.errorMessage.set(this.translate.instant('orders.create.sourceLoadError'));
       } else if (request && allocations) {
         this.sourceRequest.set(request);
@@ -424,7 +427,7 @@ export class OrderCreateComponent implements OnInit {
   }
 
   submit(): void {
-    if (this.isSubmitting() || this.savedOrder() !== null || this.form.invalid || this.lines.length === 0) return;
+    if (this.isSubmitting() || this.savedOrder() !== null || this.sourceLoadFailed() || this.form.invalid || this.lines.length === 0) return;
 
     this.isSubmitting.set(true);
     this.errorMessage.set(null);

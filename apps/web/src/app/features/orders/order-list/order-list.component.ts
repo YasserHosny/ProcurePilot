@@ -50,6 +50,8 @@ export class OrderListComponent implements OnInit {
   readonly isLoadingApprovedRequests = signal(false);
   readonly totalCount = signal<number | null>(null);
   readonly loadMoreError = signal(false);
+  // Bumped on every fresh query so a slow answer to an earlier one is dropped.
+  private generation = 0;
 
   readonly search = signal('');
   readonly statusFilter = signal('all');
@@ -104,14 +106,18 @@ export class OrderListComponent implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.loadMoreError.set(false);
+    this.isLoadingMore.set(false);
+    const generation = ++this.generation;
     this.ordersApi.listOrders(undefined, this.query()).subscribe({
       next: (response) => {
+        if (generation !== this.generation) return;
         this.orders.set(response.items);
         this.nextCursor.set(response.next_cursor);
         this.totalCount.set(response.total_count ?? null);
         this.isLoading.set(false);
       },
       error: () => {
+        if (generation !== this.generation) return;
         this.errorMessage.set(this.translate.instant('orders.loadError'));
         this.isLoading.set(false);
       },
@@ -123,8 +129,10 @@ export class OrderListComponent implements OnInit {
     if (!cursor || this.isLoadingMore()) return;
     this.isLoadingMore.set(true);
     this.loadMoreError.set(false);
+    const generation = this.generation;
     this.ordersApi.listOrders(cursor, this.query()).subscribe({
       next: (response) => {
+        if (generation !== this.generation) return;
         // An order created between two page loads shifts the offset and repeats a row.
         const known = new Set(this.orders().map((order) => order.id));
         this.orders.set([...this.orders(), ...response.items.filter((order) => !known.has(order.id))]);
@@ -133,6 +141,7 @@ export class OrderListComponent implements OnInit {
         this.isLoadingMore.set(false);
       },
       error: () => {
+        if (generation !== this.generation) return;
         this.isLoadingMore.set(false);
         this.loadMoreError.set(true);
       },

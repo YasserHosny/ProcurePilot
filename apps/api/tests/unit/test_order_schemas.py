@@ -11,6 +11,7 @@ from procurepilot_api.modules.orders.schemas import (
     PurchaseOrder,
     PurchaseOrderCreate,
     PurchaseOrderLine,
+    PurchaseOrderList,
     SupplierConfirmation,
     SupplierConfirmationLine,
 )
@@ -386,3 +387,9 @@ def test_order_create_rejects_a_header_tax_that_differs_from_the_line_taxes() ->
         PurchaseOrderCreate.model_validate(
             _create_payload(tax={"amount": "0.00", "currency": "SAR"})
         )
+
+
+def test_order_list_without_a_count_does_not_claim_zero() -> None:
+    # P-182 review: the partner endpoint shares this model and cannot report a count of 0
+    # next to a non-empty page.
+    assert PurchaseOrderList(items=(), next_cursor=None).total_count is None

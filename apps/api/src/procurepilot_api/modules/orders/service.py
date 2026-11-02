@@ -235,16 +235,15 @@ class OrdersService:
         with self._transaction(member) as cur:
             # A retry of a create that already committed is a replay, answered before the
             # allocation check: that order's own quantity would otherwise count against it.
-            cur.execute(
-                "select id from purchase_order "
-                "where tenant_id = %s and create_idempotency_key = %s",
-                (member.tenant_id, idempotency_key),
-            )
-            existing = cur.fetchone()
-            if existing is not None:
-                return self._load_order_cursor(cur, UUID(str(existing["id"]))), False
+            replayed = self._existing_create(cur, member.tenant_id, idempotency_key)
+            if replayed is not None:
+                return replayed, False
             if payload.source_request_id:
                 self._lock_requests(cur, member.tenant_id, {payload.source_request_id})
+                # The first attempt may have committed while this one waited for the lock.
+                replayed = self._existing_create(cur, member.tenant_id, idempotency_key)
+                if replayed is not None:
+                    return replayed, False
                 self._assert_request_still_ordered(cur, payload.source_request_id)
 
                 self._assert_request_allocation_available(
@@ -318,6 +317,16 @@ class OrdersService:
             order = self._load_order_cursor(cur, order_id)
             self._audit_cursor(cur, member, "orders.purchase_order_created", order_id)
         return order, True
+
+    def _existing_create(
+        self, cur: psycopg.Cursor, tenant_id: UUID, idempotency_key: UUID | None
+    ) -> PurchaseOrder | None:
+        cur.execute(
+            "select id from purchase_order where tenant_id = %s and create_idempotency_key = %s",
+            (tenant_id, idempotency_key),
+        )
+        row = cur.fetchone()
+        return self._load_order_cursor(cur, UUID(str(row["id"]))) if row is not None else None
 
     @staticmethod
     def _request_pack_snapshots(

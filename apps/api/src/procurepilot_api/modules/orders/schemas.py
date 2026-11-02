@@ -360,7 +360,7 @@ class DeliveryReceiptCreate(StrictModel):
 class PurchaseOrderList(StrictModel):
     items: tuple[PurchaseOrder, ...]
     next_cursor: str | None = None
-    total_count: int = 0
+    total_count: int | None = None
 
 
 class RequestLineAllocation(StrictModel):

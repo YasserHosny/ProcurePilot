@@ -340,6 +340,10 @@ describe('OrderCreateComponent', () => {
 
     expect(component.errorMessage()).toBeTruthy();
     expect(component.lines.length).toBe(0);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="add-line"]')).toBeNull();
+    // Even if a line gets added some other way, the unlinked order is never saved.
+    component.addLine();
+    component.lines.at(0).patchValue({ description: 'X', quantity: 1, unit_price: 1 });
     component.form.patchValue({ order_number: 'PO-X', supplier_id: 's1', order_date: new Date('2026-09-29T12:00:00Z') });
     component.submit();
     expect(ordersApiService.createOrder).not.toHaveBeenCalled();
