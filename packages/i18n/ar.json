@@ -4367,6 +4367,7 @@
       "duplicate": "تكرار",
       "sentToSuppliers": "أُرسل إلى {{count}} موردين",
       "recipientsDraftHeader": "{{count}} موردين، لم يُرسل بعد",
+      "recipientsLoading": "جارٍ تحميل المستلمين",
       "viewAllRecipients": "عرض جميع المستلمين ←",
       "recipientsLoadError": "فشل تحميل المستلمين.",
       "recipientStatus_sent": "مرسل",

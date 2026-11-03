@@ -4367,6 +4367,7 @@
       "duplicate": "Duplicate",
       "sentToSuppliers": "Sent to {{count}} suppliers",
       "recipientsDraftHeader": "{{count}} suppliers, not sent yet",
+      "recipientsLoading": "Loading recipients",
       "viewAllRecipients": "View all recipients →",
       "recipientsLoadError": "Failed to load recipients.",
       "recipientStatus_sent": "Sent",

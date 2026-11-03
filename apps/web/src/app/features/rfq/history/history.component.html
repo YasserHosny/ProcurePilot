@@ -1,4 +1,4 @@
-<div class="page-container">
+<div class="page-container" [dir]="recipientsDirection">
   @if (draftActionsUnavailable()) {
     <div class="draft-actions-notice" role="status" data-testid="draft-actions-notice">
       <mat-icon aria-hidden="true">info</mat-icon>
@@ -94,14 +94,74 @@
                 <button
                   type="button"
                   class="recipients-btn"
-                  [matMenuTriggerFor]="recipientsMenu"
-                  [matMenuTriggerData]="{ rfq: rfq }"
-                  (click)="$event.stopPropagation(); loadRecipients(rfq.id)"
+                  #recipientsButton
+                  cdkOverlayOrigin
+                  #recipientsOrigin="cdkOverlayOrigin"
+                  [attr.aria-expanded]="openRecipientsId() === rfq.id"
+                  [attr.aria-controls]="'rfq-recipients-' + rfq.id"
+                  aria-haspopup="dialog"
+                  (click)="$event.stopPropagation(); toggleRecipients(rfq, recipientsButton)"
                   [attr.aria-label]="getRecipientsAriaLabel(rfq.recipient_count)"
                   data-testid="rfq-recipients-button"
                 >
                   {{ rfq.recipient_count }}
                 </button>
+                <ng-template
+                  cdkConnectedOverlay
+                  [cdkConnectedOverlayOrigin]="recipientsOrigin"
+                  [cdkConnectedOverlayOpen]="openRecipientsId() === rfq.id"
+                  [cdkConnectedOverlayPositions]="recipientsPositions"
+                  [cdkConnectedOverlayViewportMargin]="16"
+                  (overlayOutsideClick)="closeRecipients(rfq.id)"
+                  (overlayKeydown)="onRecipientsKeydown($event)"
+                  (detach)="closeRecipients(rfq.id)"
+                >
+                  <div
+                    class="recipients-popover"
+                    role="dialog"
+                    [id]="'rfq-recipients-' + rfq.id"
+                    [attr.aria-labelledby]="'rfq-recipients-title-' + rfq.id"
+                    tabindex="-1"
+                    cdkTrapFocus
+                    [cdkTrapFocusAutoCapture]="true"
+                  >
+                    <div class="popover-header">
+                      <strong tabindex="-1" cdkFocusInitial [id]="'rfq-recipients-title-' + rfq.id">{{ (rfq.status === 'draft' ? 'rfq.history.recipientsDraftHeader' : 'rfq.history.sentToSuppliers') | translate: { count: rfq.recipient_count } }}</strong>
+                    </div>
+                    @if (recipientsCache()[rfq.id]?.loading) {
+                      <div class="popover-loading">
+                        <mat-spinner diameter="24" [attr.aria-label]="'rfq.history.recipientsLoading' | translate"></mat-spinner>
+                      </div>
+                    } @else if (recipientsCache()[rfq.id]?.error) {
+                      <div class="popover-error" role="alert">
+                        <span>{{ 'rfq.history.recipientsLoadError' | translate }}</span>
+                      </div>
+                    } @else {
+                      <div class="recipients-list">
+                        @for (recipient of recipientsCache()[rfq.id]?.recipients; track recipient.id) {
+                          <div class="recipient-row">
+                            <span aria-hidden="true" class="status-dot" [ngClass]="'dot-' + recipient.status"></span>
+                            <span class="recipient-name">{{ recipient.supplier_name || ('rfq.history.unknownSupplier' | translate) }}</span>
+                            <span class="recipient-status">{{ 'rfq.history.recipientStatus_' + recipient.status | translate }}</span>
+                            @if (recipient.sent_at) {
+                              <span class="recipient-time">{{ recipient.sent_at | formatDate: timeFormatOptions }}</span>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                    <div class="popover-footer">
+                      <a
+                        [routerLink]="['/rfq', rfq.id]"
+                        [queryParams]="{ tab: 'recipients' }"
+                        class="view-all-link"
+                        (click)="closeRecipients()"
+                      >
+                        {{ 'rfq.history.viewAllRecipients' | translate }}
+                      </a>
+                    </div>
+                  </div>
+                </ng-template>
               } @else {
                 0
               }
@@ -233,44 +293,4 @@
     </ng-template>
   </mat-menu>
 
-  <mat-menu #recipientsMenu="matMenu" class="recipients-popover-menu">
-    <ng-template matMenuContent let-rfq="rfq">
-      <div class="recipients-popover">
-        <div class="popover-header">
-          <strong>{{ (rfq.status === 'draft' ? 'rfq.history.recipientsDraftHeader' : 'rfq.history.sentToSuppliers') | translate: { count: rfq.recipient_count } }}</strong>
-        </div>
-        @if (recipientsCache()[rfq.id]?.loading) {
-          <div class="popover-loading">
-            <mat-spinner diameter="24"></mat-spinner>
-          </div>
-        } @else if (recipientsCache()[rfq.id]?.error) {
-          <div class="popover-error">
-            <span>{{ 'rfq.history.recipientsLoadError' | translate }}</span>
-          </div>
-        } @else {
-          <div class="recipients-list">
-            @for (recipient of recipientsCache()[rfq.id]?.recipients; track recipient.id) {
-              <div class="recipient-row">
-                <span class="status-dot" [ngClass]="'dot-' + recipient.status"></span>
-                <span class="recipient-name">{{ recipient.supplier_name || ('rfq.history.unknownSupplier' | translate) }}</span>
-                <span class="recipient-status">{{ 'rfq.history.recipientStatus_' + recipient.status | translate }}</span>
-                @if (recipient.sent_at) {
-                  <span class="recipient-time">{{ recipient.sent_at | formatDate: timeFormatOptions }}</span>
-                }
-              </div>
-            }
-          </div>
-        }
-        <div class="popover-footer">
-          <a
-            [routerLink]="['/rfq', rfq.id]"
-            [queryParams]="{ tab: 'recipients' }"
-            class="view-all-link"
-          >
-            {{ 'rfq.history.viewAllRecipients' | translate }}
-          </a>
-        </div>
-      </div>
-    </ng-template>
-  </mat-menu>
 </div>
