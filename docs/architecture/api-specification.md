@@ -1490,6 +1490,8 @@ Request:
 
 - Requires bearer auth. Lists requests awaiting the caller's decision — the assigned approver
   sees their own pending steps; an owner sees every pending step (FR-007 standing override).
+  Requests submitted by the caller are excluded unless the caller is the workspace's only
+  active owner (ADR-024).
 - Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50.
 - Returns `200` with `items` of `PurchaseRequest`, each embedding the full decision context
   (requester, branch, cost centre, lines, required-by date, `approval_step`, and `budget_status`
@@ -1498,6 +1500,17 @@ Request:
   RFQ split, `null` for an ordinary request. A decided request no longer appears here.
 
 ### `POST /requests/{request_id}/approve` · `POST /requests/{request_id}/reject`
+
+ADR-024 applies to approve and reject, keyed and unkeyed, and to the group approve/reject
+endpoints. After existing authorization, a requester who is not the workspace's only active
+owner receives `403` with `details.reason: self_decision_not_allowed`. Existing pending steps
+keep their assignee. Submission routes away from the requester to another active owner
+(`owner_fallback`); delegation to the requester is skipped.
+
+`ApprovalStep.self_approval` is a derived boolean (default `false`) in request detail, list,
+queue and decision responses: for pending steps the assignee is the requester; for decided
+steps the recorded decider is the requester. A requester decision's audit target includes
+`self_approved: true` for single and group decisions; other decisions omit that key.
 
 - Accepts an optional `Idempotency-Key` UUID header. Within the decision transaction, an
   authorized retry with the same tenant, actor, action, request and key returns the current

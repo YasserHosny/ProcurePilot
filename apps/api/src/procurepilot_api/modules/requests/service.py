@@ -926,6 +926,13 @@ class RequestsService:
                 query = query.neq("purchase_request.status", status)
             if member.role is not MemberRole.owner:
                 query = query.eq("assigned_membership_id", str(member.membership_id))
+            is_sole_owner = member.role is MemberRole.owner and set(
+                self._fetch_owner_membership_ids(client)
+            ) == {member.membership_id}
+            if not is_sole_owner:
+                query = query.neq(
+                    "purchase_request.requested_by_membership_id", str(member.membership_id)
+                )
             if boundary is not None:
                 created_at, step_id = boundary
                 query = query.or_(
@@ -1426,10 +1433,7 @@ class RequestsService:
                     replay = cur.fetchone()
                     cur.execute("set local role authenticated")
                     if replay is not None:
-                        return [
-                            PurchaseRequest.model_validate(item)
-                            for item in replay["target"]["response"]
-                        ]
+                        return _replay_group_response(replay["target"]["response"])
 
                     cur.execute(
                         "select id from purchase_request where request_group_id=%s order by id",
@@ -1520,6 +1524,12 @@ class RequestsService:
                                 row["id"] for row in members if row["status"] != "active"
                             },
                             owner_membership_id=owner,
+                            owner_membership_ids=[
+                                row["id"]
+                                for row in members
+                                if row["role"] == "owner" and row["status"] == "active"
+                            ],
+                            requester_membership_id=rows[0]["requested_by_membership_id"],
                             as_of=as_of,
                             is_group=True,
                         )
@@ -1633,6 +1643,10 @@ class RequestsService:
                         "idempotency_key": str(idempotency_key),
                         "response": [item.model_dump(mode="json") for item in result],
                     }
+                    if action in ("approved", "rejected") and str(
+                        rows[0]["requested_by_membership_id"]
+                    ) == str(member.membership_id):
+                        target["self_approved"] = True
                     cur.execute(
                         "select record_audit_event(%s,'success',%s,%s,%s,%s,%s)",
                         (
@@ -1954,6 +1968,10 @@ class RequestsService:
                             delegations=self._fetch_active_delegations(client, as_of=as_of),
                             removed_membership_ids=self._fetch_removed_membership_ids(client),
                             owner_membership_id=self._fetch_owner_membership_id(client),
+                            owner_membership_ids=self._fetch_owner_membership_ids(client),
+                            requester_membership_id=UUID(
+                                str(request_row["requested_by_membership_id"])
+                            ),
                             as_of=as_of,
                         )
 
@@ -2897,6 +2915,28 @@ class RequestsService:
         row = _one_row(response.data, reason="owner_membership_not_found")
         return UUID(str(row["id"]))
 
+    def _fetch_owner_membership_ids(self, client: Client) -> list[UUID]:
+        owners: list[UUID] = []
+        page_size = 1000
+        try:
+            while True:
+                offset = len(owners)
+                response = (
+                    client.table("membership")
+                    .select("id")
+                    .eq("role", "owner")
+                    .eq("status", "active")
+                    .order("id")
+                    .range(offset, offset + page_size - 1)
+                    .execute()
+                )
+                page = _rows(response.data)
+                owners.extend(UUID(str(row["id"])) for row in page)
+                if len(page) < page_size:
+                    return owners
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
     def _fetch_removed_membership_ids(self, client: Client) -> set[UUID]:
         try:
             response = client.table("membership").select("id").neq("status", "active").execute()
@@ -3048,6 +3088,8 @@ class RequestsService:
             delegations=self._fetch_active_delegations(client, as_of=as_of),
             removed_membership_ids=self._fetch_removed_membership_ids(client),
             owner_membership_id=self._fetch_owner_membership_id(client),
+            owner_membership_ids=self._fetch_owner_membership_ids(client),
+            requester_membership_id=UUID(str(request_row["requested_by_membership_id"])),
             as_of=as_of,
         )
         try:
@@ -3220,6 +3262,23 @@ class RequestsService:
         now: str,
     ) -> tuple[dict[str, object], dict[str, object]]:
         """Shared guarded writes; the caller owns the transaction and outbox."""
+        cur.execute("select * from purchase_request where id=%s for update", (request_id,))
+        request_row = cur.fetchone()
+        if request_row is None or str(request_row["status"]) != "submitted":
+            raise ConflictError(details={"reason": "not_submitted"})
+        cur.execute("select * from approval_step where id=%s for update", (step_id,))
+        step_row = cur.fetchone()
+        # Preserve the guarded-write conflict for a stale unkeyed authorization pre-check.
+        if (
+            step_row is None
+            or str(step_row["status"]) != "pending"
+            or (
+                member.role is not MemberRole.owner
+                and str(step_row["assigned_membership_id"]) != str(member.membership_id)
+            )
+        ):
+            raise ConflictError(details={"reason": "no_pending_approval"})
+        _require_self_decision_allowed(cur, request_row, member)
         cur.execute(
             """
             update purchase_request
@@ -3384,6 +3443,10 @@ class RequestsService:
                         "approval_step_id": str(decided_step["id"]),
                         "decided_by_membership_id": str(member.membership_id),
                     }
+                    if str(decided_request["requested_by_membership_id"]) == str(
+                        member.membership_id
+                    ):
+                        target["self_approved"] = True
                     if idempotency_key is not None:
                         target["idempotency_key"] = str(idempotency_key)
                     if comment is not None:
@@ -3715,6 +3778,18 @@ def _require_requester(request_row: dict[str, object], member: CurrentMember) ->
         raise PermissionDeniedError(details={"reason": "not_requester"})
 
 
+def _require_self_decision_allowed(
+    cur: psycopg.Cursor, request_row: dict[str, object], member: CurrentMember
+) -> None:
+    """Check current active owners inside the decision transaction (ADR-024)."""
+    if str(request_row["requested_by_membership_id"]) != str(member.membership_id):
+        return
+    cur.execute("select id from membership where role='owner' and status='active'")
+    owners = {str(row["id"]) for row in cur.fetchall()}
+    if owners != {str(member.membership_id)}:
+        raise PermissionDeniedError(details={"reason": "self_decision_not_allowed"})
+
+
 def _require_assigned_approver_or_owner(step_row: dict[str, object], member: CurrentMember) -> None:
     if member.role is MemberRole.owner:
         return
@@ -3800,7 +3875,15 @@ def _purchase_request(
         ),
         has_incomplete_estimate=bool(row.get("has_incomplete_estimate", False)),
         budget_status=budget_status,
-        approval_step=(_approval_step(step_row, assignee=assignee) if step_row else None),
+        approval_step=(
+            _approval_step(
+                step_row,
+                requester_membership_id=UUID(str(row["requested_by_membership_id"])),
+                assignee=assignee,
+            )
+            if step_row
+            else None
+        ),
         submitted_at=row.get("submitted_at"),
         withdrawn_at=row.get("withdrawn_at"),
         delivered_at=row.get("delivered_at"),
@@ -3866,10 +3949,30 @@ def _member_contact(row: dict[str, object]) -> MemberContact:
     return MemberContact(str(email) if email else None, str(name) if name else None)
 
 
+def _replay_group_response(rows: list[dict[str, object]]) -> list[PurchaseRequest]:
+    responses = [PurchaseRequest.model_validate(row) for row in rows]
+    for request in responses:
+        step = request.approval_step
+        if step is not None:
+            # Older audit snapshots do not carry the derived flag.
+            step.self_approval = (
+                step.assigned_membership_id
+                if step.status == "pending"
+                else step.decided_by_membership_id
+            ) == request.requested_by_membership_id
+    return responses
+
+
 def _approval_step(
-    row: dict[str, object], *, assignee: MemberContact | None = None
+    row: dict[str, object], *, requester_membership_id: UUID, assignee: MemberContact | None = None
 ) -> ApprovalStep:
     return ApprovalStep(
+        self_approval=str(
+            row["assigned_membership_id"]
+            if str(row["status"]) == "pending"
+            else row.get("decided_by_membership_id")
+        )
+        == str(requester_membership_id),
         id=UUID(str(row["id"])),
         assigned_membership_id=UUID(str(row["assigned_membership_id"])),
         assigned_name=assignee.name if assignee else None,
