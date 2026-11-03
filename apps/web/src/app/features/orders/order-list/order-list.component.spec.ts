@@ -385,4 +385,19 @@ describe('OrderListComponent', () => {
     expect(component.nextCursor()).toBeNull();
     expect(component.totalCount()).toBe(1);
   });
+  // Review (Codex, #419): Load more used the text typed after the page was loaded.
+  it('pages with the search that was applied, not with text typed but not submitted', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: '50', total_count: 80 });
+    fixture.detectChanges();
+
+    const search = el().querySelector('[data-testid="orders-search"]') as HTMLInputElement;
+    search.value = 'ALPHA';
+    search.dispatchEvent(new Event('input')); // typed, never submitted
+    component.loadMore();
+
+    http.expectOne('/api/v1/orders?limit=50&cursor=50').flush({ items: [orderRow('o2', 'PO-2')], next_cursor: null, total_count: 80 });
+    expect(component.orders().map((o) => o.id)).toEqual(['o1', 'o2']);
+    expect(component.totalCount()).toBe(80);
+  });
 });
