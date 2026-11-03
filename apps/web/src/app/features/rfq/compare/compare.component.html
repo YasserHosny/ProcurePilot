@@ -122,6 +122,14 @@
     <div class="error-state" role="alert">
       <mat-icon color="warn" aria-hidden="true">error_outline</mat-icon>
       <p>{{ errorMessage() }}</p>
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="loadData(rfqId())"
+        data-testid="rfq-compare-retry"
+      >
+        {{ 'common.retry' | translate }}
+      </button>
     </div>
   }
 
@@ -318,7 +326,7 @@
                   >
                     {{ 'rfq.compare.openRequest' | translate }}
                   </a>
-                } @else {
+                } @else if (isWriter()) {
                   <button mat-flat-button color="primary"
                     [disabled]="!canPrepare(response) || isConverted() || isExpired()"
                     (click)="prepareRequest(response)">

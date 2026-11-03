@@ -96,6 +96,8 @@ export class CompareComponent implements OnInit, OnChanges {
   readonly branchesError = signal<boolean>(false);
   readonly rfqDetailError = signal<boolean>(false);
   private splitIdempotencyKey: string | null = null;
+  private readonly supplierLookups = new Set<string>();
+  private readonly productLookups = new Set<string>();
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
   readonly isConverted = computed<boolean>(() => this.rfqDetail()?.rfq.status === 'converted');
@@ -120,6 +122,7 @@ export class CompareComponent implements OnInit, OnChanges {
     const eligibleReplies = nonRefused.filter(
       (r) => r.quotation_status === 'reviewed' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
     );
+    const eligibleSuppliers = new Set(eligibleReplies.map((r) => r.supplier_id));
 
     let totalUnmatched = 0;
     const unmatchedQuoteIds: string[] = [];
@@ -133,7 +136,7 @@ export class CompareComponent implements OnInit, OnChanges {
       }
     }
 
-    if (eligibleReplies.length < 2) {
+    if (eligibleSuppliers.size < 2) {
       return {
         canSplit: false,
         reason: 'needs_two_matched',
@@ -631,8 +634,31 @@ export class CompareComponent implements OnInit, OnChanges {
           names[s.id] = s.name;
         }
         this.supplierNames.set(names);
+        this.fetchMissingSuppliers();
+      },
+      error: () => {
+        this.fetchMissingSuppliers();
       },
     });
+  }
+
+  private fetchMissingSuppliers(): void {
+    const names = this.supplierNames();
+    for (const response of this.responses()) {
+      const id = response.supplier_id;
+      if (!id || names[id] || this.supplierLookups.has(id)) {
+        continue;
+      }
+      this.supplierLookups.add(id);
+      this.api.supplier(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: (supplier) => {
+          const current = { ...this.supplierNames() };
+          current[supplier.id] = supplier.name;
+          this.supplierNames.set(current);
+        },
+        error: () => undefined,
+      });
+    }
   }
 
   resolveProducts(): void {
@@ -643,8 +669,39 @@ export class CompareComponent implements OnInit, OnChanges {
           names[p.id] = p.tenant_name;
         }
         this.productNames.set(names);
+        this.fetchMissingProducts();
+      },
+      error: () => {
+        this.fetchMissingProducts();
       },
     });
+  }
+
+  private fetchMissingProducts(): void {
+    const names = this.productNames();
+    const missing = new Set<string>();
+    for (const response of this.responses()) {
+      for (const line of response.lines) {
+        const id = line.workspace_product_id;
+        if (id && !names[id]) {
+          missing.add(id);
+        }
+      }
+    }
+    for (const id of missing) {
+      if (this.productLookups.has(id)) {
+        continue;
+      }
+      this.productLookups.add(id);
+      this.api.product(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: (product) => {
+          const current = { ...this.productNames() };
+          current[product.id] = product.tenant_name;
+          this.productNames.set(current);
+        },
+        error: () => undefined,
+      });
+    }
   }
 
   isEligible(response: RfqResponseComparison): boolean {
