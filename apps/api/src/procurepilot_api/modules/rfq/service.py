@@ -1370,7 +1370,7 @@ def _validate_recipients(
 ) -> tuple[list[dict], list[uuid.UUID]]:
     rejected: list[dict] = []
     valid: list[uuid.UUID] = []
-    for supplier_id in supplier_ids:
+    for supplier_id in dict.fromkeys(supplier_ids):
         cur.execute("select id, contact_email from supplier where id = %s", (supplier_id,))
         row = cur.fetchone()
         if row is None:
@@ -1393,7 +1393,10 @@ def _decode_cursor(cursor: str | None) -> int:
     try:
         raw = base64.urlsafe_b64decode(cursor.encode("ascii"))
         payload = json.loads(raw.decode("utf-8"))
-        return payload["offset"]
+        offset = payload["offset"]
+        if type(offset) is not int or not 0 <= offset <= 1_000_000:
+            raise ValueError("Invalid cursor offset")
+        return offset
     except (KeyError, ValueError, TypeError, json.JSONDecodeError) as exc:
         raise UnprocessableEntityError(details={"cursor": "invalid_format"}) from exc
 

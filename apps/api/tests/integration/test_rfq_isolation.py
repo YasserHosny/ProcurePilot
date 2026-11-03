@@ -399,6 +399,10 @@ async def test_other_tenant_rfq_detail_and_draft_update_are_not_found(
     with conn.cursor() as cur:
         cur.execute("reset role")
         cur.execute("update rfq set status = 'draft' where id = %s", (beta.rfq_id,))
+        cur.execute(
+            "select workspace_product_id from rfq_line where id = %s", (alpha.rfq_line_id,)
+        )
+        product_id = cur.fetchone()[0]
     conn.commit()
 
     from procurepilot_api.deps import CurrentMember, current_member
@@ -419,7 +423,7 @@ async def test_other_tenant_rfq_detail_and_draft_update_are_not_found(
             update = await client.put(
                 f"/api/v1/rfq/{beta.rfq_id}",
                 json={
-                    "lines": [],
+                    "lines": [{"workspace_product_id": str(product_id), "quantity": "1"}],
                     "recipient_supplier_ids": [],
                     "needed_by_date": "2030-01-01",
                     "tenant_terms": "must not leak",
