@@ -17,6 +17,7 @@ import type {
   BaseUnit,
   BasketOptimiseRequest,
   BasketSplitJob,
+  BasketSplitJobList,
   BillingAccount,
   Branch,
   BranchCreate,
@@ -800,6 +801,14 @@ export class ApiService {
   ): Observable<BasketSplitJob> {
     const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
     return this.http.post<BasketSplitJob>(`${this.base}/baskets/optimise`, body, { headers });
+  }
+
+  listBasketSplitJobs(params?: { cursor?: string; limit?: number }): Observable<BasketSplitJobList> {
+    const query = new URLSearchParams();
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit) query.set('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<BasketSplitJobList>(`${this.base}/baskets${qs}`);
   }
 
   getBasketSplitJob(id: string): Observable<BasketSplitJob> {

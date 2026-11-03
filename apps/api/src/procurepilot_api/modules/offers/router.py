@@ -22,6 +22,7 @@ from procurepilot_api.modules.offers.schemas import (
     AdvancedBasketOptimiseRequest,
     BasketOptimiseRequest,
     BasketSplitJob,
+    BasketSplitJobList,
     NegotiationBrief,
     NegotiationBriefDismissRequest,
     NegotiationBriefList,
@@ -179,6 +180,16 @@ def optimise_basket(
     if not created:
         response.status_code = status.HTTP_200_OK
     return job
+
+
+@router.get("/baskets", response_model=BasketSplitJobList)
+def list_baskets(
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[BasketService, Depends(get_basket_service)],
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    cursor: Annotated[str | None, Query()] = None,
+) -> BasketSplitJobList:
+    return service.list_jobs(member=member, limit=limit, cursor=cursor)
 
 
 @router.get("/baskets/{id}", response_model=BasketSplitJob)
