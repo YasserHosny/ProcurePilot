@@ -364,18 +364,9 @@ export class CompareComponent implements OnInit, OnChanges {
     if (productIds.length === 0) {
       return null;
     }
-    const matched = this.responses().filter(
+    const replies = this.responses().filter(
       (r) => r.quotation_status !== 'refused' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
     );
-    // One reply per supplier (the latest by submitted_at), as the server prices the split from.
-    const latestBySupplier = new Map<string, RfqResponseComparison>();
-    for (const reply of matched) {
-      const current = latestBySupplier.get(reply.supplier_id);
-      if (!current || reply.submitted_at >= current.submitted_at) {
-        latestBySupplier.set(reply.supplier_id, reply);
-      }
-    }
-    const replies = [...latestBySupplier.values()];
     if (replies.length < 2) {
       return null;
     }
@@ -441,6 +432,10 @@ export class CompareComponent implements OnInit, OnChanges {
   readonly splitSaving = computed<{ amount: number; currency: string } | null>(() => {
     const grid = this.landedCostGrid();
     if (!grid || grid.replies.some((r) => r.supplier_terms_apply)) {
+      return null;
+    }
+    // The server prices the split from every eligible reply by recorded cost, so with more than one reply per supplier we cannot know which cost it will use.
+    if (new Set(grid.replies.map((r) => r.supplier_id)).size !== grid.replies.length) {
       return null;
     }
     const singleTotals = grid.replies.map((r) =>

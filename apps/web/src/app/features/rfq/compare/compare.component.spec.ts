@@ -1900,14 +1900,13 @@ describe('CompareComponent (RFQ)', () => {
     });
 
     it('shows no split saving when a supplier has more than one reply, since the split prices them by recorded cost', () => {
-      const costs = (supplier: string, a: string, b: string) => [
-        { workspace_product_id: 'p1', total_amount: a, total_currency: 'USD' },
-        { workspace_product_id: 'p2', total_amount: b, total_currency: 'USD' },
-      ].map((c) => ({ ...c, supplier }));
       const reply = (id: string, supplier: string, a: string, b: string, at: string) => ({
         ...matchedReply(id, supplier, 'p1'),
         submitted_at: at,
-        rfq_landed_costs: costs(supplier, a, b).map(({ supplier: _s, ...c }) => c),
+        rfq_landed_costs: [
+          { workspace_product_id: 'p1', total_amount: a, total_currency: 'USD' },
+          { workspace_product_id: 'p2', total_amount: b, total_currency: 'USD' },
+        ],
       });
       mockRfqApi.getRfq.and.returnValue(
         of({
