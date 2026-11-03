@@ -3860,7 +3860,10 @@
       "dateFormatHintDayFirst": "يوم/شهر/سنة",
       "dateFormatHintMonthFirst": "شهر/يوم/سنة",
       "receivedQuantityFor": "{{product}} · الكمية المستلمة ({{unit}}، المطلوب {{ordered}})",
-      "confirmedQuantityFor": "{{product}} · الكمية المؤكدة ({{unit}}، المطلوب {{ordered}})"
+      "confirmedQuantityFor": "{{product}} · الكمية المؤكدة ({{unit}}، المطلوب {{ordered}})",
+      "progressLabel": "تم استلام {{percent}}٪",
+      "sourceRfq": "طلب التسعير",
+      "sourceQuotation": "عرض السعر"
     },
     "resultCount": "{{count}} أمر شراء",
     "loadMoreError": "تعذّر تحميل المزيد من الأوامر. الأوامر الظاهرة أعلاه ما زالت معروضة.",
