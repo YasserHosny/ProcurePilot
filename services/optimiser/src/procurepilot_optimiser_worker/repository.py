@@ -138,6 +138,7 @@ def read_current_offers(conn: psycopg.Connection, *, job: BasketJob) -> list[Off
                 and q.supplier_id = any(%s::uuid[])
                 and (%s::uuid[] is null or q.id = any(%s::uuid[]))
                 and q.status = 'reviewed'
+                and q.deleted_at is null
                 and s.status in ('active', 'preferred')
                 and (lc.valid_to is null or lc.valid_to >= now())
             )
@@ -198,6 +199,7 @@ def read_current_advanced_offers(
                 and q.supplier_id = any(%s::uuid[])
                 and (%s::uuid[] is null or q.id = any(%s::uuid[]))
                 and q.status = 'reviewed'
+                and q.deleted_at is null
                 and s.status in ('active', 'preferred')
                 and (lc.valid_to is null or lc.valid_to >= now())
             )
