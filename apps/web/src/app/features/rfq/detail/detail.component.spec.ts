@@ -10,7 +10,7 @@ import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { DetailComponent } from './detail.component';
-import { RfqApi, RfqDetail, RfqRecipient, RfqResponseComparisonList, RfqSendResponse } from '../rfq-api';
+import { RfqActionKeys, RfqApi, RfqDetail, RfqRecipient, RfqResponseComparisonList, RfqSendResponse } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatService } from '../../../core/format/format.service';
@@ -225,6 +225,32 @@ describe('DetailComponent (RFQ Details)', () => {
   });
 
   describe('cancellation', () => {
+    for (const status of [0, 503, 408, 429]) {
+      it(`retains the cancel key after ${status} and rotates after success or definitive rejection`, () => {
+        component.rfqId.set(mockSentDetail.rfq.id);
+        component.rfqDetail.set(mockSentDetail);
+        dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+        rfqApiSpy.cancelRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status })));
+        component.onCancelRfq();
+        const first = rfqApiSpy.cancelRfq.calls.mostRecent().args[1];
+        expect(first).toEqual(jasmine.any(String));
+        const pending = new Subject<RfqDetail['rfq']>();
+        rfqApiSpy.cancelRfq.and.returnValue(pending);
+        component.onCancelRfq();
+        component.onCancelRfq();
+        expect(rfqApiSpy.cancelRfq).toHaveBeenCalledTimes(2);
+        expect(rfqApiSpy.cancelRfq.calls.mostRecent().args[1]).toBe(first);
+        pending.next(mockSentDetail.rfq);
+        pending.complete();
+        rfqApiSpy.cancelRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 422 })));
+        component.onCancelRfq();
+        const rejected = rfqApiSpy.cancelRfq.calls.mostRecent().args[1];
+        expect(rejected).not.toBe(first);
+        component.onCancelRfq();
+        expect(rfqApiSpy.cancelRfq.calls.mostRecent().args[1]).not.toBe(rejected);
+      });
+    }
+
     it('shows Cancel for an owner on another buyer’s RFQ, and buyers only on their own', () => {
       const role = spyOn(TestBed.inject(SessionService), 'hasRole');
       role.and.callFake((...roles) => roles.includes('owner'));
@@ -275,7 +301,7 @@ describe('DetailComponent (RFQ Details)', () => {
       fixture.detectChanges();
       expect(button.disabled).toBeTrue();
       component.onCancelRfq();
-      expect(rfqApiSpy.cancelRfq).toHaveBeenCalledOnceWith('rfq-sent-1');
+      expect(rfqApiSpy.cancelRfq).toHaveBeenCalledOnceWith('rfq-sent-1', jasmine.any(String));
       const cancelled: RfqDetail = { ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status: 'cancelled', cancelled_at: '2026-11-03T10:00:00Z' } };
       rfqApiSpy.getRfq.and.returnValue(of(cancelled));
       rfqApiSpy.getRfq.calls.reset();
@@ -727,7 +753,7 @@ describe('DetailComponent (RFQ Details)', () => {
     (component as unknown as { onRetryUnsent?: () => void }).onRetryUnsent?.();
 
     expect(rfqApiSpy.sendRfq).toHaveBeenCalledTimes(1);
-    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-sent-1');
+    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-sent-1', jasmine.any(String));
 
     // Complete the in-flight request
     sendSubject.next({ rfq: mockSentDetail.rfq, recipients: mockSentDetail.recipients });
@@ -760,7 +786,7 @@ describe('DetailComponent (RFQ Details)', () => {
     retryBtn?.click();
     fixture.detectChanges();
 
-    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-sent-1');
+    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-sent-1', jasmine.any(String));
     expect(rfqApiSpy.getRfq).toHaveBeenCalledTimes(initialGetCalls + 1);
 
     const translate = TestBed.inject(TranslateService);
@@ -1244,6 +1270,31 @@ describe('DetailComponent (RFQ Details)', () => {
       expect(texts.some((t) => t?.includes('Responses ('))).toBeFalse();
     }));
   });
+  for (const status of [0, 503]) {
+    it(`reuses the send key after ${status}, rotates on success, and blocks concurrent sends`, () => {
+      component.rfqId.set(mockSentDetail.rfq.id);
+      component.rfqDetail.set(mockSentDetail);
+      component.currentMembershipId.set(mockSentDetail.rfq.created_by_membership_id);
+      dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+      rfqApiSpy.sendRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status })));
+      component.onRetryUnsent();
+      const first = rfqApiSpy.sendRfq.calls.mostRecent().args[1];
+      const pending = new Subject<RfqSendResponse>();
+      rfqApiSpy.sendRfq.and.returnValue(pending);
+      component.onRetryUnsent();
+      component.onRetryUnsent();
+      expect(rfqApiSpy.sendRfq).toHaveBeenCalledTimes(2);
+      expect(rfqApiSpy.sendRfq.calls.mostRecent().args[1]).toBe(first);
+      pending.next({ rfq: mockSentDetail.rfq, recipients: mockSentDetail.recipients });
+      rfqApiSpy.sendRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 422 })));
+      component.onRetryUnsent();
+      const rejected = rfqApiSpy.sendRfq.calls.mostRecent().args[1];
+      expect(rejected).not.toBe(first);
+      component.onRetryUnsent();
+      expect(rfqApiSpy.sendRfq.calls.mostRecent().args[1]).not.toBe(rejected);
+    });
+  }
+
 });
 
 // Exercise the real HTTP boundary here alongside the cancellation UI regression suite.
@@ -1259,42 +1310,21 @@ describe('RfqApi cancellation idempotency', () => {
 
   afterEach(() => http.verify());
 
-  it('posts no body and retains one key per RFQ after network or server failures', () => {
-    api.cancelRfq('rfq-1', 'stable-key').subscribe({ error: () => undefined });
-    const first = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
-    expect(first.request.method).toBe('POST');
-    expect(first.request.body).toBeNull();
-    expect(first.request.headers.get('Idempotency-Key')).toBe('stable-key');
-    first.error(new ProgressEvent('error'));
-
-    api.cancelRfq('rfq-2', 'other-key').subscribe();
-    const other = http.expectOne((req) => req.url.endsWith('/rfq/rfq-2/cancel'));
-    expect(other.request.headers.get('Idempotency-Key')).toBe('other-key');
-    other.flush({ status: 'cancelled' });
-
-    api.cancelRfq('rfq-1').subscribe({ error: () => undefined });
-    const second = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
-    expect(second.request.headers.get('Idempotency-Key')).toBe('stable-key');
-    second.flush({}, { status: 503, statusText: 'Unavailable' });
-
-    api.cancelRfq('rfq-1').subscribe();
-    const third = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
-    expect(third.request.headers.get('Idempotency-Key')).toBe('stable-key');
-    third.flush({ status: 'cancelled' });
-
-    api.cancelRfq('rfq-1').subscribe();
-    const fresh = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
-    expect(fresh.request.headers.get('Idempotency-Key')).not.toBe('stable-key');
-    fresh.flush({ status: 'cancelled' });
+  it('posts no body with the caller-supplied action key', () => {
+    const keys = new RfqActionKeys();
+    const key = keys.get('cancel:rfq-1');
+    api.cancelRfq('rfq-1', key).subscribe();
+    const request = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toBeNull();
+    expect(request.request.headers.get('Idempotency-Key')).toBe(key);
+    request.flush({ status: 'cancelled' });
   });
 
-  it('releases the key after a definitive rejection', () => {
-    api.cancelRfq('rfq-1', 'rejected-key').subscribe({ error: () => undefined });
-    http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'))
-      .flush({}, { status: 409, statusText: 'Conflict' });
+  it('generates a fallback key when the caller does not supply one', () => {
     api.cancelRfq('rfq-1').subscribe();
-    const retry = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
-    expect(retry.request.headers.get('Idempotency-Key')).not.toBe('rejected-key');
-    retry.flush({ status: 'cancelled' });
+    const request = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
+    expect(request.request.headers.get('Idempotency-Key')).toEqual(jasmine.any(String));
+    request.flush({ status: 'cancelled' });
   });
 });

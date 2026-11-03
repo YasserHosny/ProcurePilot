@@ -36,10 +36,16 @@
   </mat-select>
   <mat-hint>{{ 'rfq.guardrails.costCentreHint' | translate }}</mat-hint>
 </mat-form-field>
+@if (costCentresError()) {
+  <div role="alert">
+    {{ 'rfq.guardrails.costCentresError' | translate }}
+    <button mat-button (click)="retryCostCentres()">{{ 'rfq.guardrails.retryCostCentres' | translate }}</button>
+  </div>
+}
 </div>
-<mat-slide-toggle [(ngModel)]="enabled" hideIcon>{{ 'rfq.guardrails.enabled' | translate }}</mat-slide-toggle>
+<mat-slide-toggle [disabled]="saving()" [(ngModel)]="enabled" hideIcon>{{ 'rfq.guardrails.enabled' | translate }}</mat-slide-toggle>
 <div class="form-actions">@if (editingId()) {
-  <button mat-button (click)="cancelEdit()">{{ 'rfq.guardrails.cancel' | translate }}</button>
+  <button mat-button [disabled]="saving()" (click)="cancelEdit()">{{ 'rfq.guardrails.cancel' | translate }}</button>
   }<button mat-flat-button color="primary" [disabled]="saving()" (click)="save()">{{ 'rfq.guardrails.save' | translate }}</button></div>
 </mat-card>
 
@@ -52,7 +58,7 @@
       <mat-card class="guardrail-card">
         <div><h2>{{ { amount: guardrail.max_order_value_amount, currency: guardrail.max_order_value_currency } | formatMoney }}</h2><p>{{ 'rfq.guardrails.summary' | translate: summaryParams(guardrail) }}</p></div>
         <span class="status">{{ (guardrail.enabled ? 'rfq.guardrails.on' : 'rfq.guardrails.off') | translate }}</span>
-        <div class="card-actions"><button mat-button (click)="edit(guardrail)">{{ 'rfq.guardrails.edit' | translate }}</button><button mat-button (click)="toggle(guardrail)">{{ (guardrail.enabled ? 'rfq.guardrails.disable' : 'rfq.guardrails.enable') | translate }}</button></div>
+        <div class="card-actions"><button mat-button [disabled]="saving()" (click)="edit(guardrail)">{{ 'rfq.guardrails.edit' | translate }}</button><button mat-button [disabled]="saving() || togglingIds().has(guardrail.id)" (click)="toggle(guardrail)">{{ (guardrail.enabled ? 'rfq.guardrails.disable' : 'rfq.guardrails.enable') | translate }}</button></div>
       </mat-card>
     }
   </div>

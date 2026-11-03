@@ -19,7 +19,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { RfqApi, RfqRecipient, RfqSummary } from '../rfq-api';
+import { RfqActionKeys, RfqApi, RfqRecipient, RfqSummary } from '../rfq-api';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatService } from '../../../core/format/format.service';
 import { parseIsoDateLocal } from '../../../core/format/iso-date';
@@ -70,6 +70,7 @@ export interface RecipientsCacheEntry {
   styleUrl: './history.component.scss'
 })
 export class HistoryComponent implements OnInit {
+  private readonly actionKeys = new RfqActionKeys();
   private readonly rfqApi = inject(RfqApi);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
@@ -338,15 +339,17 @@ export class HistoryComponent implements OnInit {
         this.cancellingIds.update((ids) => new Set([...ids].filter((value) => value !== id)));
         return;
       }
-      this.rfqApi.cancelRfq(id).pipe(
+      this.rfqApi.cancelRfq(id, this.actionKeys.get(`cancel:${id}`)).pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => { this.cancellingIds.update((ids) => new Set([...ids].filter((value) => value !== id))); }),
       ).subscribe({
         next: () => {
+          this.actionKeys.clear(`cancel:${id}`);
           this.showCancelMessage('rfq.cancel.success');
           this.loadRfqs();
         },
         error: (err: unknown) => {
+          this.actionKeys.onError(`cancel:${id}`, err);
           let key = 'rfq.cancel.error';
           if (err instanceof HttpErrorResponse) {
             if (err.status === 403 && err.error?.details?.reason === 'not_creator') {
@@ -451,9 +454,16 @@ export class HistoryComponent implements OnInit {
     });
   }
 
+  private readonly sendingIds = new Set<string>();
+
   private sendRfq(rfq: RfqSummary): void {
-    this.rfqApi.sendRfq(rfq.id).subscribe({
+    if (this.sendingIds.has(rfq.id)) return;
+    this.sendingIds.add(rfq.id);
+    const action = `send:${rfq.id}`;
+    this.rfqApi.sendRfq(rfq.id, this.actionKeys.get(action)).subscribe({
       next: (res) => {
+        this.sendingIds.delete(rfq.id);
+        this.actionKeys.clear(action);
         const total = res.recipients.length;
         const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
         if (sent === total && total > 0) this.showSendMessage('rfq.history.sentSuccess', { count: sent });
@@ -462,6 +472,8 @@ export class HistoryComponent implements OnInit {
         this.loadRfqs();
       },
       error: (err: unknown) => {
+        this.sendingIds.delete(rfq.id);
+        this.actionKeys.onError(action, err);
         const key = err instanceof HttpErrorResponse && err.status === 403 ? 'rfq.creatorOnly' : 'rfq.history.sendError';
         this.showSendMessage(key);
       },

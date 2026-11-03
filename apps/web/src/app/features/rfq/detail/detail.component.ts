@@ -14,7 +14,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { RfqApi, RfqDetail, RfqRecipient } from '../rfq-api';
+import { RfqActionKeys, RfqApi, RfqDetail, RfqRecipient } from '../rfq-api';
 import { FormatService } from '../../../core/format/format.service';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
@@ -68,6 +68,7 @@ const TAB_NAMES = ['details', 'items', 'recipients', 'responses'] as const;
   styleUrl: './detail.component.scss',
 })
 export class DetailComponent implements OnInit {
+  private readonly actionKeys = new RfqActionKeys();
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly rfqApi = inject(RfqApi);
@@ -284,15 +285,17 @@ export class DetailComponent implements OnInit {
         this.cancelling.set(false);
         return;
       }
-      this.rfqApi.cancelRfq(id).pipe(
+      this.rfqApi.cancelRfq(id, this.actionKeys.get(`cancel:${id}`)).pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => { this.cancelling.set(false); }),
       ).subscribe({
         next: () => {
+          this.actionKeys.clear(`cancel:${id}`);
           this.showCancelMessage('rfq.cancel.success');
           this.loadRfq(id);
         },
         error: (err: unknown) => {
+          this.actionKeys.onError(`cancel:${id}`, err);
           let key = 'rfq.cancel.error';
           if (err instanceof HttpErrorResponse) {
             if (err.status === 403 && err.error?.details?.reason === 'not_creator') {
@@ -496,8 +499,9 @@ export class DetailComponent implements OnInit {
       if (confirmed) {
         if (this.retrying()) return;
         this.retrying.set(true);
-        this.rfqApi.sendRfq(id).subscribe({
+        this.rfqApi.sendRfq(id, this.actionKeys.get(`send:${id}`)).subscribe({
           next: (res) => {
+            this.actionKeys.clear(`send:${id}`);
             this.retrying.set(false);
             const total = res.recipients.length;
             const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
@@ -507,6 +511,7 @@ export class DetailComponent implements OnInit {
             this.loadRfq(id);
           },
           error: (err: unknown) => {
+            this.actionKeys.onError(`send:${id}`, err);
             this.retrying.set(false);
             let key = 'rfq.history.sendError';
             if (err instanceof HttpErrorResponse) {
@@ -542,6 +547,7 @@ export class DetailComponent implements OnInit {
   }
 
   onSendDraft(): void {
+    if (this.retrying()) return;
     if (!this.isCreator()) return;
     const detail = this.rfqDetail();
     const id = this.rfqId();
@@ -564,8 +570,12 @@ export class DetailComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((confirmed: boolean | undefined) => {
       if (confirmed) {
-        this.rfqApi.sendRfq(id).subscribe({
+        if (this.retrying()) return;
+        this.retrying.set(true);
+        this.rfqApi.sendRfq(id, this.actionKeys.get(`send:${id}`)).subscribe({
           next: (res) => {
+            this.actionKeys.clear(`send:${id}`);
+            this.retrying.set(false);
             const total = res.recipients.length;
             const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
             const key = sent === total && total > 0 ? 'rfq.history.sentSuccess' : sent > 0 ? 'rfq.create.sentPartial' : 'rfq.create.sentNone';
@@ -574,6 +584,8 @@ export class DetailComponent implements OnInit {
             this.loadRfq(id);
           },
           error: (err: unknown) => {
+            this.actionKeys.onError(`send:${id}`, err);
+            this.retrying.set(false);
             let key = 'rfq.history.sendError';
             if (err instanceof HttpErrorResponse) {
               if (err.status === 403) {
