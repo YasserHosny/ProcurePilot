@@ -264,3 +264,36 @@ def test_recent_splits_list_pages_newest_first_with_a_summary_of_each(
 
         with pytest.raises(UnprocessableEntityError):
             service.list_jobs(member=context.member, cursor="not-a-cursor")
+
+
+def test_recent_splits_names_the_suppliers_and_reports_a_dead_job_as_failed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Review: the list must not show a job nobody works on as Queued, nor bare supplier ids."""
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("basket-history-stale") as context:
+        for supplier_id in context.supplier_ids:
+            add_costed_offer(context, supplier_id=supplier_id, amount=Decimal("3.0000"))
+        monkeypatch.setattr(basket_service, "_enqueue_redis_job", lambda *_a, **_k: None)
+        monkeypatch.setattr(basket_service, "optimiser_worker_alive", lambda _settings: None)
+        service = BasketService(settings)
+        job, _ = service.create_job(
+            member=context.member,
+            payload=BasketOptimiseRequest(
+                supplier_ids=context.supplier_ids,
+                items=[
+                    BasketItemRequest(workspace_product_id=context.product_id, quantity="1.000000")
+                ],
+            ),
+        )
+        with psycopg.connect(TEST_DATABASE_URL, autocommit=True) as conn:
+            conn.execute(
+                "update basket_split_job set created_at = now() - interval '2 days' where id = %s",
+                (job.id,),
+            )
+
+        listed = service.list_jobs(member=context.member).items[0]
+
+        assert listed.status == "failed"
+        assert all(name for name in listed.supplier_names)
+        assert len(listed.supplier_names) == 2

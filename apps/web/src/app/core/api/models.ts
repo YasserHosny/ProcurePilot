@@ -957,6 +957,8 @@ export interface BasketSplitJobSummary {
   readonly status: BasketSplitJobStatus;
   readonly created_at: string;
   readonly supplier_ids: readonly string[];
+  /** Supplier names aligned with supplier_ids; an entry is empty when the name is unknown. */
+  readonly supplier_names?: readonly string[];
   readonly item_count: number;
   readonly rfq_id?: string | null;
   readonly total_landed_cost?: Money | null;

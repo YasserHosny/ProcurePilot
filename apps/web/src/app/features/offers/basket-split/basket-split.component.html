@@ -72,7 +72,7 @@
               <span class="history-items">{{ 'basketSplit.history.items' | translate: { count: job.item_count } }}</span>
               <span class="history-status">{{ ('basketSplit.history.status.' + job.status) | translate }}</span>
               @if (job.total_landed_cost; as total) {
-                <strong class="history-total">{{ total.amount }} {{ total.currency }}</strong>
+                <strong class="history-total">{{ total | formatMoney }}</strong>
               }
             </a>
           </li>

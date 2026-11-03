@@ -1208,7 +1208,8 @@ describe('BasketSplitComponent (US3, T045)', () => {
     it('lists recent splits with a link to each and loads further pages', () => {
       const summary = (id: string) => ({
         id, status: 'completed' as const, created_at: '2026-11-03T10:00:00Z',
-        supplier_ids: ['supp-1', 'supp-2'], item_count: 3, total_landed_cost: { amount: '255.0000', currency: 'SAR' },
+        supplier_ids: ['supp-1', 'supp-2'], supplier_names: ['Al Dhahabi', 'Al Wafra'], item_count: 3,
+        total_landed_cost: { amount: '255.0000', currency: 'SAR' },
       });
       apiService.listBasketSplitJobs.and.returnValues(
         of({ items: [summary('job-a')], next_cursor: 'c2' }),
@@ -1220,7 +1221,10 @@ describe('BasketSplitComponent (US3, T045)', () => {
       const rows = () => Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="split-history-row"]'));
       expect(rows().length).toBe(1);
       expect(rows()[0].getAttribute('href')).toBe('/offers/basket-split/job-a');
-      expect(rows()[0].textContent).toContain('Supplier Alpha');
+      expect(rows()[0].textContent).toContain('Al Dhahabi, Al Wafra');
+      // The stored amount is shown like every other amount, not as «255.0000».
+      expect(rows()[0].textContent).not.toContain('255.0000');
+      expect(rows()[0].textContent).toContain('255');
       expect(component.hasMoreHistory()).toBeTrue();
 
       component.loadMoreHistory();

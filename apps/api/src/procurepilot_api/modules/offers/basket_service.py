@@ -234,7 +234,7 @@ class BasketService:
         with _authenticated_db(self._settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
-                    "select id, status, created_at, supplier_ids, rfq_id, "
+                    "select id, status, created_at, started_at, supplier_ids, rfq_id, "
                     "jsonb_array_length(items) as item_count, "
                     "result -> 'total_landed_cost' as total_landed_cost "
                     f"from basket_split_job where {condition} "
@@ -242,11 +242,30 @@ class BasketService:
                     [*params, capped + 1],
                 )
                 rows = [dict(row) for row in cur.fetchall()]
+                supplier_ids = {sid for row in rows[:capped] for sid in row["supplier_ids"]}
+                cur.execute(
+                    "select id, name from supplier where id = any(%s)", (list(supplier_ids),)
+                )
+                names = {row["id"]: row["name"] for row in cur.fetchall()}
         visible = rows[:capped]
+        # A job nobody is working on is reported as failed, as the single-job read does; the
+        # worker check is made once for the whole page.
+        alive = (
+            optimiser_worker_alive(self._settings)
+            if any(row["status"] == "queued" for row in visible)
+            else None
+        )
+        for row in visible:
+            if self._stale_code(row, worker_alive=alive) is not None:
+                row["status"] = "failed"
         return BasketSplitJobList(
             items=[
                 BasketSplitJobSummary.model_validate(
-                    {**row, "total_landed_cost": _stored_money(row.get("total_landed_cost"))}
+                    {
+                        **row,
+                        "supplier_names": [names.get(sid, "") for sid in row["supplier_ids"]],
+                        "total_landed_cost": _stored_money(row.get("total_landed_cost")),
+                    }
                 )
                 for row in visible
             ],

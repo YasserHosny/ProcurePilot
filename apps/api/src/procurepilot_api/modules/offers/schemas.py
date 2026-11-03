@@ -337,6 +337,7 @@ class BasketSplitJobSummary(BaseModel):
     status: BasketStatus
     created_at: datetime
     supplier_ids: list[UUID]
+    supplier_names: list[str] = Field(default_factory=list)
     item_count: int
     rfq_id: UUID | None = None
     total_landed_cost: Money | None = None

@@ -25,6 +25,7 @@ import type { ApiError, BasketSplitJobSummary, Product, Supplier } from '../../.
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { unitLabel } from '../../../core/format/unit-label';
 import { RfqApi, type RfqDetail } from '../../rfq/rfq-api';
 import type {
@@ -80,6 +81,7 @@ export class BasketSubmitErrorStateMatcher implements ErrorStateMatcher {
     TranslatePipe,
     RouterModule,
     FormatDatePipe,
+    FormatMoneyPipe,
     BasketSplitResultsComponent,
     BasketSplitInfeasibleComponent,
   ],
@@ -294,7 +296,9 @@ export class BasketSplitComponent implements OnInit {
 
   /** «Supplier A, Supplier B» for a history row. */
   historySuppliers(job: BasketSplitJobSummary): string {
-    return job.supplier_ids.map((id) => this.getSupplierName(id)).join(', ');
+    return job.supplier_ids
+      .map((id, index) => job.supplier_names?.[index] || this.getSupplierName(id))
+      .join(', ');
   }
 
   loadHistory(): void {
