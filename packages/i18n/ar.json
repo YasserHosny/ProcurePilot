@@ -1656,7 +1656,7 @@
       "reliabilityNotEnoughData": "لا توجد بيانات كافية (محايد)"
     },
     "table": {
-        "ariaLabel": "مقارنة عروض الموردين",
+      "ariaLabel": "مقارنة عروض الموردين",
       "supplier": "المورد",
       "normalisedUnitPrice": "سعر الوحدة",
       "landedCostTotal": "إجمالي التكلفة الواصلة",
@@ -3780,7 +3780,9 @@
       "vatInclusiveHint": "صافي بعد خصم ضريبة القيمة المضافة {{rate}}% · سعر العرض {{gross}} شامل الضريبة",
       "remainingQuantity": "المتبقي للطلب",
       "sourceLoadError": "تعذّر تحميل الطلب المعتمد، لذلك لا يمكن إنشاء أمر شراء منه. ارجع وحاول مرة أخرى.",
-      "fromApprovedRequestPlain": "من طلب معتمد"
+      "fromApprovedRequestPlain": "من طلب معتمد",
+      "quantityPacks": "الكمية (عبوات)",
+      "useEstimate": "استخدم التقدير"
     },
     "status": {
       "draft": "مسودة",
@@ -4165,6 +4167,13 @@
     }
   },
   "rfq": {
+    "pageTitle": {
+      "history": "سجل طلبات عروض الأسعار",
+      "create": "إنشاء طلب عرض أسعار",
+      "edit": "تعديل مسودة طلب عرض الأسعار",
+      "detail": "تفاصيل طلب عرض الأسعار",
+      "guardrails": "إعدادات الضوابط"
+    },
     "creatorOnly": "يمكن للشخص الذي أنشأ طلب عرض الأسعار هذا وحده إرساله أو تعديله.",
     "create": {
       "title": "إنشاء طلب عرض أسعار",

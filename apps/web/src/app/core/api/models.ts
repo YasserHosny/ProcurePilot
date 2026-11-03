@@ -941,6 +941,15 @@ export interface BasketSplitJob {
   readonly completed_at?: string | null;
   /** Pack definition per product as of submission (ADR-020); absent on older jobs. */
   readonly pack_snapshot?: Readonly<Record<string, BasketPackSnapshot>> | null;
+  /** What the job was run with (advanced baskets); absent on older jobs. */
+  readonly request_settings?: BasketRequestSettings | null;
+}
+
+export interface BasketRequestSettings {
+  readonly risk_tolerance: 'low' | 'medium' | 'high';
+  readonly urgency: 'normal' | 'urgent';
+  readonly excluded_supplier_ids: readonly string[];
+  readonly weights: OptimisationWeights;
 }
 
 export interface BasketPackSnapshot {

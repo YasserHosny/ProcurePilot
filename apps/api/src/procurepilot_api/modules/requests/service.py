@@ -2250,12 +2250,14 @@ class RequestsService:
         member: CurrentMember,
         request_id: UUID,
         payload: ApprovalDecisionInput,
+        idempotency_key: UUID | None = None,
     ) -> PurchaseRequest:
         return self._decide_request(
             bearer_token=bearer_token,
             member=member,
             request_id=request_id,
             payload=payload,
+            idempotency_key=idempotency_key,
             decision="approved",
         )
 
@@ -2266,12 +2268,14 @@ class RequestsService:
         member: CurrentMember,
         request_id: UUID,
         payload: ApprovalDecisionInput,
+        idempotency_key: UUID | None = None,
     ) -> PurchaseRequest:
         return self._decide_request(
             bearer_token=bearer_token,
             member=member,
             request_id=request_id,
             payload=payload,
+            idempotency_key=idempotency_key,
             decision="rejected",
         )
 
@@ -3050,28 +3054,30 @@ class RequestsService:
         request_id: UUID,
         payload: ApprovalDecisionInput,
         decision: str,
+        idempotency_key: UUID | None = None,
     ) -> PurchaseRequest:
         client = authenticated_client(self._settings, bearer_token)
         request_row = self._fetch_request(client, request_id)
         _require_ungrouped(request_row)
-        if str(request_row["status"]) != "submitted":
-            raise ConflictError(details={"reason": "not_submitted"})
-
         rid = str(request_id)
-        step_row = self._fetch_step(client, rid)
-        if step_row is None or str(step_row["status"]) != "pending":
-            raise ConflictError(details={"reason": "no_pending_approval"})
-        _require_assigned_approver_or_owner(step_row, member)
-
-        _validate_decision_comment(decision, payload.comment)
+        step_row = None
+        if idempotency_key is None:
+            if str(request_row["status"]) != "submitted":
+                raise ConflictError(details={"reason": "not_submitted"})
+            step_row = self._fetch_step(client, rid)
+            if step_row is None or str(step_row["status"]) != "pending":
+                raise ConflictError(details={"reason": "no_pending_approval"})
+            _require_assigned_approver_or_owner(step_row, member)
+            _validate_decision_comment(decision, payload.comment)
         now = _now_iso()
         decided_request, decided_step, notification_id = self._decide_and_notify(
             member=member,
             request_id=rid,
-            step_id=str(step_row["id"]),
+            step_id=str(step_row["id"]) if step_row else None,
             decision=decision,
             comment=payload.comment,
             now=now,
+            idempotency_key=idempotency_key,
         )
 
         if notification_id is not None:
@@ -3161,10 +3167,11 @@ class RequestsService:
         *,
         member: CurrentMember,
         request_id: str,
-        step_id: str,
+        step_id: str | None,
         decision: str,
         comment: str | None,
         now: str,
+        idempotency_key: UUID | None = None,
     ) -> tuple[dict[str, object], dict[str, object], UUID | None]:
         """Atomically applies a decision, records its audit event and queues its notification.
 
@@ -3176,9 +3183,8 @@ class RequestsService:
         express, and because these writes must succeed or fail together — a prior version of
         this method did them as separate PostgREST calls with no such guarantee (fixed after
         review caught it). Returns `(decided_request, decided_step, notification_id)` — the last
-        is `None` only if this were ever called for a request with no requester to notify, which
-        cannot happen in practice (every purchase_request has one), kept `| None` defensively
-        rather than asserted.
+        is `None` for a replay, which has no new notification to enqueue, or defensively
+        for a request with no requester to notify.
         """
         claims = {
             "sub": str(member.user_id),
@@ -3194,6 +3200,54 @@ class RequestsService:
                         "select set_config('request.jwt.claims', %s, true)",
                         (json.dumps(claims),),
                     )
+
+                    if idempotency_key is not None:
+                        lock_id = (member.tenant_id.int ^ UUID(request_id).int) & 0x7FFFFFFFFFFFFFFF
+                        cur.execute("select pg_advisory_xact_lock(%s)", (lock_id,))
+                        cur.execute(
+                            f"select {REQUEST_COLUMNS} from purchase_request "
+                            "where id = %s for update",
+                            (request_id,),
+                        )
+                        existing = cur.fetchone()
+                        if existing is None:
+                            raise NotFoundError(details={"resource": "purchase_request"})
+                        _require_ungrouped(existing)
+                        cur.execute(
+                            f"select {STEP_COLUMNS} from approval_step "
+                            "where purchase_request_id = %s "
+                            "order by created_at desc limit 1 for update",
+                            (request_id,),
+                        )
+                        current_step = cur.fetchone()
+                        if current_step is None:
+                            raise ConflictError(details={"reason": "no_pending_approval"})
+                        _require_assigned_approver_or_owner(current_step, member)
+                        cur.execute("set local role service_role")
+                        cur.execute(
+                            "select 1 from audit_event where tenant_id = %s "
+                            "and actor_membership_id = %s "
+                            "and action = %s and outcome = 'success' "
+                            "and target->>'purchase_request_id' = %s "
+                            "and target->>'idempotency_key' = %s order by id limit 1",
+                            (
+                                member.tenant_id,
+                                member.membership_id,
+                                f"requests.approval_step_{decision}",
+                                request_id,
+                                str(idempotency_key),
+                            ),
+                        )
+                        replay = cur.fetchone()
+                        cur.execute("set local role authenticated")
+                        if replay is not None:
+                            return dict(existing), dict(current_step), None
+                        if str(existing["status"]) != "submitted":
+                            raise ConflictError(details={"reason": "not_submitted"})
+                        if str(current_step["status"]) != "pending":
+                            raise ConflictError(details={"reason": "no_pending_approval"})
+                        _validate_decision_comment(decision, comment)
+                        step_id = str(current_step["id"])
 
                     # Same authoritative guard the previous (non-atomic) version used: if a
                     # concurrent withdrawal already flipped the request's status, this matches zero
@@ -3223,6 +3277,8 @@ class RequestsService:
                         "approval_step_id": str(decided_step["id"]),
                         "decided_by_membership_id": str(member.membership_id),
                     }
+                    if idempotency_key is not None:
+                        target["idempotency_key"] = str(idempotency_key)
                     if comment is not None:
                         target["comment"] = comment
                     cur.execute(
