@@ -4119,6 +4119,13 @@
     }
   },
   "rfq": {
+    "pageTitle": {
+      "history": "RFQ History",
+      "create": "Create RFQ",
+      "edit": "Edit RFQ draft",
+      "detail": "RFQ details",
+      "guardrails": "RFQ guardrails"
+    },
     "creatorOnly": "Only the person who created this RFQ can send or edit it.",
     "create": {
       "title": "Create RFQ",
