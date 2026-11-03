@@ -2284,7 +2284,9 @@
   },
   "requests": {
     "list": {
-      "newRequestButton": "New request"
+      "newRequestButton": "New request",
+      "loadMore": "Load more",
+      "loadedCount": "{{count}} requests loaded"
     },
     "table": {
       "caption": "Purchase requests"
@@ -2353,6 +2355,8 @@
       "atLeastOneLineRequired": "At least one line item is required."
     },
     "empty": "No purchase requests yet. Create your first request to get started.",
+    "listEmptyFiltered": "No purchase requests match this filter.",
+    "clearFilter": "Clear filter",
     "createSuccess": "Purchase request saved as a draft.",
     "submitSuccess": "Purchase request submitted for approval.",
     "withdrawSuccess": "Purchase request withdrawn.",
