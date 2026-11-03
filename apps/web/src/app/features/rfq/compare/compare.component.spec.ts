@@ -349,8 +349,36 @@ describe('CompareComponent (RFQ)', () => {
       '[data-testid="rfq-compare-send-button"]',
     );
     sendBtn?.click();
-    expect(mockRfqApi.sendRfq).toHaveBeenCalledWith('rfq-1');
+    expect(mockRfqApi.sendRfq).toHaveBeenCalledWith('rfq-1', jasmine.any(String));
     expect(mockSnackBar.open).toHaveBeenCalled();
+  });
+
+  it('reuses the draft send key after 503, clears it on success, and blocks concurrent sends', () => {
+    component.rfqDetail.set(draftDetail);
+    component.currentMembershipId.set(draftDetail.rfq.created_by_membership_id);
+    mockDialog.open.and.returnValue({
+      afterClosed: () => of(true),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+    mockRfqApi.sendRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+
+    component.onSendDraft();
+    const firstKey = mockRfqApi.sendRfq.calls.mostRecent().args[1];
+    expect(firstKey).toEqual(jasmine.any(String));
+
+    const pending = new Subject<RfqSendResponse>();
+    mockRfqApi.sendRfq.and.returnValue(pending);
+    component.onSendDraft();
+    expect(mockRfqApi.sendRfq.calls.mostRecent().args[1]).toBe(firstKey);
+    component.onSendDraft();
+    expect(mockRfqApi.sendRfq).toHaveBeenCalledTimes(2);
+    expect(mockDialog.open).toHaveBeenCalledTimes(2);
+
+    pending.next({ rfq: sentDetail.rfq, recipients: draftDetail.recipients });
+    component.onSendDraft();
+    expect(mockRfqApi.sendRfq).toHaveBeenCalledTimes(3);
+    expect(mockRfqApi.sendRfq.calls.mostRecent().args[1]).toEqual(jasmine.any(String));
+    expect(mockRfqApi.sendRfq.calls.mostRecent().args[1]).not.toBe(firstKey);
+    pending.complete();
   });
 
   it('shows draft actions only to the RFQ creator', async () => {
@@ -439,7 +467,7 @@ describe('CompareComponent (RFQ)', () => {
       rfq_response_id: 'resp-1',
       branch_id: 'branch-1',
       required_by_date: '2026-10-20',
-    });
+    }, jasmine.any(String));
 
     expect(mockSnackBar.open).toHaveBeenCalledWith(
       'rfq.compare.prepareSuccess',
@@ -1973,8 +2001,7 @@ describe('CompareComponent (RFQ)', () => {
       expect(mockRfqApi.prepareRequest).toHaveBeenCalledTimes(1);
       expect(mockRfqApi.prepareRequest).toHaveBeenCalledWith(
         'rfq-1',
-        jasmine.objectContaining({ rfq_response_id: 'solo' }),
-      );
+        jasmine.objectContaining({ rfq_response_id: 'solo' }), jasmine.any(String));
     });
   });
 
@@ -2405,6 +2432,58 @@ describe('CompareComponent (RFQ)', () => {
       );
     }));
   });
+  it('renders API names for entities absent from lookups, including variants and landed cost names', () => {
+    const reply = {
+      ...dummyResponses.items[0], supplier_id: 'missing-supplier', supplier_name: 'Archived supplier',
+      lines: [{ ...dummyResponses.items[0].lines[0], workspace_product_id: 'missing-product', product_name: 'Archived product', product_variant: 'Large' }],
+    };
+    component.supplierNames.set({});
+    component.productNames.set({});
+    component.responses.set([reply]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Archived supplier');
+    expect(fixture.nativeElement.textContent).toContain('Archived product (Large)');
+    expect(fixture.nativeElement.textContent).not.toContain('missing-supplier');
+    expect(fixture.nativeElement.textContent).not.toContain('missing-product');
+    expect(component.productName({ ...reply, rfq_landed_costs: [{ workspace_product_id: 'missing-product', product_name: 'Cost product', product_variant: 'Small', total_amount: '1', total_currency: 'USD' }] }, { ...reply.lines[0], product_name: null, product_variant: null })).toBe('Cost product (Small)');
+  });
+
+  it('renders translated unknown names instead of entity IDs when names are unavailable', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.use('en');
+    component.supplierNames.set({});
+    component.productNames.set({});
+    component.responses.set([{
+      ...dummyResponses.items[0], supplier_id: 'unknown-supplier-uuid', supplier_name: null,
+      lines: [{ ...dummyResponses.items[0].lines[0], workspace_product_id: 'unknown-product-uuid', product_name: null }],
+      rfq_landed_costs: [],
+    }]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Unknown supplier');
+    expect(fixture.nativeElement.textContent).toContain('Unknown product');
+    expect(fixture.nativeElement.textContent).not.toContain('unknown-supplier-uuid');
+    expect(fixture.nativeElement.textContent).not.toContain('unknown-product-uuid');
+  });
+
+  it('reuses prepare keys on ambiguous failure and drops them on success or definitive rejection', () => {
+    const reply = dummyResponses.items[0];
+    component.selectedBranchId.set('branch-1');
+    component.requiredByDate.set(new Date(2026, 11, 1));
+    mockRfqApi.prepareRequest.and.returnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+    component.prepareRequest(reply);
+    const first = mockRfqApi.prepareRequest.calls.mostRecent().args[2];
+    mockRfqApi.prepareRequest.and.returnValue(of({ purchase_request_id: 'pr-1' }));
+    component.prepareRequest(reply);
+    expect(mockRfqApi.prepareRequest.calls.mostRecent().args[2]).toBe(first);
+    mockRfqApi.prepareRequest.and.returnValue(throwError(() => new HttpErrorResponse({ status: 422 })));
+    component.prepareRequest(reply);
+    const rejected = mockRfqApi.prepareRequest.calls.mostRecent().args[2];
+    expect(rejected).not.toBe(first);
+    component.prepareRequest(reply);
+    expect(mockRfqApi.prepareRequest.calls.mostRecent().args[2]).not.toBe(rejected);
+  });
+
 });
 
 describe('RFQ quantity display', () => {
@@ -2418,4 +2497,5 @@ describe('RFQ quantity display', () => {
     expect(formatExactQuantity('1.234567', 'en')).toBe('1.234567');
     expect(formatExactQuantity('50.000000', 'en')).toBe('50');
   });
+
 });

@@ -1,3 +1,4 @@
+import { RfqActionKeys } from '../rfq-api';
 import { Component, OnInit, DestroyRef, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -68,6 +69,7 @@ const TAB_NAMES = ['details', 'items', 'recipients', 'responses'] as const;
   styleUrl: './detail.component.scss',
 })
 export class DetailComponent implements OnInit {
+  private readonly actionKeys = new RfqActionKeys();
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly rfqApi = inject(RfqApi);
@@ -440,8 +442,9 @@ export class DetailComponent implements OnInit {
       if (confirmed) {
         if (this.retrying()) return;
         this.retrying.set(true);
-        this.rfqApi.sendRfq(id).subscribe({
+        this.rfqApi.sendRfq(id, this.actionKeys.get(`send:${id}`)).subscribe({
           next: (res) => {
+            this.actionKeys.clear(`send:${id}`);
             this.retrying.set(false);
             const total = res.recipients.length;
             const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
@@ -451,6 +454,7 @@ export class DetailComponent implements OnInit {
             this.loadRfq(id);
           },
           error: (err: unknown) => {
+            this.actionKeys.onError(`send:${id}`, err);
             this.retrying.set(false);
             let key = 'rfq.history.sendError';
             if (err instanceof HttpErrorResponse) {
@@ -486,6 +490,7 @@ export class DetailComponent implements OnInit {
   }
 
   onSendDraft(): void {
+    if (this.retrying()) return;
     if (!this.isCreator()) return;
     const detail = this.rfqDetail();
     const id = this.rfqId();
@@ -508,8 +513,12 @@ export class DetailComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((confirmed: boolean | undefined) => {
       if (confirmed) {
-        this.rfqApi.sendRfq(id).subscribe({
+        if (this.retrying()) return;
+        this.retrying.set(true);
+        this.rfqApi.sendRfq(id, this.actionKeys.get(`send:${id}`)).subscribe({
           next: (res) => {
+            this.actionKeys.clear(`send:${id}`);
+            this.retrying.set(false);
             const total = res.recipients.length;
             const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
             const key = sent === total && total > 0 ? 'rfq.history.sentSuccess' : sent > 0 ? 'rfq.create.sentPartial' : 'rfq.create.sentNone';
@@ -518,6 +527,8 @@ export class DetailComponent implements OnInit {
             this.loadRfq(id);
           },
           error: (err: unknown) => {
+            this.actionKeys.onError(`send:${id}`, err);
+            this.retrying.set(false);
             let key = 'rfq.history.sendError';
             if (err instanceof HttpErrorResponse) {
               if (err.status === 403) {

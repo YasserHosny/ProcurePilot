@@ -1,3 +1,4 @@
+import { RfqActionKeys } from '../rfq-api';
 import { Component, OnInit, OnChanges, SimpleChanges, DestroyRef, Output, EventEmitter, inject, signal, computed, input, model, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, forkJoin, of, catchError, tap, switchMap, take, takeUntil } from 'rxjs';
@@ -62,6 +63,7 @@ const MINOR_UNITS = 10_000;
   styleUrl: './compare.component.scss',
 })
 export class CompareComponent implements OnInit, OnChanges {
+  private readonly actionKeys = new RfqActionKeys();
   readonly embedded = input<boolean>(false);
   readonly rfqId = model<string>('');
 
@@ -93,6 +95,7 @@ export class CompareComponent implements OnInit, OnChanges {
   readonly currentMembershipId = signal<string | null>(null);
   readonly isSplitting = signal<boolean>(false);
   readonly preparing = signal<string | null>(null);
+  readonly sending = signal<boolean>(false);
   readonly branchesError = signal<boolean>(false);
   readonly rfqDetailError = signal<boolean>(false);
   private splitIdempotencyKey: string | null = null;
@@ -231,6 +234,20 @@ export class CompareComponent implements OnInit, OnChanges {
         this.resolveProducts();
       }
     });
+  }
+
+  supplierName(response: RfqResponseComparison): string {
+    return response.supplier_name?.trim() || this.supplierNames()[response.supplier_id]
+      || this.translate.instant('rfq.compare.unknownSupplier');
+  }
+
+  productName(response: RfqResponseComparison, line: RfqResponseLineComparison): string {
+    const cost = response.rfq_landed_costs?.find((item) => item.workspace_product_id === line.workspace_product_id);
+    const name = line.product_name?.trim() || cost?.product_name?.trim()
+      || (line.workspace_product_id && this.productNames()[line.workspace_product_id]);
+    const variant = line.product_variant?.trim() || cost?.product_variant?.trim();
+    if (name) return variant ? `${name} (${variant})` : name;
+    return this.translate.instant('rfq.compare.unknownProduct');
   }
 
   formatQuantity(value: string | number): string { return this.formatService.formatExactQuantity(value); }
@@ -546,6 +563,7 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   onSendDraft(): void {
+    if (this.sending()) return;
     if (!this.isCreator()) return;
     const detail = this.rfqDetail();
     const id = this.rfqId();
@@ -568,8 +586,12 @@ export class CompareComponent implements OnInit, OnChanges {
 
     dialogRef.afterClosed().subscribe((confirmed: boolean | undefined) => {
       if (confirmed) {
-        this.rfqApi.sendRfq(id).subscribe({
+        if (this.sending()) return;
+        this.sending.set(true);
+        this.rfqApi.sendRfq(id, this.actionKeys.get(`send:${id}`)).subscribe({
           next: (res) => {
+            this.actionKeys.clear(`send:${id}`);
+            this.sending.set(false);
             const total = res.recipients.length;
             const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
             const key = sent === total && total > 0 ? 'rfq.history.sentSuccess' : sent > 0 ? 'rfq.create.sentPartial' : 'rfq.create.sentNone';
@@ -579,6 +601,8 @@ export class CompareComponent implements OnInit, OnChanges {
             else this.loadData(id);
           },
           error: (err: unknown) => {
+            this.actionKeys.onError(`send:${id}`, err);
+            this.sending.set(false);
             const key = err instanceof HttpErrorResponse && err.status === 403 ? 'rfq.creatorOnly' : 'rfq.history.sendError';
             this.snackBar.open(
               this.translate.instant(key),
@@ -800,8 +824,9 @@ export class CompareComponent implements OnInit, OnChanges {
 
     this.preparing.set(response.id);
 
-    this.rfqApi.prepareRequest(this.rfqId(), payload).subscribe({
+    this.rfqApi.prepareRequest(this.rfqId(), payload, this.actionKeys.get(`prepare:${response.id}`)).subscribe({
       next: (res) => {
+        this.actionKeys.clear(`prepare:${response.id}`);
         this.preparing.set(null);
         const snackRef = this.snackBar.open(
           this.translate.instant('rfq.compare.prepareSuccess'),
@@ -821,6 +846,7 @@ export class CompareComponent implements OnInit, OnChanges {
         navigateToDraft();
       },
       error: (err: unknown) => {
+        this.actionKeys.onError(`prepare:${response.id}`, err);
         this.preparing.set(null);
         const reason =
           err instanceof HttpErrorResponse

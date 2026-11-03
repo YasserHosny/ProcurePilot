@@ -1,3 +1,4 @@
+import { RfqActionKeys } from '../rfq-api';
 import { Component, OnInit, inject, signal, computed, DestroyRef, ChangeDetectionStrategy } from '@angular/core';
 import { BidiModule } from '@angular/cdk/bidi';
 import { A11yModule } from '@angular/cdk/a11y';
@@ -69,6 +70,7 @@ export interface RecipientsCacheEntry {
   styleUrl: './history.component.scss'
 })
 export class HistoryComponent implements OnInit {
+  private readonly actionKeys = new RfqActionKeys();
   private readonly rfqApi = inject(RfqApi);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
@@ -395,9 +397,16 @@ export class HistoryComponent implements OnInit {
     });
   }
 
+  private readonly sendingIds = new Set<string>();
+
   private sendRfq(rfq: RfqSummary): void {
-    this.rfqApi.sendRfq(rfq.id).subscribe({
+    if (this.sendingIds.has(rfq.id)) return;
+    this.sendingIds.add(rfq.id);
+    const action = `send:${rfq.id}`;
+    this.rfqApi.sendRfq(rfq.id, this.actionKeys.get(action)).subscribe({
       next: (res) => {
+        this.sendingIds.delete(rfq.id);
+        this.actionKeys.clear(action);
         const total = res.recipients.length;
         const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
         if (sent === total && total > 0) this.showSendMessage('rfq.history.sentSuccess', { count: sent });
@@ -406,6 +415,8 @@ export class HistoryComponent implements OnInit {
         this.loadRfqs();
       },
       error: (err: unknown) => {
+        this.sendingIds.delete(rfq.id);
+        this.actionKeys.onError(action, err);
         const key = err instanceof HttpErrorResponse && err.status === 403 ? 'rfq.creatorOnly' : 'rfq.history.sendError';
         this.showSendMessage(key);
       },

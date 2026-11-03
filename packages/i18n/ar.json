@@ -3865,7 +3865,10 @@
       "dateFormatHintDayFirst": "يوم/شهر/سنة",
       "dateFormatHintMonthFirst": "شهر/يوم/سنة",
       "receivedQuantityFor": "{{product}} · الكمية المستلمة ({{unit}}، المطلوب {{ordered}})",
-      "confirmedQuantityFor": "{{product}} · الكمية المؤكدة ({{unit}}، المطلوب {{ordered}})"
+      "confirmedQuantityFor": "{{product}} · الكمية المؤكدة ({{unit}}، المطلوب {{ordered}})",
+      "progressLabel": "تم استلام {{percent}}٪",
+      "sourceRfq": "طلب التسعير",
+      "sourceQuotation": "عرض السعر"
     },
     "resultCount": "{{count}} أمر شراء",
     "loadMoreError": "تعذّر تحميل المزيد من الأوامر. الأوامر الظاهرة أعلاه ما زالت معروضة.",
@@ -4267,6 +4270,8 @@
       }
     },
     "compare": {
+      "unknownSupplier": "مورد غير معروف",
+      "unknownProduct": "منتج غير معروف",
       "title": "مقارنة العروض",
       "subtitle": "قارن ردود الموردين وقم بإعداد طلب شراء.",
       "supplier": "المورد",
@@ -4510,6 +4515,8 @@
       "notSendableError": "لا يمكن إرسال طلب عرض الأسعار هذا في حالته الحالية."
     },
     "guardrails": {
+      "costCentresError": "تعذر تحميل مراكز التكلفة.",
+      "retryCostCentres": "إعادة المحاولة",
       "title": "إعدادات الضوابط",
       "subtitle": "حدد متى يمكن لرد مؤهل إعداد مسودة طلب.",
       "humanApprovalNote": "الضوابط تُعد مسودات فقط. يجب أن يوافق شخص على كل عملية شراء.",

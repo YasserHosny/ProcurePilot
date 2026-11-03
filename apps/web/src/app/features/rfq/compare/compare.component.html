@@ -191,7 +191,7 @@
       @for (response of responses(); track response) {
         <mat-card class="response-card">
           <mat-card-header>
-            <mat-card-title>{{ supplierNames()[response.supplier_id] || response.supplier_id }}</mat-card-title>
+            <mat-card-title>{{ supplierName(response) }}</mat-card-title>
             <mat-card-subtitle>
               {{ 'rfq.compare.submittedAt' | translate }}: {{ response.submitted_at | formatDate }}
             </mat-card-subtitle>
@@ -221,7 +221,7 @@
                     }
                     @if (!line.pending_match) {
                       <span>
-                        {{ line.workspace_product_id ? (productNames()[line.workspace_product_id] || line.workspace_product_id) : ('rfq.compare.pendingMatch' | translate) }}
+                        {{ productName(response, line) }}
                       </span>
                     }
                   </td>
