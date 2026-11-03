@@ -73,6 +73,23 @@
       </select>
     </label>
     <label class="filter-field">
+      <span>{{ 'orders.filters.supplier' | translate }}</span>
+      <select [value]="supplierFilter()" (change)="onSupplierChange($event)" data-testid="orders-supplier-filter">
+        <option value="" [selected]="supplierFilter() === ''">{{ 'orders.filters.allSuppliers' | translate }}</option>
+        @for (supplier of suppliers(); track supplier.id) {
+          <option [value]="supplier.id" [selected]="supplier.id === supplierFilter()" dir="auto">{{ supplier.name }}</option>
+        }
+      </select>
+    </label>
+    <label class="filter-field">
+      <span>{{ 'orders.filters.dateFrom' | translate }}</span>
+      <input type="date" [value]="dateFrom()" [max]="dateTo() || null" (change)="onDateChange('from', $event)" data-testid="orders-date-from" />
+    </label>
+    <label class="filter-field">
+      <span>{{ 'orders.filters.dateTo' | translate }}</span>
+      <input type="date" [value]="dateTo()" [min]="dateFrom() || null" (change)="onDateChange('to', $event)" data-testid="orders-date-to" />
+    </label>
+    <label class="filter-field">
       <span>{{ 'orders.filters.sort' | translate }}</span>
       <select [value]="sortKey()" (change)="onSortChange($event)" data-testid="orders-sort">
         @for (option of sortOptions; track option) {

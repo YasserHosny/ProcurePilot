@@ -92,6 +92,25 @@ export function projectComparison(
     };
   }
 
+  // When eligible offers carry multiple currencies, cross-currency totals cannot be compared directly without FX; keep server recommendation.
+  const distinctCurrencies = new Set(eligibleOffers.map((o) => o.landed_cost.currency));
+  if (distinctCurrencies.size > 1) {
+    return {
+      requested_quantity: newQuantityStr,
+      offers: projectedOffers,
+      recommendation: originalComparison.recommendation,
+    };
+  }
+
+  // Preserve server recommendation when scored with Supplier IQ weights rather than overriding with 4-factor scoring.
+  if (originalComparison.recommendation?.evidence?.weights?.['supplier_risk'] !== undefined) {
+    return {
+      requested_quantity: newQuantityStr,
+      offers: projectedOffers,
+      recommendation: originalComparison.recommendation,
+    };
+  }
+
   // 3. Find cheapest eligible projected total
   const totals = eligibleOffers.map((o) => parseFloat(o.projected_landed_cost.amount));
   const cheapestTotal = Math.min(...totals);

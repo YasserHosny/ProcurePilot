@@ -10,6 +10,7 @@ import { TranslatePipe } from "@ngx-translate/core";
 
 import { FormatDatePipe } from "../../../core/format/date.pipe";
 import { FormatMoneyPipe } from "../../../core/format/money.pipe";
+import { UnitLabelPipe } from "../../../core/format/unit-label";
 import type { ProjectedOffer } from "./compare-projection";
 
 @Component({
@@ -27,6 +28,7 @@ import type { ProjectedOffer } from "./compare-projection";
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
+    UnitLabelPipe,
   ],
   templateUrl: "./compare-table.component.html",
   changeDetection: ChangeDetectionStrategy.Eager,

@@ -56,6 +56,9 @@
 
 .pilot-actions {
   margin-block: var(--pp-space-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pp-space-3);
 }
 
 /* Defect 3: Light filled button for primary CTA on navy */
@@ -69,6 +72,29 @@
 
   &:hover {
     background-color: var(--pp-surface-page) !important;
+  }
+
+  &:focus-visible {
+    outline: var(--pp-focus-ring-width) solid var(--pp-on-inverse-surface);
+    outline-offset: 2px;
+  }
+}
+
+/* Secondary CTA on navy, same treatment as the copy-email button */
+.pilot-whatsapp-btn {
+  block-size: var(--pp-button-height-lg);
+  font-size: var(--pp-text-16);
+  color: var(--pp-on-inverse-surface) !important;
+  border: 1px solid var(--pp-on-inverse-surface) !important;
+  background: transparent;
+
+  mat-icon,
+  span {
+    color: var(--pp-on-inverse-surface) !important;
+  }
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
   }
 
   &:focus-visible {

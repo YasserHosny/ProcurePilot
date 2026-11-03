@@ -3877,7 +3877,11 @@
       "sort": "Sort by",
       "apply": "Search",
       "noMatchTitle": "No orders match",
-      "noMatchDescription": "Change the search or the status filter to see more orders."
+      "noMatchDescription": "Change the search or the status filter to see more orders.",
+      "supplier": "Supplier",
+      "allSuppliers": "All suppliers",
+      "dateFrom": "Ordered from",
+      "dateTo": "Ordered until"
     },
     "sort": {
       "created_at_desc": "Newest first",
@@ -4368,6 +4372,7 @@
       "duplicate": "Duplicate",
       "sentToSuppliers": "Sent to {{count}} suppliers",
       "recipientsDraftHeader": "{{count}} suppliers, not sent yet",
+      "recipientsLoading": "Loading recipients",
       "viewAllRecipients": "View all recipients →",
       "recipientsLoadError": "Failed to load recipients.",
       "recipientStatus_sent": "Sent",
@@ -4703,8 +4708,10 @@
       "copied": "Copied",
       "emailSubject": "ProcurePilot pilot access request",
       "emailBody": "Business name:\nNumber of branches:\nHow quotations arrive:",
+      "whatsappCta": "Message us on WhatsApp",
+      "whatsappMessage": "Hi, I'd like to know more about the ProcurePilot pilot.",
       "q1": "How do we join?",
-      "a1": "Email us. We'll talk through your branches and suppliers, then send a workspace invitation if the pilot fits.",
+      "a1": "Email us or message us on WhatsApp. We'll talk through your branches and suppliers, then send a workspace invitation if the pilot fits.",
       "q2": "Our suppliers send quotes on WhatsApp. Does that work?",
       "a2": "Yes, as files. Save the PDF or photo and upload it, or forward it by email. There's no direct WhatsApp connection.",
       "q3": "Does ProcurePilot buy anything by itself?",

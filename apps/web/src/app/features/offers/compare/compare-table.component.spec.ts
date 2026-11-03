@@ -40,4 +40,29 @@ describe('CompareTableComponent (P-159, PPS-203)', () => {
     expect(tableLabel()).toBe(arCatalog.compare.table.ariaLabel);
     expect(tableLabel()).not.toBe('Supplier Offers Comparison');
   });
+
+  it('prints the unit next to each unit price so per-pack and per-base-unit prices cannot be confused', () => {
+    translate.use('en');
+    fixture.componentRef.setInput('displayedColumns', ['unitPrice']);
+    fixture.componentRef.setInput('baseUnit', 'kilogram');
+    fixture.componentRef.setInput('offers', [
+      {
+        id: 'o1',
+        supplier_name: 'Supplier',
+        supplier_id: 's1',
+        normalised_unit_price: { amount: '8.5000', currency: 'SAR' },
+        projected_unit_price: { amount: '8.5000', currency: 'SAR' },
+        landed_cost: { amount: '850.0000', currency: 'SAR' },
+        projected_landed_cost: { amount: '850.0000', currency: 'SAR' },
+        base_unit: 'kilogram',
+        is_expired: false,
+      },
+    ]);
+    fixture.detectChanges();
+
+    const cell = (fixture.nativeElement as HTMLElement).querySelector('td.mat-column-unitPrice')?.textContent ?? '';
+    expect(cell).toContain('8.5');
+    expect(cell).toContain(enCatalog.units.kilogram);
+  });
 });
+

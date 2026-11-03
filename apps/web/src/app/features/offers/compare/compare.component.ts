@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -65,6 +65,18 @@ export class CompareComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
   private readonly format = inject(FormatService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private comparisonRequestId = 0;
+  private refreshRequestId = 0;
+  private lastAppliedRefreshId = 0;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      this.cancelRefreshTimer();
+    });
+  }
 
   readonly isLoading = signal<boolean>(false);
   readonly products = signal<Product[]>([]);
@@ -200,7 +212,15 @@ export class CompareComponent implements OnInit {
     }
   }
 
+  private cancelRefreshTimer(): void {
+    if (this.refreshTimer !== null) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+  }
+
   onProductChange(productId: string): void {
+    this.cancelRefreshTimer();
     this.selectedProductId.set(productId);
     this.router.navigate([], {
       relativeTo: this.route,
@@ -211,6 +231,7 @@ export class CompareComponent implements OnInit {
   }
 
   fetchComparison(productId: string): void {
+    this.cancelRefreshTimer();
     if (!productId) {
       this.productSignal.set(null);
       return;
@@ -230,14 +251,15 @@ export class CompareComponent implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
+    const requestId = ++this.comparisonRequestId;
     this.api.product(productId).subscribe({
       next: (product) => {
-        if (this.selectedProductId() !== productId) return;
+        if (this.selectedProductId() !== productId || requestId < this.comparisonRequestId) return;
         this.products.update((list) => [...list, product]);
         this.runComparison(productId);
       },
       error: () => {
-        if (this.selectedProductId() !== productId) return;
+        if (this.selectedProductId() !== productId || requestId < this.comparisonRequestId) return;
         this.isLoading.set(false);
         this.rawComparison.set(null);
         this.errorMessage.set(this.translate.instant('compare.packUnknown'));
@@ -246,6 +268,7 @@ export class CompareComponent implements OnInit {
   }
 
   private runComparison(productId: string): void {
+    this.cancelRefreshTimer();
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
@@ -253,14 +276,33 @@ export class CompareComponent implements OnInit {
 
     this.fetchProductSignal(productId);
 
-    const qty = this.baseQuantityInput() || '10';
-    this.api.compareOffers({ product_id: productId, quantity: qty }).subscribe({
+    const requestId = ++this.comparisonRequestId;
+    const refreshIdAtStart = this.refreshRequestId;
+    const sentBaseQty = this.baseQuantityInput();
+    const qty = sentBaseQty || '10';
+    const req$ = this.api.compareOffers({ product_id: productId, quantity: qty });
+    req$.subscribe({
       next: (comp) => {
-        this.rawComparison.set(comp);
+        if (this.selectedProductId() !== productId || requestId < this.comparisonRequestId) {
+          return;
+        }
         this.isLoading.set(false);
+        if (this.lastAppliedRefreshId > refreshIdAtStart) {
+          return;
+        }
+        this.rawComparison.set(comp);
+        if (sentBaseQty !== this.baseQuantityInput()) {
+          this.scheduleBackgroundRefresh();
+        }
       },
       error: (err: unknown) => {
+        if (this.selectedProductId() !== productId || requestId < this.comparisonRequestId) {
+          return;
+        }
         this.isLoading.set(false);
+        if (this.lastAppliedRefreshId > refreshIdAtStart) {
+          return;
+        }
         this.rawComparison.set(null);
         if (err instanceof HttpErrorResponse) {
           const apiError = err.error as ApiError | undefined;
@@ -285,6 +327,7 @@ export class CompareComponent implements OnInit {
     this.productSignal.set(null);
     this.posApi.listSignals({ workspaceProductId: productId, matchStatus: 'matched' }).subscribe({
       next: (res) => {
+        if (this.selectedProductId() !== productId) return;
         const match = res.items.find((item) => item.matched_workspace_product_id === productId) ?? res.items[0] ?? null;
         this.productSignal.set(match);
       },
@@ -299,6 +342,55 @@ export class CompareComponent implements OnInit {
     this.quantityInput.set(newQty);
     // Instant client-side recompute happens automatically through the computed signal `projected`
     // No network request is initiated per keystroke (SC-002).
+    this.scheduleBackgroundRefresh();
+  }
+
+  private scheduleBackgroundRefresh(): void {
+    this.cancelRefreshTimer();
+
+    const productId = this.selectedProductId();
+    const qtyNum = parseFloat(this.quantityInput());
+    if (!productId || isNaN(qtyNum) || qtyNum <= 0) {
+      return;
+    }
+
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = null;
+      this.refreshComparison();
+    }, 500);
+  }
+
+  private refreshComparison(): void {
+    const productId = this.selectedProductId();
+    const qtyNum = parseFloat(this.quantityInput());
+    if (!productId || isNaN(qtyNum) || qtyNum <= 0) {
+      return;
+    }
+
+    const requestId = ++this.refreshRequestId;
+    const foregroundIdAtStart = this.comparisonRequestId;
+    const qty = this.baseQuantityInput();
+
+    const req$ = this.api.compareOffers({ product_id: productId, quantity: qty });
+    req$.subscribe({
+      next: (comp) => {
+        if (
+          this.selectedProductId() !== productId ||
+          requestId < this.refreshRequestId ||
+          this.comparisonRequestId > foregroundIdAtStart
+        ) {
+          return;
+        }
+        this.rawComparison.set(comp);
+        this.errorMessage.set(null);
+        this.errorTraceId.set(null);
+        this.isLoading.set(false);
+        this.lastAppliedRefreshId = requestId;
+      },
+      error: () => {
+        // Errors of a background refresh are ignored silently (the instant projection stays)
+      },
+    });
   }
 
   toggleIncludeExpired(): void {

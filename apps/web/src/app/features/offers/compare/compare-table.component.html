@@ -30,7 +30,7 @@
     <ng-container matColumnDef="unitPrice">
       <th mat-header-cell *matHeaderCellDef>{{ 'compare.table.normalisedUnitPrice' | translate }}</th>
       <td mat-cell *matCellDef="let offer" class="pp-figures">
-        {{ offer.projected_unit_price | formatMoney }}
+        {{ offer.projected_unit_price | formatMoney }} / {{ baseUnit | unitLabel }}
       </td>
     </ng-container>
 
