@@ -912,6 +912,30 @@ class RfqService:
         # create_request commits independently. If finalisation rolled back on an earlier
         # attempt, the same key returns that unlinked draft and must finish it here.
         # Link, estimates and conversion commit together; a linked replay needs no writes.
+        if not created and purchase_request.source_rfq_response_id is None:
+            with lock_conn.cursor(row_factory=dict_row) as cur:
+                # Submission locks this same row. Re-read under that lock before changing
+                # any estimates, and hold it through finalisation so submission cannot race.
+                cur.execute(
+                    "select status, source_rfq_response_id from purchase_request "
+                    "where id = %s and tenant_id = %s for update",
+                    (purchase_request.id, member.tenant_id),
+                )
+                recovered = cur.fetchone()
+                if recovered is None:
+                    raise NotFoundError(details={"resource": "purchase_request"})
+                if recovered["source_rfq_response_id"] is not None:
+                    return RfqPrepareRequestResponse(
+                        purchase_request_id=purchase_request.id, status=purchase_request.status
+                    )
+                if recovered["status"] != "draft":
+                    raise ConflictError(
+                        details={
+                            "resource": "purchase_request",
+                            "reason": "request_not_recoverable",
+                        }
+                    )
+
         if created or purchase_request.source_rfq_response_id is None:
             with lock_conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
@@ -977,7 +1001,7 @@ class RfqService:
                         estimated_total_amount = %s,
                         estimated_total_currency = %s,
                         has_incomplete_estimate = false
-                    where id = %s and tenant_id = %s
+                    where id = %s and tenant_id = %s and status = 'draft'
                     """,
                     (
                         rfq_response_id,
