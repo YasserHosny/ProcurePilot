@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, HostListener, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EMPTY, Observable, Subject, Subscription, catchError, map, of, switchMap, takeUntil, timer } from 'rxjs';
+import { Observable, Subject, Subscription, map, of, switchMap, takeUntil, timer } from 'rxjs';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -1935,29 +1935,20 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
     this.pollAttemptCount = 0;
     this.consecutivePollErrors = 0;
 
-    this.extractionPollSub = timer(0, this.POLL_INTERVAL_MS)
-      .pipe(
-        takeUntil(this.cancelLoads$),
-        switchMap(() => {
-          this.pollAttemptCount++;
-          if (this.pollAttemptCount > this.MAX_POLL_ATTEMPTS) {
-            this.stopExtractionPolling();
-            this.extractionPollTimedOut.set(true);
-            return EMPTY;
-          }
-          return this.api.getQuotation(quotationId).pipe(
-            catchError((err: unknown) => {
-              this.consecutivePollErrors++;
-              if (this.consecutivePollErrors >= this.MAX_CONSECUTIVE_ERRORS) {
-                this.stopExtractionPolling();
-                this.handleError(err);
-                return EMPTY;
-              }
-              return EMPTY;
-            }),
-          );
-        }),
-      )
+    this.pollForExtraction(quotationId);
+  }
+
+  private pollForExtraction(quotationId: string): void {
+    this.pollAttemptCount++;
+    if (this.pollAttemptCount > this.MAX_POLL_ATTEMPTS) {
+      this.stopExtractionPolling();
+      this.extractionPollTimedOut.set(true);
+      return;
+    }
+
+    this.extractionPollSub = this.api
+      .getQuotation(quotationId)
+      .pipe(takeUntil(this.cancelLoads$))
       .subscribe({
         next: (q) => {
           this.consecutivePollErrors = 0;
@@ -1968,7 +1959,25 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
             return;
           }
           this.quotation.set(q);
+          this.scheduleNextPoll(quotationId);
         },
+        error: (err: unknown) => {
+          this.consecutivePollErrors++;
+          if (this.consecutivePollErrors >= this.MAX_CONSECUTIVE_ERRORS) {
+            this.stopExtractionPolling();
+            this.handleError(err);
+            return;
+          }
+          this.scheduleNextPoll(quotationId);
+        },
+      });
+  }
+
+  private scheduleNextPoll(quotationId: string): void {
+    this.extractionPollSub = timer(this.POLL_INTERVAL_MS)
+      .pipe(takeUntil(this.cancelLoads$))
+      .subscribe(() => {
+        this.pollForExtraction(quotationId);
       });
   }
 

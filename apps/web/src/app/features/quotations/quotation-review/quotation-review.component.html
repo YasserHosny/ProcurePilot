@@ -133,7 +133,7 @@
         <div class="timeout-content">
           <span class="timeout-message">{{ 'quotations.review.processing.timeout' | translate }}</span>
         </div>
-        <button mat-stroked-button type="button" (click)="loadQuotation(quotationId())">
+        <button mat-stroked-button type="button" (click)="loadQuotation(quotationId(), { silent: true })">
           <mat-icon aria-hidden="true">refresh</mat-icon>
           <span>{{ 'quotations.review.loadError.retry' | translate }}</span>
         </button>

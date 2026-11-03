@@ -8,7 +8,8 @@ import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { ActivatedRoute, ParamMap, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
+import { BehaviorSubject, Subject, of, throwError, timer } from 'rxjs';
+import { finalize, map } from 'rxjs/operators';
 
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -3320,6 +3321,158 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
         fixture.detectChanges();
 
         expect(component.isPollingExtraction()).toBeFalse();
+        expect(component.quotation()?.status).toBe('extracted');
+      }));
+
+      it('preserves user edits (notes, supplier, currency) when clicking retry after polling times out', fakeAsync(() => {
+        const inProgressQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracting',
+          reviewer_notes: null,
+          supplier_id: null,
+          currency: 'GBP',
+        };
+        apiService.retryExtraction.and.returnValue(of(inProgressQuote));
+        spyOn(window, 'confirm').and.returnValue(true);
+        apiService.getQuotation.calls.reset();
+        apiService.getQuotation.and.returnValue(of(inProgressQuote));
+
+        // Start extraction polling via retryExtraction
+        component.retryExtraction();
+        fixture.detectChanges();
+        expect(component.isPollingExtraction()).toBeTrue();
+
+        // User edits reviewer notes, supplier, and currency while extraction is in progress
+        component.reviewerNotes.set('Special urgent instructions');
+        component.selectedSupplierId.set('sup-user-edit-uuid');
+        component.pendingQuotationCurrency.set('EUR');
+        fixture.detectChanges();
+
+        // Let polling time out
+        for (let i = 0; i < 31; i++) {
+          tick(2000);
+        }
+        fixture.detectChanges();
+
+        expect(component.isPollingExtraction()).toBeFalse();
+        expect(component.extractionPollTimedOut()).toBeTrue();
+
+        const banner = fixture.nativeElement.querySelector('[data-testid="extraction-timeout-banner"]');
+        expect(banner).toBeTruthy();
+
+        // Server returns in-progress quote with server values on retry
+        const serverPendingQuote: QuotationDetail = {
+          ...inProgressQuote,
+          reviewer_notes: 'server notes',
+          supplier_id: 'sup-server-uuid',
+          currency: 'GBP',
+        };
+        apiService.getQuotation.calls.reset();
+        apiService.getQuotation.and.returnValue(of(serverPendingQuote));
+
+        // Click retry button in timeout banner
+        const retryBtn = banner.querySelector('button') as HTMLButtonElement;
+        expect(retryBtn).toBeTruthy();
+        retryBtn.click();
+        fixture.detectChanges();
+        tick();
+
+        // Verify user edits survived and polling resumed
+        expect(component.reviewerNotes()).toBe('Special urgent instructions');
+        expect(component.selectedSupplierId()).toBe('sup-user-edit-uuid');
+        expect(component.pendingQuotationCurrency()).toBe('EUR');
+        expect(component.extractionPollTimedOut()).toBeFalse();
+        expect(component.isPollingExtraction()).toBeTrue();
+      }));
+
+      it('completes and observes responses with 2.5s latency with exactly one request in flight at a time', fakeAsync(() => {
+        const inProgressQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracting',
+        };
+        const finishedQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracted',
+        };
+
+        let inFlight = 0;
+        let maxInFlight = 0;
+        let responsesReceived = 0;
+        let callCount = 0;
+
+        apiService.getQuotation.calls.reset();
+        apiService.getQuotation.and.callFake(() => {
+          callCount++;
+          inFlight++;
+          if (inFlight > maxInFlight) {
+            maxInFlight = inFlight;
+          }
+          const quoteToReturn = callCount === 1 ? inProgressQuote : finishedQuote;
+          return timer(2500).pipe(
+            map(() => {
+              responsesReceived++;
+              return quoteToReturn;
+            }),
+            finalize(() => {
+              inFlight--;
+            }),
+          );
+        });
+
+        component.startExtractionPolling('q-review-1');
+        fixture.detectChanges();
+
+        expect(component.isPollingExtraction()).toBeTrue();
+        expect(maxInFlight).toBe(1);
+        expect(inFlight).toBe(1);
+
+        // Advance 2000ms: request 1 is still in flight (latency is 2.5s)
+        // With switchMap, this would abort request 1 and schedule another one.
+        // With sequential polling, request 1 continues and no new request is launched.
+        tick(2000);
+        fixture.detectChanges();
+
+        expect(component.isPollingExtraction()).toBeTrue();
+        expect(maxInFlight).toBe(1);
+        expect(inFlight).toBe(1);
+        expect(responsesReceived).toBe(0);
+
+        // Advance remaining 500ms to complete request 1
+        tick(500);
+        fixture.detectChanges();
+
+        expect(responsesReceived).toBe(1);
+        expect(maxInFlight).toBe(1);
+        expect(inFlight).toBe(0);
+        expect(component.isPollingExtraction()).toBeTrue();
+
+        // 2000ms interval between requests: no request is in flight
+        tick(1000);
+        fixture.detectChanges();
+        expect(inFlight).toBe(0);
+
+        tick(1000); // 2000ms elapsed since request 1 finished; request 2 starts
+        fixture.detectChanges();
+        expect(inFlight).toBe(1);
+        expect(maxInFlight).toBe(1);
+
+        // Advance 2500ms to complete request 2 (returns extracted)
+        tick(2500);
+        fixture.detectChanges();
+
+        expect(responsesReceived).toBe(2);
+        expect(maxInFlight).toBe(1);
+        expect(component.isPollingExtraction()).toBeFalse();
+
+        // Advance 2500ms for final silent loadQuotation
+        tick(2500);
+        fixture.detectChanges();
+
+        expect(inFlight).toBe(0);
+        expect(maxInFlight).toBe(1);
         expect(component.quotation()?.status).toBe('extracted');
       }));
     });
