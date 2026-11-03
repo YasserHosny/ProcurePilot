@@ -9,12 +9,13 @@ export interface Rfq {
   id: string;
   tenant_id: string;
   created_by_membership_id: string;
-  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted';
+  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted' | 'cancelled';
   needed_by_date: string;
   tenant_terms: string | null;
   idempotency_key: string;
   created_at: string;
   sent_at?: string | null;
+  cancelled_at?: string | null;
 }
 
 export interface RfqLine {
@@ -146,10 +147,11 @@ export interface RfqResponseComparisonList {
 export interface RfqSummary {
   id: string;
   created_by_membership_id: string;
-  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted';
+  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted' | 'cancelled';
   needed_by_date: string;
   created_at: string;
   sent_at: string | null;
+  cancelled_at?: string | null;
   recipient_count: number;
   response_count: number;
   converted_purchase_request_id: string | null;
@@ -179,6 +181,13 @@ export interface PrepareRequestResponse {
 export class RfqApi {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiBaseUrl}/rfq`;
+
+  cancelRfq(rfqId: string, idempotencyKey?: string): Observable<Rfq> {
+    const headers = new HttpHeaders({
+      'Idempotency-Key': idempotencyKey ?? crypto.randomUUID(),
+    });
+    return this.http.post<Rfq>(`${this.baseUrl}/${rfqId}/cancel`, null, { headers });
+  }
 
   createRfq(payload: RfqCreatePayload, idempotencyKey?: string): Observable<RfqCreateResponse> {
     const headers = new HttpHeaders({

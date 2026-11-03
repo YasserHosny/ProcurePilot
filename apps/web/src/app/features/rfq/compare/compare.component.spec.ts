@@ -2431,6 +2431,76 @@ describe('CompareComponent (RFQ)', () => {
         jasmine.objectContaining({ duration: 5000 }),
       );
     }));
+    it('cancelled RFQ shows the notice and disables Prepare and Split', fakeAsync(() => {
+      const cancelledDetail: RfqDetail = {
+        ...sentDetail,
+        rfq: {
+          ...sentDetail.rfq,
+          status: 'cancelled',
+        },
+      };
+      mockRfqApi.getRfq.and.returnValue(of(cancelledDetail));
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const cancelledNotice = compiled.querySelector('[data-testid="rfq-compare-cancelled-notice"]');
+      expect(cancelledNotice).not.toBeNull();
+      expect(cancelledNotice?.textContent).toContain('This RFQ was cancelled — requests can no longer be prepared from it');
+
+      // Prepare is disabled
+      expect(component.canPrepare(dummyResponses.items[0])).toBeFalse();
+      const prepareBtn = compiled.querySelector<HTMLButtonElement>('.prepare-buttons-row button');
+      expect(prepareBtn?.disabled).toBeTrue();
+      const cancelledReason = compiled.querySelector('[data-testid="cancelled-reason"]');
+      expect(cancelledReason).not.toBeNull();
+      expect(cancelledReason?.textContent).toContain('This RFQ was cancelled');
+
+      // Split is disabled
+      expect(component.splitEligibility().canSplit).toBeFalse();
+      const splitBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitBtn?.disabled).toBeTrue();
+      component.prepareRequest(dummyResponses.items[0]);
+      component.splitRfq();
+      expect(mockRfqApi.prepareRequest).not.toHaveBeenCalled();
+      expect(mockRfqApi.splitRfq).not.toHaveBeenCalled();
+    }));
+
+    it('API reason rfq_cancelled shows the translated message for prepare and split', fakeAsync(() => {
+      const cancelledHttpError = new HttpErrorResponse({
+        status: 422,
+        error: { details: { reason: 'rfq_cancelled' } },
+      });
+
+      mockRfqApi.prepareRequest.and.returnValue(throwError(() => cancelledHttpError));
+      component.prepareRequest(dummyResponses.items[0]);
+
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      expect(mockSnackBar.open).toHaveBeenCalledWith(
+        translate.instant('rfq.compare.rfqCancelled'),
+        translate.instant('rfq.history.dismiss'),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+
+      // Now split with rfq_cancelled
+      const resp1 = dummyResponses.items[0];
+      const resp2 = { ...dummyResponses.items[0], id: 'resp-usd-2', supplier_id: 'supp-2', quotation_id: 'quote-2' };
+      component.responses.set([resp1, resp2]);
+      fixture.detectChanges();
+
+      mockSnackBar.open.calls.reset();
+      mockRfqApi.splitRfq.and.returnValue(throwError(() => cancelledHttpError));
+      component.splitRfq();
+
+      expect(mockSnackBar.open).toHaveBeenCalledWith(
+        translate.instant('rfq.compare.rfqCancelled'),
+        translate.instant('rfq.history.dismiss'),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+    }));
   });
   it('renders API names for entities absent from lookups, including variants and landed cost names', () => {
     const reply = {

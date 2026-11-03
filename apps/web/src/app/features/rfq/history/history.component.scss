@@ -330,3 +330,8 @@ td.mat-mdc-cell:last-of-type {
     }
   }
 }
+
+.status-badge.status-cancelled {
+  background: var(--pp-error-container);
+  color: var(--pp-error);
+}

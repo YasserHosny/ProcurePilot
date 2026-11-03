@@ -1,4 +1,3 @@
-import { RfqActionKeys } from '../rfq-api';
 import { Component, OnInit, inject, signal, ChangeDetectionStrategy, ElementRef, viewChildren } from '@angular/core';
 
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -19,7 +18,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { EMPTY, Observable, expand, forkJoin, map, reduce } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
-import { Rfq, RfqApi, RfqDetail } from '../rfq-api';
+import { RfqActionKeys, Rfq, RfqApi, RfqDetail } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { Product, Supplier } from '../../../core/api/models';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';

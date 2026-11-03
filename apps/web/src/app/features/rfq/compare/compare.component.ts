@@ -1,4 +1,3 @@
-import { RfqActionKeys } from '../rfq-api';
 import { Component, OnInit, OnChanges, SimpleChanges, DestroyRef, Output, EventEmitter, inject, signal, computed, input, model, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, forkJoin, of, catchError, tap, switchMap, take, takeUntil } from 'rxjs';
@@ -21,7 +20,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
-import { RfqApi, RfqDetail, RfqGuardrail, RfqResponseComparison, RfqResponseLineComparison } from '../rfq-api';
+import { RfqActionKeys, RfqApi, RfqDetail, RfqGuardrail, RfqResponseComparison, RfqResponseLineComparison } from '../rfq-api';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -104,18 +103,19 @@ export class CompareComponent implements OnInit, OnChanges {
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
   readonly isConverted = computed<boolean>(() => this.rfqDetail()?.rfq.status === 'converted');
+  readonly isCancelled = computed<boolean>(() => this.rfqDetail()?.rfq.status === 'cancelled');
   readonly isExpired = computed<boolean>(() => this.rfqDetail()?.rfq.status === 'expired');
 
   readonly splitEligibility = computed<{
     canSplit: boolean;
-    reason: 'rfq_expired' | 'needs_two_matched' | 'mixed_currency' | 'reply_mixed_currency' | null;
+    reason: 'rfq_cancelled' | 'rfq_expired' | 'needs_two_matched' | 'mixed_currency' | 'reply_mixed_currency' | null;
     unmatchedCount: number;
     unmatchedQuotationIds: string[];
   }>(() => {
-    if (this.isExpired() || this.isConverted()) {
+    if (this.isCancelled() || this.isExpired() || this.isConverted()) {
       return {
         canSplit: false,
-        reason: this.isExpired() ? 'rfq_expired' : null,
+        reason: this.isCancelled() ? 'rfq_cancelled' : this.isExpired() ? 'rfq_expired' : null,
         unmatchedCount: 0,
         unmatchedQuotationIds: [],
       };
@@ -772,6 +772,7 @@ export class CompareComponent implements OnInit, OnChanges {
     return (
       !this.isConverted() &&
       !this.isExpired() &&
+      !this.isCancelled() &&
       !this.branchesError() &&
       !this.rfqDetailError() &&
       this.isEligible(response) &&
@@ -783,7 +784,7 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   prepareRequest(response: RfqResponseComparison): void {
-    if (this.isConverted() || this.isExpired()) return;
+    if (this.isConverted() || this.isExpired() || this.isCancelled()) return;
     if (response.quotation_status === 'refused') return;
     if (this.isPreparing(response.id)) return;
     if (!this.isEligible(response) || this.hasMixedCurrencies(response)) {
@@ -866,9 +867,9 @@ export class CompareComponent implements OnInit, OnChanges {
           return;
         }
 
-        if (reason === 'rfq_expired') {
+        if (reason === 'rfq_expired' || reason === 'rfq_cancelled') {
           this.snackBar.open(
-            this.translate.instant('rfq.compare.prepareErrorRfqExpired'),
+            this.translate.instant(reason === 'rfq_cancelled' ? 'rfq.compare.rfqCancelled' : 'rfq.compare.prepareErrorRfqExpired'),
             this.translate.instant('rfq.history.dismiss'),
             { duration: 5000 },
           );
@@ -906,7 +907,7 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   splitRfq(): void {
-    if (!this.splitEligibility().canSplit || !this.isWriter() || this.isSplitting() || this.isExpired()) return;
+    if (!this.splitEligibility().canSplit || !this.isWriter() || this.isSplitting() || this.isExpired() || this.isCancelled()) return;
     const id = this.rfqId();
     if (!id) return;
 
@@ -934,9 +935,9 @@ export class CompareComponent implements OnInit, OnChanges {
             this.translate.instant('rfq.history.dismiss'),
             { duration: 5000 },
           );
-        } else if (reason === 'rfq_expired') {
+        } else if (reason === 'rfq_expired' || reason === 'rfq_cancelled') {
           this.snackBar.open(
-            this.translate.instant('rfq.compare.prepareErrorRfqExpired'),
+            this.translate.instant(reason === 'rfq_cancelled' ? 'rfq.compare.rfqCancelled' : 'rfq.compare.prepareErrorRfqExpired'),
             this.translate.instant('rfq.history.dismiss'),
             { duration: 5000 },
           );

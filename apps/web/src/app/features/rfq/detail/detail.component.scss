@@ -342,3 +342,8 @@ table {
 .responses-tab-content {
   padding-block-start: 8px;
 }
+
+.status-badge.status-cancelled {
+  background: var(--pp-error-container);
+  color: var(--pp-error);
+}

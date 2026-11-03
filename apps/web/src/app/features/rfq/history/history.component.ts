@@ -1,10 +1,10 @@
-import { RfqActionKeys } from '../rfq-api';
 import { Component, OnInit, inject, signal, computed, DestroyRef, ChangeDetectionStrategy } from '@angular/core';
 import { BidiModule } from '@angular/cdk/bidi';
 import { A11yModule } from '@angular/cdk/a11y';
 import { OverlayModule, ConnectedPosition } from '@angular/cdk/overlay';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { finalize, take } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
@@ -19,7 +19,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { RfqApi, RfqRecipient, RfqSummary } from '../rfq-api';
+import { RfqActionKeys, RfqApi, RfqRecipient, RfqSummary } from '../rfq-api';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatService } from '../../../core/format/format.service';
 import { parseIsoDateLocal } from '../../../core/format/iso-date';
@@ -83,6 +83,7 @@ export class HistoryComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly currentMembershipId = signal<string | null>(null);
+  readonly cancellingIds = signal<ReadonlySet<string>>(new Set());
 
   readonly isBelow1200 = signal(false);
   readonly isBelow768 = signal(false);
@@ -313,6 +314,61 @@ export class HistoryComponent implements OnInit {
     });
   }
 
+  canCancel(rfq: RfqSummary): boolean {
+    return Boolean(rfq && ['draft', 'sent', 'responded', 'expired'].includes(rfq.status) &&
+      (this.session.hasRole('owner') || (this.session.hasRole('buyer') && this.isCreator(rfq))));
+  }
+
+  onCancelRfq(rfq: RfqSummary, event?: Event): void {
+    event?.stopPropagation();
+    const id = rfq.id;
+    if (!this.canCancel(rfq) || this.cancellingIds().has(id)) return;
+    this.cancellingIds.update((ids) => new Set([...ids, id]));
+    const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
+      width: '440px',
+      data: {
+        titleKey: 'rfq.cancel.title',
+        messageKey: 'rfq.cancel.message',
+        confirmKey: 'rfq.cancel.confirm',
+        cancelKey: 'rfq.cancel.keep',
+        isDestructive: true,
+      },
+    });
+    dialogRef.afterClosed().pipe(take(1), takeUntilDestroyed(this.destroyRef)).subscribe((confirmed: boolean | undefined) => {
+      if (!confirmed) {
+        this.cancellingIds.update((ids) => new Set([...ids].filter((value) => value !== id)));
+        return;
+      }
+      this.rfqApi.cancelRfq(id, this.actionKeys.get(`cancel:${id}`)).pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => { this.cancellingIds.update((ids) => new Set([...ids].filter((value) => value !== id))); }),
+      ).subscribe({
+        next: () => {
+          this.actionKeys.clear(`cancel:${id}`);
+          this.showCancelMessage('rfq.cancel.success');
+          this.loadRfqs();
+        },
+        error: (err: unknown) => {
+          this.actionKeys.onError(`cancel:${id}`, err);
+          let key = 'rfq.cancel.error';
+          if (err instanceof HttpErrorResponse) {
+            if (err.status === 403 && err.error?.details?.reason === 'not_creator') {
+              key = 'rfq.cancel.notCreator';
+            } else if (err.status === 409) {
+              key = 'rfq.cancel.notCancellable';
+              this.loadRfqs();
+            }
+          }
+          this.showCancelMessage(key);
+        },
+      });
+    });
+  }
+
+  private showCancelMessage(key: string): void {
+    this.snackBar.open(this.translate.instant(key), this.translate.instant('rfq.history.dismiss'), { duration: 5000 });
+  }
+
   getStatusClass(status: string): string {
     switch (status) {
       case 'draft': return 'status-draft';
@@ -320,6 +376,7 @@ export class HistoryComponent implements OnInit {
       case 'responded': return 'status-responded';
       case 'expired': return 'status-expired';
       case 'converted': return 'status-converted';
+      case 'cancelled': return 'status-cancelled';
       default: return '';
     }
   }
