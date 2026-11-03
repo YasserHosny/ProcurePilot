@@ -137,6 +137,11 @@ describe('RequestFormComponent — create mode (T017)', () => {
       status: 'active', created_at: '',
     };
 
+    const matchingDraft: PurchaseRequest = {
+      ...mockRequest, cost_centre_id: null, required_by_date: '2099-01-01',
+      lines: [{ ...mockRequest.lines[0], quantity: '25.000000', note: '' }],
+    };
+
     function fillForm(): void {
       component.form.patchValue({ branch_id: 'b1', required_by_date: '2099-01-01' });
       component.lines.at(0).patchValue({ workspace_product_id: 'wp1', quantity: '25' });
@@ -196,6 +201,47 @@ describe('RequestFormComponent — create mode (T017)', () => {
       expect(fixture.nativeElement.querySelector('.save-and-submit-btn')).toBeNull();
     });
 
+    it('uses the saved pack snapshot for a read-only request after the catalogue pack changes', () => {
+      component.products.set([product]);
+      requestsApi.getRequest.and.returnValue(of({
+        ...mockRequest, status: 'submitted',
+        lines: [{ ...mockRequest.lines[0], quantity: '3', pack_base_quantity: '2.500000', base_unit: 'kg' }],
+      }));
+      routeParams.next(convertToParamMap({ id: 'r1' }));
+      expect(hint()).toContain('1 pack = 2.5 kg');
+      expect(hint()).toContain('Total 7.5 kg');
+      // The saved unit and pack remain available even without a catalogue product.
+      component.products.set([]);
+      expect(hint()).toContain('1 pack = 2.5 kg');
+    });
+
+    it('uses the current catalogue pack for an editable draft with a saved snapshot', () => {
+      component.products.set([product]);
+      requestsApi.getRequest.and.returnValue(of({
+        ...mockRequest, lines: [{ ...mockRequest.lines[0], pack_base_quantity: '2.500000' }],
+      }));
+      routeParams.next(convertToParamMap({ id: 'r1' }));
+      expect(component.form.enabled).toBeTrue();
+      expect(hint()).toContain('1 pack = 10 kg');
+      expect(hint()).toContain('Total 100 kg');
+    });
+
+    for (const size of ['0.001', '0.125']) {
+      it(`preserves exact pack size ${size} in the hint`, () => {
+        component.products.set([{ ...product, pack: { ...product.pack, base_quantity: size } }]);
+        fillForm();
+        expect(hint()).toContain(`1 pack = ${size} kg`);
+      });
+    }
+
+    it('formats three packs of 0.1 as 0.3 without floating point noise', () => {
+      component.products.set([{ ...product, pack: { ...product.pack, base_quantity: '0.1' } }]);
+      fillForm();
+      component.lines.at(0).controls.quantity.setValue('3');
+      expect(hint()).toContain('Total 0.3 kg');
+      expect(hint()).not.toContain('0.30000000000000004');
+    });
+
     it('renders Arabic pack copy, totals and the suffix', () => {
       const translate = TestBed.inject(TranslateService);
       translate.setTranslation('ar', arCatalog);
@@ -234,7 +280,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
         lines: [{ workspace_product_id: 'wp1', quantity: '25', note: null }],
       }, '11111111-1111-4111-8111-111111111111');
       expect(requestsApi.submitRequest).not.toHaveBeenCalled();
-      created.next(mockRequest);
+      created.next(matchingDraft);
       created.complete();
       expect(requestsApi.submitRequest).toHaveBeenCalledOnceWith('r1', '22222222-2222-4222-8222-222222222222');
       submitted.next({ ...mockRequest, status: 'submitted' });
@@ -272,11 +318,11 @@ describe('RequestFormComponent — create mode (T017)', () => {
 
     it('preserves the draft after submit failure, navigates without reloading and retries without another create', () => {
       fillForm();
-      requestsApi.createRequest.and.returnValue(of(mockRequest));
+      requestsApi.createRequest.and.returnValue(of(matchingDraft));
       requestsApi.submitRequest.and.returnValue(throwError(() => new Error('submit failed')));
       component.saveAndSubmit();
       const key = requestsApi.submitRequest.calls.mostRecent().args[1];
-      expect(component.existingRequest()).toEqual(mockRequest);
+      expect(component.existingRequest()).toEqual(matchingDraft);
       expect(routerSpy.navigate).toHaveBeenCalledWith(['/requests', 'r1']);
       expect(snackBarSpy.open).toHaveBeenCalledWith(enCatalog.requests.form.draftSavedSubmitFailed, undefined, { duration: 3500 });
       const line = component.lines.at(0);
@@ -288,6 +334,77 @@ describe('RequestFormComponent — create mode (T017)', () => {
       expect(requestsApi.createRequest).toHaveBeenCalledTimes(1);
       expect(requestsApi.submitRequest.calls.mostRecent().args[1]).toBe(key);
     });
+
+    it('updates an older replay with the edited payload before submitting on retry', () => {
+      fillForm();
+      requestsApi.createRequest.and.returnValue(throwError(() => new Error('response lost')));
+      component.saveAndSubmit();
+      const key = requestsApi.createRequest.calls.mostRecent().args[1];
+      component.lines.at(0).controls.quantity.setValue('3');
+      requestsApi.createRequest.and.returnValue(of(matchingDraft));
+      const updated = new Subject<PurchaseRequest>();
+      const currentDraft = { ...matchingDraft, lines: [{ ...matchingDraft.lines[0], quantity: '3.000000' }] };
+      requestsApi.updateRequest.and.returnValue(updated);
+      requestsApi.submitRequest.and.returnValue(throwError(() => new Error('submit failed')));
+      component.saveAndSubmit();
+      expect(requestsApi.createRequest.calls.mostRecent().args[1]).toBe(key);
+      expect(requestsApi.updateRequest).toHaveBeenCalledOnceWith('r1', {
+        branch_id: 'b1', cost_centre_id: null, required_by_date: '2099-01-01',
+        lines: [{ workspace_product_id: 'wp1', quantity: '3', note: null }],
+      });
+      expect(requestsApi.submitRequest).not.toHaveBeenCalled();
+      updated.next(currentDraft);
+      updated.complete();
+      expect(requestsApi.submitRequest).toHaveBeenCalledTimes(1);
+      expect(requestsApi.updateRequest).toHaveBeenCalledBefore(requestsApi.submitRequest);
+      expect(component.existingRequest()).toEqual(currentDraft);
+    });
+
+    it('submits a matching replay without updating normalized decimal, date and empty fields', () => {
+      fillForm();
+      component.form.controls.required_by_date.setValue(new Date(2099, 0, 1));
+      requestsApi.createRequest.and.returnValue(of(matchingDraft));
+      requestsApi.submitRequest.and.returnValue(of({ ...matchingDraft, status: 'submitted' }));
+      component.saveAndSubmit();
+      expect(requestsApi.updateRequest).not.toHaveBeenCalled();
+      expect(requestsApi.submitRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the saved draft and navigates with the draft-saved snackbar when replay update fails', () => {
+      fillForm();
+      component.lines.at(0).controls.quantity.setValue('3');
+      requestsApi.createRequest.and.returnValue(of(matchingDraft));
+      requestsApi.updateRequest.and.returnValue(throwError(() => new Error('update failed')));
+      component.saveAndSubmit();
+      expect(requestsApi.updateRequest).toHaveBeenCalledTimes(1);
+      expect(requestsApi.submitRequest).not.toHaveBeenCalled();
+      expect(component.existingRequest()).toEqual(matchingDraft);
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        enCatalog.requests.form.draftSavedSubmitFailed, undefined, { duration: 3500 },
+      );
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/requests', 'r1']);
+      expect(component.isSaving()).toBeFalse();
+      expect(component.isSubmitting()).toBeFalse();
+    });
+
+    for (const [field, replay] of Object.entries({
+      branch: { ...matchingDraft, branch_id: 'b2' },
+      costCentre: { ...matchingDraft, cost_centre_id: 'cc1' },
+      date: { ...matchingDraft, required_by_date: '2099-01-02' },
+      lineCount: { ...matchingDraft, lines: [...matchingDraft.lines, matchingDraft.lines[0]] },
+      product: { ...matchingDraft, lines: [{ ...matchingDraft.lines[0], workspace_product_id: 'wp2' }] },
+      note: { ...matchingDraft, lines: [{ ...matchingDraft.lines[0], note: 'old note' }] },
+    })) {
+      it(`updates a replay when its ${field} differs from the form`, () => {
+        fillForm();
+        requestsApi.createRequest.and.returnValue(of(replay));
+        requestsApi.updateRequest.and.returnValue(of(matchingDraft));
+        requestsApi.submitRequest.and.returnValue(of({ ...matchingDraft, status: 'submitted' }));
+        component.saveAndSubmit();
+        expect(requestsApi.updateRequest).toHaveBeenCalledTimes(1);
+        expect(requestsApi.updateRequest).toHaveBeenCalledBefore(requestsApi.submitRequest);
+      });
+    }
 
     it('disables both save buttons during create and submit and ignores repeated clicks', () => {
       fillForm();
@@ -305,7 +422,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
       component.saveAndSubmit();
       component.saveDraft();
       expect(requestsApi.createRequest).toHaveBeenCalledTimes(1);
-      created.next(mockRequest);
+      created.next(matchingDraft);
       created.complete();
       expectDisabled();
       submitted.next({ ...mockRequest, status: 'submitted' });
@@ -324,7 +441,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
       expect(fixture.nativeElement.querySelector('.save-and-submit-btn').disabled).toBeTrue();
       component.saveAndSubmit();
       expect(requestsApi.createRequest).toHaveBeenCalledTimes(1);
-      created.next(mockRequest);
+      created.next(matchingDraft);
       created.complete();
     });
 

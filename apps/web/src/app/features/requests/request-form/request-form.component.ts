@@ -62,6 +62,8 @@ interface LineFormGroup {
 }
 
 interface SavedLineInfo {
+  pack_base_quantity: string | null;
+  base_unit: string | null;
   id: string;
   workspace_product_id: string;
   quantity: string;
@@ -421,25 +423,31 @@ export class RequestFormComponent implements OnInit {
 
   getPackHint(group: FormGroup<LineFormGroup>): { size: string; unit: string; total: string | null } | null {
     const product = this.products().find(p => p.id === group.controls.workspace_product_id.value);
-    if (!product?.pack) {
+    const meta = this.savedLineMeta.get(group);
+    const readOnly = this.isReadOnly() || group.disabled;
+    const snapshot = readOnly ? meta?.pack_base_quantity : null;
+    const rawSize = snapshot ?? product?.pack?.base_quantity
+      ?? (product?.pack ? (Number(product.pack.unit_size) * product.pack.pack_count).toFixed(6) : null);
+    const unit = product?.base_unit || meta?.base_unit;
+    if (rawSize == null || !unit) {
       return null;
     }
-    const size = Number(product.pack.base_quantity ?? Number(product.pack.unit_size) * product.pack.pack_count);
+    const size = Number(rawSize);
     if (!Number.isFinite(size) || size <= 0) {
       return null;
     }
     // Disabled controls may contain localized display values; calculate from the saved decimal instead.
-    const rawQuantity = group.disabled
-      ? this.savedLineMeta.get(group)?.quantity ?? group.controls.quantity.value
+    const rawQuantity = readOnly
+      ? meta?.quantity ?? group.controls.quantity.value
       : group.controls.quantity.value;
     const quantity = Number(rawQuantity);
     const total = quantity * size;
     const showTotal = (group.disabled || group.controls.quantity.valid)
       && Number.isFinite(quantity) && quantity > 0 && Number.isFinite(total);
     return {
-      size: this.formatQuantity(trimDecimal(String(size))),
-      unit: product.base_unit,
-      total: showTotal ? this.formatQuantity(trimDecimal(String(total))) : null,
+      size: this.formatService.formatExactQuantity(trimDecimal(rawSize)),
+      unit,
+      total: showTotal ? this.formatService.formatExactQuantity(trimDecimal(total.toFixed(6))) : null,
     };
   }
 
@@ -466,6 +474,21 @@ export class RequestFormComponent implements OnInit {
     const draft$ = created ? of(created)
       : this.requestsApi.createRequest(this.buildRequestPayload(), this.createSubmitIdempotencyKey);
     draft$.pipe(
+      switchMap(draft => {
+        created = draft;
+        const payload = this.buildRequestPayload();
+        const matches = draft.branch_id === payload.branch_id
+          && (draft.cost_centre_id || null) === payload.cost_centre_id
+          && draft.required_by_date === payload.required_by_date
+          && draft.lines.length === payload.lines.length
+          && draft.lines.every((line, i) => {
+            const current = payload.lines[i];
+            return line.workspace_product_id === current.workspace_product_id
+              && Number(line.quantity) === Number(current.quantity)
+              && (line.note || null) === current.note;
+          });
+        return matches ? of(draft) : this.requestsApi.updateRequest(draft.id, payload);
+      }),
       switchMap(draft => {
         created = draft;
         this.isSubmitting.set(true);
@@ -548,6 +571,8 @@ export class RequestFormComponent implements OnInit {
       const savedLine = saved.lines[i];
       if (group && savedLine) {
         this.savedLineMeta.set(group, {
+          pack_base_quantity: savedLine.pack_base_quantity ?? null,
+          base_unit: savedLine.base_unit ?? null,
           id: savedLine.id,
           workspace_product_id: savedLine.workspace_product_id,
           quantity: savedLine.quantity,
@@ -891,6 +916,8 @@ export class RequestFormComponent implements OnInit {
             note: new FormControl<string>(line.note ?? '', { nonNullable: true }),
           });
           this.savedLineMeta.set(group, {
+            pack_base_quantity: line.pack_base_quantity ?? null,
+            base_unit: line.base_unit ?? null,
             id: line.id,
             workspace_product_id: line.workspace_product_id,
             quantity: line.quantity,
