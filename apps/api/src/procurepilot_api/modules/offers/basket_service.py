@@ -679,5 +679,18 @@ def _job(row: dict[str, object]) -> BasketSplitJob:
                 if isinstance(row.get("request_snapshot"), dict)
                 else None
             ),
+            "request_settings": _request_settings(row.get("request_snapshot")),
         }
     )
+
+
+def _request_settings(snapshot: object) -> dict[str, object] | None:
+    """The settings an advanced basket was submitted with; None when none were recorded."""
+    if not isinstance(snapshot, dict) or "risk_tolerance" not in snapshot:
+        return None
+    return {
+        "risk_tolerance": snapshot["risk_tolerance"],
+        "urgency": snapshot.get("urgency", "normal"),
+        "excluded_supplier_ids": snapshot.get("excluded_supplier_ids", []),
+        "weights": snapshot["weights"],
+    }
