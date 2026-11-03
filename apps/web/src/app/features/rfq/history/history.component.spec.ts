@@ -607,7 +607,7 @@ describe('HistoryComponent', () => {
     );
     const sendDialogData = dialogSpy.open.calls.mostRecent().args[1]?.data as Record<string, unknown>;
     expect(sendDialogData['warningKey']).toBeUndefined();
-    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-draft-1');
+    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-draft-1', jasmine.any(String));
     expect(snackBarSpy.open).toHaveBeenCalled();
     expect(rfqApiSpy.listRfqs).toHaveBeenCalled();
   });
@@ -680,7 +680,7 @@ describe('HistoryComponent', () => {
 
     component.onSendDraft(mockRfqs[0]);
 
-    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-draft-1');
+    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-draft-1', jasmine.any(String));
     expect(snackBarSpy.open).toHaveBeenCalledWith(
       jasmine.any(String),
       jasmine.any(String),
@@ -745,7 +745,7 @@ describe('HistoryComponent', () => {
     );
 
     component.onSendDraft(mockRfqs[0]);
-    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-draft-1');
+    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-draft-1', jasmine.any(String));
 
     // Reopen popover on the RFQ
     component.loadRecipients('rfq-draft-1');
@@ -987,4 +987,27 @@ describe('HistoryComponent', () => {
       }
     });
   });
+  for (const status of [0, 503]) {
+    it(`reuses the send key after ${status}, rotates on success, and blocks concurrent sends`, () => {
+      component.currentMembershipId.set(mockRfqs[0].created_by_membership_id);
+      dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+      rfqApiSpy.sendRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status })));
+      component.onSendDraft(mockRfqs[0]);
+      const first = rfqApiSpy.sendRfq.calls.mostRecent().args[1];
+      const pending = new Subject<RfqSendResponse>();
+      rfqApiSpy.sendRfq.and.returnValue(pending);
+      component.onSendDraft(mockRfqs[0]);
+      component.onSendDraft(mockRfqs[0]);
+      expect(rfqApiSpy.sendRfq).toHaveBeenCalledTimes(2);
+      expect(rfqApiSpy.sendRfq.calls.mostRecent().args[1]).toBe(first);
+      pending.next({ rfq: { id: mockRfqs[0].id, status: 'sent' }, recipients: [] } as unknown as RfqSendResponse);
+      rfqApiSpy.sendRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 422 })));
+      component.onSendDraft(mockRfqs[0]);
+      const rejected = rfqApiSpy.sendRfq.calls.mostRecent().args[1];
+      expect(rejected).not.toBe(first);
+      component.onSendDraft(mockRfqs[0]);
+      expect(rfqApiSpy.sendRfq.calls.mostRecent().args[1]).not.toBe(rejected);
+    });
+  }
+
 });

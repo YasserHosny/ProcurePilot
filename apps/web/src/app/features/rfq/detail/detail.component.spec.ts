@@ -625,7 +625,7 @@ describe('DetailComponent (RFQ Details)', () => {
     (component as unknown as { onRetryUnsent?: () => void }).onRetryUnsent?.();
 
     expect(rfqApiSpy.sendRfq).toHaveBeenCalledTimes(1);
-    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-sent-1');
+    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-sent-1', jasmine.any(String));
 
     // Complete the in-flight request
     sendSubject.next({ rfq: mockSentDetail.rfq, recipients: mockSentDetail.recipients });
@@ -658,7 +658,7 @@ describe('DetailComponent (RFQ Details)', () => {
     retryBtn?.click();
     fixture.detectChanges();
 
-    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-sent-1');
+    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-sent-1', jasmine.any(String));
     expect(rfqApiSpy.getRfq).toHaveBeenCalledTimes(initialGetCalls + 1);
 
     const translate = TestBed.inject(TranslateService);
@@ -1142,4 +1142,29 @@ describe('DetailComponent (RFQ Details)', () => {
       expect(texts.some((t) => t?.includes('Responses ('))).toBeFalse();
     }));
   });
+  for (const status of [0, 503]) {
+    it(`reuses the send key after ${status}, rotates on success, and blocks concurrent sends`, () => {
+      component.rfqId.set(mockSentDetail.rfq.id);
+      component.rfqDetail.set(mockSentDetail);
+      component.currentMembershipId.set(mockSentDetail.rfq.created_by_membership_id);
+      dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+      rfqApiSpy.sendRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status })));
+      component.onRetryUnsent();
+      const first = rfqApiSpy.sendRfq.calls.mostRecent().args[1];
+      const pending = new Subject<RfqSendResponse>();
+      rfqApiSpy.sendRfq.and.returnValue(pending);
+      component.onRetryUnsent();
+      component.onRetryUnsent();
+      expect(rfqApiSpy.sendRfq).toHaveBeenCalledTimes(2);
+      expect(rfqApiSpy.sendRfq.calls.mostRecent().args[1]).toBe(first);
+      pending.next({ rfq: mockSentDetail.rfq, recipients: mockSentDetail.recipients });
+      rfqApiSpy.sendRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 422 })));
+      component.onRetryUnsent();
+      const rejected = rfqApiSpy.sendRfq.calls.mostRecent().args[1];
+      expect(rejected).not.toBe(first);
+      component.onRetryUnsent();
+      expect(rfqApiSpy.sendRfq.calls.mostRecent().args[1]).not.toBe(rejected);
+    });
+  }
+
 });
