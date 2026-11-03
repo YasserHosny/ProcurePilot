@@ -4203,7 +4203,40 @@
       "recipientStatus_sent": "مرسل",
       "recipientStatus_failed": "فاشل",
       "recipientStatus_draft": "لم يُرسل",
-      "unknownSupplier": "مورد غير معروف"
+      "unknownSupplier": "مورد غير معروف",
+      "retry": "إعادة المحاولة",
+      "loadMore": "تحميل المزيد",
+      "loadingMore": "جاري تحميل المزيد من طلبات عروض الأسعار...",
+      "loadMoreError": "تعذر تحميل المزيد من طلبات عروض الأسعار.",
+      "showingRfqs": "عرض {{count}} من طلبات عروض الأسعار",
+      "showingCount": {
+        "zero": "عرض 0 من طلبات عروض الأسعار",
+        "one": "عرض طلب عرض أسعار واحد",
+        "two": "عرض طلبي عروض أسعار",
+        "few": "عرض {{count}} طلبات عروض أسعار",
+        "many": "عرض {{count}} طلب عرض أسعار",
+        "other": "عرض {{count}} طلب عرض أسعار"
+      },
+      "openRfqAriaLabel": "فتح طلب عرض الأسعار، {{status}}، مطلوب بحلول {{date}}",
+      "recipientsAriaLabelFallback": "{{count}} من المستلمين — عرض القائمة",
+      "recipientsAriaLabel": {
+        "zero": "0 مستلمين — عرض القائمة",
+        "one": "مستلم واحد — عرض القائمة",
+        "two": "مستلمان — عرض القائمة",
+        "few": "{{count}} مستلمين — عرض القائمة",
+        "many": "{{count}} مستلمًا — عرض القائمة",
+        "other": "{{count}} مستلم — عرض القائمة"
+      },
+      "responsesAriaLabelFallback": "{{count}} من الردود — مقارنة",
+      "responsesAriaLabel": {
+        "zero": "0 ردود — مقارنة",
+        "one": "رد واحد — مقارنة",
+        "two": "ردان — مقارنة",
+        "few": "{{count}} ردود — مقارنة",
+        "many": "{{count}} ردًا — مقارنة",
+        "other": "{{count}} رد — مقارنة"
+      },
+      "draftActionsUnavailable": "إجراءات المسودة غير متاحة حاليًا لتعذر تحميل أعضاء مساحة العمل."
     },
     "detail": {
       "title": "تفاصيل طلب عرض الأسعار",
