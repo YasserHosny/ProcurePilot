@@ -226,6 +226,19 @@ export class BasketSplitComponent implements OnInit {
   private pollFailures = 0;
   readonly jobNotFound = signal(false);
   readonly pollFailed = signal(false);
+
+  /** What a screen reader hears as the job moves from queued to running to finished. */
+  readonly liveStatus = computed(() => {
+    switch (this.uiState()) {
+      case 'queued': return this.translate.instant('basketSplit.status.queued');
+      case 'running':
+      case 'submitting': return this.translate.instant('basketSplit.status.running');
+      case 'completed_feasible':
+      case 'completed_infeasible': return this.translate.instant('basketSplit.status.completedAnnounce');
+      case 'failed': return this.translate.instant('basketSplit.status.failedMessage');
+      default: return '';
+    }
+  });
   /** The form was filled from an earlier job: the buyer should confirm the commercial settings. */
   readonly rerunNotice = signal(false);
 

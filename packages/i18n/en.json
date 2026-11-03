@@ -1775,7 +1775,8 @@
       "notFoundTitle": "Basket split not found",
       "notFoundMessage": "This split does not exist or is not available in this workspace. Start a new split instead.",
       "pollFailed": "The latest status could not be loaded. The split may still be running.",
-      "pollRetry": "Retry"
+      "pollRetry": "Retry",
+      "completedAnnounce": "The optimisation is complete. The result is shown below."
     },
     "result": {
       "feasibleTitle": "Recommended Basket Allocation",
@@ -2073,7 +2074,8 @@
         "no_product": "Not linked to a catalogue product",
         "zero_quantity": "Nothing ordered on this line",
         "already_recorded": "Outcome already recorded"
-      }
+      },
+      "submitOne": "Save 1 outcome"
     }
   },
   "exports": {
@@ -3835,7 +3837,15 @@
       "overdue": "Overdue",
       "exportCsv": "Export CSV",
       "print": "Print",
-      "receiveAll": "Receive all remaining"
+      "receiveAll": "Receive all remaining",
+      "submitted": "Order submitted.",
+      "cancelled": "Order cancelled.",
+      "confirmationSaved": "Supplier confirmation saved.",
+      "receiptSaved": "Delivery receipt saved.",
+      "dateFormatHintDayFirst": "dd/mm/yyyy",
+      "dateFormatHintMonthFirst": "mm/dd/yyyy",
+      "receivedQuantityFor": "{{product}} · Received quantity ({{unit}}, ordered {{ordered}})",
+      "confirmedQuantityFor": "{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})"
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",

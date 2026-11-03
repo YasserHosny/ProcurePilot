@@ -1775,7 +1775,8 @@
       "notFoundTitle": "تقسيم السلة غير موجود",
       "notFoundMessage": "هذا التقسيم غير موجود أو غير متاح في مساحة العمل هذه. ابدأ تقسيماً جديداً.",
       "pollFailed": "تعذّر تحميل أحدث حالة. قد يكون التقسيم ما زال قيد التشغيل.",
-      "pollRetry": "إعادة المحاولة"
+      "pollRetry": "إعادة المحاولة",
+      "completedAnnounce": "اكتمل التحسين. النتيجة معروضة أدناه."
     },
     "result": {
       "feasibleTitle": "التوزيع الموصى به للسلة",
@@ -2073,7 +2074,8 @@
         "no_product": "غير مرتبط بمنتج في الكتالوج",
         "zero_quantity": "لا توجد كمية مطلوبة في هذا السطر",
         "already_recorded": "تم تسجيل النتيجة مسبقاً"
-      }
+      },
+      "submitOne": "حفظ نتيجة واحدة"
     }
   },
   "exports": {
@@ -3835,7 +3837,15 @@
       "overdue": "متأخر",
       "exportCsv": "تصدير CSV",
       "print": "طباعة",
-      "receiveAll": "استلام كل المتبقي"
+      "receiveAll": "استلام كل المتبقي",
+      "submitted": "تم تقديم الأمر.",
+      "cancelled": "تم إلغاء الأمر.",
+      "confirmationSaved": "تم حفظ تأكيد المورّد.",
+      "receiptSaved": "تم حفظ إيصال التسليم.",
+      "dateFormatHintDayFirst": "يوم/شهر/سنة",
+      "dateFormatHintMonthFirst": "شهر/يوم/سنة",
+      "receivedQuantityFor": "{{product}} · الكمية المستلمة ({{unit}}، المطلوب {{ordered}})",
+      "confirmedQuantityFor": "{{product}} · الكمية المؤكدة ({{unit}}، المطلوب {{ordered}})"
     },
     "resultCount": "{{count}} أمر شراء",
     "loadMoreError": "تعذّر تحميل المزيد من الأوامر. الأوامر الظاهرة أعلاه ما زالت معروضة.",

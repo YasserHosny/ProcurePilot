@@ -1,4 +1,5 @@
 <div class="order-detail-container">
+  <div class="visually-hidden" role="status" aria-live="polite" data-testid="action-status">{{ actionStatus() }}</div>
   <a mat-button routerLink="/orders" class="back-link"><mat-icon aria-hidden="true">arrow_back</mat-icon>{{ 'orders.backToOrders' | translate }}</a>
 
   @if (errorMessage(); as error) {
@@ -91,8 +92,8 @@
         <div class="state error" role="alert" data-testid="action-error"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ actionMessage }}</span></div>
       }
       @if (submitOpen()) {
-        <div class="evidence-form submit-form">
-          <h3>{{ 'orders.detail.submitConfirmTitle' | translate }}</h3>
+        <div class="evidence-form submit-form" data-testid="submit-confirm-panel">
+          <h3 tabindex="-1">{{ 'orders.detail.submitConfirmTitle' | translate }}</h3>
           <p>{{ 'orders.detail.submitConfirmMessage' | translate }}</p>
           <div class="actions">
             <button mat-button type="button" (click)="submitOpen.set(false)" [disabled]="isSaving()">{{ 'common.cancel' | translate }}</button>
@@ -101,8 +102,8 @@
         </div>
       }
       @if (cancelOpen()) {
-        <div class="evidence-form cancel-form">
-          <h3>{{ 'orders.detail.cancelConfirmTitle' | translate }}</h3>
+        <div class="evidence-form cancel-form" data-testid="cancel-confirm-panel">
+          <h3 tabindex="-1">{{ 'orders.detail.cancelConfirmTitle' | translate }}</h3>
           <p>{{ 'orders.detail.cancelConfirmMessage' | translate }}</p>
           <div class="actions">
             <button mat-button type="button" (click)="cancelOpen.set(false)" [disabled]="isSaving()">{{ 'common.cancel' | translate }}</button>
@@ -129,11 +130,12 @@
                 [ngModelOptions]="{standalone: true}"
                 name="confirmationDate"
               />
+              <mat-hint data-testid="date-format-hint">{{ dateFormatHintKey() | translate }}</mat-hint>
               <mat-datepicker-toggle matIconSuffix [for]="confirmationDatePicker"></mat-datepicker-toggle>
               <mat-datepicker #confirmationDatePicker></mat-datepicker>
             </mat-form-field>
           </div>
-          @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ lineDescription(line) }} · {{ 'orders.detail.confirmedQuantity' | translate }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(confirmationQuantities(), line)" (ngModelChange)="setQuantity('confirmation', line.id, $event)" [name]="'confirmation-' + line.id" /></mat-form-field> }
+          @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ quantityLabel('confirmed', line) }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(confirmationQuantities(), line)" (ngModelChange)="setQuantity('confirmation', line.id, $event)" [name]="'confirmation-' + line.id" /></mat-form-field> }
           <button mat-flat-button color="primary" type="submit" [disabled]="isSaving()" data-testid="save-confirmation">{{ 'orders.detail.save' | translate }}</button>
         </form>
       }
@@ -157,11 +159,12 @@
                 [ngModelOptions]="{standalone: true}"
                 name="receiptDate"
               />
+              <mat-hint data-testid="date-format-hint">{{ dateFormatHintKey() | translate }}</mat-hint>
               <mat-datepicker-toggle matIconSuffix [for]="receiptDatePicker"></mat-datepicker-toggle>
               <mat-datepicker #receiptDatePicker></mat-datepicker>
             </mat-form-field>
           </div>
-          @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ lineDescription(line) }} · {{ 'orders.detail.receivedQuantity' | translate }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(receiptQuantities(), line)" (ngModelChange)="setQuantity('receipt', line.id, $event)" [name]="'receipt-' + line.id" /></mat-form-field> }
+          @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ quantityLabel('received', line) }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(receiptQuantities(), line)" (ngModelChange)="setQuantity('receipt', line.id, $event)" [name]="'receipt-' + line.id" /></mat-form-field> }
           @if (receiptQuantityError()) { <p class="field-error" role="alert" data-testid="receipt-quantity-error">{{ 'orders.detail.receiptQuantityRequired' | translate }}</p> }
           <button mat-flat-button color="primary" type="submit" [disabled]="isSaving()" data-testid="save-receipt">{{ 'orders.detail.save' | translate }}</button>
         </form>

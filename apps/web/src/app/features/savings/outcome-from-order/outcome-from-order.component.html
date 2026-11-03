@@ -100,7 +100,7 @@
           @if (isSubmitting()) {
             <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18"></mat-spinner>
           }
-          {{ 'savings.fromOrder.submit' | translate: { count: selectedCount() } }}
+          {{ (selectedCount() === 1 ? 'savings.fromOrder.submitOne' : 'savings.fromOrder.submit') | translate: { count: selectedCount() } }}
         </button>
       </div>
     </mat-card>
