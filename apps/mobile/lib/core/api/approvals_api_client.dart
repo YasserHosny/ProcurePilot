@@ -25,10 +25,8 @@ class ApprovalsApiClient {
   /// Lists purchase requests currently pending the signed-in approver's
   /// decision.
   ///
-  /// Known pilot-scale simplification: this returns only the first page
-  /// (capped at [limit] = 100). Counting exhaustively across pages is not
-  /// required for this release because a single approver is not expected to
-  /// have more than 100 pending requests at once.
+  /// Returns one page capped at [limit] (at most 100). Pass the returned
+  /// [PendingApprovalsList.nextCursor] as [cursor] to fetch the next page.
   Future<PendingApprovalsList> listPendingApprovals({
     String? cursor,
     int limit = 100,

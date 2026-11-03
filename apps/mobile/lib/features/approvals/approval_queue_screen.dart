@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/api/approvals_api_client.dart';
 import '../../core/api/models.dart';
@@ -25,6 +26,10 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
   List<PurchaseRequest> _requests = [];
   bool _loading = false;
   String? _errorMessage;
+  String? _nextCursor;
+  bool _loadingMore = false;
+  String? _loadMoreError;
+  int _loadGeneration = 0;
 
   @override
   void didChangeDependencies() {
@@ -33,21 +38,138 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
   }
 
   Future<void> _loadApprovals() async {
-    setState(() => _loading = true);
+    final generation = ++_loadGeneration;
+    setState(() {
+      _loading = true;
+      _nextCursor = null;
+      _loadingMore = false;
+      _loadMoreError = null;
+    });
     try {
-      final result = await _apiClient.listPendingApprovals();
-      if (!mounted) return;
+      final result = await _apiClient.listPendingApprovals(limit: 50);
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _requests = result.items;
+        _nextCursor = result.nextCursor;
         _errorMessage = null;
       });
     } on Exception catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() => _errorMessage = _i18n.t('approvals.genericError'));
       debugPrint('Failed to load pending approvals: $e');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _loading = false);
+      }
     }
+  }
+
+  Future<void> _loadMore() async {
+    final cursor = _nextCursor;
+    if (cursor == null || _loading || _loadingMore) return;
+    final generation = _loadGeneration;
+    setState(() {
+      _loadingMore = true;
+      _loadMoreError = null;
+    });
+    try {
+      final result = await _apiClient.listPendingApprovals(
+        cursor: cursor,
+        limit: 50,
+      );
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() {
+        final seenIds = _requests.map((request) => request.id).toSet();
+        _requests = [
+          ..._requests,
+          ...result.items.where((request) => seenIds.add(request.id)),
+        ];
+        _nextCursor = result.nextCursor;
+      });
+    } on Exception catch (e) {
+      if (!mounted || generation != _loadGeneration) return;
+      setState(
+        () => _loadMoreError = _i18n.t('approvals.pagination.loadError'),
+      );
+      debugPrint('Failed to load more pending approvals: $e');
+    } finally {
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _loadingMore = false);
+      }
+    }
+  }
+
+  String _paginationStatusText() {
+    final category = Intl.pluralLogic(
+      _requests.length,
+      locale: _i18n.locale,
+      zero: 'zero',
+      one: 'one',
+      two: 'two',
+      few: 'few',
+      many: 'many',
+      other: 'other',
+    );
+    final status = _nextCursor == null ? 'showing' : 'showingMore';
+    return _i18n.t(
+      'approvals.pagination.$status.$category',
+      params: {'count': _requests.length.toString()},
+    );
+  }
+
+  Widget _paginationFooter() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              _paginationStatusText(),
+              key: const Key('approvalQueueStatus'),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          if (_loadMoreError != null) ...[
+            const SizedBox(height: 8),
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                _loadMoreError!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          ],
+          if (_nextCursor != null) ...[
+            const SizedBox(height: 8),
+            FilledButton.tonal(
+              key: const Key('approvalQueueLoadMore'),
+              onPressed: _loadingMore ? null : _loadMore,
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                children: [
+                  if (_loadingMore)
+                    const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  Text(
+                    _i18n.t(
+                      _loadingMore
+                          ? 'approvals.pagination.loading'
+                          : 'approvals.pagination.loadMore',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Future<void> _navigateToDecision(Object request) async {
@@ -111,8 +233,11 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
                   ? Center(child: Text(i18n.t('approvals.empty')))
                   : ListView.builder(
                       key: const Key('approvalQueueList'),
-                      itemCount: entries.length,
+                      itemCount: entries.length + 1,
                       itemBuilder: (context, index) {
+                        if (index == entries.length) {
+                          return _paginationFooter();
+                        }
                         final requests = entries[index];
                         final request = requests.first;
                         final group = request.requestGroup;
