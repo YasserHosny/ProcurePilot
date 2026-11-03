@@ -429,6 +429,7 @@ def test_post_requests_approve_records_approval_step_approved(
             "purchase_request_id": request_id,
             "approval_step_id": approval_step_id,
             "decided_by_membership_id": str(workspace.membership_id),
+            "comment": "Approved for audit coverage",
         }
 
 

@@ -478,4 +478,43 @@ describe('OrderDetailComponent', () => {
     expect(byTestId('date-format-hint')?.textContent).toContain('mm/dd/yyyy');
     expect(byTestId('date-format-hint')?.textContent).not.toContain('dd/mm/yyyy');
   });
+
+  // P-188: a PO document for the hand-off to the supplier (the app itself sends nothing).
+  it('exports the order as a CSV named after the PO and prints it', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const saved: { name: string; content: string }[] = [];
+    spyOn(component, 'saveFile').and.callFake((name: string, content: string) => { saved.push({ name, content }); });
+    const print = spyOn(window, 'print');
+
+    byTestId('export-csv')!.click();
+    byTestId('print-order')!.click();
+
+    expect(saved.length).toBe(1);
+    expect(saved[0].name).toBe('PO-1001.csv');
+    expect(saved[0].content).toContain('PO-1001');
+    expect(saved[0].content).toContain('GBP');
+    expect(print).toHaveBeenCalled();
+  });
+
+  it('fills every line with what is still to be received', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.receiptOpen.set(true);
+    fixture.detectChanges();
+
+    byTestId('receive-all')!.click();
+
+    expect(component.quantityValue(component.receiptQuantities(), component.evidence()!.order.lines[0])).toBe('10');
+  });
+
+  it('flags a sent order whose expected delivery date has passed', () => {
+    fixture.detectChanges(); // fixture: submitted, expected 25 Sep 2026
+    expect(byTestId('order-overdue')).toBeTruthy();
+
+    showOrderAs('received');
+    fixture = TestBed.createComponent(OrderDetailComponent);
+    fixture.detectChanges();
+    expect(byTestId('order-overdue')).toBeNull();
+  });
 });

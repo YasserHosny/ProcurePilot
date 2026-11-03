@@ -26,7 +26,16 @@
         }
         <p>{{ 'orders.detail.createdAt' | translate: { date: (data.order.created_at | formatDate) } }}</p>
       </div>
-      <span class="status-chip" [attr.data-status]="data.lifecycle.status">{{ getStatusLabel(data.lifecycle.status) }}</span>
+      <div class="header-side">
+        <span class="status-chip" [attr.data-status]="data.lifecycle.status">{{ getStatusLabel(data.lifecycle.status) }}</span>
+        @if (isOverdue(data.order)) {
+          <span class="status-chip overdue" data-testid="order-overdue">{{ 'orders.detail.overdue' | translate }}</span>
+        }
+        <div class="document-actions">
+          <button mat-stroked-button type="button" (click)="exportCsv()" data-testid="export-csv"><mat-icon aria-hidden="true">download</mat-icon>{{ 'orders.detail.exportCsv' | translate }}</button>
+          <button mat-stroked-button type="button" (click)="printOrder()" data-testid="print-order"><mat-icon aria-hidden="true">print</mat-icon>{{ 'orders.detail.print' | translate }}</button>
+        </div>
+      </div>
     </div>
 
     <div class="summary-grid">
@@ -133,6 +142,7 @@
       @if (receiptOpen()) {
         <form class="evidence-form" (ngSubmit)="recordReceipt()">
           <h3>{{ 'orders.detail.receiptFormTitle' | translate }}</h3>
+          <button mat-stroked-button type="button" class="receive-all" (click)="receiveAll()" data-testid="receive-all">{{ 'orders.detail.receiveAll' | translate }}</button>
           <div class="form-grid">
             <mat-form-field appearance="outline">
               <mat-label>{{ 'orders.detail.reference' | translate }}</mat-label>

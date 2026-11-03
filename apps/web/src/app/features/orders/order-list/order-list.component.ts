@@ -13,6 +13,7 @@ import { FormatService } from '../../../core/format/format.service';
 import { parseIsoDateLocal } from '../../../core/format/iso-date';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { RequestsApiService, type PurchaseRequest } from '../../requests/requests-api';
+import { isOrderOverdue } from '../order-helpers';
 import { OrdersApiService, type OrderListQuery, type OrderStatus, type PurchaseOrder } from '../orders-api';
 
 @Component({
@@ -99,6 +100,8 @@ export class OrderListComponent implements OnInit {
   getSortLabel(key: string): string {
     return this.translate.instant(`orders.sort.${key.replace(':', '_')}`);
   }
+
+  readonly isOverdue = isOrderOverdue;
 
   ngOnInit(): void {
     this.loadOrders();

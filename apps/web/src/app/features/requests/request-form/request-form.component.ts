@@ -15,7 +15,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, RouterLink, convertToParamMap } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { EMPTY, forkJoin, of, type Observable } from 'rxjs';
+import { EMPTY, defer, forkJoin, of, Subscription, type Observable } from 'rxjs';
 import { catchError, distinctUntilChanged, expand, finalize, reduce, switchMap, tap } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -52,6 +52,7 @@ const SERVER_ERROR_KEYS: Record<string, string> = {
   cost_centre_not_found: 'requests.errors.cost_centre_not_found',
   cost_centre_branch_mismatch: 'requests.errors.cost_centre_branch_mismatch',
   product_not_found: 'requests.errors.product_not_found',
+  too_many_decimals: 'requests.errors.too_many_decimals',
 };
 
 interface LineFormGroup {
@@ -72,24 +73,23 @@ interface Paginated<T> {
   next_cursor: string | null;
 }
 
-function fetchAllPages<T>(
+export function fetchAllPages<T>(
   fetchPage: (cursor?: string) => Observable<Paginated<T>>,
   maxPages = 50,
 ): Observable<T[]> {
-  let pageCount = 0;
-  return fetchPage().pipe(
-    expand((res) => {
-      pageCount++;
-      if (res.next_cursor && pageCount < maxPages) {
-        return fetchPage(res.next_cursor);
-      }
-      return EMPTY;
-    }),
-    reduce((acc: T[], res) => {
-      acc.push(...res.items);
-      return acc;
-    }, []),
-  );
+  return defer(() => {
+    let pageCount = 0;
+    return fetchPage().pipe(
+      expand((res) => {
+        pageCount++;
+        if (res.next_cursor && pageCount < maxPages) {
+          return fetchPage(res.next_cursor);
+        }
+        return EMPTY;
+      }),
+      reduce((acc: T[], res) => [...acc, ...res.items], [] as T[]),
+    );
+  });
 }
 
 @Component({
@@ -178,6 +178,7 @@ export class RequestFormComponent implements OnInit {
   private submitIdempotencyKey: string | null = null;
   private withdrawIdempotencyKey: string | null = null;
   private currentRequestId: string | null | undefined = undefined;
+  private allocationsSub?: Subscription;
 
   readonly formChangeSignal = signal<number>(0);
   private readonly savedLineMeta = new Map<FormGroup<LineFormGroup>, SavedLineInfo>();
@@ -214,6 +215,8 @@ export class RequestFormComponent implements OnInit {
   });
 
   private resetState(): void {
+    this.allocationsSub?.unsubscribe();
+    this.allocationsSub = undefined;
     this.existingRequest.set(null);
     this.form.reset({ branch_id: '', cost_centre_id: '', required_by_date: null });
     this.form.enable();
@@ -316,6 +319,7 @@ export class RequestFormComponent implements OnInit {
     this.form.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
+        this.clearServerErrors();
         this.formChangeSignal.update((v) => v + 1);
       });
 
@@ -373,6 +377,7 @@ export class RequestFormComponent implements OnInit {
   }
 
   addLine(): void {
+    this.clearServerErrors();
     this.lines.push(
       new FormGroup<LineFormGroup>({
         workspace_product_id: new FormControl<string>('', {
@@ -381,7 +386,7 @@ export class RequestFormComponent implements OnInit {
         }),
         quantity: new FormControl<string>('', {
           nonNullable: true,
-          validators: [Validators.required, Validators.pattern(/^(?!0(?:\.0+)?$)\d+(?:\.\d+)?$/)],
+          validators: [Validators.required, Validators.pattern(/^(?!0(?:\.0+)?$)\d+(?:\.\d{1,6})?$/)],
         }),
         note: new FormControl<string>('', { nonNullable: true }),
       }),
@@ -395,6 +400,7 @@ export class RequestFormComponent implements OnInit {
     if (group) {
       this.savedLineMeta.delete(group);
     }
+    this.clearServerErrors();
     this.form.markAsDirty();
     this.formChangeSignal.update((v) => v + 1);
   }
@@ -730,7 +736,7 @@ export class RequestFormComponent implements OnInit {
             }),
             quantity: new FormControl<string>(displayQty, {
               nonNullable: true,
-              validators: [Validators.required, Validators.pattern(/^(?!0(?:\.0+)?$)\d+(?:\.\d+)?$/)],
+              validators: [Validators.required, Validators.pattern(/^(?!0(?:\.0+)?$)\d+(?:\.\d{1,6})?$/)],
             }),
             note: new FormControl<string>(line.note ?? '', { nonNullable: true }),
           });
@@ -759,21 +765,53 @@ export class RequestFormComponent implements OnInit {
   }
 
   private loadAllocations(requestId: string): void {
+    this.allocationsSub?.unsubscribe();
     this.isAllocationsLoading.set(true);
     this.allocationsFailed.set(false);
-    this.ordersApi
+    this.allocationsSub = this.ordersApi
       .getAllocations(requestId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (alloc) => {
+          if (this.existingRequest()?.id !== requestId) {
+            return;
+          }
           this.allocations.set(alloc);
           this.isAllocationsLoading.set(false);
         },
         error: () => {
+          if (this.existingRequest()?.id !== requestId) {
+            return;
+          }
           this.allocationsFailed.set(true);
           this.isAllocationsLoading.set(false);
         },
       });
+  }
+
+  private clearServerErrors(): void {
+    let hadServerErrors = false;
+    const clearControl = (control: FormControl | null | undefined) => {
+      if (control?.errors && 'server' in control.errors) {
+        hadServerErrors = true;
+        const rest = { ...control.errors };
+        delete rest['server'];
+        control.setErrors(Object.keys(rest).length > 0 ? rest : null);
+        control.updateValueAndValidity({ emitEvent: false });
+      }
+    };
+
+    clearControl(this.form.controls.branch_id);
+    clearControl(this.form.controls.cost_centre_id);
+    clearControl(this.form.controls.required_by_date);
+    for (const lineGroup of this.lines.controls) {
+      clearControl(lineGroup.controls.workspace_product_id);
+      clearControl(lineGroup.controls.quantity);
+      clearControl(lineGroup.controls.note);
+    }
+    if (hadServerErrors) {
+      this.form.updateValueAndValidity({ emitEvent: false });
+    }
   }
 
   private focusErrorBanner(): void {
@@ -805,30 +843,52 @@ export class RequestFormComponent implements OnInit {
   private handleError(err: unknown): void {
     if (err instanceof HttpErrorResponse) {
       const apiError = err.error as ApiError | undefined;
-      const details =
-        (apiError?.details as { field?: string; reason?: string } | undefined) ??
-        (Array.isArray(apiError?.details)
-          ? (apiError?.details[0] as { field?: string; reason?: string } | undefined)
-          : undefined);
+      const rawDetails = apiError?.details;
+      interface DetailEntry {
+        field?: string;
+        reason?: string;
+        type?: string;
+        msg?: string;
+        loc?: (string | number)[];
+      }
+
+      let details: DetailEntry | undefined;
+      if (Array.isArray(rawDetails)) {
+        details = (rawDetails.find((d: DetailEntry) => Boolean(d?.field)) ?? rawDetails[0]) as DetailEntry | undefined;
+      } else if (rawDetails && typeof rawDetails === 'object') {
+        details = rawDetails as DetailEntry;
+      }
+
       if (err.status === 409 && details?.reason === 'part_of_split') {
         this.errorMessage.set(this.translate.instant(`${I18N}.partOfSplitError`));
         this.focusErrorBanner();
         return;
       }
-      if (details?.reason && SERVER_ERROR_KEYS[details.reason]) {
-        const key = SERVER_ERROR_KEYS[details.reason];
-        const translated = this.translate.instant(key);
-        if (details.field) {
+
+      let reason = details?.reason ?? details?.type;
+      const isQuantityField = typeof details?.field === 'string' && /^lines\[\d+\]\.quantity$/.test(details.field);
+      if (isQuantityField && reason === 'string_pattern_mismatch') {
+        reason = 'too_many_decimals';
+      }
+
+      if (reason && SERVER_ERROR_KEYS[reason]) {
+        const key = SERVER_ERROR_KEYS[reason];
+        if (details?.field) {
           const control = this.getControlByPath(details.field);
           if (control) {
             control.setErrors({ server: key });
             control.markAsTouched();
           }
         }
-        this.errorMessage.set(translated);
+        if (isQuantityField) {
+          this.errorMessage.set(this.translate.instant(`${I18N}.genericError`));
+        } else {
+          this.errorMessage.set(this.translate.instant(key));
+        }
         this.focusErrorBanner();
         return;
       }
+
       this.errorMessage.set(this.translate.instant(`${I18N}.genericError`));
       this.focusErrorBanner();
       return;

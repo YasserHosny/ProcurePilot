@@ -1818,6 +1818,218 @@ describe('ApprovalQueueComponent', () => {
       expect(component.groupStatus().get('grp-gen')).toBeUndefined();
     });
 
+    it('split-group completeness does not overwrite loading status for pending sibling fetch when complete group is loaded first', () => {
+      requestsApi.getRequest.calls.reset();
+
+      const completeReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-c-1',
+        request_group: {
+          id: 'grp-complete',
+          rfq_id: 'rfq-c',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '2000.00', currency: 'SAR' },
+          sibling_request_ids: ['req-c-1', 'req-c-2'],
+        },
+      };
+      const completeReq2: PurchaseRequest = {
+        ...mockPendingRequests[1],
+        id: 'req-c-2',
+        request_group: {
+          id: 'grp-complete',
+          rfq_id: 'rfq-c',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '2000.00', currency: 'SAR' },
+          sibling_request_ids: ['req-c-1', 'req-c-2'],
+        },
+      };
+      const incompleteReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-inc-1',
+        request_group: {
+          id: 'grp-incomplete',
+          rfq_id: 'rfq-inc',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '1500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-inc-1', 'req-inc-2'],
+        },
+      };
+      const siblingReq2: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-inc-2',
+        request_group: {
+          id: 'grp-incomplete',
+          rfq_id: 'rfq-inc',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '1500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-inc-1', 'req-inc-2'],
+        },
+      };
+
+      const siblingSubject = new Subject<PurchaseRequest>();
+      requestsApi.getRequest.and.returnValue(siblingSubject);
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [completeReq1, completeReq2, incompleteReq1], next_cursor: 'cur-page2' }),
+      );
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const rows = fixture.nativeElement.querySelectorAll('tr.request-row');
+      expect(rows.length).toBe(2);
+
+      const completeRow = rows[0];
+      const completeApproveBtn = completeRow.querySelector('.approve-btn') as HTMLButtonElement;
+      const completeRejectBtn = completeRow.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(completeApproveBtn.disabled).toBeFalse();
+      expect(completeRejectBtn.disabled).toBeFalse();
+      expect(completeRow.querySelector('[data-testid="split-group-loading"]')).toBeNull();
+
+      const incompleteRow = rows[1];
+      const incApproveBtn = incompleteRow.querySelector('.approve-btn') as HTMLButtonElement;
+      const incRejectBtn = incompleteRow.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(incApproveBtn.disabled).toBeTrue();
+      expect(incRejectBtn.disabled).toBeTrue();
+      const loadingHint = incompleteRow.querySelector('[data-testid="split-group-loading"]');
+      expect(loadingHint).not.toBeNull();
+      expect(component.groupStatus().get('grp-incomplete')).toBe('loading');
+
+      expect(requestsApi.getRequest).toHaveBeenCalledTimes(1);
+      expect(requestsApi.getRequest).toHaveBeenCalledWith('req-inc-2');
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [], next_cursor: null }),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(requestsApi.getRequest).toHaveBeenCalledTimes(1);
+
+      siblingSubject.next(siblingReq2);
+      siblingSubject.complete();
+      fixture.detectChanges();
+
+      expect(component.groupStatus().get('grp-incomplete')).toBe('complete');
+      const updatedRows = fixture.nativeElement.querySelectorAll('tr.request-row');
+      const updatedIncompleteRow = updatedRows[1];
+      const updatedIncApproveBtn = updatedIncompleteRow.querySelector('.approve-btn') as HTMLButtonElement;
+      const updatedIncRejectBtn = updatedIncompleteRow.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(updatedIncApproveBtn.disabled).toBeFalse();
+      expect(updatedIncRejectBtn.disabled).toBeFalse();
+      expect(fixture.nativeElement.querySelector('[data-testid="split-group-loading"]')).toBeNull();
+    });
+
+    it('split-group completeness does not overwrite loading status for pending sibling fetch when incomplete group is loaded first', () => {
+      requestsApi.getRequest.calls.reset();
+
+      const incompleteReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-inc-1',
+        request_group: {
+          id: 'grp-incomplete',
+          rfq_id: 'rfq-inc',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '1500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-inc-1', 'req-inc-2'],
+        },
+      };
+      const completeReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-c-1',
+        request_group: {
+          id: 'grp-complete',
+          rfq_id: 'rfq-c',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '2000.00', currency: 'SAR' },
+          sibling_request_ids: ['req-c-1', 'req-c-2'],
+        },
+      };
+      const completeReq2: PurchaseRequest = {
+        ...mockPendingRequests[1],
+        id: 'req-c-2',
+        request_group: {
+          id: 'grp-complete',
+          rfq_id: 'rfq-c',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '2000.00', currency: 'SAR' },
+          sibling_request_ids: ['req-c-1', 'req-c-2'],
+        },
+      };
+      const siblingReq2: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-inc-2',
+        request_group: {
+          id: 'grp-incomplete',
+          rfq_id: 'rfq-inc',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '1500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-inc-1', 'req-inc-2'],
+        },
+      };
+
+      const siblingSubject = new Subject<PurchaseRequest>();
+      requestsApi.getRequest.and.returnValue(siblingSubject);
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [incompleteReq1, completeReq1, completeReq2], next_cursor: 'cur-page2' }),
+      );
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const rows = fixture.nativeElement.querySelectorAll('tr.request-row');
+      expect(rows.length).toBe(2);
+
+      const incompleteRow = rows[0];
+      const incApproveBtn = incompleteRow.querySelector('.approve-btn') as HTMLButtonElement;
+      const incRejectBtn = incompleteRow.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(incApproveBtn.disabled).toBeTrue();
+      expect(incRejectBtn.disabled).toBeTrue();
+      const loadingHint = incompleteRow.querySelector('[data-testid="split-group-loading"]');
+      expect(loadingHint).not.toBeNull();
+      expect(component.groupStatus().get('grp-incomplete')).toBe('loading');
+
+      const completeRow = rows[1];
+      const completeApproveBtn = completeRow.querySelector('.approve-btn') as HTMLButtonElement;
+      const completeRejectBtn = completeRow.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(completeApproveBtn.disabled).toBeFalse();
+      expect(completeRejectBtn.disabled).toBeFalse();
+      expect(completeRow.querySelector('[data-testid="split-group-loading"]')).toBeNull();
+
+      expect(requestsApi.getRequest).toHaveBeenCalledTimes(1);
+      expect(requestsApi.getRequest).toHaveBeenCalledWith('req-inc-2');
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [], next_cursor: null }),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(requestsApi.getRequest).toHaveBeenCalledTimes(1);
+
+      siblingSubject.next(siblingReq2);
+      siblingSubject.complete();
+      fixture.detectChanges();
+
+      expect(component.groupStatus().get('grp-incomplete')).toBe('complete');
+      const updatedRows = fixture.nativeElement.querySelectorAll('tr.request-row');
+      const updatedIncompleteRow = updatedRows[0];
+      const updatedIncApproveBtn = updatedIncompleteRow.querySelector('.approve-btn') as HTMLButtonElement;
+      const updatedIncRejectBtn = updatedIncompleteRow.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(updatedIncApproveBtn.disabled).toBeFalse();
+      expect(updatedIncRejectBtn.disabled).toBeFalse();
+      expect(fixture.nativeElement.querySelector('[data-testid="split-group-loading"]')).toBeNull();
+    });
+
     it('renders cleanly in RTL direction', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
         of({ items: mockPendingRequests, next_cursor: 'cur-ar' }),

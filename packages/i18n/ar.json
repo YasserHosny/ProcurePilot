@@ -1530,6 +1530,7 @@
         "discount": "الخصم",
         "otherCharges": "رسوم أخرى",
         "total": "إجمالي التكلفة الواصلة",
+        "totalCovers": "الإجمالي لـ {{quantity}} × {{unitPrice}}",
         "normalisedQuantity": "الكمية الموحدة",
         "baseUnit": "الوحدة الأساسية",
         "ruleVersion": "إصدار القاعدة الحسابية",
@@ -2300,7 +2301,8 @@
       "duplicate_product": "هذا المنتج موجود بالفعل في بند آخر.",
       "cost_centre_not_found": "مركز التكلفة غير موجود.",
       "cost_centre_branch_mismatch": "مركز التكلفة لا ينتمي إلى الفرع المحدد.",
-      "product_not_found": "المنتج غير موجود."
+      "product_not_found": "المنتج غير موجود.",
+      "too_many_decimals": "يمكن أن تحتوي الكمية على 6 خانات عشرية كحد أقصى."
     },
     "list": {
       "newRequestButton": "طلب جديد",
@@ -3815,14 +3817,18 @@
         "order_not_cancellable": "استُلم هذا الأمر بالكامل أو أُغلق، لذلك لا يمكن إلغاؤه.",
         "order_already_cancelled": "هذا الأمر ملغى بالفعل."
       },
+      "overdue": "متأخر",
+      "exportCsv": "تصدير CSV",
+      "print": "طباعة",
+      "receiveAll": "استلام كل المتبقي",
       "submitted": "تم تقديم الأمر.",
       "cancelled": "تم إلغاء الأمر.",
       "confirmationSaved": "تم حفظ تأكيد المورّد.",
       "receiptSaved": "تم حفظ إيصال التسليم.",
-      "receivedQuantityFor": "{{product}} · الكمية المستلمة ({{unit}}، المطلوب {{ordered}})",
-      "confirmedQuantityFor": "{{product}} · الكمية المؤكدة ({{unit}}، المطلوب {{ordered}})",
       "dateFormatHintDayFirst": "يوم/شهر/سنة",
-      "dateFormatHintMonthFirst": "شهر/يوم/سنة"
+      "dateFormatHintMonthFirst": "شهر/يوم/سنة",
+      "receivedQuantityFor": "{{product}} · الكمية المستلمة ({{unit}}، المطلوب {{ordered}})",
+      "confirmedQuantityFor": "{{product}} · الكمية المؤكدة ({{unit}}، المطلوب {{ordered}})"
     },
     "resultCount": "{{count}} أمر شراء",
     "loadMoreError": "تعذّر تحميل المزيد من الأوامر. الأوامر الظاهرة أعلاه ما زالت معروضة.",
@@ -3845,7 +3851,9 @@
       "total_asc": "الإجمالي، الأدنى",
       "order_number_asc": "رقم الأمر، تصاعدي",
       "order_number_desc": "رقم الأمر، تنازلي"
-    }
+    },
+    "expectedDate": "المتوقع {{date}}",
+    "overdue": "متأخر"
   },
   "accounting": {
     "nav": "المحاسبة",
@@ -4252,6 +4260,7 @@
       "splitBetweenSuppliers": "تقسيم بين المورّدين",
       "needsTwoMatched": "يتطلب ردّين مطابقين",
       "differentCurrencies": "الردود بعملات مختلفة",
+      "replyMixedCurrency": "يستخدم أحد الردود أكثر من عملة واحدة، لذلك لا يمكن تقسيم الردود",
       "alreadyConverted": "تم تحويل طلب عروض الأسعار بالفعل",
       "splitError": "فشل بدء التقسيم. يُرجى المحاولة مرة أخرى.",
       "lowestLinePrice": "أقل تكلفة واصلة",

@@ -185,7 +185,7 @@ def prepare_decision_service(
     in tests/integration/, not here). Its correctness is proven for real in
     tests/integration/test_decision_atomicity.py. `decide_and_notify`, when given, replaces it
     with a fake so THIS test can still unit-test the surrounding orchestration (authorization,
-    audit recording, enqueue call, response assembly) without touching a database.
+    enqueue call, response assembly) without touching a database.
     """
     client = FakeClient()
     client.updates["approval_step"] = UpdateQuery([step] if step else [])
@@ -250,7 +250,7 @@ def test_assigned_approver_can_approve_with_recorded_human_decision(
     assert result.approval_step.status == "approved"
     assert result.approval_step.comment == "Approved"
     assert result.approval_step.decided_by_membership_id == approver.membership_id
-    assert recorded[0]["action"] == "requests.approval_step_approved"
+    assert recorded == []
 
 
 def test_owner_can_override_and_reject_pending_request(
@@ -289,7 +289,7 @@ def test_owner_can_override_and_reject_pending_request(
     assert result.status == "rejected"
     assert result.approval_step is not None
     assert result.approval_step.decided_by_membership_id == owner.membership_id
-    assert recorded[0]["action"] == "requests.approval_step_rejected"
+    assert recorded == []
 
 
 def test_unassigned_member_cannot_decide(

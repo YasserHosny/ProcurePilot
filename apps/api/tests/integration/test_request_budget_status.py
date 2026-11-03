@@ -271,9 +271,8 @@ def test_exceeding_budget_does_not_block_approval(
 ) -> None:
     # _decide_and_notify (T037) is a raw-psycopg transaction, not mockable through FakeClient's
     # PostgREST-style interface (see tests/unit/test_approval_decisions.py's own note on this) —
-    # faked here so this test can still exercise budget-status attachment and audit recording in
-    # isolation. The atomic-write guarantee itself is proven for real against Postgres in
-    # tests/integration/test_decision_atomicity.py.
+    # faked here so this test can exercise budget-status attachment in isolation. Atomic
+    # decision auditing is covered by tests/integration/test_single_decision_audit.py.
     service, _client, member, request_id = service_with_budget_fixture(monkeypatch)
     audit = FakeAuditWriter()
     monkeypatch.setattr(
@@ -311,7 +310,8 @@ def test_exceeding_budget_does_not_block_approval(
     assert decided.approval_step.decided_by_membership_id == member.membership_id
     assert decided.budget_status is not None
     assert decided.budget_status.exceeds is True
-    assert audit.actions == ["requests.approval_step_approved"]
+    # The mocked transaction owns the audit; see tests/integration/test_single_decision_audit.py.
+    assert audit.actions == []
 
 
 class SpendQuery:
