@@ -1201,6 +1201,49 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(component.rerunNotice()).toBeFalse();
     });
 
+    // PPS-209: only the first 100 products and suppliers could be picked.
+    it('follows the supplier cursors so every supplier can be chosen', () => {
+      apiService.suppliers.and.callFake(((params?: { status?: string; cursor?: string }) => {
+        if (params?.status === 'preferred') return of({ items: [], next_cursor: null });
+        return params?.cursor === 'p2'
+          ? of({ items: [{ id: 'supp-3', name: 'Supplier Gamma', status: 'active', created_at: '' }], next_cursor: null })
+          : of({ items: [{ id: 'supp-1', name: 'Supplier Alpha', status: 'active', created_at: '' }], next_cursor: 'p2' });
+      }) as never);
+
+      component.loadSuppliersAndProducts();
+
+      expect(component.suppliers().map((x) => x.id)).toEqual(['supp-1', 'supp-3']);
+    });
+
+    it('loads further pages of products on request and does not duplicate any', () => {
+      const prod = (id: string) => ({ id, tenant_name: id, canonical_name: id, base_unit: 'EA', pack: { pack_count: 1, unit_size: '1' }, status: 'active', created_at: '' });
+      apiService.products.and.returnValues(
+        of({ items: [prod('prod-1')], next_cursor: 'c2' }) as never,
+        of({ items: [prod('prod-1'), prod('prod-2')], next_cursor: null }) as never,
+      );
+      component.loadSuppliersAndProducts();
+      expect(component.hasMoreProducts()).toBeTrue();
+
+      component.loadMoreProducts();
+
+      expect(apiService.products).toHaveBeenCalledWith(jasmine.objectContaining({ cursor: 'c2' }));
+      expect(component.products().map((x) => x.id)).toEqual(['prod-1', 'prod-2']);
+      expect(component.hasMoreProducts()).toBeFalse();
+    });
+
+    it('searches products by name and keeps the products already chosen', fakeAsync(() => {
+      const prod = (id: string, name: string) => ({ id, tenant_name: name, canonical_name: name, base_unit: 'EA', pack: { pack_count: 1, unit_size: '1' }, status: 'active', created_at: '' });
+      component.products.set([prod('prod-1', 'Product 1') as never]);
+      component.items.set([{ workspace_product_id: 'prod-1', quantity: '1' }]);
+      apiService.products.and.returnValue(of({ items: [prod('prod-9', 'Basmati rice') as never], next_cursor: null }));
+
+      component.onProductSearch('rice');
+      tick(300);
+
+      expect(apiService.products).toHaveBeenCalledWith(jasmine.objectContaining({ q: 'rice' }));
+      expect(component.products().map((x) => x.id).sort()).toEqual(['prod-1', 'prod-9']);
+    }));
+
     it('offers preferred suppliers as well as active ones, without duplicates', () => {
       apiService.suppliers.and.callFake(((params?: { status?: string }) =>
         of({
