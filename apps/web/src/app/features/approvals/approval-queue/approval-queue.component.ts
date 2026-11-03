@@ -806,8 +806,7 @@ export class ApprovalQueueComponent implements OnInit {
       }
     }
 
-    let statusUpdated = false;
-    const nextStatus = new Map(this.groupStatus());
+    const completeGroupIds: string[] = [];
 
     for (const [gid, { summary, requests }] of groups.entries()) {
       if (requests.length >= summary.size) {
@@ -817,9 +816,8 @@ export class ApprovalQueueComponent implements OnInit {
           allMatchGroupId &&
           uniqueIds.size === summary.size &&
           requests.length === summary.size;
-        if (verified && nextStatus.get(gid) !== 'complete') {
-          nextStatus.set(gid, 'complete');
-          statusUpdated = true;
+        if (verified && this.groupStatus().get(gid) !== 'complete') {
+          completeGroupIds.push(gid);
         }
         continue;
       }
@@ -830,8 +828,14 @@ export class ApprovalQueueComponent implements OnInit {
       this.fetchGroupSiblings(summary, requests, generation);
     }
 
-    if (statusUpdated) {
-      this.groupStatus.set(nextStatus);
+    if (completeGroupIds.length > 0) {
+      this.groupStatus.update((current) => {
+        const next = new Map(current);
+        for (const gid of completeGroupIds) {
+          next.set(gid, 'complete');
+        }
+        return next;
+      });
     }
   }
 

@@ -10,6 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { lineDescription, packLabel } from '../pack-label';
+import { isOrderOverdue, orderToCsv } from '../order-helpers';
 
 import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -149,6 +150,38 @@ export class OrderDetailComponent implements OnInit {
     if (kind === 'receipt') this.receiptQuantityError.set(false);
     const target = kind === 'confirmation' ? this.confirmationQuantities : this.receiptQuantities;
     target.set({ ...target(), [lineId]: value });
+  }
+
+  readonly isOverdue = isOrderOverdue;
+
+  /** Hands the browser a file to save; separate so tests do not need a real download. */
+  saveFile(name: string, content: string): void {
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  exportCsv(): void {
+    const order = this.evidence()?.order;
+    if (order) this.saveFile(`${order.order_number}.csv`, orderToCsv(order));
+  }
+
+  printOrder(): void {
+    window.print();
+  }
+
+  /** Puts what is still to be received on every line that has something left. */
+  receiveAll(): void {
+    const quantities: Record<string, string> = { ...this.receiptQuantities() };
+    for (const summary of this.evidence()?.lifecycle.lines ?? []) {
+      const remaining = Math.max(0, (parseFloat(summary.ordered_quantity) || 0) - (parseFloat(summary.received.quantity ?? '') || 0));
+      if (remaining > 0) quantities[summary.purchase_order_line_id] = String(Math.round(remaining * 1e6) / 1e6);
+    }
+    this.receiptQuantities.set(quantities);
+    this.receiptQuantityError.set(false);
   }
 
   /** Cancel is offered until goods are fully received (spec 016 FR-020: partially received can be cancelled). */
