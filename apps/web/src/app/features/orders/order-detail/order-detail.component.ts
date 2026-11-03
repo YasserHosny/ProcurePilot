@@ -121,17 +121,27 @@ export class OrderDetailComponent implements OnInit {
     });
   }
 
-  /** Share of the ordered quantity that has arrived (0-100); over-receipt counts only up to the order. */
+  /**
+   * How much of the order has arrived (0-100), each line weighted by its value: packs of
+   * different products are not comparable (ADR-020), a line's value is. Over-receipt counts only
+   * up to what was ordered, and 100 shows only when every line has fully arrived.
+   */
   receivedPercent(): number {
+    const order = this.evidence()?.order;
     const lines = this.evidence()?.lifecycle.lines ?? [];
-    const ordered = lines.reduce((sum, line) => sum + (parseFloat(line.ordered_quantity) || 0), 0);
-    if (ordered <= 0) return 0;
-    const received = lines.reduce(
-      (sum, line) =>
-        sum + Math.min(parseFloat(line.received.quantity ?? '') || 0, parseFloat(line.ordered_quantity) || 0),
-      0,
-    );
-    return Math.min(100, Math.round((received / ordered) * 100));
+    if (!order || lines.length === 0) return 0;
+    const value = (lineId: string) =>
+      parseFloat(order.lines.find((line) => line.id === lineId)?.line_total.amount ?? '') || 0;
+    const total = lines.reduce((sum, line) => sum + value(line.purchase_order_line_id), 0);
+    // A PO whose lines carry no value still has progress: weigh the lines equally.
+    const weight = (lineId: string) => (total > 0 ? value(lineId) : 1);
+    const weights = lines.reduce((sum, line) => sum + weight(line.purchase_order_line_id), 0);
+    const arrived = lines.reduce((sum, line) => {
+      const ordered = parseFloat(line.ordered_quantity) || 0;
+      const received = parseFloat(line.received.quantity ?? '') || 0;
+      return sum + (ordered > 0 ? Math.min(received / ordered, 1) : 0) * weight(line.purchase_order_line_id);
+    }, 0);
+    return Math.min(100, Math.floor((arrived / weights) * 100 + 1e-9));
   }
 
   readonly lineDescription = lineDescription;

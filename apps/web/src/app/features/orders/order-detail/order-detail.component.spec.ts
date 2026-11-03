@@ -584,4 +584,47 @@ describe('OrderDetailComponent', () => {
     expect(byTestId('source-quotation-link')).toBeNull();
     expect(byTestId('action-error')).toBeNull();
   });
+  // Review (Codex): 199 of 200 packs is not «100% received».
+  it('never reads 100% until every line has fully arrived', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const value = component.evidence()!;
+    const order = { ...value.order, lines: [{ ...value.order.lines[0], ordered_quantity: '200' }] };
+    component.evidence.set({
+      ...value,
+      order,
+      lifecycle: {
+        ...value.lifecycle,
+        lines: [{ ...value.lifecycle.lines[0], ordered_quantity: '200', received: { state: 'available', quantity: '199', source_ids: [] } }],
+      },
+    });
+    expect(component.receivedPercent()).toBe(99);
+  });
+
+  // Review (Codex): packs of different products must not be added up as if they were alike.
+  it('weights each line by its value, not by its pack count', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const value = component.evidence()!;
+    const line = value.order.lines[0];
+    const money = (amount: string) => ({ amount, currency: 'GBP' });
+    component.evidence.set({
+      ...value,
+      order: {
+        ...value.order,
+        lines: [
+          { ...line, id: 'a', ordered_quantity: '50', line_total: money('50.00') }, // cheap, many packs
+          { ...line, id: 'b', ordered_quantity: '2', line_total: money('150.00') }, // dear, few packs
+        ],
+      },
+      lifecycle: {
+        ...value.lifecycle,
+        lines: [
+          { ...value.lifecycle.lines[0], purchase_order_line_id: 'a', ordered_quantity: '50', received: { state: 'available', quantity: '50', source_ids: [] } },
+          { ...value.lifecycle.lines[0], purchase_order_line_id: 'b', ordered_quantity: '2', received: { state: 'pending', quantity: null, source_ids: [] } },
+        ],
+      },
+    });
+    expect(component.receivedPercent()).toBe(25); // 50 of 200 of the order's value
+  });
 });
