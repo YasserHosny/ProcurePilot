@@ -36,6 +36,13 @@
 
   <div class="visually-hidden" role="status" aria-live="polite" data-testid="job-status-live">{{ liveStatus() }}</div>
 
+  @if (errorMessage() && currentJob() && uiState() !== 'failed' && uiState() !== 'completed_infeasible') {
+    <div class="error-banner" role="alert" data-testid="job-error">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ errorMessage() }}</span>
+    </div>
+  }
+
   <!-- Loading Initial Data -->
   @if (isLoading() && !currentJob()) {
     <div class="loading-container">
@@ -302,7 +309,7 @@
           <div class="product-search">
             <mat-form-field appearance="outline" subscriptSizing="dynamic" class="product-search-field">
               <mat-label>{{ 'basketSplit.form.searchProducts' | translate }}</mat-label>
-              <input matInput type="search" (input)="onProductSearch($any($event.target).value)" data-testid="product-search" />
+              <input matInput type="search" (input)="onProductSearch($any($event.target).value)" (keydown.enter)="$event.preventDefault()" data-testid="product-search" />
             </mat-form-field>
             @if (hasMoreProducts()) {
               <button mat-stroked-button type="button" (click)="loadMoreProducts()" data-testid="load-more-products">

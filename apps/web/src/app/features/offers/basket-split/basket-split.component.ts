@@ -105,6 +105,8 @@ export class BasketSplitComponent implements OnInit {
   readonly productsCursor = signal<string | null>(null);
   readonly hasMoreProducts = computed(() => this.productsCursor() !== null);
   private productQuery = '';
+  /** Bumped by every new product search, so a slower answer to an older one is dropped. */
+  private productGeneration = 0;
   private productSearchTimer: ReturnType<typeof setTimeout> | null = null;
   readonly isLoading = signal<boolean>(false);
   readonly isSubmitting = signal<boolean>(false);
@@ -314,11 +316,13 @@ export class BasketSplitComponent implements OnInit {
     if (this.productSearchTimer) clearTimeout(this.productSearchTimer);
     this.productSearchTimer = setTimeout(() => {
       this.productQuery = query.trim();
+      const generation = ++this.productGeneration;
       this.api
         .products({ limit: 100, status: 'active', q: this.productQuery || undefined })
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: (res) => {
+            if (generation !== this.productGeneration) return;
             this.mergeProducts(res.items);
             this.productsCursor.set(res.next_cursor);
           },
@@ -331,11 +335,13 @@ export class BasketSplitComponent implements OnInit {
   loadMoreProducts(): void {
     const cursor = this.productsCursor();
     if (!cursor) return;
+    const generation = this.productGeneration;
     this.api
       .products({ limit: 100, status: 'active', cursor, q: this.productQuery || undefined })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (res) => {
+          if (generation !== this.productGeneration) return;
           const byId = new Map(this.products().map((product) => [product.id, product] as const));
           for (const product of res.items) byId.set(product.id, product);
           this.products.set([...byId.values()]);
@@ -584,6 +590,7 @@ export class BasketSplitComponent implements OnInit {
           if (generation !== this.jobGeneration) return;
           this.currentJob.set(job);
           this.isLoading.set(false);
+          this.resolveMissingProducts(job);
           if (job.rfq_id) {
             this.rfqApi.getRfq(job.rfq_id).subscribe({
               next: (detail) => this.rfqDetail.set(detail),
@@ -607,6 +614,25 @@ export class BasketSplitComponent implements OnInit {
           this.handleError(err);
         },
       });
+  }
+
+  /** A job can use products beyond the first page the page loads: look those up by id. */
+  private resolveMissingProducts(job: BasketSplitJob): void {
+    const known = new Set(this.products().map((product) => product.id));
+    for (const item of job.items) {
+      if (known.has(item.workspace_product_id)) continue;
+      this.api
+        .product(item.workspace_product_id)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (product) => {
+            if (!this.products().some((p) => p.id === product.id)) {
+              this.products.set([...this.products(), product]);
+            }
+          },
+          error: () => undefined, // the id stays as the label
+        });
+    }
   }
 
   /** Starts a fresh job view: the previous job's poll and late answers must not touch it. */
