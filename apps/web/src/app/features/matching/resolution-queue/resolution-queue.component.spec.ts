@@ -538,6 +538,32 @@ describe('ResolutionQueueComponent', () => {
       expect((fixture.nativeElement as HTMLElement).querySelector('.match-line')).toBeNull();
     });
 
+    it('does not offer the task Retry for an unrelated loader error', () => {
+      apiService.listCatalogueRefreshReviews.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'reviews down' } })),
+      );
+      component.loadRefreshReviews();
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('.error-banner')?.textContent).toContain('reviews down');
+      expect(compiled.querySelector('[data-testid="queue-retry"]')).toBeNull();
+    });
+
+    it('still says every line is matched when only the refresh-review load failed', () => {
+      component.quotationId.set('q-101');
+      component.tasks.set([]);
+      apiService.listCatalogueRefreshReviews.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'reviews down' } })),
+      );
+      component.loadRefreshReviews();
+      fixture.detectChanges();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('[data-testid="quotation-all-matched"]'),
+      ).toBeTruthy();
+    });
+
     it('offers a Retry in the error banner that reloads and clears the error', () => {
       failLoad();
       const retry = (fixture.nativeElement as HTMLElement).querySelector(

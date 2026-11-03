@@ -447,8 +447,9 @@ describe('MatchResolutionComponent (T039)', () => {
     component.confirmResolution(true);
 
     expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1', 'q-99');
+    // Scoped to the quotation: other quotations may still have open tasks.
     expect(snackSpy).toHaveBeenCalledWith(
-      enCatalog.matching.resolution.actions.queueCleared,
+      enCatalog.matching.queue.allLinesMatchedTitle,
       undefined,
       { duration: 3500 },
     );
@@ -1242,7 +1243,7 @@ describe('MatchResolutionComponent (T039)', () => {
 
       expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1', 'q-99');
       expect(snackSpy).toHaveBeenCalledWith(
-        jasmine.stringMatching(/All match tasks resolved — queue cleared.*Also matched 2 more lines/),
+        jasmine.stringMatching(/All lines of this quote are matched.*Also matched 2 more lines/),
         undefined,
         { duration: 3500 },
       );
