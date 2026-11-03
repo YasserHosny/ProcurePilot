@@ -12,22 +12,12 @@
           mat-flat-button
           type="button"
           class="pilot-primary-btn"
-          [matMenuTriggerFor]="mailMenu"
+          [matMenuTriggerFor]="mailMenu.menu"
         >
           {{ 'landing.pilot.cta' | translate }}
           <mat-icon iconPositionEnd aria-hidden="true">expand_more</mat-icon>
         </button>
-        <mat-menu #mailMenu="matMenu">
-          <a mat-menu-item [href]="gmailLink()" target="_blank" rel="noopener noreferrer">
-            {{ 'landing.pilot.mailGmail' | translate }}
-          </a>
-          <a mat-menu-item [href]="outlookLink()" target="_blank" rel="noopener noreferrer">
-            {{ 'landing.pilot.mailOutlook' | translate }}
-          </a>
-          <a mat-menu-item [href]="mailtoLink()">
-            {{ 'landing.pilot.mailApp' | translate }}
-          </a>
-        </mat-menu>
+        <app-landing-mail-menu #mailMenu />
         <a
           mat-stroked-button
           class="pilot-whatsapp-btn"

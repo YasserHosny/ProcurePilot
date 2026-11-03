@@ -75,12 +75,6 @@ describe('LandingPilotComponent', () => {
     }
   });
 
-  it('constructs mailto link with encoded subject and body', () => {
-    const mailto = component.mailtoLink();
-    expect(mailto).toContain(`mailto:${environment.salesEmail}`);
-    expect(mailto).toContain('subject=ProcurePilot%20pilot%20access%20request');
-  });
-
   it('links WhatsApp to the sales number with a prefilled message', () => {
     const btn = fixture.debugElement.query(By.css('.pilot-whatsapp-btn'));
     expect(btn.nativeElement.getAttribute('href')).toBe(

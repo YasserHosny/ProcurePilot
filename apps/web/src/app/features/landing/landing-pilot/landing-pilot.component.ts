@@ -14,6 +14,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { environment } from '../../../../environments/environment';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { LandingMailMenuComponent } from '../landing-mail-menu/landing-mail-menu.component';
 
 export interface FaqItem {
   readonly id: string;
@@ -31,7 +32,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
 @Component({
   selector: 'app-landing-pilot',
   standalone: true,
-  imports: [MatButtonModule, MatIconModule, MatMenuModule, TranslatePipe],
+  imports: [LandingMailMenuComponent, MatButtonModule, MatIconModule, MatMenuModule, TranslatePipe],
   templateUrl: './landing-pilot.component.html',
   styleUrl: './landing-pilot.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -45,31 +46,6 @@ export class LandingPilotComponent implements OnDestroy {
   readonly faqItems = FAQ_ITEMS;
   readonly emailCopied = model<boolean>(false);
   private copyTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  private readonly emailDraft = computed(() => {
-    this.i18n.currentLocale();
-    return {
-      to: encodeURIComponent(this.salesEmail),
-      subject: encodeURIComponent(this.translate.instant('landing.pilot.emailSubject')),
-      body: encodeURIComponent(this.translate.instant('landing.pilot.emailBody')),
-    };
-  });
-
-  // mailto: only works where a mail app is set up, so webmail users get their own compose links.
-  readonly mailtoLink = computed(() => {
-    const { subject, body } = this.emailDraft();
-    return `mailto:${this.salesEmail}?subject=${subject}&body=${body}`;
-  });
-
-  readonly gmailLink = computed(() => {
-    const { to, subject, body } = this.emailDraft();
-    return `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`;
-  });
-
-  readonly outlookLink = computed(() => {
-    const { to, subject, body } = this.emailDraft();
-    return `https://outlook.office.com/mail/deeplink/compose?to=${to}&subject=${subject}&body=${body}`;
-  });
 
   readonly whatsappLink = computed(() => {
     this.i18n.currentLocale();
