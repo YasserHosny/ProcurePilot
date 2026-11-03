@@ -5,13 +5,24 @@ import json
 import re
 from datetime import datetime
 from types import SimpleNamespace
+from unittest.mock import Mock
 from uuid import UUID, uuid4
 
+import psycopg
 import pytest
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
+from integration.quotation_helpers import (
+    PsycopgSupabaseClient,
+    PsycopgTableQuery,
+    _plain_select_columns,
+)
+from psycopg import sql
 from unit.test_approval_decisions import SelectQuery, member, request_row, step_row
 
 from procurepilot_api.errors import UnprocessableEntityError
 from procurepilot_api.modules.auth.jwt import MemberRole
+from procurepilot_api.modules.requests import router as requests_router
 from procurepilot_api.modules.requests import service as module
 
 
@@ -19,6 +30,11 @@ class PagingQuery(SelectQuery):
     def __init__(self, rows: list[dict[str, object]]) -> None:
         super().__init__(list(rows))
         self.orders: list[tuple[str, bool]] = []
+        self.columns = ["*"]
+
+    def select(self, columns: str) -> PagingQuery:
+        self.columns = _plain_select_columns(columns)
+        return self
 
     def order(self, column: str, *, desc: bool = False) -> PagingQuery:
         self.orders.append((column, desc))
@@ -48,6 +64,11 @@ class PagingQuery(SelectQuery):
             self.rows.sort(key=lambda row: str(row[column]), reverse=desc)
         response = super().execute()
         response.data = response.data[:1000]  # Data API's max_rows
+        if "*" not in self.columns:
+            response.data = [
+                {key: value for key, value in row.items() if key in self.columns}
+                for row in response.data
+            ]
         return response
 
 
@@ -60,6 +81,106 @@ class PagingClient:
         query = PagingQuery(self.rows)
         self.queries.append(query)
         return query
+
+
+@pytest.mark.asyncio
+async def test_pending_first_page_returns_200_and_cursor_from_selected_column(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner = member(role=MemberRole.owner)
+    timestamp = "2026-10-01T12:00:00.123456+00:00"
+    steps = [{**step_row(uuid4(), owner.membership_id), "created_at": timestamp} for _ in range(3)]
+    client = PagingClient(steps)
+    service = module.RequestsService()
+    monkeypatch.setattr(module, "authenticated_client", lambda *_: client)
+    monkeypatch.setattr(
+        service,
+        "_fetch_requests_batch",
+        lambda _client, ids: [request_row(UUID(rid), owner.membership_id) for rid in ids],
+    )
+    for method in (
+        "_fetch_lines_batch",
+        "_fetch_member_contacts_batch",
+        "_fetch_auto_prepared_batch",
+        "_fetch_sources_batch",
+        "_fetch_request_groups_batch",
+    ):
+        monkeypatch.setattr(service, method, lambda *_: {})
+    monkeypatch.setattr(
+        service,
+        "_purchase_request_with_budget_status",
+        lambda _client, row, lines, step, **_: module._purchase_request(row, lines, step),
+    )
+    app = FastAPI()
+    app.include_router(requests_router.router, prefix="/api/v1")
+    app.dependency_overrides[requests_router.bearer_token] = lambda: "test"
+    app.dependency_overrides[requests_router.current_member] = lambda: owner
+    app.dependency_overrides[requests_router.get_requests_service] = lambda: service
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
+        response = await http.get("/api/v1/approvals/pending?limit=2")
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["items"]) == 2
+    assert payload["next_cursor"] is not None
+    last_step_id = UUID(payload["items"][-1]["approval_step"]["id"])
+    assert module._decode_approval_cursor(payload["next_cursor"]) == (
+        "2026-10-01T12:00:00.123456Z",
+        last_step_id,
+    )
+    assert "created_at" in client.queries[0].columns
+
+
+def test_paging_double_omits_unselected_columns_and_ignores_embed() -> None:
+    rows = [{"id": "step", "created_at": "timestamp", "status": "pending"}]
+    query = PagingQuery(rows).select("id,purchase_request!inner(status)")
+    assert query.execute().data == [{"id": "step"}]
+
+
+@pytest.mark.parametrize(
+    "columns,projection",
+    [
+        ("id,purchase_request!inner(status)", '"id"'),
+        ("id,created_at,purchase_request!inner(status)", '"id","created_at"'),
+        ("id,quotation(status,supplier(id,name)),created_at", '"id","created_at"'),
+        ("*,purchase_request!inner(status)", "*"),
+    ],
+)
+def test_sql_adapter_selects_only_requested_plain_columns(
+    monkeypatch: pytest.MonkeyPatch, columns: str, projection: str
+) -> None:
+    query = PsycopgSupabaseClient(Mock(spec=psycopg.Connection), honor_select=True).table(
+        "approval_step"
+    )
+    statements: list[str] = []
+
+    def fetch(statement: sql.SQL, _params: list[object]) -> list[dict[str, object]]:
+        statements.append(statement.as_string())
+        return []
+
+    monkeypatch.setattr(query, "_fetch", fetch)
+    query.select(columns).execute()
+    assert statements == [f'select {projection} from "approval_step"']
+
+
+@pytest.mark.parametrize("via_client", [False, True])
+def test_sql_adapter_default_preserves_select_star(
+    monkeypatch: pytest.MonkeyPatch, via_client: bool
+) -> None:
+    connection = Mock(spec=psycopg.Connection)
+    query = (
+        PsycopgSupabaseClient(connection).table("approval_step")
+        if via_client
+        else PsycopgTableQuery(connection, "approval_step")
+    )
+    statements: list[str] = []
+
+    def fetch(statement: sql.SQL, _params: list[object]) -> list[dict[str, object]]:
+        statements.append(statement.as_string())
+        return []
+
+    monkeypatch.setattr(query, "_fetch", fetch)
+    query.select("id,alias:column,value::text,metadata->>name,quotation(status)").execute()
+    assert statements == ['select * from "approval_step"']
 
 
 def test_approval_cursor_round_trip_preserves_microseconds() -> None:

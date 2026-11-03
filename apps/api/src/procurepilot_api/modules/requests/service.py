@@ -787,7 +787,7 @@ class RequestsService:
         try:
             query = (
                 client.table("approval_step")
-                .select(f"{STEP_COLUMNS},purchase_request!inner(status)")
+                .select(f"{STEP_COLUMNS},created_at,purchase_request!inner(status)")
                 .eq("status", "pending")
             )
             for status in TERMINAL_REQUEST_STATUSES:

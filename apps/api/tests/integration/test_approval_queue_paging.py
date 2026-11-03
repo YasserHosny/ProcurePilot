@@ -9,6 +9,7 @@ import psycopg
 import pytest
 
 from integration.catalogue_helpers import TEST_DATABASE_URL, act_as, make_workspace
+from integration.quotation_helpers import PsycopgSupabaseClient
 from integration.smart_compare_helpers import member_from_workspace
 from integration.test_approvals import (
     _make_branch,
@@ -17,6 +18,7 @@ from integration.test_approvals import (
     _queue_service,
 )
 from procurepilot_api import db
+from procurepilot_api.modules.requests import service as module
 
 pytestmark = pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL not set")
 
@@ -57,6 +59,9 @@ def test_queue_traversal_survives_mutation(
             )
             expected.append(request)
     service = _queue_service(conn, monkeypatch, owner)
+    # The default SELECT * masks missing cursor columns, so this test must opt in.
+    client = PsycopgSupabaseClient(conn, claims=owner.claims(), honor_select=True)
+    monkeypatch.setattr(module, "authenticated_client", lambda *_: client)
     member = member_from_workspace(owner)
     first = service.list_pending_approvals(bearer_token="test", member=member, limit=2)
     assert len(first.items) == 2
