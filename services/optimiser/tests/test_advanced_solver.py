@@ -620,3 +620,23 @@ def test_urgent_counts_an_unknown_lead_time_as_a_week() -> None:
         urgency="urgent", a=("100.0000", None), b=("105.0000", 1)
     )
     assert _chosen_supplier(_advanced_solver(payload)) == known_fast
+
+
+def test_urgent_trade_off_stays_one_percent_a_day_at_the_web_default_price_weight() -> None:
+    # Review: with price weighted 0.4, the day cost must shrink with it. 100 and 10 days is
+    # worth 110; 120 and 1 day is worth 121.2, so the cheaper, slower supplier still wins.
+    from procurepilot_optimiser_worker.models import OptimisationSoftWeights
+
+    payload, cheap_slow, _ = _lead_time_payload(
+        urgency="urgent", a=("100.0000", 10), b=("120.0000", 1)
+    )
+    request = payload.request.model_copy(
+        update={
+            "soft_weights": OptimisationSoftWeights.model_validate(
+                {"price_competitiveness": "0.4000"}
+            )
+        }
+    )
+    payload = payload.model_copy(update={"request": request})
+
+    assert _chosen_supplier(_advanced_solver(payload)) == cheap_slow

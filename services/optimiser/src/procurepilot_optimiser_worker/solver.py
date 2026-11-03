@@ -604,7 +604,10 @@ def _weighted_offer_cost(
         # unknown lead time as a week, so a slightly dearer fast supplier can win.
         known = offer.lead_time_days
         days = known if known is not None else URGENT_UNKNOWN_LEAD_DAYS
-        lead_time += Decimal(days) * URGENT_DAY_COST_RATE * Decimal(_money_int(offer.amount))
+        # Costed against the weighted price, so the trade-off stays 1% a day at any price weight;
+        # a basket that gives price no weight falls back to the raw line amount.
+        basis = price if price > 0 else Decimal(_money_int(offer.amount))
+        lead_time += Decimal(days) * URGENT_DAY_COST_RATE * basis
     quality = Decimal(weights.quality) * (
         Decimal("5000") if risk is not None and risk.insufficient_evidence else Decimal("0")
     )
