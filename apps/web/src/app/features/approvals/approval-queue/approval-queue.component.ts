@@ -806,8 +806,21 @@ export class ApprovalQueueComponent implements OnInit {
       }
     }
 
+    let statusUpdated = false;
+    const nextStatus = new Map(this.groupStatus());
+
     for (const [gid, { summary, requests }] of groups.entries()) {
       if (requests.length >= summary.size) {
+        const allMatchGroupId = requests.every((r) => r.request_group?.id === summary.id);
+        const uniqueIds = new Set(requests.map((r) => r.id));
+        const verified =
+          allMatchGroupId &&
+          uniqueIds.size === summary.size &&
+          requests.length === summary.size;
+        if (verified && nextStatus.get(gid) !== 'complete') {
+          nextStatus.set(gid, 'complete');
+          statusUpdated = true;
+        }
         continue;
       }
       const currentStatus = this.groupStatus().get(gid);
@@ -815,6 +828,10 @@ export class ApprovalQueueComponent implements OnInit {
         continue;
       }
       this.fetchGroupSiblings(summary, requests, generation);
+    }
+
+    if (statusUpdated) {
+      this.groupStatus.set(nextStatus);
     }
   }
 
@@ -826,6 +843,23 @@ export class ApprovalQueueComponent implements OnInit {
     const knownIds = new Set(knownRequests.map((r) => r.id));
     const siblingIds = summary.sibling_request_ids ?? [];
     const missingIds = siblingIds.filter((id) => !knownIds.has(id));
+
+    if (missingIds.length === 0 && knownRequests.length >= summary.size) {
+      if (generation !== this.loadGeneration) {
+        return;
+      }
+      const allMatchGroupId = knownRequests.every((r) => r.request_group?.id === summary.id);
+      const uniqueIds = new Set(knownRequests.map((r) => r.id));
+      const verified =
+        allMatchGroupId &&
+        uniqueIds.size === summary.size &&
+        knownRequests.length === summary.size;
+
+      const nextStatus = new Map(this.groupStatus());
+      nextStatus.set(summary.id, verified ? 'complete' : 'failed');
+      this.groupStatus.set(nextStatus);
+      return;
+    }
 
     if (missingIds.length === 0 || knownRequests.length + missingIds.length < summary.size) {
       if (generation !== this.loadGeneration) {
@@ -916,6 +950,22 @@ export class ApprovalQueueComponent implements OnInit {
         return;
       }
       this.errorTraceId.set(apiError?.trace_id ?? null);
+
+      if (defaultMessageKey === 'approvals.pagination.loadError') {
+        const raw = err.error as unknown;
+        const isEnvelope =
+          typeof raw === 'object' &&
+          raw !== null &&
+          typeof (raw as Record<string, unknown>)['code'] === 'string' &&
+          typeof (raw as Record<string, unknown>)['message'] === 'string';
+        this.errorMessage.set(
+          isEnvelope && apiError?.message
+            ? apiError.message
+            : this.translate.instant(defaultMessageKey),
+        );
+        return;
+      }
+
       this.errorMessage.set(
         apiError?.message ?? err.message ?? this.translate.instant(defaultMessageKey),
       );

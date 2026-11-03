@@ -20,6 +20,7 @@ import {
   ApprovalDecisionDialogComponent,
   ApprovalQueueComponent,
   type ApprovalDecisionDialogData,
+  type GroupQueueItem,
 } from './approval-queue.component';
 
 const mockPendingRequests: PurchaseRequest[] = [
@@ -1207,6 +1208,91 @@ describe('ApprovalQueueComponent', () => {
       expect(component.errorMessage()).not.toContain('boom');
     });
 
+    it('pagination: loadMore failure shows translated loadError for non-envelope HttpErrorResponse and envelope message for real API errors', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockPendingRequests, next_cursor: 'cursor-retry' }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const expectedLoadError = 'Unable to load more requests. Please try again.';
+
+      // Case 1: status 0 with ProgressEvent (network drop / aborted)
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 0,
+              error: new ProgressEvent('error'),
+              url: '/api/v1/approvals/pending',
+            }),
+        ),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBe(expectedLoadError);
+      expect(component.errorMessage()).not.toContain('Http failure response');
+
+      // Case 2: status 502 with HTML bad gateway string
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 502,
+              error: '<html>Bad Gateway</html>',
+              url: '/api/v1/approvals/pending',
+            }),
+        ),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBe(expectedLoadError);
+      expect(component.errorMessage()).not.toContain('Bad Gateway');
+      expect(component.errorMessage()).not.toContain('Http failure response');
+
+      // Case 3: status 409 with real ProcurePilot error envelope {code, message}
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 409,
+              error: {
+                code: 'CONFLICT',
+                message: 'Approval cursor expired. Please refresh the queue.',
+                trace_id: 'trace-409',
+              },
+            }),
+        ),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBe('Approval cursor expired. Please refresh the queue.');
+      expect(component.errorTraceId()).toBe('trace-409');
+
+      // Case 4: status 500 with real ProcurePilot error envelope {code, message}
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 500,
+              error: {
+                code: 'DATABASE_ERROR',
+                message: 'Database query timed out.',
+                trace_id: 'trace-500',
+              },
+            }),
+        ),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBe('Database query timed out.');
+      expect(component.errorTraceId()).toBe('trace-500');
+    });
+
     it('pagination: double click does not fire two requests and shows loading spinner', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
         of({ items: mockPendingRequests, next_cursor: 'cursor-slow' }),
@@ -1501,6 +1587,89 @@ describe('ApprovalQueueComponent', () => {
       const rejectBtnAfter = fixture.nativeElement.querySelector('.reject-btn') as HTMLButtonElement;
       expect(approveBtnAfter.disabled).toBeFalse();
       expect(rejectBtnAfter.disabled).toBeFalse();
+    });
+
+    it('failed sibling fetch: then loadMore returns the sibling: banner and Retry gone, buttons enabled; and Retry with everything known clears the failure', () => {
+      const splitReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-split-f1',
+        request_group: {
+          id: 'grp-split-f1',
+          rfq_id: 'rfq-split-f1',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '2500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-split-f1', 'req-split-f2'],
+        },
+      };
+      const splitReq2: PurchaseRequest = {
+        ...mockPendingRequests[1],
+        id: 'req-split-f2',
+        request_group: {
+          id: 'grp-split-f1',
+          rfq_id: 'rfq-split-f1',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '2500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-split-f1', 'req-split-f2'],
+        },
+      };
+
+      // Initial load: page 1 has splitReq1 only, with next_cursor available.
+      // Sibling fetch fails.
+      requestsApi.getRequest.and.returnValue(throwError(() => new Error('Fetch failed')));
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [splitReq1], next_cursor: 'cursor-page-2' }),
+      );
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(component.groupStatus().get('grp-split-f1')).toBe('failed');
+      const approveBtn = fixture.nativeElement.querySelector('.approve-btn') as HTMLButtonElement;
+      const rejectBtn = fixture.nativeElement.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(approveBtn.disabled).toBeTrue();
+      expect(rejectBtn.disabled).toBeTrue();
+
+      let errorHint = fixture.nativeElement.querySelector('[data-testid="split-group-error"]');
+      let retryBtn = fixture.nativeElement.querySelector('[data-testid="split-group-retry"]');
+      expect(errorHint).toBeTruthy();
+      expect(retryBtn).toBeTruthy();
+
+      // User clicks Load more: next page brings in splitReq2!
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [splitReq2], next_cursor: null }),
+      );
+      const loadMoreBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
+      loadMoreBtn.click();
+      fixture.detectChanges();
+
+      // Banner and Retry gone, buttons enabled, status marked complete
+      errorHint = fixture.nativeElement.querySelector('[data-testid="split-group-error"]');
+      retryBtn = fixture.nativeElement.querySelector('[data-testid="split-group-retry"]');
+      expect(errorHint).toBeNull();
+      expect(retryBtn).toBeNull();
+
+      const approveBtnAfter = fixture.nativeElement.querySelector('.approve-btn') as HTMLButtonElement;
+      const rejectBtnAfter = fixture.nativeElement.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(approveBtnAfter.disabled).toBeFalse();
+      expect(rejectBtnAfter.disabled).toBeFalse();
+      expect(component.groupStatus().get('grp-split-f1')).toBe('complete');
+
+      // Now verify: Retry with everything known clears the failure
+      component.groupStatus.set(new Map([['grp-split-f1', 'failed']]));
+      fixture.detectChanges();
+      errorHint = fixture.nativeElement.querySelector('[data-testid="split-group-error"]');
+      expect(errorHint).toBeTruthy();
+
+      const groupItem = component.queueItems().find((i) => i.id === 'grp-split-f1');
+      expect(groupItem).toBeTruthy();
+      component.retryLoadGroup(groupItem as GroupQueueItem);
+      fixture.detectChanges();
+
+      expect(component.groupStatus().get('grp-split-f1')).toBe('complete');
+      errorHint = fixture.nativeElement.querySelector('[data-testid="split-group-error"]');
+      expect(errorHint).toBeNull();
     });
 
     it('group with size 2: sibling whose group id differs is rejected as invalid', () => {
