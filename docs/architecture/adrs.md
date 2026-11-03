@@ -422,3 +422,49 @@
 - **Consequences:** An enabled guardrail prepares a single request as soon as every reply is matched
   and converts the RFQ, so the split cannot be prepared on that RFQ. That is by design in 024's edge
   cases and is tracked as a product decision (W2, PPS-148).
+
+## ADR-024 — The Requester Does Not Approve Their Own Request, Except a Sole Owner, Who Is Marked
+
+- **Status:** Accepted (2026-11-03, owner decision on P-173 / PPS-167)
+- **Context:** Routing (`resolve_approver`) picks the approver from the threshold rules, then the
+  active delegation, then the owner. It never looks at who submitted the request, and
+  `_require_assigned_approver_or_owner` lets an owner decide any step. A requester who is the
+  matching approver, the delegate or the owner could therefore decide their own request, and
+  nothing in the queue or the audit trail said so.
+- **Options considered:**
+  1. Leave routing alone and rely on policy. Rejected: nothing enforces it and nothing shows it.
+  2. Change routing only. Rejected: the owner override would still let a requester decide their
+     own request.
+  3. Routing plus a decision-time rule, with a visible mark for the one case that cannot be avoided
+     (a workspace with a single active owner). Chosen.
+- **Decision:**
+  - **Routing.** After the threshold rule and the delegation are resolved, a step is not assigned
+    to the requester when someone else is eligible. A requester who is the matching approver is
+    replaced by an active owner other than the requester (source `owner_fallback`). A delegate who
+    is the requester is skipped and the step stays with the delegator. An owner who is the
+    requester is replaced by another active owner. The same rule applies to a split, which is
+    routed once for the group.
+  - **Decision.** A member cannot approve or reject a request they submitted, through either the
+    assigned-approver path or the owner override, unless they are the only active owner of the
+    workspace (`403 self_decision_not_allowed`). The rule covers a split decision too.
+  - **Mark.** A decision made by the requester is «self-approved». The decision's audit event
+    carries `self_approved: true`; the approval step in API responses carries a derived
+    `self_approval` flag (the requester is the assignee, or the decider); the approval queue and the
+    request page show it. No stored column is added: the flag is derived from the step and the
+    request, so there is no migration, and row-level security is unchanged.
+  - **Existing steps.** Pending steps created before this change keep their assignee. The
+    decision rule applies to them, so a requester-assigned step is decided by another owner or
+    approver unless the requester is the sole owner.
+- **Acceptance:**
+  - Submitting as the matching approver, as a delegate or as an owner assigns someone else when
+    one exists, for a single request and for a split.
+  - A sole owner's request is assigned to that owner, can be decided by them, and is marked.
+  - A requester with another eligible approver gets `403 self_decision_not_allowed` on approve,
+    reject and the split decisions; the other approver or owner can decide.
+  - The audit event, the queue and the request page show «self-approved»; a decision by someone
+    else carries no mark.
+- **Consequences:** In a workspace with two owners, an owner's own requests go to the other owner.
+  In a one-owner workspace nothing changes except the mark. The owner override still exists for
+  requests the owner did not submit. The rule is application-layer routing and decision logic, so it
+  is tested at the service and API level, not in the database; it makes no change to tenant
+  isolation.
