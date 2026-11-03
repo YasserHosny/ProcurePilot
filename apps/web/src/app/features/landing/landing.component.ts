@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -16,6 +17,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { BrandLogoComponent } from '../../layout/brand-logo/brand-logo.component';
 import { LanguageToggleComponent } from '../../layout/language-toggle/language-toggle.component';
 import { LandingEvidenceComponent } from './landing-evidence/landing-evidence.component';
+import { LandingMailMenuComponent } from './landing-mail-menu/landing-mail-menu.component';
 import {
   GALLERY_CARDS,
   type GalleryCard,
@@ -40,10 +42,12 @@ export const GALLERY_TABS = GALLERY_CARDS;
     LanguageToggleComponent,
     LandingGalleryComponent,
     LandingEvidenceComponent,
+    LandingMailMenuComponent,
     LandingPilotComponent,
     RouterLink,
     MatButtonModule,
     MatIconModule,
+    MatMenuModule,
     TranslatePipe,
   ],
   templateUrl: './landing.component.html',
@@ -73,21 +77,6 @@ export class LandingComponent {
   readonly demoPaid = { amount: 2040.0, currency: 'EGP' };
   readonly demoCalculated = { amount: 560.0, currency: 'EGP' };
   readonly demoVerified = { amount: 560.0, currency: 'EGP' };
-
-  readonly mailtoLink = computed(() => {
-    this.currentLocale();
-    const subject = this.translate.instant('landing.pilot.emailSubject');
-    const body = this.translate.instant('landing.pilot.emailBody');
-    const queryParts: string[] = [];
-    if (subject) {
-      queryParts.push(`subject=${encodeURIComponent(subject)}`);
-    }
-    if (body) {
-      queryParts.push(`body=${encodeURIComponent(body)}`);
-    }
-    const query = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
-    return `mailto:${this.salesEmail}${query}`;
-  });
 
   readonly heroImageSrc = computed(
     () => `/landing/${this.currentLocale()}/hero-recommendation.jpg`
