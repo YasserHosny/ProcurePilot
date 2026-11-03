@@ -9,11 +9,11 @@ import psycopg
 import pytest
 from httpx import ASGITransport, AsyncClient, Response
 
+from integration.test_rfq_api import _seed_product, _seed_supplier, _seed_tenant
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember, current_member
 from procurepilot_api.main import app
 from procurepilot_api.modules.auth.jwt import MemberRole
-from tests.integration.test_rfq_api import _seed_product, _seed_supplier, _seed_tenant
 
 
 @pytest.fixture(scope="module")
