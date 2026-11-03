@@ -70,6 +70,7 @@ export class CompareComponent implements OnInit {
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private comparisonRequestId = 0;
   private refreshRequestId = 0;
+  private lastAppliedRefreshId = 0;
 
   constructor() {
     this.destroyRef.onDestroy(() => {
@@ -276,14 +277,23 @@ export class CompareComponent implements OnInit {
     this.fetchProductSignal(productId);
 
     const requestId = ++this.comparisonRequestId;
-    const qty = this.baseQuantityInput() || '10';
-    this.api.compareOffers({ product_id: productId, quantity: qty }).subscribe({
+    const refreshIdAtStart = this.refreshRequestId;
+    const sentBaseQty = this.baseQuantityInput();
+    const qty = sentBaseQty || '10';
+    const req$ = this.api.compareOffers({ product_id: productId, quantity: qty });
+    req$.subscribe({
       next: (comp) => {
         if (this.selectedProductId() !== productId || requestId < this.comparisonRequestId) {
           return;
         }
-        this.rawComparison.set(comp);
         this.isLoading.set(false);
+        if (this.lastAppliedRefreshId > refreshIdAtStart) {
+          return;
+        }
+        this.rawComparison.set(comp);
+        if (sentBaseQty !== this.baseQuantityInput()) {
+          this.scheduleBackgroundRefresh();
+        }
       },
       error: (err: unknown) => {
         if (this.selectedProductId() !== productId || requestId < this.comparisonRequestId) {
@@ -358,7 +368,8 @@ export class CompareComponent implements OnInit {
     const foregroundIdAtStart = this.comparisonRequestId;
     const qty = this.baseQuantityInput();
 
-    this.api.compareOffers({ product_id: productId, quantity: qty }).subscribe({
+    const req$ = this.api.compareOffers({ product_id: productId, quantity: qty });
+    req$.subscribe({
       next: (comp) => {
         if (
           this.selectedProductId() !== productId ||
@@ -368,6 +379,7 @@ export class CompareComponent implements OnInit {
           return;
         }
         this.rawComparison.set(comp);
+        this.lastAppliedRefreshId = requestId;
       },
       error: () => {
         // Errors of a background refresh are ignored silently (the instant projection stays)

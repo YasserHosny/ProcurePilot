@@ -341,7 +341,8 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
     it('does not leave the loading spinner on when a background refresh overtakes the first load', fakeAsync(() => {
       const first$ = new Subject<OfferComparison>();
       const refresh$ = new Subject<OfferComparison>();
-      apiService.compareOffers.and.returnValues(first$, refresh$);
+      // The third answer belongs to the catch-up refresh scheduled when the first load comes back with an old quantity.
+      apiService.compareOffers.and.returnValues(first$, refresh$, new Subject<OfferComparison>());
 
       component.fetchComparison(mockComparison.product.id); // foreground load, still pending
       expect(component.isLoading()).toBeTrue();
