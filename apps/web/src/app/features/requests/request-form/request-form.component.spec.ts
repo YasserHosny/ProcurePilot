@@ -9,6 +9,7 @@ import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import { ApiService } from '../../../core/api/api.service';
 import type { BranchList, Member, Product, PurchaseRequest } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
@@ -225,7 +226,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
 
     component.saveDraft();
 
-    expect(component.errorMessage()).toBe('Zero lines');
+    expect(component.errorMessage()).toBe('Unable to save the purchase request. Please try again.');
     expect(component.isSaving()).toBeFalse();
   });
 
@@ -500,7 +501,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
 
     expect(requestsApi.updateRequest).toHaveBeenCalledTimes(1);
     expect(requestsApi.submitRequest).not.toHaveBeenCalled();
-    expect(component.errorMessage()).toBe('Failed to save draft');
+    expect(component.errorMessage()).toBe('Unable to save the purchase request. Please try again.');
     expect(component.isSubmitting()).toBeFalse();
   });
 
@@ -1836,6 +1837,225 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       expect(component.products().map((p) => p.id)).toEqual(['prod-1', 'prod-2']);
       expect(component.branches().map((b) => b.id)).toEqual(['br-1', 'br-2']);
       expect(component.allCostCentres().map((cc) => cc.id)).toEqual(['cc-1', 'cc-2']);
+    });
+  });
+
+  describe('PPS-191 Point 1: Inline field errors', () => {
+    it('shows inline mat-error for branch when touched and empty', () => {
+      const branchField = fixture.nativeElement.querySelector('mat-form-field:has(mat-select[formcontrolname="branch_id"])');
+      expect(branchField?.querySelector('mat-error')).toBeNull();
+
+      component.form.controls.branch_id.setValue('');
+      component.form.controls.branch_id.markAsTouched();
+      fixture.detectChanges();
+
+      const error = branchField?.querySelector('mat-error');
+      expect(error).toBeTruthy();
+      expect(error?.textContent?.trim()).toBe('Branch is required.');
+    });
+
+    it('shows inline mat-error for required-by date when touched and empty', () => {
+      const dateField = fixture.nativeElement.querySelector('mat-form-field:has(input[formcontrolname="required_by_date"])');
+      expect(dateField?.querySelector('mat-error')).toBeNull();
+
+      component.form.controls.required_by_date.setValue(null);
+      component.form.controls.required_by_date.markAsTouched();
+      fixture.detectChanges();
+
+      const error = dateField?.querySelector('mat-error');
+      expect(error).toBeTruthy();
+      expect(error?.textContent?.trim()).toBe('Required-by date is required.');
+    });
+
+    it('shows inline mat-error for product on line when touched and empty', () => {
+      const productField = fixture.nativeElement.querySelector('.line-product');
+      expect(productField?.querySelector('mat-error')).toBeNull();
+
+      component.lines.at(0).controls.workspace_product_id.setValue('');
+      component.lines.at(0).controls.workspace_product_id.markAsTouched();
+      fixture.detectChanges();
+
+      const error = productField?.querySelector('mat-error');
+      expect(error).toBeTruthy();
+      expect(error?.textContent?.trim()).toBe('Select a product.');
+    });
+
+    it('shows inline mat-error for quantity on line when empty or invalid pattern', () => {
+      const quantityField = fixture.nativeElement.querySelector('.line-quantity');
+      expect(quantityField?.querySelector('mat-error')).toBeNull();
+
+      // Empty quantity -> required error
+      component.lines.at(0).controls.quantity.setValue('');
+      component.lines.at(0).controls.quantity.markAsTouched();
+      fixture.detectChanges();
+
+      let error = quantityField?.querySelector('mat-error');
+      expect(error).toBeTruthy();
+      expect(error?.textContent?.trim()).toBe('Quantity must be greater than zero.');
+
+      // Zero or non-positive quantity -> pattern error
+      component.lines.at(0).controls.quantity.setValue('0');
+      component.lines.at(0).controls.quantity.markAsTouched();
+      fixture.detectChanges();
+
+      error = quantityField?.querySelector('mat-error');
+      expect(error).toBeTruthy();
+      expect(error?.textContent?.trim()).toBe('Quantity must be a number greater than zero.');
+    });
+  });
+
+  describe('PPS-191 Point 2: Error banner focus and scroll', () => {
+    it('sets tabindex=-1 on error banner, scrolls it into view, and moves focus to it on failed submit', async () => {
+      const scrollSpy = spyOn(HTMLElement.prototype, 'scrollIntoView').and.callThrough();
+      const focusSpy = spyOn(HTMLElement.prototype, 'focus').and.callThrough();
+
+      component.form.controls.branch_id.setValue('');
+      component.submitRequest();
+      fixture.detectChanges();
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      fixture.detectChanges();
+
+      const banner = fixture.nativeElement.querySelector('.error-banner') as HTMLElement;
+      expect(banner).toBeTruthy();
+      expect(banner.getAttribute('tabindex')).toBe('-1');
+      expect(scrollSpy).toHaveBeenCalled();
+      expect(focusSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('PPS-191 Point 3: Save draft enabled when invalid', () => {
+    it('keeps Save Draft button enabled when form is invalid, and clicking it displays inline errors and banner', () => {
+      component.form.controls.branch_id.setValue('');
+      fixture.detectChanges();
+
+      const saveBtn = fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement;
+      expect(saveBtn).toBeTruthy();
+      expect(saveBtn.disabled).toBeFalse();
+
+      saveBtn.click();
+      fixture.detectChanges();
+
+      expect(requestsApi.createRequest).not.toHaveBeenCalled();
+      expect(requestsApi.updateRequest).not.toHaveBeenCalled();
+      expect(component.form.controls.branch_id.touched).toBeTrue();
+      expect(component.errorMessage()).toBe('Branch is required.');
+    });
+  });
+
+  describe('PPS-191 Point 4: Server field errors', () => {
+    it('maps 422 server field errors to inline control errors and error banner for known reasons', () => {
+      component.form.controls.branch_id.setValue('b1');
+      component.form.controls.required_by_date.setValue('2026-09-15');
+      component.lines.at(0).controls.workspace_product_id.setValue('wp1');
+      component.lines.at(0).controls.quantity.setValue('10');
+
+      const error422 = new HttpErrorResponse({
+        status: 422,
+        error: {
+          code: 'unprocessable',
+          message: 'Raw date in past message',
+          details: { field: 'required_by_date', reason: 'required_by_in_the_past' },
+        },
+      });
+      requestsApi.createRequest.and.returnValue(throwError(() => error422));
+      requestsApi.updateRequest.and.returnValue(throwError(() => error422));
+
+      component.saveDraft();
+      fixture.detectChanges();
+
+      expect(component.form.controls.required_by_date.errors?.['server']).toBe(
+        'requests.errors.required_by_in_the_past',
+      );
+      const dateField = fixture.nativeElement.querySelector(
+        'mat-form-field:has(input[formcontrolname="required_by_date"])',
+      );
+      expect(dateField?.querySelector('mat-error')?.textContent?.trim()).toBe(
+        'The required-by date cannot be in the past.',
+      );
+      expect(component.errorMessage()).toBe('The required-by date cannot be in the past.');
+    });
+
+    it('falls back to requests.genericError on unknown error reason and never displays raw English apiError.message', () => {
+      component.form.controls.branch_id.setValue('b1');
+      component.form.controls.required_by_date.setValue('2026-09-15');
+      component.lines.at(0).controls.workspace_product_id.setValue('wp1');
+      component.lines.at(0).controls.quantity.setValue('10');
+
+      const error422 = new HttpErrorResponse({
+        status: 422,
+        error: {
+          code: 'unprocessable',
+          message: 'Raw database constraint failure',
+          details: { reason: 'unknown_weird_reason' },
+        },
+      });
+      requestsApi.createRequest.and.returnValue(throwError(() => error422));
+      requestsApi.updateRequest.and.returnValue(throwError(() => error422));
+
+      component.saveDraft();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBe('Unable to save the purchase request. Please try again.');
+      expect(component.errorMessage()).not.toContain('Raw database constraint failure');
+    });
+  });
+
+  describe('PPS-191 Point 5: Repeated labels', () => {
+    it('wraps each line row in role="group" with Line {position} aria-label and gives remove button position and product name', () => {
+      // In edit mode beforeEach, line 0 has product wp1 (Nitrile Gloves)
+      fixture.detectChanges();
+
+      const lineRows = fixture.nativeElement.querySelectorAll('.line-row') as NodeListOf<HTMLElement>;
+      expect(lineRows.length).toBe(1);
+
+      const row0 = lineRows[0];
+      expect(row0.getAttribute('role')).toBe('group');
+      expect(row0.getAttribute('aria-label')).toBe('Line 1');
+
+      const removeBtn = row0.querySelector('.remove-line-btn') as HTMLButtonElement;
+      expect(removeBtn).toBeTruthy();
+      expect(removeBtn.getAttribute('aria-label')).toBe('Remove line 1: Nitrile Gloves');
+    });
+  });
+
+  describe('PPS-191 Point 6: Arabic ordered status label', () => {
+    it('translates ordered status in Arabic to تم إصدار أمر الشراء', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog, true);
+      translate.use('ar');
+
+      component.existingRequest.set({ ...mockRequest, status: 'ordered' });
+      fixture.detectChanges();
+
+      const chip = fixture.nativeElement.querySelector('[data-testid="request-status-chip"]') as HTMLElement;
+      expect(chip).toBeTruthy();
+      expect(chip.textContent?.trim()).toBe('تم إصدار أمر الشراء');
+
+      translate.use('en');
+    });
+  });
+
+  describe('PPS-191 Point 7: Date format hint', () => {
+    it('displays date format hint for required-by date field in en and ar', () => {
+      const dateField = fixture.nativeElement.querySelector(
+        'mat-form-field:has(input[formcontrolname="required_by_date"])',
+      ) as HTMLElement;
+      expect(dateField).toBeTruthy();
+
+      const hint = dateField.querySelector('mat-hint');
+      expect(hint).toBeTruthy();
+      expect(hint?.textContent?.trim()).toBe('Format: DD/MM/YYYY');
+
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog, true);
+      translate.use('ar');
+      fixture.detectChanges();
+
+      const arHint = dateField.querySelector('mat-hint');
+      expect(arHint?.textContent?.trim()).toBe('التنسيق: DD/MM/YYYY');
+
+      translate.use('en');
     });
   });
 });

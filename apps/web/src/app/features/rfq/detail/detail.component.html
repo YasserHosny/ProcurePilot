@@ -13,9 +13,22 @@
       </a>
     </div>
   } @else if (errorMessage()) {
-    <div class="error-state">
+    <div class="error-state" role="alert" data-testid="rfq-detail-error">
       <mat-icon color="warn" aria-hidden="true">error_outline</mat-icon>
       <p>{{ errorMessage() }}</p>
+      <div class="error-actions">
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="loadRfq(rfqId())"
+          data-testid="rfq-detail-retry-button"
+        >
+          {{ 'common.retry' | translate }}
+        </button>
+        <a routerLink="/rfq/history" class="back-link">
+          {{ 'rfq.detail.backToHistory' | translate }}
+        </a>
+      </div>
     </div>
   } @else if (rfqDetail(); as detail) {
     <!-- Breadcrumb -->
@@ -339,9 +352,13 @@
       </mat-tab>
 
       <!-- Tab 3: Responses (n) -->
-      <mat-tab [label]="'rfq.detail.tabResponses' | translate: { count: responseCount() }">
+      <mat-tab [label]="responsesTabLabel()">
         <div class="tab-content responses-tab-content">
-          <app-rfq-compare [rfqId]="rfqId()" [embedded]="true"></app-rfq-compare>
+          <app-rfq-compare
+            [rfqId]="rfqId()"
+            [embedded]="true"
+            (responseCountChange)="responseCount.set($event)"
+          ></app-rfq-compare>
         </div>
       </mat-tab>
     </mat-tab-group>

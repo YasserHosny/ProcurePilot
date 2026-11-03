@@ -1350,6 +1350,7 @@
       "notAvailable": "غير متاح",
       "noFilterResults": "لا توجد مهام مطابقة تطابق عوامل التصفية الحالية",
       "clearFilters": "إعادة تعيين التصفية",
+      "retry": "إعادة المحاولة",
       "loadMore": "تحميل المزيد",
       "emptyTitle": "لا توجد مهام مطابقة",
       "emptyMessage": "لا توجد بنود عروض أسعار بانتظار تسوية المطابقة حالياً.",
@@ -1752,7 +1753,11 @@
       "failedMessage": "حدث خطأ أثناء تنفيذ عملية التحسين. يُرجى المحاولة مرة أخرى.",
       "noCurrentOffers": "لا توجد عروض حالية من الموردين المختارين للأصناف: {{products}}",
       "unavailableMessage": "خدمة التحسين لا تستجيب حالياً. يُرجى المحاولة مرة أخرى بعد قليل، أو التواصل مع الدعم إذا استمرت المشكلة.",
-      "timeoutMessage": "لم يكتمل التحسين في الوقت المحدد. يُرجى المحاولة مرة أخرى."
+      "timeoutMessage": "لم يكتمل التحسين في الوقت المحدد. يُرجى المحاولة مرة أخرى.",
+      "notFoundTitle": "تقسيم السلة غير موجود",
+      "notFoundMessage": "هذا التقسيم غير موجود أو غير متاح في مساحة العمل هذه. ابدأ تقسيماً جديداً.",
+      "pollFailed": "تعذّر تحميل أحدث حالة. قد يكون التقسيم ما زال قيد التشغيل.",
+      "pollRetry": "إعادة المحاولة"
     },
     "result": {
       "feasibleTitle": "التوزيع الموصى به للسلة",
@@ -1840,12 +1845,16 @@
         "allocationNotWholePacks": "يحتوي التوزيع على كميات لا يمكن تحويلها إلى عبوات كاملة.",
         "packDefinitionRequired": "تعريف العبوة مطلوب للبنود الموزعة.",
         "idempotencyKeyReused": "تم استخدام مفتاح التكرار هذا بمعاملات مختلفة مسبقاً.",
-        "generic": "تعذر إعداد طلبات الشراء."
+        "generic": "تعذر إعداد طلبات الشراء.",
+        "branchesLoadFailed": "تعذّر تحميل الفروع. أغلق هذه النافذة وحاول مرة أخرى.",
+        "costCentresLoadFailed": "تعذّر تحميل مراكز التكلفة. أغلق هذه النافذة وحاول مرة أخرى."
       }
     },
     "submit": {
       "successSplit": "تم إرسال {{count}} طلبات شراء للاعتماد كتقسيم واحد."
-    }
+    },
+    "rerunNotice": "تمت تعبئة هذا النموذج من تقسيم سابق. راجع تحمّل المخاطر والاستعجال والموردين المستبعدين والأوزان ثم شغّله مرة أخرى.",
+    "rerunPackUnknown": "لم تُحمَّل أحجام عبوات منتجات هذا التقسيم بعد. انتظر لحظة ثم أعد المحاولة."
   },
   "alerts": {
     "title": "صندوق التنبيهات الإجرائية",
@@ -2283,6 +2292,14 @@
     }
   },
   "requests": {
+    "errors": {
+      "quantity_not_positive": "يجب أن تكون الكمية أكبر من صفر.",
+      "required_by_in_the_past": "لا يمكن أن يكون تاريخ الاستحقاق في الماضي.",
+      "duplicate_product": "هذا المنتج موجود بالفعل في بند آخر.",
+      "cost_centre_not_found": "مركز التكلفة غير موجود.",
+      "cost_centre_branch_mismatch": "مركز التكلفة لا ينتمي إلى الفرع المحدد.",
+      "product_not_found": "المنتج غير موجود."
+    },
     "list": {
       "newRequestButton": "طلب جديد",
       "loadMore": "تحميل المزيد",
@@ -2298,7 +2315,7 @@
       "submitted": "مقدمة",
       "pending": "معلقة",
       "approved": "معتمدة",
-      "ordered": "مطلوبة",
+      "ordered": "تم إصدار أمر الشراء",
       "delivered": "مستلمة",
       "rejected": "مرفوضة",
       "withdrawn": "مسحوبة"
@@ -2331,15 +2348,19 @@
       "branchRequired": "الفرع مطلوب.",
       "costCentreLabel": "مركز التكلفة (اختياري)",
       "requiredByDateLabel": "مطلوب بحلول",
+      "requiredByHint": "التنسيق: {{format}}",
       "requiredByDateRequired": "تاريخ الاستحقاق مطلوب.",
       "requiredByDateInvalid": "أدخل تاريخًا صالحًا (YYYY-MM-DD).",
       "linesTitle": "البنود",
+      "lineGroup": "البند {{position}}",
       "addLineButton": "إضافة بند",
       "removeLineButton": "إزالة البند",
+      "removeLineWithProduct": "إزالة البند {{position}}: {{product}}",
       "productLabel": "المنتج",
       "productRequired": "اختر منتجًا.",
       "quantityLabel": "الكمية",
       "quantityRequired": "يجب أن تكون الكمية أكبر من صفر.",
+      "quantityPattern": "يجب أن تكون الكمية رقمًا أكبر من صفر.",
       "noteLabel": "ملاحظة (اختيارية)",
       "estimatedUnitPriceLabel": "سعر الوحدة المقدر",
       "noEstimateAvailable": "لا توجد بيانات أسعار سابقة لهذا المنتج.",
@@ -2477,7 +2498,31 @@
       "summary": "تقسيم من طلب تسعير {{short}} · {{requests}} · {{total}} · يوفر {{saving}}",
       "summaryNoSaving": "تقسيم من طلب تسعير {{short}} · {{requests}} · {{total}}",
       "splitFromRfq": "تقسيم من طلب تسعير {{short}}",
-      "saves": "يوفر {{saving}}"
+      "saves": "يوفر {{saving}}",
+      "loadingSiblings": "جارٍ تحميل باقي هذا التقسيم…",
+      "siblingsError": "تعذر تحميل باقي هذا التقسيم.",
+      "retry": "إعادة المحاولة"
+    },
+    "pagination": {
+      "loadMore": "تحميل المزيد",
+      "loading": "جارٍ التحميل...",
+      "showing": {
+        "zero": "عرض 0 طلب",
+        "one": "عرض طلب واحد",
+        "two": "عرض طلبين",
+        "few": "عرض {{count}} طلبات",
+        "many": "عرض {{count}} طلبًا",
+        "other": "عرض {{count}} طلب"
+      },
+      "showingMore": {
+        "zero": "عرض 0 طلب، ويتوفر المزيد",
+        "one": "عرض طلب واحد، ويتوفر المزيد",
+        "two": "عرض طلبين، ويتوفر المزيد",
+        "few": "عرض {{count}} طلبات، ويتوفر المزيد",
+        "many": "عرض {{count}} طلبًا، ويتوفر المزيد",
+        "other": "عرض {{count}} طلب، ويتوفر المزيد"
+      },
+      "loadError": "تعذر تحميل المزيد من الطلبات. يرجى المحاولة مرة أخرى."
     },
     "requestCount": {
       "zero": "لا توجد طلبات",
@@ -4084,18 +4129,36 @@
       "noProductsMatch": "لا توجد منتجات مطابقة",
       "duplicateNotice": "تم النسخ من طلب عرض أسعار سابق — تحقق من التواريخ والموردين قبل الحفظ",
       "quantityLabel": "الكمية",
-      "quantityPlaceholder": "أدخل الكمية",
+      "quantityPlaceholder": "الكمية",
+      "quantityRequired": "الكمية مطلوبة",
+      "quantityMin": "يجب أن تكون الكمية أكبر من 0",
       "addLineButton": "إضافة سطر",
       "removeLineButton": "إزالة",
+      "productLineAria": "المنتج — البند {{line}}",
+      "quantityLineAria": "الكمية — البند {{line}}",
+      "removeLineAria": "إزالة البند {{line}}",
       "suppliersLabel": "الموردين",
       "suppliersPlaceholder": "اختر الموردين",
+      "suppliersRequired": "اختر موردًا واحدًا على الأقل.",
+      "suppliersNoEmailHint": "لا يتم عرض {{count}} من الموردين لعدم وجود بريد إلكتروني للتواصل",
+      "supplierNoEmail": "بلا بريد إلكتروني",
+      "supplierInactive": "غير نشط",
+      "initialLoadError": "تعذر تحميل المنتجات أو الموردين.",
+      "retryButton": "إعادة المحاولة",
       "neededByDateLabel": "مطلوب بحلول تاريخ",
+      "dateFormatDayFirst": "يوم/شهر/سنة",
+      "dateFormatMonthFirst": "شهر/يوم/سنة",
       "tenantTermsLabel": "الشروط والأحكام",
       "tenantTermsPlaceholder": "أدخل الشروط للموردين (اختياري)",
       "tenantTermsTooLong": "يجب ألا تتجاوز الشروط 4000 حرف.",
       "saveDraftButton": "حفظ كمسودة",
       "sendButton": "إرسال الطلب",
       "rejectedSuppliersTitle": "الموردين المرفوضين",
+      "rejectedReasons": {
+        "missing_contact_email": "لا يوجد بريد إلكتروني للتواصل",
+        "not_found": "المورد غير موجود",
+        "generic": "تعذر إضافته"
+      },
       "rfqStatusLabel": "حالة الطلب",
       "submittingButton": "جاري الحفظ...",
       "sendingButton": "جاري الإرسال...",
@@ -4195,7 +4258,12 @@
       "prepareErrorNoPricingForRfqProducts": "لا يتضمن هذا الرد أسعاراً للمنتجات المطلوبة في طلب عروض الأسعار.",
       "prepareErrorQuotationArchived": "تمت أرشفة عرض السعر هذا ولا يمكن تحويله إلى طلب شراء.",
       "prepareErrorQuotationRefused": "رُفض عرض السعر هذا ولا يمكن استخدامه لإعداد طلب شراء.",
-      "prepareErrorMixedCurrencies": "الأسعار في هذا الرد واردة بأكثر من عملة واحدة."
+      "prepareErrorMixedCurrencies": "الأسعار في هذا الرد واردة بأكثر من عملة واحدة.",
+      "prepareErrorRfqExpired": "انتهت صلاحية طلب عرض الأسعار هذا ولا يمكن تجهيز طلبات منه.",
+      "expiredNotice": "انتهت صلاحية طلب عرض الأسعار هذا — لم يعد بالإمكان تجهيز طلبات منه",
+      "rfqExpired": "انتهت صلاحية طلب عرض الأسعار",
+      "branchesLoadError": "فشل تحميل الفروع.",
+      "rfqDetailLoadError": "فشل تحميل تفاصيل طلب عرض الأسعار."
     },
     "history": {
       "title": "سجل طلبات عروض الأسعار",
@@ -4297,6 +4365,7 @@
       "tabItems": "البنود",
       "tabRecipients": "المستلمون ({{count}})",
       "tabResponses": "الردود ({{count}})",
+      "tabResponsesNoCount": "الردود",
       "statusLabel": "الحالة",
       "sentAtLabel": "تاريخ الإرسال",
       "neededByLabel": "مطلوب بحلول",
@@ -4368,7 +4437,9 @@
       "confirmRetryTitle": "إعادة إرسال للمستلمين الذين لم يستلموا",
       "confirmRetryMessage": "هل تريد إعادة إرسال طلب عرض الأسعار هذا إلى {{count}} من الموردين الذين لم يستلموه؟",
       "confirmRetryButton": "إعادة المحاولة للمستلمين الذين لم يستلموا",
-      "cancelRetryButton": "إلغاء"
+      "cancelRetryButton": "إلغاء",
+      "rfqExpiredError": "انتهت صلاحية طلب عرض الأسعار هذا ولم يعد بالإمكان إرساله.",
+      "notSendableError": "لا يمكن إرسال طلب عرض الأسعار هذا في حالته الحالية."
     },
     "guardrails": {
       "title": "إعدادات الضوابط",

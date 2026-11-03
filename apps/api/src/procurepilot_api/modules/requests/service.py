@@ -782,30 +782,36 @@ class RequestsService:
     ) -> PurchaseRequestList:
         client = authenticated_client(self._settings, bearer_token)
         capped = _cap_limit(limit)
-        offset = _decode_cursor(cursor)
+        boundary = _decode_approval_cursor(cursor)
 
         try:
             query = (
                 client.table("approval_step")
-                .select(f"{STEP_COLUMNS},purchase_request!inner(status)")
+                .select(f"{STEP_COLUMNS},created_at,purchase_request!inner(status)")
                 .eq("status", "pending")
             )
             for status in TERMINAL_REQUEST_STATUSES:
                 query = query.neq("purchase_request.status", status)
             if member.role is not MemberRole.owner:
                 query = query.eq("assigned_membership_id", str(member.membership_id))
-            response = (
-                query.order("created_at", desc=True)
-                .order("id")
-                .range(offset, offset + capped)
-                .execute()
-            )
+            if boundary is not None:
+                created_at, step_id = boundary
+                query = query.or_(
+                    f"created_at.lt.{created_at},and(created_at.eq.{created_at},id.gt.{step_id})"
+                )
+            response = query.order("created_at", desc=True).order("id").range(0, capped).execute()
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
         step_rows = _rows(response.data)
         visible_steps = step_rows[:capped]
-        next_cursor = _encode_cursor(offset + capped) if len(step_rows) > capped else None
+        next_cursor = (
+            _encode_approval_cursor(
+                str(visible_steps[-1]["created_at"]), UUID(str(visible_steps[-1]["id"]))
+            )
+            if len(step_rows) > capped
+            else None
+        )
         if not visible_steps:
             return PurchaseRequestList(items=[], next_cursor=next_cursor)
 
@@ -2670,20 +2676,28 @@ class RequestsService:
     ) -> dict[str, list[dict[str, object]]]:
         if not request_ids:
             return {}
+        line_rows: list[dict[str, object]] = []
+        page_size = 1000
         try:
-            response = (
-                client.table("purchase_request_line")
-                .select(LINE_COLUMNS)
-                .in_("purchase_request_id", request_ids)
-                .order("position")
-                .order("created_at")
-                .order("id")
-                .execute()
-            )
+            while True:
+                offset = len(line_rows)
+                response = (
+                    client.table("purchase_request_line")
+                    .select(LINE_COLUMNS)
+                    .in_("purchase_request_id", request_ids)
+                    .order("position")
+                    .order("created_at")
+                    .order("id")
+                    .range(offset, offset + page_size - 1)
+                    .execute()
+                )
+                page = _rows(response.data)
+                line_rows.extend(page)
+                if len(page) < page_size:
+                    break
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
-        line_rows = _rows(response.data)
         product_ids = list(
             {str(r["workspace_product_id"]) for r in line_rows if r.get("workspace_product_id")}
         )
@@ -3896,6 +3910,34 @@ def _cap_limit(limit: int) -> int:
 def _encode_cursor(offset: int) -> str:
     raw = json.dumps({"offset": offset}, separators=(",", ":")).encode("utf-8")
     return base64.urlsafe_b64encode(raw).decode("ascii")
+
+
+def _encode_approval_cursor(created_at: str, step_id: UUID) -> str:
+    raw = json.dumps({"created_at": created_at, "id": str(step_id)}).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii")
+
+
+def _decode_approval_cursor(cursor: str | None) -> tuple[str, UUID] | None:
+    if cursor is None:
+        return None
+    try:
+        raw = base64.b64decode(cursor.encode("ascii"), altchars=b"-_", validate=True)
+        payload = json.loads(raw.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("invalid cursor payload")
+        created_at, step_id = payload["created_at"], payload["id"]
+        if not isinstance(created_at, str) or not isinstance(step_id, str):
+            raise ValueError("invalid cursor fields")
+        timestamp = datetime.fromisoformat(created_at)
+        if timestamp.tzinfo is None:
+            raise ValueError("cursor timestamp requires a timezone")
+        # UTC Z avoids '+' being interpreted as a space by filter/URL parsers.
+        normalized = (
+            timestamp.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+        )
+        return normalized, UUID(step_id)
+    except (KeyError, ValueError, TypeError, OverflowError) as exc:
+        raise UnprocessableEntityError(details={"cursor": "invalid"}) from exc
 
 
 def _decode_cursor(cursor: str | None) -> int:

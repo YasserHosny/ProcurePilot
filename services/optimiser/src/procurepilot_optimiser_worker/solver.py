@@ -809,12 +809,19 @@ def _advanced_baselines(
         terms = terms_by_supplier.get(supplier_id)
         if feasible and terms is not None and terms.minimum_order_value is not None:
             feasible = total >= Decimal(terms.minimum_order_value.amount)
+        # Delivery counts like it does in the split total, so the two are comparable.
+        delivery = Decimal("0.0000")
+        if terms is not None and terms.delivery_fee is not None and (
+            terms.free_delivery_threshold is None
+            or total < Decimal(terms.free_delivery_threshold.amount)
+        ):
+            delivery = Decimal(terms.delivery_fee.amount)
         baselines.append(
             SingleSupplierBaseline(
                 supplier_id=supplier_id,
                 feasible=feasible,
                 total_landed_cost=(
-                    _money(total, currency)
+                    _money(total + delivery, currency)
                     if feasible and not has_excluded_item
                     else None
                 ),

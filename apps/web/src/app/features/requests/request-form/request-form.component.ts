@@ -1,8 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { DateAdapter } from '@angular/material/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -40,9 +41,18 @@ import {
   type RequestAllocationOrder,
 } from '../../orders/orders-api';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
-import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
+import { AppDateAdapter, provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 const I18N = 'requests';
+
+const SERVER_ERROR_KEYS: Record<string, string> = {
+  quantity_not_positive: 'requests.errors.quantity_not_positive',
+  required_by_in_the_past: 'requests.errors.required_by_in_the_past',
+  duplicate_product: 'requests.errors.duplicate_product',
+  cost_centre_not_found: 'requests.errors.cost_centre_not_found',
+  cost_centre_branch_mismatch: 'requests.errors.cost_centre_branch_mismatch',
+  product_not_found: 'requests.errors.product_not_found',
+};
 
 interface LineFormGroup {
   workspace_product_id: FormControl<string>;
@@ -119,6 +129,14 @@ export class RequestFormComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly translate = inject(TranslateService);
   private readonly ordersApi = inject(OrdersApiService);
+  private readonly elementRef = inject(ElementRef);
+  private readonly dateAdapter = inject(DateAdapter);
+
+  get dateFormat(): string {
+    const adapter = this.dateAdapter as unknown as AppDateAdapter;
+    const isDayFirst = adapter?.isDayFirst ? adapter.isDayFirst() : true;
+    return isDayFirst ? 'DD/MM/YYYY' : 'MM/DD/YYYY';
+  }
 
   readonly isLoading = signal<boolean>(false);
   readonly isSaving = signal<boolean>(false);
@@ -363,7 +381,7 @@ export class RequestFormComponent implements OnInit {
         }),
         quantity: new FormControl<string>('', {
           nonNullable: true,
-          validators: [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)],
+          validators: [Validators.required, Validators.pattern(/^(?!0(?:\.0+)?$)\d+(?:\.\d+)?$/)],
         }),
         note: new FormControl<string>('', { nonNullable: true }),
       }),
@@ -389,6 +407,8 @@ export class RequestFormComponent implements OnInit {
 
     if (this.form.invalid || this.lines.length === 0) {
       this.form.markAllAsTouched();
+      this.errorMessage.set(this.getValidationErrorMessage());
+      this.focusErrorBanner();
       return;
     }
 
@@ -443,6 +463,7 @@ export class RequestFormComponent implements OnInit {
     if (!existing.request_group && (this.form.invalid || this.lines.length === 0)) {
       this.form.markAllAsTouched();
       this.errorMessage.set(this.getValidationErrorMessage());
+      this.focusErrorBanner();
       return;
     }
 
@@ -603,6 +624,18 @@ export class RequestFormComponent implements OnInit {
     return this.productNameById().has(productId);
   }
 
+  getRemoveLineAriaLabel(index: number, lineGroup: FormGroup<LineFormGroup>): string {
+    const prodId = lineGroup.controls.workspace_product_id.value;
+    const product = (prodId ? this.productNameById().get(prodId) : null) || prodId;
+    if (product) {
+      return this.translate.instant(`${I18N}.form.removeLineWithProduct`, {
+        position: index + 1,
+        product,
+      });
+    }
+    return this.translate.instant(`${I18N}.form.removeLineButton`);
+  }
+
   private getValidationErrorMessage(): string {
     if (this.form.controls.branch_id.invalid) {
       return this.translate.instant(`${I18N}.form.branchRequired`);
@@ -697,7 +730,7 @@ export class RequestFormComponent implements OnInit {
             }),
             quantity: new FormControl<string>(displayQty, {
               nonNullable: true,
-              validators: [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)],
+              validators: [Validators.required, Validators.pattern(/^(?!0(?:\.0+)?$)\d+(?:\.\d+)?$/)],
             }),
             note: new FormControl<string>(line.note ?? '', { nonNullable: true }),
           });
@@ -743,19 +776,64 @@ export class RequestFormComponent implements OnInit {
       });
   }
 
+  private focusErrorBanner(): void {
+    setTimeout(() => {
+      const banner = this.elementRef.nativeElement.querySelector('.error-banner') as HTMLElement | null;
+      if (banner) {
+        if (typeof banner.scrollIntoView === 'function') {
+          banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        banner.focus();
+      }
+    }, 0);
+  }
+
+  private getControlByPath(path?: string): FormControl | null {
+    if (!path) {
+      return null;
+    }
+    const match = path.match(/^lines\[(\d+)\]\.(.+)$/);
+    if (match) {
+      const index = parseInt(match[1], 10);
+      const subProp = match[2];
+      const group = this.lines.at(index);
+      return (group?.get(subProp) as FormControl) ?? null;
+    }
+    return (this.form.get(path) as FormControl) ?? null;
+  }
+
   private handleError(err: unknown): void {
     if (err instanceof HttpErrorResponse) {
       const apiError = err.error as ApiError | undefined;
-      const details = apiError?.details as { reason?: string } | undefined;
+      const details =
+        (apiError?.details as { field?: string; reason?: string } | undefined) ??
+        (Array.isArray(apiError?.details)
+          ? (apiError?.details[0] as { field?: string; reason?: string } | undefined)
+          : undefined);
       if (err.status === 409 && details?.reason === 'part_of_split') {
         this.errorMessage.set(this.translate.instant(`${I18N}.partOfSplitError`));
+        this.focusErrorBanner();
         return;
       }
-      this.errorMessage.set(
-        apiError?.message ?? err.message ?? this.translate.instant(`${I18N}.genericError`),
-      );
+      if (details?.reason && SERVER_ERROR_KEYS[details.reason]) {
+        const key = SERVER_ERROR_KEYS[details.reason];
+        const translated = this.translate.instant(key);
+        if (details.field) {
+          const control = this.getControlByPath(details.field);
+          if (control) {
+            control.setErrors({ server: key });
+            control.markAsTouched();
+          }
+        }
+        this.errorMessage.set(translated);
+        this.focusErrorBanner();
+        return;
+      }
+      this.errorMessage.set(this.translate.instant(`${I18N}.genericError`));
+      this.focusErrorBanner();
       return;
     }
     this.errorMessage.set(this.translate.instant(`${I18N}.genericError`));
+    this.focusErrorBanner();
   }
 }

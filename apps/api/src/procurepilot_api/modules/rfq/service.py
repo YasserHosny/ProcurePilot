@@ -106,7 +106,7 @@ def lock_rfq_for_preparation(
     cur: psycopg.Cursor, *, tenant_id: uuid.UUID, rfq_id: uuid.UUID
 ) -> str | None:
     """Serialise every preparation of one RFQ — a single-supplier request or a split (spec 024
-    research R4) — and return its status, or None when the caller cannot see it.
+    research R4) — and return its effective status, or None when the caller cannot see it.
 
     The transaction-scoped advisory lock is held until the caller's transaction ends, so the
     preparation that converts the RFQ commits before another can read its status.
@@ -115,7 +115,11 @@ def lock_rfq_for_preparation(
         "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
         (f"rfq-prepare:{tenant_id}:{rfq_id}",),
     )
-    cur.execute("select status from rfq where id = %s and tenant_id = %s", (rfq_id, tenant_id))
+    cur.execute(
+        f"select {_EFFECTIVE_STATUS_SQL} as status from rfq r "
+        "where r.id = %s and r.tenant_id = %s",
+        (rfq_id, tenant_id),
+    )
     row = cur.fetchone()
     if row is None:
         return None
@@ -742,14 +746,8 @@ class RfqService:
         with _authenticated_db(self.settings, member) as lock_conn:
             with lock_conn.cursor(row_factory=dict_row) as cur:
                 status = lock_rfq_for_preparation(cur, tenant_id=member.tenant_id, rfq_id=rfq_id)
-                if status is not None:
-                    cur.execute(
-                        f"select {_EFFECTIVE_STATUS_SQL} as status from rfq r "
-                        "where r.id = %s and r.tenant_id = %s",
-                        (rfq_id, member.tenant_id),
-                    )
-                    if cur.fetchone()["status"] == "expired":
-                        raise UnprocessableEntityError(details={"reason": "rfq_expired"})
+                if status == "expired":
+                    raise UnprocessableEntityError(details={"reason": "rfq_expired"})
                 if status == "converted":
                     # A retry of the preparation that converted it gets that request back -- only a
                     # request with this key that was prepared from one of this RFQ's responses.

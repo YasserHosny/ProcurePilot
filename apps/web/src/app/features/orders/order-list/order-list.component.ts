@@ -52,6 +52,8 @@ export class OrderListComponent implements OnInit {
   readonly loadMoreError = signal(false);
   // Bumped on every fresh query so a slow answer to an earlier one is dropped.
   private generation = 0;
+  // The filters the loaded rows were fetched with; paging must reuse them, not the live inputs.
+  private appliedQuery: OrderListQuery = {};
 
   readonly search = signal('');
   readonly statusFilter = signal('all');
@@ -108,9 +110,11 @@ export class OrderListComponent implements OnInit {
     this.loadMoreError.set(false);
     this.isLoadingMore.set(false);
     const generation = ++this.generation;
-    this.ordersApi.listOrders(undefined, this.query()).subscribe({
+    const applied = this.query();
+    this.ordersApi.listOrders(undefined, applied).subscribe({
       next: (response) => {
         if (generation !== this.generation) return;
+        this.appliedQuery = applied;
         this.orders.set(response.items);
         this.nextCursor.set(response.next_cursor);
         this.totalCount.set(response.total_count ?? null);
@@ -130,7 +134,7 @@ export class OrderListComponent implements OnInit {
     this.isLoadingMore.set(true);
     this.loadMoreError.set(false);
     const generation = this.generation;
-    this.ordersApi.listOrders(cursor, this.query()).subscribe({
+    this.ordersApi.listOrders(cursor, this.appliedQuery).subscribe({
       next: (response) => {
         if (generation !== this.generation) return;
         // An order created between two page loads shifts the offset and repeats a row.

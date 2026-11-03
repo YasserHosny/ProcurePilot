@@ -1350,6 +1350,7 @@
       "notAvailable": "Not available",
       "noFilterResults": "No match tasks match the active filters",
       "clearFilters": "Clear Filters",
+      "retry": "Retry",
       "loadMore": "Load More",
       "emptyTitle": "No match tasks found",
       "emptyMessage": "There are no quotation lines currently awaiting match resolution.",
@@ -1752,7 +1753,11 @@
       "failedMessage": "An error occurred during solver execution. Please try again.",
       "noCurrentOffers": "No current offers from the selected suppliers for: {{products}}",
       "unavailableMessage": "The optimisation service is not responding. Please try again shortly, or contact support if this keeps happening.",
-      "timeoutMessage": "The optimisation did not finish in time. Please try again."
+      "timeoutMessage": "The optimisation did not finish in time. Please try again.",
+      "notFoundTitle": "Basket split not found",
+      "notFoundMessage": "This split does not exist or is not available in this workspace. Start a new split instead.",
+      "pollFailed": "The latest status could not be loaded. The split may still be running.",
+      "pollRetry": "Retry"
     },
     "result": {
       "feasibleTitle": "Recommended Basket Allocation",
@@ -1840,12 +1845,16 @@
         "allocationNotWholePacks": "The allocation contains quantities that cannot be converted to whole packs.",
         "packDefinitionRequired": "Pack definition is required for the allocated items.",
         "idempotencyKeyReused": "This idempotency key has already been used with different parameters.",
-        "generic": "Failed to prepare requests."
+        "generic": "Failed to prepare requests.",
+        "branchesLoadFailed": "The branches could not be loaded. Close this dialog and try again.",
+        "costCentresLoadFailed": "The cost centres could not be loaded. Close this dialog and try again."
       }
     },
     "submit": {
       "successSplit": "{{count}} purchase requests submitted for approval as one split."
-    }
+    },
+    "rerunNotice": "This form was filled from an earlier split. Check the risk tolerance, urgency, excluded suppliers and weights, then run it again.",
+    "rerunPackUnknown": "The pack sizes of this split's products are not loaded yet. Wait a moment and try Re-run again."
   },
   "alerts": {
     "title": "Actionable Alerts Inbox",
@@ -2283,6 +2292,14 @@
     }
   },
   "requests": {
+    "errors": {
+      "quantity_not_positive": "Quantity must be greater than zero.",
+      "required_by_in_the_past": "The required-by date cannot be in the past.",
+      "duplicate_product": "This product is already on another line.",
+      "cost_centre_not_found": "Cost centre not found.",
+      "cost_centre_branch_mismatch": "Cost centre does not belong to the selected branch.",
+      "product_not_found": "Product not found."
+    },
     "list": {
       "newRequestButton": "New request",
       "loadMore": "Load more",
@@ -2331,15 +2348,19 @@
       "branchRequired": "Branch is required.",
       "costCentreLabel": "Cost Centre (optional)",
       "requiredByDateLabel": "Required By",
+      "requiredByHint": "Format: {{format}}",
       "requiredByDateRequired": "Required-by date is required.",
       "requiredByDateInvalid": "Enter a valid date (YYYY-MM-DD).",
       "linesTitle": "Line Items",
+      "lineGroup": "Line {{position}}",
       "addLineButton": "Add Line",
       "removeLineButton": "Remove line",
+      "removeLineWithProduct": "Remove line {{position}}: {{product}}",
       "productLabel": "Product",
       "productRequired": "Select a product.",
       "quantityLabel": "Quantity",
       "quantityRequired": "Quantity must be greater than zero.",
+      "quantityPattern": "Quantity must be a number greater than zero.",
       "noteLabel": "Note (optional)",
       "estimatedUnitPriceLabel": "Estimated Unit Price",
       "noEstimateAvailable": "No price history available for this product.",
@@ -2477,7 +2498,31 @@
       "summary": "Split from RFQ {{short}} · {{requests}} · {{total}} · saves {{saving}}",
       "summaryNoSaving": "Split from RFQ {{short}} · {{requests}} · {{total}}",
       "splitFromRfq": "Split from RFQ {{short}}",
-      "saves": "saves {{saving}}"
+      "saves": "saves {{saving}}",
+      "loadingSiblings": "Loading the rest of this split…",
+      "siblingsError": "Failed to load the rest of this split.",
+      "retry": "Retry"
+    },
+    "pagination": {
+      "loadMore": "Load more",
+      "loading": "Loading...",
+      "showing": {
+        "zero": "Showing 0 requests",
+        "one": "Showing 1 request",
+        "two": "Showing 2 requests",
+        "few": "Showing {{count}} requests",
+        "many": "Showing {{count}} requests",
+        "other": "Showing {{count}} requests"
+      },
+      "showingMore": {
+        "zero": "Showing 0 requests, more available",
+        "one": "Showing 1 request, more available",
+        "two": "Showing 2 requests, more available",
+        "few": "Showing {{count}} requests, more available",
+        "many": "Showing {{count}} requests, more available",
+        "other": "Showing {{count}} requests, more available"
+      },
+      "loadError": "Unable to load more requests. Please try again."
     },
     "requestCount": {
       "zero": "{{count}} requests",
@@ -4084,18 +4129,36 @@
       "noProductsMatch": "No products match",
       "duplicateNotice": "Duplicated from an earlier RFQ — check the dates and suppliers before saving",
       "quantityLabel": "Quantity",
-      "quantityPlaceholder": "Enter quantity",
+      "quantityPlaceholder": "Qty",
+      "quantityRequired": "Quantity is required",
+      "quantityMin": "Quantity must be greater than 0",
       "addLineButton": "Add Line",
       "removeLineButton": "Remove",
+      "productLineAria": "Product — line {{line}}",
+      "quantityLineAria": "Quantity — line {{line}}",
+      "removeLineAria": "Remove line {{line}}",
       "suppliersLabel": "Suppliers",
       "suppliersPlaceholder": "Select suppliers",
+      "suppliersRequired": "Select at least one supplier.",
+      "suppliersNoEmailHint": "{{count}} suppliers are not listed because they have no contact email",
+      "supplierNoEmail": "no email",
+      "supplierInactive": "inactive",
+      "initialLoadError": "Failed to load products or suppliers.",
+      "retryButton": "Retry",
       "neededByDateLabel": "Needed By Date",
+      "dateFormatDayFirst": "DD/MM/YYYY",
+      "dateFormatMonthFirst": "MM/DD/YYYY",
       "tenantTermsLabel": "Terms and Conditions",
       "tenantTermsPlaceholder": "Enter terms for suppliers (optional)",
       "tenantTermsTooLong": "Terms must be 4000 characters or fewer.",
       "saveDraftButton": "Save Draft",
       "sendButton": "Send RFQ",
       "rejectedSuppliersTitle": "Rejected Suppliers",
+      "rejectedReasons": {
+        "missing_contact_email": "No contact email",
+        "not_found": "Supplier not found",
+        "generic": "Could not be added"
+      },
       "rfqStatusLabel": "RFQ Status",
       "submittingButton": "Saving...",
       "sendingButton": "Sending...",
@@ -4195,7 +4258,12 @@
       "prepareErrorNoPricingForRfqProducts": "This reply does not contain prices for the requested products.",
       "prepareErrorQuotationArchived": "This quotation has been archived and cannot be converted.",
       "prepareErrorQuotationRefused": "This quotation was refused and cannot be used to prepare a request.",
-      "prepareErrorMixedCurrencies": "Prices in this reply are in more than one currency."
+      "prepareErrorMixedCurrencies": "Prices in this reply are in more than one currency.",
+      "prepareErrorRfqExpired": "This RFQ has expired and requests can no longer be prepared from it.",
+      "expiredNotice": "This RFQ has expired — requests can no longer be prepared from it",
+      "rfqExpired": "This RFQ has expired",
+      "branchesLoadError": "Failed to load branches.",
+      "rfqDetailLoadError": "Failed to load RFQ details."
     },
     "history": {
       "title": "RFQ History",
@@ -4297,6 +4365,7 @@
       "tabItems": "Items",
       "tabRecipients": "Recipients ({{count}})",
       "tabResponses": "Responses ({{count}})",
+      "tabResponsesNoCount": "Responses",
       "statusLabel": "Status",
       "sentAtLabel": "Sent date",
       "neededByLabel": "Needed by",
@@ -4368,7 +4437,9 @@
       "confirmRetryTitle": "Retry unsent recipients",
       "confirmRetryMessage": "Retry sending this RFQ to {{count}} unsent supplier(s)?",
       "confirmRetryButton": "Retry unsent recipients",
-      "cancelRetryButton": "Cancel"
+      "cancelRetryButton": "Cancel",
+      "rfqExpiredError": "This RFQ has expired and can no longer be sent.",
+      "notSendableError": "This RFQ cannot be sent in its current state."
     },
     "guardrails": {
       "title": "Guardrail settings",

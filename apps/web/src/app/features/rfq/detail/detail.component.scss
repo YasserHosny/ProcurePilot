@@ -84,6 +84,13 @@
       text-decoration: underline;
     }
   }
+
+  .error-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-block-start: 8px;
+  }
 }
 
 .tab-content {
