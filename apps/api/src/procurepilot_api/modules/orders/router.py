@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
@@ -95,13 +96,35 @@ def get_allocations(
 
 @router.get("/orders", response_model=PurchaseOrderList)
 def list_orders(
-    token: Annotated[str, Depends(bearer_token)],
-    _member: Annotated[CurrentMember, Depends(current_member)],
+    member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[OrdersService, Depends(get_orders_service)],
     cursor: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    q: Annotated[str | None, Query(max_length=100)] = None,
+    status: Annotated[str | None, Query(description="Comma-separated statuses, or `all`.")] = None,
+    supplier_id: Annotated[UUID | None, Query()] = None,
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
+    sort: Annotated[str, Query()] = "created_at",
+    direction: Annotated[str, Query(alias="dir")] = "desc",
 ) -> PurchaseOrderList:
-    return service.list_orders(bearer_token=token, cursor=cursor, limit=limit)
+    statuses = (
+        ()
+        if status is None or status == "all"
+        else tuple(part.strip() for part in status.split(",") if part.strip())
+    )
+    return service.search_orders(
+        member=member,
+        cursor=cursor,
+        limit=limit,
+        q=q,
+        statuses=statuses,
+        supplier_id=supplier_id,
+        date_from=date_from,
+        date_to=date_to,
+        sort=sort,
+        direction=direction,
+    )
 
 
 @router.get("/orders/{order_id}", response_model=OrderEvidenceProjection)
