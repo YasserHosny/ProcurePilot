@@ -2341,6 +2341,8 @@
       "noteLabel": "ملاحظة (اختيارية)",
       "estimatedUnitPriceLabel": "سعر الوحدة المقدر",
       "noEstimateAvailable": "لا توجد بيانات أسعار سابقة لهذا المنتج.",
+      "perPack": "{{price}} / العبوة",
+      "staleEstimate": "التقدير المحفوظ — احفظ للتحديث",
       "cancelButton": "إلغاء",
       "saveDraftButton": "حفظ كمسودة",
       "submitButton": "إرسال الطلب",
