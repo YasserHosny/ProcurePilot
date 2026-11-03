@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
+from contextlib import contextmanager
 from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
+from fastapi.testclient import TestClient
 
 from integration.catalogue_helpers import (
     TEST_DATABASE_URL,
@@ -22,6 +24,11 @@ from integration.quotation_helpers import (
     make_quotation,
     make_supplier,
 )
+from procurepilot_api.config import Settings
+from procurepilot_api.deps import CurrentMember, current_member
+from procurepilot_api.main import app
+from procurepilot_api.modules.auth.jwt import MemberRole
+from procurepilot_api.modules.rfq import service as rfq_service_module
 from procurepilot_api.modules.rfq.read_api import rfq_lines_for_quotation_with_conn
 
 psycopg = pytest.importorskip("psycopg")
@@ -146,3 +153,65 @@ def test_another_tenants_rfq_is_never_read(conn: psycopg.Connection) -> None:
         reset_role(cur)
         _member_scope(cur, stranger)
         assert rfq_lines_for_quotation_with_conn(conn, quotation_id) is None
+
+
+@pytest.mark.parametrize("response_count", [0, 2], ids=["awaiting-reply", "two-replies"])
+def test_detail_counts_responses_per_recipient_with_tenant_isolation(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, response_count: int
+) -> None:
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        owner = make_workspace(cur, "rfq-count-owner")
+        rfq_id, quotation_id = _rfq_with_reply(cur, owner, [])
+        reset_role(cur)
+        cur.execute(
+            "select rfq_recipient_id from rfq_response where quotation_id = %s", (quotation_id,)
+        )
+        replying_recipient_id = cur.fetchone()[0]
+        second_quotation_id = make_quotation(cur, owner, status="reviewed")
+        reset_role(cur)
+        cur.execute(
+            "insert into rfq_response (tenant_id,rfq_recipient_id,quotation_id) values (%s,%s,%s)",
+            (owner.tenant_id, replying_recipient_id, second_quotation_id),
+        )
+        supplier_id = make_supplier(cur, owner, name="Awaiting Supplier")
+        act_as(cur, owner)
+        cur.execute(
+            "insert into rfq_recipient (tenant_id,rfq_id,supplier_id,status) "
+            "values (%s,%s,%s,'sent') returning id",
+            (owner.tenant_id, rfq_id, supplier_id),
+        )
+        awaiting_recipient_id = cur.fetchone()[0]
+        reset_role(cur)
+        stranger = make_workspace(cur, "rfq-count-stranger")
+        # Composite tenant FKs prevent foreign responses referencing owner's recipient.
+        stranger_rfq_id, _ = _rfq_with_reply(cur, stranger, [])
+        reset_role(cur)
+
+    member = CurrentMember(
+        user_id=owner.user_id,
+        tenant_id=owner.tenant_id,
+        membership_id=owner.membership_id,
+        email="rfq-count@example.test",
+        role=MemberRole.owner,
+    )
+
+    @contextmanager
+    def authenticated_db(
+        settings: Settings, current: CurrentMember
+    ) -> Iterator[psycopg.Connection]:
+        # Share the rollback-only fixture transaction, retaining real authenticated RLS.
+        with conn.cursor() as cur:
+            _member_scope(cur, owner)
+        yield conn
+
+    monkeypatch.setattr(rfq_service_module, "_authenticated_db", authenticated_db)
+    monkeypatch.setitem(app.dependency_overrides, current_member, lambda: member)
+    with TestClient(app) as client:
+        response = client.get(f"/api/v1/rfq/{rfq_id}")
+        assert response.status_code == 200, response.text
+        recipients = {item["id"]: item for item in response.json()["recipients"]}
+        assert len(recipients) == 2
+        recipient_id = replying_recipient_id if response_count else awaiting_recipient_id
+        assert recipients[str(recipient_id)]["response_count"] == response_count
+        assert client.get(f"/api/v1/rfq/{stranger_rfq_id}").status_code == 404

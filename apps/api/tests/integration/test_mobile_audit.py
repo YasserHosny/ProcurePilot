@@ -17,7 +17,7 @@ has no live PostgREST server to hit directly.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -34,6 +34,7 @@ from integration.catalogue_helpers import (
     Workspace,
     act_as,
     connection,
+    delete_tenant_scoped_rows,
     make_workspace,
     make_workspace_product,
 )
@@ -74,9 +75,7 @@ class _AuditTableQuery:
     def __getattr__(self, name: str) -> Any:  # noqa: ANN401 -- proxies an untyped delegate
         return getattr(self._delegate, name)
 
-    def insert(
-        self, payload: dict[str, object] | list[dict[str, object]]
-    ) -> _AuditTableQuery:
+    def insert(self, payload: dict[str, object] | list[dict[str, object]]) -> _AuditTableQuery:
         self._delegate.insert(payload)  # type: ignore[arg-type]
         return self
 
@@ -109,9 +108,7 @@ class _PsycopgAuditWriter:
         del bearer_token
         with self._conn.cursor() as cur:
             cur.execute(
-                "select record_audit_event("
-                "%s, %s, %s::uuid, %s::uuid, %s, %s::jsonb, %s"
-                ")",
+                "select record_audit_event(%s, %s, %s::uuid, %s::uuid, %s, %s::jsonb, %s)",
                 (
                     event.action,
                     event.outcome,
@@ -246,31 +243,41 @@ def test_post_requests_records_purchase_request_created(
         workspace = make_workspace(cur, "mobile-audit-create")
         branch_id = _make_branch(cur, workspace)
         product_id = make_workspace_product(cur, workspace, name="Audit Widget")
-        act_as(cur, workspace)
+    conn.commit()
 
-        client = _client_for(conn, workspace, monkeypatch)
-        payload = {
-            "branch_id": str(branch_id),
-            "required_by_date": (date.today() + timedelta(days=7)).isoformat(),
-            "lines": [
-                {"workspace_product_id": str(product_id), "quantity": "3.000000"}
-            ],
-        }
-        response = client.post(
-            "/api/v1/requests",
-            json=payload,
-            headers={"Authorization": "Bearer test-token"},
-        )
-        assert response.status_code == 201, response.text
-        request_id = response.json()["id"]
+    try:
+        with conn.cursor() as cur:
+            act_as(cur, workspace)
 
-        row = _audit_row(
-            cur, tenant_id=workspace.tenant_id, action="requests.purchase_request_created"
-        )
-        assert row is not None
-        outcome, target = row
-        assert outcome == "success"
-        assert target == {"purchase_request_id": request_id}
+            client = _client_for(conn, workspace, monkeypatch)
+            payload = {
+                "branch_id": str(branch_id),
+                "required_by_date": (datetime.now(UTC).date() + timedelta(days=7)).isoformat(),
+                "lines": [{"workspace_product_id": str(product_id), "quantity": "3.000000"}],
+            }
+            response = client.post(
+                "/api/v1/requests",
+                json=payload,
+                headers={"Authorization": "Bearer test-token"},
+            )
+            assert response.status_code == 201, response.text
+            request_id = response.json()["id"]
+
+            row = _audit_row(
+                cur, tenant_id=workspace.tenant_id, action="requests.purchase_request_created"
+            )
+            assert row is not None
+            outcome, target = row
+            assert outcome == "success"
+            assert target == {"purchase_request_id": request_id}
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("reset role")
+            cur.execute("set local session_replication_role = replica")
+            delete_tenant_scoped_rows(cur, workspace.tenant_id)
+            cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
+            cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
+            conn.commit()
 
 
 def test_post_requests_submit_records_purchase_request_submitted(
@@ -281,36 +288,44 @@ def test_post_requests_submit_records_purchase_request_submitted(
         workspace = make_workspace(cur, "mobile-audit-submit")
         branch_id = _make_branch(cur, workspace)
         product_id = make_workspace_product(cur, workspace, name="Audit Submit Widget")
-        act_as(cur, workspace)
+    conn.commit()
 
-        client = _client_for(conn, workspace, monkeypatch)
-        headers = {"Authorization": "Bearer test-token"}
-        created = client.post(
-            "/api/v1/requests",
-            json={
-                "branch_id": str(branch_id),
-                "required_by_date": (date.today() + timedelta(days=7)).isoformat(),
-                "lines": [
-                    {"workspace_product_id": str(product_id), "quantity": "3.000000"}
-                ],
-            },
-            headers=headers,
-        )
-        assert created.status_code == 201, created.text
-        request_id = created.json()["id"]
+    try:
+        with conn.cursor() as cur:
+            act_as(cur, workspace)
 
-        submitted = client.post(
-            f"/api/v1/requests/{request_id}/submit", headers=headers
-        )
-        assert submitted.status_code == 200, submitted.text
+            client = _client_for(conn, workspace, monkeypatch)
+            headers = {"Authorization": "Bearer test-token"}
+            created = client.post(
+                "/api/v1/requests",
+                json={
+                    "branch_id": str(branch_id),
+                    "required_by_date": (datetime.now(UTC).date() + timedelta(days=7)).isoformat(),
+                    "lines": [{"workspace_product_id": str(product_id), "quantity": "3.000000"}],
+                },
+                headers=headers,
+            )
+            assert created.status_code == 201, created.text
+            request_id = created.json()["id"]
 
-        row = _audit_row(
-            cur, tenant_id=workspace.tenant_id, action="requests.purchase_request_submitted"
-        )
-        assert row is not None
-        outcome, target = row
-        assert outcome == "success"
-        assert target == {"purchase_request_id": request_id}
+            submitted = client.post(f"/api/v1/requests/{request_id}/submit", headers=headers)
+            assert submitted.status_code == 200, submitted.text
+
+            row = _audit_row(
+                cur, tenant_id=workspace.tenant_id, action="requests.purchase_request_submitted"
+            )
+            assert row is not None
+            outcome, target = row
+            assert outcome == "success"
+            assert target == {"purchase_request_id": request_id}
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("reset role")
+            cur.execute("set local session_replication_role = replica")
+            delete_tenant_scoped_rows(cur, workspace.tenant_id)
+            cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
+            cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
+            conn.commit()
 
 
 def test_post_low_stock_reports_records_low_stock_report_created(
@@ -380,18 +395,14 @@ def test_post_requests_approve_records_approval_step_approved(
             json={
                 "branch_id": str(branch_id),
                 "required_by_date": (date.today() + timedelta(days=7)).isoformat(),
-                "lines": [
-                    {"workspace_product_id": str(product_id), "quantity": "3.000000"}
-                ],
+                "lines": [{"workspace_product_id": str(product_id), "quantity": "3.000000"}],
             },
             headers=headers,
         )
         assert created.status_code == 201, created.text
         request_id = created.json()["id"]
 
-        submitted = client.post(
-            f"/api/v1/requests/{request_id}/submit", headers=headers
-        )
+        submitted = client.post(f"/api/v1/requests/{request_id}/submit", headers=headers)
         assert submitted.status_code == 200, submitted.text
         approval_step_id = submitted.json()["approval_step"]["id"]
 
@@ -440,9 +451,7 @@ def test_post_confirm_delivery_records_delivery_confirmed(
             json={
                 "branch_id": str(branch_id),
                 "required_by_date": (date.today() + timedelta(days=7)).isoformat(),
-                "lines": [
-                    {"workspace_product_id": str(product_id), "quantity": "3.000000"}
-                ],
+                "lines": [{"workspace_product_id": str(product_id), "quantity": "3.000000"}],
             },
             headers=headers,
         )
@@ -450,9 +459,7 @@ def test_post_confirm_delivery_records_delivery_confirmed(
         request_id = created.json()["id"]
         line_id = created.json()["lines"][0]["id"]
 
-        submitted = client.post(
-            f"/api/v1/requests/{request_id}/submit", headers=headers
-        )
+        submitted = client.post(f"/api/v1/requests/{request_id}/submit", headers=headers)
         assert submitted.status_code == 200, submitted.text
 
     # approve_request's own _decide_and_notify opens a separate connection that needs the
@@ -461,27 +468,21 @@ def test_post_confirm_delivery_records_delivery_confirmed(
     conn.commit()
     with conn.cursor() as cur:
         act_as(cur, workspace)
-        approved = client.post(
-            f"/api/v1/requests/{request_id}/approve", json={}, headers=headers
-        )
+        approved = client.post(f"/api/v1/requests/{request_id}/approve", json={}, headers=headers)
         assert approved.status_code == 200, approved.text
         assert approved.json()["status"] == "ordered"
 
         confirmed = client.post(
             f"/api/v1/requests/{request_id}/confirm-delivery",
             json={
-                "lines": [
-                    {"purchase_request_line_id": line_id, "quantity_received": "3.000000"}
-                ]
+                "lines": [{"purchase_request_line_id": line_id, "quantity_received": "3.000000"}]
             },
             headers=headers,
         )
         assert confirmed.status_code == 200, confirmed.text
         assert confirmed.json()["status"] == "delivered"
 
-        row = _audit_row(
-            cur, tenant_id=workspace.tenant_id, action="requests.delivery_confirmed"
-        )
+        row = _audit_row(cur, tenant_id=workspace.tenant_id, action="requests.delivery_confirmed")
         assert row is not None
         outcome, target = row
         assert outcome == "success"
@@ -507,9 +508,7 @@ def test_post_quality_issues_records_quality_issue_reported(
             json={
                 "branch_id": str(branch_id),
                 "required_by_date": (date.today() + timedelta(days=7)).isoformat(),
-                "lines": [
-                    {"workspace_product_id": str(product_id), "quantity": "3.000000"}
-                ],
+                "lines": [{"workspace_product_id": str(product_id), "quantity": "3.000000"}],
             },
             headers=headers,
         )
@@ -517,25 +516,19 @@ def test_post_quality_issues_records_quality_issue_reported(
         request_id = created.json()["id"]
         line_id = created.json()["lines"][0]["id"]
 
-        submitted = client.post(
-            f"/api/v1/requests/{request_id}/submit", headers=headers
-        )
+        submitted = client.post(f"/api/v1/requests/{request_id}/submit", headers=headers)
         assert submitted.status_code == 200, submitted.text
 
     conn.commit()
     with conn.cursor() as cur:
         act_as(cur, workspace)
-        approved = client.post(
-            f"/api/v1/requests/{request_id}/approve", json={}, headers=headers
-        )
+        approved = client.post(f"/api/v1/requests/{request_id}/approve", json={}, headers=headers)
         assert approved.status_code == 200, approved.text
 
         confirmed = client.post(
             f"/api/v1/requests/{request_id}/confirm-delivery",
             json={
-                "lines": [
-                    {"purchase_request_line_id": line_id, "quantity_received": "3.000000"}
-                ]
+                "lines": [{"purchase_request_line_id": line_id, "quantity_received": "3.000000"}]
             },
             headers=headers,
         )

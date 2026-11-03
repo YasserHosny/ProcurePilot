@@ -175,6 +175,7 @@ def process_inbound_email(
                         update rfq
                         set status = 'responded'
                         where tenant_id = %s and id = %s and status = 'sent'
+                          and needed_by_date >= current_date
                         """,
                         (tenant_id, matched_rfq_id),
                     )

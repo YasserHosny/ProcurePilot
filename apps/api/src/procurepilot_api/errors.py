@@ -171,14 +171,36 @@ def _error_response(
     return JSONResponse(status_code=status_code, content=envelope.model_dump(mode="json"))
 
 
+def _format_loc(loc: Sequence[object]) -> str:
+    parts = list(loc)
+    if parts and parts[0] in {"body", "query", "path", "header"}:
+        parts = parts[1:]
+    if not parts:
+        return ""
+    result: list[str] = []
+    for part in parts:
+        if isinstance(part, int) or (isinstance(part, str) and part.isdigit()):
+            result.append(f"[{part}]")
+        else:
+            if result:
+                result.append(f".{part}")
+            else:
+                result.append(str(part))
+    return "".join(result)
+
+
 def _validation_details(errors: Sequence[dict[str, object]]) -> list[dict[str, object]]:
     details: list[dict[str, object]] = []
     for error in errors:
+        loc = list(error.get("loc", ()))
+        err_type = str(error.get("type", "value_error"))
         details.append(
             {
-                "loc": list(error.get("loc", ())),
+                "loc": loc,
                 "msg": redact(str(error.get("msg", "Invalid value."))),
-                "type": str(error.get("type", "value_error")),
+                "type": err_type,
+                "field": _format_loc(loc),
+                "reason": err_type,
             }
         )
     return details

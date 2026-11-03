@@ -1016,6 +1016,11 @@
         "supplierRequired": "Supplier confirmation is required before authorizing this quotation",
         "supplierEmptyState": "No suppliers in this workspace yet.",
         "supplierEmptyAction": "Add a supplier",
+        "supplierLoadError": "Failed to load suppliers.",
+        "supplierRetryAction": "Retry",
+        "supplierSearchPlaceholder": "Search suppliers...",
+        "supplierSearchClear": "Clear search",
+        "supplierNoMatches": "No suppliers match your search.",
         "currencyLabel": "Currency",
         "currencyPlaceholder": "e.g. {{currency}}",
         "currencyRequired": "Currency is required",
@@ -1064,8 +1069,8 @@
         "addLinePrice": "Unit Price",
         "confirmAdd": "Add",
         "cancelAdd": "Cancel",
-        "removeLine": "Remove this line",
-        "markedForRemoval": "Will be removed on save",
+        "removeLine": "Remove this line (extraction evidence is kept)",
+        "markedForRemoval": "Will be removed on save (extraction evidence is kept)",
         "undoRemove": "Undo removal",
         "pendingAdd": "New — will be added on save"
       },
@@ -1098,7 +1103,8 @@
         "editTooltip": "Correct this field value",
         "correctedBadge": "Corrected by Human",
         "confirmedBadge": "Confirmed",
-        "confirmAsIsTooltip": "Confirm this value is correct as extracted"
+        "confirmAsIsTooltip": "Confirm this value is correct as extracted",
+        "revertTooltip": "Revert to extracted value"
       },
       "arithmetic": {
         "mismatchTitle": "Arithmetic discrepancy detected",
@@ -2280,6 +2286,9 @@
     "list": {
       "newRequestButton": "New request"
     },
+    "table": {
+      "caption": "Purchase requests"
+    },
     "title": "Purchase Requests",
     "subtitle": "Create and track purchase requests for your branches and cost centres.",
     "status": {
@@ -2332,6 +2341,8 @@
       "noteLabel": "Note (optional)",
       "estimatedUnitPriceLabel": "Estimated Unit Price",
       "noEstimateAvailable": "No price history available for this product.",
+      "perPack": "{{price}} / pack",
+      "staleEstimate": "Saved estimate — save to refresh",
       "cancelButton": "Cancel",
       "saveDraftButton": "Save Draft",
       "submitButton": "Submit Request",
@@ -4137,7 +4148,17 @@
       "splitSavingHint": "Splitting this order between suppliers could save {{money}}.",
       "openPreparedRequest": "Open draft request",
       "openRequest": "Open request",
-      "convertedReason": "This RFQ is already converted into a request."
+      "convertedReason": "This RFQ is already converted into a request.",
+      "stillBeingRead": "Still being read",
+      "awaitingReview": "Awaiting review",
+      "mixedCurrenciesNotice": "Prices in more than one currency — this reply cannot be turned into a request",
+      "prepareErrorPendingMatches": "Cannot prepare request while lines are unmatched.",
+      "prepareErrorNoQuotationLines": "This reply has no lines to turn into a request.",
+      "prepareErrorNoMatchedLines": "None of the lines in this reply are matched to catalogue products.",
+      "prepareErrorNoPricingForRfqProducts": "This reply does not contain prices for the requested products.",
+      "prepareErrorQuotationArchived": "This quotation has been archived and cannot be converted.",
+      "prepareErrorQuotationRefused": "This quotation was refused and cannot be used to prepare a request.",
+      "prepareErrorMixedCurrencies": "Prices in this reply are in more than one currency."
     },
     "history": {
       "title": "RFQ History",
@@ -4184,7 +4205,40 @@
       "recipientStatus_sent": "Sent",
       "recipientStatus_failed": "Failed",
       "recipientStatus_draft": "Not sent",
-      "unknownSupplier": "Unknown supplier"
+      "unknownSupplier": "Unknown supplier",
+      "retry": "Retry",
+      "loadMore": "Load more",
+      "loadingMore": "Loading more RFQs...",
+      "loadMoreError": "Failed to load more RFQs.",
+      "showingRfqs": "Showing {{count}} RFQs",
+      "showingCount": {
+        "zero": "Showing 0 RFQs",
+        "one": "Showing 1 RFQ",
+        "two": "Showing 2 RFQs",
+        "few": "Showing {{count}} RFQs",
+        "many": "Showing {{count}} RFQs",
+        "other": "Showing {{count}} RFQs"
+      },
+      "openRfqAriaLabel": "Open RFQ, {{status}}, needed by {{date}}",
+      "recipientsAriaLabelFallback": "{{count}} recipients — show list",
+      "recipientsAriaLabel": {
+        "zero": "{{count}} recipients — show list",
+        "one": "{{count}} recipient — show list",
+        "two": "{{count}} recipients — show list",
+        "few": "{{count}} recipients — show list",
+        "many": "{{count}} recipients — show list",
+        "other": "{{count}} recipients — show list"
+      },
+      "responsesAriaLabelFallback": "{{count}} responses — compare",
+      "responsesAriaLabel": {
+        "zero": "{{count}} responses — compare",
+        "one": "{{count}} response — compare",
+        "two": "{{count}} responses — compare",
+        "few": "{{count}} responses — compare",
+        "many": "{{count}} responses — compare",
+        "other": "{{count}} responses — compare"
+      },
+      "draftActionsUnavailable": "Draft actions are currently unavailable because workspace members could not be loaded."
     },
     "detail": {
       "title": "RFQ Details",
@@ -4228,6 +4282,31 @@
       "recipientStatus_sent": "Sent",
       "recipientStatus_failed": "Failed",
       "recipientStatus_draft": "Not sent",
+      "reply": "Reply",
+      "replyStatus_notDelivered": "Not delivered",
+      "replyStatus_replied": "Replied",
+      "replyStatus_repliedCount": "Replied ({{count}})",
+      "replyStatus_noReply": "No reply",
+      "replyStatus_overdue": "Overdue — needed by {{date}}",
+      "replyStatus_awaiting": "Awaiting reply",
+      "suppliersRepliedTitle": "{{replied}} of {{total}} suppliers replied",
+      "suppliersReplied": {
+        "zero": "0 of {{total}} suppliers replied",
+        "one": "1 of {{total}} suppliers replied",
+        "two": "2 of {{total}} suppliers replied",
+        "few": "{{replied}} of {{total}} suppliers replied",
+        "many": "{{replied}} of {{total}} suppliers replied",
+        "other": "{{replied}} of {{total}} suppliers replied"
+      },
+      "suppliersOverdueTitle": "{{count}} overdue",
+      "suppliersOverdue": {
+        "zero": "0 overdue",
+        "one": "1 overdue",
+        "two": "2 overdue",
+        "few": "{{count}} overdue",
+        "many": "{{count}} overdue",
+        "other": "{{count}} overdue"
+      },
       "convertedIntoRequest": "Converted into request",
       "convertedCount": {
         "zero": "Converted into {{count}} requests",
@@ -4237,7 +4316,22 @@
         "many": "Converted into {{count}} requests",
         "other": "Converted into {{count}} requests"
       },
-      "approvedTogether": "These requests are submitted and approved together"
+      "approvedTogether": "These requests are submitted and approved together",
+      "unsentRecipientsTitle": "{{count}} suppliers have not received this RFQ",
+      "unsentRecipients": {
+        "zero": "0 suppliers have not received this RFQ",
+        "one": "1 supplier has not received this RFQ",
+        "two": "2 suppliers have not received this RFQ",
+        "few": "{{count}} suppliers have not received this RFQ",
+        "many": "{{count}} suppliers have not received this RFQ",
+        "other": "{{count}} suppliers have not received this RFQ"
+      },
+      "unsentRecipientsHelp": "Delivery failed or was not sent for these suppliers. You can retry sending to them now.",
+      "retryUnsentRecipients": "Retry unsent recipients",
+      "confirmRetryTitle": "Retry unsent recipients",
+      "confirmRetryMessage": "Retry sending this RFQ to {{count}} unsent supplier(s)?",
+      "confirmRetryButton": "Retry unsent recipients",
+      "cancelRetryButton": "Cancel"
     },
     "guardrails": {
       "title": "Guardrail settings",

@@ -155,6 +155,26 @@
   font-weight: 700;
 }
 
+input:read-only {
+  cursor: default;
+}
+
+.revert-btn {
+  width: 24px !important;
+  height: 24px !important;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+  }
+}
+
 .pending-new-line {
   display: flex;
   align-items: center;

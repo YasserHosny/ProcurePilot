@@ -92,6 +92,10 @@ export class HistoryComponent implements OnInit {
   readonly showCountsInMenu = computed(() => this.isBelow1200());
 
   readonly loading = signal<boolean>(true);
+  readonly loadError = signal<boolean>(false);
+  readonly loadingMore = signal<boolean>(false);
+  readonly loadMoreError = signal<boolean>(false);
+  readonly draftActionsUnavailable = signal<boolean>(false);
   readonly rfqs = signal<RfqSummary[]>([]);
   readonly nextCursor = signal<string | null>(null);
   readonly recipientsCache = signal<Record<string, RecipientsCacheEntry>>({});
@@ -113,9 +117,20 @@ export class HistoryComponent implements OnInit {
         this.isBelow768.set(res.matches);
       });
 
-    this.api.members().subscribe(({ items }) => {
-      const email = this.session.currentMember()?.email;
-      this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
+    this.api.members().subscribe({
+      next: ({ items }) => {
+        const email = this.session.currentMember()?.email;
+        this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
+      },
+      error: () => {
+        const fallbackId = this.session.currentMember()?.membership_id;
+        if (fallbackId) {
+          this.currentMembershipId.set(fallbackId);
+        } else {
+          this.currentMembershipId.set(null);
+          this.draftActionsUnavailable.set(true);
+        }
+      },
     });
     this.loadRfqs();
   }
@@ -123,6 +138,7 @@ export class HistoryComponent implements OnInit {
   loadRfqs(): void {
     this.recipientsCache.set({});
     this.loading.set(true);
+    this.loadError.set(false);
     this.rfqApi.listRfqs().subscribe({
       next: (response) => {
         this.rfqs.set(response.items);
@@ -131,13 +147,80 @@ export class HistoryComponent implements OnInit {
       },
       error: () => {
         this.loading.set(false);
-        this.snackBar.open(
-          this.translate.instant('rfq.history.loadError'),
-          this.translate.instant('rfq.history.dismiss'),
-          { duration: 5000 },
-        );
-      }
+        this.loadError.set(true);
+      },
     });
+  }
+
+  loadMore(): void {
+    const cursor = this.nextCursor();
+    if (this.loadingMore() || !cursor) {
+      return;
+    }
+
+    this.loadingMore.set(true);
+    this.loadMoreError.set(false);
+    this.rfqApi.listRfqs(undefined, cursor).subscribe({
+      next: (response) => {
+        const current = this.rfqs();
+        const existingIds = new Set(current.map((item) => item.id));
+        const uniqueItems = response.items.filter((item) => !existingIds.has(item.id));
+        this.rfqs.set([...current, ...uniqueItems]);
+        this.nextCursor.set(response.next_cursor);
+        this.loadingMore.set(false);
+      },
+      error: () => {
+        this.loadingMore.set(false);
+        this.loadMoreError.set(true);
+      },
+    });
+  }
+
+  showingRfqsText(): string {
+    const count = this.rfqs().length;
+    const locale = this.translate.getCurrentLang() || this.session.activeLocale?.() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    const key = `rfq.history.showingCount.${category}`;
+    const formatted = this.formatService.formatNumber(count);
+    const translated = this.translate.instant(key, { count: formatted });
+    if (translated && translated !== key) {
+      return translated;
+    }
+    return this.translate.instant('rfq.history.showingRfqs', { count: formatted });
+  }
+
+  getRowAccessibleName(rfq: RfqSummary): string {
+    const statusKey = `rfq.history.status_${rfq.status}`;
+    const statusText = this.translate.instant(statusKey);
+    const dateText = this.formatService.formatDate(rfq.needed_by_date);
+    return this.translate.instant('rfq.history.openRfqAriaLabel', {
+      status: statusText,
+      date: dateText,
+    });
+  }
+
+  getRecipientsAriaLabel(count: number): string {
+    const locale = this.translate.getCurrentLang() || this.session.activeLocale?.() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    const key = `rfq.history.recipientsAriaLabel.${category}`;
+    const rawCount = String(count);
+    const translated = this.translate.instant(key, { count: rawCount });
+    if (translated && translated !== key) {
+      return translated;
+    }
+    return this.translate.instant('rfq.history.recipientsAriaLabelFallback', { count: rawCount });
+  }
+
+  getResponsesAriaLabel(count: number): string {
+    const locale = this.translate.getCurrentLang() || this.session.activeLocale?.() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    const key = `rfq.history.responsesAriaLabel.${category}`;
+    const rawCount = String(count);
+    const translated = this.translate.instant(key, { count: rawCount });
+    if (translated && translated !== key) {
+      return translated;
+    }
+    return this.translate.instant('rfq.history.responsesAriaLabelFallback', { count: rawCount });
   }
 
   loadRecipients(rfqId: string): void {
@@ -178,7 +261,8 @@ export class HistoryComponent implements OnInit {
     }
   }
 
-  onRowClick(rfq: RfqSummary): void {
+  onRowClick(rfq: RfqSummary, event?: Event): void {
+    event?.stopPropagation();
     if (rfq.status === 'draft') {
       this.router.navigate(this.isCreator(rfq)
         ? ['/rfq', rfq.id, 'edit'] : ['/rfq', rfq.id]);

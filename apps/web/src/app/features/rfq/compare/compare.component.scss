@@ -306,6 +306,19 @@
   color: var(--sys-error);
 }
 
+.mixed-currency-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-block: 8px 16px;
+  color: var(--sys-error);
+  font-size: 0.875rem;
+}
+
+.mixed-currencies-dash {
+  color: var(--pp-text-muted);
+}
+
 .loading-state, .empty-state, .error-state {
   display: flex;
   flex-direction: column;

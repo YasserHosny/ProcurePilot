@@ -151,6 +151,18 @@
   }
 }
 
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 .status-chip {
   display: inline-block;
   padding-inline: 0.5rem;
@@ -169,7 +181,9 @@
     color: var(--pp-info);
   }
 
-  &[data-status='approved'] {
+  &[data-status='approved'],
+  &[data-status='ordered'],
+  &[data-status='delivered'] {
     background-color: var(--pp-success-container);
     color: var(--pp-success);
   }

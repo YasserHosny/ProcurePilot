@@ -140,6 +140,29 @@
             </mat-card>
           }
 
+          @if (showRetryNotice()) {
+            <mat-card class="draft-notice-card retry-notice-card" data-testid="rfq-detail-retry-notice">
+              <div class="draft-notice-content">
+                <div class="draft-notice-text">
+                  <h2>{{ unsentRecipientsTitle() }}</h2>
+                  <p>{{ 'rfq.detail.unsentRecipientsHelp' | translate }}</p>
+                </div>
+                <div class="draft-notice-actions">
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    [disabled]="retrying()"
+                    (click)="onRetryUnsent()"
+                    data-testid="rfq-detail-retry-button"
+                  >
+                    {{ 'rfq.detail.retryUnsentRecipients' | translate }}
+                  </button>
+                </div>
+              </div>
+            </mat-card>
+          }
+
           <mat-card class="details-card">
             <dl class="details-grid">
               <div class="detail-field">
@@ -148,6 +171,11 @@
                   <span class="status-badge" [ngClass]="getStatusClass(detail.rfq.status)">
                     {{ 'rfq.history.status_' + detail.rfq.status | translate }}
                   </span>
+                  @if (detail.rfq.status === 'sent' || detail.rfq.status === 'responded') {
+                    <div class="status-summary-line" data-testid="rfq-detail-status-summary">
+                      {{ recipientSummaryText() }}
+                    </div>
+                  }
                 </dd>
               </div>
 
@@ -265,6 +293,23 @@
                       <span class="status-text">
                         {{ 'rfq.detail.recipientStatus_' + recipient.status | translate }}
                       </span>
+                    </div>
+                  </td>
+                </ng-container>
+
+                <!-- Reply Column -->
+                <ng-container matColumnDef="reply">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'rfq.detail.reply' | translate }}</th>
+                  <td mat-cell *matCellDef="let recipient">
+                    @let replyState = getRecipientReplyState(recipient, detail.rfq);
+                    <div
+                      class="recipient-reply-wrap"
+                      [class.reply-overdue]="replyState.isOverdue"
+                      [class.reply-replied]="replyState.status === 'replied'"
+                      [attr.data-testid]="'recipient-reply-' + recipient.id"
+                    >
+                      <mat-icon aria-hidden="true" class="reply-icon">{{ replyState.icon }}</mat-icon>
+                      <span class="reply-text">{{ replyState.label }}</span>
                     </div>
                   </td>
                 </ng-container>
