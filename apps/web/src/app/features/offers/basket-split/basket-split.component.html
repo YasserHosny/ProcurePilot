@@ -62,6 +62,12 @@
   @if (!currentJob() && !isLoading() && !jobNotFound()) {
     <mat-card class="form-card">
       <form (ngSubmit)="submitBasket()" #basketForm="ngForm">
+        @if (rerunNotice()) {
+          <div class="info-banner" role="status" data-testid="rerun-notice">
+            <mat-icon aria-hidden="true">info</mat-icon>
+            <span>{{ 'basketSplit.rerunNotice' | translate }}</span>
+          </div>
+        }
         <!-- Section 1: Exactly Two Named Suppliers (FR-008, Research R5) -->
         <div class="form-section">
           <h2 class="section-title">{{ 'basketSplit.form.suppliersSectionTitle' | translate }}</h2>

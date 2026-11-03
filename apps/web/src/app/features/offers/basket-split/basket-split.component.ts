@@ -226,6 +226,8 @@ export class BasketSplitComponent implements OnInit {
   private pollFailures = 0;
   readonly jobNotFound = signal(false);
   readonly pollFailed = signal(false);
+  /** The form was filled from an earlier job: the buyer should confirm the commercial settings. */
+  readonly rerunNotice = signal(false);
 
   ngOnInit(): void {
     this.loadSuppliersAndProducts();
@@ -373,6 +375,7 @@ export class BasketSplitComponent implements OnInit {
 
     this.isSubmitting.set(true);
     this.errorMessage.set(null);
+    this.rerunNotice.set(false);
 
     const s1 = this.supplierId1();
     const s2 = this.supplierId2();
@@ -458,33 +461,10 @@ export class BasketSplitComponent implements OnInit {
       return;
     }
     if (job) {
-      // A standalone job carries its own suppliers and quantities (already in base units), so a
-      // rerun after a refresh or a direct visit does not depend on the form having been filled.
-      if (!this.isWriter() || this.isSubmitting()) return;
-      this.isSubmitting.set(true);
-      this.errorMessage.set(null);
-      this.api
-        .optimiseBasket({
-          supplier_ids: job.supplier_ids,
-          items: job.items,
-          risk_tolerance: this.riskTolerance(),
-          urgency: this.urgency(),
-          weights: this.weights(),
-        })
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: (next) => {
-            this.isSubmitting.set(false);
-            this.currentJob.set(next);
-            this.router.navigate(['/offers/basket-split', next.id]);
-            this.openJob();
-            this.pollJob(next.id);
-          },
-          error: (err: unknown) => {
-            this.isSubmitting.set(false);
-            this.handleError(err);
-          },
-        });
+      // The job response carries no risk tolerance, urgency, exclusions or weights, so a rerun
+      // cannot reproduce them. Put the job's suppliers and quantities back in the form and let
+      // the buyer confirm those settings rather than silently running with the defaults.
+      this.prefillFromJob(job);
       return;
     }
     this.submitBasket();
@@ -593,11 +573,34 @@ export class BasketSplitComponent implements OnInit {
       });
   }
 
+  /** Quantities on the job are in base units; the form takes packs. */
+  private prefillFromJob(job: BasketSplitJob): void {
+    const [first, second, ...rest] = job.supplier_ids;
+    this.supplierId1.set(first ?? '');
+    this.supplierId2.set(second ?? '');
+    this.additionalSupplierIds.set([...rest]);
+    this.items.set(
+      job.items.map((item) => {
+        const packs = parseFloat(item.quantity) / this.packBaseQuantityFor(item.workspace_product_id);
+        return {
+          workspace_product_id: item.workspace_product_id,
+          quantity: String(Math.round(packs * 1e6) / 1e6),
+        };
+      }),
+    );
+    this.stopPolling();
+    this.currentJob.set(null);
+    this.errorMessage.set(null);
+    this.hasAttemptedSubmit.set(false);
+    this.rerunNotice.set(true);
+  }
+
   resetForm(): void {
     this.jobGeneration += 1;
     this.stopPolling();
     this.jobNotFound.set(false);
     this.pollFailed.set(false);
+    this.rerunNotice.set(false);
     this.currentJob.set(null);
     this.errorMessage.set(null);
     this.hasAttemptedSubmit.set(false);

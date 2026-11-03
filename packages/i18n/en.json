@@ -1852,7 +1852,8 @@
     },
     "submit": {
       "successSplit": "{{count}} purchase requests submitted for approval as one split."
-    }
+    },
+    "rerunNotice": "This form was filled from an earlier split. Check the risk tolerance, urgency, excluded suppliers and weights, then run it again."
   },
   "alerts": {
     "title": "Actionable Alerts Inbox",

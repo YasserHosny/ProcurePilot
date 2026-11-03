@@ -686,17 +686,19 @@ describe('BasketSplitComponent (US3, T045)', () => {
       );
     });
 
-    it('should re-trigger optimisation via rerunOptimisation', () => {
-      component.items.set([{ workspace_product_id: 'prod-1', quantity: '10' }]);
+    it('re-opens a standalone job in the form on rerun and optimises only after the buyer submits', () => {
       apiService.optimiseBasket.and.returnValue(of(mockFeasibleJob));
       component.currentJob.set(mockFeasibleJob);
 
+      component.rerunOptimisation();
+      expect(apiService.optimiseBasket).not.toHaveBeenCalled();
+      expect(component.currentJob()).toBeNull();
+
       try {
-        component.rerunOptimisation();
+        component.submitBasket();
       } catch {
         // Router navigation
       }
-
       expect(apiService.optimiseBasket).toHaveBeenCalled();
     });
 
@@ -1117,10 +1119,10 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(component.currentJob()?.id).toBe('job-B');
     }));
 
-    it('reruns a standalone job from the job itself after a refresh', () => {
+    // The job response carries no risk, urgency or exclusions, so a rerun must not guess them.
+    it('re-opens a standalone job in the form for confirmation instead of rerunning it with defaults', () => {
       apiService.getBasketSplitJob.and.returnValue(of(mockFeasibleJob));
-      apiService.optimiseBasket.and.returnValue(of({ ...mockFeasibleJob, id: 'job-new', status: 'queued', result: null }));
-      component.fetchJob('job-1'); // a fresh page: the form signals were never filled in
+      component.fetchJob('job-1');
 
       try {
         component.rerunOptimisation();
@@ -1128,9 +1130,15 @@ describe('BasketSplitComponent (US3, T045)', () => {
         // Router navigation errors in the empty test router are expected.
       }
 
-      expect(apiService.optimiseBasket).toHaveBeenCalledWith(
-        jasmine.objectContaining({ supplier_ids: ['supp-1', 'supp-2'], items: mockFeasibleJob.items }),
-      );
+      expect(apiService.optimiseBasket).not.toHaveBeenCalled();
+      expect(component.currentJob()).toBeNull();
+      expect(component.supplierId1()).toBe('supp-1');
+      expect(component.supplierId2()).toBe('supp-2');
+      expect(component.items()).toEqual([
+        { workspace_product_id: 'prod-1', quantity: '10' },
+        { workspace_product_id: 'prod-2', quantity: '20' },
+      ]);
+      expect(component.rerunNotice()).toBeTrue();
     });
 
     it('offers preferred suppliers as well as active ones, without duplicates', () => {
