@@ -11,7 +11,7 @@ import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { BranchList, Member, Product, PurchaseRequest } from '../../../core/api/models';
+import type { BranchList, CostCentre, Member, Product, PurchaseRequest } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
 import { OrdersApiService, type RequestAllocation } from '../../orders/orders-api';
@@ -2443,5 +2443,241 @@ describe('RequestFormComponent — edit mode (T017)', () => {
 
       translate.use('en');
     });
+  });
+});
+
+// PPS-190: specs written before the implementation; Karma red/green is owned by the orchestrator.
+describe('RequestFormComponent — PPS-190 draft actions', () => {
+  let fixture: ComponentFixture<RequestFormComponent>;
+  let component: RequestFormComponent;
+  let requestsApi: jasmine.SpyObj<RequestsApiService>;
+  let router: jasmine.SpyObj<Router>;
+  let dialog: jasmine.SpyObj<MatDialog>;
+  let snackBar: jasmine.SpyObj<MatSnackBar>;
+  let params: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
+  let query: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
+  let confirmation: Subject<boolean>;
+  let centres: Subject<{ items: CostCentre[]; next_cursor: null }>;
+
+  beforeEach(async () => {
+    params = new BehaviorSubject(convertToParamMap({ id: 'r1' }));
+    query = new BehaviorSubject(convertToParamMap({}));
+    confirmation = new Subject<boolean>();
+    centres = new Subject();
+    requestsApi = jasmine.createSpyObj('RequestsApiService', [
+      'getRequest', 'withdrawRequest', 'withdrawGroup', 'createRequest', 'updateRequest',
+    ]);
+    requestsApi.getRequest.and.returnValue(of(mockRequest));
+    requestsApi.withdrawRequest.and.returnValue(of({ ...mockRequest, status: 'withdrawn' }));
+    router = jasmine.createSpyObj('Router', ['navigate']);
+    dialog = jasmine.createSpyObj('MatDialog', ['open']);
+    snackBar = jasmine.createSpyObj('MatSnackBar', ['open']);
+    dialog.open.and.returnValue({ afterClosed: () => confirmation.asObservable() } as ReturnType<MatDialog['open']>);
+    await TestBed.configureTestingModule({
+      imports: [RequestFormComponent],
+      providers: [
+        provideTranslateService(), provideRouter([]),
+        { provide: RequestsApiService, useValue: requestsApi },
+        { provide: OrdersApiService, useValue: jasmine.createSpyObj('OrdersApiService', ['getAllocations']) },
+        { provide: OrganisationApiService, useValue: {
+          listBranches: () => of({ items: [], next_cursor: null }),
+          listCostCentres: () => centres,
+        } },
+        { provide: ApiService, useValue: {
+          products: () => of({ items: [], next_cursor: null }),
+          members: () => of({ items: [], next_cursor: null }),
+        } },
+        { provide: ActivatedRoute, useValue: { paramMap: params, queryParamMap: query } },
+      ],
+    }).overrideComponent(RequestFormComponent, { set: { providers: [
+      provideAppDateAdapter(),
+      { provide: Router, useValue: router },
+      { provide: MatDialog, useValue: dialog },
+      { provide: MatSnackBar, useValue: snackBar },
+    ] } }).compileComponents();
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.setTranslation('ar', arCatalog);
+    translate.use('en');
+    fixture = TestBed.createComponent(RequestFormComponent);
+    component = fixture.componentInstance;
+  });
+
+  function start(duplicateFrom?: string): void {
+    if (duplicateFrom) {
+      params.next(convertToParamMap({}));
+      query.next(convertToParamMap({ duplicate_from: duplicateFrom }));
+    }
+    fixture.detectChanges();
+    centres.next({ items: [
+      { id: 'cc1', branch_id: 'b1', name: 'Centre', code: 'CC', is_archived: false, is_orphaned: false, created_at: '' },
+      { id: 'cc2', branch_id: 'b2', name: 'Other', code: 'CC2', is_archived: false, is_orphaned: false, created_at: '' },
+    ], next_cursor: null });
+    centres.complete();
+    fixture.detectChanges();
+  }
+
+  function button(selector: string): HTMLButtonElement | null {
+    return fixture.nativeElement.querySelector(selector);
+  }
+
+  it('shows Discard only for a non-split draft', () => {
+    start();
+    expect(button('.discard-draft-btn')?.textContent).toContain('Discard draft');
+    for (const req of [
+      { ...mockRequest, request_group: { id: 'g', rfq_id: 'rfq', position: 1, size: 2, sibling_request_ids: [], combined_total: { amount: '1', currency: 'GBP' } } },
+      ...(['submitted', 'withdrawn', 'rejected', 'approved', 'ordered'] as const).map(status => ({ ...mockRequest, status })),
+    ]) {
+      component.existingRequest.set(req);
+      fixture.detectChanges();
+      expect(button('.discard-draft-btn')).toBeNull();
+    }
+  });
+
+  it('opens the destructive discard confirmation and cancellation does nothing', () => {
+    start();
+    button('.discard-draft-btn')!.click();
+    expect(dialog.open).toHaveBeenCalledWith(jasmine.any(Function), jasmine.objectContaining({ data: {
+      titleKey: 'requests.discard.title', messageKey: 'requests.discard.message',
+      confirmKey: 'requests.discard.confirm', isDestructive: true,
+    } }));
+    confirmation.next(false);
+    expect(requestsApi.withdrawRequest).not.toHaveBeenCalled();
+    expect(snackBar.open).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('confirms discard with a stable idempotency key, then shows success and navigates', () => {
+    start();
+    requestsApi.withdrawRequest.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+    button('.discard-draft-btn')!.click();
+    confirmation.next(true);
+    const key = requestsApi.withdrawRequest.calls.mostRecent().args[1];
+    expect(key).toEqual(jasmine.any(String));
+    expect(component.errorMessage()).toBe(enCatalog.requests.genericError);
+    expect(router.navigate).not.toHaveBeenCalled();
+    requestsApi.withdrawRequest.and.returnValue(of({ ...mockRequest, status: 'withdrawn' }));
+    confirmation.next(true);
+    expect(requestsApi.withdrawRequest).toHaveBeenCalledWith('r1', key);
+    expect(requestsApi.withdrawGroup).not.toHaveBeenCalled();
+    expect(snackBar.open).toHaveBeenCalledWith('Draft discarded.', undefined, { duration: 3500 });
+    expect(router.navigate).toHaveBeenCalledWith(['/requests']);
+  });
+
+  it('shows Duplicate only for withdrawn and rejected and navigates with duplicate_from', () => {
+    start();
+    for (const status of ['draft', 'submitted', 'approved', 'ordered', 'withdrawn', 'rejected'] as const) {
+      component.existingRequest.set({ ...mockRequest, status });
+      fixture.detectChanges();
+      const duplicate = button('.duplicate-request-btn');
+      if (status === 'withdrawn' || status === 'rejected') {
+        expect(duplicate?.textContent).toContain('Duplicate as new draft');
+        duplicate!.click();
+        expect(router.navigate).toHaveBeenCalledWith(['/requests/new'], { queryParams: { duplicate_from: 'r1' } });
+      } else {
+        expect(duplicate).toBeNull();
+      }
+    }
+  });
+
+  it('prefills only branch, valid cost centre and editable lines with notes and no date or metadata', () => {
+    requestsApi.getRequest.and.returnValue(of({ ...mockRequest, status: 'rejected',
+      source_rfq_response_id: 'response',
+      source: { rfq_id: 'rfq', rfq_response_id: 'response', quotation_id: 'quote', supplier_id: 'supplier' },
+      request_group: { id: 'g', rfq_id: 'rfq', position: 1, size: 2, sibling_request_ids: ['sibling'], combined_total: { amount: '50', currency: 'GBP' } },
+      approval_step: { id: 'approval', assigned_membership_id: 'm1', source: 'owner_fallback', status: 'rejected' },
+      estimated_total: { amount: '50', currency: 'GBP' },
+      lines: [
+      { ...mockRequest.lines[0], quantity: '999999999999.999900', note: 'Keep this note' },
+    ] }));
+    start('r1');
+    expect(component.isEditMode()).toBeFalse();
+    expect(component.existingRequest()).toBeNull();
+    expect(component.form.enabled).toBeTrue();
+    expect(component.form.getRawValue()).toEqual({ branch_id: 'b1', cost_centre_id: 'cc1', required_by_date: null,
+      lines: [{ workspace_product_id: 'wp1', quantity: '999999999999.9999', note: 'Keep this note' }] });
+    expect(component.getLineEstimate(component.lines.at(0))).toBeNull();
+    expect(fixture.nativeElement.querySelector('.request-source-line, .split-info-line, .approval-step, .total-row')).toBeNull();
+    const banner = fixture.nativeElement.querySelector('.duplicate-banner');
+    expect(banner?.getAttribute('role')).toBe('status');
+    expect(banner?.textContent).toContain('Copied from a Rejected request. Choose a new required-by date and review the lines.');
+    component.saveDraft();
+    expect(requestsApi.createRequest).not.toHaveBeenCalled();
+    expect(component.form.controls.required_by_date.hasError('required')).toBeTrue();
+  });
+
+  it('drops cost centres missing from the loaded branch options', () => {
+    requestsApi.getRequest.and.returnValue(of({ ...mockRequest, cost_centre_id: 'cc2' }));
+    start('r1');
+    expect(component.form.controls.cost_centre_id.value).toBe('');
+    requestsApi.getRequest.and.returnValue(of({ ...mockRequest, cost_centre_id: 'deleted' }));
+    query.next(convertToParamMap({ duplicate_from: 'r2' }));
+    expect(component.form.controls.cost_centre_id.value).toBe('');
+  });
+
+  for (const status of [404, 500]) {
+    it(`falls back to an empty create form and generic error on duplicate source ${status}`, () => {
+      requestsApi.getRequest.and.returnValue(throwError(() => new HttpErrorResponse({ status })));
+      start('missing');
+      expect(component.existingRequest()).toBeNull();
+      expect(component.form.getRawValue()).toEqual({ branch_id: '', cost_centre_id: '', required_by_date: null,
+        lines: [{ workspace_product_id: '', quantity: '', note: '' }] });
+      expect(component.errorMessage()).toBe(enCatalog.requests.genericError);
+      expect(fixture.nativeElement.querySelector('.duplicate-banner')).toBeNull();
+    });
+  }
+
+  it('reloads from detail to duplicate, then a second source, then plain new', () => {
+    start();
+    requestsApi.getRequest.and.returnValue(of({ ...mockRequest, status: 'withdrawn' }));
+    params.next(convertToParamMap({}));
+    query.next(convertToParamMap({ duplicate_from: 'r1' }));
+    expect(component.form.controls.branch_id.value).toBe('b1');
+    requestsApi.getRequest.and.returnValue(of({ ...mockRequest, branch_id: 'b2', status: 'rejected' }));
+    query.next(convertToParamMap({ duplicate_from: 'r2' }));
+    fixture.detectChanges();
+    expect(requestsApi.getRequest).toHaveBeenCalledWith('r2');
+    expect(component.form.controls.branch_id.value).toBe('b2');
+    expect(fixture.nativeElement.querySelector('.duplicate-banner')?.textContent).toContain('Rejected');
+    query.next(convertToParamMap({}));
+    fixture.detectChanges();
+    expect(component.form.controls.branch_id.value).toBe('');
+    expect(component.lines.length).toBe(1);
+    expect(component.lines.at(0).controls.workspace_product_id.value).toBe('');
+    expect(fixture.nativeElement.querySelector('.duplicate-banner')).toBeNull();
+  });
+
+  it('saves a duplicate as a new draft and preserves it when the saved-id route emits', () => {
+    start('r1');
+    component.form.controls.required_by_date.setValue(new Date(2099, 0, 1));
+    requestsApi.createRequest.and.returnValue(of({ ...mockRequest, id: 'new-draft' }));
+    requestsApi.getRequest.calls.reset();
+    component.saveDraft();
+    expect(requestsApi.createRequest).toHaveBeenCalledOnceWith({
+      branch_id: 'b1', cost_centre_id: 'cc1', required_by_date: '2099-01-01',
+      lines: [{ workspace_product_id: 'wp1', quantity: '10', note: null }],
+    });
+    expect(requestsApi.updateRequest).not.toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/requests', 'new-draft']);
+    params.next(convertToParamMap({ id: 'new-draft' }));
+    query.next(convertToParamMap({}));
+    fixture.detectChanges();
+    expect(requestsApi.getRequest).not.toHaveBeenCalled();
+    expect(component.existingRequest()?.id).toBe('new-draft');
+    expect(component.lines.length).toBe(1);
+    expect(fixture.nativeElement.querySelector('.duplicate-banner')).toBeNull();
+  });
+
+  it('keeps plain new empty with one line and ignores duplicate_from in edit mode', () => {
+    params.next(convertToParamMap({}));
+    start();
+    expect(component.lines.length).toBe(1);
+    expect(component.form.controls.branch_id.value).toBe('');
+    expect(requestsApi.getRequest).not.toHaveBeenCalled();
+    query.next(convertToParamMap({ duplicate_from: 'other' }));
+    requestsApi.getRequest.calls.reset();
+    params.next(convertToParamMap({ id: 'r1' }));
+    expect(requestsApi.getRequest).toHaveBeenCalledOnceWith('r1');
+    expect(component.existingRequest()?.id).toBe('r1');
   });
 });
