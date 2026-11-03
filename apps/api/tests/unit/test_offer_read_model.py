@@ -77,3 +77,47 @@ def test_offer_projection_replays_v2_inclusive() -> None:
         pack_base_quantity=Decimal("1"),
     )
     assert result.total.amount == "1380.0000"
+
+
+def test_offer_projection_prices_the_suppliers_own_pack_not_the_catalogue_pack() -> None:
+    """P-157: a 9 L supplier pack bought against an 18 L catalogue pack is twice as many packs."""
+    from procurepilot_api.modules.offers.projection import project_landed_cost
+
+    result = project_landed_cost(
+        raw_inputs={
+            "quantity": "10",
+            "normalised_base_quantity": "90",
+            "base_unit": "litre",
+            "unit_price": {"amount": "50.00", "currency": "SAR"},
+            "vat_rate": "0",
+            "delivery_fee": {"amount": "0", "currency": "SAR"},
+            "discount": {"amount": "0", "currency": "SAR"},
+        },
+        rule_version="landed-cost-v1",
+        requested_quantity=Decimal("180"),
+        pack_base_quantity=Decimal("18"),
+    )
+
+    assert result.total.amount == "1000.0000"  # 180 L / 9 L = 20 supplier packs x 50
+    assert result.normalised_unit_price.amount == "5.5556"
+
+
+def test_offer_projection_falls_back_to_the_catalogue_pack_without_a_usable_quote_pack() -> None:
+    from procurepilot_api.modules.offers.projection import project_landed_cost
+
+    result = project_landed_cost(
+        raw_inputs={
+            "quantity": "0",
+            "normalised_base_quantity": "0",
+            "base_unit": "litre",
+            "unit_price": {"amount": "50.00", "currency": "SAR"},
+            "vat_rate": "0",
+            "delivery_fee": {"amount": "0", "currency": "SAR"},
+            "discount": {"amount": "0", "currency": "SAR"},
+        },
+        rule_version="landed-cost-v1",
+        requested_quantity=Decimal("180"),
+        pack_base_quantity=Decimal("18"),
+    )
+
+    assert result.total.amount == "500.0000"  # 180 L / 18 L = 10 packs x 50
