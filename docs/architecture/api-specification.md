@@ -2924,18 +2924,20 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
 - Any owner or buyer may call this endpoint.
 - A recipient supplier with no on-file contact email is silently excluded from the created RFQ
   and reported back in `rejected_recipients`, rather than failing the whole request.
-- Returns `201` with the created `Rfq`, its `RfqLine`s, its `RfqRecipient`s, and
+- Returns `201` with the created `Rfq` (including `reference_number`, assigned by trigger and formatted by clients as `RFQ-000123`), its `RfqLine`s, its `RfqRecipient`s, and
   `rejected_recipients`.
 
 ### `GET /rfq/{rfq_id}`
 
 - The RFQ's creator (whatever their current role) or any owner or buyer may read an RFQ in their
   workspace (`rfq_select` RLS policy); another workspace's RFQ returns `404`.
-- Returns the `Rfq`, including nullable `cancelled_at`, with its lines and recipients
+- Returns the `Rfq`, including `reference_number` (formatted as `RFQ-000123`) and nullable `cancelled_at`, with its lines and recipients
   (`RfqDetail`), so a saved draft can be reopened
   for editing.
 - Each recipient includes `response_count` (integer, default `0`): the number of `rfq_response`
-  rows with that recipient's `rfq_recipient_id` and `tenant_id`.
+  rows with that recipient's `rfq_recipient_id` and `tenant_id`. Recipient send record fields
+  track delivery state: `failure_reason` (`delivery_error`, `missing_contact_email`, or `null`),
+  `send_attempts` (integer >= 0), and `last_attempt_at` (nullable timestamptz).
 - Also carries `converted_purchase_request_ids` (every purchase request prepared from this RFQ —
   one per supplier in a split) and `request_group_id` (the split's group, once prepared)
   (spec 024; rolling out).
@@ -2949,18 +2951,23 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
 - Only the RFQ's creator may edit it (`403`, `reason: not_creator`). A non-draft RFQ returns `409`
   (`reason: not_draft`); a draft that already has supplier responses returns `409`
   (`reason: has_responses`).
-- Returns `200` with the same shape as `POST /rfq`, including `rejected_recipients`.
+- Returns `200` with the same shape as `POST /rfq`, including `rejected_recipients` and `reference_number`.
 
 ### `POST /rfq/{rfq_id}/send`
 
 - Accepts `Idempotency-Key` (required).
-- Dispatches the RFQ by email (via Mailgun — ADR-018) to every recipient still in `draft` status;
+- An active owner or the RFQ's creator may send or retry sending the RFQ (PPS-179); any other member
+  receives `403` (`details: {"resource": "rfq", "reason": "not_creator"}`).
+- Dispatches the RFQ by email (via Mailgun — ADR-018) to every recipient still in `draft` or `failed` status;
   a recipient already `sent` from a prior call is left untouched, making a retry naturally
   idempotent without needing the idempotency key for this specific case.
-- A per-recipient send failure leaves that one recipient `draft` (not `failed` unless the mailer
-  itself reports a hard failure) rather than failing the whole call — the RFQ's own `status`
-  moves to `sent` as soon as at least one recipient succeeds.
-- Returns `200` with the updated `Rfq` and all its `RfqRecipient`s.
+- For each attempted recipient delivery, `send_attempts` increments by 1 and `last_attempt_at` is set
+  to current time. On mailer success, `status` moves to `sent` and `failure_reason` is set to `null`. On
+  mailer failure, `status` moves to `failed` and `failure_reason` is set to `delivery_error` (without provider text).
+  Recipients whose supplier lacks a contact email are set to `failed` with `failure_reason: missing_contact_email`
+  (attempts unchanged).
+- The RFQ's own `status` moves to `sent` as soon as at least one recipient succeeds.
+- Returns `200` with the updated `Rfq` (including `reference_number`) and all its `RfqRecipient`s with their send records.
 
 ### `POST /rfq/{rfq_id}/cancel`
 
@@ -3018,7 +3025,7 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
 ### `GET /rfq`
 
 - Lists every RFQ visible to the caller, cursor-paginated (`limit` capped at 100), each with its
-  recipient count, response count, and — once `status = converted` — the id of the purchase
+  `reference_number` (formatted as `RFQ-000123`), recipient count, response count, and — once `status = converted` — the id of the purchase
   request it produced. Each `RfqSummary` also carries `converted_purchase_request_ids` (every
   purchase request prepared from the RFQ — one per supplier in a split) and `request_group_id`
   (the split's group, once prepared) (spec 024).
