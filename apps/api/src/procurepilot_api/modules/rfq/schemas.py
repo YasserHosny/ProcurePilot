@@ -98,6 +98,8 @@ class RfqResponseLineComparison(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     workspace_product_id: UUID | None
+    product_name: str | None = None
+    product_variant: str | None = None
     original_text: str
     quoted_quantity: Decimal
     quoted_unit_price_amount: Decimal
@@ -116,6 +118,7 @@ class RfqProductLandedCost(BaseModel):
     """A reply's landed cost for the RFQ's quantity of one product, priced as the split does."""
 
     workspace_product_id: UUID
+    product_name: str | None = None
     total_amount: Decimal
     total_currency: str
 
@@ -126,6 +129,7 @@ class RfqResponseComparison(BaseModel):
     id: UUID
     rfq_id: UUID
     supplier_id: UUID
+    supplier_name: str | None = None
     quotation_id: UUID
     submitted_at: datetime
     quotation_status: QuotationStatus

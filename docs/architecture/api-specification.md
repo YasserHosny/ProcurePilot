@@ -2963,6 +2963,13 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
 
 ### `GET /rfq/{rfq_id}/responses`
 
+- Display fields are optional and default to `null`: `RfqResponseComparison.supplier_name`
+  is the tenant-scoped supplier's `name`; `RfqResponseLineComparison.product_name` is the
+  matched workspace product's `tenant_name`, and `product_variant` is its joined canonical
+  product's `variant`. Unmatched lines return `null` for both product fields.
+  `RfqProductLandedCost.product_name` likewise carries the workspace product's `tenant_name`.
+  Names remain available for archived suppliers/products and are independent of catalogue
+  list pagination. All tenant-owned name joins include the tenant scope.
 - Lists every captured response to one RFQ for comparison, each with its per-line matched product
   (or an explicit `pending_match` flag when a line's extraction/matching hasn't completed yet —
   independent of and possibly lagging RFQ response capture) and quoted quantity/price.
