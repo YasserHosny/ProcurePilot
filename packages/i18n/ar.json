@@ -1016,6 +1016,11 @@
         "supplierRequired": "تأكيد المورد إلزامي قبل اعتماد عرض السعر",
         "supplierEmptyState": "لا يوجد موردون في مساحة العمل هذه حتى الآن.",
         "supplierEmptyAction": "إضافة مورد",
+        "supplierLoadError": "فشل في تحميل الموردين.",
+        "supplierRetryAction": "إعادة المحاولة",
+        "supplierSearchPlaceholder": "البحث عن موردين...",
+        "supplierSearchClear": "مسح البحث",
+        "supplierNoMatches": "لا يوجد موردون يطابقون بحثك.",
         "currencyLabel": "العملة",
         "currencyPlaceholder": "مثال: {{currency}}",
         "currencyRequired": "العملة مطلوبة",
@@ -1064,8 +1069,8 @@
         "addLinePrice": "سعر الوحدة",
         "confirmAdd": "إضافة",
         "cancelAdd": "إلغاء",
-        "removeLine": "إزالة هذا العنصر",
-        "markedForRemoval": "سيتم إزالته عند الحفظ",
+        "removeLine": "إزالة هذا العنصر (يتم الاحتفاظ بأدلة الاستخراج)",
+        "markedForRemoval": "سيتم إزالته عند الحفظ (يتم الاحتفاظ بأدلة الاستخراج)",
         "undoRemove": "التراجع عن الإزالة",
         "pendingAdd": "جديد — سيتم إضافته عند الحفظ"
       },
@@ -1098,7 +1103,8 @@
         "editTooltip": "تصحيح قيمة هذا الحقل",
         "correctedBadge": "تم التصحيح يدوياً",
         "confirmedBadge": "مؤكد",
-        "confirmAsIsTooltip": "تأكيد أن هذه القيمة صحيحة كما استُخرجت"
+        "confirmAsIsTooltip": "تأكيد أن هذه القيمة صحيحة كما استُخرجت",
+        "revertTooltip": "استعادة القيمة المستخرجة"
       },
       "arithmetic": {
         "mismatchTitle": "تم اكتشاف فرق حسابي",
@@ -1361,6 +1367,7 @@
       "notAvailable": "غير متاح",
       "noFilterResults": "لا توجد مهام مطابقة تطابق عوامل التصفية الحالية",
       "clearFilters": "إعادة تعيين التصفية",
+      "retry": "إعادة المحاولة",
       "loadMore": "تحميل المزيد",
       "emptyTitle": "لا توجد مهام مطابقة",
       "emptyMessage": "لا توجد بنود عروض أسعار بانتظار تسوية المطابقة حالياً.",
@@ -1404,10 +1411,10 @@
       "readOnlyBanner": "لديك صلاحية العرض فقط. مالك مساحة العمل والمشتري فقط يمكنهما تسوية المطابقة وإنشاء المنتجات.",
       "keyboardShortcutsTitle": "أزرار التحكم بلوحة المفاتيح",
       "shortcuts": {
-        "selectCandidate": "1–9: اختيار المرشح",
-        "navigate": "↑ / ↓: التنقل بين المرشحين",
-        "confirm": "Enter: تأكيد القرار",
-        "toggleOutcome": "O: التبديل بين الخيارات"
+        "selectCandidate": "اختيار المرشح",
+        "navigate": "التنقل بين المرشحين",
+        "confirm": "تأكيد القرار",
+        "toggleOutcome": "التبديل بين الخيارات"
       },
       "lineDetails": {
         "title": "تفاصيل بند عرض السعر",
@@ -2294,8 +2301,18 @@
     }
   },
   "requests": {
+    "errors": {
+      "quantity_not_positive": "يجب أن تكون الكمية أكبر من صفر.",
+      "required_by_in_the_past": "لا يمكن أن يكون تاريخ الاستحقاق في الماضي.",
+      "duplicate_product": "هذا المنتج موجود بالفعل في بند آخر.",
+      "cost_centre_not_found": "مركز التكلفة غير موجود.",
+      "cost_centre_branch_mismatch": "مركز التكلفة لا ينتمي إلى الفرع المحدد.",
+      "product_not_found": "المنتج غير موجود."
+    },
     "list": {
-      "newRequestButton": "طلب جديد"
+      "newRequestButton": "طلب جديد",
+      "loadMore": "تحميل المزيد",
+      "loadedCount": "تم تحميل {{count}} من طلبات الشراء"
     },
     "table": {
       "caption": "طلبات الشراء"
@@ -2307,7 +2324,7 @@
       "submitted": "مقدمة",
       "pending": "معلقة",
       "approved": "معتمدة",
-      "ordered": "مطلوبة",
+      "ordered": "تم إصدار أمر الشراء",
       "delivered": "مستلمة",
       "rejected": "مرفوضة",
       "withdrawn": "مسحوبة"
@@ -2340,18 +2357,24 @@
       "branchRequired": "الفرع مطلوب.",
       "costCentreLabel": "مركز التكلفة (اختياري)",
       "requiredByDateLabel": "مطلوب بحلول",
+      "requiredByHint": "التنسيق: {{format}}",
       "requiredByDateRequired": "تاريخ الاستحقاق مطلوب.",
       "requiredByDateInvalid": "أدخل تاريخًا صالحًا (YYYY-MM-DD).",
       "linesTitle": "البنود",
+      "lineGroup": "البند {{position}}",
       "addLineButton": "إضافة بند",
       "removeLineButton": "إزالة البند",
+      "removeLineWithProduct": "إزالة البند {{position}}: {{product}}",
       "productLabel": "المنتج",
       "productRequired": "اختر منتجًا.",
       "quantityLabel": "الكمية",
       "quantityRequired": "يجب أن تكون الكمية أكبر من صفر.",
+      "quantityPattern": "يجب أن تكون الكمية رقمًا أكبر من صفر.",
       "noteLabel": "ملاحظة (اختيارية)",
       "estimatedUnitPriceLabel": "سعر الوحدة المقدر",
       "noEstimateAvailable": "لا توجد بيانات أسعار سابقة لهذا المنتج.",
+      "perPack": "{{price}} / العبوة",
+      "staleEstimate": "التقدير المحفوظ — احفظ للتحديث",
       "cancelButton": "إلغاء",
       "saveDraftButton": "حفظ كمسودة",
       "submitButton": "إرسال الطلب",
@@ -2362,6 +2385,8 @@
       "atLeastOneLineRequired": "مطلوب بند واحد على الأقل."
     },
     "empty": "لا توجد طلبات شراء بعد. أنشئ أول طلب للبدء.",
+    "listEmptyFiltered": "لا توجد طلبات شراء تطابق هذا الفلتر.",
+    "clearFilter": "إلغاء التصفية",
     "createSuccess": "تم حفظ طلب الشراء كمسودة.",
     "submitSuccess": "تم إرسال طلب الشراء للاعتماد.",
     "withdrawSuccess": "تم سحب طلب الشراء.",
@@ -2482,7 +2507,31 @@
       "summary": "تقسيم من طلب تسعير {{short}} · {{requests}} · {{total}} · يوفر {{saving}}",
       "summaryNoSaving": "تقسيم من طلب تسعير {{short}} · {{requests}} · {{total}}",
       "splitFromRfq": "تقسيم من طلب تسعير {{short}}",
-      "saves": "يوفر {{saving}}"
+      "saves": "يوفر {{saving}}",
+      "loadingSiblings": "جارٍ تحميل باقي هذا التقسيم…",
+      "siblingsError": "تعذر تحميل باقي هذا التقسيم.",
+      "retry": "إعادة المحاولة"
+    },
+    "pagination": {
+      "loadMore": "تحميل المزيد",
+      "loading": "جارٍ التحميل...",
+      "showing": {
+        "zero": "عرض 0 طلب",
+        "one": "عرض طلب واحد",
+        "two": "عرض طلبين",
+        "few": "عرض {{count}} طلبات",
+        "many": "عرض {{count}} طلبًا",
+        "other": "عرض {{count}} طلب"
+      },
+      "showingMore": {
+        "zero": "عرض 0 طلب، ويتوفر المزيد",
+        "one": "عرض طلب واحد، ويتوفر المزيد",
+        "two": "عرض طلبين، ويتوفر المزيد",
+        "few": "عرض {{count}} طلبات، ويتوفر المزيد",
+        "many": "عرض {{count}} طلبًا، ويتوفر المزيد",
+        "other": "عرض {{count}} طلب، ويتوفر المزيد"
+      },
+      "loadError": "تعذر تحميل المزيد من الطلبات. يرجى المحاولة مرة أخرى."
     },
     "requestCount": {
       "zero": "لا توجد طلبات",
@@ -3704,7 +3753,9 @@
       "packUnit": "عبوة {{size}} {{unit}}",
       "baseUnitPrice": "لكل {{unit}}",
       "vatInclusiveHint": "صافي بعد خصم ضريبة القيمة المضافة {{rate}}% · سعر العرض {{gross}} شامل الضريبة",
-      "remainingQuantity": "المتبقي للطلب"
+      "remainingQuantity": "المتبقي للطلب",
+      "sourceLoadError": "تعذّر تحميل الطلب المعتمد، لذلك لا يمكن إنشاء أمر شراء منه. ارجع وحاول مرة أخرى.",
+      "fromApprovedRequestPlain": "من طلب معتمد"
     },
     "status": {
       "draft": "مسودة",
@@ -3761,7 +3812,38 @@
       "cancelConfirmTitle": "هل تريد إلغاء طلب الشراء؟",
       "cancelConfirmMessage": "هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟ ستبقى أي كمية مستلمة مستهلكة، وسيتم إعادة أي كمية غير مستلمة إلى طلب المصدر.",
       "cancelOrder": "نعم، إلغاء الطلب",
-      "recordOutcome": "تسجيل النتيجة"
+      "recordOutcome": "تسجيل النتيجة",
+      "submitConfirmTitle": "هل تريد تقديم أمر الشراء؟",
+      "submitConfirmMessage": "يسجّل هذا الإجراء الأمر كمُقدَّم داخل بروكيور بايلوت لتتمكن من تسجيل أدلة التسليم. لا يُرسل شيء إلى المورّد، شاركه الأمر بنفسك. يمكنك إلغاء الأمر المُقدَّم إلى أن يُستلم بالكامل.",
+      "submitConfirm": "نعم، قدّم الأمر",
+      "receiptQuantityRequired": "أدخل كمية مستلمة أكبر من صفر في بند واحد على الأقل.",
+      "errors": {
+        "order_not_open_for_evidence": "هذا الأمر مسودة أو ملغى أو مغلق، لذلك لا يقبل أدلة التسليم أو التأكيد.",
+        "order_not_cancellable": "استُلم هذا الأمر بالكامل أو أُغلق، لذلك لا يمكن إلغاؤه.",
+        "order_already_cancelled": "هذا الأمر ملغى بالفعل."
+      }
+    },
+    "resultCount": "{{count}} أمر شراء",
+    "loadMoreError": "تعذّر تحميل المزيد من الأوامر. الأوامر الظاهرة أعلاه ما زالت معروضة.",
+    "filters": {
+      "search": "بحث",
+      "searchPlaceholder": "رقم الأمر أو المورّد",
+      "status": "الحالة",
+      "allStatuses": "كل الحالات",
+      "sort": "ترتيب حسب",
+      "apply": "بحث",
+      "noMatchTitle": "لا توجد أوامر مطابقة",
+      "noMatchDescription": "غيّر البحث أو فلتر الحالة لعرض المزيد من الأوامر."
+    },
+    "sort": {
+      "created_at_desc": "الأحدث أولاً",
+      "created_at_asc": "الأقدم أولاً",
+      "order_date_desc": "تاريخ الأمر، الأحدث",
+      "order_date_asc": "تاريخ الأمر، الأقدم",
+      "total_desc": "الإجمالي، الأعلى",
+      "total_asc": "الإجمالي، الأدنى",
+      "order_number_asc": "رقم الأمر، تصاعدي",
+      "order_number_desc": "رقم الأمر، تنازلي"
     }
   },
   "accounting": {
@@ -4157,7 +4239,22 @@
       "splitSavingHint": "تقسيم هذا الطلب بين الموردين قد يوفّر {{money}}.",
       "openPreparedRequest": "فتح مسودة الطلب",
       "openRequest": "فتح الطلب",
-      "convertedReason": "تم تحويل طلب عروض الأسعار بالفعل إلى طلب شراء."
+      "convertedReason": "تم تحويل طلب عروض الأسعار بالفعل إلى طلب شراء.",
+      "stillBeingRead": "قيد القراءة حالياً",
+      "awaitingReview": "بانتظار المراجعة",
+      "mixedCurrenciesNotice": "الأسعار بأكثر من عملة واحدة — لا يمكن تحويل هذا الرد إلى طلب شراء",
+      "prepareErrorPendingMatches": "لا يمكن إعداد الطلب بينما توجد بنود غير مطابقة.",
+      "prepareErrorNoQuotationLines": "لا يحتوي هذا الرد على أي بنود لتحويلها إلى طلب شراء.",
+      "prepareErrorNoMatchedLines": "لم تتم مطابقة أي من البنود الواردة في هذا الرد مع منتجات الكتالوج.",
+      "prepareErrorNoPricingForRfqProducts": "لا يتضمن هذا الرد أسعاراً للمنتجات المطلوبة في طلب عروض الأسعار.",
+      "prepareErrorQuotationArchived": "تمت أرشفة عرض السعر هذا ولا يمكن تحويله إلى طلب شراء.",
+      "prepareErrorQuotationRefused": "رُفض عرض السعر هذا ولا يمكن استخدامه لإعداد طلب شراء.",
+      "prepareErrorMixedCurrencies": "الأسعار في هذا الرد واردة بأكثر من عملة واحدة.",
+      "prepareErrorRfqExpired": "انتهت صلاحية طلب عرض الأسعار هذا ولا يمكن تجهيز طلبات منه.",
+      "expiredNotice": "انتهت صلاحية طلب عرض الأسعار هذا — لم يعد بالإمكان تجهيز طلبات منه",
+      "rfqExpired": "انتهت صلاحية طلب عرض الأسعار",
+      "branchesLoadError": "فشل تحميل الفروع.",
+      "rfqDetailLoadError": "فشل تحميل تفاصيل طلب عرض الأسعار."
     },
     "history": {
       "title": "سجل طلبات عروض الأسعار",
@@ -4204,7 +4301,40 @@
       "recipientStatus_sent": "مرسل",
       "recipientStatus_failed": "فاشل",
       "recipientStatus_draft": "لم يُرسل",
-      "unknownSupplier": "مورد غير معروف"
+      "unknownSupplier": "مورد غير معروف",
+      "retry": "إعادة المحاولة",
+      "loadMore": "تحميل المزيد",
+      "loadingMore": "جاري تحميل المزيد من طلبات عروض الأسعار...",
+      "loadMoreError": "تعذر تحميل المزيد من طلبات عروض الأسعار.",
+      "showingRfqs": "عرض {{count}} من طلبات عروض الأسعار",
+      "showingCount": {
+        "zero": "عرض 0 من طلبات عروض الأسعار",
+        "one": "عرض طلب عرض أسعار واحد",
+        "two": "عرض طلبي عروض أسعار",
+        "few": "عرض {{count}} طلبات عروض أسعار",
+        "many": "عرض {{count}} طلب عرض أسعار",
+        "other": "عرض {{count}} طلب عرض أسعار"
+      },
+      "openRfqAriaLabel": "فتح طلب عرض الأسعار، {{status}}، مطلوب بحلول {{date}}",
+      "recipientsAriaLabelFallback": "{{count}} من المستلمين — عرض القائمة",
+      "recipientsAriaLabel": {
+        "zero": "{{count}} مستلمين — عرض القائمة",
+        "one": "{{count}} مستلم — عرض القائمة",
+        "two": "{{count}} مستلمان — عرض القائمة",
+        "few": "{{count}} مستلمين — عرض القائمة",
+        "many": "{{count}} مستلمًا — عرض القائمة",
+        "other": "{{count}} مستلم — عرض القائمة"
+      },
+      "responsesAriaLabelFallback": "{{count}} من الردود — مقارنة",
+      "responsesAriaLabel": {
+        "zero": "{{count}} ردود — مقارنة",
+        "one": "{{count}} رد — مقارنة",
+        "two": "{{count}} ردان — مقارنة",
+        "few": "{{count}} ردود — مقارنة",
+        "many": "{{count}} ردًا — مقارنة",
+        "other": "{{count}} رد — مقارنة"
+      },
+      "draftActionsUnavailable": "إجراءات المسودة غير متاحة حاليًا لتعذر تحميل أعضاء مساحة العمل."
     },
     "detail": {
       "title": "تفاصيل طلب عرض الأسعار",
@@ -4226,6 +4356,7 @@
       "tabItems": "البنود",
       "tabRecipients": "المستلمون ({{count}})",
       "tabResponses": "الردود ({{count}})",
+      "tabResponsesNoCount": "الردود",
       "statusLabel": "الحالة",
       "sentAtLabel": "تاريخ الإرسال",
       "neededByLabel": "مطلوب بحلول",
@@ -4248,6 +4379,31 @@
       "recipientStatus_sent": "مرسل",
       "recipientStatus_failed": "فاشل",
       "recipientStatus_draft": "لم يُرسل",
+      "reply": "الرد",
+      "replyStatus_notDelivered": "لم يتم التسليم",
+      "replyStatus_replied": "تم الرد",
+      "replyStatus_repliedCount": "تم الرد ({{count}})",
+      "replyStatus_noReply": "لا يوجد رد",
+      "replyStatus_overdue": "متأخر — مطلوب بحلول {{date}}",
+      "replyStatus_awaiting": "بانتظار الرد",
+      "suppliersRepliedTitle": "رد {{replied}} من أصل {{total}} من الموردين",
+      "suppliersReplied": {
+        "zero": "لم يرد أي مورد من أصل {{total}}",
+        "one": "رد مورد واحد من أصل {{total}}",
+        "two": "رد موردان من أصل {{total}}",
+        "few": "رد {{replied}} من أصل {{total}} موردين",
+        "many": "رد {{replied}} من أصل {{total}} موردًا",
+        "other": "رد {{replied}} من أصل {{total}} مورد"
+      },
+      "suppliersOverdueTitle": "{{count}} متأخر",
+      "suppliersOverdue": {
+        "zero": "0 متأخر",
+        "one": "1 متأخر",
+        "two": "2 متأخر",
+        "few": "{{count}} متأخرة",
+        "many": "{{count}} متأخرًا",
+        "other": "{{count}} متأخر"
+      },
       "convertedIntoRequest": "تم التحويل إلى الطلب",
       "convertedCount": {
         "zero": "لم يتم التحويل إلى أي طلبات",
@@ -4272,7 +4428,9 @@
       "confirmRetryTitle": "إعادة إرسال للمستلمين الذين لم يستلموا",
       "confirmRetryMessage": "هل تريد إعادة إرسال طلب عرض الأسعار هذا إلى {{count}} من الموردين الذين لم يستلموه؟",
       "confirmRetryButton": "إعادة المحاولة للمستلمين الذين لم يستلموا",
-      "cancelRetryButton": "إلغاء"
+      "cancelRetryButton": "إلغاء",
+      "rfqExpiredError": "انتهت صلاحية طلب عرض الأسعار هذا ولم يعد بالإمكان إرساله.",
+      "notSendableError": "لا يمكن إرسال طلب عرض الأسعار هذا في حالته الحالية."
     },
     "guardrails": {
       "title": "إعدادات الضوابط",

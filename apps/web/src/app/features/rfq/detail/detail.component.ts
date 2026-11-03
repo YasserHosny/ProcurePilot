@@ -1,7 +1,9 @@
-import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, DestroyRef, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subject, forkJoin, of, catchError, tap, switchMap } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
@@ -18,6 +20,22 @@ import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { CompareComponent } from '../compare/compare.component';
+import { isDateInPast } from '../history/history.component';
+
+export type RecipientReplyStatus =
+  | 'not_delivered'
+  | 'replied'
+  | 'no_reply'
+  | 'overdue'
+  | 'awaiting_reply';
+
+export interface RecipientReplyState {
+  status: RecipientReplyStatus;
+  icon: string;
+  label: string;
+  isOverdue: boolean;
+  count: number;
+}
 
 const TAB_MAP: Record<string, number> = {
   details: 0,
@@ -59,10 +77,12 @@ export class DetailComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
   private readonly formatService = inject(FormatService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly loadTrigger$ = new Subject<string>();
 
   readonly rfqId = signal<string>('');
   readonly rfqDetail = signal<RfqDetail | null>(null);
-  readonly responseCount = signal<number>(0);
+  readonly responseCount = signal<number | null>(null);
   readonly loading = signal<boolean>(true);
   readonly isNotFound = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
@@ -71,7 +91,54 @@ export class DetailComponent implements OnInit {
   readonly retrying = signal<boolean>(false);
 
   readonly displayedItemColumns = ['product', 'quantity'];
-  readonly displayedRecipientColumns = ['supplier', 'contactEmail', 'status', 'sentAt'];
+  readonly displayedRecipientColumns = ['supplier', 'contactEmail', 'status', 'reply', 'sentAt'];
+
+  constructor() {
+    this.loadTrigger$.pipe(
+      takeUntilDestroyed(this.destroyRef),
+      tap((id) => {
+        const idChanged = id !== this.rfqId();
+        this.rfqId.set(id);
+        this.loading.set(true);
+        this.isNotFound.set(false);
+        this.errorMessage.set(null);
+        if (idChanged) {
+          this.rfqDetail.set(null);
+          this.responseCount.set(null);
+        }
+      }),
+      switchMap((id) =>
+        forkJoin({
+          detail: this.rfqApi.getRfq(id).pipe(
+            catchError((err: unknown) => of({ __error: true, err })),
+          ),
+          responses: this.rfqApi.listResponses(id).pipe(
+            catchError((err: unknown) => of({ __error: true, err })),
+          ),
+        }),
+      ),
+    ).subscribe(({ detail, responses }) => {
+      this.loading.set(false);
+      if ('__error' in detail) {
+        this.rfqDetail.set(null);
+        this.responseCount.set(null);
+        const err = detail.err;
+        if (err instanceof HttpErrorResponse && err.status === 404) {
+          this.isNotFound.set(true);
+        } else {
+          this.errorMessage.set(this.translate.instant('rfq.detail.loadError'));
+        }
+      } else {
+        this.rfqDetail.set(detail);
+      }
+
+      if ('__error' in responses) {
+        this.responseCount.set(null);
+      } else {
+        this.responseCount.set(responses.items.length);
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.api.members().subscribe(({ items }) => {
@@ -79,14 +146,14 @@ export class DetailComponent implements OnInit {
       this.currentMembershipId.set(items.find((m) => m.email === email)?.id ?? null);
     });
 
-    this.route.paramMap.subscribe((params) => {
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id');
       if (id) {
         this.loadRfq(id);
       }
     });
 
-    this.route.queryParamMap.subscribe((queryParams) => {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((queryParams) => {
       const tabParam = queryParams.get('tab');
       if (tabParam && tabParam in TAB_MAP) {
         this.selectedTabIndex.set(TAB_MAP[tabParam]);
@@ -95,34 +162,8 @@ export class DetailComponent implements OnInit {
   }
 
   loadRfq(id: string): void {
-    this.rfqId.set(id);
-    this.loading.set(true);
-    this.isNotFound.set(false);
-    this.errorMessage.set(null);
-
-    this.rfqApi.getRfq(id).subscribe({
-      next: (detail) => {
-        this.rfqDetail.set(detail);
-        this.loading.set(false);
-      },
-      error: (err: unknown) => {
-        this.loading.set(false);
-        if (err instanceof HttpErrorResponse && err.status === 404) {
-          this.isNotFound.set(true);
-        } else {
-          this.errorMessage.set(this.translate.instant('rfq.detail.loadError'));
-        }
-      },
-    });
-
-    this.rfqApi.listResponses(id).subscribe({
-      next: (res) => {
-        this.responseCount.set(res.items.length);
-      },
-      error: () => {
-        this.responseCount.set(0);
-      },
-    });
+    if (!id) return;
+    this.loadTrigger$.next(id);
   }
 
   onTabChange(index: number): void {
@@ -135,8 +176,16 @@ export class DetailComponent implements OnInit {
     });
   }
 
-  responsesReceivedTitle(): string {
+  responsesTabLabel(): string {
     const count = this.responseCount();
+    if (count === null) {
+      return this.translate.instant('rfq.detail.tabResponsesNoCount');
+    }
+    return this.translate.instant('rfq.detail.tabResponses', { count: this.formatService.formatNumber(count) });
+  }
+
+  responsesReceivedTitle(): string {
+    const count = this.responseCount() ?? 0;
     const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
     const category = new Intl.PluralRules(locale).select(count);
     const key = `rfq.detail.responsesReceived.${category}`;
@@ -219,6 +268,126 @@ export class DetailComponent implements OnInit {
     }
   }
 
+  getRecipientReplyState(
+    recipient: RfqRecipient,
+    rfq: { status: string; needed_by_date?: string | null } | null = this.rfqDetail()?.rfq ?? null,
+  ): RecipientReplyState {
+    const responseCount = recipient.response_count ?? 0;
+    const rfqStatus = rfq?.status;
+    const neededByDate = rfq?.needed_by_date;
+
+    if (recipient.status === 'draft' || recipient.status === 'failed') {
+      return {
+        status: 'not_delivered',
+        icon: 'block',
+        label: this.translate.instant('rfq.detail.replyStatus_notDelivered'),
+        isOverdue: false,
+        count: responseCount,
+      };
+    }
+
+    if (recipient.status === 'sent' && responseCount > 0) {
+      const formatted = this.formatService.formatNumber(responseCount);
+      const label =
+        responseCount > 1
+          ? this.translate.instant('rfq.detail.replyStatus_repliedCount', { count: formatted })
+          : this.translate.instant('rfq.detail.replyStatus_replied');
+      return {
+        status: 'replied',
+        icon: 'check',
+        label,
+        isOverdue: false,
+        count: responseCount,
+      };
+    }
+
+    if (recipient.status === 'sent' && (rfqStatus === 'expired' || rfqStatus === 'converted')) {
+      return {
+        status: 'no_reply',
+        icon: 'close',
+        label: this.translate.instant('rfq.detail.replyStatus_noReply'),
+        isOverdue: false,
+        count: responseCount,
+      };
+    }
+
+    if (
+      recipient.status === 'sent' &&
+      (rfqStatus === 'sent' || rfqStatus === 'responded') &&
+      isDateInPast(neededByDate)
+    ) {
+      const formattedDate = this.formatDate(neededByDate);
+      return {
+        status: 'overdue',
+        icon: 'warning',
+        label: this.translate.instant('rfq.detail.replyStatus_overdue', { date: formattedDate }),
+        isOverdue: true,
+        count: responseCount,
+      };
+    }
+
+    return {
+      status: 'awaiting_reply',
+      icon: 'schedule',
+      label: this.translate.instant('rfq.detail.replyStatus_awaiting'),
+      isOverdue: false,
+      count: responseCount,
+    };
+  }
+
+  recipientSummaryCounts(detail: RfqDetail | null = this.rfqDetail()): {
+    replied: number;
+    delivered: number;
+    overdue: number;
+  } {
+    if (!detail) {
+      return { replied: 0, delivered: 0, overdue: 0 };
+    }
+    const recipients = detail.recipients ?? [];
+    const delivered = recipients.filter((r) => r.status === 'sent');
+    const replied = delivered.filter((r) => (r.response_count ?? 0) > 0);
+    const overdue = delivered.filter((r) => this.getRecipientReplyState(r, detail.rfq).status === 'overdue');
+    return {
+      replied: replied.length,
+      delivered: delivered.length,
+      overdue: overdue.length,
+    };
+  }
+
+  recipientSummaryText(detail: RfqDetail | null = this.rfqDetail()): string {
+    if (!detail) return '';
+    const counts = this.recipientSummaryCounts(detail);
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const rules = new Intl.PluralRules(locale);
+
+    const repliedCategory = rules.select(counts.replied);
+    const repliedKey = `rfq.detail.suppliersReplied.${repliedCategory}`;
+    const repliedParams = {
+      replied: this.formatService.formatNumber(counts.replied),
+      total: this.formatService.formatNumber(counts.delivered),
+    };
+    let repliedPart = this.translate.instant(repliedKey, repliedParams);
+    if (!repliedPart || repliedPart === repliedKey) {
+      repliedPart = this.translate.instant('rfq.detail.suppliersRepliedTitle', repliedParams);
+    }
+
+    if (counts.overdue <= 0) {
+      return repliedPart;
+    }
+
+    const overdueCategory = rules.select(counts.overdue);
+    const overdueKey = `rfq.detail.suppliersOverdue.${overdueCategory}`;
+    const overdueParams = {
+      count: this.formatService.formatNumber(counts.overdue),
+    };
+    let overduePart = this.translate.instant(overdueKey, overdueParams);
+    if (!overduePart || overduePart === overdueKey) {
+      overduePart = this.translate.instant('rfq.detail.suppliersOverdueTitle', overdueParams);
+    }
+
+    return `${repliedPart} · ${overduePart}`;
+  }
+
   isCreator(): boolean {
     return this.rfqDetail()?.rfq.created_by_membership_id === this.currentMembershipId();
   }
@@ -289,8 +458,13 @@ export class DetailComponent implements OnInit {
                 key = 'rfq.creatorOnly';
               } else if (err.status === 422) {
                 const envelope = err.error as { details?: { reason?: string }; reason?: string } | null;
-                if (envelope?.details?.reason === 'needed_by_in_past' || envelope?.reason === 'needed_by_in_past') {
+                const reason = envelope?.details?.reason ?? envelope?.reason;
+                if (reason === 'needed_by_in_past') {
                   key = 'rfq.create.neededByPastError';
+                } else if (reason === 'rfq_expired') {
+                  key = 'rfq.detail.rfqExpiredError';
+                } else if (reason === 'not_sendable') {
+                  key = 'rfq.detail.notSendableError';
                 }
               }
             }
@@ -344,7 +518,22 @@ export class DetailComponent implements OnInit {
             this.loadRfq(id);
           },
           error: (err: unknown) => {
-            const key = err instanceof HttpErrorResponse && err.status === 403 ? 'rfq.creatorOnly' : 'rfq.history.sendError';
+            let key = 'rfq.history.sendError';
+            if (err instanceof HttpErrorResponse) {
+              if (err.status === 403) {
+                key = 'rfq.creatorOnly';
+              } else if (err.status === 422) {
+                const envelope = err.error as { details?: { reason?: string }; reason?: string } | null;
+                const reason = envelope?.details?.reason ?? envelope?.reason;
+                if (reason === 'needed_by_in_past') {
+                  key = 'rfq.create.neededByPastError';
+                } else if (reason === 'rfq_expired') {
+                  key = 'rfq.detail.rfqExpiredError';
+                } else if (reason === 'not_sendable') {
+                  key = 'rfq.detail.notSendableError';
+                }
+              }
+            }
             this.snackBar.open(
               this.translate.instant(key),
               this.translate.instant('rfq.history.dismiss'),

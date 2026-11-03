@@ -46,23 +46,62 @@
     </mat-card>
   }
 
+  @if (isExpired()) {
+    <mat-card class="draft-notice-card expired-notice-card" data-testid="rfq-compare-expired-notice">
+      <div class="draft-notice-content">
+        <div class="draft-notice-text">
+          <p>{{ 'rfq.compare.expiredNotice' | translate }}</p>
+        </div>
+      </div>
+    </mat-card>
+  }
+
   @if (responses().length > 0) {
     <div class="controls-section">
-      <mat-form-field appearance="outline">
-        <mat-label>{{ 'rfq.compare.branchLabel' | translate }}</mat-label>
-        <mat-select
-          [ngModel]="selectedBranchId()"
-          (ngModelChange)="onBranchChange($event)"
-          [placeholder]="'rfq.compare.branchPlaceholder' | translate"
-          [required]="!isConverted()"
+      @if (branchesError()) {
+        <div class="branch-error-warning" data-testid="branches-load-error" role="alert">
+          <mat-icon color="warn" aria-hidden="true">warning</mat-icon>
+          <span>{{ 'rfq.compare.branchesLoadError' | translate }}</span>
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="loadBranches()"
+            data-testid="retry-branches-button"
           >
-          @for (branch of branches(); track branch) {
-            <mat-option [value]="branch.id">
-              {{ branch.name }}
-            </mat-option>
-          }
-        </mat-select>
-      </mat-form-field>
+            {{ 'common.retry' | translate }}
+          </button>
+        </div>
+      } @else {
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'rfq.compare.branchLabel' | translate }}</mat-label>
+          <mat-select
+            [ngModel]="selectedBranchId()"
+            (ngModelChange)="onBranchChange($event)"
+            [placeholder]="'rfq.compare.branchPlaceholder' | translate"
+            [required]="!isConverted()"
+            >
+            @for (branch of branches(); track branch) {
+              <mat-option [value]="branch.id">
+                {{ branch.name }}
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      }
+      @if (rfqDetailError()) {
+        <div class="rfq-detail-error-warning" data-testid="rfq-detail-load-error" role="alert">
+          <mat-icon color="warn" aria-hidden="true">warning</mat-icon>
+          <span>{{ 'rfq.compare.rfqDetailLoadError' | translate }}</span>
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="reloadRfqDetail()"
+            data-testid="retry-rfq-detail-button"
+          >
+            {{ 'common.retry' | translate }}
+          </button>
+        </div>
+      }
       <mat-form-field appearance="outline">
         <mat-label>{{ 'rfq.compare.requiredByLabel' | translate }}</mat-label>
         <input matInput [matDatepicker]="picker" [(ngModel)]="requiredByDate">
@@ -119,7 +158,9 @@
         </button>
         @if (!splitEligibility().canSplit) {
           <div class="split-disabled-reason" data-testid="split-disabled-reason">
-            @if (splitEligibility().reason === 'needs_two_matched') {
+            @if (splitEligibility().reason === 'rfq_expired') {
+              <span>{{ 'rfq.compare.rfqExpired' | translate }}</span>
+            } @else if (splitEligibility().reason === 'needs_two_matched') {
               <span>{{ 'rfq.compare.needsTwoMatched' | translate }}</span>
               @if (splitEligibility().unmatchedCount > 0) {
                 <a class="match-lines-link"
@@ -208,7 +249,11 @@
                     {{ { amount: (line.quoted_quantity * line.quoted_unit_price_amount), currency: line.quoted_unit_price_currency } | formatMoney }}
                   </td>
                   <td mat-footer-cell *matFooterCellDef class="pp-figures total-value-cell">
-                    {{ { amount: responseTotal(response), currency: responseCurrency(response) } | formatMoney }}
+                    @if (!hasMixedCurrencies(response)) {
+                      {{ { amount: responseTotal(response) ?? 0, currency: responseCurrency(response) ?? '' } | formatMoney }}
+                    } @else {
+                      <span class="mixed-currencies-dash">—</span>
+                    }
                   </td>
                 </ng-container>
                 <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
@@ -216,7 +261,7 @@
                 <tr mat-footer-row *matFooterRowDef="displayedColumns" class="total-row"></tr>
               </table>
             }
-            @if (response.quotation_status !== 'refused' && !isEligible(response)) {
+            @if (response.quotation_status !== 'refused' && unmatchedCount(response) > 0) {
               <div class="pending-warning">
                 <mat-icon color="warn" aria-hidden="true">info</mat-icon>
                 <a
@@ -226,6 +271,12 @@
                 >
                   {{ matchLinesLabel(unmatchedCount(response)) }}
                 </a>
+              </div>
+            }
+            @if (response.quotation_status !== 'refused' && hasMixedCurrencies(response)) {
+              <div class="mixed-currency-notice" data-testid="mixed-currency-notice">
+                <mat-icon color="warn" aria-hidden="true">info</mat-icon>
+                <span>{{ 'rfq.compare.mixedCurrenciesNotice' | translate }}</span>
               </div>
             }
             @if (response.guardrail_evaluations?.length) {
@@ -267,14 +318,26 @@
                   </a>
                 } @else {
                   <button mat-flat-button color="primary"
-                    [disabled]="!canPrepare(response) || isConverted()"
+                    [disabled]="!canPrepare(response) || isConverted() || isExpired()"
                     (click)="prepareRequest(response)">
                     {{ 'rfq.compare.prepareRequest' | translate }}
                   </button>
                 }
               </div>
-              @if (!isConverted() && isEligible(response) && !selectedBranchId()) {
-                <span class="disabled-reason">{{ 'rfq.compare.chooseBranchFirst' | translate }}</span>
+              @if (!isConverted()) {
+                @if (isExpired()) {
+                  <span class="disabled-reason" data-testid="expired-reason">{{ 'rfq.compare.rfqExpired' | translate }}</span>
+                } @else if (branchesError()) {
+                  <span class="disabled-reason" data-testid="branches-error-reason">{{ 'rfq.compare.branchesLoadError' | translate }}</span>
+                } @else if (rfqDetailError()) {
+                  <span class="disabled-reason" data-testid="rfq-detail-error-reason">{{ 'rfq.compare.rfqDetailLoadError' | translate }}</span>
+                } @else if (!isEligible(response)) {
+                  <span class="disabled-reason" data-testid="ineligible-reason">{{ ineligibilityReason(response) | translate }}</span>
+                } @else if (hasMixedCurrencies(response)) {
+                  <span class="disabled-reason" data-testid="mixed-currencies-reason">{{ 'rfq.compare.mixedCurrenciesNotice' | translate }}</span>
+                } @else if (!selectedBranchId()) {
+                  <span class="disabled-reason">{{ 'rfq.compare.chooseBranchFirst' | translate }}</span>
+                }
               }
               @if (isConverted() && !convertedPurchaseRequestId()) {
                 <span class="disabled-reason" data-testid="converted-reason">

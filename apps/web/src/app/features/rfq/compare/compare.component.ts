@@ -1,4 +1,6 @@
-import { Component, OnInit, OnChanges, inject, signal, computed, input, model, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnChanges, SimpleChanges, DestroyRef, Output, EventEmitter, inject, signal, computed, input, model, ChangeDetectionStrategy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subject, forkJoin, of, catchError, tap, switchMap } from 'rxjs';
 
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -63,6 +65,11 @@ export class CompareComponent implements OnInit, OnChanges {
   readonly embedded = input<boolean>(false);
   readonly rfqId = model<string>('');
 
+  @Output() readonly responseCountChange = new EventEmitter<number | null>();
+
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly loadTrigger$ = new Subject<string>();
+
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
@@ -85,17 +92,29 @@ export class CompareComponent implements OnInit, OnChanges {
   readonly guardrails = signal<readonly RfqGuardrail[]>([]);
   readonly currentMembershipId = signal<string | null>(null);
   readonly isSplitting = signal<boolean>(false);
+  readonly preparing = signal<string | null>(null);
+  readonly branchesError = signal<boolean>(false);
+  readonly rfqDetailError = signal<boolean>(false);
   private splitIdempotencyKey: string | null = null;
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
   readonly isConverted = computed<boolean>(() => this.rfqDetail()?.rfq.status === 'converted');
+  readonly isExpired = computed<boolean>(() => this.rfqDetail()?.rfq.status === 'expired');
 
   readonly splitEligibility = computed<{
     canSplit: boolean;
-    reason: 'needs_two_matched' | 'mixed_currency' | null;
+    reason: 'rfq_expired' | 'needs_two_matched' | 'mixed_currency' | null;
     unmatchedCount: number;
     unmatchedQuotationIds: string[];
   }>(() => {
+    if (this.isExpired() || this.isConverted()) {
+      return {
+        canSplit: false,
+        reason: this.isExpired() ? 'rfq_expired' : null,
+        unmatchedCount: 0,
+        unmatchedQuotationIds: [],
+      };
+    }
     const responses = this.responses();
     const nonRefused = responses.filter((r) => r.quotation_status !== 'refused');
     const eligibleReplies = nonRefused.filter(
@@ -141,9 +160,82 @@ export class CompareComponent implements OnInit, OnChanges {
     };
   });
 
+  constructor() {
+    this.loadTrigger$.pipe(
+      takeUntilDestroyed(this.destroyRef),
+      tap(() => {
+        this.isLoading.set(true);
+        this.errorMessage.set(null);
+        this.rfqDetailError.set(false);
+        this.responses.set([]);
+        this.rfqDetail.set(null);
+        this.responseCountChange.emit(null);
+      }),
+      switchMap((id) =>
+        forkJoin({
+          detail: this.rfqApi.getRfq(id).pipe(
+            catchError((err: unknown) => of({ __error: true, err })),
+          ),
+          responses: this.rfqApi.listResponses(id).pipe(
+            catchError((err: unknown) => of({ __error: true, err })),
+          ),
+        }),
+      ),
+    ).subscribe(({ detail, responses }) => {
+      this.isLoading.set(false);
+
+      if (detail && '__error' in detail) {
+        this.rfqDetail.set(null);
+        this.rfqDetailError.set(true);
+      } else if (detail) {
+        this.rfqDetail.set(detail);
+        this.rfqDetailError.set(false);
+        const parsedNeededBy = parseIsoDateLocal(detail.rfq.needed_by_date);
+        if (parsedNeededBy) {
+          this.requiredByDate.set(parsedNeededBy);
+        }
+        this.applyBranchPreselection();
+      }
+
+      if ('__error' in responses) {
+        this.responses.set([]);
+        this.responseCountChange.emit(null);
+        const err = responses.err;
+        if (err instanceof HttpErrorResponse) {
+          const apiError = err.error as ApiError | undefined;
+          this.errorMessage.set(apiError?.message ?? err.message);
+        } else {
+          this.errorMessage.set(this.translate.instant('rfq.compare.loadError'));
+        }
+      } else {
+        this.responses.set(responses.items);
+        this.responseCountChange.emit(responses.items.length);
+        if (this.session.hasRole('owner')) {
+          this.rfqApi.listGuardrails().subscribe({
+            next: (guardrails) => this.guardrails.set(guardrails),
+          });
+        }
+        this.resolveSuppliers();
+        this.resolveProducts();
+      }
+    });
+  }
+
   formatQuantity(value: string | number): string { return this.formatService.formatExactQuantity(value); }
 
-  responseTotal(response: RfqResponseComparison): number {
+  hasMixedCurrencies(response: RfqResponseComparison): boolean {
+    const currencies = new Set(
+      response.lines
+        .map((line) => line.quoted_unit_price_currency?.trim().toUpperCase())
+        .filter((c): c is string => Boolean(c)),
+    );
+    return currencies.size > 1;
+  }
+
+  responseTotal(response: RfqResponseComparison): number | null {
+    if (this.hasMixedCurrencies(response)) {
+      return null;
+    }
     return response.lines.reduce((sum, line) => {
       const qty = Number(line.quoted_quantity) || 0;
       const price = Number(line.quoted_unit_price_amount) || 0;
@@ -151,7 +243,10 @@ export class CompareComponent implements OnInit, OnChanges {
     }, 0);
   }
 
-  responseCurrency(response: RfqResponseComparison): string {
+  responseCurrency(response: RfqResponseComparison): string | null {
+    if (this.hasMixedCurrencies(response)) {
+      return null;
+    }
     return response.lines[0]?.quoted_unit_price_currency || '';
   }
 
@@ -217,7 +312,7 @@ export class CompareComponent implements OnInit, OnChanges {
       return new Set<string>();
     }
 
-    const totals = eligible.map((r) => ({ id: r.id, total: this.responseTotal(r) }));
+    const totals = eligible.map((r) => ({ id: r.id, total: this.responseTotal(r) ?? 0 }));
     const minTotal = Math.min(...totals.map((t) => t.total));
     const ids = new Set<string>();
     for (const t of totals) {
@@ -356,7 +451,7 @@ export class CompareComponent implements OnInit, OnChanges {
       this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
     });
     if (!this.rfqId()) {
-      this.route.paramMap.subscribe((params) => {
+      this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
         const id = params.get('id');
         if (id) {
           this.rfqId.set(id);
@@ -368,50 +463,36 @@ export class CompareComponent implements OnInit, OnChanges {
     this.loadBranches();
   }
 
-  ngOnChanges(): void {
+  ngOnChanges(changes?: SimpleChanges): void {
     const id = this.rfqId();
-    if (id && this.rfqDetail()?.rfq.id !== id) {
+    if (id && (!changes || changes['rfqId'] || this.rfqDetail()?.rfq.id !== id)) {
       this.loadData(id);
     }
   }
 
   loadData(rfqId: string): void {
-    this.isLoading.set(true);
-    this.errorMessage.set(null);
+    if (!rfqId) return;
+    this.rfqId.set(rfqId);
+    this.loadTrigger$.next(rfqId);
+  }
 
-    this.rfqApi.getRfq?.(rfqId)?.subscribe({
+  reloadRfqDetail(): void {
+    const id = this.rfqId();
+    if (!id) return;
+    this.rfqDetailError.set(false);
+    this.rfqApi.getRfq(id).subscribe({
       next: (detail) => {
         this.rfqDetail.set(detail);
+        this.rfqDetailError.set(false);
         const parsedNeededBy = parseIsoDateLocal(detail.rfq.needed_by_date);
         if (parsedNeededBy) {
           this.requiredByDate.set(parsedNeededBy);
         }
         this.applyBranchPreselection();
       },
-      error: () => this.rfqDetail.set(null),
-    });
-
-    this.rfqApi.listResponses(rfqId).subscribe({
-      next: (res) => {
-        this.responses.set(res.items);
-        if (this.session.hasRole('owner')) {
-          this.rfqApi.listGuardrails().subscribe({
-            next: (guardrails) => this.guardrails.set(guardrails),
-          });
-        }
-        this.resolveSuppliers();
-        this.resolveProducts();
-        this.isLoading.set(false);
-      },
-      error: (err: unknown) => {
-        this.isLoading.set(false);
-        this.responses.set([]);
-        if (err instanceof HttpErrorResponse) {
-          const apiError = err.error as ApiError | undefined;
-          this.errorMessage.set(apiError?.message ?? err.message);
-        } else {
-          this.errorMessage.set(this.translate.instant('rfq.compare.loadError'));
-        }
+      error: () => {
+        this.rfqDetail.set(null);
+        this.rfqDetailError.set(true);
       },
     });
   }
@@ -487,13 +568,16 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   loadBranches(): void {
+    this.branchesError.set(false);
     this.api.listBranches({ is_active: true, limit: 100 }).subscribe({
       next: (res) => {
         this.branches.set(res.items);
+        this.branchesError.set(false);
         this.applyBranchPreselection();
       },
       error: () => {
-        // Soft fail
+        this.branches.set([]);
+        this.branchesError.set(true);
       },
     });
   }
@@ -528,24 +612,61 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   isEligible(response: RfqResponseComparison): boolean {
-    return response.quotation_status !== 'refused' && response.lines.every((l) => !l.pending_match);
+    return (
+      response.lines.length > 0 &&
+      response.quotation_status === 'reviewed' &&
+      response.lines.every((l) => !l.pending_match)
+    );
+  }
+
+  ineligibilityReason(response: RfqResponseComparison): string | null {
+    if (this.isEligible(response)) {
+      return null;
+    }
+    if (response.quotation_status === 'refused') {
+      return 'rfq.compare.refused';
+    }
+    if (response.lines.length === 0) {
+      return 'rfq.compare.stillBeingRead';
+    }
+    if (response.quotation_status !== 'reviewed') {
+      return 'rfq.compare.awaitingReview';
+    }
+    if (response.lines.some((l) => l.pending_match)) {
+      return 'rfq.compare.pendingMatch';
+    }
+    return null;
+  }
+
+  isPreparing(responseId?: string): boolean {
+    const cur = this.preparing();
+    return responseId ? cur === responseId : Boolean(cur);
   }
 
   canPrepare(response: RfqResponseComparison): boolean {
     return (
       !this.isConverted() &&
+      !this.isExpired() &&
+      !this.branchesError() &&
+      !this.rfqDetailError() &&
       this.isEligible(response) &&
+      !this.hasMixedCurrencies(response) &&
       Boolean(this.selectedBranchId()) &&
-      Boolean(this.requiredByDate())
+      Boolean(this.requiredByDate()) &&
+      !this.isPreparing(response.id)
     );
   }
 
   prepareRequest(response: RfqResponseComparison): void {
-    if (this.isConverted()) return;
+    if (this.isConverted() || this.isExpired()) return;
     if (response.quotation_status === 'refused') return;
-    if (!this.isEligible(response)) {
+    if (this.isPreparing(response.id)) return;
+    if (!this.isEligible(response) || this.hasMixedCurrencies(response)) {
+      const key = this.hasMixedCurrencies(response)
+        ? 'rfq.compare.mixedCurrenciesNotice'
+        : 'rfq.compare.cannotPreparePending';
       this.snackBar.open(
-        this.translate.instant('rfq.compare.cannotPreparePending'),
+        this.translate.instant(key),
         this.translate.instant('rfq.history.dismiss'),
         { duration: 3000 },
       );
@@ -576,8 +697,11 @@ export class CompareComponent implements OnInit, OnChanges {
       required_by_date: requiredBy,
     };
 
+    this.preparing.set(response.id);
+
     this.rfqApi.prepareRequest(this.rfqId(), payload).subscribe({
       next: (res) => {
+        this.preparing.set(null);
         const snackRef = this.snackBar.open(
           this.translate.instant('rfq.compare.prepareSuccess'),
           this.translate.instant('rfq.compare.openDraft'),
@@ -596,26 +720,55 @@ export class CompareComponent implements OnInit, OnChanges {
         navigateToDraft();
       },
       error: (err: unknown) => {
-        if (err instanceof HttpErrorResponse && err.status === 409) {
-          const reason = (err.error as ApiError | undefined)?.details?.['reason'];
-          if (reason === 'rfq_already_converted') {
-            this.snackBar.open(
-              this.translate.instant('rfq.compare.alreadyConverted'),
-              this.translate.instant('rfq.history.dismiss'),
-              { duration: 5000 },
-            );
-            const id = this.rfqId();
-            if (id) {
-              this.loadData(id);
-            }
-            return;
-          }
-        }
-        const message =
+        this.preparing.set(null);
+        const reason =
           err instanceof HttpErrorResponse
-            ? ((err.error as ApiError | undefined)?.message ??
-              this.translate.instant('rfq.compare.prepareError'))
-            : this.translate.instant('rfq.compare.prepareError');
+            ? (err.error as ApiError | undefined)?.details?.['reason']
+            : undefined;
+
+        if (reason === 'rfq_already_converted') {
+          this.snackBar.open(
+            this.translate.instant('rfq.compare.alreadyConverted'),
+            this.translate.instant('rfq.history.dismiss'),
+            { duration: 5000 },
+          );
+          const id = this.rfqId();
+          if (id) {
+            this.loadData(id);
+          }
+          return;
+        }
+
+        if (reason === 'rfq_expired') {
+          this.snackBar.open(
+            this.translate.instant('rfq.compare.prepareErrorRfqExpired'),
+            this.translate.instant('rfq.history.dismiss'),
+            { duration: 5000 },
+          );
+          const id = this.rfqId();
+          if (id) {
+            this.loadData(id);
+          }
+          return;
+        }
+
+        let message = this.translate.instant('rfq.compare.prepareError');
+        if (reason === 'pending_matches') {
+          message = this.translate.instant('rfq.compare.prepareErrorPendingMatches');
+        } else if (reason === 'no_quotation_lines') {
+          message = this.translate.instant('rfq.compare.prepareErrorNoQuotationLines');
+        } else if (reason === 'no_matched_lines') {
+          message = this.translate.instant('rfq.compare.prepareErrorNoMatchedLines');
+        } else if (reason === 'no_pricing_for_rfq_products') {
+          message = this.translate.instant('rfq.compare.prepareErrorNoPricingForRfqProducts');
+        } else if (reason === 'quotation_archived') {
+          message = this.translate.instant('rfq.compare.prepareErrorQuotationArchived');
+        } else if (reason === 'quotation_refused') {
+          message = this.translate.instant('rfq.compare.prepareErrorQuotationRefused');
+        } else if (reason === 'mixed_currencies') {
+          message = this.translate.instant('rfq.compare.prepareErrorMixedCurrencies');
+        }
+
         this.snackBar.open(
           message,
           this.translate.instant('rfq.history.dismiss'),
@@ -626,7 +779,7 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   splitRfq(): void {
-    if (!this.splitEligibility().canSplit || !this.isWriter() || this.isSplitting()) return;
+    if (!this.splitEligibility().canSplit || !this.isWriter() || this.isSplitting() || this.isExpired()) return;
     const id = this.rfqId();
     if (!id) return;
 
@@ -643,36 +796,39 @@ export class CompareComponent implements OnInit, OnChanges {
       },
       error: (err: unknown) => {
         this.isSplitting.set(false);
-        if (err instanceof HttpErrorResponse && err.status === 409) {
-          const reason = (err.error as ApiError | undefined)?.details?.['reason'];
-          if (reason === 'rfq_already_converted') {
-            this.snackBar.open(
-              this.translate.instant('rfq.compare.alreadyConverted'),
-              this.translate.instant('rfq.history.dismiss'),
-              { duration: 5000 },
-            );
-          } else if (reason === 'mixed_currency') {
-            this.snackBar.open(
-              this.translate.instant('rfq.compare.differentCurrencies'),
-              this.translate.instant('rfq.history.dismiss'),
-              { duration: 5000 },
-            );
-          } else if (reason === 'not_enough_replies') {
-            this.snackBar.open(
-              this.translate.instant('rfq.compare.needsTwoMatched'),
-              this.translate.instant('rfq.history.dismiss'),
-              { duration: 5000 },
-            );
-          } else {
-            this.snackBar.open(
-              (err.error as ApiError | undefined)?.message || this.translate.instant('rfq.compare.splitError'),
-              this.translate.instant('rfq.history.dismiss'),
-              { duration: 5000 },
-            );
-          }
+        const reason =
+          err instanceof HttpErrorResponse
+            ? (err.error as ApiError | undefined)?.details?.['reason']
+            : undefined;
+
+        if (reason === 'rfq_already_converted') {
+          this.snackBar.open(
+            this.translate.instant('rfq.compare.alreadyConverted'),
+            this.translate.instant('rfq.history.dismiss'),
+            { duration: 5000 },
+          );
+        } else if (reason === 'rfq_expired') {
+          this.snackBar.open(
+            this.translate.instant('rfq.compare.prepareErrorRfqExpired'),
+            this.translate.instant('rfq.history.dismiss'),
+            { duration: 5000 },
+          );
+        } else if (reason === 'mixed_currency') {
+          this.snackBar.open(
+            this.translate.instant('rfq.compare.differentCurrencies'),
+            this.translate.instant('rfq.history.dismiss'),
+            { duration: 5000 },
+          );
+        } else if (reason === 'not_enough_replies') {
+          this.snackBar.open(
+            this.translate.instant('rfq.compare.needsTwoMatched'),
+            this.translate.instant('rfq.history.dismiss'),
+            { duration: 5000 },
+          );
         } else {
           this.snackBar.open(
-            this.translate.instant('rfq.compare.splitError'),
+            (err instanceof HttpErrorResponse ? (err.error as ApiError | undefined)?.message : undefined) ||
+              this.translate.instant('rfq.compare.splitError'),
             this.translate.instant('rfq.history.dismiss'),
             { duration: 5000 },
           );

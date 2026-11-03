@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideTranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
+import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { FormatService } from '../../../core/format/format.service';
 import type { QuotationDetail, QuotationLine } from '../../../core/api/models';
 import { QuotationLinesComponent } from './quotation-lines.component';
@@ -54,6 +55,10 @@ describe('QuotationLinesComponent', () => {
       imports: [QuotationLinesComponent],
       providers: [provideTranslateService(), FormatService],
     }).compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.use('en');
 
     fixture = TestBed.createComponent(QuotationLinesComponent);
     component = fixture.componentInstance;
@@ -298,6 +303,476 @@ describe('QuotationLinesComponent', () => {
         amount: '75',
         currency: 'SAR',
       });
+    });
+  });
+
+  describe('PPS-158 / P-126 Line fields editing and removal copy', () => {
+    beforeEach(() => {
+      component.isWriter = true;
+      component.quotation = {
+        ...mockQuotation,
+        lines: [
+          {
+            ...mockLine,
+            pack: { pack_count: 6, unit_size: '5', unit: 'kg' },
+            delivery_fee: { amount: '5.00', currency: 'GBP' },
+            discount: { amount: '2.00', currency: 'GBP' },
+            vat_rate: '0.15',
+          },
+        ],
+        field_extractions: [
+          {
+            id: 'fe-pack-count-1',
+            quotation_id: 'q-1',
+            entity_type: 'quotation_line',
+            entity_id: 'line-1',
+            field_name: 'pack_count',
+            extracted_value: 6,
+            confidence: '0.90',
+            extraction_method: 'structured_parse',
+            model_version: 'v1',
+            corrected_value: null,
+            corrected_by: null,
+            corrected_at: null,
+          },
+          {
+            id: 'fe-unit-size-1',
+            quotation_id: 'q-1',
+            entity_type: 'quotation_line',
+            entity_id: 'line-1',
+            field_name: 'unit_size',
+            extracted_value: '5',
+            confidence: '0.90',
+            extraction_method: 'structured_parse',
+            model_version: 'v1',
+            corrected_value: null,
+            corrected_by: null,
+            corrected_at: null,
+          },
+          {
+            id: 'fe-delivery-1',
+            quotation_id: 'q-1',
+            entity_type: 'quotation_line',
+            entity_id: 'line-1',
+            field_name: 'delivery_fee',
+            extracted_value: { amount: '5.00', currency: 'GBP' },
+            confidence: '0.90',
+            extraction_method: 'structured_parse',
+            model_version: 'v1',
+            corrected_value: null,
+            corrected_by: null,
+            corrected_at: null,
+          },
+          {
+            id: 'fe-discount-1',
+            quotation_id: 'q-1',
+            entity_type: 'quotation_line',
+            entity_id: 'line-1',
+            field_name: 'discount',
+            extracted_value: { amount: '2.00', currency: 'GBP' },
+            confidence: '0.90',
+            extraction_method: 'structured_parse',
+            model_version: 'v1',
+            corrected_value: null,
+            corrected_by: null,
+            corrected_at: null,
+          },
+          {
+            id: 'fe-vat-1',
+            quotation_id: 'q-1',
+            entity_type: 'quotation_line',
+            entity_id: 'line-1',
+            field_name: 'vat_rate',
+            extracted_value: '0.15',
+            confidence: '0.90',
+            extraction_method: 'structured_parse',
+            model_version: 'v1',
+            corrected_value: null,
+            corrected_by: null,
+            corrected_at: null,
+          },
+        ],
+      };
+      component.pendingCorrections = new Map<string, unknown>();
+      component.correctionUpdated.subscribe(({ feId, newValue }) => {
+        component.pendingCorrections.set(feId, newValue);
+      });
+      fixture.detectChanges();
+    });
+
+    it('(1) delivery fee: row -> editable and stages money correction', () => {
+      const input = fixture.nativeElement.querySelector('#field-fe-delivery-1 input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.readOnly).toBeFalse();
+
+      input.value = '7.50';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-delivery-1')).toEqual({
+        amount: '7.50',
+        currency: 'GBP',
+      });
+    });
+
+    it('(1b) delivery fee: no row -> input readonly', () => {
+      component.quotation = {
+        ...component.quotation,
+        field_extractions: component.quotation.field_extractions?.filter(
+          (fe) => fe.field_name !== 'delivery_fee',
+        ) || [],
+      };
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-line-1-delivery-fee input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.readOnly).toBeTrue();
+    });
+
+    it('(2) discount: row -> editable and stages money correction', () => {
+      const input = fixture.nativeElement.querySelector('#field-fe-discount-1 input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.readOnly).toBeFalse();
+
+      input.value = '3.25';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-discount-1')).toEqual({
+        amount: '3.25',
+        currency: 'GBP',
+      });
+    });
+
+    it('(2b) discount: no row -> input readonly', () => {
+      component.quotation = {
+        ...component.quotation,
+        field_extractions: component.quotation.field_extractions?.filter(
+          (fe) => fe.field_name !== 'discount',
+        ) || [],
+      };
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-line-1-discount input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.readOnly).toBeTrue();
+    });
+
+    it('(3) line VAT: row -> editable and stages decimal fraction correction', () => {
+      const input = fixture.nativeElement.querySelector('#field-fe-vat-1 input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.readOnly).toBeFalse();
+
+      input.value = '20';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-vat-1')).toBe('0.2');
+    });
+
+    it('(3b) line VAT: no row -> input readonly', () => {
+      component.quotation = {
+        ...component.quotation,
+        field_extractions: component.quotation.field_extractions?.filter(
+          (fe) => fe.field_name !== 'vat_rate',
+        ) || [],
+      };
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-line-1-vat-rate input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.readOnly).toBeTrue();
+    });
+
+    it('(3c) line VAT: typing 1 stages 0.01', () => {
+      const input = fixture.nativeElement.querySelector('#field-fe-vat-1 input') as HTMLInputElement;
+      input.value = '1';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-vat-1')).toBe('0.01');
+    });
+
+    it('(3d) line VAT: focusing a displayed 1 (stored 0.01) and blurring stages nothing', () => {
+      component.quotation = {
+        ...component.quotation,
+        lines: [
+          {
+            ...component.quotation.lines[0],
+            vat_rate: '0.01',
+          },
+        ],
+        field_extractions: component.quotation.field_extractions?.map((fe) =>
+          fe.field_name === 'vat_rate' ? { ...fe, extracted_value: '0.01' } : fe,
+        ) || [],
+      };
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-vat-1 input') as HTMLInputElement;
+      expect(input.value).toBe('1');
+
+      input.dispatchEvent(new Event('focus'));
+      input.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.has('fe-vat-1')).toBeFalse();
+    });
+
+    it('(3e) line VAT: typing 0.5 stages 0.005', () => {
+      const input = fixture.nativeElement.querySelector('#field-fe-vat-1 input') as HTMLInputElement;
+      input.value = '0.5';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-vat-1')).toBe('0.005');
+    });
+
+    it('(3f) line VAT: typing 1.1 stages 0.011 without float artifact', () => {
+      const input = fixture.nativeElement.querySelector('#field-fe-vat-1 input') as HTMLInputElement;
+      input.value = '1.1';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-vat-1')).toBe('0.011');
+    });
+
+    it('(3g) line VAT: typing 8.2 stages 0.082 without float artifact', () => {
+      const input = fixture.nativeElement.querySelector('#field-fe-vat-1 input') as HTMLInputElement;
+      input.value = '8.2';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-vat-1')).toBe('0.082');
+    });
+
+    it('(3h) line VAT: typing 14 stages 0.14', () => {
+      const input = fixture.nativeElement.querySelector('#field-fe-vat-1 input') as HTMLInputElement;
+      input.value = '14';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-vat-1')).toBe('0.14');
+    });
+
+    it('(4) pack field is editable and stages pack corrections', () => {
+      const input = fixture.nativeElement.querySelector('#field-fe-pack-count-1 input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.readOnly).toBeFalse();
+
+      input.value = '12 × 10 kg';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-pack-count-1')).toBe(12);
+      expect(component.pendingCorrections.get('fe-unit-size-1')).toBe('10');
+    });
+
+    it('(4b) pack field: focus then blur without editing leaves pendingCorrections empty', () => {
+      const input = fixture.nativeElement.querySelector('#field-fe-pack-count-1 input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.value).toBe('6 × 5 kg');
+
+      input.dispatchEvent(new Event('focus'));
+      input.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.size).toBe(0);
+    });
+
+    it('(4c) pack field: evidence unit "kg", changing only count stages only pack_count, no pack_unit', () => {
+      component.quotation = {
+        ...component.quotation,
+        field_extractions: [
+          ...(component.quotation.field_extractions || []),
+          {
+            id: 'fe-pack-unit-1',
+            quotation_id: 'q-1',
+            entity_type: 'quotation_line',
+            entity_id: 'line-1',
+            field_name: 'pack_unit',
+            extracted_value: 'kg',
+            confidence: '0.90',
+            extraction_method: 'structured_parse',
+            model_version: 'v1',
+            corrected_value: null,
+            corrected_by: null,
+            corrected_at: null,
+          },
+        ],
+      };
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-pack-count-1 input') as HTMLInputElement;
+      input.value = '12 × 5 kg';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-pack-count-1')).toBe(12);
+      expect(component.pendingCorrections.has('fe-unit-size-1')).toBeFalse();
+      expect(component.pendingCorrections.has('fe-pack-unit-1')).toBeFalse();
+    });
+
+    it('(4d) pack field: changing pack unit stages typed pack_unit correction', () => {
+      component.quotation = {
+        ...component.quotation,
+        field_extractions: [
+          ...(component.quotation.field_extractions || []),
+          {
+            id: 'fe-pack-unit-1',
+            quotation_id: 'q-1',
+            entity_type: 'quotation_line',
+            entity_id: 'line-1',
+            field_name: 'pack_unit',
+            extracted_value: 'kg',
+            confidence: '0.90',
+            extraction_method: 'structured_parse',
+            model_version: 'v1',
+            corrected_value: null,
+            corrected_by: null,
+            corrected_at: null,
+          },
+        ],
+      };
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-pack-count-1 input') as HTMLInputElement;
+      input.value = '6 × 5 box';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.has('fe-pack-count-1')).toBeFalse();
+      expect(component.pendingCorrections.has('fe-unit-size-1')).toBeFalse();
+      expect(component.pendingCorrections.get('fe-pack-unit-1')).toBe('box');
+    });
+
+    it('(4e) pack field: no pack rows -> input readonly; rows -> editable', () => {
+      // With rows present from beforeEach:
+      const editableInput = fixture.nativeElement.querySelector('#field-fe-pack-count-1 input') as HTMLInputElement;
+      expect(editableInput).toBeTruthy();
+      expect(editableInput.readOnly).toBeFalse();
+
+      // Remove all persistable pack rows:
+      component.quotation = {
+        ...component.quotation,
+        field_extractions: component.quotation.field_extractions?.filter(
+          (fe) => !['pack', 'pack_count', 'unit_size', 'pack_unit'].includes(fe.field_name),
+        ) || [],
+      };
+      fixture.detectChanges();
+
+      const readonlyInput = fixture.nativeElement.querySelector('#field-line-1-pack input') as HTMLInputElement;
+      expect(readonlyInput).toBeTruthy();
+      expect(readonlyInput.readOnly).toBeTrue();
+    });
+
+    it('(4f) pack field: only some constituents have rows -> only stages existing rows', () => {
+      // Line only has fe-pack-count-1, remove fe-unit-size-1
+      component.quotation = {
+        ...component.quotation,
+        field_extractions: component.quotation.field_extractions?.filter(
+          (fe) => fe.field_name !== 'unit_size' && fe.field_name !== 'pack_unit',
+        ) || [],
+      };
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-pack-count-1 input') as HTMLInputElement;
+      expect(input.readOnly).toBeFalse();
+
+      input.value = '12 × 10 kg';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-pack-count-1')).toBe(12);
+      expect(component.pendingCorrections.has('fe-unit-size-1')).toBeFalse();
+      expect(component.pendingCorrections.has('fe-pack-unit-1')).toBeFalse();
+    });
+
+    it('(5) line text: no row -> input readonly', () => {
+      const input = fixture.nativeElement.querySelector('#field-line-1-desc input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.readOnly).toBeTrue();
+    });
+
+    it('(5b) line text: row -> editable and stages description correction', () => {
+      component.quotation = {
+        ...component.quotation,
+        field_extractions: [
+          ...(component.quotation.field_extractions || []),
+          {
+            id: 'fe-desc-1',
+            quotation_id: 'q-1',
+            entity_type: 'quotation_line',
+            entity_id: 'line-1',
+            field_name: 'original_text',
+            extracted_value: 'Test item',
+            confidence: '0.90',
+            extraction_method: 'structured_parse',
+            model_version: 'v1',
+            corrected_value: null,
+            corrected_by: null,
+            corrected_at: null,
+          },
+        ],
+      };
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('#field-fe-desc-1 input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.readOnly).toBeFalse();
+
+      input.value = 'Premium Whole Milk';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(component.pendingCorrections.get('fe-desc-1')).toBe('Premium Whole Milk');
+    });
+
+    it('(6) line fields are read-only for non-writers or reviewed quotations', () => {
+      component.isWriter = false;
+      fixture.detectChanges();
+
+      const deliveryInput = fixture.nativeElement.querySelector('#field-fe-delivery-1 input') as HTMLInputElement;
+      const discountInput = fixture.nativeElement.querySelector('#field-fe-discount-1 input') as HTMLInputElement;
+      const vatInput = fixture.nativeElement.querySelector('#field-fe-vat-1 input') as HTMLInputElement;
+
+      expect(deliveryInput.readOnly).toBeTrue();
+      expect(discountInput.readOnly).toBeTrue();
+      expect(vatInput.readOnly).toBeTrue();
+    });
+
+    it('(7) removing a line indicates extraction evidence is retained', () => {
+      component.pendingRemoveLineIds = new Set(['line-1']);
+      fixture.detectChanges();
+
+      const badge = fixture.nativeElement.querySelector('.removal-badge') as HTMLElement;
+      expect(badge).toBeTruthy();
+      expect(badge.textContent?.toLowerCase()).toContain('evidence');
     });
   });
 });

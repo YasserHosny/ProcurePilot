@@ -69,6 +69,10 @@
 .draft-notice-card {
   padding: 20px;
   margin-block-end: 24px;
+
+  &.expired-notice-card {
+    border-inline-start: 4px solid var(--pp-error);
+  }
 }
 
 .draft-notice-content {
@@ -111,6 +115,27 @@
   border: 1px solid var(--pp-border);
   border-radius: var(--pp-radius-card);
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.branch-error-warning,
+.rfq-detail-error-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-block: 8px;
+  padding-inline: 12px;
+  border-radius: var(--pp-radius-control);
+  background: var(--pp-error-container);
+  color: var(--pp-error);
+  font-size: 0.875rem;
+
+  mat-icon {
+    font-size: 20px;
+    inline-size: 20px;
+    block-size: 20px;
+    color: var(--pp-error);
+  }
 }
 
 .rfq-actions-bar {
@@ -304,6 +329,19 @@
   gap: 8px;
   padding-block: 16px;
   color: var(--sys-error);
+}
+
+.mixed-currency-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-block: 8px 16px;
+  color: var(--sys-error);
+  font-size: 0.875rem;
+}
+
+.mixed-currencies-dash {
+  color: var(--pp-text-muted);
 }
 
 .loading-state, .empty-state, .error-state {

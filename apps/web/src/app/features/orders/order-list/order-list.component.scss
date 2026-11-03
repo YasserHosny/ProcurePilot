@@ -27,3 +27,9 @@
 @media (max-width: 720px) { .orders-container { padding: 0.75rem; } .order-row { grid-template-columns: 1fr; } .order-summary { align-items: flex-start; } .order-row > a { justify-content: center; } }
 .header-actions { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
 .approved-requests-state, .approved-requests-empty { display: flex; align-items: center; gap: 0.5rem; padding-block: 0.75rem; padding-inline: 1rem; color: var(--pp-text-muted); font-size: 0.875rem; }
+
+.filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; }
+.filter-field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: var(--pp-text-muted); }
+.filter-field input, .filter-field select { min-height: 40px; padding-inline: 0.75rem; border: 1px solid var(--pp-border); border-radius: 8px; background: var(--pp-surface); color: var(--pp-text); font: inherit; }
+.search-field { flex: 1 1 220px; }
+.result-count { margin: 0; color: var(--pp-text-muted); font-size: 0.85rem; }

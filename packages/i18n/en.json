@@ -1016,6 +1016,11 @@
         "supplierRequired": "Supplier confirmation is required before authorizing this quotation",
         "supplierEmptyState": "No suppliers in this workspace yet.",
         "supplierEmptyAction": "Add a supplier",
+        "supplierLoadError": "Failed to load suppliers.",
+        "supplierRetryAction": "Retry",
+        "supplierSearchPlaceholder": "Search suppliers...",
+        "supplierSearchClear": "Clear search",
+        "supplierNoMatches": "No suppliers match your search.",
         "currencyLabel": "Currency",
         "currencyPlaceholder": "e.g. {{currency}}",
         "currencyRequired": "Currency is required",
@@ -1064,8 +1069,8 @@
         "addLinePrice": "Unit Price",
         "confirmAdd": "Add",
         "cancelAdd": "Cancel",
-        "removeLine": "Remove this line",
-        "markedForRemoval": "Will be removed on save",
+        "removeLine": "Remove this line (extraction evidence is kept)",
+        "markedForRemoval": "Will be removed on save (extraction evidence is kept)",
         "undoRemove": "Undo removal",
         "pendingAdd": "New — will be added on save"
       },
@@ -1098,7 +1103,8 @@
         "editTooltip": "Correct this field value",
         "correctedBadge": "Corrected by Human",
         "confirmedBadge": "Confirmed",
-        "confirmAsIsTooltip": "Confirm this value is correct as extracted"
+        "confirmAsIsTooltip": "Confirm this value is correct as extracted",
+        "revertTooltip": "Revert to extracted value"
       },
       "arithmetic": {
         "mismatchTitle": "Arithmetic discrepancy detected",
@@ -1361,6 +1367,7 @@
       "notAvailable": "Not available",
       "noFilterResults": "No match tasks match the active filters",
       "clearFilters": "Clear Filters",
+      "retry": "Retry",
       "loadMore": "Load More",
       "emptyTitle": "No match tasks found",
       "emptyMessage": "There are no quotation lines currently awaiting match resolution.",
@@ -1404,10 +1411,10 @@
       "readOnlyBanner": "You have view-only access. Only workspace owners and buyers can resolve matches and create catalogue products.",
       "keyboardShortcutsTitle": "Keyboard Controls",
       "shortcuts": {
-        "selectCandidate": "1–9: Select Candidate",
-        "navigate": "↑ / ↓: Navigate Candidates",
-        "confirm": "Enter: Confirm Decision",
-        "toggleOutcome": "O: Cycle Outcomes"
+        "selectCandidate": "Select candidate",
+        "navigate": "Navigate candidates",
+        "confirm": "Confirm decision",
+        "toggleOutcome": "Cycle outcomes"
       },
       "lineDetails": {
         "title": "Quotation Line Details",
@@ -2294,8 +2301,18 @@
     }
   },
   "requests": {
+    "errors": {
+      "quantity_not_positive": "Quantity must be greater than zero.",
+      "required_by_in_the_past": "The required-by date cannot be in the past.",
+      "duplicate_product": "This product is already on another line.",
+      "cost_centre_not_found": "Cost centre not found.",
+      "cost_centre_branch_mismatch": "Cost centre does not belong to the selected branch.",
+      "product_not_found": "Product not found."
+    },
     "list": {
-      "newRequestButton": "New request"
+      "newRequestButton": "New request",
+      "loadMore": "Load more",
+      "loadedCount": "{{count}} requests loaded"
     },
     "table": {
       "caption": "Purchase requests"
@@ -2340,18 +2357,24 @@
       "branchRequired": "Branch is required.",
       "costCentreLabel": "Cost Centre (optional)",
       "requiredByDateLabel": "Required By",
+      "requiredByHint": "Format: {{format}}",
       "requiredByDateRequired": "Required-by date is required.",
       "requiredByDateInvalid": "Enter a valid date (YYYY-MM-DD).",
       "linesTitle": "Line Items",
+      "lineGroup": "Line {{position}}",
       "addLineButton": "Add Line",
       "removeLineButton": "Remove line",
+      "removeLineWithProduct": "Remove line {{position}}: {{product}}",
       "productLabel": "Product",
       "productRequired": "Select a product.",
       "quantityLabel": "Quantity",
       "quantityRequired": "Quantity must be greater than zero.",
+      "quantityPattern": "Quantity must be a number greater than zero.",
       "noteLabel": "Note (optional)",
       "estimatedUnitPriceLabel": "Estimated Unit Price",
       "noEstimateAvailable": "No price history available for this product.",
+      "perPack": "{{price}} / pack",
+      "staleEstimate": "Saved estimate — save to refresh",
       "cancelButton": "Cancel",
       "saveDraftButton": "Save Draft",
       "submitButton": "Submit Request",
@@ -2362,6 +2385,8 @@
       "atLeastOneLineRequired": "At least one line item is required."
     },
     "empty": "No purchase requests yet. Create your first request to get started.",
+    "listEmptyFiltered": "No purchase requests match this filter.",
+    "clearFilter": "Clear filter",
     "createSuccess": "Purchase request saved as a draft.",
     "submitSuccess": "Purchase request submitted for approval.",
     "withdrawSuccess": "Purchase request withdrawn.",
@@ -2482,7 +2507,31 @@
       "summary": "Split from RFQ {{short}} · {{requests}} · {{total}} · saves {{saving}}",
       "summaryNoSaving": "Split from RFQ {{short}} · {{requests}} · {{total}}",
       "splitFromRfq": "Split from RFQ {{short}}",
-      "saves": "saves {{saving}}"
+      "saves": "saves {{saving}}",
+      "loadingSiblings": "Loading the rest of this split…",
+      "siblingsError": "Failed to load the rest of this split.",
+      "retry": "Retry"
+    },
+    "pagination": {
+      "loadMore": "Load more",
+      "loading": "Loading...",
+      "showing": {
+        "zero": "Showing 0 requests",
+        "one": "Showing 1 request",
+        "two": "Showing 2 requests",
+        "few": "Showing {{count}} requests",
+        "many": "Showing {{count}} requests",
+        "other": "Showing {{count}} requests"
+      },
+      "showingMore": {
+        "zero": "Showing 0 requests, more available",
+        "one": "Showing 1 request, more available",
+        "two": "Showing 2 requests, more available",
+        "few": "Showing {{count}} requests, more available",
+        "many": "Showing {{count}} requests, more available",
+        "other": "Showing {{count}} requests, more available"
+      },
+      "loadError": "Unable to load more requests. Please try again."
     },
     "requestCount": {
       "zero": "{{count}} requests",
@@ -3704,7 +3753,9 @@
       "packUnit": "pack of {{size}} {{unit}}",
       "baseUnitPrice": "per {{unit}}",
       "vatInclusiveHint": "Net of {{rate}}% VAT · quoted {{gross}} incl. VAT",
-      "remainingQuantity": "Still to order"
+      "remainingQuantity": "Still to order",
+      "sourceLoadError": "The approved request could not be loaded, so no order can be created from it. Go back and try again.",
+      "fromApprovedRequestPlain": "From an approved request"
     },
     "status": {
       "draft": "Draft",
@@ -3761,7 +3812,38 @@
       "cancelConfirmTitle": "Cancel Purchase Order?",
       "cancelConfirmMessage": "Are you sure you want to cancel this order? Any received quantity will remain consumed, and any unreceived quantity will be released back to the source request.",
       "cancelOrder": "Yes, Cancel Order",
-      "recordOutcome": "Record outcome"
+      "recordOutcome": "Record outcome",
+      "submitConfirmTitle": "Submit this purchase order?",
+      "submitConfirmMessage": "This marks the order as submitted in ProcurePilot so delivery evidence can be recorded. Nothing is sent to the supplier: share the order with them yourself. A submitted order can still be cancelled until it is fully received.",
+      "submitConfirm": "Yes, submit order",
+      "receiptQuantityRequired": "Enter a received quantity greater than zero on at least one line.",
+      "errors": {
+        "order_not_open_for_evidence": "This order is a draft, cancelled or closed, so it cannot take delivery or confirmation evidence.",
+        "order_not_cancellable": "This order is already fully received or closed, so it can no longer be cancelled.",
+        "order_already_cancelled": "This order is already cancelled."
+      }
+    },
+    "resultCount": "{{count}} orders",
+    "loadMoreError": "More orders could not be loaded. The orders above are still shown.",
+    "filters": {
+      "search": "Search",
+      "searchPlaceholder": "Order number or supplier",
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "sort": "Sort by",
+      "apply": "Search",
+      "noMatchTitle": "No orders match",
+      "noMatchDescription": "Change the search or the status filter to see more orders."
+    },
+    "sort": {
+      "created_at_desc": "Newest first",
+      "created_at_asc": "Oldest first",
+      "order_date_desc": "Order date, latest",
+      "order_date_asc": "Order date, earliest",
+      "total_desc": "Total, highest",
+      "total_asc": "Total, lowest",
+      "order_number_asc": "Order number, A to Z",
+      "order_number_desc": "Order number, Z to A"
     }
   },
   "accounting": {
@@ -4157,7 +4239,22 @@
       "splitSavingHint": "Splitting this order between suppliers could save {{money}}.",
       "openPreparedRequest": "Open draft request",
       "openRequest": "Open request",
-      "convertedReason": "This RFQ is already converted into a request."
+      "convertedReason": "This RFQ is already converted into a request.",
+      "stillBeingRead": "Still being read",
+      "awaitingReview": "Awaiting review",
+      "mixedCurrenciesNotice": "Prices in more than one currency — this reply cannot be turned into a request",
+      "prepareErrorPendingMatches": "Cannot prepare request while lines are unmatched.",
+      "prepareErrorNoQuotationLines": "This reply has no lines to turn into a request.",
+      "prepareErrorNoMatchedLines": "None of the lines in this reply are matched to catalogue products.",
+      "prepareErrorNoPricingForRfqProducts": "This reply does not contain prices for the requested products.",
+      "prepareErrorQuotationArchived": "This quotation has been archived and cannot be converted.",
+      "prepareErrorQuotationRefused": "This quotation was refused and cannot be used to prepare a request.",
+      "prepareErrorMixedCurrencies": "Prices in this reply are in more than one currency.",
+      "prepareErrorRfqExpired": "This RFQ has expired and requests can no longer be prepared from it.",
+      "expiredNotice": "This RFQ has expired — requests can no longer be prepared from it",
+      "rfqExpired": "This RFQ has expired",
+      "branchesLoadError": "Failed to load branches.",
+      "rfqDetailLoadError": "Failed to load RFQ details."
     },
     "history": {
       "title": "RFQ History",
@@ -4204,7 +4301,40 @@
       "recipientStatus_sent": "Sent",
       "recipientStatus_failed": "Failed",
       "recipientStatus_draft": "Not sent",
-      "unknownSupplier": "Unknown supplier"
+      "unknownSupplier": "Unknown supplier",
+      "retry": "Retry",
+      "loadMore": "Load more",
+      "loadingMore": "Loading more RFQs...",
+      "loadMoreError": "Failed to load more RFQs.",
+      "showingRfqs": "Showing {{count}} RFQs",
+      "showingCount": {
+        "zero": "Showing 0 RFQs",
+        "one": "Showing 1 RFQ",
+        "two": "Showing 2 RFQs",
+        "few": "Showing {{count}} RFQs",
+        "many": "Showing {{count}} RFQs",
+        "other": "Showing {{count}} RFQs"
+      },
+      "openRfqAriaLabel": "Open RFQ, {{status}}, needed by {{date}}",
+      "recipientsAriaLabelFallback": "{{count}} recipients — show list",
+      "recipientsAriaLabel": {
+        "zero": "{{count}} recipients — show list",
+        "one": "{{count}} recipient — show list",
+        "two": "{{count}} recipients — show list",
+        "few": "{{count}} recipients — show list",
+        "many": "{{count}} recipients — show list",
+        "other": "{{count}} recipients — show list"
+      },
+      "responsesAriaLabelFallback": "{{count}} responses — compare",
+      "responsesAriaLabel": {
+        "zero": "{{count}} responses — compare",
+        "one": "{{count}} response — compare",
+        "two": "{{count}} responses — compare",
+        "few": "{{count}} responses — compare",
+        "many": "{{count}} responses — compare",
+        "other": "{{count}} responses — compare"
+      },
+      "draftActionsUnavailable": "Draft actions are currently unavailable because workspace members could not be loaded."
     },
     "detail": {
       "title": "RFQ Details",
@@ -4226,6 +4356,7 @@
       "tabItems": "Items",
       "tabRecipients": "Recipients ({{count}})",
       "tabResponses": "Responses ({{count}})",
+      "tabResponsesNoCount": "Responses",
       "statusLabel": "Status",
       "sentAtLabel": "Sent date",
       "neededByLabel": "Needed by",
@@ -4248,6 +4379,31 @@
       "recipientStatus_sent": "Sent",
       "recipientStatus_failed": "Failed",
       "recipientStatus_draft": "Not sent",
+      "reply": "Reply",
+      "replyStatus_notDelivered": "Not delivered",
+      "replyStatus_replied": "Replied",
+      "replyStatus_repliedCount": "Replied ({{count}})",
+      "replyStatus_noReply": "No reply",
+      "replyStatus_overdue": "Overdue — needed by {{date}}",
+      "replyStatus_awaiting": "Awaiting reply",
+      "suppliersRepliedTitle": "{{replied}} of {{total}} suppliers replied",
+      "suppliersReplied": {
+        "zero": "0 of {{total}} suppliers replied",
+        "one": "1 of {{total}} suppliers replied",
+        "two": "2 of {{total}} suppliers replied",
+        "few": "{{replied}} of {{total}} suppliers replied",
+        "many": "{{replied}} of {{total}} suppliers replied",
+        "other": "{{replied}} of {{total}} suppliers replied"
+      },
+      "suppliersOverdueTitle": "{{count}} overdue",
+      "suppliersOverdue": {
+        "zero": "0 overdue",
+        "one": "1 overdue",
+        "two": "2 overdue",
+        "few": "{{count}} overdue",
+        "many": "{{count}} overdue",
+        "other": "{{count}} overdue"
+      },
       "convertedIntoRequest": "Converted into request",
       "convertedCount": {
         "zero": "Converted into {{count}} requests",
@@ -4272,7 +4428,9 @@
       "confirmRetryTitle": "Retry unsent recipients",
       "confirmRetryMessage": "Retry sending this RFQ to {{count}} unsent supplier(s)?",
       "confirmRetryButton": "Retry unsent recipients",
-      "cancelRetryButton": "Cancel"
+      "cancelRetryButton": "Cancel",
+      "rfqExpiredError": "This RFQ has expired and can no longer be sent.",
+      "notSendableError": "This RFQ cannot be sent in its current state."
     },
     "guardrails": {
       "title": "Guardrail settings",

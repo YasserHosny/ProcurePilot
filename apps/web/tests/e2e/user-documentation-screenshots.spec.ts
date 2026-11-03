@@ -394,7 +394,9 @@ async function buildCommercialFixtures(page: Page): Promise<ScreenshotFixtures> 
   });
   const request = await apiAsUser<{ id: string }>(ownerToken, 'POST', '/requests', {
     branch_id: branch.id,
-    required_by_date: '2026-10-15',
+    // The API refuses a required-by date in the past (P-162), so the seeded request needs a
+    // date that stays in the future; the day and month are unchanged, only the year differs.
+    required_by_date: '2030-10-15',
     lines: [{ workspace_product_id: product.id, quantity: '3' }],
   });
   await apiAsUser(ownerToken, 'POST', `/requests/${request.id}/submit`);
@@ -411,7 +413,7 @@ async function buildCommercialFixtures(page: Page): Promise<ScreenshotFixtures> 
     quotationId,
     matchedProductId,
     savingId: purchase.saving_record.id,
-    approvalRequest: { branchName: branch.name, requiredByDate: '2026-10-15' },
+    approvalRequest: { branchName: branch.name, requiredByDate: '2030-10-15' },
   };
 }
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -20,6 +20,7 @@ from integration.catalogue_helpers import (
     Workspace,
     act_as,
     connection,
+    delete_tenant_scoped_rows,
     make_workspace,
     make_workspace_product,
 )
@@ -60,9 +61,7 @@ class _ReplayTableQuery:
     def __getattr__(self, name: str) -> Any:  # noqa: ANN401 -- proxies an untyped delegate
         return getattr(self._delegate, name)
 
-    def insert(
-        self, payload: dict[str, object] | list[dict[str, object]]
-    ) -> _ReplayTableQuery:
+    def insert(self, payload: dict[str, object] | list[dict[str, object]]) -> _ReplayTableQuery:
         self._delegate.insert(payload)  # type: ignore[arg-type]
         return self
 
@@ -96,9 +95,7 @@ class _PsycopgAuditWriter:
         del bearer_token
         with self._conn.cursor() as cur:
             cur.execute(
-                "select record_audit_event("
-                "%s, %s, %s::uuid, %s::uuid, %s, %s::jsonb, %s"
-                ")",
+                "select record_audit_event(%s, %s, %s::uuid, %s::uuid, %s, %s::jsonb, %s)",
                 (
                     event.action,
                     event.outcome,
@@ -114,8 +111,7 @@ class _PsycopgAuditWriter:
 def _make_branch(cur: psycopg.Cursor, workspace: Workspace) -> UUID:
     branch_id = uuid4()
     cur.execute(
-        "insert into branch (id,tenant_id,name,region) "
-        "values (%s,%s,'Replay Branch','GB')",
+        "insert into branch (id,tenant_id,name,region) values (%s,%s,'Replay Branch','GB')",
         (branch_id, workspace.tenant_id),
     )
     return branch_id
@@ -189,7 +185,7 @@ def _client_for(
         return _PsycopgReplayClient(conn)
 
     service = RequestsService.__new__(RequestsService)
-    service._settings = object()
+    service._settings = _test_settings()
     service._estimate_products = lambda product_ids, **_kw: [
         LineEstimate(None, None, None) for _product_id in product_ids
     ]
@@ -211,9 +207,7 @@ def _client_for(
 
 def _count_rows(cur: psycopg.Cursor, table: str, tenant_id: UUID) -> int:
     cur.execute(
-        sql.SQL("select count(*) from {} where tenant_id = %s").format(
-            sql.Identifier(table)
-        ),
+        sql.SQL("select count(*) from {} where tenant_id = %s").format(sql.Identifier(table)),
         (tenant_id,),
     )
     return int(cur.fetchone()[0])
@@ -227,29 +221,43 @@ def test_post_requests_replay_returns_original_request_without_second_row(
         workspace = make_workspace(cur, "idempotent-request")
         branch_id = _make_branch(cur, workspace)
         product_id = make_workspace_product(cur, workspace, name="Replay Widget")
-        act_as(cur, workspace)
+    conn.commit()
 
-        client = _client_for(conn, workspace, monkeypatch)
-        key = str(uuid4())
-        payload = {
-            "branch_id": str(branch_id),
-            "required_by_date": (date.today() + timedelta(days=7)).isoformat(),
-            "lines": [
-                {
-                    "workspace_product_id": str(product_id),
-                    "quantity": "3.000000",
-                }
-            ],
-        }
-        headers = {"Authorization": "Bearer test-token", "Idempotency-Key": key}
+    try:
+        with conn.cursor() as cur:
+            act_as(cur, workspace)
 
-        first = client.post("/api/v1/requests", json=payload, headers=headers)
-        replay = client.post("/api/v1/requests", json=payload, headers=headers)
+            client = _client_for(conn, workspace, monkeypatch)
+            key = str(uuid4())
+            payload = {
+                "branch_id": str(branch_id),
+                "required_by_date": (datetime.now(UTC).date() + timedelta(days=7)).isoformat(),
+                "lines": [
+                    {
+                        "workspace_product_id": str(product_id),
+                        "quantity": "3.000000",
+                    }
+                ],
+            }
+            headers = {"Authorization": "Bearer test-token", "Idempotency-Key": key}
 
-        assert first.status_code == 201, first.text
-        assert replay.status_code == 200, replay.text
-        assert replay.json()["id"] == first.json()["id"]
-        assert _count_rows(cur, "purchase_request", workspace.tenant_id) == 1
+            first = client.post("/api/v1/requests", json=payload, headers=headers)
+            replay = client.post("/api/v1/requests", json=payload, headers=headers)
+
+            assert first.status_code == 201, first.text
+            assert replay.status_code == 200, replay.text
+            assert replay.json()["id"] == first.json()["id"]
+
+            conn.commit()
+            assert _count_rows(cur, "purchase_request", workspace.tenant_id) == 1
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("reset role")
+            cur.execute("set local session_replication_role = replica")
+            delete_tenant_scoped_rows(cur, workspace.tenant_id)
+            cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
+            cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
+            conn.commit()
 
 
 def test_post_low_stock_reports_replay_returns_original_report_without_second_row(

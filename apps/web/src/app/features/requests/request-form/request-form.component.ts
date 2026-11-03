@@ -1,8 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { DateAdapter } from '@angular/material/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -12,10 +13,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink, convertToParamMap } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { forkJoin, of, type Observable } from 'rxjs';
-import { catchError, distinctUntilChanged, finalize, switchMap, tap } from 'rxjs/operators';
+import { EMPTY, forkJoin, of, type Observable } from 'rxjs';
+import { catchError, distinctUntilChanged, expand, finalize, reduce, switchMap, tap } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -25,9 +26,7 @@ import { trimDecimal } from '../../../core/format/trim-decimal';
 import type {
   ApiError,
   Branch,
-  BranchList,
   CostCentre,
-  CostCentreList,
   Member,
   Money,
   Product,
@@ -42,14 +41,55 @@ import {
   type RequestAllocationOrder,
 } from '../../orders/orders-api';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
-import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
+import { AppDateAdapter, provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 const I18N = 'requests';
+
+const SERVER_ERROR_KEYS: Record<string, string> = {
+  quantity_not_positive: 'requests.errors.quantity_not_positive',
+  required_by_in_the_past: 'requests.errors.required_by_in_the_past',
+  duplicate_product: 'requests.errors.duplicate_product',
+  cost_centre_not_found: 'requests.errors.cost_centre_not_found',
+  cost_centre_branch_mismatch: 'requests.errors.cost_centre_branch_mismatch',
+  product_not_found: 'requests.errors.product_not_found',
+};
 
 interface LineFormGroup {
   workspace_product_id: FormControl<string>;
   quantity: FormControl<string>;
   note: FormControl<string>;
+}
+
+interface SavedLineInfo {
+  id: string;
+  workspace_product_id: string;
+  quantity: string;
+  estimated_unit_price: Money | null;
+}
+
+interface Paginated<T> {
+  items: readonly T[];
+  next_cursor: string | null;
+}
+
+function fetchAllPages<T>(
+  fetchPage: (cursor?: string) => Observable<Paginated<T>>,
+  maxPages = 50,
+): Observable<T[]> {
+  let pageCount = 0;
+  return fetchPage().pipe(
+    expand((res) => {
+      pageCount++;
+      if (res.next_cursor && pageCount < maxPages) {
+        return fetchPage(res.next_cursor);
+      }
+      return EMPTY;
+    }),
+    reduce((acc: T[], res) => {
+      acc.push(...res.items);
+      return acc;
+    }, []),
+  );
 }
 
 @Component({
@@ -89,6 +129,14 @@ export class RequestFormComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly translate = inject(TranslateService);
   private readonly ordersApi = inject(OrdersApiService);
+  private readonly elementRef = inject(ElementRef);
+  private readonly dateAdapter = inject(DateAdapter);
+
+  get dateFormat(): string {
+    const adapter = this.dateAdapter as unknown as AppDateAdapter;
+    const isDayFirst = adapter?.isDayFirst ? adapter.isDayFirst() : true;
+    return isDayFirst ? 'DD/MM/YYYY' : 'MM/DD/YYYY';
+  }
 
   readonly isLoading = signal<boolean>(false);
   readonly isSaving = signal<boolean>(false);
@@ -129,6 +177,56 @@ export class RequestFormComponent implements OnInit {
 
   private submitIdempotencyKey: string | null = null;
   private withdrawIdempotencyKey: string | null = null;
+  private currentRequestId: string | null | undefined = undefined;
+
+  readonly formChangeSignal = signal<number>(0);
+  private readonly savedLineMeta = new Map<FormGroup<LineFormGroup>, SavedLineInfo>();
+
+  readonly isEstimateStale = computed<boolean>(() => {
+    this.formChangeSignal();
+    const req = this.existingRequest();
+    if (!req || !req.estimated_total) {
+      return false;
+    }
+    if (!this.form.dirty) {
+      return false;
+    }
+    const currentLines = this.lines.controls;
+    const savedLines = req.lines;
+    if (currentLines.length !== savedLines.length) {
+      return true;
+    }
+    for (const group of currentLines) {
+      const meta = this.savedLineMeta.get(group);
+      if (!meta) {
+        return true;
+      }
+      if (group.controls.workspace_product_id.value !== meta.workspace_product_id) {
+        return true;
+      }
+      const currentQty = parseFloat(String(group.controls.quantity.value ?? ''));
+      const savedQty = parseFloat(String(meta.quantity));
+      if (isNaN(currentQty) || isNaN(savedQty) || currentQty !== savedQty) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  private resetState(): void {
+    this.existingRequest.set(null);
+    this.form.reset({ branch_id: '', cost_centre_id: '', required_by_date: null });
+    this.form.enable();
+    this.lines.clear();
+    this.savedLineMeta.clear();
+    this.allocations.set(null);
+    this.isAllocationsLoading.set(false);
+    this.allocationsFailed.set(false);
+    this.errorMessage.set(null);
+    this.submitIdempotencyKey = null;
+    this.withdrawIdempotencyKey = null;
+    this.formChangeSignal.update((v) => v + 1);
+  }
 
   readonly isReadOnly = computed<boolean>(() => {
     const req = this.existingRequest();
@@ -215,30 +313,63 @@ export class RequestFormComponent implements OnInit {
         }
       });
 
-    const requestId = this.route.snapshot.paramMap.get('id');
-    const isEditMode = requestId !== null;
-    if (isEditMode) {
-      this.isEditMode.set(true);
-      this.loadMembers();
-    }
+    this.form.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.formChangeSignal.update((v) => v + 1);
+      });
 
-    forkJoin({
+    let refDataLoaded = false;
+    const refData$ = forkJoin({
       branches: this.loadBranches(),
       costCentres: this.loadCostCentres(),
       products: this.loadProducts(),
-      request: requestId ? this.loadRequest(requestId) : of(null),
-    })
+    }).pipe(
+      tap(() => {
+        refDataLoaded = true;
+      }),
+    );
+
+    const paramMap$ = (this.route.paramMap ?? of(this.route.snapshot?.paramMap ?? convertToParamMap({}))).pipe(
+      takeUntilDestroyed(this.destroyRef),
+    );
+
+    paramMap$
       .pipe(
-        finalize(() => {
-          this.isLoading.set(false);
-          if (!isEditMode) {
-            this.addLine();
+        switchMap((params) => {
+          const requestId = params.get('id');
+          if (this.currentRequestId !== undefined && this.currentRequestId === requestId) {
+            return of(null);
           }
+          this.currentRequestId = requestId;
+          this.resetState();
+          this.isLoading.set(true);
+
+          const isEditMode = requestId !== null;
+          this.isEditMode.set(isEditMode);
+          if (isEditMode) {
+            this.loadMembers();
+          }
+
+          const req$: Observable<unknown> = requestId ? this.loadRequest(requestId) : of(null);
+          const load$: Observable<unknown> = refDataLoaded ? req$ : forkJoin({ ref: refData$, req: req$ });
+
+          return load$.pipe(
+            catchError((err: unknown) => {
+              this.handleError(err);
+              return of(null);
+            }),
+            finalize(() => {
+              this.isLoading.set(false);
+              if (!this.isEditMode() && this.lines.length === 0) {
+                this.addLine();
+              }
+            }),
+          );
         }),
+        takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe({
-        error: (err: unknown) => this.handleError(err),
-      });
+      .subscribe();
   }
 
   addLine(): void {
@@ -250,15 +381,22 @@ export class RequestFormComponent implements OnInit {
         }),
         quantity: new FormControl<string>('', {
           nonNullable: true,
-          validators: [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)],
+          validators: [Validators.required, Validators.pattern(/^(?!0(?:\.0+)?$)\d+(?:\.\d+)?$/)],
         }),
         note: new FormControl<string>('', { nonNullable: true }),
       }),
     );
+    this.formChangeSignal.update((v) => v + 1);
   }
 
   removeLine(index: number): void {
+    const group = this.lines.at(index);
     this.lines.removeAt(index);
+    if (group) {
+      this.savedLineMeta.delete(group);
+    }
+    this.form.markAsDirty();
+    this.formChangeSignal.update((v) => v + 1);
   }
 
   saveDraft(): void {
@@ -269,6 +407,8 @@ export class RequestFormComponent implements OnInit {
 
     if (this.form.invalid || this.lines.length === 0) {
       this.form.markAllAsTouched();
+      this.errorMessage.set(this.getValidationErrorMessage());
+      this.focusErrorBanner();
       return;
     }
 
@@ -287,6 +427,21 @@ export class RequestFormComponent implements OnInit {
         this.existingRequest.set(saved);
         this.isEditMode.set(true);
         this.form.markAsPristine();
+        this.currentRequestId = saved.id;
+        this.savedLineMeta.clear();
+        for (let i = 0; i < this.lines.length; i++) {
+          const group = this.lines.at(i);
+          const savedLine = saved.lines[i];
+          if (group && savedLine) {
+            this.savedLineMeta.set(group, {
+              id: savedLine.id,
+              workspace_product_id: savedLine.workspace_product_id,
+              quantity: savedLine.quantity,
+              estimated_unit_price: savedLine.estimated_unit_price ?? null,
+            });
+          }
+        }
+        this.formChangeSignal.update((v) => v + 1);
         this.snackBar.open(this.translate.instant(`${I18N}.createSuccess`), undefined, {
           duration: 3500,
         });
@@ -308,6 +463,7 @@ export class RequestFormComponent implements OnInit {
     if (!existing.request_group && (this.form.invalid || this.lines.length === 0)) {
       this.form.markAllAsTouched();
       this.errorMessage.set(this.getValidationErrorMessage());
+      this.focusErrorBanner();
       return;
     }
 
@@ -441,11 +597,43 @@ export class RequestFormComponent implements OnInit {
     if (!line.estimated_unit_price) {
       return this.translate.instant(`${I18N}.form.noEstimateAvailable`);
     }
-    return this.formatService.formatCurrencyAmount(line.estimated_unit_price);
+    const price = this.formatService.formatCurrencyAmount(line.estimated_unit_price);
+    return this.translate.instant(`${I18N}.form.perPack`, { price });
+  }
+
+  getLineEstimate(group: FormGroup<LineFormGroup>): string | null {
+    const meta = this.savedLineMeta.get(group);
+    if (!meta) {
+      return null;
+    }
+    if (group.controls.workspace_product_id.value !== meta.workspace_product_id) {
+      return null;
+    }
+    if (!meta.estimated_unit_price) {
+      return this.translate.instant(`${I18N}.form.noEstimateAvailable`);
+    }
+    return this.formatEstimate({
+      id: meta.id,
+      workspace_product_id: meta.workspace_product_id,
+      quantity: meta.quantity,
+      estimated_unit_price: meta.estimated_unit_price,
+    } as PurchaseRequestLine);
   }
 
   hasProductName(productId: string): boolean {
     return this.productNameById().has(productId);
+  }
+
+  getRemoveLineAriaLabel(index: number, lineGroup: FormGroup<LineFormGroup>): string {
+    const prodId = lineGroup.controls.workspace_product_id.value;
+    const product = (prodId ? this.productNameById().get(prodId) : null) || prodId;
+    if (product) {
+      return this.translate.instant(`${I18N}.form.removeLineWithProduct`, {
+        position: index + 1,
+        product,
+      });
+    }
+    return this.translate.instant(`${I18N}.form.removeLineButton`);
   }
 
   private getValidationErrorMessage(): string {
@@ -485,16 +673,16 @@ export class RequestFormComponent implements OnInit {
     };
   }
 
-  private loadBranches(): Observable<BranchList> {
-    return this.organisationApi
-      .listBranches({ is_active: true })
-      .pipe(tap((res) => this.branches.set([...res.items])));
+  private loadBranches(): Observable<Branch[]> {
+    return fetchAllPages<Branch>((cursor) =>
+      this.organisationApi.listBranches({ is_active: true, ...(cursor ? { cursor } : {}) }),
+    ).pipe(tap((items) => this.branches.set(items)));
   }
 
-  private loadCostCentres(): Observable<CostCentreList> {
-    return this.organisationApi
-      .listCostCentres({ is_archived: false })
-      .pipe(tap((res) => this.allCostCentres.set([...res.items])));
+  private loadCostCentres(): Observable<CostCentre[]> {
+    return fetchAllPages<CostCentre>((cursor) =>
+      this.organisationApi.listCostCentres({ is_archived: false, ...(cursor ? { cursor } : {}) }),
+    ).pipe(tap((items) => this.allCostCentres.set(items)));
   }
 
   private loadMembers(): void {
@@ -511,18 +699,13 @@ export class RequestFormComponent implements OnInit {
       .subscribe((res) => this.members.set([...res.items]));
   }
 
-  private loadProducts(): Observable<{ items: Product[]; next_cursor: string | null }> {
-    return this.api
-      .products({ status: 'all', limit: 100 })
-      .pipe(
-        catchError(() =>
-          of<{ items: Product[]; next_cursor: string | null }>({
-            items: [],
-            next_cursor: null,
-          }),
-        ),
-        tap((res) => this.products.set([...res.items])),
-      );
+  private loadProducts(): Observable<Product[]> {
+    return fetchAllPages<Product>((cursor) =>
+      this.api.products({ status: 'all', limit: 100, ...(cursor ? { cursor } : {}) }),
+    ).pipe(
+      catchError(() => of<Product[]>([])),
+      tap((items) => this.products.set(items)),
+    );
   }
 
   private loadRequest(requestId: string): Observable<PurchaseRequest> {
@@ -537,6 +720,7 @@ export class RequestFormComponent implements OnInit {
 
         const isReadOnly = req.status !== 'draft' || !!req.request_group;
         this.lines.clear();
+        this.savedLineMeta.clear();
         for (const line of req.lines) {
           const displayQty = isReadOnly ? this.formatQuantity(line.quantity) : trimDecimal(line.quantity);
           const group = new FormGroup<LineFormGroup>({
@@ -546,12 +730,19 @@ export class RequestFormComponent implements OnInit {
             }),
             quantity: new FormControl<string>(displayQty, {
               nonNullable: true,
-              validators: [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)],
+              validators: [Validators.required, Validators.pattern(/^(?!0(?:\.0+)?$)\d+(?:\.\d+)?$/)],
             }),
             note: new FormControl<string>(line.note ?? '', { nonNullable: true }),
           });
+          this.savedLineMeta.set(group, {
+            id: line.id,
+            workspace_product_id: line.workspace_product_id,
+            quantity: line.quantity,
+            estimated_unit_price: line.estimated_unit_price ?? null,
+          });
           this.lines.push(group);
         }
+        this.formChangeSignal.update((v) => v + 1);
 
         if (isReadOnly) {
           this.form.disable();
@@ -585,19 +776,64 @@ export class RequestFormComponent implements OnInit {
       });
   }
 
+  private focusErrorBanner(): void {
+    setTimeout(() => {
+      const banner = this.elementRef.nativeElement.querySelector('.error-banner') as HTMLElement | null;
+      if (banner) {
+        if (typeof banner.scrollIntoView === 'function') {
+          banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        banner.focus();
+      }
+    }, 0);
+  }
+
+  private getControlByPath(path?: string): FormControl | null {
+    if (!path) {
+      return null;
+    }
+    const match = path.match(/^lines\[(\d+)\]\.(.+)$/);
+    if (match) {
+      const index = parseInt(match[1], 10);
+      const subProp = match[2];
+      const group = this.lines.at(index);
+      return (group?.get(subProp) as FormControl) ?? null;
+    }
+    return (this.form.get(path) as FormControl) ?? null;
+  }
+
   private handleError(err: unknown): void {
     if (err instanceof HttpErrorResponse) {
       const apiError = err.error as ApiError | undefined;
-      const details = apiError?.details as { reason?: string } | undefined;
+      const details =
+        (apiError?.details as { field?: string; reason?: string } | undefined) ??
+        (Array.isArray(apiError?.details)
+          ? (apiError?.details[0] as { field?: string; reason?: string } | undefined)
+          : undefined);
       if (err.status === 409 && details?.reason === 'part_of_split') {
         this.errorMessage.set(this.translate.instant(`${I18N}.partOfSplitError`));
+        this.focusErrorBanner();
         return;
       }
-      this.errorMessage.set(
-        apiError?.message ?? err.message ?? this.translate.instant(`${I18N}.genericError`),
-      );
+      if (details?.reason && SERVER_ERROR_KEYS[details.reason]) {
+        const key = SERVER_ERROR_KEYS[details.reason];
+        const translated = this.translate.instant(key);
+        if (details.field) {
+          const control = this.getControlByPath(details.field);
+          if (control) {
+            control.setErrors({ server: key });
+            control.markAsTouched();
+          }
+        }
+        this.errorMessage.set(translated);
+        this.focusErrorBanner();
+        return;
+      }
+      this.errorMessage.set(this.translate.instant(`${I18N}.genericError`));
+      this.focusErrorBanner();
       return;
     }
     this.errorMessage.set(this.translate.instant(`${I18N}.genericError`));
+    this.focusErrorBanner();
   }
 }

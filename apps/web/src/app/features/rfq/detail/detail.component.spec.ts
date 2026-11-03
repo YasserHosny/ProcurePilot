@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter, Router, ActivatedRoute, convertToParamMap } from '@angular/router';
@@ -10,7 +10,7 @@ import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { DetailComponent } from './detail.component';
-import { RfqApi, RfqDetail, RfqResponseComparisonList, RfqSendResponse } from '../rfq-api';
+import { RfqApi, RfqDetail, RfqRecipient, RfqResponseComparisonList, RfqSendResponse } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatService } from '../../../core/format/format.service';
@@ -798,5 +798,339 @@ describe('DetailComponent (RFQ Details)', () => {
 
     expect(enResult).not.toMatch(/\{\{.*?\}\}/);
     expect(arResult).not.toMatch(/\{\{.*?\}\}/);
+  });
+
+  describe('PPS-176 / P-142: Supplier reply status and summary', () => {
+    const baseRecipient: RfqRecipient = {
+      id: 'rec-test-1',
+      tenant_id: 't-1',
+      rfq_id: 'rfq-sent-1',
+      supplier_id: 'sup-1',
+      status: 'sent',
+      outbound_message_id: 'msg-1',
+      sent_at: '2026-10-28T14:14:00Z',
+      created_at: '2026-10-20T10:00:00Z',
+      supplier_name: 'Al-Madina Foods',
+      supplier_contact_email: 'contact@almadina.test',
+    };
+
+    const pastDate = '2020-01-01';
+    const futureDate = '2099-01-01';
+
+    describe('getRecipientReplyState (five states)', () => {
+      it('derives «Not delivered» for status draft or failed regardless of response_count', () => {
+        const draftRec: RfqRecipient = { ...baseRecipient, status: 'draft', response_count: 0 };
+        const failedRec: RfqRecipient = { ...baseRecipient, status: 'failed', response_count: 2 };
+        const stateDraft = component.getRecipientReplyState(draftRec, { status: 'sent', needed_by_date: futureDate });
+        const stateFailed = component.getRecipientReplyState(failedRec, { status: 'sent', needed_by_date: futureDate });
+
+        expect(stateDraft.status).toBe('not_delivered');
+        expect(stateDraft.icon).toBe('block');
+        expect(stateDraft.label).toBe('Not delivered');
+        expect(stateDraft.isOverdue).toBeFalse();
+
+        expect(stateFailed.status).toBe('not_delivered');
+        expect(stateFailed.icon).toBe('block');
+        expect(stateFailed.label).toBe('Not delivered');
+      });
+
+      it('derives «Replied» for status sent and response_count > 0 (with count when > 1)', () => {
+        const singleReply: RfqRecipient = { ...baseRecipient, status: 'sent', response_count: 1 };
+        const multiReply: RfqRecipient = { ...baseRecipient, status: 'sent', response_count: 3 };
+
+        const stateSingle = component.getRecipientReplyState(singleReply, { status: 'sent', needed_by_date: pastDate });
+        const stateMulti = component.getRecipientReplyState(multiReply, { status: 'sent', needed_by_date: pastDate });
+
+        expect(stateSingle.status).toBe('replied');
+        expect(stateSingle.icon).toBe('check');
+        expect(stateSingle.label).toBe('Replied');
+        expect(stateSingle.isOverdue).toBeFalse();
+
+        expect(stateMulti.status).toBe('replied');
+        expect(stateMulti.icon).toBe('check');
+        expect(stateMulti.label).toBe('Replied (3)');
+        expect(stateMulti.isOverdue).toBeFalse();
+      });
+
+      it('derives «No reply» for status sent, no reply, when RFQ status is expired or converted', () => {
+        const noReplyRec: RfqRecipient = { ...baseRecipient, status: 'sent', response_count: 0 };
+
+        const stateExpired = component.getRecipientReplyState(noReplyRec, { status: 'expired', needed_by_date: pastDate });
+        const stateConverted = component.getRecipientReplyState(noReplyRec, { status: 'converted', needed_by_date: futureDate });
+
+        expect(stateExpired.status).toBe('no_reply');
+        expect(stateExpired.icon).toBe('close');
+        expect(stateExpired.label).toBe('No reply');
+        expect(stateExpired.isOverdue).toBeFalse();
+
+        expect(stateConverted.status).toBe('no_reply');
+        expect(stateConverted.icon).toBe('close');
+        expect(stateConverted.label).toBe('No reply');
+      });
+
+      it('derives «Overdue — needed by <date>» for status sent, no reply, RFQ sent/responded and needed_by_date in past', () => {
+        const noReplyRec: RfqRecipient = { ...baseRecipient, status: 'sent', response_count: 0 };
+
+        const stateSentOverdue = component.getRecipientReplyState(noReplyRec, { status: 'sent', needed_by_date: pastDate });
+        const stateRespondedOverdue = component.getRecipientReplyState(noReplyRec, { status: 'responded', needed_by_date: pastDate });
+
+        expect(stateSentOverdue.status).toBe('overdue');
+        expect(stateSentOverdue.icon).toBe('warning');
+        expect(stateSentOverdue.isOverdue).toBeTrue();
+        expect(stateSentOverdue.label).toContain('Overdue — needed by');
+
+        expect(stateRespondedOverdue.status).toBe('overdue');
+        expect(stateRespondedOverdue.icon).toBe('warning');
+        expect(stateRespondedOverdue.isOverdue).toBeTrue();
+      });
+
+      it('derives «Awaiting reply» otherwise (sent, no reply, not yet due)', () => {
+        const noReplyRec: RfqRecipient = { ...baseRecipient, status: 'sent', response_count: 0 };
+
+        const stateAwaiting = component.getRecipientReplyState(noReplyRec, { status: 'sent', needed_by_date: futureDate });
+
+        expect(stateAwaiting.status).toBe('awaiting_reply');
+        expect(stateAwaiting.icon).toBe('schedule');
+        expect(stateAwaiting.label).toBe('Awaiting reply');
+        expect(stateAwaiting.isOverdue).toBeFalse();
+      });
+
+      it('treats response_count undefined as 0', () => {
+        const undefinedCountRec: RfqRecipient = { ...baseRecipient, status: 'sent', response_count: undefined };
+
+        const stateAwaiting = component.getRecipientReplyState(undefinedCountRec, { status: 'sent', needed_by_date: futureDate });
+        expect(stateAwaiting.status).toBe('awaiting_reply');
+
+        const stateOverdue = component.getRecipientReplyState(undefinedCountRec, { status: 'sent', needed_by_date: pastDate });
+        expect(stateOverdue.status).toBe('overdue');
+      });
+    });
+
+    describe('summary line counts and display', () => {
+      it('calculates replied of delivered and overdue counts', () => {
+        const detail: RfqDetail = {
+          ...mockSentDetail,
+          rfq: { ...mockSentDetail.rfq, status: 'sent', needed_by_date: pastDate },
+          recipients: [
+            { ...baseRecipient, id: 'r1', status: 'sent', response_count: 2 },
+            { ...baseRecipient, id: 'r2', status: 'sent', response_count: 1 },
+            { ...baseRecipient, id: 'r3', status: 'sent', response_count: 0 },
+            { ...baseRecipient, id: 'r4', status: 'failed', response_count: 0 },
+          ],
+        };
+
+        const counts = component.recipientSummaryCounts(detail);
+        expect(counts).toEqual({ replied: 2, delivered: 3, overdue: 1 });
+
+        const summaryText = component.recipientSummaryText(detail);
+        expect(summaryText).toBe('2 of 3 suppliers replied · 1 overdue');
+      });
+
+      it('omits overdue part when overdue count is 0', () => {
+        const detail: RfqDetail = {
+          ...mockSentDetail,
+          rfq: { ...mockSentDetail.rfq, status: 'sent', needed_by_date: futureDate },
+          recipients: [
+            { ...baseRecipient, id: 'r1', status: 'sent', response_count: 1 },
+            { ...baseRecipient, id: 'r2', status: 'sent', response_count: 0 },
+          ],
+        };
+
+        const counts = component.recipientSummaryCounts(detail);
+        expect(counts).toEqual({ replied: 1, delivered: 2, overdue: 0 });
+
+        const summaryText = component.recipientSummaryText(detail);
+        expect(summaryText).toBe('1 of 2 suppliers replied');
+      });
+
+      it('renders the summary line under status in Details tab when status is sent or responded', async () => {
+        const detail: RfqDetail = {
+          ...mockSentDetail,
+          rfq: { ...mockSentDetail.rfq, status: 'sent', needed_by_date: pastDate },
+          recipients: [
+            { ...baseRecipient, id: 'r1', status: 'sent', response_count: 2 },
+            { ...baseRecipient, id: 'r2', status: 'sent', response_count: 0 },
+          ],
+        };
+        rfqApiSpy.getRfq.and.returnValue(of(detail));
+        component.loadRfq('rfq-sent-1');
+        component.selectedTabIndex.set(0);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        const compiled = fixture.nativeElement as HTMLElement;
+        const summaryEl = compiled.querySelector('[data-testid="rfq-detail-status-summary"]');
+        expect(summaryEl).not.toBeNull();
+        expect(summaryEl?.textContent?.trim()).toContain('1 of 2 suppliers replied · 1 overdue');
+      });
+
+      it('renders the Reply column in the Recipients tab', async () => {
+        const detail: RfqDetail = {
+          ...mockSentDetail,
+          rfq: { ...mockSentDetail.rfq, status: 'sent', needed_by_date: pastDate },
+          recipients: [
+            { ...baseRecipient, id: 'r1', status: 'sent', response_count: 1 },
+            { ...baseRecipient, id: 'r2', status: 'sent', response_count: 0 },
+          ],
+        };
+        rfqApiSpy.getRfq.and.returnValue(of(detail));
+        component.loadRfq('rfq-sent-1');
+        component.selectedTabIndex.set(2);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        const compiled = fixture.nativeElement as HTMLElement;
+        const replyHeaders = Array.from(compiled.querySelectorAll('th')).map((th) => th.textContent?.trim());
+        expect(replyHeaders).toContain('Reply');
+
+        const replyCell1 = compiled.querySelector('[data-testid="recipient-reply-r1"]');
+        expect(replyCell1?.textContent?.trim()).toContain('Replied');
+
+        const replyCell2 = compiled.querySelector('[data-testid="recipient-reply-r2"]');
+        expect(replyCell2?.classList).toContain('reply-overdue');
+        expect(replyCell2?.textContent?.trim()).toContain('Overdue');
+      });
+    });
+
+    describe('Arabic catalogue strings for new keys', () => {
+      it('has Arabic strings for all new reply status and summary keys with matching interpolation', () => {
+        const newKeys = [
+          'rfq.detail.reply',
+          'rfq.detail.replyStatus_notDelivered',
+          'rfq.detail.replyStatus_replied',
+          'rfq.detail.replyStatus_repliedCount',
+          'rfq.detail.replyStatus_noReply',
+          'rfq.detail.replyStatus_overdue',
+          'rfq.detail.replyStatus_awaiting',
+          'rfq.detail.suppliersRepliedTitle',
+          'rfq.detail.suppliersReplied.zero',
+          'rfq.detail.suppliersReplied.one',
+          'rfq.detail.suppliersReplied.two',
+          'rfq.detail.suppliersReplied.few',
+          'rfq.detail.suppliersReplied.many',
+          'rfq.detail.suppliersReplied.other',
+          'rfq.detail.suppliersOverdueTitle',
+          'rfq.detail.suppliersOverdue.zero',
+          'rfq.detail.suppliersOverdue.one',
+          'rfq.detail.suppliersOverdue.two',
+          'rfq.detail.suppliersOverdue.few',
+          'rfq.detail.suppliersOverdue.many',
+          'rfq.detail.suppliersOverdue.other',
+        ];
+
+        const getNested = (obj: Record<string, unknown>, path: string): string => {
+          return path.split('.').reduce<unknown>((acc, part) => (acc as Record<string, unknown>)?.[part], obj) as string;
+        };
+
+        for (const key of newKeys) {
+          const enVal = getNested(enCatalog as Record<string, unknown>, key);
+          const arVal = getNested(arCatalog as Record<string, unknown>, key);
+          expect(typeof enVal).withContext(`EN missing ${key}`).toBe('string');
+          expect(typeof arVal).withContext(`AR missing ${key}`).toBe('string');
+          expect(enVal.length).withContext(`EN empty ${key}`).toBeGreaterThan(0);
+          expect(arVal.length).withContext(`AR empty ${key}`).toBeGreaterThan(0);
+        }
+      });
+    });
+  });
+
+  describe('PPS-180: Resilient and honest RFQ Detail', () => {
+    it('non-404 error shows Retry + back link and Retry reloads', fakeAsync(() => {
+      rfqApiSpy.getRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+      component.loadRfq('rfq-error-500');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const errorEl = compiled.querySelector('.error-state');
+      expect(errorEl).not.toBeNull();
+      expect(errorEl?.getAttribute('role')).toBe('alert');
+      expect(errorEl?.textContent).toContain('Failed to load RFQ details.');
+
+      const retryBtn = errorEl?.querySelector<HTMLButtonElement>('[data-testid="rfq-detail-retry-button"]');
+      expect(retryBtn).not.toBeNull();
+      expect(retryBtn?.textContent?.trim()).toBe('Retry');
+
+      const backLink = errorEl?.querySelector<HTMLAnchorElement>('.back-link');
+      expect(backLink).not.toBeNull();
+      expect(backLink?.textContent?.trim()).toBe('Back to RFQ History');
+      expect(backLink?.getAttribute('routerLink') ?? backLink?.getAttribute('href')).toBe('/rfq/history');
+
+      // Now retry reloads
+      rfqApiSpy.getRfq.and.returnValue(of(mockSentDetail));
+      retryBtn?.click();
+      fixture.detectChanges();
+
+      expect(rfqApiSpy.getRfq).toHaveBeenCalledWith('rfq-error-500');
+      expect(component.rfqDetail()).toEqual(mockSentDetail);
+      expect(compiled.querySelector('.error-state')).toBeNull();
+    }));
+
+    it('switching ids A -> B with A response delayed shows only B data', fakeAsync(() => {
+      const subjectA = new Subject<RfqDetail>();
+      const subjectB = new Subject<RfqDetail>();
+
+      rfqApiSpy.getRfq.and.callFake((id: string) => {
+        if (id === 'rfq-A') return subjectA;
+        if (id === 'rfq-B') return subjectB;
+        return of(mockSentDetail);
+      });
+
+      component.loadRfq('rfq-A');
+      fixture.detectChanges();
+
+      expect(component.loading()).toBeTrue();
+      expect(component.rfqDetail()).toBeNull();
+
+      component.loadRfq('rfq-B');
+      fixture.detectChanges();
+
+      expect(component.loading()).toBeTrue();
+      expect(component.rfqDetail()).toBeNull();
+
+      // B responds first
+      const detailB: RfqDetail = {
+        ...mockSentDetail,
+        rfq: { ...mockSentDetail.rfq, id: 'rfq-B' },
+      };
+      subjectB.next(detailB);
+      subjectB.complete();
+      fixture.detectChanges();
+
+      expect(component.rfqDetail()?.rfq.id).toBe('rfq-B');
+
+      // A delayed response arrives now
+      const detailA: RfqDetail = {
+        ...mockSentDetail,
+        rfq: { ...mockSentDetail.rfq, id: 'rfq-A' },
+      };
+      subjectA.next(detailA);
+      subjectA.complete();
+      fixture.detectChanges();
+
+      expect(component.rfqDetail()?.rfq.id).toBe('rfq-B');
+    }));
+
+    it('failed responses request renders tab label without a number', fakeAsync(() => {
+      const failedDetail = {
+        ...mockSentDetail,
+        rfq: { ...mockSentDetail.rfq, id: 'rfq-sent-failed' },
+      };
+      rfqApiSpy.getRfq.and.returnValue(of(failedDetail));
+      rfqApiSpy.listResponses.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+
+      component.loadRfq('rfq-sent-failed');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const tabLabels = compiled.querySelectorAll('.mat-mdc-tab .mdc-tab__text-label');
+      const texts = Array.from(tabLabels).map((el) => el.textContent?.trim());
+
+      expect(texts.some((t) => t === 'Responses')).toBeTrue();
+      expect(texts.some((t) => t?.includes('Responses ('))).toBeFalse();
+    }));
   });
 });

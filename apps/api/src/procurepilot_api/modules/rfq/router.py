@@ -47,12 +47,12 @@ def _rfq_send_limit() -> str:
 
 class RfqLineCreate(BaseModel):
     workspace_product_id: uuid.UUID
-    quantity: Decimal
+    quantity: Decimal = Field(gt=0, max_digits=18, decimal_places=6)
 
 
 class RfqCreatePayload(BaseModel):
-    lines: list[RfqLineCreate]
-    recipient_supplier_ids: list[uuid.UUID]
+    lines: list[RfqLineCreate] = Field(min_length=1, max_length=200)
+    recipient_supplier_ids: list[uuid.UUID] = Field(max_length=100)
     needed_by_date: date
     tenant_terms: str | None = Field(default=None, max_length=4000)
 

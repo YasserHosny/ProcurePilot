@@ -51,6 +51,12 @@ from procurepilot_api.shared.mailer import get_mailer
 
 logger = logging.getLogger(__name__)
 
+# Read-time expiry only: stored lifecycle states are never rewritten by a read.
+_EFFECTIVE_STATUS_SQL = (
+    "case when r.status = 'sent' and r.needed_by_date < current_date "
+    "then 'expired' else r.status end"
+)
+
 
 @contextmanager
 def _authenticated_db(settings: Settings, member: CurrentMember) -> Iterator[psycopg.Connection]:
@@ -100,7 +106,7 @@ def lock_rfq_for_preparation(
     cur: psycopg.Cursor, *, tenant_id: uuid.UUID, rfq_id: uuid.UUID
 ) -> str | None:
     """Serialise every preparation of one RFQ — a single-supplier request or a split (spec 024
-    research R4) — and return its status, or None when the caller cannot see it.
+    research R4) — and return its effective status, or None when the caller cannot see it.
 
     The transaction-scoped advisory lock is held until the caller's transaction ends, so the
     preparation that converts the RFQ commits before another can read its status.
@@ -109,7 +115,11 @@ def lock_rfq_for_preparation(
         "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
         (f"rfq-prepare:{tenant_id}:{rfq_id}",),
     )
-    cur.execute("select status from rfq where id = %s and tenant_id = %s", (rfq_id, tenant_id))
+    cur.execute(
+        f"select {_EFFECTIVE_STATUS_SQL} as status from rfq r "
+        "where r.id = %s and r.tenant_id = %s",
+        (rfq_id, tenant_id),
+    )
     row = cur.fetchone()
     if row is None:
         return None
@@ -256,7 +266,12 @@ class RfqService:
     def get_detail(self, *, member: CurrentMember, rfq_id: uuid.UUID) -> RfqDetail:
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute("select * from rfq where id = %s", (rfq_id,))
+                cur.execute(
+                    f"select r.id, r.tenant_id, r.created_by_membership_id, "
+                    f"{_EFFECTIVE_STATUS_SQL} as status, r.needed_by_date, "
+                    "r.tenant_terms, r.idempotency_key, r.created_at from rfq r where r.id = %s",
+                    (rfq_id,),
+                )
                 row = cur.fetchone()
                 if row is None:
                     raise NotFoundError(details={"resource": "rfq"})
@@ -273,7 +288,10 @@ class RfqService:
                 lines = [RfqLine(**item) for item in cur.fetchall()]
                 cur.execute(
                     """select r.*, s.name as supplier_name,
-                              s.contact_email as supplier_contact_email
+                              s.contact_email as supplier_contact_email,
+                              (select count(*) from rfq_response resp
+                               where resp.tenant_id = r.tenant_id
+                                 and resp.rfq_recipient_id = r.id) as response_count
                        from rfq_recipient r
                        left join supplier s on s.id = r.supplier_id and s.tenant_id = r.tenant_id
                        where r.rfq_id = %s
@@ -728,6 +746,8 @@ class RfqService:
         with _authenticated_db(self.settings, member) as lock_conn:
             with lock_conn.cursor(row_factory=dict_row) as cur:
                 status = lock_rfq_for_preparation(cur, tenant_id=member.tenant_id, rfq_id=rfq_id)
+                if status == "expired":
+                    raise UnprocessableEntityError(details={"reason": "rfq_expired"})
                 if status == "converted":
                     # A retry of the preparation that converted it gets that request back -- only a
                     # request with this key that was prepared from one of this RFQ's responses.
@@ -1137,14 +1157,18 @@ class RfqService:
         query_filters = ["tenant_id = %s"]
         params: list[str | uuid.UUID | int] = [member.tenant_id]
 
-        if status:
-            query_filters.append("status = %s")
+        if status is not None:
+            if status not in ("draft", "sent", "responded", "expired", "converted"):
+                raise UnprocessableEntityError(
+                    details={"reason": "invalid_status", "field": "status"}
+                )
+            query_filters.append(f"({_EFFECTIVE_STATUS_SQL}) = %s")
             params.append(status)
 
         query = f"""
             SELECT
                 r.id,
-                r.status,
+                {_EFFECTIVE_STATUS_SQL} as status,
                 r.needed_by_date,
                 r.created_at,
                 r.created_by_membership_id,
@@ -1344,7 +1368,7 @@ def _validate_recipients(
 ) -> tuple[list[dict], list[uuid.UUID]]:
     rejected: list[dict] = []
     valid: list[uuid.UUID] = []
-    for supplier_id in supplier_ids:
+    for supplier_id in dict.fromkeys(supplier_ids):
         cur.execute("select id, contact_email from supplier where id = %s", (supplier_id,))
         row = cur.fetchone()
         if row is None:
@@ -1367,7 +1391,10 @@ def _decode_cursor(cursor: str | None) -> int:
     try:
         raw = base64.urlsafe_b64decode(cursor.encode("ascii"))
         payload = json.loads(raw.decode("utf-8"))
-        return payload["offset"]
+        offset = payload["offset"]
+        if type(offset) is not int or not 0 <= offset <= 1_000_000:
+            raise ValueError("Invalid cursor offset")
+        return offset
     except (KeyError, ValueError, TypeError, json.JSONDecodeError) as exc:
         raise UnprocessableEntityError(details={"cursor": "invalid_format"}) from exc
 

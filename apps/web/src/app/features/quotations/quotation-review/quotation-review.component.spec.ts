@@ -3745,4 +3745,177 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       });
     });
   });
+
+  describe('PPS-158 / P-126 Supplier corrections and picker', () => {
+    it('(1) supplier-only change enables Save button and persists supplier_id in review patch', () => {
+      component.quotation.set({
+        ...mockQuotationDetail,
+        supplier_id: 'sup-1',
+      });
+      component.selectedSupplierId.set('sup-1');
+      fixture.detectChanges();
+
+      // Initially, quotation has supplier_id 'sup-1', matches selectedSupplierId
+      expect(component.quotation()?.supplier_id).toBe('sup-1');
+      expect(component.selectedSupplierId()).toBe('sup-1');
+      expect(component.hasPendingReviewChanges()).toBeFalse();
+
+      const saveBtn = fixture.nativeElement.querySelector('.save-btn') as HTMLButtonElement;
+      expect(saveBtn.disabled).toBeTrue();
+
+      // Change only the supplier to 'sup-2'
+      component.selectedSupplierId.set('sup-2');
+      fixture.detectChanges();
+
+      expect(component.hasPendingReviewChanges()).toBeTrue();
+      expect(saveBtn.disabled).toBeFalse();
+
+      // Calling saveCorrections sends review patch containing supplier_id 'sup-2'
+      apiService.patchQuotation.and.returnValue(
+        of({
+          ...mockQuotationDetail,
+          supplier_id: 'sup-2',
+        }),
+      );
+
+      component.saveCorrections();
+      expect(apiService.patchQuotation).toHaveBeenCalledWith(
+        'q-review-1',
+        jasmine.objectContaining({
+          supplier_id: 'sup-2',
+        }),
+      );
+
+      fixture.detectChanges();
+      // After save succeeds, hasPendingReviewChanges is reset to false
+      expect(component.hasPendingReviewChanges()).toBeFalse();
+      expect(saveBtn.disabled).toBeTrue();
+    });
+
+    it('(2) supplier picker follows next cursors until all pages are loaded', () => {
+      const page1 = [
+        { id: 'sup-1', name: 'Alpha Ltd', status: 'active' as const, created_at: '2026-08-01T00:00:00Z' },
+      ];
+      const page2 = [
+        { id: 'sup-2', name: 'Beta Ltd', status: 'active' as const, created_at: '2026-08-02T00:00:00Z' },
+      ];
+
+      apiService.suppliers.and.callFake((params?: { cursor?: string; limit?: number }) => {
+        if (!params?.cursor) {
+          return of({ items: page1, next_cursor: 'cursor-page-2' });
+        }
+        if (params.cursor === 'cursor-page-2') {
+          return of({ items: page2, next_cursor: null });
+        }
+        return of({ items: [], next_cursor: null });
+      });
+
+      component.loadSuppliers();
+
+      expect(apiService.suppliers).toHaveBeenCalledWith(jasmine.objectContaining({ limit: 100 }));
+      expect(apiService.suppliers).toHaveBeenCalledWith(jasmine.objectContaining({ cursor: 'cursor-page-2' }));
+      expect(component.suppliers().length).toBe(2);
+      expect(component.suppliers().map((s) => s.id)).toEqual(['sup-1', 'sup-2']);
+    });
+
+    it('(3) supplier picker shows distinct error state with retry on failure, not empty-list message', () => {
+      apiService.suppliers.and.returnValue(throwError(() => new Error('API failure')));
+
+      component.loadSuppliers();
+      fixture.detectChanges();
+
+      const errorState = fixture.nativeElement.querySelector('.supplier-error-state');
+      const emptyState = fixture.nativeElement.querySelector('.supplier-empty-state');
+
+      expect(errorState).toBeTruthy();
+      expect(emptyState).toBeFalsy();
+
+      // Retry button calls loadSuppliers again
+      apiService.suppliers.and.returnValue(
+        of({
+          items: [{ id: 'sup-1', name: 'Dairy Direct', status: 'active' as const, created_at: '2026-08-01T00:00:00Z' }],
+          next_cursor: null,
+        }),
+      );
+
+      const retryBtn = errorState.querySelector('button') as HTMLButtonElement;
+      retryBtn.click();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.supplier-error-state')).toBeFalsy();
+      expect(component.suppliers().length).toBe(1);
+    });
+
+    it('(4) supplier picker is searchable and filters client-side', () => {
+      component.suppliers.set([
+        { id: 'sup-1', name: 'Dairy Direct Ltd', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+        { id: 'sup-2', name: 'Bakery Best', status: 'active', created_at: '2026-08-02T00:00:00Z' },
+      ]);
+      fixture.detectChanges();
+
+      const comp = component as unknown as {
+        filteredSuppliers?: () => Supplier[];
+        setSupplierSearch?: (q: string) => void;
+      };
+      expect(comp.filteredSuppliers?.().length).toBe(2);
+
+      comp.setSupplierSearch?.('bakery');
+      fixture.detectChanges();
+
+      expect(comp.filteredSuppliers?.().length).toBe(1);
+      expect(comp.filteredSuppliers?.()[0].name).toBe('Bakery Best');
+    });
+
+    it('(5) typing, space and arrows inside search input stop propagation and do not close or change select', () => {
+      component.quotation.set({
+        ...mockQuotationDetail,
+        supplier_id: null,
+      });
+      component.suppliers.set([
+        { id: 'sup-1', name: 'Dairy Direct Ltd', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+        { id: 'sup-2', name: 'Bakery Best', status: 'active', created_at: '2026-08-02T00:00:00Z' },
+      ]);
+      fixture.detectChanges();
+
+      const selectDebug = fixture.debugElement.query(By.css('#supplier-select'));
+      expect(selectDebug).toBeTruthy();
+      const matSelect = selectDebug.componentInstance;
+      matSelect.open();
+      fixture.detectChanges();
+
+      expect(matSelect.panelOpen).toBeTrue();
+
+      const searchInput = (document.querySelector('[data-testid="supplier-search-input"]') ||
+        fixture.nativeElement.querySelector('[data-testid="supplier-search-input"]')) as HTMLInputElement;
+      expect(searchInput).toBeTruthy();
+
+      // Space, arrows, and normal characters must stop propagation and leave panel open & select unchanged
+      const testKeys = [' ', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'a'];
+      for (const key of testKeys) {
+        const keyEvent = new KeyboardEvent('keydown', {
+          key,
+          bubbles: true,
+          cancelable: true,
+        });
+        spyOn(keyEvent, 'stopPropagation').and.callThrough();
+        searchInput.dispatchEvent(keyEvent);
+
+        expect(keyEvent.stopPropagation).toHaveBeenCalled();
+        expect(matSelect.panelOpen).toBeTrue();
+        expect(component.selectedSupplierId()).toBeNull();
+      }
+
+      // Typing in input updates filter query without selecting or closing
+      searchInput.value = 'Bakery';
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      fixture.detectChanges();
+
+      expect(component.supplierSearchQuery()).toBe('Bakery');
+      expect(matSelect.panelOpen).toBeTrue();
+      expect(component.selectedSupplierId()).toBeNull();
+
+      matSelect.close();
+      fixture.detectChanges();
+    });
+  });
 });

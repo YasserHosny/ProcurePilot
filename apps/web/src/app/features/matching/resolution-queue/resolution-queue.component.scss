@@ -15,6 +15,17 @@
   .banner-text { font-size: 0.825rem; color: var(--pp-success); }
 }
 
+.error-banner {
+  .error-content {
+    flex: 1;
+  }
+
+  .retry-btn {
+    margin-inline-start: auto;
+    align-self: center;
+  }
+}
+
 .filter-card,
 .quotation-group {
   border-radius: 8px;

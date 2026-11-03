@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import logging
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import PurePosixPath
 from typing import Literal
@@ -176,7 +176,16 @@ class MatchingService:
                 if date_from is not None:
                     query = query.gte("created_at", date_from)
                 if date_to is not None:
-                    query = query.lte("created_at", date_to)
+                    next_day = None
+                    if "T" not in date_to:
+                        try:
+                            next_day = date.fromisoformat(date_to) + timedelta(days=1)
+                        except (ValueError, OverflowError):
+                            pass
+                    if next_day is not None:
+                        query = query.lt("created_at", f"{next_day.isoformat()}T00:00:00+00:00")
+                    else:
+                        query = query.lte("created_at", date_to)
                 if quotation_id is not None:
                     line_ids = [str(row["id"]) for row in _line_rows(client, quotation_id)]
                     if not line_ids:
@@ -323,7 +332,17 @@ class MatchingService:
         if date_from is not None:
             filters.append("created_at >= %(date_from)s::timestamptz")
         if date_to is not None:
-            filters.append("created_at <= %(date_to)s::timestamptz")
+            next_day = None
+            if "T" not in date_to:
+                try:
+                    next_day = date.fromisoformat(date_to) + timedelta(days=1)
+                except (ValueError, OverflowError):
+                    pass
+            if next_day is not None:
+                params["date_to_exclusive"] = f"{next_day.isoformat()}T00:00:00+00:00"
+                filters.append("created_at < %(date_to_exclusive)s::timestamptz")
+            else:
+                filters.append("created_at <= %(date_to)s::timestamptz")
         if search and search.strip():
             filters.append(
                 "(lower(original_text) like '%%' || lower(%(search)s) || '%%' "
@@ -1225,7 +1244,16 @@ class MatchingService:
             if date_from is not None:
                 query = query.gte("decided_at", date_from)
             if date_to is not None:
-                query = query.lte("decided_at", date_to)
+                next_day = None
+                if "T" not in date_to:
+                    try:
+                        next_day = date.fromisoformat(date_to) + timedelta(days=1)
+                    except (ValueError, OverflowError):
+                        pass
+                if next_day is not None:
+                    query = query.lt("decided_at", f"{next_day.isoformat()}T00:00:00+00:00")
+                else:
+                    query = query.lte("decided_at", date_to)
             if quotation_id is not None:
                 line_ids = [str(row["id"]) for row in _line_rows(client, quotation_id)]
                 if not line_ids:
