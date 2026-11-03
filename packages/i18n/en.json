@@ -1656,7 +1656,7 @@
       "reliabilityNotEnoughData": "Not enough data (neutral)"
     },
     "table": {
-        "ariaLabel": "Supplier offers comparison",
+      "ariaLabel": "Supplier offers comparison",
       "supplier": "Supplier",
       "normalisedUnitPrice": "Unit Price",
       "landedCostTotal": "Total Landed Cost",
@@ -3780,7 +3780,9 @@
       "vatInclusiveHint": "Net of {{rate}}% VAT · quoted {{gross}} incl. VAT",
       "remainingQuantity": "Still to order",
       "sourceLoadError": "The approved request could not be loaded, so no order can be created from it. Go back and try again.",
-      "fromApprovedRequestPlain": "From an approved request"
+      "fromApprovedRequestPlain": "From an approved request",
+      "quantityPacks": "Quantity (packs)",
+      "useEstimate": "Use estimate"
     },
     "status": {
       "draft": "Draft",
