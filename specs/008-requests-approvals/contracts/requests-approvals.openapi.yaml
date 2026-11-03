@@ -149,7 +149,9 @@ paths:
       description: >
         The request's currently-resolved approver, or an owner acting as standing override
         (FR-007), only. Requires a recorded human decision (FR-006) — there is no
-        system-originated approval path.
+        system-originated approval path. A requester receives 403 with
+        details.reason self_decision_not_allowed unless they are the only active owner
+        (ADR-024).
       parameters:
         - $ref: '#/components/parameters/RequestId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -170,7 +172,9 @@ paths:
   /requests/{request_id}/reject:
     post:
       summary: Reject a request
-      description: Same authorisation rule as approve (FR-007).
+      description: >
+        Same authorisation rule as approve (FR-007, ADR-024), including 403 with
+        details.reason self_decision_not_allowed unless the requester is the only active owner.
       parameters:
         - $ref: '#/components/parameters/RequestId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -472,6 +476,10 @@ components:
       type: object
       required: [id, assigned_membership_id, source, status]
       properties:
+        self_approval:
+          type: boolean
+          default: false
+          description: Derived; pending assignee or recorded decider is the requester (ADR-024).
         id: { type: string, format: uuid }
         assigned_membership_id: { type: string, format: uuid }
         assigned_name: { type: string, nullable: true }

@@ -4,6 +4,8 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+import pytest
+
 from procurepilot_api.modules.requests.routing import (
     DelegationRow,
     ThresholdRuleRow,
@@ -63,6 +65,8 @@ def test_branch_specific_rule_wins_over_tenant_default() -> None:
         delegations=[],
         removed_membership_ids=set(),
         owner_membership_id=owner_id,
+        requester_membership_id=uuid4(),
+        owner_membership_ids=[owner_id],
         as_of=date(2026, 9, 10),
     )
 
@@ -87,6 +91,8 @@ def test_narrowest_matching_range_wins_when_rules_overlap() -> None:
         delegations=[],
         removed_membership_ids=set(),
         owner_membership_id=owner_id,
+        requester_membership_id=uuid4(),
+        owner_membership_ids=[owner_id],
         as_of=date(2026, 9, 10),
     )
 
@@ -108,6 +114,8 @@ def test_active_delegation_redirects_threshold_resolved_assignee() -> None:
         delegations=[delegation(delegator_id=approver, delegate_id=delegate)],
         removed_membership_ids=set(),
         owner_membership_id=owner_id,
+        requester_membership_id=uuid4(),
+        owner_membership_ids=[owner_id],
         as_of=date(2026, 9, 10),
     )
 
@@ -127,6 +135,8 @@ def test_owner_fallback_when_no_rule_matches_or_estimate_is_incomplete() -> None
         delegations=[],
         removed_membership_ids=set(),
         owner_membership_id=owner_id,
+        requester_membership_id=uuid4(),
+        owner_membership_ids=[owner_id],
         as_of=date(2026, 9, 10),
     )
 
@@ -147,6 +157,8 @@ def test_removed_threshold_approver_falls_back_to_owner() -> None:
         delegations=[],
         removed_membership_ids={removed_approver},
         owner_membership_id=owner_id,
+        requester_membership_id=uuid4(),
+        owner_membership_ids=[owner_id],
         as_of=date(2026, 9, 10),
     )
 
@@ -168,6 +180,8 @@ def test_delegation_to_removed_delegate_falls_through_to_original_assignee() -> 
         delegations=[delegation(delegator_id=approver, delegate_id=removed_delegate)],
         removed_membership_ids={removed_delegate},
         owner_membership_id=owner_id,
+        requester_membership_id=uuid4(),
+        owner_membership_ids=[owner_id],
         as_of=date(2026, 9, 10),
     )
 
@@ -188,6 +202,8 @@ def test_split_combined_total_routes_to_b_while_small_request_routes_to_a() -> N
         delegations=[],
         removed_membership_ids=set(),
         owner_membership_id=owner,
+        requester_membership_id=uuid4(),
+        owner_membership_ids=[owner],
         as_of=date(2026, 10, 30),
     )
     result = resolve_approver(
@@ -210,8 +226,57 @@ def test_split_without_matching_rule_keeps_owner_fallback() -> None:
         delegations=[],
         removed_membership_ids=set(),
         owner_membership_id=owner,
+        requester_membership_id=uuid4(),
+        owner_membership_ids=[owner],
         as_of=date(2026, 10, 30),
         is_group=True,
     )
     assert result.assigned_membership_id == owner
     assert result.source == "owner_fallback"
+
+
+@pytest.mark.parametrize("is_group", [False, True])
+@pytest.mark.parametrize(
+    "scenario", ["matching", "delegate", "sole", "two", "removed", "uninvolved", "delegated_away"]
+)
+def test_requester_routing(scenario: str, is_group: bool) -> None:
+    requester, owner, other, approver = (uuid4() for _ in range(4))
+    owners = [owner]
+    rules = [rule(approver_id=approver)]
+    delegations = []
+    removed = set()
+    expected, source = approver, "threshold_match"
+    if scenario == "matching":
+        rules = [rule(approver_id=requester)]
+        expected, source = owner, "owner_fallback"
+    elif scenario == "delegate":
+        delegations = [delegation(delegator_id=approver, delegate_id=requester)]
+    elif scenario in ("sole", "two", "removed"):
+        owner = requester
+        owners = [requester] if scenario == "sole" else [requester, other]
+        rules = []
+        expected, source = requester if scenario == "sole" else other, "owner_fallback"
+        if scenario == "removed":
+            owners.insert(1, approver)
+            removed.add(approver)
+    elif scenario == "delegated_away":
+        rules = [rule(approver_id=requester)]
+        delegations = [delegation(delegator_id=requester, delegate_id=other)]
+        expected, source = other, "delegate"
+    result = resolve_approver(
+        request_value=Decimal("75"),
+        request_currency="GBP",
+        branch_id=uuid4(),
+        rules=rules,
+        delegations=delegations,
+        removed_membership_ids=removed,
+        owner_membership_id=owner,
+        owner_membership_ids=owners,
+        requester_membership_id=requester,
+        as_of=date(2026, 9, 10),
+        is_group=is_group,
+    )
+    assert result.assigned_membership_id == expected
+    if is_group and source in ("threshold_match", "delegate"):
+        source = "group_threshold_match"
+    assert result.source == source

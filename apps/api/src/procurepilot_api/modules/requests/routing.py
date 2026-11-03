@@ -44,6 +44,8 @@ def resolve_approver(
     delegations: Sequence[DelegationRow],
     removed_membership_ids: Collection[UUID],
     owner_membership_id: UUID,
+    requester_membership_id: UUID,
+    owner_membership_ids: Sequence[UUID],
     as_of: date,
     is_group: bool = False,
 ) -> ResolvedApproval:
@@ -65,6 +67,19 @@ def resolve_approver(
         owner_membership_id,
     )
     delegate = _active_delegation_for(assignee, delegations, as_of, removed_membership_ids)
+    if delegate == requester_membership_id:
+        delegate = None
+    if (delegate or assignee) == requester_membership_id:
+        alternative = next(
+            (
+                owner
+                for owner in owner_membership_ids
+                if owner != requester_membership_id and owner not in removed_membership_ids
+            ),
+            None,
+        )
+        if alternative is not None:
+            assignee, source, delegate = alternative, "owner_fallback", None
     if is_group:
         return ResolvedApproval(
             assigned_membership_id=delegate or assignee,
