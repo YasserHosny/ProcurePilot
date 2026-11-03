@@ -1849,6 +1849,63 @@ describe('CompareComponent (RFQ)', () => {
       expect(split?.disabled).toBeTrue();
     });
 
+    it('retries a name lookup that failed the first time on the next load', () => {
+      mockRfqApi.listResponses.and.returnValue(
+        of({ items: [matchedReply('r-far', 'supp-1', 'prod-999')] }),
+      );
+      mockApiService.product.and.returnValues(
+        throwError(() => new Error('busy')),
+        of({ id: 'prod-999', tenant_name: 'Far Product' } as Product),
+      );
+
+      component.loadData('rfq-1');
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      expect(mockApiService.product).toHaveBeenCalledTimes(2);
+      expect(component.productNames()['prod-999']).toBe('Far Product');
+    });
+
+    it('shows no split saving for replies from one supplier only', () => {
+      const costs = (a: string, b: string) => [
+        { workspace_product_id: 'p1', total_amount: a, total_currency: 'USD' },
+        { workspace_product_id: 'p2', total_amount: b, total_currency: 'USD' },
+      ];
+      const reply = (id: string, a: string, b: string) => ({
+        ...matchedReply(id, 'supp-1', 'p1'),
+        rfq_landed_costs: costs(a, b),
+      });
+      mockRfqApi.getRfq.and.returnValue(
+        of({
+          ...sentDetail,
+          lines: ['p1', 'p2'].map((product) => ({
+            id: `line-${product}`,
+            tenant_id: 'tenant-1',
+            rfq_id: 'rfq-1',
+            workspace_product_id: product,
+            quantity: '10',
+            created_at: '2026-09-25T09:00:00Z',
+          })),
+        }),
+      );
+      mockRfqApi.listResponses.and.returnValue(
+        of({ items: [reply('a', '100', '200'), reply('b', '150', '120')] }),
+      );
+
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      expect(component.splitSaving()).toBeNull();
+      expect(el().querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+    });
+
+    it('shows no Prepare prerequisites to roles that cannot prepare', () => {
+      mockSession.hasRole.and.returnValue(false);
+      recreate();
+
+      expect(el().querySelector('.prepare-actions .disabled-reason')).toBeNull();
+    });
+
     it('offers Retry when the responses cannot be loaded', () => {
       mockRfqApi.listResponses.and.returnValue(throwError(() => new Error('boom')));
       component.loadData('rfq-1');
