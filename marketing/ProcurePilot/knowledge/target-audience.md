@@ -15,7 +15,7 @@ inspected. "V" below means *the product team has chosen this target* (documented
 
 | Attribute | Value | Label | Evidence |
 |---|---|---|---|
-| Industry / segment | Multi-location F&B: restaurant groups first; the plan also names retail and hospitality chains, pharmacy chains and distributors | V (team's chosen wedge); fit with buyers H | SRC-012 ("Starting wedge"), SRC-017 landing eyebrow |
+| Industry / segment | Companies buying from many suppliers across branches (owner, 2026-11-04: "procurement, not just restaurants"). Restaurants first; also clinics and labs, pharmacy, retail, hospitality, distributors | V for the owner's direction and the restaurant wedge; fit outside restaurants H, untested | MD-20, SRC-012, SRC-017 |
 | Company size | 2+ branches (or 1 branch with a central kitchen/warehouse); 5+ suppliers; at least weekly orders | V (pilot qualification criteria) | SRC-012 |
 | Region and language | Egypt first (landing, first-customer plan). Saudi Arabia chosen as the first GCC market (demo workspace and video ready). An Ireland/eurozone English demo also exists | V (documented choices); priority between them ? | SRC-012, SRC-014, SRC-015 |
 | Trigger events (why now) | Opening more branches; supplier price swings; owner losing visibility of what branches pay | H | None |
