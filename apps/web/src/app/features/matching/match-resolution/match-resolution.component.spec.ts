@@ -679,6 +679,75 @@ describe('MatchResolutionComponent (T039)', () => {
     });
   });
 
+  describe('result cards (P-158, PPS-202)', () => {
+    const loadDecided = (
+      line: Partial<MatchTask['quotation_line']> = {},
+      cost: Partial<LandedCost> = {},
+    ): HTMLElement => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          quotation_line: { ...mockTask.quotation_line, ...line },
+          decision: mockDecision,
+        }),
+      );
+      apiService.getLandedCost.and.returnValue(of({ ...mockLandedCost, ...cost }));
+      component.loadTask('line-99');
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    };
+
+    it('shows a zero discount without a minus sign and a real discount with one', () => {
+      let el = loadDecided({}, { discount: { amount: '0.00', currency: 'GBP' } });
+      expect(el.querySelector('.discount-val')?.textContent?.trim()).not.toMatch(/^-/);
+
+      el = loadDecided({}, { discount: { amount: '1.00', currency: 'GBP' } });
+      expect(el.querySelector('.discount-val')?.textContent?.trim()).toMatch(/^-/);
+    });
+
+    it('says which quantity the landed total covers', () => {
+      const el = loadDecided();
+      expect(el.querySelector('.landed-cost-card')?.textContent).toMatch(
+        /Total for 10\s*×\s*GBP 2\.5/,
+      );
+    });
+
+    it('does not invent a quantity of 1 when the quote has none', () => {
+      const el = loadDecided({ quantity: null });
+      const metrics = Array.from(el.querySelectorAll('.line-card .metric-item'));
+      const quantity = metrics.find((m) => m.textContent?.includes('Quantity'));
+      expect(quantity?.querySelector('.metric-value')?.textContent?.trim()).toBe(
+        enCatalog.matching.queue.notAvailable,
+      );
+    });
+
+    it('labels the pack unit like the rest of the app instead of the raw code', () => {
+      const el = loadDecided({ pack: { pack_count: 1, unit_size: '2.0', unit: 'litre' } });
+      const text = el.querySelector('.line-card')?.textContent ?? '';
+      expect(text).toContain(`1 × 2.0 ${enCatalog.units.litre}`);
+      expect(text).not.toContain('litre');
+    });
+
+    it('keeps a fractional VAT rate exact', () => {
+      const el = loadDecided({ vat_rate: '0.145' });
+      expect(el.querySelector('.line-card')?.textContent).toContain('14.5%');
+    });
+
+    it('gives every region on the page an accessible name', () => {
+      const el = loadDecided();
+      const regions = Array.from(el.querySelectorAll('[role="region"]'));
+      expect(regions.length).toBeGreaterThan(0);
+      for (const region of regions) {
+        const named =
+          region.hasAttribute('aria-label') ||
+          (region.getAttribute('aria-labelledby') &&
+            document.getElementById(region.getAttribute('aria-labelledby')!)?.textContent?.trim());
+        expect(named).withContext(region.className).toBeTruthy();
+      }
+    });
+  });
+
   describe('RFQ-aware matching (spec 023 US1)', () => {
     it('shows "Your RFQ line {n}" when candidate has rfq_line_id and pack_check is not conflict', () => {
       apiService.getMatchTaskForLine.and.returnValue(

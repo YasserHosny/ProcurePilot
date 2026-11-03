@@ -1530,6 +1530,7 @@
         "discount": "Discount",
         "otherCharges": "Other Charges",
         "total": "Total Landed Cost",
+        "totalCovers": "Total for {{quantity}} × {{unitPrice}}",
         "normalisedQuantity": "Normalised Quantity",
         "baseUnit": "Base Unit",
         "ruleVersion": "Rule Version",
