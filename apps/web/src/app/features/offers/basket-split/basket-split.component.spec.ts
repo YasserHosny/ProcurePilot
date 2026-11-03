@@ -1,4 +1,4 @@
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
@@ -9,7 +9,7 @@ import { MatSelect } from '@angular/material/select';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import en from '../../../../../../../packages/i18n/en.json';
 import ar from '../../../../../../../packages/i18n/ar.json';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import { RfqApi } from '../../rfq/rfq-api';
@@ -1052,6 +1052,102 @@ describe('BasketSplitComponent (US3, T045)', () => {
         err.textContent?.includes('This product is already in the basket.')
       );
       expect(duplicateError).toBeDefined();
+    });
+  });
+  // ─── P-185: loading, polling and rerun robustness ───────────────────────────
+
+  describe('P-185 — job loading and polling', () => {
+    const runningJob: BasketSplitJob = { ...mockFeasibleJob, id: 'job-run', status: 'running', result: null };
+    const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+
+    it('shows a not-found state, not the empty form, for an unknown job id', () => {
+      apiService.getBasketSplitJob.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 404, error: { code: 'not_found', message: 'Resource was not found.' } })),
+      );
+      component.fetchJob('missing');
+      fixture.detectChanges();
+
+      expect(el().querySelector('[data-testid="job-not-found"]')).toBeTruthy();
+      expect(el().querySelector('.form-card')).toBeNull();
+    });
+
+    it('keeps polling through a transient failure and offers a retry after repeated failures', fakeAsync(() => {
+      const answers = [
+        of(runningJob), // the initial fetch
+        throwError(() => new HttpErrorResponse({ status: 503 })), // one blip: tolerated
+        of(runningJob),
+        throwError(() => new HttpErrorResponse({ status: 503 })),
+        throwError(() => new HttpErrorResponse({ status: 503 })),
+        throwError(() => new HttpErrorResponse({ status: 503 })),
+      ];
+      apiService.getBasketSplitJob.and.callFake(() => answers.shift() ?? of(runningJob));
+
+      component.fetchJob('job-run');
+      tick(1500);
+      expect(component.pollFailed()).toBeFalse();
+      tick(1500);
+      tick(1500 * 3);
+      expect(component.pollFailed()).toBeTrue();
+      fixture.detectChanges();
+      expect(el().querySelector('[data-testid="poll-error"]')).toBeTruthy();
+
+      const callsWhenStopped = apiService.getBasketSplitJob.calls.count();
+      tick(1500 * 3);
+      expect(apiService.getBasketSplitJob.calls.count()).toBe(callsWhenStopped);
+
+      apiService.getBasketSplitJob.and.returnValue(of(mockFeasibleJob));
+      component.retryPolling();
+      tick(1500);
+      expect(component.pollFailed()).toBeFalse();
+      expect(component.currentJob()?.status).toBe('completed');
+    }));
+
+    it('stops polling the previous job when another job is opened', fakeAsync(() => {
+      const jobA: BasketSplitJob = { ...runningJob, id: 'job-A' };
+      const jobB: BasketSplitJob = { ...mockFeasibleJob, id: 'job-B' };
+      apiService.getBasketSplitJob.and.callFake((id: string) => of(id === 'job-A' ? jobA : jobB));
+
+      component.fetchJob('job-A');
+      tick(1500);
+      component.fetchJob('job-B');
+      apiService.getBasketSplitJob.calls.reset();
+      tick(1500 * 3);
+
+      expect(apiService.getBasketSplitJob.calls.allArgs().some(([id]) => id === 'job-A')).toBeFalse();
+      expect(component.currentJob()?.id).toBe('job-B');
+    }));
+
+    it('reruns a standalone job from the job itself after a refresh', () => {
+      apiService.getBasketSplitJob.and.returnValue(of(mockFeasibleJob));
+      apiService.optimiseBasket.and.returnValue(of({ ...mockFeasibleJob, id: 'job-new', status: 'queued', result: null }));
+      component.fetchJob('job-1'); // a fresh page: the form signals were never filled in
+
+      try {
+        component.rerunOptimisation();
+      } catch {
+        // Router navigation errors in the empty test router are expected.
+      }
+
+      expect(apiService.optimiseBasket).toHaveBeenCalledWith(
+        jasmine.objectContaining({ supplier_ids: ['supp-1', 'supp-2'], items: mockFeasibleJob.items }),
+      );
+    });
+
+    it('offers preferred suppliers as well as active ones, without duplicates', () => {
+      apiService.suppliers.and.callFake(((params?: { status?: string }) =>
+        of({
+          items: params?.status === 'preferred'
+            ? [{ id: 'supp-pref', name: 'Supplier Preferred', status: 'preferred', created_at: '' }]
+            : [
+                { id: 'supp-1', name: 'Supplier Alpha', status: 'active', created_at: '' },
+                { id: 'supp-2', name: 'Supplier Beta', status: 'active', created_at: '' },
+              ],
+          next_cursor: null,
+        })) as never);
+
+      component.loadSuppliersAndProducts();
+
+      expect(component.suppliers().map((x) => x.id).sort()).toEqual(['supp-1', 'supp-2', 'supp-pref']);
     });
   });
 });

@@ -1753,7 +1753,11 @@
       "failedMessage": "An error occurred during solver execution. Please try again.",
       "noCurrentOffers": "No current offers from the selected suppliers for: {{products}}",
       "unavailableMessage": "The optimisation service is not responding. Please try again shortly, or contact support if this keeps happening.",
-      "timeoutMessage": "The optimisation did not finish in time. Please try again."
+      "timeoutMessage": "The optimisation did not finish in time. Please try again.",
+      "notFoundTitle": "Basket split not found",
+      "notFoundMessage": "This split does not exist or is not available in this workspace. Start a new split instead.",
+      "pollFailed": "The latest status could not be loaded. The split may still be running.",
+      "pollRetry": "Retry"
     },
     "result": {
       "feasibleTitle": "Recommended Basket Allocation",
@@ -1841,7 +1845,9 @@
         "allocationNotWholePacks": "The allocation contains quantities that cannot be converted to whole packs.",
         "packDefinitionRequired": "Pack definition is required for the allocated items.",
         "idempotencyKeyReused": "This idempotency key has already been used with different parameters.",
-        "generic": "Failed to prepare requests."
+        "generic": "Failed to prepare requests.",
+        "branchesLoadFailed": "The branches could not be loaded. Close this dialog and try again.",
+        "costCentresLoadFailed": "The cost centres could not be loaded. Close this dialog and try again."
       }
     },
     "submit": {
