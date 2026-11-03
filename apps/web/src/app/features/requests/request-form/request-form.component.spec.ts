@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import type { ComponentFixture } from '@angular/core/testing';
-import { TestBed } from '@angular/core/testing';
+import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, RouterLink, convertToParamMap, provideRouter } from '@angular/router';
@@ -51,8 +51,10 @@ describe('RequestFormComponent — create mode (T017)', () => {
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
   let routerSpy: jasmine.SpyObj<Router>;
   let dialogSpy: jasmine.SpyObj<MatDialog>;
+  let routeParams: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
 
   beforeEach(async () => {
+    routeParams = new BehaviorSubject(convertToParamMap({}));
     requestsApi = jasmine.createSpyObj('RequestsApiService', [
       'createRequest',
       'updateRequest',
@@ -103,7 +105,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
         { provide: ApiService, useValue: api },
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { paramMap: { get: () => null } } },
+          useValue: { paramMap: routeParams, queryParamMap: of(convertToParamMap({})) },
         },
       ],
     })
@@ -126,6 +128,213 @@ describe('RequestFormComponent — create mode (T017)', () => {
     fixture = TestBed.createComponent(RequestFormComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  });
+
+  describe('PPS-193 pack hints and Save and submit', () => {
+    const product: Product = {
+      id: 'wp1', tenant_name: 'Flour', canonical_name: 'Flour', base_unit: 'kg',
+      pack: { pack_count: 2, unit_size: '3.000000', base_quantity: '10.000000' },
+      status: 'active', created_at: '',
+    };
+
+    function fillForm(): void {
+      component.form.patchValue({ branch_id: 'b1', required_by_date: '2099-01-01' });
+      component.lines.at(0).patchValue({ workspace_product_id: 'wp1', quantity: '25' });
+    }
+
+    function hint(): string | null {
+      fixture.detectChanges();
+      return fixture.nativeElement.querySelector('.line-quantity mat-hint')?.textContent ?? null;
+    }
+
+    it('shows pack size/unit on selection and updates on product changes with fallback pack arithmetic', () => {
+      component.products.set([product, {
+        ...product, id: 'wp2', base_unit: 'l', pack: { pack_count: 3, unit_size: '2.500000' },
+      }]);
+      expect(hint()).toBeNull();
+      component.lines.at(0).controls.workspace_product_id.setValue('wp1');
+      expect(hint()).toContain('1 pack = 10 kg');
+      component.lines.at(0).controls.workspace_product_id.setValue('wp2');
+      expect(hint()).toContain('1 pack = 7.5 l');
+    });
+
+    it('updates the trimmed total for valid quantities and omits it for empty, zero and invalid quantities', () => {
+      component.products.set([product]);
+      fillForm();
+      expect(hint()).toContain('Total 250 kg');
+      component.lines.at(0).controls.quantity.setValue('1.25');
+      expect(hint()).toContain('Total 12.5 kg');
+      for (const quantity of ['', '0', 'invalid', '-1', '1.1234567']) {
+        component.lines.at(0).controls.quantity.setValue(quantity);
+        expect(hint()).not.toContain('Total');
+      }
+    });
+
+    it('omits the hint for a product without pack data', () => {
+      component.products.set([{ ...product, pack: undefined } as unknown as Product]);
+      fillForm();
+      expect(hint()).toBeNull();
+    });
+
+    it('shows the translated packs suffix only on editable quantity inputs', () => {
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.line-quantity [matSuffix]')?.textContent).toContain('packs');
+      component.form.disable();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.line-quantity [matSuffix]')).toBeNull();
+    });
+
+    it('preserves the hint and raw total for localized read-only quantities', () => {
+      component.products.set([product]);
+      requestsApi.getRequest.and.returnValue(of({
+        ...mockRequest, status: 'submitted', lines: [{ ...mockRequest.lines[0], quantity: '1250.000000' }],
+      }));
+      routeParams.next(convertToParamMap({ id: 'r1' }));
+      expect(component.form.disabled).toBeTrue();
+      expect(hint()).toContain('1 pack = 10 kg');
+      expect(hint()).toContain('Total 12,500 kg');
+      expect(fixture.nativeElement.querySelector('.save-and-submit-btn')).toBeNull();
+    });
+
+    it('renders Arabic pack copy, totals and the suffix', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog);
+      translate.use('ar');
+      component.products.set([product]);
+      fillForm();
+      const text = hint();
+      expect(text).toContain('عبوة واحدة = ١٠ kg');
+      expect(text).toContain('الإجمالي ٢٥٠ kg');
+      expect(fixture.nativeElement.querySelector('.line-quantity [matSuffix]')?.textContent).toContain('عبوات');
+    });
+
+    it('marks an invalid form touched, shows and focuses the banner without calling either API', fakeAsync(() => {
+      component.saveAndSubmit();
+      fixture.detectChanges();
+      tick();
+      expect(component.form.controls.branch_id.touched).toBeTrue();
+      expect(component.errorMessage()).toBeTruthy();
+      expect(document.activeElement).toBe(fixture.nativeElement.querySelector('.error-banner'));
+      expect(requestsApi.createRequest).not.toHaveBeenCalled();
+      expect(requestsApi.submitRequest).not.toHaveBeenCalled();
+    }));
+
+    it('creates then submits with distinct stable keys, shows success and navigates without reloading', () => {
+      fillForm();
+      const created = new Subject<PurchaseRequest>();
+      const submitted = new Subject<PurchaseRequest>();
+      requestsApi.createRequest.and.returnValue(created);
+      requestsApi.submitRequest.and.returnValue(submitted);
+      const uuid = spyOn(crypto, 'randomUUID').and.returnValues(
+        '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222',
+      );
+      component.saveAndSubmit();
+      expect(requestsApi.createRequest).toHaveBeenCalledOnceWith({
+        branch_id: 'b1', cost_centre_id: null, required_by_date: '2099-01-01',
+        lines: [{ workspace_product_id: 'wp1', quantity: '25', note: null }],
+      }, '11111111-1111-4111-8111-111111111111');
+      expect(requestsApi.submitRequest).not.toHaveBeenCalled();
+      created.next(mockRequest);
+      created.complete();
+      expect(requestsApi.submitRequest).toHaveBeenCalledOnceWith('r1', '22222222-2222-4222-8222-222222222222');
+      submitted.next({ ...mockRequest, status: 'submitted' });
+      submitted.complete();
+      expect(uuid).toHaveBeenCalledTimes(2);
+      expect(snackBarSpy.open).toHaveBeenCalledWith(enCatalog.requests.submitSuccess, undefined, { duration: 3500 });
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/requests', 'r1']);
+      const line = component.lines.at(0);
+      routeParams.next(convertToParamMap({ id: 'r1' }));
+      expect(requestsApi.getRequest).not.toHaveBeenCalled();
+      expect(component.lines.at(0)).toBe(line);
+      expect(component.existingRequest()?.status).toBe('submitted');
+      expect(component.form.disabled).toBeTrue();
+      expect(component.isSaving()).toBeFalse();
+      expect(component.isSubmitting()).toBeFalse();
+    });
+
+    it('keeps create failures on the form with inline errors and reuses the create key on retry', () => {
+      fillForm();
+      requestsApi.createRequest.and.returnValue(throwError(() => new HttpErrorResponse({
+        status: 422, error: { details: [{ field: 'lines[0].quantity', reason: 'quantity_not_positive' }] },
+      })));
+      component.saveAndSubmit();
+      const key = requestsApi.createRequest.calls.mostRecent().args[1];
+      expect(key).toBeTruthy();
+      expect(component.lines.at(0).controls.quantity.errors?.['server']).toBe('requests.errors.quantity_not_positive');
+      expect(requestsApi.submitRequest).not.toHaveBeenCalled();
+      expect(routerSpy.navigate).not.toHaveBeenCalled();
+      expect(component.existingRequest()).toBeNull();
+      expect(component.isSaving()).toBeFalse();
+      component.lines.at(0).controls.quantity.setValue('25');
+      component.saveAndSubmit();
+      expect(requestsApi.createRequest.calls.mostRecent().args[1]).toBe(key);
+    });
+
+    it('preserves the draft after submit failure, navigates without reloading and retries without another create', () => {
+      fillForm();
+      requestsApi.createRequest.and.returnValue(of(mockRequest));
+      requestsApi.submitRequest.and.returnValue(throwError(() => new Error('submit failed')));
+      component.saveAndSubmit();
+      const key = requestsApi.submitRequest.calls.mostRecent().args[1];
+      expect(component.existingRequest()).toEqual(mockRequest);
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/requests', 'r1']);
+      expect(snackBarSpy.open).toHaveBeenCalledWith(enCatalog.requests.form.draftSavedSubmitFailed, undefined, { duration: 3500 });
+      const line = component.lines.at(0);
+      routeParams.next(convertToParamMap({ id: 'r1' }));
+      expect(requestsApi.getRequest).not.toHaveBeenCalled();
+      expect(component.lines.at(0)).toBe(line);
+      requestsApi.submitRequest.and.returnValue(of({ ...mockRequest, status: 'submitted' }));
+      component.saveAndSubmit();
+      expect(requestsApi.createRequest).toHaveBeenCalledTimes(1);
+      expect(requestsApi.submitRequest.calls.mostRecent().args[1]).toBe(key);
+    });
+
+    it('disables both save buttons during create and submit and ignores repeated clicks', () => {
+      fillForm();
+      const created = new Subject<PurchaseRequest>();
+      const submitted = new Subject<PurchaseRequest>();
+      requestsApi.createRequest.and.returnValue(created);
+      requestsApi.submitRequest.and.returnValue(submitted);
+      component.saveAndSubmit();
+      const expectDisabled = (): void => {
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('button[type="submit"]').disabled).toBeTrue();
+        expect(fixture.nativeElement.querySelector('.save-and-submit-btn').disabled).toBeTrue();
+      };
+      expectDisabled();
+      component.saveAndSubmit();
+      component.saveDraft();
+      expect(requestsApi.createRequest).toHaveBeenCalledTimes(1);
+      created.next(mockRequest);
+      created.complete();
+      expectDisabled();
+      submitted.next({ ...mockRequest, status: 'submitted' });
+      submitted.complete();
+      expect(component.isSaving()).toBeFalse();
+      expect(component.isSubmitting()).toBeFalse();
+    });
+
+    it('disables Save and submit while Save Draft is in flight', () => {
+      fillForm();
+      const created = new Subject<PurchaseRequest>();
+      requestsApi.createRequest.and.returnValue(created);
+      component.saveDraft();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('button[type="submit"]').disabled).toBeTrue();
+      expect(fixture.nativeElement.querySelector('.save-and-submit-btn').disabled).toBeTrue();
+      component.saveAndSubmit();
+      expect(requestsApi.createRequest).toHaveBeenCalledTimes(1);
+      created.next(mockRequest);
+      created.complete();
+    });
+
+    it('hides Save and submit on an existing draft', () => {
+      requestsApi.getRequest.and.returnValue(of(mockRequest));
+      routeParams.next(convertToParamMap({ id: 'r1' }));
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.save-and-submit-btn')).toBeNull();
+      expect(fixture.nativeElement.querySelector('.submit-request-btn')).not.toBeNull();
+    });
   });
 
   it('filters cost centres to the selected branch and keeps tenant-wide centres', () => {
