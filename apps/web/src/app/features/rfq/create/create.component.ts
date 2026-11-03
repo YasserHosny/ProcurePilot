@@ -337,22 +337,27 @@ export class RfqCreateComponent implements OnInit {
         this.linesFormArray.clear();
         for (const item of job.items) {
           const product = products.find((p) => p.id === item.workspace_product_id);
+          const saved = parseFloat(job.pack_snapshot?.[item.workspace_product_id]?.base_quantity ?? '');
+          // The pack saved on the job, else the product's (a product without pack data is sold
+          // loose); with neither, the pack is unknown and the buyer enters the quantity.
           const packBase =
-            parseFloat(job.pack_snapshot?.[item.workspace_product_id]?.base_quantity ?? '') ||
-            parseFloat(product?.pack?.base_quantity ?? '') ||
-            1;
-          const packs = Math.round((parseFloat(item.quantity) / packBase) * 1e6) / 1e6;
-          this.linesFormArray.push(
-            this.fb.nonNullable.group({
-              workspace_product_id: [item.workspace_product_id, [Validators.required, this.productValidator]],
-              quantity: [String(packs), [Validators.required, Validators.min(0.01)]],
-            }),
-          );
+            saved > 0 ? saved : product ? parseFloat(product.pack?.base_quantity ?? '') || 1 : null;
+          const packs = packBase ? Math.round((parseFloat(item.quantity) / packBase) * 1e6) / 1e6 : null;
+          const lineGroup = this.fb.nonNullable.group({
+            workspace_product_id: [item.workspace_product_id, [Validators.required, this.productValidator]],
+            quantity: [packs === null ? '' : String(packs), [Validators.required, Validators.min(0.01)]],
+          });
+          if (!product) lineGroup.get('workspace_product_id')?.markAsTouched();
+          this.linesFormArray.push(lineGroup);
         }
         if (this.linesFormArray.length === 0) this.addLine();
 
         const sendable = new Set(withEmail.map((s) => s.id));
-        this.form.patchValue({ supplierIds: job.supplier_ids.filter((id) => sendable.has(id)) });
+        // Suppliers the buyer excluded from the split are not asked for a quote.
+        const excluded = new Set(job.request_settings?.excluded_supplier_ids ?? []);
+        this.form.patchValue({
+          supplierIds: job.supplier_ids.filter((id) => sendable.has(id) && !excluded.has(id)),
+        });
         this.isDataLoaded.set(true);
         this.isLoadingRfq.set(false);
       },

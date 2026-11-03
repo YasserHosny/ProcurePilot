@@ -1689,6 +1689,58 @@ describe('RfqCreateComponent', () => {
       expect(component.form.controls.neededByDate.value).toBeNull();
     });
 
+    // Review: a supplier the buyer excluded from the split must not be asked for a quote.
+    it('does not preselect a supplier that was excluded from the split', () => {
+      apiSpy.suppliers.and.returnValue(
+        of({
+          items: [
+            { id: 'sup-1', name: 'Supplier 1', contact_email: 'a@test.com' } as Supplier,
+            { id: 'sup-2', name: 'Supplier 2', contact_email: 'b@test.com' } as Supplier,
+          ],
+          next_cursor: null,
+        }),
+      );
+      apiSpy.getBasketSplitJob.and.returnValue(
+        of({
+          ...splitJob,
+          supplier_ids: ['sup-1', 'sup-2'],
+          request_settings: { risk_tolerance: 'low', urgency: 'normal', excluded_supplier_ids: ['sup-2'], weights: {} },
+        } as unknown as import('../../../core/api/models').BasketSplitJob),
+      );
+      openFromSplit();
+
+      expect(component.form.controls.supplierIds.value).toEqual(['sup-1']);
+    });
+
+    // Review: an unknown pack size must not turn base units into a pack count.
+    it('leaves the quantity empty when the pack size of a product is unknown', () => {
+      apiSpy.getBasketSplitJob.and.returnValue(
+        of({
+          ...splitJob,
+          items: [{ workspace_product_id: 'prod-gone', quantity: '100.000000' }],
+          pack_snapshot: null,
+        } as unknown as import('../../../core/api/models').BasketSplitJob),
+      );
+      openFromSplit();
+
+      const [line] = component.linesFormArray.getRawValue();
+      expect(line.quantity).toBe('');
+    });
+
+    // Review: a product that is no longer active shows its problem straight away.
+    it('marks a line whose product is no longer active', () => {
+      apiSpy.getBasketSplitJob.and.returnValue(
+        of({
+          ...splitJob,
+          items: [{ workspace_product_id: 'prod-gone', quantity: '5.000000' }],
+          pack_snapshot: { 'prod-gone': { base_quantity: '1', base_unit: 'each' } },
+        } as unknown as import('../../../core/api/models').BasketSplitJob),
+      );
+      openFromSplit();
+
+      expect(component.linesFormArray.at(0).get('workspace_product_id')?.touched).toBeTrue();
+    });
+
     it('opens an empty form and says so when the split cannot be loaded', () => {
       apiSpy.getBasketSplitJob.and.returnValue(throwError(() => new Error('gone')));
       openFromSplit();
