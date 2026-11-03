@@ -455,4 +455,19 @@ describe('OrderListComponent', () => {
     fixture.detectChanges();
     expect(el().querySelector('[data-testid="orders-no-match"]')).toBeTruthy(); // a filter is active
   });
+  // Review (Codex, #460): suppliers beyond the first page could never be chosen in the filter.
+  it('follows the supplier cursors so every supplier can be filtered on', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [], next_cursor: null, total_count: 0 });
+    http.expectOne((r) => r.url.includes('/suppliers') && !r.url.includes('cursor')).flush({
+      items: [{ id: 'sup-1', name: 'Al Dhahabi', status: 'active', created_at: '' }],
+      next_cursor: 'page-2',
+    });
+    http.expectOne((r) => r.url.includes('/suppliers') && r.url.includes('cursor=page-2')).flush({
+      items: [{ id: 'sup-2', name: 'Al Wafra', status: 'active', created_at: '' }],
+      next_cursor: null,
+    });
+
+    expect(component.suppliers().map((s) => s.id)).toEqual(['sup-1', 'sup-2']);
+  });
 });

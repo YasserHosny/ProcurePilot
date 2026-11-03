@@ -133,9 +133,18 @@ export class OrderListComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadOrders();
-    this.api.suppliers({ limit: 100, status: 'all' }).subscribe({
-      next: (response) => this.suppliers.set(response.items),
-      error: () => this.suppliers.set([]), // the filter simply offers no suppliers
+    this.loadSuppliers();
+  }
+
+  /** Every supplier, page by page, so none with an order is missing from the filter. */
+  private loadSuppliers(cursor?: string, loaded: Supplier[] = [], page = 1): void {
+    this.api.suppliers({ limit: 100, status: 'all', cursor }).subscribe({
+      next: (response) => {
+        const all = [...loaded, ...response.items];
+        this.suppliers.set(all);
+        if (response.next_cursor && page < 20) this.loadSuppliers(response.next_cursor, all, page + 1);
+      },
+      error: () => this.suppliers.set(loaded), // the filter offers what was loaded
     });
   }
 
