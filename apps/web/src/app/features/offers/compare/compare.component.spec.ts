@@ -1,6 +1,6 @@
 import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
@@ -266,6 +266,166 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
     productList.next({ items: [tin], next_cursor: null });
     expect(apiService.compareOffers).toHaveBeenCalledTimes(1);
     expect(apiService.compareOffers.calls.mostRecent().args[0].quantity).toBe('180');
+  });
+
+  describe('server refresh, stale answers and errors (P-157, PPS-201)', () => {
+    const comparisonFor = (id: string, total: string): OfferComparison => ({
+      ...mockComparison,
+      offers: mockComparison.offers.map((o) => ({ ...o, id: `${id}-${o.id}`, landed_cost: { ...o.landed_cost, amount: total } })),
+      recommendation: null,
+    });
+    const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+
+    it('refreshes from the server once the buyer stops typing, without a loading flash', fakeAsync(() => {
+      const pending$ = new Subject<OfferComparison>();
+      apiService.compareOffers.calls.reset();
+      apiService.compareOffers.and.returnValue(pending$);
+
+      component.onQuantityChange('20');
+      component.onQuantityChange('50');
+      tick(100);
+      expect(apiService.compareOffers).withContext('still typing').not.toHaveBeenCalled();
+
+      tick(600);
+      expect(apiService.compareOffers).toHaveBeenCalledTimes(1);
+      expect(apiService.compareOffers.calls.mostRecent().args[0].quantity).toBe(component.baseQuantityInput());
+      expect(component.isLoading()).withContext('no spinner for a background refresh').toBeFalse();
+
+      const fresh = comparisonFor('fresh', '999.0000');
+      pending$.next(fresh);
+      expect(component.rawComparison()).toBe(fresh);
+    }));
+
+    it('ignores an older refresh that answers after a newer one', fakeAsync(() => {
+      const first$ = new Subject<OfferComparison>();
+      const second$ = new Subject<OfferComparison>();
+      apiService.compareOffers.and.returnValues(first$, second$);
+
+      component.onQuantityChange('20');
+      tick(700);
+      component.onQuantityChange('30');
+      tick(700);
+
+      const newer = comparisonFor('newer', '300.0000');
+      second$.next(newer);
+      first$.next(comparisonFor('older', '200.0000'));
+
+      expect(component.rawComparison()).toBe(newer);
+    }));
+
+    it('ignores a comparison for a product the buyer already left', () => {
+      const product = (id: string) =>
+        ({
+          id,
+          tenant_name: id,
+          canonical_name: id,
+          base_unit: 'kilogram',
+          pack: { pack_count: 1, unit_size: '1' },
+          status: 'active' as const,
+          created_at: '2026-08-01T00:00:00Z',
+        }) as never;
+      component.products.set([product('prod-A'), product('prod-B')]);
+      const a$ = new Subject<OfferComparison>();
+      const b = comparisonFor('b', '20.0000');
+      apiService.compareOffers.and.returnValues(a$, of(b));
+
+      component.selectedProductId.set('prod-A');
+      component.fetchComparison('prod-A');
+      component.selectedProductId.set('prod-B');
+      component.fetchComparison('prod-B');
+      a$.next(comparisonFor('a', '10.0000'));
+
+      expect(component.rawComparison()).toBe(b);
+    });
+
+    it('does not leave the loading spinner on when a background refresh overtakes the first load', fakeAsync(() => {
+      const first$ = new Subject<OfferComparison>();
+      const refresh$ = new Subject<OfferComparison>();
+      // The third answer belongs to the catch-up refresh scheduled when the first load comes back with an old quantity.
+      apiService.compareOffers.and.returnValues(first$, refresh$, new Subject<OfferComparison>());
+
+      component.fetchComparison(mockComparison.product.id); // foreground load, still pending
+      expect(component.isLoading()).toBeTrue();
+      component.onQuantityChange('40');
+      tick(700); // the background refresh is issued while the first load is pending
+
+      const loaded = comparisonFor('first', '111.0000');
+      first$.next(loaded);
+
+      expect(component.isLoading()).withContext('spinner released').toBeFalse();
+      expect(component.rawComparison()).toBe(loaded);
+    }));
+
+    it('keeps a newer refresh answer when a slower first load answers afterwards', fakeAsync(() => {
+      const first$ = new Subject<OfferComparison>();
+      const refresh$ = new Subject<OfferComparison>();
+      apiService.compareOffers.and.returnValues(first$, refresh$);
+
+      component.fetchComparison(mockComparison.product.id);
+      component.onQuantityChange('40');
+      tick(700);
+
+      const refreshed = comparisonFor('refreshed', '500.0000');
+      refresh$.next(refreshed);
+      first$.next(comparisonFor('first', '200.0000'));
+
+      expect(component.rawComparison()).toBe(refreshed);
+      expect(component.isLoading()).toBeFalse();
+    }));
+
+    it('recovers from a failed first load when the background refresh then succeeds', fakeAsync(() => {
+      const first$ = new Subject<OfferComparison>();
+      const refresh$ = new Subject<OfferComparison>();
+      apiService.compareOffers.and.returnValues(first$, refresh$);
+
+      component.fetchComparison(mockComparison.product.id);
+      component.onQuantityChange('40');
+      tick(700);
+
+      first$.error(new HttpErrorResponse({ status: 503, error: { message: 'down' } }));
+      expect(component.errorMessage()).toBe('down');
+
+      const refreshed = comparisonFor('refreshed', '500.0000');
+      refresh$.next(refreshed);
+
+      expect(component.rawComparison()).toBe(refreshed);
+      expect(component.errorMessage()).withContext('stale error cleared').toBeNull();
+    }));
+
+    it('does not let an older failed first load wipe a refresh that already succeeded', fakeAsync(() => {
+      const first$ = new Subject<OfferComparison>();
+      const refresh$ = new Subject<OfferComparison>();
+      apiService.compareOffers.and.returnValues(first$, refresh$);
+
+      component.fetchComparison(mockComparison.product.id);
+      component.onQuantityChange('40');
+      tick(700);
+
+      const refreshed = comparisonFor('refreshed', '500.0000');
+      refresh$.next(refreshed);
+      first$.error(new HttpErrorResponse({ status: 503, error: { message: 'down' } }));
+
+      expect(component.rawComparison()).toBe(refreshed);
+      expect(component.errorMessage()).toBeNull();
+      expect(component.isLoading()).toBeFalse();
+    }));
+
+    it('shows a failed comparison as an alert with Retry', () => {
+      apiService.compareOffers.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'Offers are down', trace_id: 'tr-9' } })),
+      );
+      component.fetchComparison(mockComparison.product.id);
+      fixture.detectChanges();
+
+      expect(el().querySelector('[role="alert"]')?.textContent).toContain('Offers are down');
+      const retry = el().querySelector('[data-testid="compare-retry"]') as HTMLButtonElement | null;
+      expect(retry).withContext('retry button').toBeTruthy();
+
+      apiService.compareOffers.calls.reset();
+      apiService.compareOffers.and.returnValue(of(mockComparison));
+      retry!.click();
+      expect(apiService.compareOffers).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('product outside the loaded catalogue page', () => {
