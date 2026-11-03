@@ -1853,7 +1853,8 @@
     "submit": {
       "successSplit": "{{count}} purchase requests submitted for approval as one split."
     },
-    "rerunNotice": "This form was filled from an earlier split. Check the risk tolerance, urgency, excluded suppliers and weights, then run it again."
+    "rerunNotice": "This form was filled from an earlier split. Check the risk tolerance, urgency, excluded suppliers and weights, then run it again.",
+    "rerunPackUnknown": "The pack sizes of this split's products are not loaded yet. Wait a moment and try Re-run again."
   },
   "alerts": {
     "title": "Actionable Alerts Inbox",

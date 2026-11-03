@@ -573,20 +573,32 @@ export class BasketSplitComponent implements OnInit {
       });
   }
 
+  /** Base units in one pack: the size saved on the job, else the product's, else unknown. */
+  private packBaseFor(job: BasketSplitJob, productId: string): number | null {
+    const saved = parseFloat(job.pack_snapshot?.[productId]?.base_quantity ?? '');
+    if (saved > 0) return saved;
+    return this.products().some((product) => product.id === productId)
+      ? this.packBaseQuantityFor(productId)
+      : null;
+  }
+
   /** Quantities on the job are in base units; the form takes packs. */
   private prefillFromJob(job: BasketSplitJob): void {
+    const packBases = job.items.map((item) => this.packBaseFor(job, item.workspace_product_id));
+    if (packBases.some((base) => base === null)) {
+      // Treating an unknown pack as one unit would turn base units into packs and inflate the rerun.
+      this.errorMessage.set(this.translate.instant('basketSplit.rerunPackUnknown'));
+      return;
+    }
     const [first, second, ...rest] = job.supplier_ids;
     this.supplierId1.set(first ?? '');
     this.supplierId2.set(second ?? '');
     this.additionalSupplierIds.set([...rest]);
     this.items.set(
-      job.items.map((item) => {
-        const packs = parseFloat(item.quantity) / this.packBaseQuantityFor(item.workspace_product_id);
-        return {
-          workspace_product_id: item.workspace_product_id,
-          quantity: String(Math.round(packs * 1e6) / 1e6),
-        };
-      }),
+      job.items.map((item, index) => ({
+        workspace_product_id: item.workspace_product_id,
+        quantity: String(Math.round((parseFloat(item.quantity) / packBases[index]!) * 1e6) / 1e6),
+      })),
     );
     this.stopPolling();
     this.currentJob.set(null);

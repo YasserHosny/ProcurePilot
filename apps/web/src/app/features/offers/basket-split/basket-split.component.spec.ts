@@ -1141,6 +1141,35 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(component.rerunNotice()).toBeTrue();
     });
 
+    // Review (Codex, #437): with the products request still pending, base units were stored as packs.
+    it('does not prefill a rerun while the pack size of a product is unknown', () => {
+      component.products.set([]); // the products request has not answered yet
+      apiService.getBasketSplitJob.and.returnValue(of(mockFeasibleJob)); // no pack_snapshot on it
+      component.fetchJob('job-1');
+
+      component.rerunOptimisation();
+
+      expect(component.currentJob()).not.toBeNull();
+      expect(component.items()).not.toEqual(jasmine.arrayContaining([jasmine.objectContaining({ quantity: '10' })]));
+      expect(component.errorMessage()).toBeTruthy();
+    });
+
+    it('converts a rerun back to packs using the pack sizes saved on the job', () => {
+      component.products.set([]);
+      apiService.getBasketSplitJob.and.returnValue(
+        of({
+          ...mockFeasibleJob,
+          items: [{ workspace_product_id: 'prod-1', quantity: '100.000000' }],
+          pack_snapshot: { 'prod-1': { base_quantity: '10', base_unit: 'kilogram' } },
+        }),
+      );
+      component.fetchJob('job-1');
+
+      component.rerunOptimisation();
+
+      expect(component.items()).toEqual([{ workspace_product_id: 'prod-1', quantity: '10' }]);
+    });
+
     it('offers preferred suppliers as well as active ones, without duplicates', () => {
       apiService.suppliers.and.callFake(((params?: { status?: string }) =>
         of({
