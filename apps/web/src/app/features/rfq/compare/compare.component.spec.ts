@@ -1478,6 +1478,7 @@ describe('CompareComponent (RFQ)', () => {
       const hint = compiled.querySelector('[data-testid="split-saving-hint"]');
       expect(hint).not.toBeNull();
       expect(hint?.textContent).toContain('60');
+      expect(hint?.textContent).toContain('could save'); // still open: an offer worth taking
 
       // (a) open RFQ, writer, eligible -> the hint has no Split button of its own; the RFQ's one Split
       // action follows it directly and calls rfqApi.splitRfq with the RFQ id
@@ -1506,6 +1507,9 @@ describe('CompareComponent (RFQ)', () => {
       const convertedHint = compiled.querySelector('[data-testid="split-saving-hint"]');
       expect(convertedHint).not.toBeNull();
       expect(convertedHint?.textContent).toContain('60');
+      // PPS-208: on a converted RFQ it is a record of what was left on the table, not an offer.
+      expect(convertedHint?.textContent).toContain('would have saved');
+      expect(convertedHint?.textContent).not.toContain('could save');
       expect(convertedHint?.querySelector('button')).toBeNull();
       expect(compiled.querySelector('[data-testid="rfq-compare-split-button"]')).toBeNull();
 

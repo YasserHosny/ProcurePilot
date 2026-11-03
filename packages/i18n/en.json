@@ -4365,7 +4365,8 @@
       "expiredNotice": "This RFQ has expired — requests can no longer be prepared from it",
       "rfqExpired": "This RFQ has expired",
       "branchesLoadError": "Failed to load branches.",
-      "rfqDetailLoadError": "Failed to load RFQ details."
+      "rfqDetailLoadError": "Failed to load RFQ details.",
+      "splitSavingHintConverted": "Splitting this order between suppliers would have saved {{money}}."
     },
     "history": {
       "status_cancelled": "Cancelled",

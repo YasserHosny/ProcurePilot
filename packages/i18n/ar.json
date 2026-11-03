@@ -4365,7 +4365,8 @@
       "expiredNotice": "انتهت صلاحية طلب عرض الأسعار هذا — لم يعد بالإمكان تجهيز طلبات منه",
       "rfqExpired": "انتهت صلاحية طلب عرض الأسعار",
       "branchesLoadError": "فشل تحميل الفروع.",
-      "rfqDetailLoadError": "فشل تحميل تفاصيل طلب عرض الأسعار."
+      "rfqDetailLoadError": "فشل تحميل تفاصيل طلب عرض الأسعار.",
+      "splitSavingHintConverted": "كان تقسيم هذا الطلب بين الموردين سيوفّر {{money}}."
     },
     "history": {
       "status_cancelled": "ملغى",
