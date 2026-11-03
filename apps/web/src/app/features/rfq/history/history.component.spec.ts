@@ -71,7 +71,7 @@ describe('HistoryComponent', () => {
   beforeEach(async () => {
     jasmine.clock().install();
     jasmine.clock().mockDate(new Date(2026, 9, 28));
-    rfqApiSpy = jasmine.createSpyObj('RfqApi', ['listRfqs', 'sendRfq', 'getRfq']);
+    rfqApiSpy = jasmine.createSpyObj('RfqApi', ['listRfqs', 'sendRfq', 'cancelRfq', 'getRfq']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
     const apiSpy = jasmine.createSpyObj('ApiService', ['members']);
     apiSpy.members.and.returnValue(of({ items: [{ id: 'm1', email: 'user@test.com' }], next_cursor: null }));
@@ -156,6 +156,66 @@ describe('HistoryComponent', () => {
 
   afterEach(() => {
     jasmine.clock().uninstall();
+  });
+
+  describe('cancellation', () => {
+    it('shows the menu item for owners and only the creating buyer', async () => {
+      const role = spyOn(TestBed.inject(SessionService), 'hasRole');
+      role.and.callFake((...roles) => roles.includes('owner'));
+      component.currentMembershipId.set('another-member');
+      expect(component.canCancel(mockRfqs[1])).toBeTrue();
+      role.and.callFake((...roles) => roles.includes('buyer'));
+      expect(component.canCancel(mockRfqs[1])).toBeFalse();
+      component.currentMembershipId.set('m1');
+      expect(component.canCancel(mockRfqs[1])).toBeTrue();
+      expect(component.canCancel(mockRfqs[2])).toBeFalse();
+      expect(component.canCancel({ ...mockRfqs[1], status: 'cancelled' })).toBeFalse();
+      const page = fixture.nativeElement as HTMLElement;
+      page.querySelector<HTMLButtonElement>('[data-testid="rfq-actions-button"]')!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(document.querySelector('[data-testid="rfq-history-cancel-button"]')?.textContent).toContain(enCatalog.rfq.cancel.confirm);
+      component.currentMembershipId.set('another-member');
+      fixture.detectChanges();
+      expect(document.querySelector('[data-testid="rfq-history-cancel-button"]')).toBeNull();
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it('confirms once, stops row navigation and reloads the list on success', () => {
+      const confirmation = new Subject<boolean>();
+      const result = new Subject<RfqDetail['rfq']>();
+      dialogSpy.open.and.returnValue({ afterClosed: () => confirmation } as unknown as MatDialogRef<CatalogueConfirmDialogComponent>);
+      rfqApiSpy.cancelRfq.and.returnValue(result);
+      const event = new Event('click');
+      spyOn(event, 'stopPropagation');
+      component.onCancelRfq(mockRfqs[1], event);
+      component.onCancelRfq(mockRfqs[1], event);
+      expect(event.stopPropagation).toHaveBeenCalled();
+      expect(dialogSpy.open.calls.count()).toBe(1);
+      expect(dialogSpy.open.calls.mostRecent().args[1]?.data).toEqual(jasmine.objectContaining({ isDestructive: true }));
+      confirmation.next(true);
+      confirmation.next(true);
+      component.onCancelRfq(mockRfqs[1]);
+      expect(rfqApiSpy.cancelRfq).toHaveBeenCalledOnceWith(mockRfqs[1].id);
+      rfqApiSpy.listRfqs.calls.reset();
+      result.next({ ...mockRfqs[1], tenant_id: 't1', tenant_terms: null, idempotency_key: 'key', status: 'cancelled' });
+      result.complete();
+      expect(rfqApiSpy.listRfqs.calls.count()).toBe(1);
+      expect(component.cancellingIds().size).toBe(0);
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    for (const [status, key] of [[403, 'notCreator'], [409, 'notCancellable'], [500, 'error']] as const) {
+      it(`handles cancellation error ${status}`, () => {
+        dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as MatDialogRef<CatalogueConfirmDialogComponent>);
+        rfqApiSpy.cancelRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status, error: { details: { reason: 'not_creator' } } })));
+        rfqApiSpy.listRfqs.calls.reset();
+        component.onCancelRfq(mockRfqs[1]);
+        expect(snackBarSpy.open).toHaveBeenCalledWith(enCatalog.rfq.cancel[key], jasmine.any(String), jasmine.any(Object));
+        expect(rfqApiSpy.listRfqs.calls.count()).toBe(status === 409 ? 1 : 0);
+        expect(component.cancellingIds().size).toBe(0);
+      });
+    }
   });
 
   it('should create and load RFQs', () => {

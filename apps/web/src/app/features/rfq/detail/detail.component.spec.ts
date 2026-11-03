@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter, Router, ActivatedRoute, convertToParamMap } from '@angular/router';
 import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
@@ -139,7 +139,7 @@ describe('DetailComponent (RFQ Details)', () => {
     paramMapSubject = new BehaviorSubject(convertToParamMap({ id: 'rfq-sent-1' }));
     queryParamMapSubject = new BehaviorSubject(convertToParamMap({}));
 
-    rfqApiSpy = jasmine.createSpyObj('RfqApi', ['getRfq', 'listResponses', 'sendRfq', 'listGuardrails']);
+    rfqApiSpy = jasmine.createSpyObj('RfqApi', ['getRfq', 'listResponses', 'sendRfq', 'cancelRfq', 'listGuardrails']);
     rfqApiSpy.getRfq.and.returnValue(of(mockSentDetail));
     rfqApiSpy.listResponses.and.returnValue(of(mockResponses));
     rfqApiSpy.listGuardrails.and.returnValue(of([]));
@@ -222,6 +222,108 @@ describe('DetailComponent (RFQ Details)', () => {
     router = TestBed.inject(Router);
     spyOn(router, 'navigate');
     fixture.detectChanges();
+  });
+
+  describe('cancellation', () => {
+    it('shows Cancel for an owner on another buyer’s RFQ, and buyers only on their own', () => {
+      const role = spyOn(TestBed.inject(SessionService), 'hasRole');
+      role.and.callFake((...roles) => roles.includes('owner'));
+      component.currentMembershipId.set('another-member');
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-detail-cancel-button"]')).not.toBeNull();
+      role.and.callFake((...roles) => roles.includes('buyer'));
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-detail-cancel-button"]')).toBeNull();
+      component.currentMembershipId.set('m-creator');
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-detail-cancel-button"]')).not.toBeNull();
+      role.and.returnValue(false);
+      expect(component.canCancel()).toBeFalse();
+    });
+
+    for (const status of ['draft', 'sent', 'responded', 'expired'] as const) {
+      it(`allows cancellation of ${status}`, () => {
+        component.rfqDetail.set({ ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status } });
+        expect(component.canCancel()).toBeTrue();
+      });
+    }
+
+    for (const status of ['converted', 'cancelled'] as const) {
+      it(`hides Cancel for ${status}`, () => {
+        component.rfqDetail.set({ ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status } });
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-detail-cancel-button"]')).toBeNull();
+        component.onCancelRfq();
+        expect(dialogSpy.open).not.toHaveBeenCalled();
+      });
+    }
+
+    it('confirms a destructive action and calls cancel once despite repeated clicks or confirmation emissions', () => {
+      const confirmation = new Subject<boolean>();
+      const result = new Subject<RfqDetail['rfq']>();
+      dialogSpy.open.and.returnValue({ afterClosed: () => confirmation } as unknown as MatDialogRef<CatalogueConfirmDialogComponent>);
+      rfqApiSpy.cancelRfq.and.returnValue(result);
+      const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid="rfq-detail-cancel-button"]')!;
+      button.click();
+      button.click();
+      expect(dialogSpy.open).toHaveBeenCalledOnceWith(CatalogueConfirmDialogComponent, jasmine.objectContaining({
+        data: jasmine.objectContaining({ isDestructive: true, confirmKey: 'rfq.cancel.confirm', cancelKey: 'rfq.cancel.keep' }),
+      }));
+      expect(rfqApiSpy.cancelRfq).not.toHaveBeenCalled();
+      confirmation.next(true);
+      confirmation.next(true);
+      fixture.detectChanges();
+      expect(button.disabled).toBeTrue();
+      component.onCancelRfq();
+      expect(rfqApiSpy.cancelRfq).toHaveBeenCalledOnceWith('rfq-sent-1');
+      const cancelled: RfqDetail = { ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status: 'cancelled', cancelled_at: '2026-11-03T10:00:00Z' } };
+      rfqApiSpy.getRfq.and.returnValue(of(cancelled));
+      rfqApiSpy.getRfq.calls.reset();
+      result.next(cancelled.rfq);
+      result.complete();
+      fixture.detectChanges();
+      expect(rfqApiSpy.getRfq).toHaveBeenCalledWith('rfq-sent-1');
+      expect(snackBarSpy.open).toHaveBeenCalledWith(enCatalog.rfq.cancel.success, jasmine.any(String), jasmine.any(Object));
+      const page = fixture.nativeElement as HTMLElement;
+      for (const action of ['cancel', 'edit', 'send', 'retry']) {
+        expect(page.querySelector(`[data-testid="rfq-detail-${action}-button"]`)).toBeNull();
+      }
+      expect(page.querySelector('.status-badge')?.textContent).toContain('Cancelled');
+      expect(page.querySelector('[data-testid="rfq-detail-cancelled-at"]')?.textContent).toContain(component.formatDate(cancelled.rfq.cancelled_at));
+      expect(component.getRecipientReplyState(cancelled.recipients[0]).status).toBe('no_reply');
+      expect(component.getRecipientReplyState({ ...cancelled.recipients[0], response_count: 1 }).status).toBe('replied');
+    });
+
+    it('keeps the RFQ when confirmation is declined', () => {
+      dialogSpy.open.and.returnValue({ afterClosed: () => of(false) } as MatDialogRef<CatalogueConfirmDialogComponent>);
+      component.onCancelRfq();
+      expect(rfqApiSpy.cancelRfq).not.toHaveBeenCalled();
+      expect(component.cancelling()).toBeFalse();
+    });
+
+    for (const [status, reason, key] of [
+      [403, 'not_creator', 'notCreator'], [409, 'not_cancellable', 'notCancellable'], [500, '', 'error'],
+    ] as const) {
+      it(`handles cancellation error ${status}`, () => {
+        dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as MatDialogRef<CatalogueConfirmDialogComponent>);
+        rfqApiSpy.cancelRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status, error: { details: { reason } } })));
+        rfqApiSpy.getRfq.calls.reset();
+        component.onCancelRfq();
+        expect(snackBarSpy.open).toHaveBeenCalledWith(enCatalog.rfq.cancel[key], jasmine.any(String), jasmine.any(Object));
+        expect(component.cancelling()).toBeFalse();
+        expect(rfqApiSpy.getRfq.calls.count()).toBe(status === 409 ? 1 : 0);
+      });
+    }
+
+    it('provides cancellation copy and status in English and Arabic', () => {
+      for (const catalog of [enCatalog, arCatalog]) {
+        expect(catalog.rfq.history.status_cancelled).toBeTruthy();
+        expect(catalog.rfq.detail.cancelledAtLabel).toBeTruthy();
+        expect(catalog.rfq.compare.rfqCancelled).toBeTruthy();
+        for (const value of Object.values(catalog.rfq.cancel)) expect(value.trim()).toBeTruthy();
+      }
+      expect(arCatalog.rfq.history.status_cancelled).toMatch(/[\u0600-\u06ff]/);
+    });
   });
 
   it('loads RFQ detail and responses on init', () => {
@@ -1141,5 +1243,58 @@ describe('DetailComponent (RFQ Details)', () => {
       expect(texts.some((t) => t === 'Responses')).toBeTrue();
       expect(texts.some((t) => t?.includes('Responses ('))).toBeFalse();
     }));
+  });
+});
+
+// Exercise the real HTTP boundary here alongside the cancellation UI regression suite.
+describe('RfqApi cancellation idempotency', () => {
+  let api: RfqApi;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(withXhr()), provideHttpClientTesting()] });
+    api = TestBed.inject(RfqApi);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  it('posts no body and retains one key per RFQ after network or server failures', () => {
+    api.cancelRfq('rfq-1', 'stable-key').subscribe({ error: () => undefined });
+    const first = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
+    expect(first.request.method).toBe('POST');
+    expect(first.request.body).toBeNull();
+    expect(first.request.headers.get('Idempotency-Key')).toBe('stable-key');
+    first.error(new ProgressEvent('error'));
+
+    api.cancelRfq('rfq-2', 'other-key').subscribe();
+    const other = http.expectOne((req) => req.url.endsWith('/rfq/rfq-2/cancel'));
+    expect(other.request.headers.get('Idempotency-Key')).toBe('other-key');
+    other.flush({ status: 'cancelled' });
+
+    api.cancelRfq('rfq-1').subscribe({ error: () => undefined });
+    const second = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
+    expect(second.request.headers.get('Idempotency-Key')).toBe('stable-key');
+    second.flush({}, { status: 503, statusText: 'Unavailable' });
+
+    api.cancelRfq('rfq-1').subscribe();
+    const third = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
+    expect(third.request.headers.get('Idempotency-Key')).toBe('stable-key');
+    third.flush({ status: 'cancelled' });
+
+    api.cancelRfq('rfq-1').subscribe();
+    const fresh = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
+    expect(fresh.request.headers.get('Idempotency-Key')).not.toBe('stable-key');
+    fresh.flush({ status: 'cancelled' });
+  });
+
+  it('releases the key after a definitive rejection', () => {
+    api.cancelRfq('rfq-1', 'rejected-key').subscribe({ error: () => undefined });
+    http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'))
+      .flush({}, { status: 409, statusText: 'Conflict' });
+    api.cancelRfq('rfq-1').subscribe();
+    const retry = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
+    expect(retry.request.headers.get('Idempotency-Key')).not.toBe('rejected-key');
+    retry.flush({ status: 'cancelled' });
   });
 });

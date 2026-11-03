@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
+import { Observable, defer, tap } from 'rxjs';
 
 import type { QuotationStatus, BasketSplitJob } from '../../core/api/models';
 import { environment } from '../../../environments/environment';
@@ -9,12 +9,13 @@ export interface Rfq {
   id: string;
   tenant_id: string;
   created_by_membership_id: string;
-  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted';
+  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted' | 'cancelled';
   needed_by_date: string;
   tenant_terms: string | null;
   idempotency_key: string;
   created_at: string;
   sent_at?: string | null;
+  cancelled_at?: string | null;
 }
 
 export interface RfqLine {
@@ -141,10 +142,11 @@ export interface RfqResponseComparisonList {
 export interface RfqSummary {
   id: string;
   created_by_membership_id: string;
-  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted';
+  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted' | 'cancelled';
   needed_by_date: string;
   created_at: string;
   sent_at: string | null;
+  cancelled_at?: string | null;
   recipient_count: number;
   response_count: number;
   converted_purchase_request_id: string | null;
@@ -174,6 +176,28 @@ export interface PrepareRequestResponse {
 export class RfqApi {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiBaseUrl}/rfq`;
+
+  private readonly cancelKeys = new Map<string, string>();
+
+  cancelRfq(rfqId: string, idempotencyKey?: string): Observable<Rfq> {
+    return defer(() => {
+      const key = this.cancelKeys.get(rfqId) ?? idempotencyKey ?? crypto.randomUUID();
+      this.cancelKeys.set(rfqId, key);
+      const clearKey = () => {
+        if (this.cancelKeys.get(rfqId) === key) this.cancelKeys.delete(rfqId);
+      };
+      return this.http.post<Rfq>(`${this.baseUrl}/${rfqId}/cancel`, null, {
+        headers: new HttpHeaders({ 'Idempotency-Key': key }),
+      }).pipe(tap({
+        next: clearKey,
+        error: (err: unknown) => {
+          // Network failures, timeouts, throttling and 5xx may follow a committed action.
+          if (err instanceof HttpErrorResponse && err.status >= 400 && err.status < 500 &&
+              err.status !== 408 && err.status !== 429) clearKey();
+        },
+      }));
+    });
+  }
 
   createRfq(payload: RfqCreatePayload): Observable<RfqCreateResponse> {
     const headers = new HttpHeaders({

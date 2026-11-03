@@ -4174,6 +4174,16 @@
     }
   },
   "rfq": {
+    "cancel": {
+      "title": "Cancel this RFQ?",
+      "message": "Suppliers are not notified. Replies already received stay available.",
+      "confirm": "Cancel RFQ",
+      "keep": "Keep RFQ",
+      "success": "RFQ cancelled",
+      "notCreator": "Only the person who created this RFQ, or an owner, can cancel it",
+      "notCancellable": "This RFQ can no longer be cancelled",
+      "error": "Could not cancel this RFQ. Please try again."
+    },
     "pageTitle": {
       "history": "RFQ History",
       "create": "Create RFQ",
@@ -4265,6 +4275,7 @@
       }
     },
     "compare": {
+      "rfqCancelled": "This RFQ was cancelled — requests can no longer be prepared from it",
       "title": "Compare responses",
       "subtitle": "Compare supplier responses and prepare a purchase request.",
       "supplier": "Supplier",
@@ -4331,6 +4342,7 @@
       "rfqDetailLoadError": "Failed to load RFQ details."
     },
     "history": {
+      "status_cancelled": "Cancelled",
       "title": "RFQ History",
       "subtitle": "Track your requests for quotation.",
       "createRfq": "Create RFQ",
@@ -4412,6 +4424,7 @@
       "draftActionsUnavailable": "Draft actions are currently unavailable because workspace members could not be loaded."
     },
     "detail": {
+      "cancelledAtLabel": "Cancelled",
       "title": "RFQ Details",
       "subtitle": "What was asked, who it went to and what came back.",
       "responsesReceivedTitle": "{{count}} responses received",

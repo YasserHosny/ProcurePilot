@@ -46,6 +46,16 @@
     </mat-card>
   }
 
+  @if (isCancelled()) {
+    <mat-card class="draft-notice-card expired-notice-card" data-testid="rfq-compare-cancelled-notice" role="status">
+      <div class="draft-notice-content">
+        <div class="draft-notice-text">
+          <p>{{ 'rfq.compare.rfqCancelled' | translate }}</p>
+        </div>
+      </div>
+    </mat-card>
+  }
+
   @if (isExpired()) {
     <mat-card class="draft-notice-card expired-notice-card" data-testid="rfq-compare-expired-notice">
       <div class="draft-notice-content">
@@ -166,7 +176,9 @@
         </button>
         @if (!splitEligibility().canSplit) {
           <div class="split-disabled-reason" data-testid="split-disabled-reason">
-            @if (splitEligibility().reason === 'rfq_expired') {
+            @if (splitEligibility().reason === 'rfq_cancelled') {
+              <span>{{ 'rfq.compare.rfqCancelled' | translate }}</span>
+            } @else if (splitEligibility().reason === 'rfq_expired') {
               <span>{{ 'rfq.compare.rfqExpired' | translate }}</span>
             } @else if (splitEligibility().reason === 'needs_two_matched') {
               <span>{{ 'rfq.compare.needsTwoMatched' | translate }}</span>
@@ -328,14 +340,16 @@
                   </a>
                 } @else if (isWriter()) {
                   <button mat-flat-button color="primary"
-                    [disabled]="!canPrepare(response) || isConverted() || isExpired()"
+                    [disabled]="!canPrepare(response) || isConverted() || isExpired() || isCancelled()"
                     (click)="prepareRequest(response)">
                     {{ 'rfq.compare.prepareRequest' | translate }}
                   </button>
                 }
               </div>
               @if (!isConverted()) {
-                @if (isExpired()) {
+                @if (isCancelled()) {
+                  <span class="disabled-reason" data-testid="cancelled-reason">{{ 'rfq.compare.rfqCancelled' | translate }}</span>
+                } @else if (isExpired()) {
                   <span class="disabled-reason" data-testid="expired-reason">{{ 'rfq.compare.rfqExpired' | translate }}</span>
                 } @else if (isWriter()) {
                   @if (branchesError()) {
