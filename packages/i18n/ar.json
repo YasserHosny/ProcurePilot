@@ -2283,6 +2283,14 @@
     }
   },
   "requests": {
+    "errors": {
+      "quantity_not_positive": "يجب أن تكون الكمية أكبر من صفر.",
+      "required_by_in_the_past": "لا يمكن أن يكون تاريخ الاستحقاق في الماضي.",
+      "duplicate_product": "هذا المنتج موجود بالفعل في بند آخر.",
+      "cost_centre_not_found": "مركز التكلفة غير موجود.",
+      "cost_centre_branch_mismatch": "مركز التكلفة لا ينتمي إلى الفرع المحدد.",
+      "product_not_found": "المنتج غير موجود."
+    },
     "list": {
       "newRequestButton": "طلب جديد"
     },
@@ -2296,7 +2304,7 @@
       "submitted": "مقدمة",
       "pending": "معلقة",
       "approved": "معتمدة",
-      "ordered": "مطلوبة",
+      "ordered": "تم إصدار أمر الشراء",
       "delivered": "مستلمة",
       "rejected": "مرفوضة",
       "withdrawn": "مسحوبة"
@@ -2329,15 +2337,19 @@
       "branchRequired": "الفرع مطلوب.",
       "costCentreLabel": "مركز التكلفة (اختياري)",
       "requiredByDateLabel": "مطلوب بحلول",
+      "requiredByHint": "التنسيق: {{format}}",
       "requiredByDateRequired": "تاريخ الاستحقاق مطلوب.",
       "requiredByDateInvalid": "أدخل تاريخًا صالحًا (YYYY-MM-DD).",
       "linesTitle": "البنود",
+      "lineGroup": "البند {{position}}",
       "addLineButton": "إضافة بند",
       "removeLineButton": "إزالة البند",
+      "removeLineWithProduct": "إزالة البند {{position}}: {{product}}",
       "productLabel": "المنتج",
       "productRequired": "اختر منتجًا.",
       "quantityLabel": "الكمية",
       "quantityRequired": "يجب أن تكون الكمية أكبر من صفر.",
+      "quantityPattern": "يجب أن تكون الكمية رقمًا أكبر من صفر.",
       "noteLabel": "ملاحظة (اختيارية)",
       "estimatedUnitPriceLabel": "سعر الوحدة المقدر",
       "noEstimateAvailable": "لا توجد بيانات أسعار سابقة لهذا المنتج.",
