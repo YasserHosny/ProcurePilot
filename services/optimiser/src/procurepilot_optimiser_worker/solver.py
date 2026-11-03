@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
@@ -115,7 +115,10 @@ def solve_advanced_basket(
 ) -> AdvancedBasketResult:
     request = input_payload.request
     now = (computed_at or datetime.now(UTC)).replace(microsecond=0)
-    valid_until = now
+    # A result is good until the earliest price it is built on expires; open-ended prices
+    # leave it valid for a day, so it never arrives already expired.
+    expiries = [offer.valid_to for offer in input_payload.offers if offer.valid_to is not None]
+    valid_until = min(expiries) if expiries else now + timedelta(days=1)
     terms_by_supplier = {terms.supplier_id: terms for terms in input_payload.supplier_terms}
     risks_by_supplier = {risk.supplier_id: risk for risk in input_payload.supplier_risks}
     eligible_supplier_ids = [

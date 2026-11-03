@@ -64,7 +64,12 @@ def load_advanced_optimisation_input(
     return AdvancedOptimisationInput(
         request=request,
         offers=offers,
-        supplier_terms=supplier_terms or read_supplier_terms(conn, request=request),
+        # An empty snapshot is still the snapshot: only a job without one reads the live terms.
+        supplier_terms=(
+            supplier_terms
+            if supplier_terms is not None
+            else read_supplier_terms(conn, request=request)
+        ),
         supplier_risks=read_supplier_risks(conn, request=request),
     )
 
@@ -182,6 +187,7 @@ def read_current_advanced_offers(
                 (s.status = 'preferred'
                   or wp.preferred_supplier_id = q.supplier_id) as preferred,
                 s.lead_time_days,
+                lc.valid_to,
                 row_number() over (
                   partition by md.matched_workspace_product_id, q.supplier_id
                   order by lc.recorded_at desc, lc.id desc
@@ -361,6 +367,7 @@ def _advanced_offer(row: dict[str, object]) -> AdvancedOfferInput:
         source_landed_cost_id=UUID(str(row["source_landed_cost_id"])),
         preferred=bool(row["preferred"]),
         lead_time_days=int(lead_time) if lead_time is not None else None,
+        valid_to=row.get("valid_to"),  # type: ignore[arg-type]
     )
 
 
@@ -425,10 +432,11 @@ def _supplier_terms(row: dict[str, object]) -> SupplierCommercialTerms:
 
 def _supplier_terms_from_snapshot(
     snapshot: dict[str, object],
-) -> list[SupplierCommercialTerms]:
+) -> list[SupplierCommercialTerms] | None:
+    """The terms the buyer saw at submission; None when no snapshot was ever taken."""
     raw_terms = snapshot.get("supplier_terms")
     if not isinstance(raw_terms, list):
-        return []
+        return None
     terms = []
     for raw_term in raw_terms:
         if not isinstance(raw_term, dict):
