@@ -217,6 +217,10 @@ export class ApprovalQueueComponent implements OnInit {
 
   readonly isLoading = signal<boolean>(true);
   readonly pendingRequests = signal<PurchaseRequest[]>([]);
+  readonly nextCursor = signal<string | null>(null);
+  readonly isLoadingMore = signal<boolean>(false);
+  readonly groupSiblings = signal<Map<string, PurchaseRequest[]>>(new Map());
+  readonly groupStatus = signal<Map<string, 'loading' | 'complete' | 'failed'>>(new Map());
   readonly branches = signal<Branch[]>([]);
   readonly costCentres = signal<CostCentre[]>([]);
   readonly products = signal<Product[]>([]);
@@ -276,12 +280,26 @@ export class ApprovalQueueComponent implements OnInit {
       }
     }
 
+    const siblingsMap = this.groupSiblings();
+
     for (const req of reqs) {
       if (req.request_group) {
         const gid = req.request_group.id;
         if (!seenGroupIds.has(gid)) {
           seenGroupIds.add(gid);
-          const requests = groupsMap.get(gid)!;
+          const pageRequests = groupsMap.get(gid)!;
+          const fetchedSiblings = siblingsMap.get(gid) ?? [];
+
+          const reqMap = new Map<string, PurchaseRequest>();
+          for (const r of pageRequests) {
+            reqMap.set(r.id, r);
+          }
+          for (const r of fetchedSiblings) {
+            if (!reqMap.has(r.id)) {
+              reqMap.set(r.id, r);
+            }
+          }
+          const requests = Array.from(reqMap.values());
           const linesCount = requests.reduce((sum, r) => sum + r.lines.length, 0);
           items.push({
             kind: 'group',
@@ -305,6 +323,7 @@ export class ApprovalQueueComponent implements OnInit {
   });
 
   private readonly idempotencyKeys = new Map<string, string>();
+  private loadGeneration = 0;
 
   private getIdempotencyKey(action: string, targetId: string): string {
     const keyId = `${action}:${targetId}`;
@@ -325,9 +344,18 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   loadPendingApprovals(): void {
+    // When reloading (e.g. after a decision), reload from the first page and reset cursor.
+    // Why: Reloading from cursor=null fetches fresh page 1 from the server. If accumulated
+    // extra pages were kept, items could be duplicated or stale across pages, and the server
+    // cursor would be out-of-sync with the spliced client list.
+    const generation = ++this.loadGeneration;
     this.isLoading.set(true);
+    this.isLoadingMore.set(false);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
+    this.nextCursor.set(null);
+    this.groupSiblings.set(new Map());
+    this.groupStatus.set(new Map());
 
     forkJoin({
       approvals: this.approvalsApi.listPendingApprovals({ limit: 50 }),
@@ -336,15 +364,57 @@ export class ApprovalQueueComponent implements OnInit {
       products: this.loadProducts(),
     }).subscribe({
       next: ({ approvals, branches, costCentres, products }) => {
+        if (generation !== this.loadGeneration) {
+          return;
+        }
         this.pendingRequests.set([...approvals.items]);
+        this.nextCursor.set(approvals.next_cursor ?? null);
         this.branches.set([...branches.items]);
         this.costCentres.set([...costCentres.items]);
         this.products.set([...products.items]);
         this.isLoading.set(false);
+        this.checkAndFetchMissingGroupSiblings(generation);
       },
       error: (err: unknown) => {
+        if (generation !== this.loadGeneration) {
+          return;
+        }
         this.isLoading.set(false);
         this.handleError(err);
+      },
+    });
+  }
+
+  loadMore(): void {
+    const cursor = this.nextCursor();
+    if (!cursor || this.isLoadingMore()) {
+      return;
+    }
+    const generation = this.loadGeneration;
+    this.isLoadingMore.set(true);
+    this.errorMessage.set(null);
+    this.errorTraceId.set(null);
+
+    this.approvalsApi.listPendingApprovals({ cursor, limit: 50 }).subscribe({
+      next: (res) => {
+        if (generation !== this.loadGeneration) {
+          return;
+        }
+        const current = this.pendingRequests();
+        const seenIds = new Set(current.map((r) => r.id));
+        const additions = res.items.filter((r) => !seenIds.has(r.id));
+        this.pendingRequests.set([...current, ...additions]);
+        this.nextCursor.set(res.next_cursor ?? null);
+        this.isLoadingMore.set(false);
+        this.checkAndFetchMissingGroupSiblings(generation);
+      },
+      error: (err: unknown) => {
+        if (generation !== this.loadGeneration) {
+          return;
+        }
+        this.isLoadingMore.set(false);
+        // Keep rows already loaded, show error banner and keep nextCursor so Load more can retry.
+        this.handleError(err, 'approvals.pagination.loadError');
       },
     });
   }
@@ -440,6 +510,9 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   openGroupDecisionDialog(item: GroupQueueItem, action: 'approve' | 'reject'): void {
+    if (!this.isGroupComplete(item)) {
+      return;
+    }
     const branchName = this.branchNameById().get(item.requests[0]?.branch_id);
     const amount = this.formatService.formatCurrencyAmount(item.group.combined_total);
 
@@ -466,6 +539,10 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   submitGroupDecision(groupId: string, action: 'approve' | 'reject', comment?: string): void {
+    const targetItem = this.queueItems().find((i) => i.id === groupId);
+    if (targetItem && this.isGroupRow(targetItem) && !this.isGroupComplete(targetItem)) {
+      return;
+    }
     this.processingRequestId.set(groupId);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
@@ -683,7 +760,188 @@ export class ApprovalQueueComponent implements OnInit {
     );
   }
 
-  private handleError(err: unknown): void {
+  isGroupLoading(groupId: string): boolean {
+    return this.groupStatus().get(groupId) === 'loading';
+  }
+
+  isGroupFailed(groupId: string): boolean {
+    return this.groupStatus().get(groupId) === 'failed';
+  }
+
+  isGroupComplete(item: GroupQueueItem): boolean {
+    const pageReqs = this.pendingRequests().filter(
+      (r) => r.request_group?.id === item.groupId,
+    );
+    if (pageReqs.length >= item.group.size) {
+      return true;
+    }
+    return (
+      this.groupStatus().get(item.groupId) === 'complete' &&
+      item.requests.length === item.group.size &&
+      item.requests.every((r) => r.request_group?.id === item.groupId)
+    );
+  }
+
+  isDecisionDisabled(row: QueueItem): boolean {
+    if (this.isProcessing(row.id)) {
+      return true;
+    }
+    if (this.isGroupRow(row) && !this.isGroupComplete(row)) {
+      return true;
+    }
+    return false;
+  }
+
+  private checkAndFetchMissingGroupSiblings(generation = this.loadGeneration): void {
+    const reqs = this.pendingRequests();
+    const groups = new Map<string, { summary: RequestGroupSummary; requests: PurchaseRequest[] }>();
+
+    for (const req of reqs) {
+      if (req.request_group) {
+        const gid = req.request_group.id;
+        if (!groups.has(gid)) {
+          groups.set(gid, { summary: req.request_group, requests: [] });
+        }
+        groups.get(gid)!.requests.push(req);
+      }
+    }
+
+    let statusUpdated = false;
+    const nextStatus = new Map(this.groupStatus());
+
+    for (const [gid, { summary, requests }] of groups.entries()) {
+      if (requests.length >= summary.size) {
+        const allMatchGroupId = requests.every((r) => r.request_group?.id === summary.id);
+        const uniqueIds = new Set(requests.map((r) => r.id));
+        const verified =
+          allMatchGroupId &&
+          uniqueIds.size === summary.size &&
+          requests.length === summary.size;
+        if (verified && nextStatus.get(gid) !== 'complete') {
+          nextStatus.set(gid, 'complete');
+          statusUpdated = true;
+        }
+        continue;
+      }
+      const currentStatus = this.groupStatus().get(gid);
+      if (currentStatus === 'loading' || currentStatus === 'complete') {
+        continue;
+      }
+      this.fetchGroupSiblings(summary, requests, generation);
+    }
+
+    if (statusUpdated) {
+      this.groupStatus.set(nextStatus);
+    }
+  }
+
+  fetchGroupSiblings(
+    summary: RequestGroupSummary,
+    knownRequests: PurchaseRequest[],
+    generation = this.loadGeneration,
+  ): void {
+    const knownIds = new Set(knownRequests.map((r) => r.id));
+    const siblingIds = summary.sibling_request_ids ?? [];
+    const missingIds = siblingIds.filter((id) => !knownIds.has(id));
+
+    if (missingIds.length === 0 && knownRequests.length >= summary.size) {
+      if (generation !== this.loadGeneration) {
+        return;
+      }
+      const allMatchGroupId = knownRequests.every((r) => r.request_group?.id === summary.id);
+      const uniqueIds = new Set(knownRequests.map((r) => r.id));
+      const verified =
+        allMatchGroupId &&
+        uniqueIds.size === summary.size &&
+        knownRequests.length === summary.size;
+
+      const nextStatus = new Map(this.groupStatus());
+      nextStatus.set(summary.id, verified ? 'complete' : 'failed');
+      this.groupStatus.set(nextStatus);
+      return;
+    }
+
+    if (missingIds.length === 0 || knownRequests.length + missingIds.length < summary.size) {
+      if (generation !== this.loadGeneration) {
+        return;
+      }
+      const nextStatus = new Map(this.groupStatus());
+      nextStatus.set(summary.id, 'failed');
+      this.groupStatus.set(nextStatus);
+      return;
+    }
+
+    const nextLoading = new Map(this.groupStatus());
+    nextLoading.set(summary.id, 'loading');
+    this.groupStatus.set(nextLoading);
+
+    forkJoin(missingIds.map((id) => this.requestsApi.getRequest(id))).subscribe({
+      next: (fetchedSiblings) => {
+        if (generation !== this.loadGeneration) {
+          return;
+        }
+        const allRequests = [...knownRequests, ...fetchedSiblings];
+        const allMatchGroupId = allRequests.every((r) => r.request_group?.id === summary.id);
+        const uniqueIds = new Set(allRequests.map((r) => r.id));
+        const verified =
+          allMatchGroupId &&
+          uniqueIds.size === summary.size &&
+          allRequests.length === summary.size;
+
+        if (!verified) {
+          const nextStatus = new Map(this.groupStatus());
+          nextStatus.set(summary.id, 'failed');
+          this.groupStatus.set(nextStatus);
+          return;
+        }
+
+        const sibMap = new Map(this.groupSiblings());
+        sibMap.set(summary.id, fetchedSiblings);
+        this.groupSiblings.set(sibMap);
+
+        const nextStatus = new Map(this.groupStatus());
+        nextStatus.set(summary.id, 'complete');
+        this.groupStatus.set(nextStatus);
+      },
+      error: () => {
+        if (generation !== this.loadGeneration) {
+          return;
+        }
+        const nextStatus = new Map(this.groupStatus());
+        nextStatus.set(summary.id, 'failed');
+        this.groupStatus.set(nextStatus);
+      },
+    });
+  }
+
+  retryLoadGroup(item: GroupQueueItem): void {
+    const knownRequests = this.pendingRequests().filter(
+      (r) => r.request_group?.id === item.groupId,
+    );
+    this.fetchGroupSiblings(item.group, knownRequests, this.loadGeneration);
+  }
+
+  showingRequestsLabel(count: number): string {
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    return this.translate.instant(`approvals.pagination.showing.${category}`, {
+      count: this.formatService.formatNumber(count),
+    });
+  }
+
+  paginationStatusText(): string {
+    const count = this.pendingRequests().length;
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    const key = this.nextCursor()
+      ? `approvals.pagination.showingMore.${category}`
+      : `approvals.pagination.showing.${category}`;
+    return this.translate.instant(key, {
+      count: this.formatService.formatNumber(count),
+    });
+  }
+
+  private handleError(err: unknown, defaultMessageKey = `${I18N}.genericError`): void {
     if (err instanceof HttpErrorResponse) {
       const apiError = err.error as ApiError | undefined;
       const details = apiError?.details as { reason?: string } | undefined;
@@ -692,11 +950,27 @@ export class ApprovalQueueComponent implements OnInit {
         return;
       }
       this.errorTraceId.set(apiError?.trace_id ?? null);
+
+      if (defaultMessageKey === 'approvals.pagination.loadError') {
+        const raw = err.error as unknown;
+        const isEnvelope =
+          typeof raw === 'object' &&
+          raw !== null &&
+          typeof (raw as Record<string, unknown>)['code'] === 'string' &&
+          typeof (raw as Record<string, unknown>)['message'] === 'string';
+        this.errorMessage.set(
+          isEnvelope && apiError?.message
+            ? apiError.message
+            : this.translate.instant(defaultMessageKey),
+        );
+        return;
+      }
+
       this.errorMessage.set(
-        apiError?.message ?? err.message ?? this.translate.instant(`${I18N}.genericError`),
+        apiError?.message ?? err.message ?? this.translate.instant(defaultMessageKey),
       );
       return;
     }
-    this.errorMessage.set(this.translate.instant(`${I18N}.genericError`));
+    this.errorMessage.set(this.translate.instant(defaultMessageKey));
   }
 }
