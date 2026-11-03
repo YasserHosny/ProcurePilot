@@ -1695,6 +1695,7 @@ class RequestsService:
                     if existing is None:
                         raise NotFoundError(details={"resource": "purchase_request"})
                     _require_ungrouped(existing)
+                    _require_requester(existing, member)
 
                     is_replay = False
                     if idempotency_key is not None:
@@ -1736,7 +1737,6 @@ class RequestsService:
                     else:
                         if str(existing["status"]) != "draft":
                             raise ConflictError(details={"reason": "not_draft"})
-                        _require_requester(existing, member)
 
                         rid = str(request_id)
                         cur.execute(
@@ -1868,21 +1868,25 @@ class RequestsService:
                             target=audit_target,
                         )
 
+                        if resolved is not None and resolved.source == "owner_fallback":
+                            escalation_target: dict[str, object] = {
+                                "purchase_request_id": rid,
+                                "approval_step_id": str(routed_step["id"]),
+                                "assigned_membership_id": str(resolved.assigned_membership_id),
+                            }
+                            if idempotency_key is not None:
+                                escalation_target["idempotency_key"] = str(idempotency_key)
+                            self._record(
+                                cur=cur,
+                                bearer_token=bearer_token,
+                                member=member,
+                                action="requests.approval_step_escalated",
+                                target=escalation_target,
+                            )
+
         except psycopg.Error as exc:
             raise _map_psycopg_error(exc) from exc
 
-        rid = str(request_id)
-        if not is_replay and resolved is not None and resolved.source == "owner_fallback":
-            self._record(
-                bearer_token=bearer_token,
-                member=member,
-                action="requests.approval_step_escalated",
-                target={
-                    "purchase_request_id": rid,
-                    "approval_step_id": str(routed_step["id"]),
-                    "assigned_membership_id": str(resolved.assigned_membership_id),
-                },
-            )
         return self._purchase_request_with_budget_status(
             client, request_row, frozen_lines, routed_step
         )

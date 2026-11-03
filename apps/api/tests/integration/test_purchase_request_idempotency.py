@@ -10,7 +10,7 @@ Proves:
 (e) submit/withdraw without key preserves existing behaviour (no idempotency_key in audit
     target, second call gets 409);
 (f) submit and withdraw replays are scoped to the actor (a different member calling
-    submit gets 409 not_draft, calling withdraw gets 409 already_decided_or_withdrawn;
+    submit gets 403 not_requester, calling withdraw gets 409 already_decided_or_withdrawn;
     same member replaying gets 200).
 """
 
@@ -348,13 +348,34 @@ def test_submit_replay_does_not_rerun_estimation(
     conn.commit()
 
     try:
-        client, _ = _build_test_client(conn, workspace, monkeypatch)
+        client, service = _build_test_client(conn, workspace, monkeypatch)
         key = uuid4()
         headers = {"Idempotency-Key": str(key)}
+
+        estimate_calls = 0
+
+        def _counting_estimate(product_ids: list[UUID], **kw: object) -> list[LineEstimate]:
+            nonlocal estimate_calls
+            estimate_calls += 1
+            if estimate_calls > 1:
+                raise AssertionError("Estimation must not run on replay")
+            return [
+                LineEstimate(
+                    unit_price_amount=Decimal("15.5000"),
+                    unit_price_currency="GBP",
+                    source_landed_cost_id=None,
+                )
+                for _ in product_ids
+            ]
+
+        monkeypatch.setattr(service, "_estimate_products", _counting_estimate)
 
         # Call 1: Submit
         res1 = client.post(f"/api/v1/requests/{request_id}/submit", headers=headers)
         assert res1.status_code == 200, res1.text
+        assert estimate_calls == 1, (
+            f"Expected 1 estimate call on first submit, got {estimate_calls}"
+        )
 
         with conn.cursor(row_factory=dict_row) as cur:
             reset_role(cur)
@@ -364,6 +385,7 @@ def test_submit_replay_does_not_rerun_estimation(
         # Call 2: Replay
         res2 = client.post(f"/api/v1/requests/{request_id}/submit", headers=headers)
         assert res2.status_code == 200, res2.text
+        assert estimate_calls == 1, f"Expected estimate not called on replay, got {estimate_calls}"
 
         with conn.cursor(row_factory=dict_row) as cur:
             reset_role(cur)
@@ -473,10 +495,10 @@ def test_submit_replay_scoped_to_actor(
         assert res_a1.json()["status"] == "submitted"
 
         # Call 2: Member B (owner) calls submit with key K -> must NOT replay A's result
-        # (it gets normal 409 not_draft)
+        # (it gets 403 not_requester because Member B is not the requester)
         res_b = client_b.post(f"/api/v1/requests/{request_id}/submit", headers=headers)
-        assert res_b.status_code == 409, f"Expected 409, got {res_b.status_code}: {res_b.text}"
-        assert res_b.json()["details"] == {"reason": "not_draft"}
+        assert res_b.status_code == 403, f"Expected 403, got {res_b.status_code}: {res_b.text}"
+        assert res_b.json()["details"] == {"reason": "not_requester"}
 
         # Call 3: Member A replaying with key K still gets 200
         res_a2 = client_a.post(f"/api/v1/requests/{request_id}/submit", headers=headers)
@@ -536,4 +558,158 @@ def test_withdraw_replay_scoped_to_actor(
             cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
             cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
             cur.execute("delete from auth.users where id = %s", (member_a.user_id,))
+            conn.commit()
+
+
+def test_replay_with_marker_for_non_requester_returns_permission_denied(
+    conn: psycopg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "pr-idem-perm-owner")
+        member_a = _make_member(cur, workspace.tenant_id, "pr-idem-perm-a", "branch_manager")
+        member_b = _make_member(cur, workspace.tenant_id, "pr-idem-perm-b", "buyer")
+        branch_id = _make_branch(cur, workspace)
+        product_id = make_workspace_product(cur, workspace, name="Permission Replay Item")
+        request_id = _create_draft_request_with_line(
+            cur, workspace, branch_id, product_id, requester=member_a
+        )
+        key_sub = uuid4()
+        key_wdr = uuid4()
+
+        # Insert replay markers directly for member_b (who is NOT requester and NOT owner)
+        reset_role(cur)
+        cur.execute(
+            "select record_audit_event(%s, %s, %s::uuid, %s::uuid, %s, %s::jsonb, %s)",
+            (
+                "requests.purchase_request_submitted",
+                "success",
+                workspace.tenant_id,
+                member_b.membership_id,
+                "actor-b@example.test",
+                Jsonb({"purchase_request_id": str(request_id), "idempotency_key": str(key_sub)}),
+                "test-trace-sub",
+            ),
+        )
+        cur.execute(
+            "select record_audit_event(%s, %s, %s::uuid, %s::uuid, %s, %s::jsonb, %s)",
+            (
+                "requests.purchase_request_withdrawn",
+                "success",
+                workspace.tenant_id,
+                member_b.membership_id,
+                "actor-b@example.test",
+                Jsonb({"purchase_request_id": str(request_id), "idempotency_key": str(key_wdr)}),
+                "test-trace-wdr",
+            ),
+        )
+    conn.commit()
+
+    try:
+        client_b, _ = _build_test_client(conn, workspace, monkeypatch, actor=member_b)
+
+        # Submit call: member_b is not requester, so even with replay marker, must return 403
+        res_sub = client_b.post(
+            f"/api/v1/requests/{request_id}/submit",
+            headers={"Idempotency-Key": str(key_sub)},
+        )
+        assert res_sub.status_code == 403, (
+            f"Expected 403 for submit, got {res_sub.status_code}: {res_sub.text}"
+        )
+        assert res_sub.json()["details"] == {"reason": "not_requester"}
+
+        # Withdraw call: member_b is not owner/requester; with replay marker, must return 403
+        res_wdr = client_b.post(
+            f"/api/v1/requests/{request_id}/withdraw",
+            headers={"Idempotency-Key": str(key_wdr)},
+        )
+        assert res_wdr.status_code == 403, (
+            f"Expected 403 for withdraw, got {res_wdr.status_code}: {res_wdr.text}"
+        )
+        assert res_wdr.json()["details"] == {"reason": "not_requester"}
+    finally:
+        with conn.cursor() as cur:
+            reset_role(cur)
+            delete_tenant_scoped_rows(cur, workspace.tenant_id)
+            cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
+            cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
+            cur.execute("delete from auth.users where id = %s", (member_a.user_id,))
+            cur.execute("delete from auth.users where id = %s", (member_b.user_id,))
+            conn.commit()
+
+
+def test_owner_fallback_submit_writes_both_audit_events_and_replay_writes_neither(
+    conn: psycopg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "pr-idem-owner-fb")
+        branch_id = _make_branch(cur, workspace)
+        product_id = make_workspace_product(cur, workspace, name="Owner Fallback Item")
+        request_id = _create_draft_request_with_line(cur, workspace, branch_id, product_id)
+    conn.commit()
+
+    try:
+        client, _ = _build_test_client(conn, workspace, monkeypatch)
+        key = uuid4()
+        headers = {"Idempotency-Key": str(key)}
+
+        # Call 1: Submit with key -> triggers owner_fallback (rules=[])
+        res1 = client.post(f"/api/v1/requests/{request_id}/submit", headers=headers)
+        assert res1.status_code == 200, res1.text
+        assert res1.json()["status"] == "submitted"
+
+        # Assert BOTH events exist in audit_event, exactly once each, with idempotency_key
+        with conn.cursor(row_factory=dict_row) as cur:
+            reset_role(cur)
+            cur.execute(
+                "select action, outcome, target from audit_event where tenant_id = %s order by id",
+                (workspace.tenant_id,),
+            )
+            rows = cur.fetchall()
+            submitted_rows = [
+                r for r in rows if r["action"] == "requests.purchase_request_submitted"
+            ]
+            escalated_rows = [r for r in rows if r["action"] == "requests.approval_step_escalated"]
+            assert len(submitted_rows) == 1, f"Expected 1 submitted, got {len(submitted_rows)}"
+            assert len(escalated_rows) == 1, f"Expected 1 escalated, got {len(escalated_rows)}"
+            assert submitted_rows[0]["target"]["idempotency_key"] == str(key)
+            assert escalated_rows[0]["target"]["idempotency_key"] == str(key)
+            assert escalated_rows[0]["target"]["purchase_request_id"] == str(request_id)
+            assert "approval_step_id" in escalated_rows[0]["target"]
+            assert escalated_rows[0]["target"]["assigned_membership_id"] == str(
+                workspace.membership_id
+            )
+
+        # Call 2: Replay with the same key
+        res2 = client.post(f"/api/v1/requests/{request_id}/submit", headers=headers)
+        assert res2.status_code == 200, res2.text
+        assert res2.json()["status"] == "submitted"
+
+        # Assert still exactly ONE of each (neither written again)
+        with conn.cursor(row_factory=dict_row) as cur:
+            reset_role(cur)
+            cur.execute(
+                "select action, outcome, target from audit_event where tenant_id = %s order by id",
+                (workspace.tenant_id,),
+            )
+            rows2 = cur.fetchall()
+            submitted_rows2 = [
+                r for r in rows2 if r["action"] == "requests.purchase_request_submitted"
+            ]
+            escalated_rows2 = [
+                r for r in rows2 if r["action"] == "requests.approval_step_escalated"
+            ]
+            assert len(submitted_rows2) == 1, (
+                f"Expected 1 submitted after replay, got {len(submitted_rows2)}"
+            )
+            assert len(escalated_rows2) == 1, (
+                f"Expected 1 escalated after replay, got {len(escalated_rows2)}"
+            )
+    finally:
+        with conn.cursor() as cur:
+            reset_role(cur)
+            delete_tenant_scoped_rows(cur, workspace.tenant_id)
+            cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
+            cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
             conn.commit()

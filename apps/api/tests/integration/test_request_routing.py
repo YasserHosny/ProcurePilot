@@ -400,15 +400,20 @@ def test_owner_fallback_records_escalation_when_no_rule_matches(
 
         assert source == "owner_fallback"
         assert assignee_id == member.membership_id
-        # The escalation event still goes through the (post-commit) audit writer; the submitted
-        # event is now written inside the submit transaction, straight to audit_event, so it is
-        # read back from the table instead of the fake writer.
-        assert audit.actions == ["requests.approval_step_escalated"]
+        # Both submitted and escalated events are written inside the submit transaction,
+        # straight to audit_event, so both are read back from the table and the fake writer
+        # sees neither.
+        assert audit.actions == []
         with conn.cursor() as cur:
             reset_role(cur)
             cur.execute(
                 "select count(*) from audit_event where tenant_id = %s and action = %s",
                 (owner.tenant_id, "requests.purchase_request_submitted"),
+            )
+            assert cur.fetchone()[0] == 1
+            cur.execute(
+                "select count(*) from audit_event where tenant_id = %s and action = %s",
+                (owner.tenant_id, "requests.approval_step_escalated"),
             )
             assert cur.fetchone()[0] == 1
     finally:
