@@ -97,7 +97,7 @@
         <mat-card-content class="line-metrics-grid">
           <div class="metric-item">
             <span class="metric-label">{{ 'matching.resolution.lineDetails.quantity' | translate }}</span>
-            <span class="metric-value">{{ (l.quantity != null && l.quantity !== '') ? (l.quantity | formatQuantity) : ('matching.queue.notAvailable' | translate) }}</span>
+            <span class="metric-value">{{ (l.quantity !== null && l.quantity !== undefined && l.quantity !== '') ? (l.quantity | formatQuantity) : ('matching.queue.notAvailable' | translate) }}</span>
           </div>
           @if (l.pack) {
             <div class="metric-item">
