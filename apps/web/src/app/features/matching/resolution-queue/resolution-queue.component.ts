@@ -100,6 +100,7 @@ export class ResolutionQueueComponent implements OnInit {
   readonly sortOrder = signal<MatchTaskSortOrder>('desc');
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
+  readonly tasksLoadFailed = signal<boolean>(false);
   readonly exactMatchCount = signal<number>(0);
   readonly isConfirmingExact = signal<boolean>(false);
   readonly exactConfirmedCount = signal<number | null>(null);
@@ -257,6 +258,7 @@ export class ResolutionQueueComponent implements OnInit {
     const requestId = ++this.latestLoadRequestId;
     this.isLoading.set(true);
     this.isLoadingMore.set(false);
+    this.tasksLoadFailed.set(false);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
     this.nextCursor.set(null);
@@ -283,10 +285,14 @@ export class ResolutionQueueComponent implements OnInit {
           if (requestId !== this.latestLoadRequestId) return;
           this.tasks.set(res.items);
           this.nextCursor.set(res.next_cursor);
+          this.tasksLoadFailed.set(false);
           this.isLoading.set(false);
         },
         error: (err: unknown) => {
           if (requestId !== this.latestLoadRequestId) return;
+          this.tasks.set([]);
+          this.nextCursor.set(null);
+          this.tasksLoadFailed.set(true);
           this.isLoading.set(false);
           this.handleError(err);
         },

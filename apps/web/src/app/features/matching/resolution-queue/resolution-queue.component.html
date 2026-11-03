@@ -25,6 +25,11 @@
           <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
         }
       </div>
+      @if (tasksLoadFailed()) {
+        <button mat-stroked-button type="button" class="retry-btn" data-testid="queue-retry" (click)="loadTasks()">
+          <span>{{ 'matching.queue.retry' | translate }}</span>
+        </button>
+      }
     </div>
   }
 
@@ -175,7 +180,7 @@
       <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
       <span>{{ 'common.loading' | translate }}</span>
     </div>
-  } @else if (tasks().length === 0 && quotationId()) {
+  } @else if (!tasksLoadFailed() && tasks().length === 0 && quotationId()) {
     <div class="empty-state" data-testid="quotation-all-matched">
       <mat-icon class="empty-icon" aria-hidden="true">done_all</mat-icon>
       <h2 class="empty-title">{{ 'matching.queue.allLinesMatchedTitle' | translate }}</h2>
@@ -190,7 +195,7 @@
         </button>
       </div>
     </div>
-  } @else if (tasks().length === 0 && hasActiveFilters()) {
+  } @else if (!tasksLoadFailed() && tasks().length === 0 && hasActiveFilters()) {
     <div class="empty-state">
       <mat-icon class="empty-icon" aria-hidden="true">filter_alt_off</mat-icon>
       <h2 class="empty-title">{{ 'matching.queue.noFilterResults' | translate }}</h2>
@@ -199,13 +204,13 @@
         <span>{{ 'matching.queue.clearFilters' | translate }}</span>
       </button>
     </div>
-  } @else if (tasks().length === 0) {
+  } @else if (!tasksLoadFailed() && tasks().length === 0) {
     <div class="empty-state">
       <mat-icon class="empty-icon" aria-hidden="true">done_all</mat-icon>
       <h2 class="empty-title">{{ 'matching.queue.emptyTitle' | translate }}</h2>
       <p class="empty-message">{{ 'matching.queue.emptyMessage' | translate }}</p>
     </div>
-  } @else {
+  } @else if (!tasksLoadFailed() && tasks().length > 0) {
     <section class="quotation-groups" [attr.aria-label]="'matching.queue.groupsLabel' | translate">
       @for (group of groups(); track group.quotation.id) {
         <mat-card class="quotation-group">
