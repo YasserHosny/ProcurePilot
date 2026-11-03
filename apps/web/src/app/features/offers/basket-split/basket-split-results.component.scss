@@ -457,3 +457,7 @@
     }
   }
 }
+
+.standalone-next-step { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; margin-block: 1rem; }
+.standalone-note { margin: 0; color: var(--pp-text-muted); flex: 1 1 280px; }
+.standalone-next-step a { display: inline-flex; align-items: center; gap: 0.35rem; }

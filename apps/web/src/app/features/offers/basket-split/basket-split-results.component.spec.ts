@@ -1108,4 +1108,22 @@ describe('BasketSplitResultsComponent — packs and constraint copy', () => {
     });
     });
   });
+  // PPS-209: a standalone split is an estimate; acting on it means asking for fresh quotes.
+  it('offers to start an RFQ from a standalone result, linking to the prefilled form', () => {
+    const el = render([], [], { ...job, id: 'job-77', rfq_id: null } as BasketSplitJob);
+    const link = el.querySelector('[data-testid="start-rfq-from-split"]') as HTMLAnchorElement | null;
+    expect(link).toBeTruthy();
+    expect(link?.getAttribute('href')).toBe('/rfq/create?from_split=job-77');
+  });
+
+  it('does not offer it on a split that already belongs to an RFQ', () => {
+    const el = render([], [], { ...job, rfq_id: 'rfq-1' } as BasketSplitJob);
+    expect(el.querySelector('[data-testid="start-rfq-from-split"]')).toBeNull();
+  });
+
+  it('hides it from read-only members, who cannot create an RFQ', () => {
+    mockSession.hasRole.and.returnValue(false);
+    const el = render([], [], { ...job, id: 'job-77', rfq_id: null } as BasketSplitJob);
+    expect(el.querySelector('[data-testid="start-rfq-from-split"]')).toBeNull();
+  });
 });
