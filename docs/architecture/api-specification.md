@@ -1490,6 +1490,8 @@ Request:
 
 - Requires bearer auth. Lists requests awaiting the caller's decision — the assigned approver
   sees their own pending steps; an owner sees every pending step (FR-007 standing override).
+  Requests submitted by the caller are excluded unless the caller is the workspace's only
+  active owner (ADR-024).
 - Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50.
 - Returns `200` with `items` of `PurchaseRequest`, each embedding the full decision context
   (requester, branch, cost centre, lines, required-by date, `approval_step`, and `budget_status`

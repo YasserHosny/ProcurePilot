@@ -926,6 +926,13 @@ class RequestsService:
                 query = query.neq("purchase_request.status", status)
             if member.role is not MemberRole.owner:
                 query = query.eq("assigned_membership_id", str(member.membership_id))
+            is_sole_owner = member.role is MemberRole.owner and set(
+                self._fetch_owner_membership_ids(client)
+            ) == {member.membership_id}
+            if not is_sole_owner:
+                query = query.neq(
+                    "purchase_request.requested_by_membership_id", str(member.membership_id)
+                )
             if boundary is not None:
                 created_at, step_id = boundary
                 query = query.or_(

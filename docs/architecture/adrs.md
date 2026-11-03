@@ -447,11 +447,12 @@
   - **Decision.** A member cannot approve or reject a request they submitted, through either the
     assigned-approver path or the owner override, unless they are the only active owner of the
     workspace (`403 self_decision_not_allowed`). The rule covers a split decision too.
-  - **Mark.** A decision made by the requester is «self-approved». The decision's audit event
-    carries `self_approved: true`; the approval step in API responses carries a derived
-    `self_approval` flag (the requester is the assignee, or the decider); the approval queue and the
-    request page show it. No stored column is added: the flag is derived from the step and the
-    request, so there is no migration, and row-level security is unchanged.
+  - **Mark.** A decision made by the requester is «self-approved». The mark is delivered in two
+    steps: this change ships the audit mark (`self_approved: true`) and the derived `self_approval`
+    flag in API responses (the requester is the assignee, or the decider); the queue and
+    request-page display (and a dedicated message for the 403 reason in the clients) ship in the
+    next web change tracked as P-173 part 2. No stored column is added: the flag is derived from the
+    step and the request, so there is no migration, and row-level security is unchanged.
   - **Existing steps.** Pending steps created before this change keep their assignee. The
     decision rule applies to them, so a requester-assigned step is decided by another owner or
     approver unless the requester is the sole owner.
@@ -461,8 +462,9 @@
   - A sole owner's request is assigned to that owner, can be decided by them, and is marked.
   - A requester with another eligible approver gets `403 self_decision_not_allowed` on approve,
     reject and the split decisions; the other approver or owner can decide.
-  - The audit event, the queue and the request page show «self-approved»; a decision by someone
-    else carries no mark.
+  - The audit event carries `self_approved: true` and API responses carry `self_approval: true`
+    (the queue and request-page display, and dedicated client messaging for `self_decision_not_allowed`,
+    ship in part 2); a decision by someone else carries no mark.
 - **Consequences:** In a workspace with two owners, an owner's own requests go to the other owner.
   In a one-owner workspace nothing changes except the mark. The owner override still exists for
   requests the owner did not submit. The rule is application-layer routing and decision logic, so it

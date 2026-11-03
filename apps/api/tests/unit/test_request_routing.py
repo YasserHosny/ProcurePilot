@@ -280,3 +280,84 @@ def test_requester_routing(scenario: str, is_group: bool) -> None:
     if is_group and source in ("threshold_match", "delegate"):
         source = "group_threshold_match"
     assert result.source == source
+
+
+@pytest.mark.parametrize("is_group", [False, True])
+@pytest.mark.parametrize(
+    "owners_order,primary_owner",
+    [
+        ("a_then_b", "a"),
+        ("a_then_b", "b"),
+        ("b_then_a", "a"),
+        ("b_then_a", "b"),
+    ],
+)
+def test_replacement_owner_active_delegation_to_non_owner(
+    is_group: bool, owners_order: str, primary_owner: str
+) -> None:
+    owner_a, owner_b, delegate_c = uuid4(), uuid4(), uuid4()
+    requester = owner_a
+    owners = [owner_a, owner_b] if owners_order == "a_then_b" else [owner_b, owner_a]
+    primary = owner_a if primary_owner == "a" else owner_b
+    delegations = [delegation(delegator_id=owner_b, delegate_id=delegate_c)]
+
+    result = resolve_approver(
+        request_value=Decimal("75"),
+        request_currency="GBP",
+        branch_id=uuid4(),
+        rules=[],
+        delegations=delegations,
+        removed_membership_ids=set(),
+        owner_membership_id=primary,
+        owner_membership_ids=owners,
+        requester_membership_id=requester,
+        as_of=date(2026, 9, 10),
+        is_group=is_group,
+    )
+    assert result.assigned_membership_id == delegate_c
+    assert result.source == ("owner_fallback" if is_group else "delegate")
+
+
+@pytest.mark.parametrize("is_group", [False, True])
+def test_replacement_owner_delegation_to_requester_skipped(is_group: bool) -> None:
+    owner_a, owner_b = uuid4(), uuid4()
+    requester = owner_a
+    delegations = [delegation(delegator_id=owner_b, delegate_id=requester)]
+
+    result = resolve_approver(
+        request_value=Decimal("75"),
+        request_currency="GBP",
+        branch_id=uuid4(),
+        rules=[],
+        delegations=delegations,
+        removed_membership_ids=set(),
+        owner_membership_id=owner_a,
+        owner_membership_ids=[owner_a, owner_b],
+        requester_membership_id=requester,
+        as_of=date(2026, 9, 10),
+        is_group=is_group,
+    )
+    assert result.assigned_membership_id == owner_b
+    assert result.source == "owner_fallback"
+
+
+@pytest.mark.parametrize("is_group", [False, True])
+def test_replacement_owner_without_delegation_unchanged(is_group: bool) -> None:
+    owner_a, owner_b = uuid4(), uuid4()
+    requester = owner_a
+
+    result = resolve_approver(
+        request_value=Decimal("75"),
+        request_currency="GBP",
+        branch_id=uuid4(),
+        rules=[],
+        delegations=[],
+        removed_membership_ids=set(),
+        owner_membership_id=owner_a,
+        owner_membership_ids=[owner_a, owner_b],
+        requester_membership_id=requester,
+        as_of=date(2026, 9, 10),
+        is_group=is_group,
+    )
+    assert result.assigned_membership_id == owner_b
+    assert result.source == "owner_fallback"

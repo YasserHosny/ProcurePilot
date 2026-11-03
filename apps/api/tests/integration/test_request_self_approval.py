@@ -19,7 +19,12 @@ from integration.catalogue_helpers import (
     make_workspace_product,
     reset_role,
 )
-from integration.test_approvals import _make_branch, _make_member
+from integration.test_approvals import (
+    _make_branch,
+    _make_member,
+    _make_pending_step,
+    _make_submitted_request,
+)
 from integration.test_purchase_requests import _add_line_no_estimate, _make_request
 from integration.test_request_group_schema import _insert_group, _setup
 from integration.test_single_decision_audit import api_as, seed, state
@@ -217,3 +222,119 @@ def test_other_tenant_decision_remains_not_found(
         for action in ("approve", "reject"):
             response = client.post(f"/api/v1/requests/{rid}/{action}", json={"comment": "Reason"})
             assert response.status_code == 404, response.text
+
+
+def test_two_owners_pending_queue_excludes_own_requests(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        ws = make_workspace(cur, f"self-two-owners-queue-{uuid4().hex}")
+        other = _make_member(cur, ws.tenant_id, f"owner-{uuid4().hex}", "owner")
+        branch = _make_branch(cur, ws)
+        rid = _make_request(cur, ws, branch)
+        product = make_workspace_product(cur, ws, name="Request product")
+        _add_line_no_estimate(cur, ws, rid, product)
+    with api_as(conn, monkeypatch, ws) as client_a:
+        submit_res = client_a.post(f"/api/v1/requests/{rid}/submit")
+        assert submit_res.status_code == 200, submit_res.text
+        assert submit_res.json()["approval_step"]["assigned_membership_id"] == str(
+            other.membership_id
+        )
+        res_a = client_a.get("/api/v1/approvals/pending")
+        assert res_a.status_code == 200, res_a.text
+        assert not any(item["id"] == str(rid) for item in res_a.json()["items"])
+    with api_as(conn, monkeypatch, other) as client_b:
+        res_b = client_b.get("/api/v1/approvals/pending")
+        assert res_b.status_code == 200, res_b.text
+        assert any(item["id"] == str(rid) for item in res_b.json()["items"])
+
+
+def test_sole_owner_pending_queue_includes_own_request(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        ws = make_workspace(cur, f"self-sole-queue-{uuid4().hex}")
+        branch = _make_branch(cur, ws)
+        rid = _make_request(cur, ws, branch)
+        product = make_workspace_product(cur, ws, name="Request product")
+        _add_line_no_estimate(cur, ws, rid, product)
+    with api_as(conn, monkeypatch, ws) as client:
+        submit_res = client.post(f"/api/v1/requests/{rid}/submit")
+        assert submit_res.status_code == 200, submit_res.text
+        res = client.get("/api/v1/approvals/pending")
+        assert res.status_code == 200, res.text
+        assert any(item["id"] == str(rid) for item in res.json()["items"])
+
+
+def test_legacy_self_assigned_non_owner_step_is_not_listed(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        ws = make_workspace(cur, f"self-legacy-approver-{uuid4().hex}")
+        approver = _make_member(cur, ws.tenant_id, f"approver-{uuid4().hex}", "approver")
+        branch = _make_branch(cur, ws)
+        rid = _make_submitted_request(cur, approver, branch)
+        _make_pending_step(cur, ws.tenant_id, rid, approver.membership_id)
+    with api_as(conn, monkeypatch, approver) as client:
+        res = client.get("/api/v1/approvals/pending")
+        assert res.status_code == 200, res.text
+        assert not any(item["id"] == str(rid) for item in res.json()["items"])
+
+
+def test_pending_queue_paging_across_excluded_rows(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        ws = make_workspace(cur, f"self-paging-{uuid4().hex}")
+        other = _make_member(cur, ws.tenant_id, f"owner-{uuid4().hex}", "owner")
+        branch = _make_branch(cur, ws)
+        # Create 4 requests with distinct step timestamps:
+        # Step 4 (newest): requested by other (visible to ws)
+        # Step 3: requested by ws (excluded for ws)
+        # Step 2: requested by ws (excluded for ws)
+        # Step 1 (oldest): requested by other (visible to ws)
+        rid1 = _make_submitted_request(cur, other, branch)
+        step1 = _make_pending_step(cur, ws.tenant_id, rid1, ws.membership_id)
+        cur.execute(
+            "update approval_step set created_at = '2026-10-01T10:00:00Z' where id = %s",
+            (step1,),
+        )
+
+        rid2 = _make_submitted_request(cur, ws, branch)
+        step2 = _make_pending_step(cur, ws.tenant_id, rid2, other.membership_id)
+        cur.execute(
+            "update approval_step set created_at = '2026-10-01T11:00:00Z' where id = %s",
+            (step2,),
+        )
+
+        rid3 = _make_submitted_request(cur, ws, branch)
+        step3 = _make_pending_step(cur, ws.tenant_id, rid3, other.membership_id)
+        cur.execute(
+            "update approval_step set created_at = '2026-10-01T12:00:00Z' where id = %s",
+            (step3,),
+        )
+
+        rid4 = _make_submitted_request(cur, other, branch)
+        step4 = _make_pending_step(cur, ws.tenant_id, rid4, ws.membership_id)
+        cur.execute(
+            "update approval_step set created_at = '2026-10-01T13:00:00Z' where id = %s",
+            (step4,),
+        )
+
+    with api_as(conn, monkeypatch, ws) as client_a:
+        page1 = client_a.get("/api/v1/approvals/pending?limit=1")
+        assert page1.status_code == 200, page1.text
+        items1 = page1.json()["items"]
+        assert len(items1) == 1
+        assert items1[0]["id"] == str(rid4)
+        cursor = page1.json()["next_cursor"]
+        assert cursor is not None
+
+        page2 = client_a.get(f"/api/v1/approvals/pending?limit=1&cursor={cursor}")
+        assert page2.status_code == 200, page2.text
+        items2 = page2.json()["items"]
+        assert len(items2) == 1
+        assert items2[0]["id"] == str(rid1)
+
+        all_ids = [item["id"] for item in items1 + items2]
+        assert all_ids == [str(rid4), str(rid1)]

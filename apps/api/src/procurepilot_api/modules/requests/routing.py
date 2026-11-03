@@ -79,7 +79,12 @@ def resolve_approver(
             None,
         )
         if alternative is not None:
-            assignee, source, delegate = alternative, "owner_fallback", None
+            alternative_delegate = _active_delegation_for(
+                alternative, delegations, as_of, removed_membership_ids
+            )
+            if alternative_delegate == requester_membership_id:
+                alternative_delegate = None
+            assignee, source, delegate = alternative, "owner_fallback", alternative_delegate
     if is_group:
         return ResolvedApproval(
             assigned_membership_id=delegate or assignee,
