@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { ApiService } from '../../../core/api/api.service';
 import type { Product } from '../../../core/api/models';
 
@@ -23,7 +23,7 @@ describe('OrderDetailComponent', () => {
     catalogue = jasmine.createSpyObj<ApiService>('ApiService', ['product']);
     catalogue.product.and.returnValue(of(product));
     api = jasmine.createSpyObj<OrdersApiService>('OrdersApiService', [
-      'getOrder', 'submitOrder', 'recordConfirmation', 'recordReceipt',
+      'getOrder', 'submitOrder', 'cancelOrder', 'recordConfirmation', 'recordReceipt',
     ]);
     api.getOrder.and.returnValue(of({
       order: {
@@ -60,6 +60,7 @@ describe('OrderDetailComponent', () => {
         backToOrders: 'Back', retry: 'Retry', loadError: 'Load failed', saveError: 'Save failed', notProvided: 'Not provided',
         status: { submitted: 'Submitted' }, evidence: { pending: 'Pending' },
         detail: {
+          errors: { order_not_open_for_evidence: 'This order cannot take delivery or confirmation evidence.' },
           eyebrow: 'Purchase order', createdAt: 'Created {{date}}', orderDate: 'Order date', expectedDelivery: 'Expected',
           total: 'Total', confirmation: 'Confirmation', receipt: 'Receipt', linesTitle: 'Lines', linesSubtitle: 'Evidence',
           ordered: 'Ordered', confirmed: 'Confirmed', received: 'Received', remaining: 'Remaining', fromRequest: 'From request', actionsTitle: 'Actions',
@@ -208,6 +209,7 @@ describe('OrderDetailComponent', () => {
     expect(input.value).toBe('25/10/2026');
 
     component.receiptReference.set('REC-888');
+    component.setQuantity('receipt', 'line-1', '2');
     api.recordReceipt.and.returnValue(of(component.evidence()!));
 
     component.recordReceipt();
@@ -287,5 +289,109 @@ describe('OrderDetailComponent', () => {
 
     const remainingText = (fixture.nativeElement as HTMLElement).querySelector('.line-remaining strong');
     expect(remainingText?.textContent?.trim()).toBe('10');
+  });
+  function showOrderAs(status: string): void {
+    api.getOrder('order-1').subscribe((value) => {
+      api.getOrder.and.returnValue(of({
+        ...value,
+        order: { ...value.order, status: status as typeof value.order.status },
+        lifecycle: { ...value.lifecycle, status: status as typeof value.lifecycle.status },
+      }));
+    }).unsubscribe();
+  }
+
+  const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const byTestId = (id: string): HTMLElement | null => el().querySelector(`[data-testid="${id}"]`);
+
+  // P-181: submitting is not undoable in the UI, so it asks first.
+  it('asks before submitting a draft order and submits only on confirmation', () => {
+    showOrderAs('draft');
+    fixture.detectChanges();
+    api.submitOrder.and.returnValue(of(fixture.componentInstance.evidence()!.order));
+
+    byTestId('submit-order')!.click();
+    fixture.detectChanges();
+
+    expect(api.submitOrder).not.toHaveBeenCalled();
+    expect(byTestId('confirm-submit')).toBeTruthy();
+
+    byTestId('confirm-submit')!.click();
+    expect(api.submitOrder).toHaveBeenCalledWith('order-1');
+  });
+
+  // P-181: the API cancels sent orders short of fully received (spec 016 FR-020).
+  it('offers cancel on sent orders that are not fully received, closed or cancelled', () => {
+    const offered: Record<string, boolean> = {};
+    for (const status of ['draft', 'submitted', 'confirmed', 'partially_received', 'received', 'closed', 'cancelled']) {
+      fixture = TestBed.createComponent(OrderDetailComponent);
+      showOrderAs(status);
+      fixture.detectChanges();
+      offered[status] = byTestId('cancel-order') !== null;
+    }
+    expect(offered).toEqual({
+      draft: true, submitted: true, confirmed: true, partially_received: true,
+      received: false, closed: false, cancelled: false,
+    });
+  });
+
+  // P-181: a failed save used to replace the whole page with a load-error card.
+  it('keeps the order and the typed receipt on screen when saving a receipt fails, and says why', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.receiptOpen.set(true);
+    component.receiptReference.set('GRN-7');
+    component.receiptDate.set('2026-10-25');
+    component.setQuantity('receipt', 'line-1', '4');
+    api.recordReceipt.and.returnValue(throwError(() => ({
+      status: 409, error: { code: 'conflict', details: { reason: 'order_not_open_for_evidence' } },
+    })));
+
+    component.recordReceipt();
+    fixture.detectChanges();
+
+    expect(byTestId('order-lines')).toBeTruthy();
+    expect(component.receiptReference()).toBe('GRN-7');
+    expect(component.quantityValue(component.receiptQuantities(), component.evidence()!.order.lines[0])).toBe('4');
+    expect(byTestId('action-error')?.getAttribute('role')).toBe('alert');
+    expect(byTestId('action-error')?.textContent).toContain('cannot take delivery or confirmation evidence');
+    expect(el().textContent).not.toContain('Load failed');
+  });
+
+  // P-180: a receipt of nothing is refused before it reaches the API.
+  it('does not save a delivery receipt that receives nothing on any line', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.receiptOpen.set(true);
+    component.receiptReference.set('GRN-0');
+    component.receiptDate.set('2026-10-25');
+    fixture.detectChanges();
+
+    component.recordReceipt();
+    fixture.detectChanges();
+    component.setQuantity('receipt', 'line-1', '0');
+    component.recordReceipt();
+    fixture.detectChanges();
+
+    expect(api.recordReceipt).not.toHaveBeenCalled();
+    expect(byTestId('receipt-quantity-error')).toBeTruthy();
+  });
+  it('clears an earlier failure message once a confirmation saves', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.receiptReference.set('GRN-7');
+    component.receiptDate.set('2026-10-25');
+    component.setQuantity('receipt', 'line-1', '4');
+    api.recordReceipt.and.returnValue(throwError(() => ({ status: 503 })));
+    component.recordReceipt();
+    fixture.detectChanges();
+    expect(byTestId('action-error')).toBeTruthy();
+
+    component.confirmationReference.set('SO-1');
+    component.onConfirmationDateChange(new Date(2026, 9, 25));
+    api.recordConfirmation.and.returnValue(of(component.evidence()!));
+    component.recordConfirmation();
+    fixture.detectChanges();
+
+    expect(byTestId('action-error')).toBeNull();
   });
 });

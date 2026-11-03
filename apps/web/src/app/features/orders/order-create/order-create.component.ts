@@ -112,6 +112,8 @@ export class OrderCreateComponent implements OnInit {
   readonly savedOrder = signal<PurchaseOrder | null>(null);
   readonly navigationFailed = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
+  // The approved request this page was opened for could not be loaded: nothing may be saved.
+  readonly sourceLoadFailed = signal(false);
   readonly sourceRequest = signal<PurchaseRequest | null>(null);
   // Currency of the supplier quote the unit prices were pre-filled from; the order must use it.
   private readonly quotedCurrency = signal<string | null>(null);
@@ -198,13 +200,16 @@ export class OrderCreateComponent implements OnInit {
   get computedTotals() {
     return () => {
       let units = 0n;
+      let taxUnits = 0n;
       const lines = this.lines.getRawValue();
       for (const line of lines) {
         units += this.lineTotalUnits(line);
+        taxUnits += moneyUnits(line.line_tax || 0);
       }
       const linesTotal = Number(units) / 10000;
       return {
         linesTotal,
+        taxTotal: Number(taxUnits) / 10000,
         orderTotal: linesTotal,
       };
     };
@@ -309,6 +314,12 @@ export class OrderCreateComponent implements OnInit {
             }
           });
         }
+      } else if (sourceRequestId && !editId && (!request || !allocations)) {
+        // Without the request there is nothing to link or to cap quantities against: refuse to
+        // fall back to a blank manual order that would be saved unlinked.
+        this.lines.clear();
+        this.sourceLoadFailed.set(true);
+        this.errorMessage.set(this.translate.instant('orders.create.sourceLoadError'));
       } else if (request && allocations) {
         this.sourceRequest.set(request);
         this.requestAllocations.set(allocations);
@@ -416,7 +427,7 @@ export class OrderCreateComponent implements OnInit {
   }
 
   submit(): void {
-    if (this.isSubmitting() || this.savedOrder() !== null || this.form.invalid || this.lines.length === 0) return;
+    if (this.isSubmitting() || this.savedOrder() !== null || this.sourceLoadFailed() || this.form.invalid || this.lines.length === 0) return;
 
     this.isSubmitting.set(true);
     this.errorMessage.set(null);
@@ -460,7 +471,8 @@ export class OrderCreateComponent implements OnInit {
       };
     });
 
-    const orderTaxAmount = value.order_tax || 0;
+    // The header tax is the sum of the line taxes, so the two can never disagree.
+    const orderTaxUnits = value.lines.reduce((sum, line) => sum + moneyUnits(line.line_tax || 0), 0n);
 
     const payload: PurchaseOrderCreate = {
       order_number: value.order_number,
@@ -468,7 +480,7 @@ export class OrderCreateComponent implements OnInit {
       order_date: formatDate(value.order_date)!,
       expected_delivery_date: formatDate(value.expected_delivery_date),
       total: { amount: formatMoneyUnits(linesTotalAmount), currency },
-      tax: { amount: orderTaxAmount.toFixed(4), currency },
+      tax: { amount: formatMoneyUnits(orderTaxUnits), currency },
       source_kind: 'manual',
       source_reference: value.order_number,
       source_request_id: this.sourceRequest()?.id || undefined,
