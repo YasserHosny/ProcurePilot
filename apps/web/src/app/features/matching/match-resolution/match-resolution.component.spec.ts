@@ -808,6 +808,34 @@ describe('MatchResolutionComponent (T039)', () => {
       expect(second[2]).not.toBe(first[2]);
     });
 
+    it('does not redraw the old line when a correction answers after the buyer moved on', () => {
+      const correction$ = new Subject<{
+        decision: MatchDecision;
+        superseded_decision_id: string;
+        lines_matched_through_old_wording: string[];
+      }>();
+      apiService.correctMatch.and.returnValue(correction$);
+      component.executeCorrection('line-99', payloadA);
+
+      apiService.getMatchTaskForLine.calls.reset();
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({ ...mockTask, id: 'task-B', quotation_line: { ...mockTask.quotation_line, id: 'line-B' } }),
+      );
+      component.loadTask('line-B');
+      apiService.getMatchTaskForLine.calls.reset();
+
+      correction$.next({
+        decision: { ...mockDecision, id: 'dec-2' },
+        superseded_decision_id: 'dec-1',
+        lines_matched_through_old_wording: ['l-1'],
+      });
+      fixture.detectChanges();
+
+      expect(apiService.getMatchTaskForLine).not.toHaveBeenCalledWith('line-99');
+      expect(component.line()?.id).toBe('line-B');
+      expect(component.dependentLinesCount()).toBe(0);
+    });
+
     it('ignores a late response for a line the buyer already left', () => {
       const a$ = new Subject<MatchTask>();
       const b$ = new Subject<MatchTask>();

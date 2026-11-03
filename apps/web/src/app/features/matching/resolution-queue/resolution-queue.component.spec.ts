@@ -778,6 +778,27 @@ describe('ResolutionQueueComponent', () => {
         );
       });
 
+      it('opens the dependent lines in the queue itself, not through a link that leaves the list unchanged', () => {
+        apiService.correctMatch.and.returnValue(
+          done({ lines_matched_through_old_wording: ['l-1'] }),
+        );
+        closeWith(requestA);
+        component.openCorrectMatchDialog(autoTask);
+        fixture.detectChanges();
+
+        const review = (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="queue-dependent-lines-review"]',
+        ) as HTMLElement | null;
+        expect(review?.tagName).toBe('BUTTON');
+
+        apiService.getMatchTasks.calls.reset();
+        review!.click();
+
+        expect(apiService.getMatchTasks).toHaveBeenCalledWith(
+          jasmine.objectContaining({ quotation_id: autoTask.quotation.id, status: 'all' }),
+        );
+      });
+
       it('ignores a second click on «Correct match» while the first is still loading', () => {
         const pending$ = new Subject<MatchTask>();
         apiService.getMatchTaskForLine.and.returnValue(pending$);
