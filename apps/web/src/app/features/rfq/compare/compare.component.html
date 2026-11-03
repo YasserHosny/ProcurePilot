@@ -151,11 +151,11 @@
   }
 
   @if (!isLoading() && responses().length > 0) {
-    @if (splitSaving()) {
+    @if (splitSaving() && splitSavingMode(); as savingMode) {
       <aside class="split-saving-hint" data-testid="split-saving-hint">
         <mat-icon class="split-saving-icon" aria-hidden="true">savings</mat-icon>
         <span class="split-saving-text">
-          {{ (isConverted() ? 'rfq.compare.splitSavingHintConverted' : 'rfq.compare.splitSavingHint') | translate: { money: splitSavingMoney() } }}
+          {{ (savingMode === 'missed' ? 'rfq.compare.splitSavingHintConverted' : 'rfq.compare.splitSavingHint') | translate: { money: splitSavingMoney() } }}
         </span>
       </aside>
     }
