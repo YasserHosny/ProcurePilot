@@ -601,6 +601,24 @@ describe('ResolutionQueueComponent', () => {
       expect(summary?.textContent).toContain('Quotations: 2');
     });
 
+    it('keeps one summary live region in the page across loads and reports zero results', () => {
+      const summary = (): HTMLElement | null =>
+        (fixture.nativeElement as HTMLElement).querySelector('[data-testid="queue-result-summary"]');
+      const first = summary();
+      expect(first).withContext('present with results').toBeTruthy();
+
+      component.isLoading.set(true);
+      fixture.detectChanges();
+      expect(summary()).withContext('same element while loading').toBe(first);
+      expect(summary()?.textContent?.trim()).withContext('silent while loading').toBe('');
+
+      component.tasks.set([]);
+      component.isLoading.set(false);
+      fixture.detectChanges();
+      expect(summary()).withContext('same element at zero results').toBe(first);
+      expect(summary()?.textContent).toContain('Lines shown: 0');
+    });
+
     it('makes the full quotation id reachable without a mouse', () => {
       const badge = (fixture.nativeElement as HTMLElement).querySelector('.quotation-badge')!;
       expect(badge.getAttribute('tabindex')).toBe('0');
