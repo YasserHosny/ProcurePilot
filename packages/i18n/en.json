@@ -2490,7 +2490,31 @@
       "summary": "Split from RFQ {{short}} · {{requests}} · {{total}} · saves {{saving}}",
       "summaryNoSaving": "Split from RFQ {{short}} · {{requests}} · {{total}}",
       "splitFromRfq": "Split from RFQ {{short}}",
-      "saves": "saves {{saving}}"
+      "saves": "saves {{saving}}",
+      "loadingSiblings": "Loading the rest of this split…",
+      "siblingsError": "Failed to load the rest of this split.",
+      "retry": "Retry"
+    },
+    "pagination": {
+      "loadMore": "Load more",
+      "loading": "Loading...",
+      "showing": {
+        "zero": "Showing 0 requests",
+        "one": "Showing 1 request",
+        "two": "Showing 2 requests",
+        "few": "Showing {{count}} requests",
+        "many": "Showing {{count}} requests",
+        "other": "Showing {{count}} requests"
+      },
+      "showingMore": {
+        "zero": "Showing 0 requests, more available",
+        "one": "Showing 1 request, more available",
+        "two": "Showing 2 requests, more available",
+        "few": "Showing {{count}} requests, more available",
+        "many": "Showing {{count}} requests, more available",
+        "other": "Showing {{count}} requests, more available"
+      },
+      "loadError": "Unable to load more requests. Please try again."
     },
     "requestCount": {
       "zero": "{{count}} requests",

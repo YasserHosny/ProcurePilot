@@ -153,7 +153,7 @@
                   color="primary"
                   type="button"
                   class="approve-btn"
-                  [disabled]="isProcessing(row.id)"
+                  [disabled]="isDecisionDisabled(row)"
                   (click)="isGroupRow(row) ? openGroupDecisionDialog(row, 'approve') : openDecisionDialog(row.request, 'approve')"
                 >
                   <mat-icon aria-hidden="true">check</mat-icon>
@@ -163,13 +163,34 @@
                   mat-stroked-button
                   type="button"
                   class="reject-btn pp-danger"
-                  [disabled]="isProcessing(row.id)"
+                  [disabled]="isDecisionDisabled(row)"
                   (click)="isGroupRow(row) ? openGroupDecisionDialog(row, 'reject') : openDecisionDialog(row.request, 'reject')"
                 >
                   <mat-icon aria-hidden="true">close</mat-icon>
                   <span>{{ 'approvals.actions.reject' | translate }}</span>
                 </button>
               </div>
+              @if (isGroupRow(row)) {
+                @if (isGroupLoading(row.groupId)) {
+                  <div class="group-loading-hint" data-testid="split-group-loading">
+                    <mat-spinner diameter="14" [attr.aria-label]="'approvals.splitGroup.loadingSiblings' | translate"></mat-spinner>
+                    <span>{{ 'approvals.splitGroup.loadingSiblings' | translate }}</span>
+                  </div>
+                } @else if (isGroupFailed(row.groupId)) {
+                  <div class="group-error-hint" data-testid="split-group-error">
+                    <span class="group-error-text">{{ 'approvals.splitGroup.siblingsError' | translate }}</span>
+                    <button
+                      type="button"
+                      mat-button
+                      class="group-retry-btn"
+                      data-testid="split-group-retry"
+                      (click)="retryLoadGroup(row)"
+                    >
+                      {{ 'approvals.splitGroup.retry' | translate }}
+                    </button>
+                  </div>
+                }
+              }
             </td>
           </ng-container>
 
@@ -267,6 +288,30 @@
             [class.detail-row-collapsed]="!isExpanded(row.id)"
           ></tr>
         </table>
+      </div>
+
+      <div class="pagination-footer">
+        <div class="pagination-status" aria-live="polite" aria-atomic="true" data-testid="pagination-status">
+          {{ paginationStatusText() }}
+        </div>
+        @if (nextCursor()) {
+          <button
+            mat-stroked-button
+            type="button"
+            class="load-more-btn"
+            data-testid="load-more-btn"
+            [disabled]="isLoadingMore()"
+            (click)="loadMore()"
+          >
+            @if (isLoadingMore()) {
+              <mat-spinner diameter="18" [attr.aria-label]="'approvals.pagination.loading' | translate"></mat-spinner>
+              <span>{{ 'approvals.pagination.loading' | translate }}</span>
+            } @else {
+              <mat-icon aria-hidden="true">expand_more</mat-icon>
+              <span>{{ 'approvals.pagination.loadMore' | translate }}</span>
+            }
+          </button>
+        }
       </div>
     }
   </mat-card>
