@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HistoryComponent } from './history.component';
-import { RfqApi, RfqSummary, RfqList, RfqSendResponse } from '../rfq-api';
+import { RfqApi, RfqSummary, RfqList, RfqSendResponse, RfqDetail } from '../rfq-api';
 import { Router, provideRouter } from '@angular/router';
 import { of, throwError, Subject } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -10,8 +10,6 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
-import { By } from '@angular/platform-browser';
-import { MatMenu } from '@angular/material/menu';
 import { SessionService } from '../../../core/auth/session.service';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { ApiService } from '../../../core/api/api.service';
@@ -540,8 +538,12 @@ describe('HistoryComponent', () => {
     expect(component.onRowClick).not.toHaveBeenCalled();
     expect(rfqApiSpy.getRfq).toHaveBeenCalledWith('rfq-draft-1');
 
-    // Second click should use cache
+    // Close and reopen: the second opening should use the cached response.
+    fixture.detectChanges();
     recipientButtons[0].click();
+    fixture.detectChanges();
+    recipientButtons[0].click();
+    fixture.detectChanges();
     expect(rfqApiSpy.getRfq).toHaveBeenCalledTimes(1);
   });
 
@@ -796,27 +798,93 @@ describe('HistoryComponent', () => {
     }
   });
 
-  it('applies recipients-popover-menu panel class to recipients mat-menu', async () => {
+  async function openRecipientsPopover(): Promise<HTMLButtonElement> {
     fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    const menuDebugEls = fixture.debugElement.queryAll(By.directive(MatMenu));
-    const recipientsMatMenu = menuDebugEls
-      .map((debugEl) => debugEl.componentInstance as MatMenu)
-      .find((menu) => menu.panelClass?.includes('recipients-popover-menu'));
-    expect(recipientsMatMenu).toBeDefined();
-
-    const recipientButtons = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+    const trigger = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
       '[data-testid="rfq-recipients-button"]',
-    );
-    expect(recipientButtons.length).toBeGreaterThan(0);
-    recipientButtons[0].click();
+    )!;
+    trigger.focus();
+    trigger.click();
     fixture.detectChanges();
     await fixture.whenStable();
+    fixture.detectChanges();
+    return trigger;
+  }
 
-    const panel = document.querySelector('.mat-mdc-menu-panel.recipients-popover-menu');
-    expect(panel).not.toBeNull();
+  it('opens a named dialog disclosure and moves focus inside', async () => {
+    const trigger = await openRecipientsPopover();
+    const dialog = document.querySelector<HTMLElement>('.recipients-popover[role="dialog"]')!;
+    expect(dialog).not.toBeNull();
+    expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(trigger.getAttribute('aria-controls')).toBe(dialog.id);
+    const title = document.getElementById(dialog.getAttribute('aria-labelledby')!);
+    expect(title?.textContent).toContain('3 suppliers');
+    expect(dialog.contains(document.activeElement)).toBeTrue();
+    expect(dialog.querySelector('[role="menuitem"]')).toBeNull();
+    expect(dialog.querySelector('.status-dot')?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('names and positions the recipients dialog in Arabic', async () => {
+    TestBed.inject(TranslateService).use('ar');
+    await openRecipientsPopover();
+    const dialog = document.querySelector<HTMLElement>('.recipients-popover')!;
+    const title = document.getElementById(dialog.getAttribute('aria-labelledby')!);
+    expect(title?.textContent?.trim()).toBe(arCatalog.rfq.history.recipientsDraftHeader.replace('{{count}}', '3'));
+    expect(dialog.closest('[dir]')?.getAttribute('dir')).toBe('rtl');
+  });
+
+  it('closes on Escape and restores focus to the trigger', async () => {
+    const trigger = await openRecipientsPopover();
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(document.querySelector('.recipients-popover')).toBeNull();
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('keeps the footer link in the dialog tab order and focus trap', async () => {
+    await openRecipientsPopover();
+    const dialog = document.querySelector<HTMLElement>('.recipients-popover')!;
+    const link = dialog.querySelector<HTMLAnchorElement>('.view-all-link')!;
+    expect(link.textContent).toContain('View all recipients');
+    expect(link.getAttribute('href')).toBe('/rfq/rfq-draft-1?tab=recipients');
+    expect(link.tabIndex).toBe(0);
+    // Synthetic Tab events cannot invoke browser navigation in Karma. Exercise the
+    // focus trap's end anchor to verify its first tabbable target is the footer.
+    const endAnchor = dialog.nextElementSibling as HTMLElement;
+    expect(endAnchor.classList.contains('cdk-focus-trap-anchor')).toBeTrue();
+    endAnchor.focus();
+    expect(document.activeElement).toBe(link);
+  });
+
+  it('closes on an outside click and restores focus to the trigger', async () => {
+    const trigger = await openRecipientsPopover();
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(document.querySelector('.recipients-popover')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('renders the loading spinner while recipients are pending', async () => {
+    const pending = new Subject<RfqDetail>();
+    rfqApiSpy.getRfq.and.returnValue(pending);
+    await openRecipientsPopover();
+    const spinner = document.querySelector('.recipients-popover mat-spinner');
+    expect(spinner?.getAttribute('aria-label')).toBe('Loading recipients');
+    expect(document.querySelector('.recipients-popover .recipient-row')).toBeNull();
+    expect(document.querySelector('.recipients-popover .view-all-link')).not.toBeNull();
+  });
+
+  it('renders the recipients error inside the open dialog', async () => {
+    rfqApiSpy.getRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+    await openRecipientsPopover();
+    const error = document.querySelector('.recipients-popover [role="alert"]');
+    expect(error?.textContent?.trim()).toBe(enCatalog.rfq.history.recipientsLoadError);
+    expect(document.querySelector('.recipients-popover mat-spinner')).toBeNull();
+    expect(document.querySelector('.recipients-popover .view-all-link')).not.toBeNull();
   });
 
   describe('Responsive columns (PPS-94)', () => {

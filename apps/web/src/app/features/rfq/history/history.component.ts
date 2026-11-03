@@ -1,4 +1,7 @@
 import { Component, OnInit, inject, signal, computed, DestroyRef, ChangeDetectionStrategy } from '@angular/core';
+import { BidiModule } from '@angular/cdk/bidi';
+import { A11yModule } from '@angular/cdk/a11y';
+import { OverlayModule, ConnectedPosition } from '@angular/cdk/overlay';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -45,6 +48,9 @@ export interface RecipientsCacheEntry {
   standalone: true,
   imports: [
     CommonModule,
+    A11yModule,
+    BidiModule,
+    OverlayModule,
     RouterModule,
     MatCardModule,
     MatTableModule,
@@ -100,6 +106,44 @@ export class HistoryComponent implements OnInit {
   readonly nextCursor = signal<string | null>(null);
   private listGeneration = 0;
   readonly recipientsCache = signal<Record<string, RecipientsCacheEntry>>({});
+
+  readonly openRecipientsId = signal<string | null>(null);
+  private recipientsTrigger: HTMLButtonElement | null = null;
+  readonly recipientsPositions: ConnectedPosition[] = [
+    { originX: 'end', originY: 'bottom', overlayX: 'end', overlayY: 'top', offsetY: 8 },
+    { originX: 'end', originY: 'top', overlayX: 'end', overlayY: 'bottom', offsetY: -8 },
+  ];
+
+  get recipientsDirection(): 'rtl' | 'ltr' {
+    return (this.translate.getCurrentLang() || this.session.activeLocale()) === 'ar' ? 'rtl' : 'ltr';
+  }
+
+  toggleRecipients(rfq: RfqSummary, trigger: HTMLButtonElement): void {
+    if (this.openRecipientsId() === rfq.id) {
+      this.closeRecipients();
+      return;
+    }
+    this.recipientsTrigger = trigger;
+    trigger.focus();
+    this.openRecipientsId.set(rfq.id);
+    this.loadRecipients(rfq.id);
+  }
+
+  closeRecipients(rfqId = this.openRecipientsId()): void {
+    // A previous row can detach after another disclosure has opened.
+    if (rfqId !== this.openRecipientsId()) return;
+    this.openRecipientsId.set(null);
+    this.recipientsTrigger?.focus();
+    this.recipientsTrigger = null;
+  }
+
+  onRecipientsKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      this.closeRecipients();
+    }
+  }
 
   readonly timeFormatOptions: Intl.DateTimeFormatOptions = { timeStyle: 'short' };
 
