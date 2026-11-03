@@ -152,6 +152,7 @@ paths:
         system-originated approval path.
       parameters:
         - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         content:
           application/json:
@@ -172,6 +173,7 @@ paths:
       description: Same authorisation rule as approve (FR-007).
       parameters:
         - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         content:
           application/json:
