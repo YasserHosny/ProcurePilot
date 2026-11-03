@@ -11,6 +11,16 @@
         <a mat-flat-button class="pilot-primary-btn" [href]="mailtoLink()">
           {{ 'landing.pilot.cta' | translate }}
         </a>
+        <a
+          mat-stroked-button
+          class="pilot-whatsapp-btn"
+          [href]="whatsappLink()"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <mat-icon aria-hidden="true">chat</mat-icon>
+          <span>{{ 'landing.pilot.whatsappCta' | translate }}</span>
+        </a>
       </div>
       <div class="pilot-email-row">
         <span class="pilot-email-text">
