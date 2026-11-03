@@ -4196,7 +4196,12 @@
       "prepareErrorNoPricingForRfqProducts": "لا يتضمن هذا الرد أسعاراً للمنتجات المطلوبة في طلب عروض الأسعار.",
       "prepareErrorQuotationArchived": "تمت أرشفة عرض السعر هذا ولا يمكن تحويله إلى طلب شراء.",
       "prepareErrorQuotationRefused": "رُفض عرض السعر هذا ولا يمكن استخدامه لإعداد طلب شراء.",
-      "prepareErrorMixedCurrencies": "الأسعار في هذا الرد واردة بأكثر من عملة واحدة."
+      "prepareErrorMixedCurrencies": "الأسعار في هذا الرد واردة بأكثر من عملة واحدة.",
+      "prepareErrorRfqExpired": "انتهت صلاحية طلب عرض الأسعار هذا ولا يمكن تجهيز طلبات منه.",
+      "expiredNotice": "انتهت صلاحية طلب عرض الأسعار هذا — لم يعد بالإمكان تجهيز طلبات منه",
+      "rfqExpired": "انتهت صلاحية طلب عرض الأسعار",
+      "branchesLoadError": "فشل تحميل الفروع.",
+      "rfqDetailLoadError": "فشل تحميل تفاصيل طلب عرض الأسعار."
     },
     "history": {
       "title": "سجل طلبات عروض الأسعار",
@@ -4298,6 +4303,7 @@
       "tabItems": "البنود",
       "tabRecipients": "المستلمون ({{count}})",
       "tabResponses": "الردود ({{count}})",
+      "tabResponsesNoCount": "الردود",
       "statusLabel": "الحالة",
       "sentAtLabel": "تاريخ الإرسال",
       "neededByLabel": "مطلوب بحلول",
@@ -4369,7 +4375,9 @@
       "confirmRetryTitle": "إعادة إرسال للمستلمين الذين لم يستلموا",
       "confirmRetryMessage": "هل تريد إعادة إرسال طلب عرض الأسعار هذا إلى {{count}} من الموردين الذين لم يستلموه؟",
       "confirmRetryButton": "إعادة المحاولة للمستلمين الذين لم يستلموا",
-      "cancelRetryButton": "إلغاء"
+      "cancelRetryButton": "إلغاء",
+      "rfqExpiredError": "انتهت صلاحية طلب عرض الأسعار هذا ولم يعد بالإمكان إرساله.",
+      "notSendableError": "لا يمكن إرسال طلب عرض الأسعار هذا في حالته الحالية."
     },
     "guardrails": {
       "title": "إعدادات الضوابط",

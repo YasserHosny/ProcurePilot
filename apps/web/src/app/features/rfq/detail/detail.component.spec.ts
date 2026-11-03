@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter, Router, ActivatedRoute, convertToParamMap } from '@angular/router';
@@ -1034,5 +1034,103 @@ describe('DetailComponent (RFQ Details)', () => {
         }
       });
     });
+  });
+
+  describe('PPS-180: Resilient and honest RFQ Detail', () => {
+    it('non-404 error shows Retry + back link and Retry reloads', fakeAsync(() => {
+      rfqApiSpy.getRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+      component.loadRfq('rfq-error-500');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const errorEl = compiled.querySelector('.error-state');
+      expect(errorEl).not.toBeNull();
+      expect(errorEl?.getAttribute('role')).toBe('alert');
+      expect(errorEl?.textContent).toContain('Failed to load RFQ details.');
+
+      const retryBtn = errorEl?.querySelector<HTMLButtonElement>('[data-testid="rfq-detail-retry-button"]');
+      expect(retryBtn).not.toBeNull();
+      expect(retryBtn?.textContent?.trim()).toBe('Retry');
+
+      const backLink = errorEl?.querySelector<HTMLAnchorElement>('.back-link');
+      expect(backLink).not.toBeNull();
+      expect(backLink?.textContent?.trim()).toBe('Back to RFQ History');
+      expect(backLink?.getAttribute('routerLink') ?? backLink?.getAttribute('href')).toBe('/rfq/history');
+
+      // Now retry reloads
+      rfqApiSpy.getRfq.and.returnValue(of(mockSentDetail));
+      retryBtn?.click();
+      fixture.detectChanges();
+
+      expect(rfqApiSpy.getRfq).toHaveBeenCalledWith('rfq-error-500');
+      expect(component.rfqDetail()).toEqual(mockSentDetail);
+      expect(compiled.querySelector('.error-state')).toBeNull();
+    }));
+
+    it('switching ids A -> B with A response delayed shows only B data', fakeAsync(() => {
+      const subjectA = new Subject<RfqDetail>();
+      const subjectB = new Subject<RfqDetail>();
+
+      rfqApiSpy.getRfq.and.callFake((id: string) => {
+        if (id === 'rfq-A') return subjectA;
+        if (id === 'rfq-B') return subjectB;
+        return of(mockSentDetail);
+      });
+
+      component.loadRfq('rfq-A');
+      fixture.detectChanges();
+
+      expect(component.loading()).toBeTrue();
+      expect(component.rfqDetail()).toBeNull();
+
+      component.loadRfq('rfq-B');
+      fixture.detectChanges();
+
+      expect(component.loading()).toBeTrue();
+      expect(component.rfqDetail()).toBeNull();
+
+      // B responds first
+      const detailB: RfqDetail = {
+        ...mockSentDetail,
+        rfq: { ...mockSentDetail.rfq, id: 'rfq-B' },
+      };
+      subjectB.next(detailB);
+      subjectB.complete();
+      fixture.detectChanges();
+
+      expect(component.rfqDetail()?.rfq.id).toBe('rfq-B');
+
+      // A delayed response arrives now
+      const detailA: RfqDetail = {
+        ...mockSentDetail,
+        rfq: { ...mockSentDetail.rfq, id: 'rfq-A' },
+      };
+      subjectA.next(detailA);
+      subjectA.complete();
+      fixture.detectChanges();
+
+      expect(component.rfqDetail()?.rfq.id).toBe('rfq-B');
+    }));
+
+    it('failed responses request renders tab label without a number', fakeAsync(() => {
+      const failedDetail = {
+        ...mockSentDetail,
+        rfq: { ...mockSentDetail.rfq, id: 'rfq-sent-failed' },
+      };
+      rfqApiSpy.getRfq.and.returnValue(of(failedDetail));
+      rfqApiSpy.listResponses.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+
+      component.loadRfq('rfq-sent-failed');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const tabLabels = compiled.querySelectorAll('.mat-mdc-tab .mdc-tab__text-label');
+      const texts = Array.from(tabLabels).map((el) => el.textContent?.trim());
+
+      expect(texts.some((t) => t === 'Responses')).toBeTrue();
+      expect(texts.some((t) => t?.includes('Responses ('))).toBeFalse();
+    }));
   });
 });
