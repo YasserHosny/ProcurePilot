@@ -15,9 +15,9 @@
 
     <!-- Candidate choices -->
     <section class="candidates-choice-section">
-      <h3 class="section-title">{{ 'matching.resolution.correction.candidatesTitle' | translate }}</h3>
+      <h3 class="section-title" id="candidates-title">{{ 'matching.resolution.correction.candidatesTitle' | translate }}</h3>
 
-      <div class="candidates-list" role="radiogroup">
+      <div class="candidates-list" role="radiogroup" aria-labelledby="candidates-title">
         @for (cand of data.candidates; track cand.id) {
           <label
             class="dialog-candidate-item"

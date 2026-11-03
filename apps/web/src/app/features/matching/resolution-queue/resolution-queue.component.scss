@@ -9,10 +9,60 @@
   margin: 0 auto;
 }
 
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 .read-only-banner {
   .banner-icon { color: var(--pp-success); }
   .banner-title { font-weight: 600; font-size: 0.9rem; }
   .banner-text { font-size: 0.825rem; color: var(--pp-success); }
+}
+
+.error-banner {
+  .error-content {
+    flex: 1;
+  }
+
+  .retry-btn {
+    margin-inline-start: auto;
+    align-self: center;
+  }
+}
+
+.dependent-lines-banner,
+.alias-conflict-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: var(--pp-info-container);
+  color: var(--pp-info);
+  border: 1px solid var(--pp-info);
+
+  .banner-content {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+.banner-link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  margin-inline-start: 0.5rem;
 }
 
 .filter-card,

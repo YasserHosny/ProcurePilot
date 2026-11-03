@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import NamedTuple
@@ -10,6 +11,7 @@ from uuid import UUID, uuid4
 
 import psycopg
 from postgrest.exceptions import APIError
+from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from supabase import Client
@@ -56,6 +58,7 @@ from procurepilot_api.modules.requests.schemas import (
     PurchaseRequest,
     PurchaseRequestCreate,
     PurchaseRequestLine,
+    PurchaseRequestLineInput,
     PurchaseRequestList,
     PurchaseRequestStatus,
     PurchaseRequestUpdate,
@@ -157,6 +160,108 @@ class RequestsService:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
 
+    def _validate_request_lines(self, lines: Sequence[PurchaseRequestLineInput]) -> None:
+        seen: set[UUID] = set()
+        for i, line in enumerate(lines):
+            try:
+                qty = Decimal(str(line.quantity))
+            except Exception:
+                raise UnprocessableEntityError(
+                    details={"field": f"lines[{i}].quantity", "reason": "quantity_not_positive"}
+                ) from None
+            if qty <= Decimal("0") or qty.as_tuple().exponent < -6:
+                raise UnprocessableEntityError(
+                    details={"field": f"lines[{i}].quantity", "reason": "quantity_not_positive"}
+                )
+            if line.workspace_product_id in seen:
+                raise UnprocessableEntityError(
+                    details={
+                        "field": f"lines[{i}].workspace_product_id",
+                        "reason": "duplicate_product",
+                    }
+                )
+            seen.add(line.workspace_product_id)
+
+    def _validate_required_by_date(self, req_date: date) -> None:
+        if req_date < datetime.now(UTC).date():
+            raise UnprocessableEntityError(
+                details={"field": "required_by_date", "reason": "required_by_in_the_past"}
+            )
+
+    def _validate_products_exist(
+        self, client: Client, *, lines: Sequence[PurchaseRequestLineInput]
+    ) -> None:
+        product_ids = [str(line.workspace_product_id) for line in lines]
+        if not product_ids:
+            return
+        try:
+            response = (
+                client.table("workspace_product")
+                .select("id")
+                .in_("id", list(dict.fromkeys(product_ids)))
+                .execute()
+            )
+            found_ids = {str(row["id"]) for row in (response.data or [])}
+        except Exception as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+        for i, line in enumerate(lines):
+            if str(line.workspace_product_id) not in found_ids:
+                raise UnprocessableEntityError(
+                    details={
+                        "field": f"lines[{i}].workspace_product_id",
+                        "reason": "product_not_found",
+                    }
+                )
+
+    def _validate_cost_centre_branch(
+        self, client: Client, *, cost_centre_id: UUID, branch_id: UUID
+    ) -> None:
+        try:
+            response = (
+                client.table("cost_centre")
+                .select("id,branch_id")
+                .eq("id", str(cost_centre_id))
+                .execute()
+            )
+        except Exception as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        if not response.data:
+            raise UnprocessableEntityError(
+                details={"field": "cost_centre_id", "reason": "cost_centre_not_found"}
+            )
+        cc = response.data[0]
+        cc_branch_id = cc.get("branch_id")
+        if cc_branch_id is not None and str(cc_branch_id) != str(branch_id):
+            raise UnprocessableEntityError(
+                details={"field": "cost_centre_id", "reason": "cost_centre_branch_mismatch"}
+            )
+
+    def _insert_lines_db(
+        self, cur: psycopg.Cursor, *, rows: list[dict[str, object]]
+    ) -> list[dict[str, object]]:
+        if not rows:
+            return []
+        keys = list(rows[0])
+        query = sql.SQL(
+            "insert into purchase_request_line ({cols}) values {vals} returning {ret}"
+        ).format(
+            cols=sql.SQL(", ").join(sql.Identifier(k) for k in keys),
+            vals=sql.SQL(", ").join(
+                sql.SQL("({})").format(
+                    sql.SQL(", ").join(sql.Placeholder(f"{k}_{i}") for k in keys)
+                )
+                for i in range(len(rows))
+            ),
+            ret=sql.SQL(LINE_COLUMNS),
+        )
+        params: dict[str, object] = {}
+        for i, r in enumerate(rows):
+            for k in keys:
+                params[f"{k}_{i}"] = r[k]
+        cur.execute(query, params)
+        return cur.fetchall()
+
     def create_request(
         self,
         *,
@@ -172,65 +277,137 @@ class RequestsService:
         same fix `low_stock_report` already had for this exact class of problem, applied here
         because a lost response otherwise let a client retry create a second draft (FR-011).
         """
+        client = authenticated_client(self._settings, bearer_token)
+
+        # 0. Idempotent replay BEFORE validation: an existing (tenant, key) request is resolved
+        # and replayed without re-running validations (e.g. required_by_date, product existence).
+        if idempotency_key is not None:
+            replay = self._find_idempotent_replay(
+                client=client, member=member, idempotency_key=idempotency_key
+            )
+            if replay is not None:
+                return replay, False
+
+        # 1. Validation BEFORE any write and BEFORE estimate lookup
+        self._validate_required_by_date(payload.required_by_date)
+        self._validate_request_lines(payload.lines)
+
+        self._authorize_branch_for_write(client, member=member, branch_id=payload.branch_id)
+        if payload.cost_centre_id is not None:
+            self._validate_cost_centre_branch(
+                client, cost_centre_id=payload.cost_centre_id, branch_id=payload.branch_id
+            )
+        self._validate_products_exist(client, lines=payload.lines)
+
+        # 2. Estimates & Totals
         product_ids = [line.workspace_product_id for line in payload.lines]
         estimates = self._estimate_products(product_ids)
         quantities = [line.quantity for line in payload.lines]
         total_amount, total_currency, has_incomplete = _compute_totals(quantities, estimates)
-
-        client = authenticated_client(self._settings, bearer_token)
-        self._authorize_branch_for_write(client, member=member, branch_id=payload.branch_id)
-        row_data: dict[str, object] = {
-            "tenant_id": str(member.tenant_id),
-            "branch_id": str(payload.branch_id),
-            "cost_centre_id": (
-                str(payload.cost_centre_id) if payload.cost_centre_id is not None else None
-            ),
-            "requested_by_membership_id": str(member.membership_id),
-            "required_by_date": payload.required_by_date.isoformat(),
-            "status": "draft",
-            "estimated_total_amount": (
-                _format_decimal(total_amount, scale=4) if total_amount is not None else None
-            ),
-            "estimated_total_currency": total_currency,
-            "has_incomplete_estimate": has_incomplete,
-        }
-        if idempotency_key is not None:
-            row_data["idempotency_key"] = str(idempotency_key)
-
-        try:
-            response = client.table("purchase_request").insert(row_data).execute()
-        except APIError as exc:
-            if idempotency_key is not None and _api_error_code(exc) == "23505":
-                existing_row = self._fetch_request_by_idempotency_key(
-                    client, idempotency_key=idempotency_key
-                )
-                rid = str(existing_row["id"])
-                existing_lines = self._fetch_lines_for(client, rid)
-                existing_step = self._fetch_step(client, rid)
-                return (
-                    self._purchase_request_with_budget_status(
-                        client, existing_row, existing_lines, existing_step
-                    ),
-                    False,
-                )
-            raise _write_error(exc) from exc
-
-        request_row = _one_row(response.data, reason="request_write_failed")
-        request_id = str(request_row["id"])
-
-        line_rows = self._insert_lines(
-            client,
-            tenant_id=str(member.tenant_id),
-            request_id=request_id,
-            payload_lines=payload.lines,
-            estimates=estimates,
+        pack_quantities = self._fetch_pack_quantities_batch(
+            client, [str(pid) for pid in product_ids]
         )
 
+        request_id = uuid4()
+        claims = {
+            "sub": str(member.user_id),
+            "tenant_id": str(member.tenant_id),
+            "role": "authenticated",
+            "member_role": member.role.value,
+        }
+        lock_id = (
+            member.tenant_id.int ^ (idempotency_key.int if idempotency_key else request_id.int)
+        ) & 0x7FFFFFFFFFFFFFFF
+
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute("set local role authenticated")
+                    cur.execute(
+                        "select set_config('request.jwt.claims', %s, true)",
+                        (json.dumps(claims),),
+                    )
+                    cur.execute("select pg_advisory_xact_lock(%s)", (lock_id,))
+
+                    cur.execute(
+                        f"""
+                        insert into purchase_request (
+                            id, tenant_id, branch_id, cost_centre_id,
+                            requested_by_membership_id, required_by_date, status,
+                            estimated_total_amount, estimated_total_currency,
+                            has_incomplete_estimate, idempotency_key
+                        ) values (
+                            %s, %s, %s, %s, %s,
+                            %s, 'draft', %s, %s,
+                            %s, %s
+                        ) returning {REQUEST_COLUMNS}
+                        """,
+                        (
+                            request_id,
+                            member.tenant_id,
+                            payload.branch_id,
+                            payload.cost_centre_id,
+                            member.membership_id,
+                            payload.required_by_date.isoformat(),
+                            (
+                                _format_decimal(total_amount, scale=4)
+                                if total_amount is not None
+                                else None
+                            ),
+                            total_currency,
+                            has_incomplete,
+                            str(idempotency_key) if idempotency_key else None,
+                        ),
+                    )
+                    request_row = cur.fetchone()
+                    if request_row is None:
+                        raise ServiceUnavailableError(details={"dependency": "database"})
+
+                    line_data = [
+                        {
+                            "id": uuid4(),
+                            "tenant_id": member.tenant_id,
+                            "purchase_request_id": request_id,
+                            "workspace_product_id": line.workspace_product_id,
+                            "position": pos,
+                            "quantity": line.quantity,
+                            "pack_base_quantity": pack_quantities.get(
+                                str(line.workspace_product_id)
+                            ),
+                            "note": line.note,
+                            "estimated_unit_price_amount": (
+                                _format_decimal(est.unit_price_amount, scale=4)
+                                if est.unit_price_amount is not None
+                                else None
+                            ),
+                            "estimated_unit_price_currency": est.unit_price_currency,
+                            "estimated_unit_price_source_landed_cost_id": (
+                                est.source_landed_cost_id
+                                if est.source_landed_cost_id is not None
+                                else None
+                            ),
+                        }
+                        for pos, (line, est) in enumerate(
+                            zip(payload.lines, estimates, strict=True)
+                        )
+                    ]
+                    line_rows = self._insert_lines_db(cur, rows=line_data)
+
+        except psycopg.Error as exc:
+            if idempotency_key is not None and getattr(exc, "sqlstate", None) == "23505":
+                replay = self._find_idempotent_replay(
+                    client=client, member=member, idempotency_key=idempotency_key
+                )
+                if replay is not None:
+                    return replay, False
+            raise _map_psycopg_error(exc) from exc
+
+        rid = str(request_id)
         self._record(
             bearer_token=bearer_token,
             member=member,
             action="requests.purchase_request_created",
-            target={"purchase_request_id": request_id},
+            target={"purchase_request_id": rid},
         )
         return (
             self._purchase_request_with_budget_status(
@@ -238,6 +415,56 @@ class RequestsService:
             ),
             True,
         )
+
+    def _find_idempotent_replay(
+        self,
+        *,
+        client: Client,
+        member: CurrentMember,
+        idempotency_key: UUID,
+    ) -> PurchaseRequest | None:
+        claims = {
+            "sub": str(member.user_id),
+            "tenant_id": str(member.tenant_id),
+            "role": "authenticated",
+            "member_role": member.role.value,
+        }
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute("set local role authenticated")
+                    cur.execute(
+                        "select set_config('request.jwt.claims', %s, true)",
+                        (json.dumps(claims),),
+                    )
+                    cur.execute(
+                        f"select {REQUEST_COLUMNS} from purchase_request "
+                        "where tenant_id = %s and idempotency_key = %s",
+                        (member.tenant_id, str(idempotency_key)),
+                    )
+                    existing_row = cur.fetchone()
+                    if existing_row is None:
+                        return None
+
+                    rid = str(existing_row["id"])
+                    cur.execute(
+                        f"select {LINE_COLUMNS} from purchase_request_line "
+                        "where tenant_id = %s and purchase_request_id = %s "
+                        "order by position, created_at, id",
+                        (member.tenant_id, rid),
+                    )
+                    existing_lines = cur.fetchall()
+                    cur.execute(
+                        f"select {STEP_COLUMNS} from approval_step "
+                        "where tenant_id = %s and purchase_request_id = %s limit 1",
+                        (member.tenant_id, rid),
+                    )
+                    existing_step = cur.fetchone()
+                    return self._purchase_request_with_budget_status(
+                        client, existing_row, existing_lines, existing_step
+                    )
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def _fetch_request_by_idempotency_key(
         self, client: Client, *, idempotency_key: UUID
@@ -580,30 +807,36 @@ class RequestsService:
     ) -> PurchaseRequestList:
         client = authenticated_client(self._settings, bearer_token)
         capped = _cap_limit(limit)
-        offset = _decode_cursor(cursor)
+        boundary = _decode_approval_cursor(cursor)
 
         try:
             query = (
                 client.table("approval_step")
-                .select(f"{STEP_COLUMNS},purchase_request!inner(status)")
+                .select(f"{STEP_COLUMNS},created_at,purchase_request!inner(status)")
                 .eq("status", "pending")
             )
             for status in TERMINAL_REQUEST_STATUSES:
                 query = query.neq("purchase_request.status", status)
             if member.role is not MemberRole.owner:
                 query = query.eq("assigned_membership_id", str(member.membership_id))
-            response = (
-                query.order("created_at", desc=True)
-                .order("id")
-                .range(offset, offset + capped)
-                .execute()
-            )
+            if boundary is not None:
+                created_at, step_id = boundary
+                query = query.or_(
+                    f"created_at.lt.{created_at},and(created_at.eq.{created_at},id.gt.{step_id})"
+                )
+            response = query.order("created_at", desc=True).order("id").range(0, capped).execute()
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
         step_rows = _rows(response.data)
         visible_steps = step_rows[:capped]
-        next_cursor = _encode_cursor(offset + capped) if len(step_rows) > capped else None
+        next_cursor = (
+            _encode_approval_cursor(
+                str(visible_steps[-1]["created_at"]), UUID(str(visible_steps[-1]["id"]))
+            )
+            if len(step_rows) > capped
+            else None
+        )
         if not visible_steps:
             return PurchaseRequestList(items=[], next_cursor=next_cursor)
 
@@ -787,75 +1020,177 @@ class RequestsService:
         patch: PurchaseRequestUpdate,
     ) -> PurchaseRequest:
         client = authenticated_client(self._settings, bearer_token)
-        existing = self._fetch_request(client, request_id)
-        _require_ungrouped(existing)
 
-        if str(existing["status"]) != "draft":
-            raise ConflictError(details={"reason": "not_draft"})
-        _require_requester(existing, member)
+        # 1. Validation BEFORE any write
+        if "required_by_date" in patch.model_fields_set and patch.required_by_date is not None:
+            self._validate_required_by_date(patch.required_by_date)
+
+        if patch.lines is not None:
+            self._validate_request_lines(patch.lines)
+            self._validate_products_exist(client, lines=patch.lines)
 
         if "branch_id" in patch.model_fields_set and patch.branch_id is not None:
             self._authorize_branch_for_write(client, member=member, branch_id=patch.branch_id)
 
-        updates: dict[str, object] = {}
-        for field in ("branch_id", "cost_centre_id", "required_by_date"):
-            if field not in patch.model_fields_set:
-                continue
-            val = getattr(patch, field)
-            if isinstance(val, UUID):
-                updates[field] = str(val)
-            elif isinstance(val, date):
-                updates[field] = val.isoformat()
-            else:
-                updates[field] = val
+        claims = {
+            "sub": str(member.user_id),
+            "tenant_id": str(member.tenant_id),
+            "role": "authenticated",
+            "member_role": member.role.value,
+        }
+        lock_id = (member.tenant_id.int ^ request_id.int) & 0x7FFFFFFFFFFFFFFF
 
-        new_line_rows: list[dict[str, object]] | None = None
-        if patch.lines is not None:
-            product_ids = [ln.workspace_product_id for ln in patch.lines]
-            estimates = self._estimate_products(product_ids, request_id=request_id)
-            quantities = [ln.quantity for ln in patch.lines]
-            total_amount, total_currency, has_incomplete = _compute_totals(quantities, estimates)
-            updates["estimated_total_amount"] = (
-                _format_decimal(total_amount, scale=4) if total_amount is not None else None
-            )
-            updates["estimated_total_currency"] = total_currency
-            updates["has_incomplete_estimate"] = has_incomplete
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute("set local role authenticated")
+                    cur.execute(
+                        "select set_config('request.jwt.claims', %s, true)",
+                        (json.dumps(claims),),
+                    )
+                    cur.execute("select pg_advisory_xact_lock(%s)", (lock_id,))
 
-            try:
-                client.table("purchase_request_line").delete().eq(
-                    "purchase_request_id", str(request_id)
-                ).execute()
-            except APIError as exc:
-                raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+                    cur.execute(
+                        f"select {REQUEST_COLUMNS} from purchase_request where id = %s for update",
+                        (request_id,),
+                    )
+                    existing = cur.fetchone()
+                    if existing is None:
+                        raise NotFoundError(details={"resource": "purchase_request"})
+                    _require_ungrouped(existing)
 
-            new_line_rows = self._insert_lines(
-                client,
-                tenant_id=str(member.tenant_id),
-                request_id=str(request_id),
-                payload_lines=patch.lines,
-                estimates=estimates,
-            )
+                    if str(existing["status"]) != "draft":
+                        raise ConflictError(details={"reason": "not_draft"})
+                    _require_requester(existing, member)
 
-        if updates:
-            updates["updated_at"] = _now_iso()
-            try:
-                response = (
-                    client.table("purchase_request")
-                    .update(updates)
-                    .eq("id", str(request_id))
-                    .execute()
-                )
-            except APIError as exc:
-                raise _write_error(exc) from exc
-            request_row = _one_row_or_not_found(response.data, resource="purchase_request")
-        else:
-            request_row = existing
+                    effective_branch_id = (
+                        patch.branch_id
+                        if ("branch_id" in patch.model_fields_set and patch.branch_id is not None)
+                        else UUID(str(existing["branch_id"]))
+                    )
+                    if "cost_centre_id" in patch.model_fields_set:
+                        effective_cc_id = patch.cost_centre_id
+                    else:
+                        effective_cc_id = (
+                            UUID(str(existing["cost_centre_id"]))
+                            if existing.get("cost_centre_id") is not None
+                            else None
+                        )
+
+                    if effective_cc_id is not None:
+                        self._validate_cost_centre_branch(
+                            client,
+                            cost_centre_id=effective_cc_id,
+                            branch_id=effective_branch_id,
+                        )
+
+                    updates: dict[str, object] = {}
+                    for field in ("branch_id", "cost_centre_id", "required_by_date"):
+                        if field not in patch.model_fields_set:
+                            continue
+                        val = getattr(patch, field)
+                        if isinstance(val, UUID):
+                            updates[field] = str(val)
+                        elif isinstance(val, date):
+                            updates[field] = val.isoformat()
+                        else:
+                            updates[field] = val
+
+                    new_line_rows: list[dict[str, object]] | None = None
+                    if patch.lines is not None:
+                        product_ids = [ln.workspace_product_id for ln in patch.lines]
+                        estimates = self._estimate_products(product_ids, request_id=request_id)
+                        quantities = [ln.quantity for ln in patch.lines]
+                        total_amount, total_currency, has_incomplete = _compute_totals(
+                            quantities, estimates
+                        )
+                        updates["estimated_total_amount"] = (
+                            _format_decimal(total_amount, scale=4)
+                            if total_amount is not None
+                            else None
+                        )
+                        updates["estimated_total_currency"] = total_currency
+                        updates["has_incomplete_estimate"] = has_incomplete
+
+                        cur.execute(
+                            "delete from purchase_request_line where purchase_request_id = %s",
+                            (request_id,),
+                        )
+
+                        pack_quantities = self._fetch_pack_quantities_batch(
+                            client, [str(pid) for pid in product_ids]
+                        )
+                        line_data = [
+                            {
+                                "id": uuid4(),
+                                "tenant_id": member.tenant_id,
+                                "purchase_request_id": request_id,
+                                "workspace_product_id": line.workspace_product_id,
+                                "position": pos,
+                                "quantity": line.quantity,
+                                "pack_base_quantity": pack_quantities.get(
+                                    str(line.workspace_product_id)
+                                ),
+                                "note": line.note,
+                                "estimated_unit_price_amount": (
+                                    _format_decimal(est.unit_price_amount, scale=4)
+                                    if est.unit_price_amount is not None
+                                    else None
+                                ),
+                                "estimated_unit_price_currency": est.unit_price_currency,
+                                "estimated_unit_price_source_landed_cost_id": (
+                                    est.source_landed_cost_id
+                                    if est.source_landed_cost_id is not None
+                                    else None
+                                ),
+                            }
+                            for pos, (line, est) in enumerate(
+                                zip(patch.lines, estimates, strict=True)
+                            )
+                        ]
+                        new_line_rows = self._insert_lines_db(cur, rows=line_data)
+
+                    if updates:
+                        set_clauses = [
+                            sql.SQL("{} = %s").format(sql.Identifier(k)) for k in updates
+                        ]
+                        set_clauses.append(sql.SQL("updated_at = now()"))
+                        set_stmt = sql.SQL(", ").join(set_clauses)
+                        params = list(updates.values())
+                        params.append(request_id)
+                        cur.execute(
+                            sql.SQL(
+                                "update purchase_request set {set_stmt} "
+                                "where id = %s and status = 'draft' returning {cols}"
+                            ).format(set_stmt=set_stmt, cols=sql.SQL(REQUEST_COLUMNS)),
+                            params,
+                        )
+                        request_row = cur.fetchone()
+                        if request_row is None:
+                            raise ConflictError(details={"reason": "not_draft"})
+                    else:
+                        request_row = existing
+
+                    rid = str(request_id)
+                    if new_line_rows is None:
+                        cur.execute(
+                            f"select {LINE_COLUMNS} from purchase_request_line "
+                            "where purchase_request_id = %s order by position, created_at, id",
+                            (request_id,),
+                        )
+                        new_line_rows = cur.fetchall()
+
+                    cur.execute(
+                        f"select {STEP_COLUMNS} from approval_step "
+                        "where purchase_request_id = %s limit 1",
+                        (request_id,),
+                    )
+                    step_row = cur.fetchone()
+
+        except psycopg.Error as exc:
+            raise _map_psycopg_error(exc) from exc
 
         rid = str(request_id)
-        if new_line_rows is None:
-            new_line_rows = self._fetch_lines_for(client, rid)
-        step_row = self._fetch_step(client, rid)
-
         self._record(
             bearer_token=bearer_token,
             member=member,
@@ -1025,14 +1360,8 @@ class RequestsService:
                         for row in rows:
                             if action == "submitted" or member.role is not MemberRole.owner:
                                 _require_requester(row, member)
-                    if (
-                        action in ("approved", "rejected")
-                        and comment is not None
-                        and len(comment) > 2000
-                    ):
-                        raise UnprocessableEntityError(details={"reason": "comment_too_long"})
-                    if action == "rejected" and (comment is None or not comment.strip()):
-                        raise UnprocessableEntityError(details={"reason": "comment_required"})
+                    if action in ("approved", "rejected"):
+                        _validate_decision_comment(action, comment)
                     now = _now_iso()
                     if action == "submitted":
                         total = sum(
@@ -1356,87 +1685,227 @@ class RequestsService:
         bearer_token: str,
         member: CurrentMember,
         request_id: UUID,
+        idempotency_key: UUID | None = None,
     ) -> PurchaseRequest:
         client = authenticated_client(self._settings, bearer_token)
-        existing = self._fetch_request(client, request_id)
-        _require_ungrouped(existing)
-
-        if str(existing["status"]) != "draft":
-            raise ConflictError(details={"reason": "not_draft"})
-        _require_requester(existing, member)
-
-        rid = str(request_id)
-        line_rows = self._fetch_lines_for(client, rid)
-
-        if not line_rows:
-            raise UnprocessableEntityError(details={"reason": "no_lines"})
-
-        product_ids = [UUID(str(lr["workspace_product_id"])) for lr in line_rows]
-        estimates = self._estimate_products(product_ids, request_id=request_id)
-
-        now = _now_iso()
-        for lr, est in zip(line_rows, estimates, strict=True):
-            try:
-                client.table("purchase_request_line").update(
-                    {
-                        "estimated_unit_price_amount": (
-                            _format_decimal(est.unit_price_amount, scale=4)
-                            if est.unit_price_amount is not None
-                            else None
-                        ),
-                        "estimated_unit_price_currency": est.unit_price_currency,
-                        "estimated_unit_price_source_landed_cost_id": (
-                            str(est.source_landed_cost_id)
-                            if est.source_landed_cost_id is not None
-                            else None
-                        ),
-                        "estimated_at": now,
-                    }
-                ).eq("id", str(lr["id"])).execute()
-            except APIError as exc:
-                raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-
-        quantities = [_decimal(lr["quantity"], scale=6) for lr in line_rows]
-        total_amount, total_currency, has_incomplete = _compute_totals(quantities, estimates)
+        claims = {
+            "sub": str(member.user_id),
+            "tenant_id": str(member.tenant_id),
+            "role": "authenticated",
+            "member_role": member.role.value,
+        }
+        lock_id = (member.tenant_id.int ^ request_id.int) & 0x7FFFFFFFFFFFFFFF
 
         try:
-            response = (
-                client.table("purchase_request")
-                .update(
-                    {
-                        "status": "submitted",
-                        "submitted_at": now,
-                        "estimated_total_amount": (
-                            _format_decimal(total_amount, scale=4)
-                            if total_amount is not None
-                            else None
-                        ),
-                        "estimated_total_currency": total_currency,
-                        "has_incomplete_estimate": has_incomplete,
-                        "updated_at": now,
-                    }
-                )
-                .eq("id", rid)
-                .execute()
-            )
-        except APIError as exc:
-            raise _write_error(exc) from exc
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute("set local role authenticated")
+                    cur.execute(
+                        "select set_config('request.jwt.claims', %s, true)",
+                        (json.dumps(claims),),
+                    )
+                    cur.execute("select pg_advisory_xact_lock(%s)", (lock_id,))
 
-        request_row = _one_row_or_not_found(response.data, resource="purchase_request")
-        routed_step = self._create_submission_approval_step(
-            client,
-            bearer_token=bearer_token,
-            member=member,
-            request_row=request_row,
-        )
-        frozen_lines = self._fetch_lines_for(client, rid)
+                    cur.execute(
+                        f"select {REQUEST_COLUMNS} from purchase_request where id = %s for update",
+                        (request_id,),
+                    )
+                    existing = cur.fetchone()
+                    if existing is None:
+                        raise NotFoundError(details={"resource": "purchase_request"})
+                    _require_ungrouped(existing)
+                    _require_requester(existing, member)
 
-        self._record(
-            bearer_token=bearer_token,
-            member=member,
-            action="requests.purchase_request_submitted",
-            target={"purchase_request_id": rid},
-        )
+                    is_replay = False
+                    if idempotency_key is not None:
+                        cur.execute("set local role service_role")
+                        cur.execute(
+                            "select 1 from audit_event where tenant_id = %s "
+                            "and actor_membership_id = %s "
+                            "and action = %s and outcome = 'success' "
+                            "and target->>'purchase_request_id' = %s "
+                            "and target->>'idempotency_key' = %s order by id limit 1",
+                            (
+                                member.tenant_id,
+                                member.membership_id,
+                                "requests.purchase_request_submitted",
+                                str(request_id),
+                                str(idempotency_key),
+                            ),
+                        )
+                        replay = cur.fetchone()
+                        cur.execute("set local role authenticated")
+                        if replay is not None:
+                            is_replay = True
+
+                    if is_replay:
+                        cur.execute(
+                            f"select {LINE_COLUMNS} from purchase_request_line "
+                            "where purchase_request_id = %s order by position, created_at, id",
+                            (request_id,),
+                        )
+                        frozen_lines = cur.fetchall()
+                        cur.execute(
+                            f"select {STEP_COLUMNS} from approval_step "
+                            "where purchase_request_id = %s order by created_at desc limit 1",
+                            (request_id,),
+                        )
+                        routed_step = cur.fetchone()
+                        request_row = existing
+                        resolved = None
+                    else:
+                        if str(existing["status"]) != "draft":
+                            raise ConflictError(details={"reason": "not_draft"})
+
+                        rid = str(request_id)
+                        cur.execute(
+                            f"select {LINE_COLUMNS} from purchase_request_line "
+                            "where purchase_request_id = %s order by position, created_at, id",
+                            (request_id,),
+                        )
+                        line_rows = cur.fetchall()
+                        if not line_rows:
+                            raise UnprocessableEntityError(details={"reason": "no_lines"})
+
+                        product_ids = [UUID(str(lr["workspace_product_id"])) for lr in line_rows]
+                        estimates = self._estimate_products(product_ids, request_id=request_id)
+
+                        now = _now_iso()
+                        for lr, est in zip(line_rows, estimates, strict=True):
+                            cur.execute(
+                                """
+                                update purchase_request_line set
+                                    estimated_unit_price_amount = %s,
+                                    estimated_unit_price_currency = %s,
+                                    estimated_unit_price_source_landed_cost_id = %s,
+                                    estimated_at = %s
+                                where id = %s
+                                """,
+                                (
+                                    _format_decimal(est.unit_price_amount, scale=4)
+                                    if est.unit_price_amount is not None
+                                    else None,
+                                    est.unit_price_currency,
+                                    (
+                                        str(est.source_landed_cost_id)
+                                        if est.source_landed_cost_id is not None
+                                        else None
+                                    ),
+                                    now,
+                                    lr["id"],
+                                ),
+                            )
+
+                        quantities = [_decimal(lr["quantity"], scale=6) for lr in line_rows]
+                        total_amount, total_currency, has_incomplete = _compute_totals(
+                            quantities, estimates
+                        )
+
+                        cur.execute(
+                            f"""
+                            update purchase_request set
+                                status = 'submitted',
+                                submitted_at = %s,
+                                estimated_total_amount = %s,
+                                estimated_total_currency = %s,
+                                has_incomplete_estimate = %s,
+                                updated_at = %s
+                            where id = %s and status = 'draft'
+                            returning {REQUEST_COLUMNS}
+                            """,
+                            (
+                                now,
+                                (
+                                    _format_decimal(total_amount, scale=4)
+                                    if total_amount is not None
+                                    else None
+                                ),
+                                total_currency,
+                                has_incomplete,
+                                now,
+                                request_id,
+                            ),
+                        )
+                        request_row = cur.fetchone()
+                        if request_row is None:
+                            raise ConflictError(details={"reason": "not_draft"})
+
+                        as_of = datetime.now(UTC).date()
+                        resolved = resolve_approver(
+                            request_value=(
+                                Decimal(str(request_row["estimated_total_amount"]))
+                                if request_row.get("estimated_total_amount") is not None
+                                else None
+                            ),
+                            request_currency=(
+                                str(request_row["estimated_total_currency"])
+                                if request_row.get("estimated_total_currency") is not None
+                                else None
+                            ),
+                            branch_id=UUID(str(request_row["branch_id"])),
+                            rules=self._fetch_threshold_rules(client),
+                            delegations=self._fetch_active_delegations(client, as_of=as_of),
+                            removed_membership_ids=self._fetch_removed_membership_ids(client),
+                            owner_membership_id=self._fetch_owner_membership_id(client),
+                            as_of=as_of,
+                        )
+
+                        cur.execute(
+                            f"""
+                            insert into approval_step (
+                                id, tenant_id, purchase_request_id,
+                                assigned_membership_id, source, status
+                            ) values (
+                                %s, %s, %s, %s, %s, 'pending'
+                            ) returning {STEP_COLUMNS}
+                            """,
+                            (
+                                uuid4(),
+                                member.tenant_id,
+                                request_id,
+                                resolved.assigned_membership_id,
+                                resolved.source,
+                            ),
+                        )
+                        routed_step = cur.fetchone()
+
+                        cur.execute(
+                            f"select {LINE_COLUMNS} from purchase_request_line "
+                            "where purchase_request_id = %s order by position, created_at, id",
+                            (request_id,),
+                        )
+                        frozen_lines = cur.fetchall()
+
+                        audit_target: dict[str, object] = {"purchase_request_id": rid}
+                        if idempotency_key is not None:
+                            audit_target["idempotency_key"] = str(idempotency_key)
+                        self._record(
+                            cur=cur,
+                            bearer_token=bearer_token,
+                            member=member,
+                            action="requests.purchase_request_submitted",
+                            target=audit_target,
+                        )
+
+                        if resolved is not None and resolved.source == "owner_fallback":
+                            escalation_target: dict[str, object] = {
+                                "purchase_request_id": rid,
+                                "approval_step_id": str(routed_step["id"]),
+                                "assigned_membership_id": str(resolved.assigned_membership_id),
+                            }
+                            if idempotency_key is not None:
+                                escalation_target["idempotency_key"] = str(idempotency_key)
+                            self._record(
+                                cur=cur,
+                                bearer_token=bearer_token,
+                                member=member,
+                                action="requests.approval_step_escalated",
+                                target=escalation_target,
+                            )
+
+        except psycopg.Error as exc:
+            raise _map_psycopg_error(exc) from exc
+
         return self._purchase_request_with_budget_status(
             client, request_row, frozen_lines, routed_step
         )
@@ -1447,24 +1916,23 @@ class RequestsService:
         bearer_token: str,
         member: CurrentMember,
         request_id: UUID,
+        idempotency_key: UUID | None = None,
     ) -> PurchaseRequest:
         client = authenticated_client(self._settings, bearer_token)
         rid = str(request_id)
-        request_row, previous_status = self._withdraw_request_row(member, request_id)
+        request_row, previous_status, is_replay = self._withdraw_request_row(
+            member, request_id, idempotency_key=idempotency_key
+        )
         line_rows = self._fetch_lines_for(client, rid)
         step_row = self._fetch_step(client, rid)
-
-        self._record(
-            bearer_token=bearer_token,
-            member=member,
-            action="requests.purchase_request_withdrawn",
-            target={"purchase_request_id": rid, "previous_status": previous_status},
-        )
         return self._purchase_request_with_budget_status(client, request_row, line_rows, step_row)
 
     def _withdraw_request_row(
-        self, member: CurrentMember, request_id: UUID
-    ) -> tuple[dict[str, object], str]:
+        self,
+        member: CurrentMember,
+        request_id: UUID,
+        idempotency_key: UUID | None = None,
+    ) -> tuple[dict[str, object], str | None, bool]:
         # Use the same transaction lock as PO creation/editing so the absence check
         # and withdrawal cannot interleave with attaching a live purchase order.
         claims = {
@@ -1493,6 +1961,32 @@ class RequestsService:
                     _require_ungrouped(existing)
                     if member.role is not MemberRole.owner:
                         _require_requester(existing, member)
+
+                    is_replay = False
+                    if idempotency_key is not None:
+                        cur.execute("set local role service_role")
+                        cur.execute(
+                            "select 1 from audit_event where tenant_id = %s "
+                            "and actor_membership_id = %s "
+                            "and action = %s and outcome = 'success' "
+                            "and target->>'purchase_request_id' = %s "
+                            "and target->>'idempotency_key' = %s order by id limit 1",
+                            (
+                                member.tenant_id,
+                                member.membership_id,
+                                "requests.purchase_request_withdrawn",
+                                str(request_id),
+                                str(idempotency_key),
+                            ),
+                        )
+                        replay = cur.fetchone()
+                        cur.execute("set local role authenticated")
+                        if replay is not None:
+                            is_replay = True
+
+                    if is_replay:
+                        return existing, None, True
+
                     previous_status = str(existing["status"])
                     if previous_status not in ("draft", "submitted", "ordered"):
                         raise ConflictError(details={"reason": "already_decided_or_withdrawn"})
@@ -1513,7 +2007,20 @@ class RequestsService:
                     row = cur.fetchone()
                     if row is None:
                         raise NotFoundError(details={"resource": "purchase_request"})
-                    return row, previous_status
+
+                    audit_target: dict[str, object] = {
+                        "purchase_request_id": str(request_id),
+                        "previous_status": previous_status,
+                    }
+                    if idempotency_key is not None:
+                        audit_target["idempotency_key"] = str(idempotency_key)
+                    self._record(
+                        cur=cur,
+                        member=member,
+                        action="requests.purchase_request_withdrawn",
+                        target=audit_target,
+                    )
+                    return row, previous_status, False
         except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -1743,12 +2250,14 @@ class RequestsService:
         member: CurrentMember,
         request_id: UUID,
         payload: ApprovalDecisionInput,
+        idempotency_key: UUID | None = None,
     ) -> PurchaseRequest:
         return self._decide_request(
             bearer_token=bearer_token,
             member=member,
             request_id=request_id,
             payload=payload,
+            idempotency_key=idempotency_key,
             decision="approved",
         )
 
@@ -1759,12 +2268,14 @@ class RequestsService:
         member: CurrentMember,
         request_id: UUID,
         payload: ApprovalDecisionInput,
+        idempotency_key: UUID | None = None,
     ) -> PurchaseRequest:
         return self._decide_request(
             bearer_token=bearer_token,
             member=member,
             request_id=request_id,
             payload=payload,
+            idempotency_key=idempotency_key,
             decision="rejected",
         )
 
@@ -2192,20 +2703,28 @@ class RequestsService:
     ) -> dict[str, list[dict[str, object]]]:
         if not request_ids:
             return {}
+        line_rows: list[dict[str, object]] = []
+        page_size = 1000
         try:
-            response = (
-                client.table("purchase_request_line")
-                .select(LINE_COLUMNS)
-                .in_("purchase_request_id", request_ids)
-                .order("position")
-                .order("created_at")
-                .order("id")
-                .execute()
-            )
+            while True:
+                offset = len(line_rows)
+                response = (
+                    client.table("purchase_request_line")
+                    .select(LINE_COLUMNS)
+                    .in_("purchase_request_id", request_ids)
+                    .order("position")
+                    .order("created_at")
+                    .order("id")
+                    .range(offset, offset + page_size - 1)
+                    .execute()
+                )
+                page = _rows(response.data)
+                line_rows.extend(page)
+                if len(page) < page_size:
+                    break
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
-        line_rows = _rows(response.data)
         product_ids = list(
             {str(r["workspace_product_id"]) for r in line_rows if r.get("workspace_product_id")}
         )
@@ -2366,11 +2885,25 @@ class RequestsService:
     def _record(
         self,
         *,
-        bearer_token: str,
+        bearer_token: str | None = None,
         member: CurrentMember,
         action: str,
         target: dict[str, object],
+        cur: psycopg.Cursor | None = None,
     ) -> None:
+        if cur is not None:
+            cur.execute(
+                "select record_audit_event(%s,'success',%s,%s,%s,%s,%s)",
+                (
+                    action,
+                    member.tenant_id,
+                    member.membership_id,
+                    member.email,
+                    Jsonb(target),
+                    get_trace_id(),
+                ),
+            )
+            return
         get_audit_writer().record(
             AuditEventCreate(
                 tenant_id=member.tenant_id,
@@ -2521,27 +3054,30 @@ class RequestsService:
         request_id: UUID,
         payload: ApprovalDecisionInput,
         decision: str,
+        idempotency_key: UUID | None = None,
     ) -> PurchaseRequest:
         client = authenticated_client(self._settings, bearer_token)
         request_row = self._fetch_request(client, request_id)
         _require_ungrouped(request_row)
-        if str(request_row["status"]) != "submitted":
-            raise ConflictError(details={"reason": "not_submitted"})
-
         rid = str(request_id)
-        step_row = self._fetch_step(client, rid)
-        if step_row is None or str(step_row["status"]) != "pending":
-            raise ConflictError(details={"reason": "no_pending_approval"})
-        _require_assigned_approver_or_owner(step_row, member)
-
+        step_row = None
+        if idempotency_key is None:
+            if str(request_row["status"]) != "submitted":
+                raise ConflictError(details={"reason": "not_submitted"})
+            step_row = self._fetch_step(client, rid)
+            if step_row is None or str(step_row["status"]) != "pending":
+                raise ConflictError(details={"reason": "no_pending_approval"})
+            _require_assigned_approver_or_owner(step_row, member)
+            _validate_decision_comment(decision, payload.comment)
         now = _now_iso()
         decided_request, decided_step, notification_id = self._decide_and_notify(
             member=member,
             request_id=rid,
-            step_id=str(step_row["id"]),
+            step_id=str(step_row["id"]) if step_row else None,
             decision=decision,
             comment=payload.comment,
             now=now,
+            idempotency_key=idempotency_key,
         )
 
         if notification_id is not None:
@@ -2560,16 +3096,6 @@ class RequestsService:
                 )
 
         line_rows = self._fetch_lines_for(client, rid)
-        self._record(
-            bearer_token=bearer_token,
-            member=member,
-            action=f"requests.approval_step_{decision}",
-            target={
-                "purchase_request_id": rid,
-                "approval_step_id": str(decided_step["id"]),
-                "decided_by_membership_id": str(member.membership_id),
-            },
-        )
         return self._purchase_request_with_budget_status(
             client, decided_request, line_rows, decided_step
         )
@@ -2641,24 +3167,24 @@ class RequestsService:
         *,
         member: CurrentMember,
         request_id: str,
-        step_id: str,
+        step_id: str | None,
         decision: str,
         comment: str | None,
         now: str,
+        idempotency_key: UUID | None = None,
     ) -> tuple[dict[str, object], dict[str, object], UUID | None]:
-        """Atomically applies a decision and queues its notification (T037, research.md R1).
+        """Atomically applies a decision, records its audit event and queues its notification.
 
         A single raw-`psycopg` transaction (mirroring `devices/service.py`'s own
         `_authenticated_db`-style pattern — a deliberate, isolated exception to this file's
         otherwise-uniform PostgREST/`authenticated_client` style) because `push_notification`
         grants nothing to `authenticated` at all (its own migration: service-role only), so the
         notification write needs a role switch mid-transaction that PostgREST/supabase-py cannot
-        express, and because these three writes must succeed or fail together — a prior version of
+        express, and because these writes must succeed or fail together — a prior version of
         this method did them as separate PostgREST calls with no such guarantee (fixed after
         review caught it). Returns `(decided_request, decided_step, notification_id)` — the last
-        is `None` only if this were ever called for a request with no requester to notify, which
-        cannot happen in practice (every purchase_request has one), kept `| None` defensively
-        rather than asserted.
+        is `None` for a replay, which has no new notification to enqueue, or defensively
+        for a request with no requester to notify.
         """
         claims = {
             "sub": str(member.user_id),
@@ -2666,56 +3192,130 @@ class RequestsService:
             "role": "authenticated",
             "member_role": member.role.value,
         }
-        with db.connect(self._settings.database_url.get_secret_value()) as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute("set local role authenticated")
-                cur.execute(
-                    "select set_config('request.jwt.claims', %s, true)",
-                    (json.dumps(claims),),
-                )
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute("set local role authenticated")
+                    cur.execute(
+                        "select set_config('request.jwt.claims', %s, true)",
+                        (json.dumps(claims),),
+                    )
 
-                # Same authoritative guard the previous (non-atomic) version used: if a concurrent
-                # withdrawal already flipped the request's status, this matches zero rows and we
-                # raise before touching the step or writing a notification, leaving the step
-                # `pending` rather than stranding a `decided` step on a non-submitted request.
-                #
-                # An approved request lands directly on `ordered`, not `approved` (chunk R2.3,
-                # specs/010-mobile-approvals-receipt/research.md R1) — there is no separate
-                # "place the order" human action this release, so the same decision that approves
-                # a request is also what marks it ordered. `approval_step.status` and the audit
-                # action below still record the human's actual decision ("approved"), unchanged;
-                # only `purchase_request.status` itself takes the new terminal value.
-                decided_request, decided_step = self._apply_request_decision(
-                    cur,
-                    member=member,
-                    request_id=request_id,
-                    step_id=step_id,
-                    decision=decision,
-                    request_status="ordered" if decision == "approved" else decision,
-                    comment=comment,
-                    now=now,
-                )
+                    if idempotency_key is not None:
+                        lock_id = (member.tenant_id.int ^ UUID(request_id).int) & 0x7FFFFFFFFFFFFFFF
+                        cur.execute("select pg_advisory_xact_lock(%s)", (lock_id,))
+                        cur.execute(
+                            f"select {REQUEST_COLUMNS} from purchase_request "
+                            "where id = %s for update",
+                            (request_id,),
+                        )
+                        existing = cur.fetchone()
+                        if existing is None:
+                            raise NotFoundError(details={"resource": "purchase_request"})
+                        _require_ungrouped(existing)
+                        cur.execute(
+                            f"select {STEP_COLUMNS} from approval_step "
+                            "where purchase_request_id = %s "
+                            "order by created_at desc limit 1 for update",
+                            (request_id,),
+                        )
+                        current_step = cur.fetchone()
+                        if current_step is None:
+                            raise ConflictError(details={"reason": "no_pending_approval"})
+                        _require_assigned_approver_or_owner(current_step, member)
+                        cur.execute("set local role service_role")
+                        cur.execute(
+                            "select 1 from audit_event where tenant_id = %s "
+                            "and actor_membership_id = %s "
+                            "and action = %s and outcome = 'success' "
+                            "and target->>'purchase_request_id' = %s "
+                            "and target->>'idempotency_key' = %s order by id limit 1",
+                            (
+                                member.tenant_id,
+                                member.membership_id,
+                                f"requests.approval_step_{decision}",
+                                request_id,
+                                str(idempotency_key),
+                            ),
+                        )
+                        replay = cur.fetchone()
+                        cur.execute("set local role authenticated")
+                        if replay is not None:
+                            return dict(existing), dict(current_step), None
+                        if str(existing["status"]) != "submitted":
+                            raise ConflictError(details={"reason": "not_submitted"})
+                        if str(current_step["status"]) != "pending":
+                            raise ConflictError(details={"reason": "no_pending_approval"})
+                        _validate_decision_comment(decision, comment)
+                        step_id = str(current_step["id"])
 
-                cur.execute("set local role service_role")
-                cur.execute(
-                    """
-                    insert into push_notification (tenant_id, purchase_request_id, member_id)
-                    values (%s, %s, %s)
-                    returning id
-                    """,
-                    (
-                        str(member.tenant_id),
-                        request_id,
-                        str(decided_request["requested_by_membership_id"]),
-                    ),
-                )
-                notification_row = cur.fetchone()
-                notification_id = (
-                    UUID(str(notification_row["id"])) if notification_row is not None else None
-                )
-            # Exiting the `with db.connect(...)` block here commits all three writes above
-            # atomically (or rolls all of them back if any exception was raised) — psycopg's own
-            # connection context manager semantics, the same ones `devices/service.py` relies on.
+                    # Same authoritative guard the previous (non-atomic) version used: if a
+                    # concurrent withdrawal already flipped the request's status, this matches zero
+                    # rows and we raise before touching the step or writing a notification, leaving
+                    # the step `pending` rather than stranding a `decided` step on a non-submitted
+                    # request.
+                    #
+                    # An approved request lands directly on `ordered`, not `approved` (chunk R2.3,
+                    # specs/010-mobile-approvals-receipt/research.md R1) — there is no separate
+                    # "place the order" human action this release, so the same decision that
+                    # approves a request is also what marks it ordered. `approval_step.status` and
+                    # the audit action below still record the human's actual decision ("approved"),
+                    # unchanged; only `purchase_request.status` itself takes the new terminal value.
+                    decided_request, decided_step = self._apply_request_decision(
+                        cur,
+                        member=member,
+                        request_id=request_id,
+                        step_id=step_id,
+                        decision=decision,
+                        request_status="ordered" if decision == "approved" else decision,
+                        comment=comment,
+                        now=now,
+                    )
+
+                    target = {
+                        "purchase_request_id": request_id,
+                        "approval_step_id": str(decided_step["id"]),
+                        "decided_by_membership_id": str(member.membership_id),
+                    }
+                    if idempotency_key is not None:
+                        target["idempotency_key"] = str(idempotency_key)
+                    if comment is not None:
+                        target["comment"] = comment
+                    cur.execute(
+                        "select record_audit_event(%s,'success',%s,%s,%s,%s,%s)",
+                        (
+                            f"requests.approval_step_{decision}",
+                            member.tenant_id,
+                            member.membership_id,
+                            member.email,
+                            Jsonb(target),
+                            get_trace_id(),
+                        ),
+                    )
+
+                    cur.execute("set local role service_role")
+                    cur.execute(
+                        """
+                        insert into push_notification (tenant_id, purchase_request_id, member_id)
+                        values (%s, %s, %s)
+                        returning id
+                        """,
+                        (
+                            str(member.tenant_id),
+                            request_id,
+                            str(decided_request["requested_by_membership_id"]),
+                        ),
+                    )
+                    notification_row = cur.fetchone()
+                    notification_id = (
+                        UUID(str(notification_row["id"])) if notification_row is not None else None
+                    )
+                # Exiting the `with db.connect(...)` block here commits all writes above
+                # atomically (or rolls all of them back if any exception was raised) — psycopg's
+                # own connection context manager semantics, the same ones `devices/service.py`
+                # relies on.
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return dict(decided_request), dict(decided_step), notification_id
 
     def _purchase_request_with_budget_status(
@@ -3326,6 +3926,13 @@ def _compute_totals(
     return None, None, has_incomplete
 
 
+def _validate_decision_comment(decision: str, comment: str | None) -> None:
+    if comment is not None and len(comment) > 2000:
+        raise UnprocessableEntityError(details={"reason": "comment_too_long"})
+    if decision == "rejected" and (comment is None or not comment.strip()):
+        raise UnprocessableEntityError(details={"reason": "comment_required"})
+
+
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -3406,6 +4013,34 @@ def _encode_cursor(offset: int) -> str:
     return base64.urlsafe_b64encode(raw).decode("ascii")
 
 
+def _encode_approval_cursor(created_at: str, step_id: UUID) -> str:
+    raw = json.dumps({"created_at": created_at, "id": str(step_id)}).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii")
+
+
+def _decode_approval_cursor(cursor: str | None) -> tuple[str, UUID] | None:
+    if cursor is None:
+        return None
+    try:
+        raw = base64.b64decode(cursor.encode("ascii"), altchars=b"-_", validate=True)
+        payload = json.loads(raw.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("invalid cursor payload")
+        created_at, step_id = payload["created_at"], payload["id"]
+        if not isinstance(created_at, str) or not isinstance(step_id, str):
+            raise ValueError("invalid cursor fields")
+        timestamp = datetime.fromisoformat(created_at)
+        if timestamp.tzinfo is None:
+            raise ValueError("cursor timestamp requires a timezone")
+        # UTC Z avoids '+' being interpreted as a space by filter/URL parsers.
+        normalized = (
+            timestamp.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+        )
+        return normalized, UUID(step_id)
+    except (KeyError, ValueError, TypeError, OverflowError) as exc:
+        raise UnprocessableEntityError(details={"cursor": "invalid"}) from exc
+
+
 def _decode_cursor(cursor: str | None) -> int:
     if cursor is None:
         return 0
@@ -3429,6 +4064,17 @@ def _write_error(
     exc: APIError,
 ) -> ConflictError | ServiceUnavailableError | UnprocessableEntityError:
     code = _api_error_code(exc)
+    if code in {"23503", "23514", "22P02"}:
+        return UnprocessableEntityError(details={"reason": "database_constraint"})
+    if code == "23505":
+        return ConflictError(details={"reason": "duplicate"})
+    return ServiceUnavailableError(details={"dependency": "database"})
+
+
+def _map_psycopg_error(
+    exc: psycopg.Error,
+) -> ConflictError | ServiceUnavailableError | UnprocessableEntityError:
+    code = getattr(exc, "sqlstate", None)
     if code in {"23503", "23514", "22P02"}:
         return UnprocessableEntityError(details={"reason": "database_constraint"})
     if code == "23505":

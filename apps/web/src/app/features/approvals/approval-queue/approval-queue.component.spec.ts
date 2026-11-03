@@ -20,6 +20,7 @@ import {
   ApprovalDecisionDialogComponent,
   ApprovalQueueComponent,
   type ApprovalDecisionDialogData,
+  type GroupQueueItem,
 } from './approval-queue.component';
 
 const mockPendingRequests: PurchaseRequest[] = [
@@ -110,7 +111,9 @@ describe('ApprovalQueueComponent', () => {
     requestsApi = jasmine.createSpyObj('RequestsApiService', [
       'approveRequest',
       'rejectRequest',
+      'getRequest',
     ]);
+    requestsApi.getRequest.and.returnValue(of(mockPendingRequests[0]));
     organisationApi = jasmine.createSpyObj('OrganisationApiService', [
       'listBranches',
       'listCostCentres',
@@ -1087,6 +1090,965 @@ describe('ApprovalQueueComponent', () => {
 
       expect(component.errorMessage()).toBeTruthy();
       expect(component.errorMessage()?.toLowerCase()).toContain('split');
+    });
+  });
+
+  describe('P-170 (PPS-164) — Pagination and Group Completeness Gate', () => {
+    it('pagination: appends next page and de-duplicates by request id', () => {
+      const page1Item1 = { ...mockPendingRequests[0], id: 'req-p1-1' };
+      const page1Item2 = { ...mockPendingRequests[1], id: 'req-p1-2' };
+      const page2Item1 = { ...mockPendingRequests[0], id: 'req-p1-2' }; // duplicate
+      const page2Item2 = { ...mockPendingRequests[0], id: 'req-p2-1' }; // new
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [page1Item1, page1Item2], next_cursor: 'cursor-page-2' }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(component.pendingRequests().length).toBe(2);
+      expect(component.nextCursor()).toBe('cursor-page-2');
+
+      const loadMoreBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
+      expect(loadMoreBtn).toBeTruthy();
+
+      const statusEl = fixture.nativeElement.querySelector('[data-testid="pagination-status"]');
+      expect(statusEl?.textContent).toContain('Showing 2 requests, more available');
+
+      // Next page returns page2Item1 (duplicate) and page2Item2 (new), with next_cursor: null
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [page2Item1, page2Item2], next_cursor: null }),
+      );
+
+      loadMoreBtn.click();
+      fixture.detectChanges();
+
+      expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
+        cursor: 'cursor-page-2',
+        limit: 50,
+      });
+      // Deduplicated: 2 original + 1 new = 3
+      expect(component.pendingRequests().length).toBe(3);
+      expect(component.pendingRequests().map((r) => r.id)).toEqual(['req-p1-1', 'req-p1-2', 'req-p2-1']);
+      expect(component.nextCursor()).toBeNull();
+
+      // Button hidden when no cursor
+      const loadMoreBtnAfter = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
+      expect(loadMoreBtnAfter).toBeNull();
+
+      // Status updated
+      expect(statusEl?.textContent).toContain('Showing 3 requests');
+      expect(statusEl?.textContent).not.toContain('more available');
+    });
+
+    it('pagination: button hidden when no cursor on initial load', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockPendingRequests, next_cursor: null }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(component.nextCursor()).toBeNull();
+      const loadMoreBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
+      expect(loadMoreBtn).toBeNull();
+
+      const statusEl = fixture.nativeElement.querySelector('[data-testid="pagination-status"]');
+      expect(statusEl?.textContent).toContain('Showing 2 requests');
+      expect(statusEl?.textContent).not.toContain('more available');
+    });
+
+    it('pagination: failure keeps loaded rows, shows error banner and keeps load more available to retry', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockPendingRequests, next_cursor: 'cursor-retry' }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(component.pendingRequests().length).toBe(2);
+
+      // Trigger error on load more
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(() => new Error('Server unavailable')),
+      );
+
+      const loadMoreBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
+      loadMoreBtn.click();
+      fixture.detectChanges();
+
+      // Rows kept
+      expect(component.pendingRequests().length).toBe(2);
+      // Next cursor preserved
+      expect(component.nextCursor()).toBe('cursor-retry');
+      // Error banner visible
+      expect(component.errorMessage()).toBeTruthy();
+      const errorBanner = fixture.nativeElement.querySelector('.error-banner');
+      expect(errorBanner).toBeTruthy();
+
+      // Load more button remains available to retry
+      const retryBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
+      expect(retryBtn).toBeTruthy();
+      expect(retryBtn.disabled).toBeFalse();
+    });
+
+    it('pagination: plain new Error from listPendingApprovals during loadMore shows localized loadError text, not raw message', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockPendingRequests, next_cursor: 'cursor-retry' }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(() => new Error('boom')),
+      );
+
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBe('Unable to load more requests. Please try again.');
+      expect(component.errorMessage()).not.toContain('boom');
+    });
+
+    it('pagination: loadMore failure shows translated loadError for non-envelope HttpErrorResponse and envelope message for real API errors', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockPendingRequests, next_cursor: 'cursor-retry' }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const expectedLoadError = 'Unable to load more requests. Please try again.';
+
+      // Case 1: status 0 with ProgressEvent (network drop / aborted)
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 0,
+              error: new ProgressEvent('error'),
+              url: '/api/v1/approvals/pending',
+            }),
+        ),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBe(expectedLoadError);
+      expect(component.errorMessage()).not.toContain('Http failure response');
+
+      // Case 2: status 502 with HTML bad gateway string
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 502,
+              error: '<html>Bad Gateway</html>',
+              url: '/api/v1/approvals/pending',
+            }),
+        ),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBe(expectedLoadError);
+      expect(component.errorMessage()).not.toContain('Bad Gateway');
+      expect(component.errorMessage()).not.toContain('Http failure response');
+
+      // Case 3: status 409 with real ProcurePilot error envelope {code, message}
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 409,
+              error: {
+                code: 'CONFLICT',
+                message: 'Approval cursor expired. Please refresh the queue.',
+                trace_id: 'trace-409',
+              },
+            }),
+        ),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBe('Approval cursor expired. Please refresh the queue.');
+      expect(component.errorTraceId()).toBe('trace-409');
+
+      // Case 4: status 500 with real ProcurePilot error envelope {code, message}
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 500,
+              error: {
+                code: 'DATABASE_ERROR',
+                message: 'Database query timed out.',
+                trace_id: 'trace-500',
+              },
+            }),
+        ),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBe('Database query timed out.');
+      expect(component.errorTraceId()).toBe('trace-500');
+    });
+
+    it('pagination: double click does not fire two requests and shows loading spinner', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockPendingRequests, next_cursor: 'cursor-slow' }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const pendingSubject = new Subject<{ items: PurchaseRequest[]; next_cursor: string | null }>();
+      approvalsApi.listPendingApprovals.calls.reset();
+      approvalsApi.listPendingApprovals.and.returnValue(pendingSubject);
+
+      const loadMoreBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
+      loadMoreBtn.click();
+      fixture.detectChanges();
+
+      // Button is disabled and loading
+      expect(component.isLoadingMore()).toBeTrue();
+      expect(loadMoreBtn.disabled).toBeTrue();
+
+      // Second click while in-flight
+      loadMoreBtn.click();
+      fixture.detectChanges();
+
+      // Still only called once with cursor
+      expect(approvalsApi.listPendingApprovals).toHaveBeenCalledTimes(1);
+      expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
+        cursor: 'cursor-slow',
+        limit: 50,
+      });
+
+      // Complete in-flight
+      pendingSubject.next({ items: [], next_cursor: null });
+      pendingSubject.complete();
+      fixture.detectChanges();
+
+      expect(component.isLoadingMore()).toBeFalse();
+    });
+
+    it('stale loadMore in flight during loadPendingApprovals does not leave isLoadingMore stuck true', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockPendingRequests, next_cursor: 'cursor-1' }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(component.nextCursor()).toBe('cursor-1');
+      expect(component.isLoadingMore()).toBeFalse();
+
+      // Start loadMore with pending observable
+      const pendingLoadMore$ = new Subject<{ items: PurchaseRequest[]; next_cursor: string | null }>();
+      approvalsApi.listPendingApprovals.calls.reset();
+      approvalsApi.listPendingApprovals.and.returnValue(pendingLoadMore$);
+
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(component.isLoadingMore()).toBeTrue();
+
+      // While loadMore is in flight, a decision or reload triggers loadPendingApprovals()
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockPendingRequests, next_cursor: 'cursor-2' }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      // Old loadMore resolves now (stale response)
+      pendingLoadMore$.next({ items: [], next_cursor: null });
+      pendingLoadMore$.complete();
+      fixture.detectChanges();
+
+      // Assert isLoadingMore is false
+      expect(component.isLoadingMore()).toBeFalse();
+
+      // Assert a new loadMore works once reload returned cursor-2
+      approvalsApi.listPendingApprovals.calls.reset();
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [], next_cursor: null }),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
+        cursor: 'cursor-2',
+        limit: 50,
+      });
+      expect(component.isLoadingMore()).toBeFalse();
+    });
+
+    it('decisions reload first page and reset cursor clearing accumulated rows', () => {
+      const page1Item = { ...mockPendingRequests[0], id: 'req-single' };
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [page1Item], next_cursor: 'cur-page-2' }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      // Load page 2
+      const page2Item = { ...mockPendingRequests[1], id: 'req-page-2' };
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [page2Item], next_cursor: 'cur-page-3' }),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+      expect(component.pendingRequests().length).toBe(2);
+
+      // Now approve req-single
+      requestsApi.approveRequest.and.returnValue(of(page1Item));
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [page2Item], next_cursor: null }),
+      );
+
+      component.submitDecision('req-single', 'approve');
+      fixture.detectChanges();
+
+      // Reloaded page 1: extra pages and old cursor are cleared
+      expect(component.pendingRequests().length).toBe(1);
+      expect(component.nextCursor()).toBeNull();
+    });
+
+    it('group with size 2 but only one request in page: disabled, fetches missing sibling, enables when resolved, includes sibling in detail and totals', () => {
+      const partialGroupReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-split-1',
+        estimated_total: { amount: '1000.00', currency: 'SAR' },
+        lines: [
+          {
+            id: 'line-s1',
+            workspace_product_id: 'prod-gloves',
+            quantity: '10',
+            estimated_unit_price: { amount: '100.00', currency: 'SAR' },
+            note: 'First split',
+            quoted_prices_include_vat: false,
+            quoted_vat_rate: null,
+            quoted_net_unit_price: null,
+          },
+        ],
+        source: {
+          rfq_id: 'rfq-split-1',
+          rfq_response_id: 'resp-1',
+          quotation_id: 'q-1',
+          supplier_id: 'sup-1',
+          supplier_name: 'Supplier A',
+        },
+        request_group: {
+          id: 'grp-split-1',
+          rfq_id: 'rfq-split-1',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '2500.00', currency: 'SAR' },
+          saving: { amount: '500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-split-1', 'req-split-2'],
+        },
+      };
+
+      const siblingReq2: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-split-2',
+        estimated_total: { amount: '1500.00', currency: 'SAR' },
+        lines: [
+          {
+            id: 'line-s2',
+            workspace_product_id: 'prod-masks',
+            quantity: '50',
+            estimated_unit_price: { amount: '30.00', currency: 'SAR' },
+            note: 'Second split',
+            quoted_prices_include_vat: false,
+            quoted_vat_rate: null,
+            quoted_net_unit_price: null,
+          },
+        ],
+        source: {
+          rfq_id: 'rfq-split-1',
+          rfq_response_id: 'resp-2',
+          quotation_id: 'q-2',
+          supplier_id: 'sup-2',
+          supplier_name: 'Supplier B',
+        },
+        request_group: {
+          id: 'grp-split-1',
+          rfq_id: 'rfq-split-1',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '2500.00', currency: 'SAR' },
+          saving: { amount: '500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-split-1', 'req-split-2'],
+        },
+      };
+
+      const siblingSubject = new Subject<PurchaseRequest>();
+      requestsApi.getRequest.and.returnValue(siblingSubject);
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [partialGroupReq1], next_cursor: null }),
+      );
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      // getRequest was called for the missing sibling id
+      expect(requestsApi.getRequest).toHaveBeenCalledWith('req-split-2');
+
+      // Row's Approve and Reject buttons are disabled
+      const approveBtn = fixture.nativeElement.querySelector('.approve-btn') as HTMLButtonElement;
+      const rejectBtn = fixture.nativeElement.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(approveBtn.disabled).toBeTrue();
+      expect(rejectBtn.disabled).toBeTrue();
+
+      // Row shows loading hint
+      const loadingHint = fixture.nativeElement.querySelector('[data-testid="split-group-loading"]');
+      expect(loadingHint).toBeTruthy();
+      expect(loadingHint.textContent).toContain('Loading the rest of this split');
+
+      // Now resolve sibling fetch
+      siblingSubject.next(siblingReq2);
+      siblingSubject.complete();
+      fixture.detectChanges();
+
+      // Enabled after resolve
+      const approveBtnAfter = fixture.nativeElement.querySelector('.approve-btn') as HTMLButtonElement;
+      const rejectBtnAfter = fixture.nativeElement.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(approveBtnAfter.disabled).toBeFalse();
+      expect(rejectBtnAfter.disabled).toBeFalse();
+      expect(fixture.nativeElement.querySelector('[data-testid="split-group-loading"]')).toBeNull();
+
+      // Totals / expanded detail include sibling
+      const groupItem = component.queueItems()[0];
+      expect(groupItem.kind).toBe('group');
+      if (groupItem.kind === 'group') {
+        expect(groupItem.requests.length).toBe(2);
+        expect(groupItem.linesCount).toBe(2);
+      }
+
+      // Expand group row
+      component.toggleExpand('grp-split-1');
+      fixture.detectChanges();
+
+      const expandedText = fixture.nativeElement.textContent;
+      expect(expandedText).toContain('Supplier A');
+      expect(expandedText).toContain('Supplier B');
+      expect(expandedText).toContain('SAR 1,000');
+      expect(expandedText).toContain('SAR 1,500');
+    });
+
+    it('group with size 2: failing sibling fetch keeps buttons disabled and shows retry', () => {
+      const partialGroupReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-split-1',
+        request_group: {
+          id: 'grp-split-1',
+          rfq_id: 'rfq-split-1',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '2500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-split-1', 'req-split-2'],
+        },
+      };
+
+      requestsApi.getRequest.and.returnValue(throwError(() => new Error('Fetch failed')));
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [partialGroupReq1], next_cursor: null }),
+      );
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const approveBtn = fixture.nativeElement.querySelector('.approve-btn') as HTMLButtonElement;
+      const rejectBtn = fixture.nativeElement.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(approveBtn.disabled).toBeTrue();
+      expect(rejectBtn.disabled).toBeTrue();
+
+      // Error hint and retry button visible
+      const errorHint = fixture.nativeElement.querySelector('[data-testid="split-group-error"]');
+      expect(errorHint).toBeTruthy();
+      expect(errorHint.textContent).toContain('Failed to load the rest of this split');
+
+      const retryBtn = fixture.nativeElement.querySelector('[data-testid="split-group-retry"]') as HTMLButtonElement;
+      expect(retryBtn).toBeTruthy();
+
+      // Click retry
+      requestsApi.getRequest.calls.reset();
+      requestsApi.getRequest.and.returnValue(of({
+        ...partialGroupReq1,
+        id: 'req-split-2',
+      }));
+
+      retryBtn.click();
+      fixture.detectChanges();
+
+      expect(requestsApi.getRequest).toHaveBeenCalledWith('req-split-2');
+      const approveBtnAfter = fixture.nativeElement.querySelector('.approve-btn') as HTMLButtonElement;
+      const rejectBtnAfter = fixture.nativeElement.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(approveBtnAfter.disabled).toBeFalse();
+      expect(rejectBtnAfter.disabled).toBeFalse();
+    });
+
+    it('failed sibling fetch: then loadMore returns the sibling: banner and Retry gone, buttons enabled; and Retry with everything known clears the failure', () => {
+      const splitReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-split-f1',
+        request_group: {
+          id: 'grp-split-f1',
+          rfq_id: 'rfq-split-f1',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '2500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-split-f1', 'req-split-f2'],
+        },
+      };
+      const splitReq2: PurchaseRequest = {
+        ...mockPendingRequests[1],
+        id: 'req-split-f2',
+        request_group: {
+          id: 'grp-split-f1',
+          rfq_id: 'rfq-split-f1',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '2500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-split-f1', 'req-split-f2'],
+        },
+      };
+
+      // Initial load: page 1 has splitReq1 only, with next_cursor available.
+      // Sibling fetch fails.
+      requestsApi.getRequest.and.returnValue(throwError(() => new Error('Fetch failed')));
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [splitReq1], next_cursor: 'cursor-page-2' }),
+      );
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(component.groupStatus().get('grp-split-f1')).toBe('failed');
+      const approveBtn = fixture.nativeElement.querySelector('.approve-btn') as HTMLButtonElement;
+      const rejectBtn = fixture.nativeElement.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(approveBtn.disabled).toBeTrue();
+      expect(rejectBtn.disabled).toBeTrue();
+
+      let errorHint = fixture.nativeElement.querySelector('[data-testid="split-group-error"]');
+      let retryBtn = fixture.nativeElement.querySelector('[data-testid="split-group-retry"]');
+      expect(errorHint).toBeTruthy();
+      expect(retryBtn).toBeTruthy();
+
+      // User clicks Load more: next page brings in splitReq2!
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [splitReq2], next_cursor: null }),
+      );
+      const loadMoreBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
+      loadMoreBtn.click();
+      fixture.detectChanges();
+
+      // Banner and Retry gone, buttons enabled, status marked complete
+      errorHint = fixture.nativeElement.querySelector('[data-testid="split-group-error"]');
+      retryBtn = fixture.nativeElement.querySelector('[data-testid="split-group-retry"]');
+      expect(errorHint).toBeNull();
+      expect(retryBtn).toBeNull();
+
+      const approveBtnAfter = fixture.nativeElement.querySelector('.approve-btn') as HTMLButtonElement;
+      const rejectBtnAfter = fixture.nativeElement.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(approveBtnAfter.disabled).toBeFalse();
+      expect(rejectBtnAfter.disabled).toBeFalse();
+      expect(component.groupStatus().get('grp-split-f1')).toBe('complete');
+
+      // Now verify: Retry with everything known clears the failure
+      component.groupStatus.set(new Map([['grp-split-f1', 'failed']]));
+      fixture.detectChanges();
+      errorHint = fixture.nativeElement.querySelector('[data-testid="split-group-error"]');
+      expect(errorHint).toBeTruthy();
+
+      const groupItem = component.queueItems().find((i) => i.id === 'grp-split-f1');
+      expect(groupItem).toBeTruthy();
+      component.retryLoadGroup(groupItem as GroupQueueItem);
+      fixture.detectChanges();
+
+      expect(component.groupStatus().get('grp-split-f1')).toBe('complete');
+      errorHint = fixture.nativeElement.querySelector('[data-testid="split-group-error"]');
+      expect(errorHint).toBeNull();
+    });
+
+    it('group with size 2: sibling whose group id differs is rejected as invalid', () => {
+      const partialGroupReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-split-1',
+        request_group: {
+          id: 'grp-split-1',
+          rfq_id: 'rfq-split-1',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '2500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-split-1', 'req-split-2'],
+        },
+      };
+
+      const invalidSiblingReq2: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-split-2',
+        request_group: {
+          id: 'grp-DIFFERENT',
+          rfq_id: 'rfq-split-1',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '2500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-split-1', 'req-split-2'],
+        },
+      };
+
+      requestsApi.getRequest.and.returnValue(of(invalidSiblingReq2));
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [partialGroupReq1], next_cursor: null }),
+      );
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      // Buttons stay disabled
+      const approveBtn = fixture.nativeElement.querySelector('.approve-btn') as HTMLButtonElement;
+      const rejectBtn = fixture.nativeElement.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(approveBtn.disabled).toBeTrue();
+      expect(rejectBtn.disabled).toBeTrue();
+
+      // Shows error and retry
+      const errorHint = fixture.nativeElement.querySelector('[data-testid="split-group-error"]');
+      expect(errorHint).toBeTruthy();
+    });
+
+    it('a complete group on one page is enabled immediately without extra calls', () => {
+      requestsApi.getRequest.calls.reset();
+
+      const completeGroupReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-c-1',
+        request_group: {
+          id: 'grp-complete',
+          rfq_id: 'rfq-c',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '2000.00', currency: 'SAR' },
+          sibling_request_ids: ['req-c-1', 'req-c-2'],
+        },
+      };
+      const completeGroupReq2: PurchaseRequest = {
+        ...mockPendingRequests[1],
+        id: 'req-c-2',
+        request_group: {
+          id: 'grp-complete',
+          rfq_id: 'rfq-c',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '2000.00', currency: 'SAR' },
+          sibling_request_ids: ['req-c-1', 'req-c-2'],
+        },
+      };
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [completeGroupReq1, completeGroupReq2], next_cursor: null }),
+      );
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(requestsApi.getRequest).not.toHaveBeenCalled();
+
+      const approveBtn = fixture.nativeElement.querySelector('.approve-btn') as HTMLButtonElement;
+      const rejectBtn = fixture.nativeElement.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(approveBtn.disabled).toBeFalse();
+      expect(rejectBtn.disabled).toBeFalse();
+      expect(fixture.nativeElement.querySelector('[data-testid="split-group-loading"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="split-group-error"]')).toBeNull();
+    });
+
+    it('stale responses: sibling fetch result is ignored if loadPendingApprovals reloaded while fetch was pending', () => {
+      const partialGroupReq: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-split-gen1',
+        request_group: {
+          id: 'grp-gen',
+          rfq_id: 'rfq-gen',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '2000.00', currency: 'SAR' },
+          sibling_request_ids: ['req-split-gen1', 'req-split-gen2'],
+        },
+      };
+
+      const pendingSiblingSubject = new Subject<PurchaseRequest>();
+      requestsApi.getRequest.and.returnValue(pendingSiblingSubject);
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [partialGroupReq], next_cursor: null }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(requestsApi.getRequest).toHaveBeenCalledWith('req-split-gen2');
+      expect(component.groupStatus().get('grp-gen')).toBe('loading');
+
+      // Reload while fetch is pending
+      const freshReq: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-fresh-1',
+        request_group: null,
+      };
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [freshReq], next_cursor: null }),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      // State is reset for new load
+      expect(component.groupSiblings().has('grp-gen')).toBeFalse();
+
+      // Old fetch resolves now (late response)
+      pendingSiblingSubject.next({
+        ...partialGroupReq,
+        id: 'req-split-gen2',
+      });
+      pendingSiblingSubject.complete();
+      fixture.detectChanges();
+
+      // Old late response must be ignored
+      expect(component.groupSiblings().has('grp-gen')).toBeFalse();
+      expect(component.groupStatus().get('grp-gen')).toBeUndefined();
+    });
+
+    it('split-group completeness does not overwrite loading status for pending sibling fetch when complete group is loaded first', () => {
+      requestsApi.getRequest.calls.reset();
+
+      const completeReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-c-1',
+        request_group: {
+          id: 'grp-complete',
+          rfq_id: 'rfq-c',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '2000.00', currency: 'SAR' },
+          sibling_request_ids: ['req-c-1', 'req-c-2'],
+        },
+      };
+      const completeReq2: PurchaseRequest = {
+        ...mockPendingRequests[1],
+        id: 'req-c-2',
+        request_group: {
+          id: 'grp-complete',
+          rfq_id: 'rfq-c',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '2000.00', currency: 'SAR' },
+          sibling_request_ids: ['req-c-1', 'req-c-2'],
+        },
+      };
+      const incompleteReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-inc-1',
+        request_group: {
+          id: 'grp-incomplete',
+          rfq_id: 'rfq-inc',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '1500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-inc-1', 'req-inc-2'],
+        },
+      };
+      const siblingReq2: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-inc-2',
+        request_group: {
+          id: 'grp-incomplete',
+          rfq_id: 'rfq-inc',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '1500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-inc-1', 'req-inc-2'],
+        },
+      };
+
+      const siblingSubject = new Subject<PurchaseRequest>();
+      requestsApi.getRequest.and.returnValue(siblingSubject);
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [completeReq1, completeReq2, incompleteReq1], next_cursor: 'cur-page2' }),
+      );
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const rows = fixture.nativeElement.querySelectorAll('tr.request-row');
+      expect(rows.length).toBe(2);
+
+      const completeRow = rows[0];
+      const completeApproveBtn = completeRow.querySelector('.approve-btn') as HTMLButtonElement;
+      const completeRejectBtn = completeRow.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(completeApproveBtn.disabled).toBeFalse();
+      expect(completeRejectBtn.disabled).toBeFalse();
+      expect(completeRow.querySelector('[data-testid="split-group-loading"]')).toBeNull();
+
+      const incompleteRow = rows[1];
+      const incApproveBtn = incompleteRow.querySelector('.approve-btn') as HTMLButtonElement;
+      const incRejectBtn = incompleteRow.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(incApproveBtn.disabled).toBeTrue();
+      expect(incRejectBtn.disabled).toBeTrue();
+      const loadingHint = incompleteRow.querySelector('[data-testid="split-group-loading"]');
+      expect(loadingHint).not.toBeNull();
+      expect(component.groupStatus().get('grp-incomplete')).toBe('loading');
+
+      expect(requestsApi.getRequest).toHaveBeenCalledTimes(1);
+      expect(requestsApi.getRequest).toHaveBeenCalledWith('req-inc-2');
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [], next_cursor: null }),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(requestsApi.getRequest).toHaveBeenCalledTimes(1);
+
+      siblingSubject.next(siblingReq2);
+      siblingSubject.complete();
+      fixture.detectChanges();
+
+      expect(component.groupStatus().get('grp-incomplete')).toBe('complete');
+      const updatedRows = fixture.nativeElement.querySelectorAll('tr.request-row');
+      const updatedIncompleteRow = updatedRows[1];
+      const updatedIncApproveBtn = updatedIncompleteRow.querySelector('.approve-btn') as HTMLButtonElement;
+      const updatedIncRejectBtn = updatedIncompleteRow.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(updatedIncApproveBtn.disabled).toBeFalse();
+      expect(updatedIncRejectBtn.disabled).toBeFalse();
+      expect(fixture.nativeElement.querySelector('[data-testid="split-group-loading"]')).toBeNull();
+    });
+
+    it('split-group completeness does not overwrite loading status for pending sibling fetch when incomplete group is loaded first', () => {
+      requestsApi.getRequest.calls.reset();
+
+      const incompleteReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-inc-1',
+        request_group: {
+          id: 'grp-incomplete',
+          rfq_id: 'rfq-inc',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '1500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-inc-1', 'req-inc-2'],
+        },
+      };
+      const completeReq1: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-c-1',
+        request_group: {
+          id: 'grp-complete',
+          rfq_id: 'rfq-c',
+          position: 1,
+          size: 2,
+          combined_total: { amount: '2000.00', currency: 'SAR' },
+          sibling_request_ids: ['req-c-1', 'req-c-2'],
+        },
+      };
+      const completeReq2: PurchaseRequest = {
+        ...mockPendingRequests[1],
+        id: 'req-c-2',
+        request_group: {
+          id: 'grp-complete',
+          rfq_id: 'rfq-c',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '2000.00', currency: 'SAR' },
+          sibling_request_ids: ['req-c-1', 'req-c-2'],
+        },
+      };
+      const siblingReq2: PurchaseRequest = {
+        ...mockPendingRequests[0],
+        id: 'req-inc-2',
+        request_group: {
+          id: 'grp-incomplete',
+          rfq_id: 'rfq-inc',
+          position: 2,
+          size: 2,
+          combined_total: { amount: '1500.00', currency: 'SAR' },
+          sibling_request_ids: ['req-inc-1', 'req-inc-2'],
+        },
+      };
+
+      const siblingSubject = new Subject<PurchaseRequest>();
+      requestsApi.getRequest.and.returnValue(siblingSubject);
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [incompleteReq1, completeReq1, completeReq2], next_cursor: 'cur-page2' }),
+      );
+
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const rows = fixture.nativeElement.querySelectorAll('tr.request-row');
+      expect(rows.length).toBe(2);
+
+      const incompleteRow = rows[0];
+      const incApproveBtn = incompleteRow.querySelector('.approve-btn') as HTMLButtonElement;
+      const incRejectBtn = incompleteRow.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(incApproveBtn.disabled).toBeTrue();
+      expect(incRejectBtn.disabled).toBeTrue();
+      const loadingHint = incompleteRow.querySelector('[data-testid="split-group-loading"]');
+      expect(loadingHint).not.toBeNull();
+      expect(component.groupStatus().get('grp-incomplete')).toBe('loading');
+
+      const completeRow = rows[1];
+      const completeApproveBtn = completeRow.querySelector('.approve-btn') as HTMLButtonElement;
+      const completeRejectBtn = completeRow.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(completeApproveBtn.disabled).toBeFalse();
+      expect(completeRejectBtn.disabled).toBeFalse();
+      expect(completeRow.querySelector('[data-testid="split-group-loading"]')).toBeNull();
+
+      expect(requestsApi.getRequest).toHaveBeenCalledTimes(1);
+      expect(requestsApi.getRequest).toHaveBeenCalledWith('req-inc-2');
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: [], next_cursor: null }),
+      );
+      component.loadMore();
+      fixture.detectChanges();
+
+      expect(requestsApi.getRequest).toHaveBeenCalledTimes(1);
+
+      siblingSubject.next(siblingReq2);
+      siblingSubject.complete();
+      fixture.detectChanges();
+
+      expect(component.groupStatus().get('grp-incomplete')).toBe('complete');
+      const updatedRows = fixture.nativeElement.querySelectorAll('tr.request-row');
+      const updatedIncompleteRow = updatedRows[0];
+      const updatedIncApproveBtn = updatedIncompleteRow.querySelector('.approve-btn') as HTMLButtonElement;
+      const updatedIncRejectBtn = updatedIncompleteRow.querySelector('.reject-btn') as HTMLButtonElement;
+      expect(updatedIncApproveBtn.disabled).toBeFalse();
+      expect(updatedIncRejectBtn.disabled).toBeFalse();
+      expect(fixture.nativeElement.querySelector('[data-testid="split-group-loading"]')).toBeNull();
+    });
+
+    it('renders cleanly in RTL direction', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockPendingRequests, next_cursor: 'cur-ar' }),
+      );
+      component.loadPendingApprovals();
+
+      document.documentElement.setAttribute('dir', 'rtl');
+      const translate = TestBed.inject(TranslateService);
+      translate.use('ar');
+      fixture.detectChanges();
+
+      const container = fixture.nativeElement.querySelector('.approval-queue-container');
+      expect(container).not.toBeNull();
+      const statusEl = fixture.nativeElement.querySelector('[data-testid="pagination-status"]');
+      expect(statusEl?.textContent).toContain('عرض طلبين، ويتوفر المزيد');
+
+      document.documentElement.setAttribute('dir', 'ltr');
+      translate.use('en');
+      fixture.detectChanges();
     });
   });
 });

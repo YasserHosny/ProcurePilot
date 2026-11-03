@@ -1,4 +1,4 @@
-import { Component, inject, ChangeDetectionStrategy } from "@angular/core";
+import { Component, inject, ChangeDetectionStrategy, ElementRef, afterNextRender } from "@angular/core";
 import { MatButtonModule } from "@angular/material/button";
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatIconModule } from "@angular/material/icon";
@@ -18,6 +18,8 @@ export interface ConfirmDialogData {
   readonly [key: string]: unknown;
 }
 
+let nextDescriptionId = 0;
+
 @Component({
   selector: "app-catalogue-confirm-dialog",
   standalone: true,
@@ -29,6 +31,25 @@ export interface ConfirmDialogData {
 export class CatalogueConfirmDialogComponent {
   private readonly dialogRef = inject(MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
   readonly data: ConfirmDialogData = inject(MAT_DIALOG_DATA);
+
+  readonly messageId = `confirm-dialog-message-${nextDescriptionId++}`;
+  readonly warningId = `${this.messageId}-warning`;
+
+  constructor() {
+    const host = inject(ElementRef<HTMLElement>).nativeElement;
+    afterNextRender(() => {
+      const container = host.closest('.mat-mdc-dialog-container');
+      if (!container) return;
+
+      container.setAttribute('aria-modal', 'true');
+      const descriptionIds = new Set(
+        (container.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean),
+      );
+      descriptionIds.add(this.messageId);
+      if (this.data.warningKey) descriptionIds.add(this.warningId);
+      container.setAttribute('aria-describedby', [...descriptionIds].join(' '));
+    });
+  }
 
   onConfirm(): void {
     this.dialogRef.close(true);

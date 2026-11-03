@@ -39,10 +39,14 @@
               [attr.data-testid]="'approved-request-option-' + req.id"
             >
               <span>
+                @if (approvedRequestSupplier(req); as supplier) {
+                  <span dir="auto">{{ supplier }}</span> ·
+                }
                 {{ formatRequiredBy(req.required_by_date) }}
                 @if (req.estimated_total) {
                   · {{ formatApprovedRequestMoney(req) }}
                 }
+                · {{ 'orders.lineCount' | translate: { count: req.lines.length } }}
               </span>
             </button>
           }
@@ -55,6 +59,50 @@
     </div>
   </div>
 
+  <form class="filters" role="search" data-testid="orders-search-form" (submit)="onSearchSubmit($event)">
+    <label class="filter-field search-field">
+      <span>{{ 'orders.filters.search' | translate }}</span>
+      <input type="search" [value]="search()" (input)="onSearchInput($event)" [placeholder]="'orders.filters.searchPlaceholder' | translate" data-testid="orders-search" />
+    </label>
+    <label class="filter-field">
+      <span>{{ 'orders.filters.status' | translate }}</span>
+      <select [value]="statusFilter()" (change)="onStatusChange($event)" data-testid="orders-status-filter">
+        @for (option of statusOptions; track option) {
+          <option [value]="option" [selected]="option === statusFilter()">{{ option === 'all' ? ('orders.filters.allStatuses' | translate) : getStatusLabel(option) }}</option>
+        }
+      </select>
+    </label>
+    <label class="filter-field">
+      <span>{{ 'orders.filters.supplier' | translate }}</span>
+      <select [value]="supplierFilter()" (change)="onSupplierChange($event)" data-testid="orders-supplier-filter">
+        <option value="" [selected]="supplierFilter() === ''">{{ 'orders.filters.allSuppliers' | translate }}</option>
+        @for (supplier of suppliers(); track supplier.id) {
+          <option [value]="supplier.id" [selected]="supplier.id === supplierFilter()" dir="auto">{{ supplier.name }}</option>
+        }
+      </select>
+    </label>
+    <label class="filter-field">
+      <span>{{ 'orders.filters.dateFrom' | translate }}</span>
+      <input type="date" [value]="dateFrom()" [max]="dateTo() || null" (change)="onDateChange('from', $event)" data-testid="orders-date-from" />
+    </label>
+    <label class="filter-field">
+      <span>{{ 'orders.filters.dateTo' | translate }}</span>
+      <input type="date" [value]="dateTo()" [min]="dateFrom() || null" (change)="onDateChange('to', $event)" data-testid="orders-date-to" />
+    </label>
+    <label class="filter-field">
+      <span>{{ 'orders.filters.sort' | translate }}</span>
+      <select [value]="sortKey()" (change)="onSortChange($event)" data-testid="orders-sort">
+        @for (option of sortOptions; track option) {
+          <option [value]="option" [selected]="option === sortKey()">{{ getSortLabel(option) }}</option>
+        }
+      </select>
+    </label>
+    <button mat-stroked-button type="submit">{{ 'orders.filters.apply' | translate }}</button>
+  </form>
+  @if (totalCount() !== null && !isLoading() && !errorMessage()) {
+    <p class="result-count" role="status" data-testid="orders-result-count">{{ 'orders.resultCount' | translate: { count: totalCount() } }}</p>
+  }
+
   @if (errorMessage(); as error) {
     <mat-card class="state error" role="alert">
       <mat-icon aria-hidden="true">error_outline</mat-icon>
@@ -63,6 +111,12 @@
     </mat-card>
   } @else if (isLoading()) {
     <div class="state" role="status"><mat-spinner diameter="36" /></div>
+  } @else if (orders().length === 0 && filtersActive()) {
+    <mat-card class="state" data-testid="orders-no-match">
+      <mat-icon aria-hidden="true">search_off</mat-icon>
+      <h2>{{ 'orders.filters.noMatchTitle' | translate }}</h2>
+      <p>{{ 'orders.filters.noMatchDescription' | translate }}</p>
+    </mat-card>
   } @else if (orders().length === 0) {
     <mat-card class="state">
       <mat-icon aria-hidden="true">assignment</mat-icon>
@@ -77,9 +131,15 @@
             <div class="order-heading">
               <a [routerLink]="['/orders', order.id]">{{ order.order_number }}</a>
               <span class="status-chip" [attr.data-status]="order.status">{{ getStatusLabel(order.status) }}</span>
+              @if (isOverdue(order)) {
+                <span class="status-chip overdue" data-testid="order-overdue">{{ 'orders.overdue' | translate }}</span>
+              }
             </div>
             @if (order.supplier_name; as supplier) {
               <span class="order-supplier" dir="auto" data-testid="order-card-supplier">{{ supplier }}</span>
+            }
+            @if (order.expected_delivery_date) {
+              <span class="order-date" data-testid="order-expected">{{ 'orders.expectedDate' | translate: { date: (order.expected_delivery_date | formatDate) } }}</span>
             }
             @if (order.status === 'draft') {
               <span class="order-date">{{ 'orders.createdDate' | translate: { date: (order.created_at | formatDate) } }}</span>
@@ -98,6 +158,13 @@
         </mat-card>
       }
     </div>
+    @if (loadMoreError()) {
+      <mat-card class="state error" role="alert" data-testid="load-more-error">
+        <mat-icon aria-hidden="true">error_outline</mat-icon>
+        <span>{{ 'orders.loadMoreError' | translate }}</span>
+        <button mat-button type="button" (click)="loadMore()">{{ 'orders.retry' | translate }}</button>
+      </mat-card>
+    }
     @if (nextCursor()) {
       <div class="pagination">
         <button mat-stroked-button type="button" (click)="loadMore()" [disabled]="isLoadingMore()">

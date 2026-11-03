@@ -55,7 +55,7 @@
             @if (sourceSupplierName() && sourceBranchName()) {
               {{ 'orders.create.fromApprovedRequestBanner' | translate: { supplier: sourceSupplierName(), branch: sourceBranchName() } }}
             } @else {
-              {{ 'orders.create.creatingFromRequest' | translate }}: {{ req.id }}
+              {{ 'orders.create.fromApprovedRequestPlain' | translate }}
             }
           </span>
         </a>
@@ -108,12 +108,13 @@
       <div class="form-row">
         <mat-form-field appearance="outline">
           <mat-label>{{ 'orders.create.currency' | translate }}</mat-label>
-          <input matInput formControlName="currency" [readonly]="!!sourceRequest()" [placeholder]="'orders.create.currencyPlaceholder' | translate: { currency: homeCurrency }" />
+          <mat-select formControlName="currency">
+            @for (code of currencyOptions(); track code) {
+              <mat-option [value]="code">{{ code }}</mat-option>
+            }
+          </mat-select>
           @if (form.controls.currency.hasError('required')) {
             <mat-error>{{ 'orders.create.errors.required' | translate }}</mat-error>
-          }
-          @if (form.controls.currency.hasError('pattern')) {
-            <mat-error>{{ 'orders.create.errors.currencyFormat' | translate }}</mat-error>
           }
         </mat-form-field>
       </div>
@@ -129,7 +130,7 @@
               @if (line.controls.source_request_line_id.value) {
                 <div class="line-reference-info">
                   @if (line.controls.estimated_price.value !== null) {
-                    <span class="estimate-badge">{{ 'orders.create.estimateReference' | translate }}: {{ { amount: line.controls.estimated_price.value, currency: form.controls.currency.value } | formatMoney }}</span>
+                    <span class="estimate-badge">{{ 'orders.create.estimateReference' | translate }}: {{ { amount: line.controls.estimated_price.value, currency: estimateCurrencyFor(line) } | formatMoney }}</span>
                   }
                   <span class="remaining-badge">{{ 'orders.create.remainingQuantity' | translate }}: {{ line.controls.remaining_quantity.value }}</span>
                 </div>
@@ -141,7 +142,7 @@
             </div>
 
             <div class="form-row">
-              <mat-form-field appearance="outline">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
                 <mat-label>{{ 'orders.create.product' | translate }}</mat-label>
                 <mat-select formControlName="workspace_product_id" (selectionChange)="onProductSelected(i, $event.value)">
                   <mat-option [value]="null">{{ 'orders.create.noProduct' | translate }}</mat-option>
@@ -151,7 +152,7 @@
                 </mat-select>
               </mat-form-field>
 
-              <mat-form-field appearance="outline">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
                 <mat-label>{{ 'orders.create.description' | translate }}</mat-label>
                 <input matInput formControlName="description" />
                 @if (line.controls.description.hasError('required')) {
@@ -161,8 +162,8 @@
             </div>
 
             <div class="form-row">
-              <mat-form-field appearance="outline">
-                <mat-label>{{ 'orders.create.quantity' | translate }}</mat-label>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>{{ quantityLabelKey(line) | translate }}</mat-label>
                 <input matInput type="number" step="0.01" formControlName="quantity" />
                 @if (line.controls.quantity.hasError('required')) {
                   <mat-error>{{ 'orders.create.errors.required' | translate }}</mat-error>
@@ -175,7 +176,7 @@
                 }
               </mat-form-field>
 
-              <mat-form-field appearance="outline">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
                 <mat-label>{{ 'orders.create.baseUnit' | translate }}</mat-label>
                 <input matInput formControlName="base_unit" />
                 @if (line.controls.base_unit.hasError('required')) {
@@ -185,9 +186,12 @@
             </div>
 
             <div class="form-row">
-              <mat-form-field appearance="outline" class="pp-figures">
+              <mat-form-field appearance="outline" class="pp-figures" subscriptSizing="dynamic">
                 <mat-label>{{ 'orders.create.unitPrice' | translate }}</mat-label>
                 <input matInput type="number" step="0.01" formControlName="unit_price" />
+                @if (canUseEstimate(i)) {
+                  <button matSuffix mat-button type="button" (click)="useEstimate(i)" data-testid="use-estimate">{{ 'orders.create.useEstimate' | translate }}</button>
+                }
                 @if (packHint(line); as pack) {
                   <mat-hint>{{ pack }}</mat-hint>
                 }
@@ -199,7 +203,7 @@
                 }
               </mat-form-field>
 
-              <mat-form-field appearance="outline" class="pp-figures">
+              <mat-form-field appearance="outline" class="pp-figures" subscriptSizing="dynamic">
                 <mat-label>{{ 'orders.create.lineTax' | translate }}</mat-label>
                 <input matInput type="number" step="0.01" formControlName="line_tax" />
                 @if (line.controls.line_tax.hasError('min')) {
@@ -215,32 +219,26 @@
       </div>
 
       <div class="actions actions-start">
-        <button mat-stroked-button type="button" (click)="addLine()">
-          <mat-icon>add</mat-icon>
-          {{ 'orders.create.addLine' | translate }}
-        </button>
+        @if (!sourceLoadFailed()) {
+          <button mat-stroked-button type="button" (click)="addLine()" data-testid="add-line">
+            <mat-icon>add</mat-icon>
+            {{ 'orders.create.addLine' | translate }}
+          </button>
+        }
       </div>
 
       <mat-card class="totals-card">
         <div>
           <span>{{ 'orders.create.linesTotalLabel' | translate }}:</span>
-          <span class="pp-figures">{{ { amount: computedTotals().linesTotal, currency: form.value.currency || 'USD' } | formatMoney }}</span>
+          <span class="pp-figures">{{ { amount: computedTotals().linesTotal, currency: form.controls.currency.value || 'USD' } | formatMoney }}</span>
         </div>
         <div class="tax-row">
           <span>{{ 'orders.create.orderTax' | translate }}:</span>
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="pp-figures tax-field">
-            <input
-              matInput
-              type="number"
-              step="0.01"
-              formControlName="order_tax"
-              [attr.aria-label]="'orders.create.orderTax' | translate"
-            />
-          </mat-form-field>
+          <span class="pp-figures" data-testid="order-tax-total">{{ { amount: computedTotals().taxTotal, currency: form.controls.currency.value || 'USD' } | formatMoney }}</span>
         </div>
         <div class="grand-total">
           <span>{{ 'orders.create.orderTotal' | translate }}:</span>
-          <span class="pp-figures">{{ { amount: computedTotals().orderTotal, currency: form.value.currency || 'USD' } | formatMoney }}</span>
+          <span class="pp-figures">{{ { amount: computedTotals().orderTotal, currency: form.controls.currency.value || 'USD' } | formatMoney }}</span>
         </div>
       </mat-card>
 

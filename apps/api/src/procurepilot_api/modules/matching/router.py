@@ -43,12 +43,14 @@ def next_match_task(
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[MatchingService, Depends(get_matching_service)],
     exclude_task_id: UUID | None = None,
+    quotation_id: UUID | None = None,
 ) -> NextMatchTask:
     queue = service.list_match_tasks(
         bearer_token=token,
         member=member,
         limit=100,
         status="open",
+        quotation_id=quotation_id,
         sort_by="created_at",
         sort_order="desc",
     )

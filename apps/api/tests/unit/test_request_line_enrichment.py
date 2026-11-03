@@ -25,6 +25,7 @@ class RecordingSelectQuery:
         self.in_filters: list[tuple[str, list[str]]] = []
         self.orders: list[tuple[str, bool]] = []
         self.inserts: list[dict[str, object]] | None = None
+        self.bounds: tuple[int, int] | None = None
 
     def select(self, columns: str) -> RecordingSelectQuery:
         self.tracker.append({"table": self.table_name, "op": "select", "columns": columns})
@@ -50,6 +51,10 @@ class RecordingSelectQuery:
         self.orders.append((column, desc))
         return self
 
+    def range(self, start: int, end: int) -> RecordingSelectQuery:
+        self.bounds = (start, end)
+        return self
+
     def execute(self) -> SimpleNamespace:
         if self.inserts is not None:
             return SimpleNamespace(data=self.inserts)
@@ -61,6 +66,9 @@ class RecordingSelectQuery:
             data = [r for r in data if str(r.get(col)) in allowed]
         for col, desc in reversed(self.orders):
             data = sorted(data, key=lambda r: str(r.get(col, "")), reverse=desc)
+        if self.bounds is not None:
+            start, end = self.bounds
+            data = data[start : end + 1]
         return SimpleNamespace(data=data)
 
 

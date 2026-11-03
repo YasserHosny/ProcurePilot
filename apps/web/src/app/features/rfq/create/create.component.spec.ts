@@ -12,6 +12,8 @@ import { of, throwError, Subject } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Product, Supplier } from '../../../core/api/models';
+import enCatalog from '../../../../../../../packages/i18n/en.json';
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 
 describe('RfqCreateComponent', () => {
   let component: RfqCreateComponent;
@@ -97,43 +99,18 @@ describe('RfqCreateComponent', () => {
     spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
 
     translate = TestBed.inject(TranslateService);
-    translate.setTranslation(
-      'en',
-      {
-        rfq: {
-          create: {
-            title: 'Create RFQ',
-            editTitle: 'Edit RFQ draft',
-            draftSaved: 'Draft saved',
-            productRequired: 'Select a product from the catalogue.',
-            sentSuccess: 'RFQ sent. Suppliers emailed: {{count}}',
-            notDraftTitle: 'RFQ cannot be edited',
-            notDraftMessage: 'Only draft RFQs can be edited. This RFQ has already been sent.',
-            backToHistory: 'Back to RFQ History',
-            validationError: 'Please check the following RFQ fields:',
-            neededByDateLabel: 'Needed By Date',
-            saveError: 'SAVE FALLBACK',
-            neededByPastError: "The needed-by date can't be in the past",
-            neededByDateRequired: 'Needed by date is required',
-            neededByDateFormat: 'Enter a date as {{format}}',
-            productDuplicate: 'The same product cannot be added more than once',
-            productDuplicateOnLine: 'Already on line {{line}}',
-            alreadyAdded: 'Already added',
-            confirmSendMessage: {
-              one: 'Send this RFQ to {{suppliers}} for {{itemCount}} item, needed by {{date}}?',
-              other: 'Send this RFQ to {{suppliers}} for {{itemCount}} items, needed by {{date}}?',
-            },
-            errors: { notFound: 'The requested RFQ resource could not be found.' },
-          },
-          history: {
-            dismiss: 'Close',
-            status_draft: 'Draft',
-            status_sent: 'Sent',
-          },
+    const enMerged = {
+      ...enCatalog,
+      rfq: {
+        ...enCatalog.rfq,
+        create: {
+          ...enCatalog.rfq.create,
+          saveError: 'SAVE FALLBACK',
         },
       },
-      true,
-    );
+    };
+    translate.setTranslation('en', enMerged, true);
+    translate.setTranslation('ar', arCatalog, true);
     translate.use('en');
 
     fixture = TestBed.createComponent(RfqCreateComponent);
@@ -353,7 +330,7 @@ describe('RfqCreateComponent', () => {
     expect(dateVal?.getMonth()).toBe(10); // November is 10 in 0-indexed local month
     expect(dateVal?.getDate()).toBe(15);
 
-    const heading = (editFixture.nativeElement as HTMLElement).querySelector('h2');
+    const heading = (editFixture.nativeElement as HTMLElement).querySelector('h1');
     expect(heading?.textContent).toContain('Edit RFQ draft');
 
     editComp.onSave();
@@ -1377,5 +1354,271 @@ describe('RfqCreateComponent', () => {
       );
       expect(document.activeElement).toBe(neededByInput);
     }));
+  });
+
+  describe('PPS-179 / P-145 improvements', () => {
+    it('shows translated error text for quantity and suppliers on invalid submit', () => {
+      component.onSave();
+      fixture.detectChanges();
+
+      const errors = Array.from(fixture.nativeElement.querySelectorAll('mat-error')).map(
+        (e: unknown) => (e as HTMLElement).textContent?.trim(),
+      );
+
+      expect(errors).toContain(enCatalog.rfq.create.quantityRequired);
+      expect(errors).toContain(enCatalog.rfq.create.suppliersRequired);
+
+      const qtyControl = component.linesFormArray.at(0).get('quantity');
+      qtyControl?.setValue(0);
+      qtyControl?.markAsTouched();
+      fixture.detectChanges();
+
+      const updatedErrors = Array.from(fixture.nativeElement.querySelectorAll('mat-error')).map(
+        (e: unknown) => (e as HTMLElement).textContent?.trim(),
+      );
+      expect(updatedErrors).toContain(enCatalog.rfq.create.quantityMin);
+    });
+
+    it('translates rejected supplier reasons and names known suppliers', () => {
+      const knownSupplier = { id: 'sup-1', name: 'Acme Supplies', contact_email: null, status: 'active', created_at: '' } as Supplier;
+      component.allLoadedSuppliers.set([knownSupplier]);
+      component.suppliers.set([knownSupplier]);
+      component.rejectedSuppliers.set([
+        { supplier_id: 'sup-1', reason: 'missing_contact_email' },
+        { supplier_id: 'sup-99', reason: 'not_found' },
+        { supplier_id: 'sup-88', reason: 'unknown_code' },
+      ]);
+      fixture.detectChanges();
+
+      const rejectionsList = fixture.nativeElement.querySelectorAll('.rejections-card li');
+      const items = Array.from(rejectionsList).map((li: unknown) => (li as HTMLElement).textContent?.trim());
+
+      expect(items[0]).toContain('Acme Supplies');
+      expect(items[0]).toContain(enCatalog.rfq.create.rejectedReasons.missing_contact_email);
+
+      expect(items[1]).toContain('sup-99');
+      expect(items[1]).toContain(enCatalog.rfq.create.rejectedReasons.not_found);
+
+      expect(items[2]).toContain('sup-88');
+      expect(items[2]).toContain(enCatalog.rfq.create.rejectedReasons.generic);
+    });
+
+    it('uses <h1> for the page title', () => {
+      const h1 = fixture.nativeElement.querySelector('.header h1');
+      expect(h1).withContext('<h1> should exist in .header').not.toBeNull();
+      expect(h1.textContent?.trim()).toBe(enCatalog.rfq.create.title);
+
+      const h2 = fixture.nativeElement.querySelector('.header h2');
+      expect(h2).withContext('<h2> should not be used as page title in .header').toBeNull();
+    });
+
+    it('provides translated date format hint keys in English and Arabic', () => {
+      translate.use('en');
+      fixture.detectChanges();
+      expect(enCatalog.rfq.create.dateFormatDayFirst).toBe('DD/MM/YYYY');
+      expect(enCatalog.rfq.create.dateFormatMonthFirst).toBe('MM/DD/YYYY');
+      expect(component.dateFormatHint).toBe('DD/MM/YYYY');
+
+      translate.use('ar');
+      fixture.detectChanges();
+      expect(arCatalog.rfq.create.dateFormatDayFirst).toBe('يوم/شهر/سنة');
+      expect(arCatalog.rfq.create.dateFormatMonthFirst).toBe('شهر/يوم/سنة');
+      expect(component.dateFormatHint).toBe('يوم/شهر/سنة');
+
+      expect(typeof enCatalog.rfq.create.suppliersNoEmailHint).toBe('string');
+      expect(typeof arCatalog.rfq.create.suppliersNoEmailHint).toBe('string');
+      translate.use('en');
+    });
+
+    it('isolates direction of the Terms counter markup using <bdi dir="ltr">', () => {
+      fixture.detectChanges();
+      const bdi = fixture.nativeElement.querySelector('mat-hint bdi[dir="ltr"]');
+      expect(bdi).withContext('terms counter should use <bdi dir="ltr">').not.toBeNull();
+      expect(bdi?.textContent?.trim()).toBe('0 / 4000');
+
+      component.form.controls.tenantTerms.setValue('Hello');
+      fixture.detectChanges();
+      expect(bdi?.textContent?.trim()).toBe('5 / 4000');
+    });
+
+    it('includes line context in accessible names and startsWith visible label text in en and ar', () => {
+      component.addLine();
+      fixture.detectChanges();
+
+      const productInputs = fixture.nativeElement.querySelectorAll('input[formcontrolname="workspace_product_id"]');
+      const quantityInputs = fixture.nativeElement.querySelectorAll('input[formcontrolname="quantity"]');
+      const removeButtons = fixture.nativeElement.querySelectorAll('.line-row button[mat-icon-button]');
+
+      expect(productInputs.length).toBe(2);
+      expect(quantityInputs.length).toBe(2);
+      expect(removeButtons.length).toBe(2);
+
+      translate.use('en');
+      fixture.detectChanges();
+
+      const enProdLabel = enCatalog.rfq.create.productIdLabel;
+      const enQtyLabel = enCatalog.rfq.create.quantityLabel;
+
+      const p1Label = productInputs[0].getAttribute('aria-label');
+      const p2Label = productInputs[1].getAttribute('aria-label');
+      expect(p1Label?.startsWith(enProdLabel)).toBeTrue();
+      expect(p1Label).toContain('1');
+      expect(p2Label?.startsWith(enProdLabel)).toBeTrue();
+      expect(p2Label).toContain('2');
+
+      const q1Label = quantityInputs[0].getAttribute('aria-label');
+      const q2Label = quantityInputs[1].getAttribute('aria-label');
+      expect(q1Label?.startsWith(enQtyLabel)).toBeTrue();
+      expect(q1Label).toContain('1');
+      expect(q2Label?.startsWith(enQtyLabel)).toBeTrue();
+      expect(q2Label).toContain('2');
+
+      const r1Label = removeButtons[0].getAttribute('aria-label');
+      const r2Label = removeButtons[1].getAttribute('aria-label');
+      expect(r1Label).toContain('1');
+      expect(r2Label).toContain('2');
+
+      translate.use('ar');
+      fixture.detectChanges();
+
+      const arProdLabel = arCatalog.rfq.create.productIdLabel;
+      const arQtyLabel = arCatalog.rfq.create.quantityLabel;
+
+      const arP1Label = productInputs[0].getAttribute('aria-label');
+      const arP2Label = productInputs[1].getAttribute('aria-label');
+      expect(arP1Label?.startsWith(arProdLabel)).toBeTrue();
+      expect(arP1Label).toContain('1');
+      expect(arP2Label?.startsWith(arProdLabel)).toBeTrue();
+      expect(arP2Label).toContain('2');
+
+      const arQ1Label = quantityInputs[0].getAttribute('aria-label');
+      const arQ2Label = quantityInputs[1].getAttribute('aria-label');
+      expect(arQ1Label?.startsWith(arQtyLabel)).toBeTrue();
+      expect(arQ1Label).toContain('1');
+      expect(arQ2Label?.startsWith(arQtyLabel)).toBeTrue();
+      expect(arQ2Label).toContain('2');
+
+      translate.use('en');
+    });
+
+    it('loads suppliers across multiple pages and shows hint for suppliers without email', () => {
+      apiSpy.suppliers.calls.reset();
+      apiSpy.suppliers.and.returnValues(
+        of({
+          items: [
+            { id: 's-1', name: 'Sup 1', contact_email: 's1@example.com', status: 'active', created_at: '' } as Supplier,
+            { id: 's-2', name: 'Sup 2', contact_email: null, status: 'active', created_at: '' } as Supplier,
+          ],
+          next_cursor: 'cursor-page-2',
+        }),
+        of({
+          items: [
+            { id: 's-3', name: 'Sup 3', contact_email: 's3@example.com', status: 'active', created_at: '' } as Supplier,
+            { id: 's-4', name: 'Sup 4', contact_email: '', status: 'active', created_at: '' } as Supplier,
+          ],
+          next_cursor: null,
+        }),
+      );
+
+      const pageFixture = TestBed.createComponent(RfqCreateComponent);
+      const pageComp = pageFixture.componentInstance;
+      pageFixture.detectChanges();
+
+      expect(apiSpy.suppliers.calls.count()).toBe(2);
+      expect(apiSpy.suppliers.calls.argsFor(0)[0]).toEqual({ limit: 100, status: 'active' });
+      expect(apiSpy.suppliers.calls.argsFor(1)[0]).toEqual({ limit: 100, status: 'active', cursor: 'cursor-page-2' });
+
+      expect(pageComp.suppliers().map((s) => s.id)).toEqual(['s-1', 's-3']);
+      expect(pageComp.excludedSupplierCount()).toBe(2);
+
+      pageFixture.detectChanges();
+      const hints = Array.from(pageFixture.nativeElement.querySelectorAll('mat-hint')).map(
+        (h: unknown) => (h as HTMLElement).textContent?.trim(),
+      );
+      const expectedHint = translate.instant('rfq.create.suppliersNoEmailHint', { count: 2 });
+      expect(hints.some((h) => h?.includes(expectedHint))).toBeTrue();
+    });
+
+    it('shows Retry button on load failure and clicking Retry reloads data and enables Save', () => {
+      apiSpy.products.and.returnValue(throwError(() => new Error('Load failure')));
+      apiSpy.suppliers.and.returnValue(throwError(() => new Error('Load failure')));
+
+      const errFixture = TestBed.createComponent(RfqCreateComponent);
+      const errComp = errFixture.componentInstance;
+      errFixture.detectChanges();
+
+      const alert = errFixture.nativeElement.querySelector('.load-error-alert[role="alert"]');
+      expect(alert).not.toBeNull();
+      expect(alert.textContent).toContain(enCatalog.rfq.create.initialLoadError);
+
+      const submitBtn = errFixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement;
+      expect(submitBtn.disabled).toBeTrue();
+
+      apiSpy.products.and.returnValue(
+        of({ items: [{ id: 'prod-1', tenant_name: 'Product 1' } as Product], next_cursor: null }),
+      );
+      apiSpy.suppliers.and.returnValue(
+        of({ items: [{ id: 'sup-1', name: 'Supplier 1', contact_email: 's@test.com' } as Supplier], next_cursor: null }),
+      );
+
+      const retryBtn = alert.querySelector('button') as HTMLButtonElement;
+      expect(retryBtn).not.toBeNull();
+      retryBtn.click();
+      errFixture.detectChanges();
+
+      expect(errComp.initialLoadError()).toBeNull();
+      expect(errFixture.nativeElement.querySelector('.load-error-alert')).toBeNull();
+      expect(errComp.isDataLoaded()).toBeTrue();
+    });
+
+    it('edit mode keeps an out-of-list recipient visible and selected with warning marker', () => {
+      routeId = 'rfq-edit-extra';
+      const detailWithExtra: RfqDetail = {
+        rfq: {
+          id: 'rfq-edit-extra',
+          status: 'draft',
+          needed_by_date: '2026-12-01',
+          tenant_id: 't-1',
+          created_by_membership_id: 'm-1',
+          tenant_terms: '',
+          idempotency_key: 'idem-1',
+          created_at: '2026-10-01T00:00:00Z',
+        },
+        lines: [{ id: 'l-1', tenant_id: 't-1', rfq_id: 'rfq-edit-extra', workspace_product_id: 'prod-1', quantity: '10', created_at: '' }],
+        recipients: [
+          {
+            id: 'rec-1',
+            tenant_id: 't-1',
+            rfq_id: 'rfq-edit-extra',
+            supplier_id: 'sup-archived',
+            supplier_name: 'Archived Supplier',
+            supplier_contact_email: null,
+            status: 'draft',
+            outbound_message_id: null,
+            sent_at: null,
+            created_at: '',
+          },
+        ],
+      };
+      rfqApiSpy.getRfq.and.returnValue(of(detailWithExtra));
+      apiSpy.suppliers.and.returnValue(
+        of({
+          items: [{ id: 'sup-1', name: 'Active Supplier', contact_email: 'sup@test.com' } as Supplier],
+          next_cursor: null,
+        }),
+      );
+
+      const editFixture = TestBed.createComponent(RfqCreateComponent);
+      const editComp = editFixture.componentInstance;
+      editFixture.detectChanges();
+
+      expect(editComp.form.controls.supplierIds.value).toContain('sup-archived');
+
+      const archivedInSuppliers = editComp.suppliers().find((s) => s.id === 'sup-archived');
+      expect(archivedInSuppliers).toBeDefined();
+      expect(archivedInSuppliers?.name).toBe('Archived Supplier');
+
+      expect(editComp.selectedSupplierNames()).toContain('Archived Supplier');
+    });
   });
 });

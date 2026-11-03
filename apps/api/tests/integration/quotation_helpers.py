@@ -219,14 +219,20 @@ class PsycopgSupabaseClient:
         *,
         service_role: bool = False,
         claims: str | None = None,
+        honor_select: bool = False,
     ) -> None:
         self._conn = conn
         self._service_role = service_role
         self._claims = claims
+        self._honor_select = honor_select
 
     def table(self, name: str) -> PsycopgTableQuery:
         return PsycopgTableQuery(
-            self._conn, name, service_role=self._service_role, claims=self._claims
+            self._conn,
+            name,
+            service_role=self._service_role,
+            claims=self._claims,
+            honor_select=self._honor_select,
         )
 
     def rpc(self, name: str, params: dict[str, object]) -> PsycopgRpcQuery:
@@ -294,6 +300,22 @@ _EMBED_RELATIONS = {
 }
 
 
+def _plain_select_columns(columns: str) -> list[str]:
+    """Split top-level columns, leaving embeds to the adapter's existing handling."""
+    tokens: list[str] = []
+    start, depth = 0, 0
+    for index, character in enumerate(columns):
+        if character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+        elif character == "," and depth == 0:
+            tokens.append(columns[start:index].strip())
+            start = index + 1
+    tokens.append(columns[start:].strip())
+    return [token for token in tokens if token and "(" not in token]
+
+
 class PsycopgTableQuery:
     def __init__(
         self,
@@ -302,20 +324,24 @@ class PsycopgTableQuery:
         *,
         service_role: bool = False,
         claims: str | None = None,
+        honor_select: bool = False,
     ) -> None:
         self._conn = conn
         self._table = table
         self._service_role = service_role
         self._claims = claims
+        self._honor_select = honor_select
         self._operation = "select"
         self._payload: dict[str, object] | list[dict[str, object]] | None = None
         self._where: list[tuple[str, str, object]] = []
         self._limit: int | None = None
         self._offset: int | None = None
         self._order: list[tuple[str, bool]] = []
+        self._columns = "*"
 
-    def select(self, _columns: str = "*") -> PsycopgTableQuery:
+    def select(self, columns: str = "*") -> PsycopgTableQuery:
         self._operation = "select"
+        self._columns = columns
         return self
 
     def insert(self, payload: dict[str, object] | list[dict[str, object]]) -> PsycopgTableQuery:
@@ -351,6 +377,17 @@ class PsycopgTableQuery:
 
     def lt(self, column: str, value: object) -> PsycopgTableQuery:
         self._where.append((column, "<", value))
+        return self
+
+    def or_(self, expression: str) -> PsycopgTableQuery:
+        """Support the approval queue's timestamp/UUID keyset predicate."""
+        match = re.fullmatch(
+            r"created_at.lt.([^,]+),and\(created_at.eq.([^,]+),id.gt.([^)]+)\)",
+            expression,
+        )
+        if match is None or match[1] != match[2]:
+            raise NotImplementedError(f"test adapter does not support or_ {expression!r}")
+        self._where.append(("created_at", "keyset", (match[1].strip('"'), match[3])))
         return self
 
     def gte(self, column: str, value: object) -> PsycopgTableQuery:
@@ -418,6 +455,14 @@ class PsycopgTableQuery:
 
     def _execute_select(self) -> object:
         query = sql.SQL("select * from {}").format(sql.Identifier(self._table))
+        if self._honor_select:
+            columns = _plain_select_columns(self._columns)
+            projection = (
+                sql.SQL("*")
+                if not columns or "*" in columns
+                else sql.SQL(",").join(sql.Identifier(column) for column in columns)
+            )
+            query = sql.SQL("select {} from {}").format(projection, sql.Identifier(self._table))
         params: list[object] = []
         where_sql, where_params = self._where_sql()
         params.extend(where_params)
@@ -508,6 +553,11 @@ class PsycopgTableQuery:
         clauses: list[sql.SQL] = []
         params: list[object] = []
         for column, operator, value in self._where:
+            if operator == "keyset":
+                timestamp, step_id = value
+                clauses.append(sql.SQL("(created_at < %s or (created_at = %s and id > %s))"))
+                params.extend([timestamp, timestamp, step_id])
+                continue
             relation = None
             if "." in column:
                 embed, column = column.split(".", maxsplit=1)

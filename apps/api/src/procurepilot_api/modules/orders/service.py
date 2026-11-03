@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import base64
 import json
 import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 import psycopg
@@ -233,8 +235,17 @@ class OrdersService:
             "create_idempotency_key": str(idempotency_key),
         }
         with self._transaction(member) as cur:
+            # A retry of a create that already committed is a replay, answered before the
+            # allocation check: that order's own quantity would otherwise count against it.
+            replayed = self._existing_create(cur, member.tenant_id, idempotency_key)
+            if replayed is not None:
+                return replayed, False
             if payload.source_request_id:
                 self._lock_requests(cur, member.tenant_id, {payload.source_request_id})
+                # The first attempt may have committed while this one waited for the lock.
+                replayed = self._existing_create(cur, member.tenant_id, idempotency_key)
+                if replayed is not None:
+                    return replayed, False
                 self._assert_request_still_ordered(cur, payload.source_request_id)
 
                 self._assert_request_allocation_available(
@@ -308,6 +319,16 @@ class OrdersService:
             order = self._load_order_cursor(cur, order_id)
             self._audit_cursor(cur, member, "orders.purchase_order_created", order_id)
         return order, True
+
+    def _existing_create(
+        self, cur: psycopg.Cursor, tenant_id: UUID, idempotency_key: UUID | None
+    ) -> PurchaseOrder | None:
+        cur.execute(
+            "select id from purchase_order where tenant_id = %s and create_idempotency_key = %s",
+            (tenant_id, idempotency_key),
+        )
+        row = cur.fetchone()
+        return self._load_order_cursor(cur, UUID(str(row["id"]))) if row is not None else None
 
     @staticmethod
     def _request_pack_snapshots(
@@ -401,6 +422,12 @@ class OrdersService:
                     excluded_order_id=order_id,
                 )
 
+            # Lines go first: their composite key ties them to the header's current source request.
+            cur.execute(
+                "delete from purchase_order_line where tenant_id = %s and purchase_order_id = %s",
+                (member.tenant_id, order_id),
+            )
+
             cur.execute(
                 "update purchase_order set order_number = %s, supplier_id = %s, order_date = %s, "
                 "expected_delivery_date = %s, total_amount = %s, total_currency = %s, "
@@ -425,11 +452,6 @@ class OrdersService:
                     member.tenant_id,
                     order_id,
                 ),
-            )
-
-            cur.execute(
-                "delete from purchase_order_line where tenant_id = %s and purchase_order_id = %s",
-                (member.tenant_id, order_id),
             )
 
             request_pack_snapshots = self._request_pack_snapshots(
@@ -714,6 +736,101 @@ class OrdersService:
             items=orders, next_cursor=str(offset + capped) if len(_rows(rows)) > capped else None
         )
 
+    def search_orders(
+        self,
+        *,
+        member: CurrentMember,
+        limit: int = 50,
+        cursor: str | None = None,
+        q: str | None = None,
+        statuses: tuple[str, ...] = (),
+        supplier_id: UUID | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        sort: str = "created_at",
+        direction: str = "desc",
+    ) -> PurchaseOrderList:
+        capped = max(1, min(limit, 100))
+        sort_column = _ORDER_SORT_COLUMNS.get(sort)
+        if sort_column is None or direction not in ("asc", "desc"):
+            raise UnprocessableEntityError(details={"sort": "invalid"})
+        after = _decode_keyset(cursor, sort=sort, direction=direction)
+        unknown = [value for value in statuses if value not in _ORDER_STATUSES]
+        if unknown:
+            raise UnprocessableEntityError(details={"status": "invalid"})
+
+        where = ["tenant_id = %s"]
+        params: list[object] = [member.tenant_id]
+        if q and q.strip():
+            pattern = "%" + _escape_like(q.strip()) + "%"
+            where.append(
+                "(order_number ilike %s or exists (select 1 from supplier s "
+                "where s.id = purchase_order.supplier_id and s.name ilike %s))"
+            )
+            params += [pattern, pattern]
+        if statuses:
+            where.append("status::text = any(%s)")
+            params.append(list(statuses))
+        if supplier_id is not None:
+            where.append("supplier_id = %s")
+            params.append(supplier_id)
+        if date_from is not None:
+            where.append("order_date >= %s")
+            params.append(date_from)
+        if date_to is not None:
+            where.append("order_date <= %s")
+            params.append(date_to)
+        condition = " and ".join(where)
+
+        with self._transaction(member) as cur:
+            cur.execute(f"select count(*) as n from purchase_order where {condition}", params)
+            total_count = int(cur.fetchone()["n"])
+            # Keyset paging: the page starts after the last row shown, so an order created or
+            # changed meanwhile can neither repeat a row nor hide one. The id tie-break makes the
+            # position unique when several orders share a sort value.
+            page_condition, page_params = condition, list(params)
+            if after is not None:
+                comparison = "<" if direction == "desc" else ">"
+                cast = _ORDER_SORT_CASTS[sort_column]
+                page_condition += f" and ({sort_column}, id) {comparison} (%s::{cast}, %s::uuid)"
+                page_params += [after[0], after[1]]
+            cur.execute(
+                f"select {ORDER_HEADER_COLUMNS} from purchase_order where {page_condition} "
+                f"order by {sort_column} {direction}, id {direction} limit %s",
+                [*page_params, capped + 1],
+            )
+            rows = cur.fetchall()
+            visible = rows[:capped]
+            order_ids = [row["id"] for row in visible]
+            lines_by_order: dict[object, list[dict[str, object]]] = {}
+            names: dict[object, str] = {}
+            if order_ids:
+                cur.execute(
+                    f"select purchase_order_id, {ORDER_LINE_COLUMNS} from purchase_order_line "
+                    "where purchase_order_id = any(%s) order by purchase_order_id, line_number",
+                    (order_ids,),
+                )
+                for line in cur.fetchall():
+                    lines_by_order.setdefault(line["purchase_order_id"], []).append(line)
+                cur.execute(
+                    "select id, name from supplier where id = any(%s)",
+                    ([row["supplier_id"] for row in visible],),
+                )
+                names = {row["id"]: row["name"] for row in cur.fetchall()}
+        orders = tuple(
+            _order_model(row, lines_by_order.get(row["id"], []), names.get(row["supplier_id"]))
+            for row in visible
+        )
+        return PurchaseOrderList(
+            items=orders,
+            next_cursor=(
+                _encode_keyset(visible[-1], sort=sort, sort_column=sort_column, direction=direction)
+                if len(rows) > capped
+                else None
+            ),
+            total_count=total_count,
+        )
+
     def get_order(self, *, bearer_token: str, order_id: UUID) -> OrderEvidenceProjection:
         client = authenticated_client(self._settings, bearer_token)
         return self._evidence(client, order_id)
@@ -785,7 +902,13 @@ class OrdersService:
         except ValueError as exc:
             raise UnprocessableEntityError(details={"reason": "invalid_confirmation"}) from exc
         with self._transaction(member) as cur:
-            self._lock_order_cursor(cur, member.tenant_id, order_id)
+            self._lock_order_cursor(
+                cur,
+                member.tenant_id,
+                order_id,
+                evidence_table="supplier_confirmation",
+                idempotency_key=idempotency_key,
+            )
             cur.execute(
                 "insert into supplier_confirmation (tenant_id,purchase_order_id,supplier_reference,"
                 "confirmed_at,expected_delivery_date,source_kind,source_reference,source_hash,"
@@ -881,7 +1004,13 @@ class OrdersService:
         except ValueError as exc:
             raise UnprocessableEntityError(details={"reason": "invalid_receipt"}) from exc
         with self._transaction(member) as cur:
-            self._lock_order_cursor(cur, member.tenant_id, order_id)
+            self._lock_order_cursor(
+                cur,
+                member.tenant_id,
+                order_id,
+                evidence_table="delivery_receipt",
+                idempotency_key=idempotency_key,
+            )
             cur.execute(
                 "insert into delivery_receipt (tenant_id,purchase_order_id,receipt_reference,"
                 "receipt_date,"
@@ -977,14 +1106,40 @@ class OrdersService:
             raise _database_error(exc) from exc
 
     @staticmethod
-    def _lock_order_cursor(cur: psycopg.Cursor, tenant_id: UUID, order_id: UUID) -> None:
-        """Serialize evidence writes with each other and with submit/cancel on this order."""
+    def _lock_order_cursor(
+        cur: psycopg.Cursor,
+        tenant_id: UUID,
+        order_id: UUID,
+        *,
+        evidence_table: Literal["delivery_receipt", "supplier_confirmation"] | None = None,
+        idempotency_key: UUID | None = None,
+    ) -> None:
+        """Serialize evidence writes with each other and with submit/cancel on this order.
+
+        Evidence belongs to an order that was sent: a draft, cancelled or closed order refuses
+        new evidence, decided under the lock so a racing cancel cannot slip a receipt past the
+        check. A retry of evidence already recorded under the same key is a replay, not new
+        evidence, so it still gets its original answer after the order was cancelled.
+        """
         cur.execute(
-            "select 1 from purchase_order where tenant_id = %s and id = %s for update",
+            "select status::text as status from purchase_order "
+            "where tenant_id = %s and id = %s for update",
             (tenant_id, order_id),
         )
-        if cur.fetchone() is None:
+        row = cur.fetchone()
+        if row is None:
             raise NotFoundError(details={"resource": "purchase_order"})
+        if row["status"] not in ("draft", "cancelled", "closed"):
+            return
+        if evidence_table is not None and idempotency_key is not None:
+            cur.execute(
+                f"select 1 from {evidence_table} "  # noqa: S608 - literal table names only
+                "where tenant_id = %s and purchase_order_id = %s and idempotency_key = %s",
+                (tenant_id, order_id, idempotency_key),
+            )
+            if cur.fetchone() is not None:
+                return
+        raise ConflictError(details={"reason": "order_not_open_for_evidence"})
 
     def _progress_status_cursor(
         self, cur: psycopg.Cursor, member: CurrentMember, order_id: UUID
@@ -1417,6 +1572,51 @@ def _write_error(
     if _code(exc) == "23505":
         return ConflictError(details={"reason": duplicate_reason})
     return ServiceUnavailableError(details={"dependency": "database"})
+
+
+_ORDER_STATUSES = frozenset(
+    {"draft", "submitted", "confirmed", "partially_received", "received", "closed", "cancelled"}
+)
+_ORDER_SORT_COLUMNS = {
+    "created_at": "created_at",
+    "order_date": "order_date",
+    "total": "total_amount",
+    "order_number": "order_number",
+}
+
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+_ORDER_SORT_CASTS = {
+    "created_at": "timestamptz",
+    "order_date": "date",
+    "total_amount": "numeric",
+    "order_number": "text",
+}
+
+
+def _encode_keyset(row: dict[str, object], *, sort: str, sort_column: str, direction: str) -> str:
+    value = row[sort_column]
+    text = value.isoformat() if isinstance(value, (datetime, date)) else str(value)
+    payload = json.dumps({"s": sort, "d": direction, "v": text, "i": str(row["id"])})
+    return base64.urlsafe_b64encode(payload.encode()).decode()
+
+
+def _decode_keyset(value: str | None, *, sort: str, direction: str) -> tuple[str, str] | None:
+    """The sort position a page continues from; a cursor made for another sort is refused."""
+    if value is None:
+        return None
+    try:
+        data = json.loads(base64.urlsafe_b64decode(value.encode()))
+        position = (str(data["v"]), str(UUID(str(data["i"]))))
+        matches = data["s"] == sort and data["d"] == direction
+    except (ValueError, KeyError, TypeError) as exc:
+        raise UnprocessableEntityError(details={"cursor": "invalid"}) from exc
+    if not matches:
+        raise UnprocessableEntityError(details={"cursor": "invalid"})
+    return position
 
 
 def _cursor(value: str | None) -> int:

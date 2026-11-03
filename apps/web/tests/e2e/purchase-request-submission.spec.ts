@@ -157,7 +157,9 @@ test.describe('Purchase Request Submission (chunk 008 US1)', () => {
     await expect(page.locator('.form-title')).toContainText('Edit Purchase Request');
 
     // Click the Submit button (not the Save Draft submit)
-    const submitBtn = page.getByRole('button', { name: 'Submit' });
+    // Exact name: the line Remove buttons now carry the product name ("Remove line 1: <product>"),
+    // which can contain "Submit" when a test product is named after the test.
+    const submitBtn = page.getByRole('button', { name: 'Submit Request', exact: true });
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 

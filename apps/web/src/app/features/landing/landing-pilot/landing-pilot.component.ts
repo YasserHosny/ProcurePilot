@@ -60,6 +60,12 @@ export class LandingPilotComponent implements OnDestroy {
     return `mailto:${this.salesEmail}${query}`;
   });
 
+  readonly whatsappLink = computed(() => {
+    this.i18n.currentLocale();
+    const text = this.translate.instant('landing.pilot.whatsappMessage');
+    return `https://wa.me/${environment.salesWhatsapp}?text=${encodeURIComponent(text)}`;
+  });
+
   copyEmail(): void {
     this.clipboard.copy(this.salesEmail);
     this.emailCopied.set(true);

@@ -1,4 +1,7 @@
 import { Component, OnInit, inject, signal, computed, DestroyRef, ChangeDetectionStrategy } from '@angular/core';
+import { BidiModule } from '@angular/cdk/bidi';
+import { A11yModule } from '@angular/cdk/a11y';
+import { OverlayModule, ConnectedPosition } from '@angular/cdk/overlay';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -45,6 +48,9 @@ export interface RecipientsCacheEntry {
   standalone: true,
   imports: [
     CommonModule,
+    A11yModule,
+    BidiModule,
+    OverlayModule,
     RouterModule,
     MatCardModule,
     MatTableModule,
@@ -92,9 +98,52 @@ export class HistoryComponent implements OnInit {
   readonly showCountsInMenu = computed(() => this.isBelow1200());
 
   readonly loading = signal<boolean>(true);
+  readonly loadError = signal<boolean>(false);
+  readonly loadingMore = signal<boolean>(false);
+  readonly loadMoreError = signal<boolean>(false);
+  readonly draftActionsUnavailable = signal<boolean>(false);
   readonly rfqs = signal<RfqSummary[]>([]);
   readonly nextCursor = signal<string | null>(null);
+  private listGeneration = 0;
   readonly recipientsCache = signal<Record<string, RecipientsCacheEntry>>({});
+
+  readonly openRecipientsId = signal<string | null>(null);
+  private recipientsTrigger: HTMLButtonElement | null = null;
+  readonly recipientsPositions: ConnectedPosition[] = [
+    { originX: 'end', originY: 'bottom', overlayX: 'end', overlayY: 'top', offsetY: 8 },
+    { originX: 'end', originY: 'top', overlayX: 'end', overlayY: 'bottom', offsetY: -8 },
+  ];
+
+  get recipientsDirection(): 'rtl' | 'ltr' {
+    return (this.translate.getCurrentLang() || this.session.activeLocale()) === 'ar' ? 'rtl' : 'ltr';
+  }
+
+  toggleRecipients(rfq: RfqSummary, trigger: HTMLButtonElement): void {
+    if (this.openRecipientsId() === rfq.id) {
+      this.closeRecipients();
+      return;
+    }
+    this.recipientsTrigger = trigger;
+    trigger.focus();
+    this.openRecipientsId.set(rfq.id);
+    this.loadRecipients(rfq.id);
+  }
+
+  closeRecipients(rfqId = this.openRecipientsId()): void {
+    // A previous row can detach after another disclosure has opened.
+    if (rfqId !== this.openRecipientsId()) return;
+    this.openRecipientsId.set(null);
+    this.recipientsTrigger?.focus();
+    this.recipientsTrigger = null;
+  }
+
+  onRecipientsKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      this.closeRecipients();
+    }
+  }
 
   readonly timeFormatOptions: Intl.DateTimeFormatOptions = { timeStyle: 'short' };
 
@@ -113,31 +162,126 @@ export class HistoryComponent implements OnInit {
         this.isBelow768.set(res.matches);
       });
 
-    this.api.members().subscribe(({ items }) => {
-      const email = this.session.currentMember()?.email;
-      this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
+    this.api.members().subscribe({
+      next: ({ items }) => {
+        const email = this.session.currentMember()?.email;
+        this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
+      },
+      error: () => {
+        const fallbackId = this.session.currentMember()?.membership_id;
+        if (fallbackId) {
+          this.currentMembershipId.set(fallbackId);
+        } else {
+          this.currentMembershipId.set(null);
+          this.draftActionsUnavailable.set(true);
+        }
+      },
     });
     this.loadRfqs();
   }
 
   loadRfqs(): void {
+    const generation = ++this.listGeneration;
     this.recipientsCache.set({});
     this.loading.set(true);
+    this.loadError.set(false);
+    this.loadMoreError.set(false);
+    this.loadingMore.set(false);
     this.rfqApi.listRfqs().subscribe({
       next: (response) => {
+        if (generation !== this.listGeneration) {
+          return;
+        }
         this.rfqs.set(response.items);
         this.nextCursor.set(response.next_cursor);
         this.loading.set(false);
       },
       error: () => {
+        if (generation !== this.listGeneration) {
+          return;
+        }
         this.loading.set(false);
-        this.snackBar.open(
-          this.translate.instant('rfq.history.loadError'),
-          this.translate.instant('rfq.history.dismiss'),
-          { duration: 5000 },
-        );
-      }
+        this.loadError.set(true);
+      },
     });
+  }
+
+  loadMore(): void {
+    const cursor = this.nextCursor();
+    if (this.loadingMore() || !cursor) {
+      return;
+    }
+
+    const generation = this.listGeneration;
+    this.loadingMore.set(true);
+    this.loadMoreError.set(false);
+    this.rfqApi.listRfqs(undefined, cursor).subscribe({
+      next: (response) => {
+        if (generation !== this.listGeneration) {
+          return;
+        }
+        const current = this.rfqs();
+        const existingIds = new Set(current.map((item) => item.id));
+        const uniqueItems = response.items.filter((item) => !existingIds.has(item.id));
+        this.rfqs.set([...current, ...uniqueItems]);
+        this.nextCursor.set(response.next_cursor);
+        this.loadingMore.set(false);
+      },
+      error: () => {
+        if (generation !== this.listGeneration) {
+          return;
+        }
+        this.loadingMore.set(false);
+        this.loadMoreError.set(true);
+      },
+    });
+  }
+
+  showingRfqsText(): string {
+    const count = this.rfqs().length;
+    const locale = this.translate.getCurrentLang() || this.session.activeLocale?.() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    const key = `rfq.history.showingCount.${category}`;
+    const formatted = this.formatService.formatNumber(count);
+    const translated = this.translate.instant(key, { count: formatted });
+    if (translated && translated !== key) {
+      return translated;
+    }
+    return this.translate.instant('rfq.history.showingRfqs', { count: formatted });
+  }
+
+  getRowAccessibleName(rfq: RfqSummary): string {
+    const statusKey = `rfq.history.status_${rfq.status}`;
+    const statusText = this.translate.instant(statusKey);
+    const dateText = this.formatService.formatDate(rfq.needed_by_date);
+    return this.translate.instant('rfq.history.openRfqAriaLabel', {
+      status: statusText,
+      date: dateText,
+    });
+  }
+
+  getRecipientsAriaLabel(count: number): string {
+    const locale = this.translate.getCurrentLang() || this.session.activeLocale?.() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    const key = `rfq.history.recipientsAriaLabel.${category}`;
+    const rawCount = String(count);
+    const translated = this.translate.instant(key, { count: rawCount });
+    if (translated && translated !== key) {
+      return translated;
+    }
+    return this.translate.instant('rfq.history.recipientsAriaLabelFallback', { count: rawCount });
+  }
+
+  getResponsesAriaLabel(count: number): string {
+    const locale = this.translate.getCurrentLang() || this.session.activeLocale?.() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    const key = `rfq.history.responsesAriaLabel.${category}`;
+    const rawCount = String(count);
+    const translated = this.translate.instant(key, { count: rawCount });
+    if (translated && translated !== key) {
+      return translated;
+    }
+    return this.translate.instant('rfq.history.responsesAriaLabelFallback', { count: rawCount });
   }
 
   loadRecipients(rfqId: string): void {
@@ -178,7 +322,8 @@ export class HistoryComponent implements OnInit {
     }
   }
 
-  onRowClick(rfq: RfqSummary): void {
+  onRowClick(rfq: RfqSummary, event?: Event): void {
+    event?.stopPropagation();
     if (rfq.status === 'draft') {
       this.router.navigate(this.isCreator(rfq)
         ? ['/rfq', rfq.id, 'edit'] : ['/rfq', rfq.id]);

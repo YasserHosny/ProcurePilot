@@ -1,12 +1,15 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { MatDatepicker } from '@angular/material/datepicker';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { ActivatedRoute, ParamMap, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
+import { BehaviorSubject, Subject, of, throwError, timer } from 'rxjs';
+import { finalize, map } from 'rxjs/operators';
 
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -20,6 +23,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
   let component: QuotationReviewComponent;
   let fixture: ComponentFixture<QuotationReviewComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  let dialogSpy: jasmine.SpyObj<MatDialog>;
   let paramMapSubject: BehaviorSubject<ParamMap>;
   let queryParamMapSubject: BehaviorSubject<ParamMap>;
   const homeCurrency = signal<string | undefined>('EGP');
@@ -145,6 +149,11 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       }),
     );
 
+    dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of(true),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
     paramMapSubject = new BehaviorSubject<ParamMap>(convertToParamMap({ id: 'q-review-1' }));
     queryParamMapSubject = new BehaviorSubject<ParamMap>(convertToParamMap({}));
 
@@ -164,6 +173,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
         provideTranslateService(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
+        { provide: MatDialog, useValue: dialogSpy },
         { provide: SessionService, useValue: mockSession },
         {
           provide: ActivatedRoute,
@@ -181,7 +191,13 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
           },
         },
       ],
-    }).compileComponents();
+    })
+      .overrideComponent(QuotationReviewComponent, {
+        add: {
+          providers: [{ provide: MatDialog, useValue: dialogSpy }],
+        },
+      })
+      .compileComponents();
 
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', enCatalog);
@@ -3143,6 +3159,916 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       expect(component.priorQuotations()).toEqual([
         { id: 'quote-prior-acme', created_at: '2026-08-15T00:00:00Z', supplier_name: 'Acme Suggested Ltd' },
       ]);
+    });
+  });
+
+  describe('PPS-159 Detail-page findings', () => {
+    describe('Finding 1: Extraction polling', () => {
+      it('polls quotation after retryExtraction until extraction leaves in-progress state', fakeAsync(() => {
+        const inProgressQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracting',
+        };
+        const finishedQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracted',
+        };
+        apiService.retryExtraction.and.returnValue(of(inProgressQuote));
+        spyOn(window, 'confirm').and.returnValue(true);
+        apiService.getQuotation.calls.reset();
+        apiService.getQuotation.and.returnValue(of(inProgressQuote));
+
+        component.retryExtraction();
+        fixture.detectChanges();
+
+        expect(component.isPollingExtraction()).toBeTrue();
+        expect(fixture.nativeElement.querySelector('[data-testid="extraction-processing-banner"]')).toBeTruthy();
+
+        // Advance polling interval
+        apiService.getQuotation.and.returnValue(of(finishedQuote));
+        tick(2000);
+        fixture.detectChanges();
+
+        expect(component.isPollingExtraction()).toBeFalse();
+        expect(component.quotation()?.status).toBe('extracted');
+        expect(fixture.nativeElement.querySelector('[data-testid="extraction-processing-banner"]')).toBeFalsy();
+      }));
+
+      it('polls quotation after replaceDocument until extraction leaves in-progress state', fakeAsync(() => {
+        const inProgressQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracting',
+        };
+        const finishedQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracted',
+        };
+        apiService.uploadFileToStorage.and.returnValue(of(undefined));
+        apiService.replaceDocument.and.returnValue(of(inProgressQuote));
+        apiService.getQuotation.calls.reset();
+        apiService.getQuotation.and.returnValue(of(inProgressQuote));
+
+        const dummyFile = new File(['dummy'], 'new-quote.pdf', { type: 'application/pdf' });
+        const dummyEvent = {
+          target: { files: [dummyFile], value: 'fake' },
+        } as unknown as Event;
+
+        component.onReplaceDocumentSelected(dummyEvent);
+        fixture.detectChanges();
+
+        expect(component.isPollingExtraction()).toBeTrue();
+
+        apiService.getQuotation.and.returnValue(of(finishedQuote));
+        tick(2000);
+        fixture.detectChanges();
+
+        expect(component.isPollingExtraction()).toBeFalse();
+        expect(component.quotation()?.status).toBe('extracted');
+      }));
+
+      it('stops polling when route parameter changes or destroyed', fakeAsync(() => {
+        const inProgressQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracting',
+        };
+        apiService.retryExtraction.and.returnValue(of(inProgressQuote));
+        spyOn(window, 'confirm').and.returnValue(true);
+        apiService.getQuotation.calls.reset();
+        apiService.getQuotation.and.returnValue(of(inProgressQuote));
+
+        component.retryExtraction();
+        fixture.detectChanges();
+        expect(component.isPollingExtraction()).toBeTrue();
+
+        // Route changes to a different quotation
+        const otherQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-other',
+          status: 'extracted',
+        };
+        apiService.getQuotation.calls.reset();
+        apiService.getQuotation.and.returnValue(of(otherQuote));
+        paramMapSubject.next(convertToParamMap({ id: 'q-other' }));
+        fixture.detectChanges();
+
+        expect(component.isPollingExtraction()).toBeFalse();
+        tick(2500);
+        expect(apiService.getQuotation).not.toHaveBeenCalledWith('q-review-1');
+      }));
+
+      it('stops polling and shows timeout banner after maximum poll attempts without infinite spinner', fakeAsync(() => {
+        const inProgressQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracting',
+        };
+        apiService.retryExtraction.and.returnValue(of(inProgressQuote));
+        spyOn(window, 'confirm').and.returnValue(true);
+        apiService.getQuotation.calls.reset();
+        apiService.getQuotation.and.returnValue(of(inProgressQuote));
+
+        component.retryExtraction();
+        fixture.detectChanges();
+        expect(component.isPollingExtraction()).toBeTrue();
+
+        // Advance through 31 intervals
+        for (let i = 0; i < 31; i++) {
+          tick(2000);
+        }
+        fixture.detectChanges();
+
+        expect(component.isPollingExtraction()).toBeFalse();
+        expect(component.extractionPollTimedOut()).toBeTrue();
+        expect(fixture.nativeElement.querySelector('[data-testid="extraction-timeout-banner"]')).toBeTruthy();
+      }));
+
+      it('survives transient errors during polling and continues polling', fakeAsync(() => {
+        const inProgressQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracting',
+        };
+        const finishedQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracted',
+        };
+        apiService.retryExtraction.and.returnValue(of(inProgressQuote));
+        spyOn(window, 'confirm').and.returnValue(true);
+        apiService.getQuotation.calls.reset();
+        apiService.getQuotation.and.returnValue(of(inProgressQuote));
+
+        component.retryExtraction();
+        fixture.detectChanges();
+        expect(component.isPollingExtraction()).toBeTrue();
+
+        // Transient failure
+        apiService.getQuotation.and.returnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+        tick(2000);
+        fixture.detectChanges();
+
+        // Polling is still active despite single error
+        expect(component.isPollingExtraction()).toBeTrue();
+
+        // Now returns succeeded
+        apiService.getQuotation.and.returnValue(of(finishedQuote));
+        tick(2000);
+        fixture.detectChanges();
+
+        expect(component.isPollingExtraction()).toBeFalse();
+        expect(component.quotation()?.status).toBe('extracted');
+      }));
+
+      it('preserves user edits (notes, supplier, currency) when clicking retry after polling times out', fakeAsync(() => {
+        const inProgressQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracting',
+          reviewer_notes: null,
+          supplier_id: null,
+          currency: 'GBP',
+        };
+        apiService.retryExtraction.and.returnValue(of(inProgressQuote));
+        spyOn(window, 'confirm').and.returnValue(true);
+        apiService.getQuotation.calls.reset();
+        apiService.getQuotation.and.returnValue(of(inProgressQuote));
+
+        // Start extraction polling via retryExtraction
+        component.retryExtraction();
+        fixture.detectChanges();
+        expect(component.isPollingExtraction()).toBeTrue();
+
+        // User edits reviewer notes, supplier, and currency while extraction is in progress
+        component.reviewerNotes.set('Special urgent instructions');
+        component.selectedSupplierId.set('sup-user-edit-uuid');
+        component.pendingQuotationCurrency.set('EUR');
+        fixture.detectChanges();
+
+        // Let polling time out
+        for (let i = 0; i < 31; i++) {
+          tick(2000);
+        }
+        fixture.detectChanges();
+
+        expect(component.isPollingExtraction()).toBeFalse();
+        expect(component.extractionPollTimedOut()).toBeTrue();
+
+        const banner = fixture.nativeElement.querySelector('[data-testid="extraction-timeout-banner"]');
+        expect(banner).toBeTruthy();
+
+        // Server returns in-progress quote with server values on retry
+        const serverPendingQuote: QuotationDetail = {
+          ...inProgressQuote,
+          reviewer_notes: 'server notes',
+          supplier_id: 'sup-server-uuid',
+          currency: 'GBP',
+        };
+        apiService.getQuotation.calls.reset();
+        apiService.getQuotation.and.returnValue(of(serverPendingQuote));
+
+        // Click retry button in timeout banner
+        const retryBtn = banner.querySelector('button') as HTMLButtonElement;
+        expect(retryBtn).toBeTruthy();
+        retryBtn.click();
+        fixture.detectChanges();
+        tick();
+
+        // Verify user edits survived and polling resumed
+        expect(component.reviewerNotes()).toBe('Special urgent instructions');
+        expect(component.selectedSupplierId()).toBe('sup-user-edit-uuid');
+        expect(component.pendingQuotationCurrency()).toBe('EUR');
+        expect(component.extractionPollTimedOut()).toBeFalse();
+        expect(component.isPollingExtraction()).toBeTrue();
+      }));
+
+      it('completes and observes responses with 2.5s latency with exactly one request in flight at a time', fakeAsync(() => {
+        const inProgressQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracting',
+        };
+        const finishedQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-review-1',
+          status: 'extracted',
+        };
+
+        let inFlight = 0;
+        let maxInFlight = 0;
+        let responsesReceived = 0;
+        let callCount = 0;
+
+        apiService.getQuotation.calls.reset();
+        apiService.getQuotation.and.callFake(() => {
+          callCount++;
+          inFlight++;
+          if (inFlight > maxInFlight) {
+            maxInFlight = inFlight;
+          }
+          const quoteToReturn = callCount === 1 ? inProgressQuote : finishedQuote;
+          return timer(2500).pipe(
+            map(() => {
+              responsesReceived++;
+              return quoteToReturn;
+            }),
+            finalize(() => {
+              inFlight--;
+            }),
+          );
+        });
+
+        component.startExtractionPolling('q-review-1');
+        fixture.detectChanges();
+
+        expect(component.isPollingExtraction()).toBeTrue();
+        expect(maxInFlight).toBe(1);
+        expect(inFlight).toBe(1);
+
+        // Advance 2000ms: request 1 is still in flight (latency is 2.5s)
+        // With switchMap, this would abort request 1 and schedule another one.
+        // With sequential polling, request 1 continues and no new request is launched.
+        tick(2000);
+        fixture.detectChanges();
+
+        expect(component.isPollingExtraction()).toBeTrue();
+        expect(maxInFlight).toBe(1);
+        expect(inFlight).toBe(1);
+        expect(responsesReceived).toBe(0);
+
+        // Advance remaining 500ms to complete request 1
+        tick(500);
+        fixture.detectChanges();
+
+        expect(responsesReceived).toBe(1);
+        expect(maxInFlight).toBe(1);
+        expect(inFlight).toBe(0);
+        expect(component.isPollingExtraction()).toBeTrue();
+
+        // 2000ms interval between requests: no request is in flight
+        tick(1000);
+        fixture.detectChanges();
+        expect(inFlight).toBe(0);
+
+        tick(1000); // 2000ms elapsed since request 1 finished; request 2 starts
+        fixture.detectChanges();
+        expect(inFlight).toBe(1);
+        expect(maxInFlight).toBe(1);
+
+        // Advance 2500ms to complete request 2 (returns extracted)
+        tick(2500);
+        fixture.detectChanges();
+
+        expect(responsesReceived).toBe(2);
+        expect(maxInFlight).toBe(1);
+        expect(component.isPollingExtraction()).toBeFalse();
+
+        // Advance 2500ms for final silent loadQuotation
+        tick(2500);
+        fixture.detectChanges();
+
+        expect(inFlight).toBe(0);
+        expect(maxInFlight).toBe(1);
+        expect(component.quotation()?.status).toBe('extracted');
+      }));
+    });
+
+    describe('Finding 2: Refuse confirmation dialog', () => {
+      it('opens confirmation dialog on refuse click and does nothing when cancelled', () => {
+        dialogSpy.open.calls.reset();
+        apiService.refuseQuotation.calls.reset();
+        dialogSpy.open.and.returnValue({
+          afterClosed: () => of(false),
+        } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+        component.refuseQuotation();
+
+        expect(dialogSpy.open).toHaveBeenCalledWith(
+          CatalogueConfirmDialogComponent,
+          jasmine.objectContaining({
+            width: '440px',
+            data: jasmine.objectContaining({
+              titleKey: 'quotations.review.refuseConfirm.title',
+              messageKey: 'quotations.review.refuseConfirm.message',
+              confirmKey: 'quotations.review.refuseConfirm.confirm',
+              cancelKey: 'quotations.review.refuseConfirm.cancel',
+              isDestructive: true,
+            }),
+          }),
+        );
+        expect(apiService.refuseQuotation).not.toHaveBeenCalled();
+        expect(component.isRefusing()).toBeFalse();
+      });
+
+      it('calls apiService.refuseQuotation when confirm dialog is confirmed', () => {
+        dialogSpy.open.calls.reset();
+        apiService.refuseQuotation.calls.reset();
+        dialogSpy.open.and.returnValue({
+          afterClosed: () => of(true),
+        } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+        apiService.refuseQuotation.and.returnValue(of(mockQuotationDetail));
+
+        component.refuseQuotation();
+
+        expect(dialogSpy.open).toHaveBeenCalled();
+        expect(apiService.refuseQuotation).toHaveBeenCalledWith('q-review-1');
+      });
+    });
+
+    describe('Finding 3: Refused quotation controls', () => {
+      it('hides or disables editing controls, lines editing, Save and Confirm on refused quotation', () => {
+        const refusedQuote: QuotationDetail = {
+          ...mockQuotationDetail,
+          id: 'q-refused-1',
+          status: 'refused',
+        };
+        component.quotation.set(refusedQuote);
+        fixture.detectChanges();
+
+        // Save & Confirm buttons must be hidden
+        expect(fixture.nativeElement.querySelector('.save-btn')).toBeFalsy();
+        expect(fixture.nativeElement.querySelector('.confirm-btn')).toBeFalsy();
+        expect(fixture.nativeElement.querySelector('.refuse-btn')).toBeFalsy();
+
+        // Supplier select must be disabled
+        const supplierSelect = fixture.debugElement.query(By.css('#supplier-select'));
+        expect(supplierSelect.attributes['aria-disabled']).toBe('true');
+
+        // Add line button must be hidden
+        expect(fixture.nativeElement.querySelector('.add-line-btn')).toBeFalsy();
+
+        // Remove line button must be hidden
+        expect(fixture.nativeElement.querySelector('[data-testid="remove-line-btn"]') || fixture.nativeElement.querySelector('button[mattooltip="quotations.review.lines.removeLine"]')).toBeFalsy();
+
+        // Audit trail is still present
+        expect(fixture.nativeElement.querySelector('app-quotation-audit-trail')).toBeTruthy();
+      });
+    });
+
+    describe('Finding 4: Unsaved-changes guard & beforeunload', () => {
+      it('allows leaving without prompt when nothing is pending', () => {
+        dialogSpy.open.calls.reset();
+        const canLeave = component.canDeactivate();
+        expect(canLeave).toBeTrue();
+        expect(dialogSpy.open).not.toHaveBeenCalled();
+      });
+
+      it('allows leaving without prompt when quotation is already reviewed or refused', () => {
+        component.quotation.set({ ...mockQuotationDetail, status: 'reviewed' });
+        component.reviewerNotes.set('Unsaved draft notes');
+        fixture.detectChanges();
+
+        dialogSpy.open.calls.reset();
+        expect(component.canDeactivate()).toBeTrue();
+        expect(dialogSpy.open).not.toHaveBeenCalled();
+
+        component.quotation.set({ ...mockQuotationDetail, status: 'refused' });
+        fixture.detectChanges();
+        expect(component.canDeactivate()).toBeTrue();
+        expect(dialogSpy.open).not.toHaveBeenCalled();
+      });
+
+      it('prompts via confirm dialog when corrections, supplier, or notes are pending and allows leaving on confirm', (done) => {
+        component.quotation.set(mockQuotationDetail);
+        component.reviewerNotes.set('New unsaved notes');
+        fixture.detectChanges();
+
+        dialogSpy.open.calls.reset();
+        dialogSpy.open.and.returnValue({
+          afterClosed: () => of(true),
+        } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+        const result = component.canDeactivate();
+        expect(dialogSpy.open).toHaveBeenCalledWith(
+          CatalogueConfirmDialogComponent,
+          jasmine.objectContaining({
+            width: '440px',
+            data: jasmine.objectContaining({
+              titleKey: 'quotations.review.unsavedChanges.title',
+              messageKey: 'quotations.review.unsavedChanges.message',
+              confirmKey: 'quotations.review.unsavedChanges.confirm',
+              cancelKey: 'quotations.review.unsavedChanges.cancel',
+              isDestructive: true,
+            }),
+          }),
+        );
+
+        if (typeof result === 'boolean') {
+          fail('expected observable');
+          done();
+        } else {
+          result.subscribe((allowed: boolean) => {
+            expect(allowed).toBeTrue();
+            done();
+          });
+        }
+      });
+
+      it('cancels navigation when confirm dialog is cancelled', (done) => {
+        component.quotation.set(mockQuotationDetail);
+        component.selectedSupplierId.set('sup-changed');
+        fixture.detectChanges();
+
+        dialogSpy.open.calls.reset();
+        dialogSpy.open.and.returnValue({
+          afterClosed: () => of(false),
+        } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+        const result = component.canDeactivate();
+        expect(dialogSpy.open).toHaveBeenCalled();
+
+        if (typeof result === 'boolean') {
+          fail('expected observable');
+          done();
+        } else {
+          result.subscribe((allowed: boolean) => {
+            expect(allowed).toBeFalse();
+            done();
+          });
+        }
+      });
+
+      it('prevents beforeunload when changes are pending', () => {
+        component.quotation.set(mockQuotationDetail);
+        component.reviewerNotes.set('Unsaved notes');
+        fixture.detectChanges();
+
+        const event = {
+          preventDefault: jasmine.createSpy('preventDefault'),
+          returnValue: undefined as unknown as string,
+        } as unknown as BeforeUnloadEvent;
+
+        component.onBeforeUnload(event);
+
+        expect(event.preventDefault).toHaveBeenCalled();
+        expect(event.returnValue).toBe('');
+      });
+
+      it('does not prevent beforeunload when pristine', () => {
+        component.quotation.set(mockQuotationDetail);
+        fixture.detectChanges();
+
+        const event = {
+          preventDefault: jasmine.createSpy('preventDefault'),
+          returnValue: undefined as unknown as string,
+        } as unknown as BeforeUnloadEvent;
+
+        component.onBeforeUnload(event);
+
+        expect(event.preventDefault).not.toHaveBeenCalled();
+        expect(event.returnValue).toBeUndefined();
+      });
+    });
+
+    describe('P2 Review Fixes (F1 - F4)', () => {
+      describe('F1: Polling-timeout banner clearing', () => {
+        it('clears extraction timeout banner on route change / resetPerQuotationState', fakeAsync(() => {
+          component.extractionPollTimedOut.set(true);
+          fixture.detectChanges();
+          expect(fixture.nativeElement.querySelector('[data-testid="extraction-timeout-banner"]')).toBeTruthy();
+
+          const otherQuote: QuotationDetail = {
+            ...mockQuotationDetail,
+            id: 'q-other-extracted',
+            status: 'extracted',
+          };
+          apiService.getQuotation.calls.reset();
+          apiService.getQuotation.and.returnValue(of(otherQuote));
+
+          paramMapSubject.next(convertToParamMap({ id: 'q-other-extracted' }));
+          fixture.detectChanges();
+          tick();
+
+          expect(component.extractionPollTimedOut()).toBeFalse();
+          expect(fixture.nativeElement.querySelector('[data-testid="extraction-timeout-banner"]')).toBeFalsy();
+        }));
+
+        it('clears extraction timeout banner when loadQuotation returns extracted status', fakeAsync(() => {
+          component.extractionPollTimedOut.set(true);
+          fixture.detectChanges();
+          expect(fixture.nativeElement.querySelector('[data-testid="extraction-timeout-banner"]')).toBeTruthy();
+
+          const extractedQuote: QuotationDetail = {
+            ...mockQuotationDetail,
+            id: 'q-review-1',
+            status: 'extracted',
+          };
+          apiService.getQuotation.calls.reset();
+          apiService.getQuotation.and.returnValue(of(extractedQuote));
+
+          component.loadQuotation('q-review-1');
+          fixture.detectChanges();
+          tick();
+
+          expect(component.extractionPollTimedOut()).toBeFalse();
+          expect(fixture.nativeElement.querySelector('[data-testid="extraction-timeout-banner"]')).toBeFalsy();
+        }));
+      });
+
+      describe('F2: Archive confirmation with unsaved edits', () => {
+        it('prompts to discard unsaved changes before archiving and aborts if keep editing is chosen', () => {
+          component.quotation.set(mockQuotationDetail);
+          component.reviewerNotes.set('Edited notes draft');
+          fixture.detectChanges();
+          expect(component.hasPendingReviewChanges()).toBeTrue();
+
+          dialogSpy.open.calls.reset();
+          dialogSpy.open.and.returnValue({
+            afterClosed: () => of(false),
+          } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+          const confirmSpy = spyOn(window, 'confirm');
+          apiService.archiveQuotation.calls.reset();
+
+          component.archiveQuotation();
+
+          expect(dialogSpy.open).toHaveBeenCalledWith(
+            CatalogueConfirmDialogComponent,
+            jasmine.objectContaining({
+              data: jasmine.objectContaining({
+                titleKey: 'quotations.review.unsavedChanges.title',
+                messageKey: 'quotations.review.unsavedChanges.message',
+                confirmKey: 'quotations.review.unsavedChanges.confirm',
+                cancelKey: 'quotations.review.unsavedChanges.cancel',
+              }),
+            }),
+          );
+          expect(confirmSpy).not.toHaveBeenCalled();
+          expect(apiService.archiveQuotation).not.toHaveBeenCalled();
+          expect(component.isArchiving()).toBeFalse();
+        });
+
+        it('confirms discard first, then archives and navigates without prompting again in canDeactivate', fakeAsync(() => {
+          component.quotation.set(mockQuotationDetail);
+          component.reviewerNotes.set('Edited notes draft');
+          fixture.detectChanges();
+          expect(component.hasPendingReviewChanges()).toBeTrue();
+
+          dialogSpy.open.calls.reset();
+          dialogSpy.open.and.returnValue({
+            afterClosed: () => of(true),
+          } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+          spyOn(window, 'confirm').and.returnValue(true);
+          apiService.archiveQuotation.and.returnValue(of(mockQuotationDetail));
+          const router = TestBed.inject(Router);
+          spyOn(router, 'navigate');
+
+          component.archiveQuotation();
+          tick();
+
+          expect(apiService.archiveQuotation).toHaveBeenCalledWith(mockQuotationDetail.id);
+          expect(router.navigate).toHaveBeenCalledWith(['/quotations']);
+
+          dialogSpy.open.calls.reset();
+          const canLeave = component.canDeactivate();
+          expect(canLeave).toBeTrue();
+          expect(dialogSpy.open).not.toHaveBeenCalled();
+        }));
+      });
+
+      describe('F3: In-flight save/confirm mutations treated as dirty', () => {
+        it('prompts via confirm dialog when isSaving is in flight', (done) => {
+          component.quotation.set(mockQuotationDetail);
+          component.isSaving.set(true);
+          fixture.detectChanges();
+
+          dialogSpy.open.calls.reset();
+          dialogSpy.open.and.returnValue({
+            afterClosed: () => of(false),
+          } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+          const result = component.canDeactivate();
+          expect(dialogSpy.open).toHaveBeenCalled();
+          if (typeof result === 'boolean') {
+            fail('expected observable dialog result');
+            done();
+          } else {
+            result.subscribe((allowed) => {
+              expect(allowed).toBeFalse();
+              done();
+            });
+          }
+        });
+
+        it('prompts via confirm dialog when isConfirming is in flight', (done) => {
+          component.quotation.set(mockQuotationDetail);
+          component.isConfirming.set(true);
+          fixture.detectChanges();
+
+          dialogSpy.open.calls.reset();
+          dialogSpy.open.and.returnValue({
+            afterClosed: () => of(false),
+          } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+
+          const result = component.canDeactivate();
+          expect(dialogSpy.open).toHaveBeenCalled();
+          if (typeof result === 'boolean') {
+            fail('expected observable dialog result');
+            done();
+          } else {
+            result.subscribe((allowed) => {
+              expect(allowed).toBeFalse();
+              done();
+            });
+          }
+        });
+
+        it('prevents beforeunload when isSaving or isConfirming is in flight', () => {
+          component.quotation.set(mockQuotationDetail);
+          component.isSaving.set(true);
+          fixture.detectChanges();
+
+          const event = {
+            preventDefault: jasmine.createSpy('preventDefault'),
+            returnValue: undefined as unknown as string,
+          } as unknown as BeforeUnloadEvent;
+
+          component.onBeforeUnload(event);
+
+          expect(event.preventDefault).toHaveBeenCalled();
+          expect(event.returnValue).toBe('');
+        });
+      });
+
+      describe('F4: Silent reload after extraction preserves user edits', () => {
+        it('preserves user-edited notes and supplier during silent reload after extraction completes', fakeAsync(() => {
+          const extractingQuote: QuotationDetail = {
+            ...mockQuotationDetail,
+            id: 'q-review-1',
+            status: 'extracting',
+            reviewer_notes: 'Initial notes',
+            supplier_id: 'sup-1',
+          };
+          component.quotation.set(extractingQuote);
+          component.reviewerNotes.set('User updated notes while extracting');
+          component.selectedSupplierId.set('sup-2');
+          fixture.detectChanges();
+
+          const finishedQuote: QuotationDetail = {
+            ...mockQuotationDetail,
+            id: 'q-review-1',
+            status: 'extracted',
+            reviewer_notes: 'Initial notes',
+            supplier_id: 'sup-1',
+          };
+          apiService.getQuotation.calls.reset();
+          apiService.getQuotation.and.returnValue(of(finishedQuote));
+
+          component.loadQuotation('q-review-1', { silent: true });
+          fixture.detectChanges();
+          tick();
+
+          expect(component.reviewerNotes()).toBe('User updated notes while extracting');
+          expect(component.selectedSupplierId()).toBe('sup-2');
+          expect(component.quotation()?.status).toBe('extracted');
+        }));
+
+        it('updates notes and supplier on silent reload if user did not edit them', fakeAsync(() => {
+          const extractingQuote: QuotationDetail = {
+            ...mockQuotationDetail,
+            id: 'q-review-1',
+            status: 'extracting',
+            reviewer_notes: '',
+            supplier_id: null,
+          };
+          component.quotation.set(extractingQuote);
+          component.reviewerNotes.set('');
+          component.selectedSupplierId.set(null);
+          fixture.detectChanges();
+
+          const finishedQuote: QuotationDetail = {
+            ...mockQuotationDetail,
+            id: 'q-review-1',
+            status: 'extracted',
+            reviewer_notes: '',
+            supplier_id: 'sup-extracted',
+          };
+          apiService.getQuotation.calls.reset();
+          apiService.getQuotation.and.returnValue(of(finishedQuote));
+
+          component.loadQuotation('q-review-1', { silent: true });
+          fixture.detectChanges();
+          tick();
+
+          expect(component.selectedSupplierId()).toBe('sup-extracted');
+        }));
+      });
+    });
+  });
+
+  describe('PPS-158 / P-126 Supplier corrections and picker', () => {
+    it('(1) supplier-only change enables Save button and persists supplier_id in review patch', () => {
+      component.quotation.set({
+        ...mockQuotationDetail,
+        supplier_id: 'sup-1',
+      });
+      component.selectedSupplierId.set('sup-1');
+      fixture.detectChanges();
+
+      // Initially, quotation has supplier_id 'sup-1', matches selectedSupplierId
+      expect(component.quotation()?.supplier_id).toBe('sup-1');
+      expect(component.selectedSupplierId()).toBe('sup-1');
+      expect(component.hasPendingReviewChanges()).toBeFalse();
+
+      const saveBtn = fixture.nativeElement.querySelector('.save-btn') as HTMLButtonElement;
+      expect(saveBtn.disabled).toBeTrue();
+
+      // Change only the supplier to 'sup-2'
+      component.selectedSupplierId.set('sup-2');
+      fixture.detectChanges();
+
+      expect(component.hasPendingReviewChanges()).toBeTrue();
+      expect(saveBtn.disabled).toBeFalse();
+
+      // Calling saveCorrections sends review patch containing supplier_id 'sup-2'
+      apiService.patchQuotation.and.returnValue(
+        of({
+          ...mockQuotationDetail,
+          supplier_id: 'sup-2',
+        }),
+      );
+
+      component.saveCorrections();
+      expect(apiService.patchQuotation).toHaveBeenCalledWith(
+        'q-review-1',
+        jasmine.objectContaining({
+          supplier_id: 'sup-2',
+        }),
+      );
+
+      fixture.detectChanges();
+      // After save succeeds, hasPendingReviewChanges is reset to false
+      expect(component.hasPendingReviewChanges()).toBeFalse();
+      expect(saveBtn.disabled).toBeTrue();
+    });
+
+    it('(2) supplier picker follows next cursors until all pages are loaded', () => {
+      const page1 = [
+        { id: 'sup-1', name: 'Alpha Ltd', status: 'active' as const, created_at: '2026-08-01T00:00:00Z' },
+      ];
+      const page2 = [
+        { id: 'sup-2', name: 'Beta Ltd', status: 'active' as const, created_at: '2026-08-02T00:00:00Z' },
+      ];
+
+      apiService.suppliers.and.callFake((params?: { cursor?: string; limit?: number }) => {
+        if (!params?.cursor) {
+          return of({ items: page1, next_cursor: 'cursor-page-2' });
+        }
+        if (params.cursor === 'cursor-page-2') {
+          return of({ items: page2, next_cursor: null });
+        }
+        return of({ items: [], next_cursor: null });
+      });
+
+      component.loadSuppliers();
+
+      expect(apiService.suppliers).toHaveBeenCalledWith(jasmine.objectContaining({ limit: 100 }));
+      expect(apiService.suppliers).toHaveBeenCalledWith(jasmine.objectContaining({ cursor: 'cursor-page-2' }));
+      expect(component.suppliers().length).toBe(2);
+      expect(component.suppliers().map((s) => s.id)).toEqual(['sup-1', 'sup-2']);
+    });
+
+    it('(3) supplier picker shows distinct error state with retry on failure, not empty-list message', () => {
+      apiService.suppliers.and.returnValue(throwError(() => new Error('API failure')));
+
+      component.loadSuppliers();
+      fixture.detectChanges();
+
+      const errorState = fixture.nativeElement.querySelector('.supplier-error-state');
+      const emptyState = fixture.nativeElement.querySelector('.supplier-empty-state');
+
+      expect(errorState).toBeTruthy();
+      expect(emptyState).toBeFalsy();
+
+      // Retry button calls loadSuppliers again
+      apiService.suppliers.and.returnValue(
+        of({
+          items: [{ id: 'sup-1', name: 'Dairy Direct', status: 'active' as const, created_at: '2026-08-01T00:00:00Z' }],
+          next_cursor: null,
+        }),
+      );
+
+      const retryBtn = errorState.querySelector('button') as HTMLButtonElement;
+      retryBtn.click();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.supplier-error-state')).toBeFalsy();
+      expect(component.suppliers().length).toBe(1);
+    });
+
+    it('(4) supplier picker is searchable and filters client-side', () => {
+      component.suppliers.set([
+        { id: 'sup-1', name: 'Dairy Direct Ltd', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+        { id: 'sup-2', name: 'Bakery Best', status: 'active', created_at: '2026-08-02T00:00:00Z' },
+      ]);
+      fixture.detectChanges();
+
+      const comp = component as unknown as {
+        filteredSuppliers?: () => Supplier[];
+        setSupplierSearch?: (q: string) => void;
+      };
+      expect(comp.filteredSuppliers?.().length).toBe(2);
+
+      comp.setSupplierSearch?.('bakery');
+      fixture.detectChanges();
+
+      expect(comp.filteredSuppliers?.().length).toBe(1);
+      expect(comp.filteredSuppliers?.()[0].name).toBe('Bakery Best');
+    });
+
+    it('(5) typing, space and arrows inside search input stop propagation and do not close or change select', () => {
+      component.quotation.set({
+        ...mockQuotationDetail,
+        supplier_id: null,
+      });
+      component.suppliers.set([
+        { id: 'sup-1', name: 'Dairy Direct Ltd', status: 'active', created_at: '2026-08-01T00:00:00Z' },
+        { id: 'sup-2', name: 'Bakery Best', status: 'active', created_at: '2026-08-02T00:00:00Z' },
+      ]);
+      fixture.detectChanges();
+
+      const selectDebug = fixture.debugElement.query(By.css('#supplier-select'));
+      expect(selectDebug).toBeTruthy();
+      const matSelect = selectDebug.componentInstance;
+      matSelect.open();
+      fixture.detectChanges();
+
+      expect(matSelect.panelOpen).toBeTrue();
+
+      const searchInput = (document.querySelector('[data-testid="supplier-search-input"]') ||
+        fixture.nativeElement.querySelector('[data-testid="supplier-search-input"]')) as HTMLInputElement;
+      expect(searchInput).toBeTruthy();
+
+      // Space, arrows, and normal characters must stop propagation and leave panel open & select unchanged
+      const testKeys = [' ', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'a'];
+      for (const key of testKeys) {
+        const keyEvent = new KeyboardEvent('keydown', {
+          key,
+          bubbles: true,
+          cancelable: true,
+        });
+        spyOn(keyEvent, 'stopPropagation').and.callThrough();
+        searchInput.dispatchEvent(keyEvent);
+
+        expect(keyEvent.stopPropagation).toHaveBeenCalled();
+        expect(matSelect.panelOpen).toBeTrue();
+        expect(component.selectedSupplierId()).toBeNull();
+      }
+
+      // Typing in input updates filter query without selecting or closing
+      searchInput.value = 'Bakery';
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      fixture.detectChanges();
+
+      expect(component.supplierSearchQuery()).toBe('Bakery');
+      expect(matSelect.panelOpen).toBeTrue();
+      expect(component.selectedSupplierId()).toBeNull();
+
+      matSelect.close();
+      fixture.detectChanges();
     });
   });
 });

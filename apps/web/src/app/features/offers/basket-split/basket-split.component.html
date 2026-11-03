@@ -34,6 +34,8 @@
     </div>
   }
 
+  <div class="visually-hidden" role="status" aria-live="polite" data-testid="job-status-live">{{ liveStatus() }}</div>
+
   <!-- Loading Initial Data -->
   @if (isLoading() && !currentJob()) {
     <div class="loading-container">
@@ -42,10 +44,32 @@
     </div>
   }
 
+  @if (jobNotFound()) {
+    <mat-card class="not-found-card" role="alert" data-testid="job-not-found">
+      <h2 class="section-title">{{ 'basketSplit.status.notFoundTitle' | translate }}</h2>
+      <p>{{ 'basketSplit.status.notFoundMessage' | translate }}</p>
+      <button mat-flat-button type="button" (click)="resetForm()">{{ 'basketSplit.actions.newSplit' | translate }}</button>
+    </mat-card>
+  }
+
+  @if (pollFailed() && currentJob()) {
+    <div class="error-banner" role="alert" data-testid="poll-error">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ 'basketSplit.status.pollFailed' | translate }}</span>
+      <button mat-stroked-button type="button" (click)="retryPolling()" data-testid="poll-retry">{{ 'basketSplit.status.pollRetry' | translate }}</button>
+    </div>
+  }
+
   <!-- Form View (When No Active Job / Result Displayed) -->
-  @if (!currentJob() && !isLoading()) {
+  @if (!currentJob() && !isLoading() && !jobNotFound()) {
     <mat-card class="form-card">
       <form (ngSubmit)="submitBasket()" #basketForm="ngForm">
+        @if (rerunNotice()) {
+          <div class="info-banner" role="status" data-testid="rerun-notice">
+            <mat-icon aria-hidden="true">info</mat-icon>
+            <span>{{ 'basketSplit.rerunNotice' | translate }}</span>
+          </div>
+        }
         <!-- Section 1: Exactly Two Named Suppliers (FR-008, Research R5) -->
         <div class="form-section">
           <h2 class="section-title">{{ 'basketSplit.form.suppliersSectionTitle' | translate }}</h2>
@@ -345,7 +369,7 @@
         </div>
 
         @if (errorMessage()) {
-          <div class="error-banner">
+          <div class="error-banner" role="alert">
             <mat-icon aria-hidden="true">error_outline</mat-icon>
             <span>{{ errorMessage() }}</span>
           </div>

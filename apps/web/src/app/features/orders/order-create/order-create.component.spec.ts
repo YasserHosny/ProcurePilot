@@ -300,11 +300,8 @@ describe('OrderCreateComponent', () => {
     // 3. Expected delivery date pre-filled from required_by_date
     expect(component.form.controls.expected_delivery_date.value).toEqual(new Date(2026, 9, 1));
 
-    // 4. Currency is readonly
-    const currencyInput = (fixture.nativeElement as HTMLElement).querySelector(
-      'input[formControlName="currency"]',
-    );
-    expect(currencyInput?.hasAttribute('readonly')).toBeTrue();
+    // 4. Currency is fixed by the request: the control is disabled, not editable
+    expect(component.form.controls.currency.disabled).toBeTrue();
 
     // 5. Line remaining badge says "Still to order"
     const remainingBadge = (fixture.nativeElement as HTMLElement).querySelector('.remaining-badge');
@@ -325,6 +322,67 @@ describe('OrderCreateComponent', () => {
 
     expect(component.form.controls.order_number.value).toBe('');
     expect(component.form.controls.supplier_id.value).toBe('');
+  });
+
+  // P-183: a failed source load used to fall through to a blank manual order with no link.
+  it('does not offer a manual order when the source request cannot be loaded', () => {
+    fixture.destroy();
+    routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-99' });
+    requestsApiService.getRequest.and.returnValue(throwError(() => new Error('Failed')));
+    ordersApiService.getAllocations.and.returnValue(of({ source_request_id: 'req-99', lines: [] }));
+    ordersApiService.getRequestPrefill.and.returnValue(of({ source_request_id: 'req-99', supplier: null }));
+    fixture = TestBed.createComponent(OrderCreateComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.errorMessage()).toBeTruthy();
+    expect(component.lines.length).toBe(0);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="add-line"]')).toBeNull();
+    // Even if a line gets added some other way, the unlinked order is never saved.
+    component.addLine();
+    component.lines.at(0).patchValue({ description: 'X', quantity: 1, unit_price: 1 });
+    component.form.patchValue({ order_number: 'PO-X', supplier_id: 's1', order_date: new Date('2026-09-29T12:00:00Z') });
+    component.submit();
+    expect(ordersApiService.createOrder).not.toHaveBeenCalled();
+  });
+
+  // P-183: «Creating from Request: <uuid>» stayed on screen until a supplier was chosen.
+  it('never shows the raw request id in the banner', () => {
+    fixture.destroy();
+    routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-4242' });
+    requestsApiService.getRequest.and.returnValue(of({
+      id: 'req-4242', branch_id: 'b1', requested_by_membership_id: 'm1', required_by_date: '2026-10-01',
+      status: 'approved', lines: [{ id: 'rl-1', workspace_product_id: 'p1', quantity: '3.000000' }],
+      has_incomplete_estimate: false, created_at: '2026-09-29T00:00:00Z',
+    } as unknown as import('../../../core/api/models').PurchaseRequest));
+    ordersApiService.getAllocations.and.returnValue(of({
+      source_request_id: 'req-4242',
+      lines: [{ source_request_line_id: 'rl-1', requested_quantity: '3', allocated_quantity: '0', remaining_quantity: '3' }],
+    }));
+    ordersApiService.getRequestPrefill.and.returnValue(of({ source_request_id: 'req-4242', supplier: null }));
+    fixture = TestBed.createComponent(OrderCreateComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const banner = (fixture.nativeElement as HTMLElement).querySelector('.source-request-banner');
+    expect(banner).toBeTruthy();
+    expect(banner?.textContent).not.toContain('req-4242');
+  });
+
+  // P-183: the header tax is the sum of the line taxes, never a separate number.
+  it('submits a header tax equal to the sum of the line taxes', () => {
+    component.form.patchValue({
+      order_number: 'PO-TAX', supplier_id: 's1', order_date: new Date('2026-09-29T12:00:00Z'), currency: 'USD', order_tax: 99,
+    });
+    component.lines.at(0).patchValue({ description: 'A', quantity: 2, base_unit: 'EA', unit_price: 10, line_tax: 3 });
+    component.addLine();
+    component.lines.at(1).patchValue({ description: 'B', quantity: 1, base_unit: 'EA', unit_price: 5, line_tax: 1.5 });
+    ordersApiService.createOrder.and.returnValue(of({ id: 'order-1' } as import('../orders-api').PurchaseOrder));
+
+    component.submit();
+
+    const payload = ordersApiService.createOrder.calls.mostRecent().args[0];
+    expect(payload.tax.amount).toBe('4.5000');
   });
 
   it('shows specific i18n error messages on 409 for order_number_exists and idempotency_key_exists', () => {
@@ -671,7 +729,7 @@ describe('OrderCreateComponent', () => {
     expect(payload.lines[0].description).toBe('Test Item');
     
     expect(payload.total.amount).toBe('22.0000');
-    expect(payload.tax.amount).toBe('5.0000');
+    expect(payload.tax.amount).toBe('2.0000');
     expect(payload.lines[0].line_total.amount).toBe('22.0000');
 
     expect(router.navigate).toHaveBeenCalledWith(['/orders', 'order-123']);
@@ -1002,5 +1060,107 @@ describe('OrderCreateComponent', () => {
       const submitButton = editFixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement;
       expect(submitButton.disabled).toBeFalse();
     });
+  });
+  // PPS-207: quantities are in packs, so the label must say so next to a pack line.
+  it('labels the quantity as packs when the product has a pack, and plainly when it has none', () => {
+    component.products.set([
+      { id: 'p-pack', tenant_name: 'Rice', base_unit: 'kilogram', pack: { pack_count: 1, unit_size: '10', base_quantity: '10' } },
+      { id: 'p-none', tenant_name: 'Loose', base_unit: 'each' },
+    ] as unknown as import('../../../core/api/models').Product[]);
+    component.lines.at(0).patchValue({ workspace_product_id: 'p-pack' });
+    expect(component.quantityLabelKey(component.lines.at(0))).toBe('orders.create.quantityPacks');
+    component.lines.at(0).patchValue({ workspace_product_id: 'p-none' });
+    expect(component.quantityLabelKey(component.lines.at(0))).toBe('orders.create.quantity');
+  });
+
+  // PPS-207: currency was a free-text box; it is now a choice that always contains the right value.
+  it('offers a currency choice that includes the home currency and the current value', () => {
+    homeCurrency.set('SAR');
+    component.form.patchValue({ currency: 'JPY' });
+    const options = component.currencyOptions();
+    expect(options).toContain('SAR');
+    expect(options).toContain('JPY');
+    expect(new Set(options).size).toBe(options.length);
+  });
+
+  it('offers only the quote currency once the order comes from a quoted request', () => {
+    fixture.destroy();
+    routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-7' });
+    requestsApiService.getRequest.and.returnValue(of({
+      id: 'req-7', branch_id: 'b1', requested_by_membership_id: 'm1', required_by_date: '2026-10-01',
+      status: 'approved',
+      lines: [{ id: 'rl-1', workspace_product_id: 'p1', quantity: '2', quoted_unit_price: { amount: '10', currency: 'EGP' } }],
+      has_incomplete_estimate: false, created_at: '2026-09-29T00:00:00Z',
+    } as unknown as import('../../../core/api/models').PurchaseRequest));
+    ordersApiService.getAllocations.and.returnValue(of({
+      source_request_id: 'req-7',
+      lines: [{ source_request_line_id: 'rl-1', requested_quantity: '2', allocated_quantity: '0', remaining_quantity: '2' }],
+    }));
+    fixture = TestBed.createComponent(OrderCreateComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.currencyOptions()).toEqual(['EGP']);
+  });
+
+  // PPS-207: the request's estimate was shown as a badge but could not be taken as the price.
+  it('lets the buyer take the request estimate as the unit price when it is in the order currency', () => {
+    component.form.patchValue({ currency: 'USD' });
+    component.lines.at(0).patchValue({ unit_price: null, source_request_line_id: 'rl-1' });
+    component.lines.at(0).controls.estimated_price.setValue(15);
+    component.rememberEstimateCurrency('rl-1', 'USD');
+
+    expect(component.canUseEstimate(0)).toBeTrue();
+    component.useEstimate(0);
+
+    expect(component.lines.at(0).controls.unit_price.value).toBe(15);
+  });
+
+  // Review (Codex): an estimate in another currency must not become a price in this order's currency.
+  it('does not offer an estimate that is in a different currency than the order', () => {
+    component.form.patchValue({ currency: 'EUR' });
+    component.lines.at(0).patchValue({ unit_price: null, source_request_line_id: 'rl-2' });
+    component.lines.at(0).controls.estimated_price.setValue(15);
+    component.rememberEstimateCurrency('rl-2', 'EGP');
+
+    expect(component.canUseEstimate(0)).toBeFalse();
+    component.useEstimate(0);
+
+    expect(component.lines.at(0).controls.unit_price.value).toBeNull();
+  });
+
+  // Review (Codex): a disabled control drops out of form.value, so the totals fell back to USD.
+  it('shows the totals in the order currency when the order comes from a request', () => {
+    fixture.destroy();
+    routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-9' });
+    requestsApiService.getRequest.and.returnValue(of({
+      id: 'req-9', branch_id: 'b1', requested_by_membership_id: 'm1', required_by_date: '2026-10-01',
+      status: 'approved',
+      lines: [{ id: 'rl-1', workspace_product_id: 'p1', quantity: '2', quoted_unit_price: { amount: '10', currency: 'EGP' } }],
+      has_incomplete_estimate: false, created_at: '2026-09-29T00:00:00Z',
+    } as unknown as import('../../../core/api/models').PurchaseRequest));
+    ordersApiService.getAllocations.and.returnValue(of({
+      source_request_id: 'req-9',
+      lines: [{ source_request_line_id: 'rl-1', requested_quantity: '2', allocated_quantity: '0', remaining_quantity: '2' }],
+    }));
+    fixture = TestBed.createComponent(OrderCreateComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const total = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="order-tax-total"]');
+    expect(total?.textContent).toContain('EGP');
+    expect(total?.textContent).not.toContain('$');
+  });
+  // Review (Codex): the estimate badge labelled the estimate with the order's currency.
+  it('labels the estimate with its own currency', () => {
+    component.form.patchValue({ currency: 'EUR' });
+    component.lines.at(0).patchValue({ source_request_line_id: 'rl-3' });
+    component.lines.at(0).controls.estimated_price.setValue(15);
+    component.rememberEstimateCurrency('rl-3', 'EGP');
+    fixture.detectChanges();
+
+    const badge = (fixture.nativeElement as HTMLElement).querySelector('.estimate-badge');
+    expect(badge?.textContent).toContain('EGP');
+    expect(badge?.textContent).not.toContain('€');
   });
 });

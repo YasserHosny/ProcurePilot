@@ -250,3 +250,19 @@ td.date-cell {
   background-color: var(--pp-primary-container);
   color: var(--pp-primary);
 }
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  padding-block: 1rem;
+}
+
+.load-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.clear-filter-btn {
+  margin-block-start: 0.5rem;
+}

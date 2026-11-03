@@ -25,6 +25,38 @@
           <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
         }
       </div>
+      @if (tasksLoadFailed()) {
+        <button mat-stroked-button type="button" class="retry-btn" data-testid="queue-retry" (click)="loadTasks()">
+          <span>{{ 'matching.queue.retry' | translate }}</span>
+        </button>
+      }
+    </div>
+  }
+
+  @if (dependentLinesCount() > 0) {
+    <div class="info-banner dependent-lines-banner" data-testid="queue-dependent-lines-notice" role="status">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      <div class="banner-content">
+        <span>{{ 'matching.resolution.correction.dependentLinesNotice' | translate: { count: dependentLinesCount() } }}</span>
+        @if (dependentLinesQuotationId(); as qid) {
+          <button
+            mat-button
+            type="button"
+            data-testid="queue-dependent-lines-review"
+            class="banner-link"
+            (click)="reviewDependentLines(qid)"
+          >
+            {{ 'matching.resolution.correction.reviewQueue' | translate }}
+          </button>
+        }
+      </div>
+    </div>
+  }
+
+  @if (aliasConflictNotice()) {
+    <div class="warning-banner alias-conflict-banner" data-testid="queue-alias-conflict-notice" role="status">
+      <mat-icon aria-hidden="true">warning</mat-icon>
+      <span>{{ 'matching.resolution.correction.aliasConflictNotice' | translate }}</span>
     </div>
   }
 
@@ -170,12 +202,18 @@
     </section>
   }
 
+  <div class="visually-hidden" data-testid="queue-result-summary" role="status" aria-live="polite">
+    @if (isLoading() === false && tasksLoadFailed() === false) {
+      {{ 'matching.queue.resultSummary' | translate: { lines: tasks().length, quotations: groups().length } }}
+    }
+  </div>
+
   @if (isLoading()) {
-    <div class="loading-state">
+    <div class="loading-state" role="status">
       <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
       <span>{{ 'common.loading' | translate }}</span>
     </div>
-  } @else if (tasks().length === 0 && quotationId()) {
+  } @else if (!tasksLoadFailed() && tasks().length === 0 && quotationId()) {
     <div class="empty-state" data-testid="quotation-all-matched">
       <mat-icon class="empty-icon" aria-hidden="true">done_all</mat-icon>
       <h2 class="empty-title">{{ 'matching.queue.allLinesMatchedTitle' | translate }}</h2>
@@ -190,7 +228,7 @@
         </button>
       </div>
     </div>
-  } @else if (tasks().length === 0 && hasActiveFilters()) {
+  } @else if (!tasksLoadFailed() && tasks().length === 0 && hasActiveFilters()) {
     <div class="empty-state">
       <mat-icon class="empty-icon" aria-hidden="true">filter_alt_off</mat-icon>
       <h2 class="empty-title">{{ 'matching.queue.noFilterResults' | translate }}</h2>
@@ -199,13 +237,13 @@
         <span>{{ 'matching.queue.clearFilters' | translate }}</span>
       </button>
     </div>
-  } @else if (tasks().length === 0) {
+  } @else if (!tasksLoadFailed() && tasks().length === 0) {
     <div class="empty-state">
       <mat-icon class="empty-icon" aria-hidden="true">done_all</mat-icon>
       <h2 class="empty-title">{{ 'matching.queue.emptyTitle' | translate }}</h2>
       <p class="empty-message">{{ 'matching.queue.emptyMessage' | translate }}</p>
     </div>
-  } @else {
+  } @else if (!tasksLoadFailed() && tasks().length > 0) {
     <section class="quotation-groups" [attr.aria-label]="'matching.queue.groupsLabel' | translate">
       @for (group of groups(); track group.quotation.id) {
         <mat-card class="quotation-group">
@@ -213,7 +251,13 @@
             <div class="group-heading">
               <div class="group-title-row">
                 <h2>{{ group.quotation.supplier_name || ('matching.queue.unknownSupplier' | translate) }}</h2>
-                <span class="quotation-badge" [matTooltip]="group.quotation.id">{{ truncateId(group.quotation.id) }}</span>
+                <span
+                  class="quotation-badge"
+                  tabindex="0"
+                  [matTooltip]="group.quotation.id"
+                  [attr.aria-label]="'matching.queue.quotationIdLabel' | translate: { id: group.quotation.id }"
+                  >{{ truncateId(group.quotation.id) }}</span
+                >
               </div>
               <p class="source-reference">
                 <mat-icon aria-hidden="true">description</mat-icon>

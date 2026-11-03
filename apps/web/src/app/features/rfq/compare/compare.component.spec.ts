@@ -1,7 +1,8 @@
 import { signal } from '@angular/core';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync } from '@angular/core/testing';
 import { CompareComponent } from './compare.component';
 import { formatExactQuantity, formatLocaleNumber, FormatService } from '../../../core/format/format.service';
+import { parseIsoDateLocal } from '../../../core/format/iso-date';
 import {
   RfqApi,
   RfqDetail,
@@ -14,7 +15,7 @@ import { ApiService } from '../../../core/api/api.service';
 import { ActivatedRoute, Router, UrlTree } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
@@ -151,7 +152,17 @@ describe('CompareComponent (RFQ)', () => {
     });
     mockSession.hasRole.and.returnValue(true);
 
-    mockApiService = jasmine.createSpyObj('ApiService', ['listBranches', 'suppliers', 'products', 'members']);
+    mockApiService = jasmine.createSpyObj('ApiService', [
+      'listBranches',
+      'suppliers',
+      'products',
+      'members',
+      'supplier',
+      'product',
+    ]);
+    // Ids outside the first page of the lists are looked up one by one; by default they are unknown.
+    mockApiService.supplier.and.returnValue(throwError(() => new Error('not found')));
+    mockApiService.product.and.returnValue(throwError(() => new Error('not found')));
     mockApiService.members.and.returnValue(
       of({ items: [{ id: 'member-1', email: 'owner@test.com' }], next_cursor: null } as unknown as { items: Member[]; next_cursor: string | null }),
     );
@@ -1082,9 +1093,93 @@ describe('CompareComponent (RFQ)', () => {
         expect(compare['splitBetweenSuppliers']).toBeTruthy();
         expect(compare['needsTwoMatched']).toBeTruthy();
         expect(compare['differentCurrencies']).toBeTruthy();
+        expect(compare['replyMixedCurrency']).toBeTruthy();
         expect(compare['alreadyConverted']).toBeTruthy();
         expect(compare['splitError']).toBeTruthy();
       }
+    });
+
+    it('mixed-currency reply next to a single-currency reply never gets the lowest-total badge and disables split with the translated reason', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const respMixed: RfqResponseComparison = {
+        id: 'resp-mixed',
+        rfq_id: 'rfq-1',
+        supplier_id: 'supp-mixed',
+        quotation_id: 'quote-mixed',
+        quotation_status: 'reviewed',
+        submitted_at: '2026-09-25T10:00:00Z',
+        lines: [
+          {
+            workspace_product_id: 'prod-1',
+            original_text: 'Product 1',
+            quoted_quantity: '10',
+            quoted_unit_price_amount: '5.00',
+            quoted_unit_price_currency: 'USD',
+            pending_match: false,
+          },
+          {
+            workspace_product_id: 'prod-2',
+            original_text: 'Product 2',
+            quoted_quantity: '20',
+            quoted_unit_price_amount: '10.00',
+            quoted_unit_price_currency: 'EUR',
+            pending_match: false,
+          },
+        ],
+        guardrail_evaluations: [],
+      };
+
+      const respSingle: RfqResponseComparison = {
+        id: 'resp-single',
+        rfq_id: 'rfq-1',
+        supplier_id: 'supp-single',
+        quotation_id: 'quote-single',
+        quotation_status: 'reviewed',
+        submitted_at: '2026-09-25T11:00:00Z',
+        lines: [
+          {
+            workspace_product_id: 'prod-1',
+            original_text: 'Product 1',
+            quoted_quantity: '10',
+            quoted_unit_price_amount: '20.00',
+            quoted_unit_price_currency: 'SAR',
+            pending_match: false,
+          },
+          {
+            workspace_product_id: 'prod-2',
+            original_text: 'Product 2',
+            quoted_quantity: '20',
+            quoted_unit_price_amount: '40.00',
+            quoted_unit_price_currency: 'SAR',
+            pending_match: false,
+          },
+        ],
+        guardrail_evaluations: [],
+      };
+
+      component.responses.set([respMixed, respSingle]);
+      fixture.detectChanges();
+
+      expect(component.hasLowestTotal(respMixed)).toBeFalse();
+      expect(component.lowestTotalResponseIds().has(respMixed.id)).toBeFalse();
+      const compiled = fixture.nativeElement as HTMLElement;
+      const bestChips = compiled.querySelectorAll('.pp-chip-best');
+      for (const chip of Array.from(bestChips)) {
+        const card = chip.closest('.response-card');
+        expect(card?.textContent).not.toContain('supp-mixed');
+      }
+
+      expect(component.splitEligibility().canSplit).toBeFalse();
+      const splitBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitBtn?.disabled).toBeTrue();
+
+      const reason = compiled.querySelector('[data-testid="split-disabled-reason"]');
+      expect(reason?.textContent).toContain(
+        translate.instant('rfq.compare.replyMixedCurrency'),
+      );
     });
   });
 
@@ -1689,6 +1784,626 @@ describe('CompareComponent (RFQ)', () => {
       );
       expect(component.loadData).toHaveBeenCalledWith('rfq-1');
     });
+  });
+
+  describe('page robustness (P-156, PPS-200)', () => {
+    const matchedReply = (id: string, supplierId: string, productId: string): RfqResponseComparisonList['items'][number] => ({
+      id,
+      rfq_id: 'rfq-1',
+      supplier_id: supplierId,
+      quotation_id: `quote-${id}`,
+      quotation_status: 'reviewed',
+      submitted_at: '2026-09-25T10:00:00Z',
+      lines: [
+        {
+          workspace_product_id: productId,
+          original_text: 'x',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '5.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+      ],
+    });
+    const recreate = (): void => {
+      fixture = TestBed.createComponent(CompareComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+    };
+    const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+
+    it('shows product and supplier names that are not on the first page of the lists', () => {
+      mockRfqApi.listResponses.and.returnValue(
+        of({ items: [matchedReply('r-far', 'supp-999', 'prod-999')] }),
+      );
+      mockApiService.product.and.returnValue(of({ id: 'prod-999', tenant_name: 'Far Product' } as Product));
+      mockApiService.supplier.and.returnValue(of({ id: 'supp-999', name: 'Far Supplier' } as Supplier));
+
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      expect(mockApiService.product).toHaveBeenCalledTimes(1);
+      expect(mockApiService.product).toHaveBeenCalledWith('prod-999');
+      expect(mockApiService.supplier).toHaveBeenCalledWith('supp-999');
+      expect(el().textContent).toContain('Far Product');
+      expect(el().textContent).toContain('Far Supplier');
+      expect(el().textContent).not.toContain('prod-999');
+    });
+
+    it('does not offer Prepare request to roles that cannot prepare', () => {
+      mockSession.hasRole.and.returnValue(false);
+      recreate();
+
+      expect(el().querySelector('.prepare-buttons-row button')).toBeNull();
+    });
+
+    it('does not enable the split for two replies from the same supplier', () => {
+      mockRfqApi.listResponses.and.returnValue(
+        of({ items: [matchedReply('a', 'supp-1', 'prod-1'), matchedReply('b', 'supp-1', 'prod-1')] }),
+      );
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      expect(component.splitEligibility().canSplit).toBeFalse();
+      const split = el().querySelector('[data-testid="rfq-compare-split-button"]') as HTMLButtonElement | null;
+      expect(split?.disabled).toBeTrue();
+    });
+
+    it('retries a name lookup that failed the first time on the next load', () => {
+      mockRfqApi.listResponses.and.returnValue(
+        of({ items: [matchedReply('r-far', 'supp-1', 'prod-999')] }),
+      );
+      mockApiService.product.and.returnValues(
+        throwError(() => new Error('busy')),
+        of({ id: 'prod-999', tenant_name: 'Far Product' } as Product),
+      );
+
+      component.loadData('rfq-1');
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      expect(mockApiService.product).toHaveBeenCalledTimes(2);
+      expect(component.productNames()['prod-999']).toBe('Far Product');
+    });
+
+    it('shows no split saving for replies from one supplier only', () => {
+      const costs = (a: string, b: string) => [
+        { workspace_product_id: 'p1', total_amount: a, total_currency: 'USD' },
+        { workspace_product_id: 'p2', total_amount: b, total_currency: 'USD' },
+      ];
+      const reply = (id: string, a: string, b: string) => ({
+        ...matchedReply(id, 'supp-1', 'p1'),
+        rfq_landed_costs: costs(a, b),
+      });
+      mockRfqApi.getRfq.and.returnValue(
+        of({
+          ...sentDetail,
+          lines: ['p1', 'p2'].map((product) => ({
+            id: `line-${product}`,
+            tenant_id: 'tenant-1',
+            rfq_id: 'rfq-1',
+            workspace_product_id: product,
+            quantity: '10',
+            created_at: '2026-09-25T09:00:00Z',
+          })),
+        }),
+      );
+      mockRfqApi.listResponses.and.returnValue(
+        of({ items: [reply('a', '100', '200'), reply('b', '150', '120')] }),
+      );
+
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      expect(component.splitSaving()).toBeNull();
+      expect(el().querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+    });
+
+    it('shows no split saving when a supplier has more than one reply, since the split prices them by recorded cost', () => {
+      const reply = (id: string, supplier: string, a: string, b: string, at: string) => ({
+        ...matchedReply(id, supplier, 'p1'),
+        submitted_at: at,
+        rfq_landed_costs: [
+          { workspace_product_id: 'p1', total_amount: a, total_currency: 'USD' },
+          { workspace_product_id: 'p2', total_amount: b, total_currency: 'USD' },
+        ],
+      });
+      mockRfqApi.getRfq.and.returnValue(
+        of({
+          ...sentDetail,
+          lines: ['p1', 'p2'].map((product) => ({
+            id: `line-${product}`,
+            tenant_id: 'tenant-1',
+            rfq_id: 'rfq-1',
+            workspace_product_id: product,
+            quantity: '10',
+            created_at: '2026-09-25T09:00:00Z',
+          })),
+        }),
+      );
+      // Two suppliers; supp-1 sent an older and a newer reply. Without the second reply the split would save money.
+      mockRfqApi.listResponses.and.returnValue(
+        of({
+          items: [
+            reply('old', 'supp-1', '100', '200', '2026-09-25T10:00:00Z'),
+            reply('new', 'supp-1', '110', '210', '2026-09-26T10:00:00Z'),
+            reply('other', 'supp-2', '150', '120', '2026-09-25T11:00:00Z'),
+          ],
+        }),
+      );
+
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      expect(component.splitEligibility().canSplit).toBeTrue();
+      expect(component.splitSaving()).toBeNull();
+      expect(el().querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+    });
+
+    it('shows no Prepare prerequisites to roles that cannot prepare', () => {
+      mockSession.hasRole.and.returnValue(false);
+      recreate();
+
+      expect(el().querySelector('.prepare-actions .disabled-reason')).toBeNull();
+    });
+
+    it('offers Retry when the responses cannot be loaded', () => {
+      mockRfqApi.listResponses.and.returnValue(throwError(() => new Error('boom')));
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      const retry = el().querySelector('[data-testid="rfq-compare-retry"]') as HTMLButtonElement | null;
+      expect(retry).toBeTruthy();
+      mockRfqApi.listResponses.calls.reset();
+      mockRfqApi.listResponses.and.returnValue(of(dummyResponses));
+      retry!.click();
+      expect(mockRfqApi.listResponses).toHaveBeenCalledWith('rfq-1');
+    });
+
+    it('prepares a request once when Prepare is clicked twice', () => {
+      const pending$ = new Subject<PrepareRequestResponse>();
+      mockRfqApi.prepareRequest.and.returnValue(pending$);
+      const reply = matchedReply('solo', 'supp-1', 'prod-1');
+      component.responses.set([reply]);
+
+      component.prepareRequest(reply);
+      component.prepareRequest(reply);
+      component.prepareRequest(reply);
+
+      expect(mockRfqApi.prepareRequest).toHaveBeenCalledTimes(1);
+      expect(mockRfqApi.prepareRequest).toHaveBeenCalledWith(
+        'rfq-1',
+        jasmine.objectContaining({ rfq_response_id: 'solo' }),
+      );
+    });
+  });
+
+  describe('screen-reader states (P-159, PPS-203)', () => {
+    const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+
+    it('announces loading with a labelled spinner', () => {
+      component.isLoading.set(true);
+      fixture.detectChanges();
+
+      const loading = el().querySelector('.loading-state');
+      expect(loading?.getAttribute('role')).toBe('status');
+      expect(loading?.querySelector('mat-spinner')?.getAttribute('aria-label')).toBeTruthy();
+    });
+
+    it('announces a load error as an alert', () => {
+      component.isLoading.set(false);
+      component.errorMessage.set('Could not load');
+      fixture.detectChanges();
+
+      expect(el().querySelector('.error-state')?.getAttribute('role')).toBe('alert');
+    });
+
+    it('announces the empty state as a status', () => {
+      component.isLoading.set(false);
+      component.errorMessage.set(null);
+      component.responses.set([]);
+      fixture.detectChanges();
+
+      expect(el().querySelector('.empty-state')?.getAttribute('role')).toBe('status');
+    });
+  });
+
+  describe('PPS-175: RFQ Compare Prepare Eligibility and Error Handling', () => {
+    it('empty-lines reply is not eligible and shows "still being read" reason', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const emptyLinesReply: RfqResponseComparison = {
+        ...dummyResponses.items[0],
+        id: 'resp-empty',
+        quotation_status: 'reviewed',
+        lines: [],
+      };
+
+      expect(component.isEligible(emptyLinesReply)).toBeFalse();
+      expect(component.ineligibilityReason(emptyLinesReply)).toBe('rfq.compare.stillBeingRead');
+
+      component.responses.set([emptyLinesReply]);
+      component.selectedBranchId.set('branch-1');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const card = compiled.querySelector('.response-card');
+      const prepareBtn = card?.querySelector<HTMLButtonElement>('.prepare-buttons-row button');
+      expect(prepareBtn?.disabled).toBeTrue();
+      expect(card?.querySelector('.prepare-actions')?.textContent).toContain(
+        enCatalog.rfq.compare.stillBeingRead,
+      );
+    });
+
+    it('unreviewed reply is not eligible and shows awaiting review reason', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const unreviewedReply: RfqResponseComparison = {
+        ...dummyResponses.items[0],
+        id: 'resp-unreviewed',
+        quotation_status: 'extracted',
+      };
+
+      expect(component.isEligible(unreviewedReply)).toBeFalse();
+      expect(component.ineligibilityReason(unreviewedReply)).toBe('rfq.compare.awaitingReview');
+
+      component.responses.set([unreviewedReply]);
+      component.selectedBranchId.set('branch-1');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const card = compiled.querySelector('.response-card');
+      const prepareBtn = card?.querySelector<HTMLButtonElement>('.prepare-buttons-row button');
+      expect(prepareBtn?.disabled).toBeTrue();
+      expect(card?.querySelector('.prepare-actions')?.textContent).toContain(
+        enCatalog.rfq.compare.awaitingReview,
+      );
+    });
+
+    it('mixed-currency reply shows notice, no single total, and button is disabled', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const mixedReply: RfqResponseComparison = {
+        ...dummyResponses.items[0],
+        id: 'resp-mixed',
+        quotation_status: 'reviewed',
+        lines: [
+          {
+            workspace_product_id: 'prod-1',
+            original_text: 'Item 1 USD',
+            quoted_quantity: '2',
+            quoted_unit_price_amount: '10.00',
+            quoted_unit_price_currency: 'USD',
+            pending_match: false,
+          },
+          {
+            workspace_product_id: 'prod-2',
+            original_text: 'Item 2 EUR',
+            quoted_quantity: '1',
+            quoted_unit_price_amount: '20.00',
+            quoted_unit_price_currency: 'EUR',
+            pending_match: false,
+          },
+        ],
+      };
+
+      expect(component.hasMixedCurrencies(mixedReply)).toBeTrue();
+      expect(component.canPrepare(mixedReply)).toBeFalse();
+      expect(component.responseTotal(mixedReply)).toBeNull();
+
+      component.responses.set([mixedReply]);
+      component.selectedBranchId.set('branch-1');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const card = compiled.querySelector('.response-card');
+      const prepareBtn = card?.querySelector<HTMLButtonElement>('.prepare-buttons-row button');
+      expect(prepareBtn?.disabled).toBeTrue();
+
+      const expectedNotice = enCatalog.rfq.compare.mixedCurrenciesNotice;
+      expect(card?.textContent).toContain(expectedNotice);
+
+      const totalCell = card?.querySelector('.total-value-cell');
+      expect(totalCell?.textContent).not.toContain('40');
+      expect(totalCell?.textContent).not.toContain('USD');
+      expect(totalCell?.textContent).not.toContain('EUR');
+    });
+
+    it('each mapped API reason shows its translated message', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const testReasons: { reason: string; fallbackText: string }[] = [
+        { reason: 'mixed_currencies', fallbackText: enCatalog.rfq.compare.prepareErrorMixedCurrencies },
+        { reason: 'no_quotation_lines', fallbackText: enCatalog.rfq.compare.prepareErrorNoQuotationLines },
+        { reason: 'pending_matches', fallbackText: enCatalog.rfq.compare.prepareErrorPendingMatches },
+        { reason: 'no_matched_lines', fallbackText: enCatalog.rfq.compare.prepareErrorNoMatchedLines },
+        { reason: 'no_pricing_for_rfq_products', fallbackText: enCatalog.rfq.compare.prepareErrorNoPricingForRfqProducts },
+        { reason: 'quotation_archived', fallbackText: enCatalog.rfq.compare.prepareErrorQuotationArchived },
+        { reason: 'quotation_refused', fallbackText: enCatalog.rfq.compare.prepareErrorQuotationRefused },
+      ];
+
+      component.rfqDetail.set(sentDetail);
+      component.selectedBranchId.set('branch-1');
+
+      for (const { reason, fallbackText } of testReasons) {
+        mockSnackBar.open.calls.reset();
+        mockRfqApi.prepareRequest.and.returnValue(
+          throwError(
+            () =>
+              new HttpErrorResponse({
+                status: 422,
+                error: {
+                  message: 'Backend raw message should never be printed',
+                  details: { reason },
+                },
+              }),
+          ),
+        );
+
+        component.prepareRequest(dummyResponses.items[0]);
+
+        expect(mockSnackBar.open).toHaveBeenCalledWith(
+          fallbackText,
+          enCatalog.rfq.history.dismiss,
+          { duration: 5000 },
+        );
+      }
+    });
+
+    it('double click on an eligible reply calls rfqApi.prepareRequest exactly once', () => {
+      component.rfqDetail.set(sentDetail);
+      component.selectedBranchId.set('branch-1');
+
+      const pendingSubject = new Subject<PrepareRequestResponse>();
+      mockRfqApi.prepareRequest.and.returnValue(pendingSubject.asObservable());
+
+      // First click
+      component.prepareRequest(dummyResponses.items[0]);
+      // Second click while in-flight
+      component.prepareRequest(dummyResponses.items[0]);
+
+      expect(mockRfqApi.prepareRequest).toHaveBeenCalledTimes(1);
+
+      // Verify preparing state clears on completion
+      pendingSubject.next({ purchase_request_id: 'pr-1' } as PrepareRequestResponse);
+      pendingSubject.complete();
+      expect(component.preparing()).toBeNull();
+    });
+
+    it('an unknown error shows the generic message, not err.error.message', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      component.rfqDetail.set(sentDetail);
+      component.selectedBranchId.set('branch-1');
+
+      mockRfqApi.prepareRequest.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 500,
+              error: {
+                message: 'Fatal Postgres connection error',
+                details: { reason: 'unknown_database_failure' },
+              },
+            }),
+        ),
+      );
+
+      component.prepareRequest(dummyResponses.items[0]);
+
+      expect(mockSnackBar.open).toHaveBeenCalledWith(
+        enCatalog.rfq.compare.prepareError,
+        enCatalog.rfq.history.dismiss,
+        { duration: 5000 },
+      );
+      expect(mockSnackBar.open).not.toHaveBeenCalledWith(
+        jasmine.stringMatching(/Fatal Postgres connection error/),
+        jasmine.any(String),
+        jasmine.any(Object),
+      );
+    });
+  });
+
+  describe('PPS-180: Resilient and honest RFQ Compare', () => {
+    beforeEach(() => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+    });
+
+    it('stale response for an old id is ignored', fakeAsync(() => {
+      const responsesA$ = new Subject<RfqResponseComparisonList>();
+      const responsesB$ = new Subject<RfqResponseComparisonList>();
+
+      mockRfqApi.listResponses.and.callFake((id: string) => {
+        if (id === 'rfq-A') return responsesA$;
+        if (id === 'rfq-B') return responsesB$;
+        return of(dummyResponses);
+      });
+
+      component.loadData('rfq-A');
+      fixture.detectChanges();
+
+      component.loadData('rfq-B');
+      fixture.detectChanges();
+
+      const responsesBData: RfqResponseComparisonList = {
+        items: [{ ...dummyResponses.items[0], id: 'resp-B' }],
+      };
+      responsesB$.next(responsesBData);
+      responsesB$.complete();
+      fixture.detectChanges();
+
+      expect(component.responses()[0].id).toBe('resp-B');
+
+      // Now stale responses for A arrive
+      const responsesAData: RfqResponseComparisonList = {
+        items: [{ ...dummyResponses.items[0], id: 'resp-A' }],
+      };
+      responsesA$.next(responsesAData);
+      responsesA$.complete();
+      fixture.detectChanges();
+
+      expect(component.responses()[0].id).toBe('resp-B');
+    }));
+
+    it('detail Retry pending, id changes to B, A retry resolves -> B detail and requiredByDate are unchanged', fakeAsync(() => {
+      const detailARetry$ = new Subject<RfqDetail>();
+      const detailB: RfqDetail = {
+        rfq: {
+          ...sentDetail.rfq,
+          id: 'rfq-B',
+          needed_by_date: '2026-11-15',
+        },
+        lines: [],
+        recipients: [],
+      };
+      const detailA: RfqDetail = {
+        rfq: {
+          ...sentDetail.rfq,
+          id: 'rfq-A',
+          needed_by_date: '2026-10-20',
+        },
+        lines: [],
+        recipients: [],
+      };
+
+      mockRfqApi.getRfq.and.callFake((id: string) => {
+        if (id === 'rfq-A') return detailARetry$;
+        if (id === 'rfq-B') return of(detailB);
+        return of(sentDetail);
+      });
+      mockRfqApi.listResponses.and.returnValue(of({ items: [] }));
+
+      component.rfqId.set('rfq-A');
+      component.rfqDetailError.set(true);
+
+      component.reloadRfqDetail();
+
+      component.loadData('rfq-B');
+      fixture.detectChanges();
+
+      const dateB = parseIsoDateLocal('2026-11-15')!;
+      expect(component.rfqDetail()).toEqual(detailB);
+      expect(component.requiredByDate()).toEqual(dateB);
+
+      detailARetry$.next(detailA);
+      detailARetry$.complete();
+      fixture.detectChanges();
+
+      expect(component.rfqDetail()).toEqual(detailB);
+      expect(component.requiredByDate()).toEqual(dateB);
+    }));
+
+    it('branches failure shows the warning with Retry and Prepare disabled', fakeAsync(() => {
+      mockApiService.listBranches.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+      component.loadBranches();
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const branchWarning = compiled.querySelector('[data-testid="branches-load-error"]');
+      expect(branchWarning).not.toBeNull();
+      expect(branchWarning?.textContent).toContain('Failed to load branches.');
+
+      const retryBtn = branchWarning?.querySelector<HTMLButtonElement>('[data-testid="retry-branches-button"]');
+      expect(retryBtn).not.toBeNull();
+      expect(retryBtn?.textContent?.trim()).toBe('Retry');
+
+      // Prepare must be disabled
+      expect(component.canPrepare(dummyResponses.items[0])).toBeFalse();
+      const reasonEl = compiled.querySelector('[data-testid="branches-error-reason"]');
+      expect(reasonEl).not.toBeNull();
+      expect(reasonEl?.textContent).toContain('Failed to load branches.');
+
+      // Retrying reloads branches
+      mockApiService.listBranches.and.returnValue(of({
+        items: [{ id: 'branch-1', name: 'Main Branch' }],
+        next_cursor: null,
+      } as unknown as { items: Branch[]; next_cursor: string | null }));
+      retryBtn?.click();
+      fixture.detectChanges();
+
+      expect(compiled.querySelector('[data-testid="branches-load-error"]')).toBeNull();
+      expect(component.branches().length).toBe(1);
+      expect(component.canPrepare(dummyResponses.items[0])).toBeTrue();
+    }));
+
+    it('expired RFQ shows the notice and disables Prepare and Split', fakeAsync(() => {
+      const expiredDetail: RfqDetail = {
+        ...sentDetail,
+        rfq: {
+          ...sentDetail.rfq,
+          status: 'expired',
+        },
+      };
+      mockRfqApi.getRfq.and.returnValue(of(expiredDetail));
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const expiredNotice = compiled.querySelector('[data-testid="rfq-compare-expired-notice"]');
+      expect(expiredNotice).not.toBeNull();
+      expect(expiredNotice?.textContent).toContain('This RFQ has expired — requests can no longer be prepared from it');
+
+      // Prepare is disabled
+      expect(component.canPrepare(dummyResponses.items[0])).toBeFalse();
+      const prepareBtn = compiled.querySelector<HTMLButtonElement>('.prepare-buttons-row button');
+      expect(prepareBtn?.disabled).toBeTrue();
+      const expiredReason = compiled.querySelector('[data-testid="expired-reason"]');
+      expect(expiredReason).not.toBeNull();
+      expect(expiredReason?.textContent).toContain('This RFQ has expired');
+
+      // Split is disabled
+      expect(component.splitEligibility().canSplit).toBeFalse();
+      const splitBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitBtn?.disabled).toBeTrue();
+    }));
+
+    it('API reason rfq_expired shows the translated message for prepare and split', fakeAsync(() => {
+      const expiredHttpError = new HttpErrorResponse({
+        status: 422,
+        error: { details: { reason: 'rfq_expired' } },
+      });
+
+      mockRfqApi.prepareRequest.and.returnValue(throwError(() => expiredHttpError));
+      component.prepareRequest(dummyResponses.items[0]);
+
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      expect(mockSnackBar.open).toHaveBeenCalledWith(
+        translate.instant('rfq.compare.prepareErrorRfqExpired'),
+        translate.instant('rfq.history.dismiss'),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+
+      // Now split with rfq_expired
+      const resp1 = dummyResponses.items[0];
+      const resp2 = { ...dummyResponses.items[0], id: 'resp-usd-2', supplier_id: 'supp-2', quotation_id: 'quote-2' };
+      component.responses.set([resp1, resp2]);
+      fixture.detectChanges();
+
+      mockSnackBar.open.calls.reset();
+      mockRfqApi.splitRfq.and.returnValue(throwError(() => expiredHttpError));
+      component.splitRfq();
+
+      expect(mockSnackBar.open).toHaveBeenCalledWith(
+        translate.instant('rfq.compare.prepareErrorRfqExpired'),
+        translate.instant('rfq.history.dismiss'),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+    }));
   });
 });
 

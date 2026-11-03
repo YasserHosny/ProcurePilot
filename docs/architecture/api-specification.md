@@ -1499,6 +1499,12 @@ Request:
 
 ### `POST /requests/{request_id}/approve` · `POST /requests/{request_id}/reject`
 
+- Accepts an optional `Idempotency-Key` UUID header. Within the decision transaction, an
+  authorized retry with the same tenant, actor, action, request and key returns the current
+  request and approval step without another decision, audit event, notification or push enqueue.
+  Replay ignores changed comment input. A different key, actor or action follows the usual
+  conflict checks. Without the header, repeated decisions continue to return `409`.
+
 - Requires bearer auth. The caller must be the step's `assigned_membership_id` or an owner
   (FR-007).
 - Request fields: optional `comment`.
@@ -2927,6 +2933,8 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
   workspace (`rfq_select` RLS policy); another workspace's RFQ returns `404`.
 - Returns the `Rfq` with its lines and recipients (`RfqDetail`), so a saved draft can be reopened
   for editing.
+- Each recipient includes `response_count` (integer, default `0`): the number of `rfq_response`
+  rows with that recipient's `rfq_recipient_id` and `tenant_id`.
 - Also carries `converted_purchase_request_ids` (every purchase request prepared from this RFQ —
   one per supplier in a split) and `request_group_id` (the split's group, once prepared)
   (spec 024; rolling out).
@@ -2988,7 +2996,8 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
   request it produced. Each `RfqSummary` also carries `converted_purchase_request_ids` (every
   purchase request prepared from the RFQ — one per supplier in a split) and `request_group_id`
   (the split's group, once prepared) (spec 024).
-- Optional `status` filter.
+- Expiry is derived at read time: a stored `sent` RFQ with `needed_by_date < current_date` reads
+  as `expired`, including in the optional `status` filter.
 - Scoped per FR-016, same creator-plus-owner/buyer pattern as every list endpoint in this release.
 - Returns `200` with an `RfqList`.
 

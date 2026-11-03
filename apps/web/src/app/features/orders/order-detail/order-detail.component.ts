@@ -1,5 +1,6 @@
-import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ElementRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { DateAdapter } from '@angular/material/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -10,12 +11,13 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { lineDescription, packLabel } from '../pack-label';
+import { isOrderOverdue, orderToCsv } from '../order-helpers';
 
 import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
-import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
+import { AppDateAdapter, provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 import {
   OrdersApiService,
   type EvidenceState,
@@ -51,6 +53,8 @@ export class OrderDetailComponent implements OnInit {
   private readonly ordersApi = inject(OrdersApiService);
   private readonly translate = inject(TranslateService);
   private readonly formatService = inject(FormatService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly dateAdapter = inject(DateAdapter) as AppDateAdapter;
 
   readonly evidence = signal<OrderEvidenceProjection | null>(null);
   readonly isLoading = signal(true);
@@ -59,6 +63,11 @@ export class OrderDetailComponent implements OnInit {
   readonly confirmationOpen = signal(false);
   readonly receiptOpen = signal(false);
   readonly cancelOpen = signal(false);
+  readonly submitOpen = signal(false);
+  readonly actionError = signal<string | null>(null);
+  /** Polite announcement of the last successful action, for screen readers. */
+  readonly actionStatus = signal('');
+  readonly receiptQuantityError = signal(false);
   readonly confirmationReference = signal('');
   readonly confirmationDate = signal('');
   readonly receiptReference = signal('');
@@ -143,41 +152,129 @@ export class OrderDetailComponent implements OnInit {
   }
 
   setQuantity(kind: 'confirmation' | 'receipt', lineId: string, value: string): void {
+    if (kind === 'receipt') this.receiptQuantityError.set(false);
     const target = kind === 'confirmation' ? this.confirmationQuantities : this.receiptQuantities;
     target.set({ ...target(), [lineId]: value });
   }
 
-  submitOrder(): void {
-    this.isSaving.set(true);
-    this.ordersApi.submitOrder(this.orderId).subscribe({
-      next: () => { this.loadOrder(); this.isSaving.set(false); },
-      error: () => { this.errorMessage.set(this.translate.instant('orders.saveError')); this.isSaving.set(false); },
+  readonly isOverdue = isOrderOverdue;
+
+  /** Hands the browser a file to save; separate so tests do not need a real download. */
+  saveFile(name: string, content: string): void {
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  exportCsv(): void {
+    const order = this.evidence()?.order;
+    if (order) this.saveFile(`${order.order_number}.csv`, orderToCsv(order));
+  }
+
+  printOrder(): void {
+    window.print();
+  }
+
+  /** Puts what is still to be received on every line that has something left. */
+  receiveAll(): void {
+    const quantities: Record<string, string> = { ...this.receiptQuantities() };
+    for (const summary of this.evidence()?.lifecycle.lines ?? []) {
+      const remaining = Math.max(0, (parseFloat(summary.ordered_quantity) || 0) - (parseFloat(summary.received.quantity ?? '') || 0));
+      if (remaining > 0) quantities[summary.purchase_order_line_id] = String(Math.round(remaining * 1e6) / 1e6);
+    }
+    this.receiptQuantities.set(quantities);
+    this.receiptQuantityError.set(false);
+  }
+
+  /** Cancel is offered until goods are fully received (spec 016 FR-020: partially received can be cancelled). */
+  canCancel(status: string): boolean {
+    return ['draft', 'submitted', 'confirmed', 'partially_received'].includes(status);
+  }
+
+  private failWith(err: unknown): void {
+    const reason = (err as { error?: { details?: { reason?: unknown } } })?.error?.details?.reason;
+    const key = typeof reason === 'string' ? `orders.detail.errors.${reason}` : null;
+    const specific = key ? this.translate.instant(key) : null;
+    this.actionError.set(specific && specific !== key ? specific : this.translate.instant('orders.saveError'));
+    this.isSaving.set(false);
+  }
+
+  /** The hint follows the order the date input really parses (English US workspaces type month-first). */
+  dateFormatHintKey(): string {
+    return this.dateAdapter.isDayFirst()
+      ? 'orders.detail.dateFormatHintDayFirst'
+      : 'orders.detail.dateFormatHintMonthFirst';
+  }
+
+  private announce(key: string): void {
+    // Clear first: the same message twice leaves the text unchanged and a live region stays quiet.
+    this.actionStatus.set('');
+    const message = this.translate.instant(key);
+    setTimeout(() => this.actionStatus.set(message));
+  }
+
+  /** Moves focus into an inline confirmation once it has rendered. */
+  private focusPanel(testId: string): void {
+    setTimeout(() => {
+      this.host.nativeElement.querySelector<HTMLElement>(`[data-testid="${testId}"] h3`)?.focus();
     });
   }
 
-  
+  /** Quantities on the order are in packs (ADR-020), so the unit shown is the pack when there is one. */
+  quantityLabel(kind: 'confirmed' | 'received', line: PurchaseOrderLine): string {
+    const { unit, label } = packLabel(
+      line.pack_base_quantity, line.base_unit, this.translate, this.formatService,
+    );
+    return this.translate.instant(`orders.detail.${kind}QuantityFor`, {
+      product: lineDescription(line),
+      unit: label ?? unit,
+      ordered: this.formatQuantity(line.ordered_quantity),
+    });
+  }
+
+  requestSubmit(): void {
+    this.actionError.set(null);
+    this.submitOpen.set(true);
+    this.focusPanel('submit-confirm-panel');
+  }
+
+  submitOrder(): void {
+    this.isSaving.set(true);
+    this.actionError.set(null);
+    this.actionStatus.set('');
+    this.ordersApi.submitOrder(this.orderId).subscribe({
+      next: () => { this.submitOpen.set(false); this.loadOrder(); this.isSaving.set(false); this.announce('orders.detail.submitted'); },
+      error: (err: unknown) => this.failWith(err),
+    });
+  }
+
   cancelOrder(): void {
+    this.actionError.set(null);
     this.cancelOpen.set(true);
+    this.focusPanel('cancel-confirm-panel');
   }
 
   confirmCancel(): void {
     this.isSaving.set(true);
+    this.actionError.set(null);
     this.ordersApi.cancelOrder(this.orderId).subscribe({
-      next: () => { 
-        this.loadOrder(); 
-        this.cancelOpen.set(false); 
-        this.isSaving.set(false); 
+      next: () => {
+        this.loadOrder();
+        this.cancelOpen.set(false);
+        this.isSaving.set(false);
+        this.announce('orders.detail.cancelled');
       },
-      error: () => { 
-        this.errorMessage.set(this.translate.instant('orders.saveError')); 
-        this.isSaving.set(false); 
-      },
+      error: (err: unknown) => this.failWith(err),
     });
   }
 
   recordConfirmation(): void {
     const current = this.evidence();
     if (!current || !this.confirmationReference().trim() || !this.confirmationDate()) return;
+    this.actionError.set(null);
     this.isSaving.set(true);
     this.ordersApi.recordConfirmation(this.orderId, {
       supplier_reference: this.confirmationReference().trim(),
@@ -191,14 +288,21 @@ export class OrderDetailComponent implements OnInit {
         confirmed_unit_price: null,
       })),
     }).subscribe({
-      next: (value) => { this.evidence.set(value); this.confirmationOpen.set(false); this.isSaving.set(false); },
-      error: () => { this.errorMessage.set(this.translate.instant('orders.saveError')); this.isSaving.set(false); },
+      next: (value) => { this.evidence.set(value); this.confirmationOpen.set(false); this.isSaving.set(false); this.announce('orders.detail.confirmationSaved'); },
+      error: (err: unknown) => this.failWith(err),
     });
   }
 
   recordReceipt(): void {
     const current = this.evidence();
     if (!current || !this.receiptReference().trim() || !this.receiptDate()) return;
+    const quantities = this.receiptQuantities();
+    if (!current.order.lines.some((line) => (parseFloat(quantities[line.id] ?? '') || 0) > 0)) {
+      this.receiptQuantityError.set(true);
+      return;
+    }
+    this.receiptQuantityError.set(false);
+    this.actionError.set(null);
     this.isSaving.set(true);
     this.ordersApi.recordReceipt(this.orderId, {
       receipt_reference: this.receiptReference().trim(),
@@ -210,8 +314,8 @@ export class OrderDetailComponent implements OnInit {
         received_quantity: this.quantityValue(this.receiptQuantities(), line) || '0',
       })),
     }).subscribe({
-      next: (value) => { this.evidence.set(value); this.receiptOpen.set(false); this.isSaving.set(false); },
-      error: () => { this.errorMessage.set(this.translate.instant('orders.saveError')); this.isSaving.set(false); },
+      next: (value) => { this.evidence.set(value); this.receiptOpen.set(false); this.isSaving.set(false); this.announce('orders.detail.receiptSaved'); },
+      error: (err: unknown) => this.failWith(err),
     });
   }
 }

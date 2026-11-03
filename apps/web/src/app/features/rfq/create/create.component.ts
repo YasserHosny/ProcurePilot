@@ -77,7 +77,9 @@ export class RfqCreateComponent implements OnInit {
     const isDayFirst = (this.dateAdapter as unknown as AppDateAdapter)?.isDayFirst
       ? (this.dateAdapter as unknown as AppDateAdapter).isDayFirst()
       : true;
-    return isDayFirst ? 'DD/MM/YYYY' : 'MM/DD/YYYY';
+    return isDayFirst
+      ? this.translate.instant('rfq.create.dateFormatDayFirst')
+      : this.translate.instant('rfq.create.dateFormatMonthFirst');
   }
 
   readonly products = signal<Product[]>([]);
@@ -166,6 +168,10 @@ export class RfqCreateComponent implements OnInit {
   readonly rfqId = signal<string | null>(null);
   readonly rfqStatus = signal<Rfq['status'] | null>(null);
   readonly rejectedSuppliers = signal<{ supplier_id: string; reason: string }[]>([]);
+  readonly allLoadedSuppliers = signal<Supplier[]>([]);
+  readonly excludedSupplierCount = signal<number>(0);
+  readonly isDataLoaded = signal(false);
+  readonly initialLoadError = signal<string | null>(null);
   readonly errorMessage = signal<string | null>(null);
 
   productLabel(prod: Product): string {
@@ -229,6 +235,17 @@ export class RfqCreateComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.loadInitialData();
+  }
+
+  retryInitialLoad(): void {
+    this.loadInitialData();
+  }
+
+  loadInitialData(): void {
+    this.initialLoadError.set(null);
+    this.isDataLoaded.set(false);
+
     const routeId = this.route?.snapshot?.paramMap?.get('id') ?? null;
     if (routeId) {
       this.isEditMode.set(true);
@@ -243,13 +260,39 @@ export class RfqCreateComponent implements OnInit {
       return;
     }
 
-    this.loadAllActiveProducts().subscribe((items) => {
-      this.products.set(items);
-      this.revalidateLines();
+    this.loadCreateModeData();
+  }
+
+  private loadCreateModeData(): void {
+    forkJoin({
+      products: this.loadAllActiveProducts(),
+      suppliers: this.loadAllActiveSuppliers(),
+    }).subscribe({
+      next: ({ products, suppliers }) => {
+        this.products.set(products);
+        this.revalidateLines();
+        this.allLoadedSuppliers.set(suppliers);
+        this.excludedSupplierCount.set(suppliers.filter((s) => !s.contact_email).length);
+        this.suppliers.set(suppliers.filter((s) => !!s.contact_email));
+        this.isDataLoaded.set(true);
+        this.initialLoadError.set(null);
+      },
+      error: () => {
+        this.isDataLoaded.set(false);
+        this.initialLoadError.set(this.translate.instant('rfq.create.initialLoadError'));
+      },
     });
-    this.apiService.suppliers({ limit: 100, status: 'active' }).subscribe((res) => {
-      this.suppliers.set(res.items.filter((s) => !!s.contact_email));
-    });
+  }
+
+  private loadAllActiveSuppliers(): Observable<Supplier[]> {
+    return this.apiService.suppliers({ limit: 100, status: 'active' }).pipe(
+      expand((res) =>
+        res.next_cursor
+          ? this.apiService.suppliers({ limit: 100, status: 'active', cursor: res.next_cursor })
+          : EMPTY,
+      ),
+      reduce((acc, res) => acc.concat(res.items), [] as Supplier[]),
+    );
   }
 
   private loadAllActiveProducts(): Observable<Product[]> {
@@ -266,21 +309,25 @@ export class RfqCreateComponent implements OnInit {
   private loadDuplicateData(fromId: string): void {
     this.isLoadingRfq.set(true);
     this.errorMessage.set(null);
+    this.initialLoadError.set(null);
 
     forkJoin({
       products: this.loadAllActiveProducts(),
-      suppliers: this.apiService.suppliers({ limit: 100, status: 'active' }),
+      suppliers: this.loadAllActiveSuppliers(),
       detail: this.rfqApi.getRfq(fromId),
     }).subscribe({
       next: ({ products, suppliers, detail }) => {
         this.products.set(products);
-        const validSuppliers = suppliers.items.filter((s) => !!s.contact_email);
-        this.suppliers.set(validSuppliers);
-        this.applyDuplicateDetail(detail, validSuppliers);
+        this.allLoadedSuppliers.set(suppliers);
+        this.excludedSupplierCount.set(suppliers.filter((s) => !s.contact_email).length);
+        this.applyDuplicateDetail(detail, suppliers);
+        this.isDataLoaded.set(true);
         this.isLoadingRfq.set(false);
       },
       error: (err: unknown) => {
         this.isLoadingRfq.set(false);
+        this.isDataLoaded.set(false);
+        this.initialLoadError.set(this.translate.instant('rfq.create.initialLoadError'));
         this.errorMessage.set(
           err instanceof HttpErrorResponse && err.status === 403
             ? this.translate.instant('rfq.creatorOnly')
@@ -290,7 +337,7 @@ export class RfqCreateComponent implements OnInit {
     });
   }
 
-  private applyDuplicateDetail(detail: RfqDetail, activeSuppliers: Supplier[]): void {
+  private applyDuplicateDetail(detail: RfqDetail, allActiveSuppliers: Supplier[]): void {
     this.isDuplicated.set(true);
     this.isEditMode.set(false);
     this.rfqId.set(null);
@@ -313,7 +360,10 @@ export class RfqCreateComponent implements OnInit {
       this.linesFormArray.push(lineGroup);
     }
 
-    const activeSupplierIds = new Set(activeSuppliers.map((s) => s.id));
+    const validSuppliers = allActiveSuppliers.filter((s) => !!s.contact_email);
+    this.suppliers.set(validSuppliers);
+
+    const activeSupplierIds = new Set(validSuppliers.map((s) => s.id));
     const prefilledSuppliers = detail.recipients
       .map((r) => r.supplier_id)
       .filter((id) => activeSupplierIds.has(id));
@@ -328,27 +378,35 @@ export class RfqCreateComponent implements OnInit {
   private loadEditModeData(rfqId: string): void {
     this.isLoadingRfq.set(true);
     this.errorMessage.set(null);
+    this.initialLoadError.set(null);
 
     forkJoin({
       products: this.loadAllActiveProducts(),
-      suppliers: this.apiService.suppliers({ limit: 100, status: 'active' }),
+      suppliers: this.loadAllActiveSuppliers(),
       detail: this.rfqApi.getRfq(rfqId),
     }).subscribe({
       next: ({ products, suppliers, detail }) => {
         this.products.set(products);
-        this.suppliers.set(suppliers.items.filter((s) => !!s.contact_email));
-        this.applyRfqDetail(detail);
+        this.allLoadedSuppliers.set(suppliers);
+        this.excludedSupplierCount.set(suppliers.filter((s) => !s.contact_email).length);
+        this.applyRfqDetail(detail, suppliers);
+        this.isDataLoaded.set(true);
         this.isLoadingRfq.set(false);
       },
       error: (err: unknown) => {
         this.isLoadingRfq.set(false);
-        this.errorMessage.set(err instanceof HttpErrorResponse && err.status === 403
-          ? this.translate.instant('rfq.creatorOnly') : this.getErrorMessage(err, 'rfq.create.saveError'));
+        this.isDataLoaded.set(false);
+        this.initialLoadError.set(this.translate.instant('rfq.create.initialLoadError'));
+        this.errorMessage.set(
+          err instanceof HttpErrorResponse && err.status === 403
+            ? this.translate.instant('rfq.creatorOnly')
+            : this.getErrorMessage(err, 'rfq.create.saveError'),
+        );
       },
     });
   }
 
-  private applyRfqDetail(detail: RfqDetail): void {
+  private applyRfqDetail(detail: RfqDetail, allActiveSuppliers: Supplier[]): void {
     this.rfqId.set(detail.rfq.id);
     this.rfqStatus.set(detail.rfq.status);
 
@@ -374,6 +432,30 @@ export class RfqCreateComponent implements OnInit {
       }
       this.linesFormArray.push(lineGroup);
     }
+
+    const validSuppliers = allActiveSuppliers.filter((s) => !!s.contact_email);
+    const validSupplierIds = new Set(validSuppliers.map((s) => s.id));
+    const extraSuppliers: Supplier[] = [];
+
+    for (const recipient of detail.recipients) {
+      if (!validSupplierIds.has(recipient.supplier_id)) {
+        const existingInActive = allActiveSuppliers.find((s) => s.id === recipient.supplier_id);
+        if (existingInActive) {
+          extraSuppliers.push(existingInActive);
+        } else {
+          extraSuppliers.push({
+            id: recipient.supplier_id,
+            name: recipient.supplier_name || recipient.supplier_id,
+            contact_email: recipient.supplier_contact_email ?? null,
+            status: 'archived',
+            created_at: recipient.created_at || '',
+          });
+        }
+        validSupplierIds.add(recipient.supplier_id);
+      }
+    }
+
+    this.suppliers.set([...validSuppliers, ...extraSuppliers]);
 
     this.form.patchValue({
       supplierIds: detail.recipients.map((r) => r.supplier_id),
@@ -681,5 +763,28 @@ export class RfqCreateComponent implements OnInit {
     };
     const key = typeof envelope?.code === 'string' ? errorKeys[envelope.code] : undefined;
     return key ? this.translate.instant(key) : fallback;
+  }
+
+  getSupplierName(supplierId: string): string {
+    const inAll = this.allLoadedSuppliers().find((s) => s.id === supplierId);
+    if (inAll) return inAll.name;
+    const inSuppliers = this.suppliers().find((s) => s.id === supplierId);
+    if (inSuppliers) return inSuppliers.name;
+    return supplierId;
+  }
+
+  getRejectedReasonText(reason: string): string {
+    const reasonKeys: Record<string, string> = {
+      missing_contact_email: 'rfq.create.rejectedReasons.missing_contact_email',
+      not_found: 'rfq.create.rejectedReasons.not_found',
+    };
+    const key = reasonKeys[reason] ?? 'rfq.create.rejectedReasons.generic';
+    return this.translate.instant(key);
+  }
+
+  rejectedSupplierLabel(rej: { supplier_id: string; reason: string }): string {
+    const name = this.getSupplierName(rej.supplier_id);
+    const reasonText = this.getRejectedReasonText(rej.reason);
+    return `${name} — ${reasonText}`;
   }
 }

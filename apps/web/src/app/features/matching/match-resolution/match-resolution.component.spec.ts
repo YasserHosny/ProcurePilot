@@ -1,8 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -17,6 +18,9 @@ import type {
 } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { MatchResolutionComponent } from './match-resolution.component';
+
+@Component({ standalone: true, template: '<p>dialog</p>' })
+class OpenDialogStubComponent {}
 
 describe('MatchResolutionComponent (T039)', () => {
   let component: MatchResolutionComponent;
@@ -350,11 +354,15 @@ describe('MatchResolutionComponent (T039)', () => {
 
     component.confirmResolution();
 
-    expect(apiService.resolveMatch).toHaveBeenCalledWith('line-99', {
-      outcome: 'different_variant',
-      selected_match_candidate_id: 'cand-2',
-      create_product: null,
-    });
+    expect(apiService.resolveMatch).toHaveBeenCalledWith(
+      'line-99',
+      {
+        outcome: 'different_variant',
+        selected_match_candidate_id: 'cand-2',
+        create_product: null,
+      },
+      jasmine.any(String),
+    );
     expect(apiService.getLandedCost).toHaveBeenCalledWith('line-99');
     expect(component.decision()).toEqual(mockDecision);
   });
@@ -375,23 +383,27 @@ describe('MatchResolutionComponent (T039)', () => {
 
     component.confirmResolution();
 
-    expect(apiService.resolveMatch).toHaveBeenCalledWith('line-99', {
-      outcome: 'no_match_new_product',
-      selected_match_candidate_id: null,
-      create_product: {
-        tenant_name: 'Farm Fresh Whole Milk 2L',
-        brand: 'Farm Fresh',
-        canonical_name: 'Farm Fresh Whole Milk',
-        variant: 'Whole',
-        gtin: '501234567890',
-        base_unit: 'litre',
-        pack: {
-          pack_count: 6,
-          unit_size: '2.0',
+    expect(apiService.resolveMatch).toHaveBeenCalledWith(
+      'line-99',
+      {
+        outcome: 'no_match_new_product',
+        selected_match_candidate_id: null,
+        create_product: {
+          tenant_name: 'Farm Fresh Whole Milk 2L',
+          brand: 'Farm Fresh',
+          canonical_name: 'Farm Fresh Whole Milk',
+          variant: 'Whole',
+          gtin: '501234567890',
+          base_unit: 'litre',
+          pack: {
+            pack_count: 6,
+            unit_size: '2.0',
+          },
+          preferred_supplier_id: null,
         },
-        preferred_supplier_id: null,
       },
-    });
+      jasmine.any(String),
+    );
   });
 
   it('should handle 409 alias conflict error', () => {
@@ -419,8 +431,10 @@ describe('MatchResolutionComponent (T039)', () => {
     component.confirmResolution(true);
 
     expect(apiService.resolveMatch).toHaveBeenCalled();
-    expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1');
-    expect(navSpy).toHaveBeenCalledWith(['/matching', 'line-next']);
+    expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1', 'q-99');
+    expect(navSpy).toHaveBeenCalledWith(['/matching', 'line-next'], {
+      queryParams: jasmine.objectContaining({ quotation_id: 'q-99' }),
+    });
   });
 
   it('navigates to /matching and shows queue cleared toast on Resolve and Next when no tasks remain', () => {
@@ -432,13 +446,16 @@ describe('MatchResolutionComponent (T039)', () => {
 
     component.confirmResolution(true);
 
-    expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1');
+    expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1', 'q-99');
+    // Scoped to the quotation: other quotations may still have open tasks.
     expect(snackSpy).toHaveBeenCalledWith(
-      enCatalog.matching.resolution.actions.queueCleared,
+      enCatalog.matching.queue.allLinesMatchedTitle,
       undefined,
       { duration: 3500 },
     );
-    expect(navSpy).toHaveBeenCalledWith(['/matching']);
+    expect(navSpy).toHaveBeenCalledWith(['/matching'], {
+      queryParams: jasmine.objectContaining({ quotation_id: 'q-99' }),
+    });
   });
 
   it('displays task.matched_product name in the Matched Product box on a resolved task page', () => {
@@ -515,6 +532,329 @@ describe('MatchResolutionComponent (T039)', () => {
     const metricValues = fixture.nativeElement.querySelectorAll('.metric-item .metric-value');
     const quantityText = metricValues[0]?.textContent?.trim();
     expect(quantityText).toBe('8');
+  });
+
+  describe('keyboard safety and idempotency (P-150, PPS-194)', () => {
+    const keydown = (target: EventTarget, init: KeyboardEventInit): KeyboardEvent => {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
+      target.dispatchEvent(event);
+      return event;
+    };
+
+    afterEach(() => {
+      document.documentElement.dir = 'ltr';
+    });
+
+    it('does not confirm when Enter is pressed on a focused link, radio or outcome control', () => {
+      const targets: Element[] = [
+        fixture.nativeElement.querySelector('a.back-btn'),
+        fixture.nativeElement.querySelector('a.cancel-btn'),
+        fixture.nativeElement.querySelector('.cand-radio-input'),
+        fixture.nativeElement.querySelector('mat-radio-button'),
+      ];
+      for (const target of targets) {
+        expect(target).withContext('focus target exists').not.toBeNull();
+        const event = keydown(target, { key: 'Enter' });
+        expect(event.defaultPrevented).withContext('Enter keeps its native action').toBeFalse();
+      }
+      expect(apiService.resolveMatch).not.toHaveBeenCalled();
+    });
+
+    it('does not confirm on a plain Enter anywhere on the page', () => {
+      keydown(document.body, { key: 'Enter' });
+      keydown(window, { key: 'Enter' });
+      expect(apiService.resolveMatch).not.toHaveBeenCalled();
+    });
+
+    it('confirms on Ctrl+Enter and on Cmd+Enter', () => {
+      keydown(document.body, { key: 'Enter', ctrlKey: true });
+      expect(apiService.resolveMatch).toHaveBeenCalledTimes(1);
+
+      component.decision.set(null);
+      apiService.resolveMatch.calls.reset();
+      keydown(document.body, { key: 'Enter', metaKey: true });
+      expect(apiService.resolveMatch).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves browser shortcuts alone when Alt, Ctrl or Cmd is held with arrows or digits', () => {
+      expect(component.selectedCandidateId()).toBe('cand-1');
+      const combos: KeyboardEventInit[] = [
+        { key: 'ArrowRight', altKey: true },
+        { key: 'ArrowLeft', altKey: true },
+        { key: 'ArrowDown', ctrlKey: true },
+        { key: 'ArrowDown', metaKey: true },
+        { key: '2', ctrlKey: true },
+        { key: '2', metaKey: true },
+        { key: 'o', ctrlKey: true },
+      ];
+      for (const init of combos) {
+        const event = keydown(document.body, init);
+        expect(event.defaultPrevented).withContext(JSON.stringify(init)).toBeFalse();
+      }
+      expect(component.selectedCandidateId()).toBe('cand-1');
+      expect(component.selectedOutcome()).toBe('same_product');
+    });
+
+    it('ignores shortcuts while a dialog is open', () => {
+      const dialog = TestBed.inject(MatDialog);
+      const ref = dialog.open(OpenDialogStubComponent);
+      fixture.detectChanges();
+
+      const arrow = keydown(document.body, { key: 'ArrowDown' });
+      keydown(document.body, { key: '2' });
+      keydown(document.body, { key: 'Enter', ctrlKey: true });
+
+      expect(arrow.defaultPrevented).toBeFalse();
+      expect(component.selectedCandidateId()).toBe('cand-1');
+      expect(apiService.resolveMatch).not.toHaveBeenCalled();
+      ref.close();
+    });
+
+    it('moves the candidate with the arrow that points the reading direction', () => {
+      const [first, second] = mockTask.candidates!;
+      const third = { ...second, id: 'cand-3', rank: 3 };
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({ ...mockTask, candidates: [first, second, third] }),
+      );
+      component.loadTask('line-99');
+      fixture.detectChanges();
+      expect(component.selectedCandidateId()).toBe('cand-1');
+
+      keydown(document.body, { key: 'ArrowRight' });
+      expect(component.selectedCandidateId()).withContext('ltr: right is next').toBe('cand-2');
+
+      document.documentElement.dir = 'rtl';
+      keydown(document.body, { key: 'ArrowLeft' });
+      expect(component.selectedCandidateId()).withContext('rtl: left is next').toBe('cand-3');
+      keydown(document.body, { key: 'ArrowRight' });
+      expect(component.selectedCandidateId()).withContext('rtl: right is previous').toBe('cand-2');
+    });
+
+    it('leaves arrow keys to the outcome radio group when it has focus', () => {
+      const outcomeRadio = fixture.nativeElement.querySelector(
+        '.outcomes-radio-group input[type="radio"]',
+      ) as HTMLElement;
+      expect(outcomeRadio).not.toBeNull();
+      expect(component.selectedCandidateId()).toBe('cand-1');
+
+      const down = keydown(outcomeRadio, { key: 'ArrowDown' });
+      const right = keydown(outcomeRadio, { key: 'ArrowRight' });
+
+      expect(down.defaultPrevented).toBeFalse();
+      expect(right.defaultPrevented).toBeFalse();
+      expect(component.selectedCandidateId()).toBe('cand-1');
+    });
+
+    it('sends an Idempotency-Key, reuses it on retry and renews it after success', () => {
+      apiService.resolveMatch.and.returnValues(
+        throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'busy' } })),
+        of(mockDecision),
+      );
+
+      component.confirmResolution();
+      component.confirmResolution();
+      const [first, retry] = apiService.resolveMatch.calls.allArgs();
+      expect(first[2]).withContext('first attempt has a key').toEqual(jasmine.any(String));
+      expect(retry[2]).withContext('retry replays the same key').toBe(first[2]);
+
+      component.decision.set(null);
+      apiService.resolveMatch.and.returnValue(of(mockDecision));
+      component.confirmResolution();
+      const third = apiService.resolveMatch.calls.mostRecent().args[2];
+      expect(third).withContext('next logical attempt gets a new key').not.toBe(first[2]);
+    });
+
+    it('prints each shortcut key once, in English and in Arabic', () => {
+      const translate = TestBed.inject(TranslateService);
+      for (const [lang, catalog] of [['en', enCatalog], ['ar', arCatalog]] as const) {
+        translate.setTranslation(lang, catalog);
+        translate.use(lang);
+        fixture.detectChanges();
+        const bar = (fixture.nativeElement.querySelector('.keyboard-shortcuts-bar') as HTMLElement)
+          .textContent!;
+        expect(bar.match(/Enter/g)?.length).withContext(`${lang}: Enter`).toBe(1);
+        expect(bar.match(/1\s*–\s*9/g)?.length).withContext(`${lang}: 1–9`).toBe(1);
+        expect(bar).withContext(`${lang}: names the modifier`).toMatch(/Ctrl|⌘|Cmd/);
+      }
+    });
+  });
+
+  describe('result cards (P-158, PPS-202)', () => {
+    const loadDecided = (
+      line: Partial<MatchTask['quotation_line']> = {},
+      cost: Partial<LandedCost> = {},
+    ): HTMLElement => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          quotation_line: { ...mockTask.quotation_line, ...line },
+          decision: mockDecision,
+        }),
+      );
+      apiService.getLandedCost.and.returnValue(of({ ...mockLandedCost, ...cost }));
+      component.loadTask('line-99');
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    };
+
+    it('shows a zero discount without a minus sign and a real discount with one', () => {
+      let el = loadDecided({}, { discount: { amount: '0.00', currency: 'GBP' } });
+      expect(el.querySelector('.discount-val')?.textContent?.trim()).not.toMatch(/^-/);
+
+      el = loadDecided({}, { discount: { amount: '1.00', currency: 'GBP' } });
+      expect(el.querySelector('.discount-val')?.textContent?.trim()).toMatch(/^-/);
+    });
+
+    it('says which quantity the landed total covers', () => {
+      const el = loadDecided();
+      expect(el.querySelector('.landed-cost-card')?.textContent).toMatch(
+        /Total for 10\s*×\s*GBP 2\.5/,
+      );
+    });
+
+    it('does not invent a quantity of 1 when the quote has none', () => {
+      const el = loadDecided({ quantity: null });
+      const metrics = Array.from(el.querySelectorAll('.line-card .metric-item'));
+      const quantity = metrics.find((m) => m.textContent?.includes('Quantity'));
+      expect(quantity?.querySelector('.metric-value')?.textContent?.trim()).toBe(
+        enCatalog.matching.queue.notAvailable,
+      );
+    });
+
+    it('labels the pack unit like the rest of the app instead of the raw code', () => {
+      const el = loadDecided({ pack: { pack_count: 1, unit_size: '2.0', unit: 'litre' } });
+      const text = el.querySelector('.line-card')?.textContent ?? '';
+      expect(text).toContain(`1 × 2.0 ${enCatalog.units.litre}`);
+      expect(text).not.toContain('litre');
+    });
+
+    it('keeps a fractional VAT rate exact', () => {
+      const el = loadDecided({ vat_rate: '0.145' });
+      expect(el.querySelector('.line-card')?.textContent).toContain('14.5%');
+    });
+
+    it('gives every region on the page an accessible name', () => {
+      const el = loadDecided();
+      const regions = Array.from(el.querySelectorAll('[role="region"]'));
+      expect(regions.length).toBeGreaterThan(0);
+      for (const region of regions) {
+        const named =
+          region.hasAttribute('aria-label') ||
+          (region.getAttribute('aria-labelledby') &&
+            document.getElementById(region.getAttribute('aria-labelledby')!)?.textContent?.trim());
+        expect(named).withContext(region.className).toBeTruthy();
+      }
+    });
+  });
+
+  describe('correction retries and stale loads (P-154, PPS-198)', () => {
+    const payloadA: MatchCorrectionRequest = {
+      expected_current_decision_id: 'dec-1',
+      outcome: 'same_product',
+      selected_match_candidate_id: 'cand-2',
+      new_product: null,
+      learn_alias: true,
+    };
+    const payloadB: MatchCorrectionRequest = { ...payloadA, selected_match_candidate_id: 'cand-1' };
+    const ok = of({
+      decision: { ...mockDecision, id: 'dec-2' },
+      superseded_decision_id: 'dec-1',
+      lines_matched_through_old_wording: [],
+    });
+    const lost = () => throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'busy' } }));
+
+    const reopenWith = (payload: MatchCorrectionRequest): void => {
+      const dialog = (component as unknown as { dialog: { open: jasmine.Spy } }).dialog;
+      (dialog.open as jasmine.Spy).and.returnValue({ afterClosed: () => of(payload) });
+      component.openCorrectMatchDialog();
+    };
+
+    beforeEach(() => {
+      component.decision.set(mockDecision);
+      spyOn((component as unknown as { dialog: { open: () => unknown } }).dialog, 'open');
+    });
+
+    it('replays the same Idempotency-Key when the same correction is retried after a failure', () => {
+      apiService.correctMatch.and.returnValues(lost(), ok);
+
+      reopenWith(payloadA);
+      reopenWith(payloadA);
+
+      const [first, retry] = apiService.correctMatch.calls.allArgs();
+      expect(first[2]).toEqual(jasmine.any(String));
+      expect(retry[2]).withContext('retry replays the key').toBe(first[2]);
+    });
+
+    it('uses a new key when the retried correction is a different one', () => {
+      apiService.correctMatch.and.returnValues(lost(), ok);
+
+      reopenWith(payloadA);
+      reopenWith(payloadB);
+
+      const [first, second] = apiService.correctMatch.calls.allArgs();
+      expect(second[2]).not.toBe(first[2]);
+    });
+
+    it('uses a new key for the next correction after one succeeded', () => {
+      apiService.correctMatch.and.returnValues(ok, ok);
+      apiService.getMatchTaskForLine.and.returnValue(of({ ...mockTask, decision: mockDecision }));
+
+      reopenWith(payloadA);
+      component.decision.set(mockDecision);
+      reopenWith(payloadA);
+
+      const [first, second] = apiService.correctMatch.calls.allArgs();
+      expect(second[2]).not.toBe(first[2]);
+    });
+
+    it('does not redraw the old line when a correction answers after the buyer moved on', () => {
+      const correction$ = new Subject<{
+        decision: MatchDecision;
+        superseded_decision_id: string;
+        lines_matched_through_old_wording: string[];
+      }>();
+      apiService.correctMatch.and.returnValue(correction$);
+      component.executeCorrection('line-99', payloadA);
+
+      apiService.getMatchTaskForLine.calls.reset();
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({ ...mockTask, id: 'task-B', quotation_line: { ...mockTask.quotation_line, id: 'line-B' } }),
+      );
+      component.loadTask('line-B');
+      apiService.getMatchTaskForLine.calls.reset();
+
+      correction$.next({
+        decision: { ...mockDecision, id: 'dec-2' },
+        superseded_decision_id: 'dec-1',
+        lines_matched_through_old_wording: ['l-1'],
+      });
+      fixture.detectChanges();
+
+      expect(apiService.getMatchTaskForLine).not.toHaveBeenCalledWith('line-99');
+      expect(component.line()?.id).toBe('line-B');
+      expect(component.dependentLinesCount()).toBe(0);
+    });
+
+    it('ignores a late response for a line the buyer already left', () => {
+      const a$ = new Subject<MatchTask>();
+      const b$ = new Subject<MatchTask>();
+      apiService.getMatchTaskForLine.and.callFake((id: string) => (id === 'line-A' ? a$ : b$));
+      const taskFor = (id: string): MatchTask => ({
+        ...mockTask,
+        id: `task-${id}`,
+        quotation_line: { ...mockTask.quotation_line, id, original_text: `text ${id}` },
+      });
+
+      component.loadTask('line-A');
+      component.loadTask('line-B');
+      b$.next(taskFor('line-B'));
+      a$.next(taskFor('line-A'));
+      fixture.detectChanges();
+
+      expect(component.line()?.id).toBe('line-B');
+      expect(component.task()?.id).toBe('task-line-B');
+    });
   });
 
   describe('RFQ-aware matching (spec 023 US1)', () => {
@@ -1079,9 +1419,9 @@ describe('MatchResolutionComponent (T039)', () => {
 
       component.confirmResolution(true);
 
-      expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1');
+      expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1', 'q-99');
       expect(snackSpy).toHaveBeenCalledWith(
-        jasmine.stringMatching(/All match tasks resolved — queue cleared.*Also matched 2 more lines/),
+        jasmine.stringMatching(/All lines of this quote are matched.*Also matched 2 more lines/),
         undefined,
         { duration: 3500 },
       );

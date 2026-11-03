@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
@@ -115,7 +115,10 @@ def solve_advanced_basket(
 ) -> AdvancedBasketResult:
     request = input_payload.request
     now = (computed_at or datetime.now(UTC)).replace(microsecond=0)
-    valid_until = now
+    # A result is good until the earliest price it is built on expires; open-ended prices
+    # leave it valid for a day, so it never arrives already expired.
+    expiries = [offer.valid_to for offer in input_payload.offers if offer.valid_to is not None]
+    valid_until = min(expiries) if expiries else now + timedelta(days=1)
     terms_by_supplier = {terms.supplier_id: terms for terms in input_payload.supplier_terms}
     risks_by_supplier = {risk.supplier_id: risk for risk in input_payload.supplier_risks}
     eligible_supplier_ids = [
@@ -809,12 +812,19 @@ def _advanced_baselines(
         terms = terms_by_supplier.get(supplier_id)
         if feasible and terms is not None and terms.minimum_order_value is not None:
             feasible = total >= Decimal(terms.minimum_order_value.amount)
+        # Delivery counts like it does in the split total, so the two are comparable.
+        delivery = Decimal("0.0000")
+        if terms is not None and terms.delivery_fee is not None and (
+            terms.free_delivery_threshold is None
+            or total < Decimal(terms.free_delivery_threshold.amount)
+        ):
+            delivery = Decimal(terms.delivery_fee.amount)
         baselines.append(
             SingleSupplierBaseline(
                 supplier_id=supplier_id,
                 feasible=feasible,
                 total_landed_cost=(
-                    _money(total, currency)
+                    _money(total + delivery, currency)
                     if feasible and not has_excluded_item
                     else None
                 ),

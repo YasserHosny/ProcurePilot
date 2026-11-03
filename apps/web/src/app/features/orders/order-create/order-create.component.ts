@@ -112,6 +112,8 @@ export class OrderCreateComponent implements OnInit {
   readonly savedOrder = signal<PurchaseOrder | null>(null);
   readonly navigationFailed = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
+  // The approved request this page was opened for could not be loaded: nothing may be saved.
+  readonly sourceLoadFailed = signal(false);
   readonly sourceRequest = signal<PurchaseRequest | null>(null);
   // Currency of the supplier quote the unit prices were pre-filled from; the order must use it.
   private readonly quotedCurrency = signal<string | null>(null);
@@ -140,6 +142,52 @@ export class OrderCreateComponent implements OnInit {
 
   private lineTotalUnits(line: ReturnType<FormGroup<OrderLineForm>['getRawValue']>): bigint {
     return lineNetUnits(line.unit_price || 0, line.quantity || 0) + moneyUnits(line.line_tax || 0);
+  }
+
+  /** Quantities are in packs when the line has a pack; say so, so they are not read as base units. */
+  quantityLabelKey(line: FormGroup<OrderLineForm>): string {
+    return this.packHint(line) ? 'orders.create.quantityPacks' : 'orders.create.quantity';
+  }
+
+  /** The currencies on offer: a quoted request fixes one; otherwise the usual ones plus the current value. */
+  currencyOptions(): string[] {
+    const current = this.form.controls.currency.value;
+    const quoted = this.quotedCurrency();
+    if (this.sourceRequest() && quoted) return [quoted];
+    const options = [this.homeCurrency, current, 'SAR', 'EGP', 'AED', 'USD', 'EUR', 'GBP']
+      .filter((code): code is string => /^[A-Z]{3}$/.test(code ?? ''));
+    return [...new Set(options)];
+  }
+
+  // The currency each request line's estimate is in; it can differ from the quote's order currency.
+  private readonly estimateCurrencies = new Map<string, string>();
+
+  /** The currency a line's estimate is in; the order currency when it was never recorded. */
+  estimateCurrencyFor(line: FormGroup<OrderLineForm>): string {
+    return (
+      this.estimateCurrencies.get(line.controls.source_request_line_id.value ?? '') ??
+      this.form.controls.currency.value
+    );
+  }
+
+  rememberEstimateCurrency(requestLineId: string, currency: string): void {
+    this.estimateCurrencies.set(requestLineId, currency);
+  }
+
+  /** The estimate is a usable price only while the line is unpriced and the currencies agree. */
+  canUseEstimate(index: number): boolean {
+    const line = this.lines.at(index);
+    const estimate = line.controls.estimated_price.value;
+    if (estimate === null || line.controls.unit_price.value) return false;
+    const estimateCurrency = this.estimateCurrencies.get(line.controls.source_request_line_id.value ?? '');
+    return estimateCurrency === undefined || estimateCurrency === this.form.controls.currency.value;
+  }
+
+  /** Takes the request's estimate as this line's unit price. */
+  useEstimate(index: number): void {
+    if (!this.canUseEstimate(index)) return;
+    const line = this.lines.at(index);
+    line.controls.unit_price.setValue(line.controls.estimated_price.value);
   }
 
   packDescription(product: Product | undefined): string | null {
@@ -198,13 +246,16 @@ export class OrderCreateComponent implements OnInit {
   get computedTotals() {
     return () => {
       let units = 0n;
+      let taxUnits = 0n;
       const lines = this.lines.getRawValue();
       for (const line of lines) {
         units += this.lineTotalUnits(line);
+        taxUnits += moneyUnits(line.line_tax || 0);
       }
       const linesTotal = Number(units) / 10000;
       return {
         linesTotal,
+        taxTotal: Number(taxUnits) / 10000,
         orderTotal: linesTotal,
       };
     };
@@ -291,6 +342,7 @@ export class OrderCreateComponent implements OnInit {
           }).subscribe(({ request, allocations }) => {
             if (!request || !allocations) return;
             this.sourceRequest.set(request);
+            this.form.controls.currency.disable({ emitEvent: false });
             this.requestAllocations.set(allocations);
 
             for (const lineGroup of this.lines.controls) {
@@ -301,6 +353,9 @@ export class OrderCreateComponent implements OnInit {
               const currentQuantity = lineGroup.controls.quantity.value || 0;
               const remaining = parseFloat(allocation?.remaining_quantity || '0') + currentQuantity;
               lineGroup.controls.remaining_quantity.setValue(remaining);
+              if (requestLine?.estimated_unit_price) {
+                this.rememberEstimateCurrency(lineId, requestLine.estimated_unit_price.currency);
+              }
               lineGroup.controls.estimated_price.setValue(
                 requestLine?.estimated_unit_price ? parseFloat(requestLine.estimated_unit_price.amount) : null,
               );
@@ -309,8 +364,15 @@ export class OrderCreateComponent implements OnInit {
             }
           });
         }
+      } else if (sourceRequestId && !editId && (!request || !allocations)) {
+        // Without the request there is nothing to link or to cap quantities against: refuse to
+        // fall back to a blank manual order that would be saved unlinked.
+        this.lines.clear();
+        this.sourceLoadFailed.set(true);
+        this.errorMessage.set(this.translate.instant('orders.create.sourceLoadError'));
       } else if (request && allocations) {
         this.sourceRequest.set(request);
+            this.form.controls.currency.disable({ emitEvent: false });
         this.requestAllocations.set(allocations);
         if (request.required_by_date && !this.form.controls.expected_delivery_date.value) {
           this.form.controls.expected_delivery_date.setValue(parseIsoDateLocal(request.required_by_date));
@@ -351,6 +413,9 @@ export class OrderCreateComponent implements OnInit {
               : null;
             if (prefillQuotes && reqLine.quoted_unit_price) {
               this.prefilledQuotes.set(reqLine.id, parseFloat(quotedPrice!.amount));
+            }
+            if (reqLine.estimated_unit_price) {
+              this.rememberEstimateCurrency(reqLine.id, reqLine.estimated_unit_price.currency);
             }
             const lineGroup = new FormGroup<OrderLineForm>({
                 workspace_product_id: new FormControl<string | null>(reqLine.workspace_product_id || null),
@@ -416,7 +481,7 @@ export class OrderCreateComponent implements OnInit {
   }
 
   submit(): void {
-    if (this.isSubmitting() || this.savedOrder() !== null || this.form.invalid || this.lines.length === 0) return;
+    if (this.isSubmitting() || this.savedOrder() !== null || this.sourceLoadFailed() || this.form.invalid || this.lines.length === 0) return;
 
     this.isSubmitting.set(true);
     this.errorMessage.set(null);
@@ -460,7 +525,8 @@ export class OrderCreateComponent implements OnInit {
       };
     });
 
-    const orderTaxAmount = value.order_tax || 0;
+    // The header tax is the sum of the line taxes, so the two can never disagree.
+    const orderTaxUnits = value.lines.reduce((sum, line) => sum + moneyUnits(line.line_tax || 0), 0n);
 
     const payload: PurchaseOrderCreate = {
       order_number: value.order_number,
@@ -468,7 +534,7 @@ export class OrderCreateComponent implements OnInit {
       order_date: formatDate(value.order_date)!,
       expected_delivery_date: formatDate(value.expected_delivery_date),
       total: { amount: formatMoneyUnits(linesTotalAmount), currency },
-      tax: { amount: orderTaxAmount.toFixed(4), currency },
+      tax: { amount: formatMoneyUnits(orderTaxUnits), currency },
       source_kind: 'manual',
       source_reference: value.order_number,
       source_request_id: this.sourceRequest()?.id || undefined,

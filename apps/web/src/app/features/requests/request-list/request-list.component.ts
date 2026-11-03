@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -14,15 +15,15 @@ import { Router } from '@angular/router';
 import { TranslatePipe,
 TranslateService } from '@ngx-translate/core';
 import { RoleDirective } from '../../../core/auth/role.directive';
-import { forkJoin, of, type Observable } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { EMPTY, Subject, defer, forkJoin, of, type Observable, type Subscription } from 'rxjs';
+import { catchError, expand, reduce, switchMap } from 'rxjs/operators';
 
-import type { ApiError, Branch, BranchList, PurchaseRequest, PurchaseRequestStatus } from '../../../core/api/models';
+import type { ApiError, Branch, BranchList, PurchaseRequest } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { parseIsoDateLocal } from '../../../core/format/iso-date';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
-import { RequestsApiService } from '../requests-api';
+import { RequestsApiService, type PurchaseRequestStatus } from '../requests-api';
 
 const I18N = 'requests';
 
@@ -57,11 +58,47 @@ export class RequestListComponent implements OnInit {
   private readonly translate = inject(TranslateService);
 
   readonly isLoading = signal<boolean>(true);
+  readonly isLoadingMore = signal<boolean>(false);
   readonly requests = signal<PurchaseRequest[]>([]);
+  readonly nextCursor = signal<string | null>(null);
   readonly branches = signal<Branch[]>([]);
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
   readonly statusFilter = signal<PurchaseRequestStatus | ''>('');
+
+  private readonly reloadSubject = new Subject<{ status?: PurchaseRequestStatus }>();
+  private loadMoreSub?: Subscription;
+
+  constructor() {
+    this.reloadSubject
+      .pipe(
+        switchMap(({ status }) => {
+          this.isLoading.set(true);
+          this.errorMessage.set(null);
+          this.errorTraceId.set(null);
+
+          return forkJoin({
+            requests: this.requestsApi.listRequests({ status }),
+            branches: this.loadBranches(),
+          }).pipe(
+            catchError((err: unknown) => {
+              this.isLoading.set(false);
+              this.requests.set([]);
+              this.nextCursor.set(null);
+              this.handleError(err);
+              return EMPTY;
+            }),
+          );
+        }),
+        takeUntilDestroyed(),
+      )
+      .subscribe(({ requests, branches }) => {
+        this.requests.set([...requests.items]);
+        this.branches.set([...branches.items]);
+        this.nextCursor.set(requests.next_cursor);
+        this.isLoading.set(false);
+      });
+  }
 
   readonly branchNameById = computed<Map<string, string>>(() => {
     const byId = new Map<string, string>();
@@ -85,29 +122,53 @@ export class RequestListComponent implements OnInit {
   }
 
   loadRequests(): void {
-    this.isLoading.set(true);
+    this.loadMoreSub?.unsubscribe();
+    this.isLoadingMore.set(false);
+    this.reloadSubject.next({
+      status: this.statusFilter() || undefined,
+    });
+  }
+
+  loadMore(): void {
+    const cursor = this.nextCursor();
+    if (!cursor || this.isLoadingMore()) {
+      return;
+    }
+
+    this.isLoadingMore.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
 
-    forkJoin({
-      requests: this.requestsApi.listRequests({ status: this.statusFilter() || undefined }),
-      branches: this.loadBranches(),
-    }).subscribe({
-      next: ({ requests, branches }) => {
-        this.requests.set([...requests.items]);
-        this.branches.set([...branches.items]);
-        this.isLoading.set(false);
-      },
-      error: (err: unknown) => {
-        this.isLoading.set(false);
-        this.handleError(err);
-      },
-    });
+    this.loadMoreSub?.unsubscribe();
+    this.loadMoreSub = this.requestsApi
+      .listRequests({
+        status: this.statusFilter() || undefined,
+        cursor,
+      })
+      .subscribe({
+        next: (res) => {
+          const existingIds = new Set(this.requests().map((r) => r.id));
+          const newItems = res.items.filter((r) => !existingIds.has(r.id));
+          this.requests.set([...this.requests(), ...newItems]);
+          this.nextCursor.set(res.next_cursor);
+          this.isLoadingMore.set(false);
+        },
+        error: (err: unknown) => {
+          this.isLoadingMore.set(false);
+          this.handleError(err);
+        },
+      });
   }
 
   onStatusFilterChange(value: PurchaseRequestStatus | ''): void {
     this.statusFilter.set(value);
+    this.requests.set([]);
+    this.nextCursor.set(null);
     this.loadRequests();
+  }
+
+  clearFilter(): void {
+    this.onStatusFilterChange('');
   }
 
   navigateToCreate(): void {
@@ -216,15 +277,34 @@ export class RequestListComponent implements OnInit {
     return this.branchNameById().get(branchId) ?? branchId;
   }
 
-  private loadBranches() {
-    return this.organisationApi.listBranches({ limit: 100 }).pipe(
-      catchError(() =>
-        of<BranchList>({
-          items: [],
-          next_cursor: null,
+  private loadBranches(): Observable<BranchList> {
+    return defer(() => {
+      const HARD_CAP = 50;
+      let pageCount = 0;
+
+      return this.organisationApi.listBranches({ limit: 100 }).pipe(
+        expand((res) => {
+          pageCount++;
+          if (res.next_cursor && pageCount < HARD_CAP) {
+            return this.organisationApi.listBranches({ limit: 100, cursor: res.next_cursor });
+          }
+          return EMPTY;
         }),
-      ),
-    );
+        reduce(
+          (acc: BranchList, res: BranchList) => ({
+            items: [...acc.items, ...res.items],
+            next_cursor: res.next_cursor,
+          }),
+          { items: [], next_cursor: null } as BranchList,
+        ),
+        catchError(() =>
+          of<BranchList>({
+            items: [],
+            next_cursor: null,
+          }),
+        ),
+      );
+    });
   }
 
   private handleError(err: unknown): void {

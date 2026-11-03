@@ -8,14 +8,28 @@ audit event.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+import os
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID, uuid4
 
+import psycopg
 import pytest
+from pydantic import SecretStr
 
+from integration.catalogue_helpers import (
+    TEST_DATABASE_URL,
+    Workspace,
+    connection,
+    delete_tenant_scoped_rows,
+    make_workspace,
+    make_workspace_product,
+    reset_role,
+)
+from integration.quotation_helpers import PsycopgSupabaseClient, PsycopgTableQuery
+from procurepilot_api.config import Settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.requests.routing import DelegationRow, ThresholdRuleRow
@@ -24,93 +38,57 @@ from procurepilot_api.modules.requests.service import RequestsService
 from procurepilot_api.modules.requests.valuation import LineEstimate
 from procurepilot_api.shared.audit import AuditEventCreate
 
-
-@dataclass
-class Response:
-    data: list[dict[str, object]]
-
-
-class FakeQuery:
-    def __init__(self, client: FakeClient, table: str) -> None:
-        self.client = client
-        self.table = table
-        self.excluded_request_statuses: list[str] = []
-        self.insert_body: dict[str, object] | None = None
-        self.update_body: dict[str, object] | None = None
-
-    def select(self, _columns: str) -> FakeQuery:
-        return self
-
-    def insert(self, body: dict[str, object]) -> FakeQuery:
-        self.insert_body = body
-        return self
-
-    def update(self, body: dict[str, object]) -> FakeQuery:
-        self.update_body = body
-        return self
-
-    def eq(self, _column: str, _value: object) -> FakeQuery:
-        return self
-
-    def neq(self, column: str, value: str) -> FakeQuery:
-        assert column == "purchase_request.status"
-        self.excluded_request_statuses.append(value)
-        return self
-
-    def in_(self, _column: str, _value: object) -> FakeQuery:
-        return self
-
-    def order(self, _column: str, *, desc: bool = False) -> FakeQuery:
-        return self
-
-    def range(self, _start: int, _end: int) -> FakeQuery:
-        return self
-
-    def limit(self, _count: int) -> FakeQuery:
-        return self
-
-    def execute(self) -> Response:
-        if self.insert_body is not None:
-            if self.table != "approval_step":
-                raise AssertionError(f"unexpected insert into {self.table}")
-            row = {
-                "id": str(uuid4()),
-                "comment": None,
-                "decided_by_membership_id": None,
-                "decided_at": None,
-                **self.insert_body,
-            }
-            self.client.step_rows.append(row)
-            return Response([row])
-
-        if self.update_body is not None:
-            if self.table == "purchase_request":
-                self.client.request_row.update(self.update_body)
-                return Response([self.client.request_row])
-            if self.table == "purchase_request_line":
-                self.client.line_row.update(self.update_body)
-                return Response([self.client.line_row])
-            raise AssertionError(f"unexpected update of {self.table}")
-
-        if self.table == "approval_step":
-            if self.client.request_row["status"] in self.excluded_request_statuses:
-                return Response([])
-            return Response(self.client.step_rows)
-        return Response([])
+pytestmark = pytest.mark.skipif(
+    not TEST_DATABASE_URL,
+    reason="TEST_DATABASE_URL not set; requires a migrated database",
+)
 
 
-class FakeClient:
+@pytest.fixture
+def conn() -> Iterator[psycopg.Connection]:
+    yield from connection()
+
+
+def _test_settings() -> Settings:
+    return Settings(
+        API_HOST="127.0.0.1",
+        API_PORT=8000,
+        API_ENV="local",
+        API_LOG_LEVEL="error",
+        API_CORS_ORIGINS="http://localhost:4200",
+        SUPABASE_URL="http://localhost:54321",
+        SUPABASE_ANON_KEY=SecretStr("anon"),
+        SUPABASE_SERVICE_ROLE_KEY=SecretStr("service"),
+        SUPABASE_JWT_AUDIENCE="authenticated",
+        SUPABASE_JWT_ISSUER="http://localhost:54321/auth/v1",
+        DATABASE_URL=SecretStr(TEST_DATABASE_URL or os.environ.get("TEST_DATABASE_URL", "")),
+        PLATFORM_INVITATION_TTL_DAYS=7,
+        MEMBER_INVITATION_TTL_DAYS=7,
+        RATE_LIMIT_AUTH="100/minute",
+        WEB_API_BASE_URL="http://localhost:8000/api/v1",
+        WEB_DEFAULT_LOCALE="en",
+    )
+
+
+class _TestTableQuery(PsycopgTableQuery):
+    pass
+
+
+class _TestSupabaseClient(PsycopgSupabaseClient):
     def __init__(
         self,
-        request_row: dict[str, object],
-        line_row: dict[str, object],
+        conn: psycopg.Connection,
+        *,
+        service_role: bool = False,
+        claims: str | None = None,
     ) -> None:
-        self.request_row = request_row
-        self.line_row = line_row
-        self.step_rows: list[dict[str, object]] = []
+        super().__init__(conn, service_role=service_role, claims=claims)
+        self.request_row: dict[str, object] = {}
 
-    def table(self, name: str) -> FakeQuery:
-        return FakeQuery(self, name)
+    def table(self, table: str) -> _TestTableQuery:
+        return _TestTableQuery(
+            self._conn, table, service_role=self._service_role, claims=self._claims
+        )
 
 
 class FakeAuditWriter:
@@ -121,57 +99,45 @@ class FakeAuditWriter:
         self.actions.append(str(event.action))
 
 
-def request_row(
-    *,
-    request_id: UUID,
-    tenant_id: UUID,
-    branch_id: UUID,
-    requester_id: UUID,
-) -> dict[str, object]:
-    return {
-        "id": str(request_id),
-        "tenant_id": str(tenant_id),
-        "branch_id": str(branch_id),
-        "cost_centre_id": None,
-        "requested_by_membership_id": str(requester_id),
-        "required_by_date": "2026-09-15",
-        "status": "draft",
-        "estimated_total_amount": None,
-        "estimated_total_currency": None,
-        "has_incomplete_estimate": False,
-        "submitted_at": None,
-        "withdrawn_at": None,
-        "created_at": "2026-09-11T08:55:00Z",
-        "updated_at": None,
-    }
-
-
-def line_row(*, request_id: UUID, product_id: UUID) -> dict[str, object]:
-    return {
-        "id": str(uuid4()),
-        "purchase_request_id": str(request_id),
-        "workspace_product_id": str(product_id),
-        "quantity": "5.000000",
-        "note": None,
-        "estimated_unit_price_amount": None,
-        "estimated_unit_price_currency": None,
-        "estimated_unit_price_source_landed_cost_id": None,
-        "estimated_at": None,
-    }
-
-
-def owner_member(
-    *,
-    tenant_id: UUID,
-    membership_id: UUID,
-) -> CurrentMember:
-    return CurrentMember(
-        tenant_id=tenant_id,
-        membership_id=membership_id,
-        user_id=uuid4(),
-        email="owner@example.test",
-        role=MemberRole.owner,
+def _make_member(cur: psycopg.Cursor, tenant_id: UUID, label: str, role: str) -> Workspace:
+    reset_role(cur)
+    user_id, membership_id = uuid4(), uuid4()
+    email = f"{label}-{user_id.hex[:8]}@example.test"
+    cur.execute(
+        "insert into auth.users (id,email) values (%s,%s)",
+        (user_id, email),
     )
+    cur.execute(
+        "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
+        "values (%s,%s,%s,%s,%s,true)",
+        (membership_id, tenant_id, user_id, email, role),
+    )
+    return Workspace(tenant_id, user_id, membership_id, role, label)
+
+
+def _make_branch(cur: psycopg.Cursor, workspace: Workspace) -> UUID:
+    branch_id = uuid4()
+    cur.execute(
+        "insert into branch (id,tenant_id,name,region) values (%s,%s,'Branch','GB')",
+        (branch_id, workspace.tenant_id),
+    )
+    return branch_id
+
+
+def _cleanup(
+    conn: psycopg.Connection,
+    owner: Workspace,
+    extra_members: list[Workspace] | None = None,
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute("set local session_replication_role = replica")
+        delete_tenant_scoped_rows(cur, owner.tenant_id)
+        cur.execute("delete from tenant where id = %s", (owner.tenant_id,))
+        cur.execute("delete from auth.users where id = %s", (owner.user_id,))
+        for m in extra_members or []:
+            cur.execute("delete from auth.users where id = %s", (m.user_id,))
+        conn.commit()
 
 
 def threshold_rule(
@@ -196,41 +162,66 @@ def active_delegation(*, delegator_id: UUID, delegate_id: UUID) -> DelegationRow
         id=uuid4(),
         delegator_membership_id=delegator_id,
         delegate_membership_id=delegate_id,
-        starts_on=date.today() - timedelta(days=1),
-        ends_on=date.today() + timedelta(days=1),
+        starts_on=datetime.now(UTC).date() - timedelta(days=2),
+        ends_on=datetime.now(UTC).date() + timedelta(days=2),
         created_at=datetime.now(UTC),
     )
 
 
 def build_service(
+    conn: psycopg.Connection,
     monkeypatch: pytest.MonkeyPatch,
     *,
+    owner: Workspace,
+    branch_id: UUID,
+    product_id: UUID,
     rules: list[ThresholdRuleRow],
     delegations: list[DelegationRow] | None = None,
     removed_membership_ids: set[UUID] | None = None,
-) -> tuple[RequestsService, FakeClient, CurrentMember, UUID]:
-    tenant_id = uuid4()
-    branch_id = uuid4()
-    owner_id = uuid4()
+    audit: FakeAuditWriter | None = None,
+) -> tuple[RequestsService, _TestSupabaseClient, CurrentMember, UUID]:
     request_id = uuid4()
-    product_id = uuid4()
-    req = request_row(
-        request_id=request_id,
-        tenant_id=tenant_id,
-        branch_id=branch_id,
-        requester_id=owner_id,
-    )
-    line = line_row(request_id=request_id, product_id=product_id)
-    client = FakeClient(req, line)
+    with conn.cursor() as cur:
+        cur.execute(
+            "insert into purchase_request ("
+            " id, tenant_id, branch_id, requested_by_membership_id, required_by_date, status"
+            ") values (%s, %s, %s, %s, %s, 'draft')",
+            (
+                request_id,
+                owner.tenant_id,
+                branch_id,
+                owner.membership_id,
+                datetime.now(UTC).date() + timedelta(days=7),
+            ),
+        )
+        cur.execute(
+            "insert into purchase_request_line ("
+            " id, tenant_id, purchase_request_id, workspace_product_id, quantity, position"
+            ") values (%s, %s, %s, %s, 5, 0)",
+            (uuid4(), owner.tenant_id, request_id, product_id),
+        )
+        reset_role(cur)
+    conn.commit()
+
     service = RequestsService()
-    member = owner_member(tenant_id=tenant_id, membership_id=owner_id)
+    service._settings = _test_settings()
+    client = _TestSupabaseClient(conn, claims=owner.claims())
+    client.request_row = {"branch_id": str(branch_id)}
+
+    member = CurrentMember(
+        tenant_id=owner.tenant_id,
+        membership_id=owner.membership_id,
+        user_id=owner.user_id,
+        email=f"{owner.label}@example.test",
+        role=MemberRole.owner,
+    )
 
     monkeypatch.setattr(
         "procurepilot_api.modules.requests.service.authenticated_client",
-        lambda *_args, **_kwargs: client,
+        lambda _settings, token: _TestSupabaseClient(
+            conn, claims=token if (token and token.startswith("{")) else owner.claims()
+        ),
     )
-    monkeypatch.setattr(service, "_fetch_request", lambda _client, _id: req)
-    monkeypatch.setattr(service, "_fetch_lines_for", lambda _client, _id: [line])
     monkeypatch.setattr(
         service,
         "_estimate_products",
@@ -247,18 +238,11 @@ def build_service(
         "_fetch_removed_membership_ids",
         lambda _client: removed_membership_ids or set(),
     )
-    monkeypatch.setattr(service, "_fetch_owner_membership_id", lambda _client: owner_id)
-    monkeypatch.setattr(service, "_fetch_requests_batch", lambda _client, _ids: [req])
-    monkeypatch.setattr(
-        service,
-        "_fetch_lines_batch",
-        lambda _client, _ids: {str(request_id): [line]},
-    )
-    monkeypatch.setattr(service, "_fetch_budget_rows", lambda _client: [])
-    monkeypatch.setattr(service, "_fetch_committed_spend_rows", lambda _client, _budget: [])
+    monkeypatch.setattr(service, "_fetch_owner_membership_id", lambda _client: owner.membership_id)
+    monkeypatch.setattr(service, "_budget_status_for", lambda _client, _row: None)
     monkeypatch.setattr(
         "procurepilot_api.modules.requests.service.get_audit_writer",
-        lambda: FakeAuditWriter(),
+        lambda: audit if audit is not None else FakeAuditWriter(),
     )
 
     return service, client, member, request_id
@@ -269,13 +253,16 @@ def submit_and_fetch_pending(
     member: CurrentMember,
     request_id: UUID,
 ) -> tuple[ApprovalStepSource, UUID]:
+    claims_token = (
+        f'{{"sub":"{member.user_id}","tenant_id":"{member.tenant_id}","role":"authenticated"}}'
+    )
     submitted = service.submit_request(
-        bearer_token="token",
+        bearer_token=claims_token,
         member=member,
         request_id=request_id,
     )
     pending = service.list_pending_approvals(
-        bearer_token="token",
+        bearer_token=claims_token,
         member=member,
     )
 
@@ -290,77 +277,144 @@ def submit_and_fetch_pending(
     [(True, "threshold_match"), (False, "threshold_match")],
 )
 def test_submitted_request_routes_to_matching_threshold_approver(
+    conn: psycopg.Connection,
     monkeypatch: pytest.MonkeyPatch,
     branch_rule: bool,
     expected_source: Literal["threshold_match"],
 ) -> None:
-    branch_approver_id = uuid4()
-    tenant_approver_id = uuid4()
-    rules = [
-        threshold_rule(
-            branch_id=None,
-            min_amount="0",
-            max_amount="1000",
-            approver_id=tenant_approver_id,
-        )
-    ]
-    service, client, member, request_id = build_service(monkeypatch, rules=rules)
-    if branch_rule:
-        rules.append(
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "req-routing")
+        branch_id = _make_branch(cur, owner)
+        product_id = make_workspace_product(cur, owner, name="Routing Widget")
+        branch_approver = _make_member(cur, owner.tenant_id, "branch-appr", "approver")
+        tenant_approver = _make_member(cur, owner.tenant_id, "tenant-appr", "approver")
+    conn.commit()
+
+    extra_members = [branch_approver, tenant_approver]
+    try:
+        rules = [
             threshold_rule(
-                branch_id=UUID(str(client.request_row["branch_id"])),
+                branch_id=None,
                 min_amount="0",
                 max_amount="1000",
-                approver_id=branch_approver_id,
+                approver_id=tenant_approver.membership_id,
             )
+        ]
+        if branch_rule:
+            rules.append(
+                threshold_rule(
+                    branch_id=branch_id,
+                    min_amount="0",
+                    max_amount="1000",
+                    approver_id=branch_approver.membership_id,
+                )
+            )
+
+        service, client, member, request_id = build_service(
+            conn,
+            monkeypatch,
+            owner=owner,
+            branch_id=branch_id,
+            product_id=product_id,
+            rules=rules,
         )
 
-    source, assignee_id = submit_and_fetch_pending(service, member, request_id)
+        source, assignee_id = submit_and_fetch_pending(service, member, request_id)
 
-    assert source == expected_source
-    assert assignee_id == (branch_approver_id if branch_rule else tenant_approver_id)
+        assert source == expected_source
+        assert assignee_id == (
+            branch_approver.membership_id if branch_rule else tenant_approver.membership_id
+        )
+    finally:
+        _cleanup(conn, owner, extra_members)
 
 
 def test_active_delegation_redirects_the_threshold_resolved_assignee(
+    conn: psycopg.Connection,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    approver_id = uuid4()
-    delegate_id = uuid4()
-    rules = [
-        threshold_rule(
-            branch_id=None,
-            min_amount="0",
-            max_amount="1000",
-            approver_id=approver_id,
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "req-delegation")
+        branch_id = _make_branch(cur, owner)
+        product_id = make_workspace_product(cur, owner, name="Routing Widget")
+        approver = _make_member(cur, owner.tenant_id, "approver", "approver")
+        delegate = _make_member(cur, owner.tenant_id, "delegate", "buyer")
+    conn.commit()
+
+    extra_members = [approver, delegate]
+    try:
+        rules = [
+            threshold_rule(
+                branch_id=None,
+                min_amount="0",
+                max_amount="1000",
+                approver_id=approver.membership_id,
+            )
+        ]
+        service, _client, member, request_id = build_service(
+            conn,
+            monkeypatch,
+            owner=owner,
+            branch_id=branch_id,
+            product_id=product_id,
+            rules=rules,
+            delegations=[
+                active_delegation(
+                    delegator_id=approver.membership_id,
+                    delegate_id=delegate.membership_id,
+                )
+            ],
         )
-    ]
-    service, _client, member, request_id = build_service(
-        monkeypatch,
-        rules=rules,
-        delegations=[active_delegation(delegator_id=approver_id, delegate_id=delegate_id)],
-    )
 
-    source, assignee_id = submit_and_fetch_pending(service, member, request_id)
+        source, assignee_id = submit_and_fetch_pending(service, member, request_id)
 
-    assert source == "delegate"
-    assert assignee_id == delegate_id
+        assert source == "delegate"
+        assert assignee_id == delegate.membership_id
+    finally:
+        _cleanup(conn, owner, extra_members)
 
 
 def test_owner_fallback_records_escalation_when_no_rule_matches(
+    conn: psycopg.Connection,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    audit = FakeAuditWriter()
-    service, _client, member, request_id = build_service(monkeypatch, rules=[])
-    monkeypatch.setattr(
-        "procurepilot_api.modules.requests.service.get_audit_writer",
-        lambda: audit,
-    )
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "req-fallback")
+        branch_id = _make_branch(cur, owner)
+        product_id = make_workspace_product(cur, owner, name="Routing Widget")
+    conn.commit()
 
-    source, assignee_id = submit_and_fetch_pending(service, member, request_id)
+    try:
+        audit = FakeAuditWriter()
+        service, _client, member, request_id = build_service(
+            conn,
+            monkeypatch,
+            owner=owner,
+            branch_id=branch_id,
+            product_id=product_id,
+            rules=[],
+            audit=audit,
+        )
 
-    assert source == "owner_fallback"
-    assert assignee_id == member.membership_id
-    assert audit.actions == [
-        "requests.approval_step_escalated",
-        "requests.purchase_request_submitted",
-    ]
+        source, assignee_id = submit_and_fetch_pending(service, member, request_id)
+
+        assert source == "owner_fallback"
+        assert assignee_id == member.membership_id
+        # Both submitted and escalated events are written inside the submit transaction,
+        # straight to audit_event, so both are read back from the table and the fake writer
+        # sees neither.
+        assert audit.actions == []
+        with conn.cursor() as cur:
+            reset_role(cur)
+            cur.execute(
+                "select count(*) from audit_event where tenant_id = %s and action = %s",
+                (owner.tenant_id, "requests.purchase_request_submitted"),
+            )
+            assert cur.fetchone()[0] == 1
+            cur.execute(
+                "select count(*) from audit_event where tenant_id = %s and action = %s",
+                (owner.tenant_id, "requests.approval_step_escalated"),
+            )
+            assert cur.fetchone()[0] == 1
+    finally:
+        _cleanup(conn, owner)

@@ -509,6 +509,123 @@ describe('ResolutionQueueComponent', () => {
     expect(component.errorTraceId()).toBe('tr-err-1');
   });
 
+  describe('failed loads (P-153, PPS-197)', () => {
+    const failLoad = (): void => {
+      apiService.getMatchTasks.and.returnValue(
+        throwError(
+          () => new HttpErrorResponse({ status: 503, error: { message: 'busy', trace_id: 'tr-1' } }),
+        ),
+      );
+      component.loadTasks();
+      fixture.detectChanges();
+    };
+
+    it('does not claim every line is matched when the load failed for a quotation', () => {
+      component.quotationId.set('q-101');
+      component.tasks.set([]);
+      failLoad();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('[data-testid="quotation-all-matched"]')).toBeNull();
+      expect(compiled.querySelector('.error-banner')?.textContent).toContain('busy');
+    });
+
+    it('drops the previous rows instead of showing them under the error', () => {
+      expect(component.tasks().length).toBe(2);
+      failLoad();
+
+      expect(component.tasks().length).toBe(0);
+      expect((fixture.nativeElement as HTMLElement).querySelector('.match-line')).toBeNull();
+    });
+
+    it('does not offer the task Retry for an unrelated loader error', () => {
+      apiService.listCatalogueRefreshReviews.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'reviews down' } })),
+      );
+      component.loadRefreshReviews();
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('.error-banner')?.textContent).toContain('reviews down');
+      expect(compiled.querySelector('[data-testid="queue-retry"]')).toBeNull();
+    });
+
+    it('still says every line is matched when only the refresh-review load failed', () => {
+      component.quotationId.set('q-101');
+      component.tasks.set([]);
+      apiService.listCatalogueRefreshReviews.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'reviews down' } })),
+      );
+      component.loadRefreshReviews();
+      fixture.detectChanges();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('[data-testid="quotation-all-matched"]'),
+      ).toBeTruthy();
+    });
+
+    it('offers a Retry in the error banner that reloads and clears the error', () => {
+      failLoad();
+      const retry = (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="queue-retry"]',
+      ) as HTMLButtonElement | null;
+      expect(retry).withContext('retry button').toBeTruthy();
+
+      apiService.getMatchTasks.and.returnValue(of({ items: mockTasks, next_cursor: null }));
+      apiService.getMatchTasks.calls.reset();
+      retry!.click();
+      fixture.detectChanges();
+
+      expect(apiService.getMatchTasks).toHaveBeenCalledTimes(1);
+      expect(component.errorMessage()).toBeNull();
+      expect(component.tasks().length).toBe(2);
+    });
+  });
+
+  describe('screen-reader states (P-159, PPS-203)', () => {
+    it('announces loading as a status', () => {
+      component.isLoading.set(true);
+      fixture.detectChanges();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('.loading-state')?.getAttribute('role'),
+      ).toBe('status');
+    });
+
+    it('announces how many lines and quotations are shown', () => {
+      const summary = (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="queue-result-summary"]',
+      );
+      expect(summary?.getAttribute('role')).toBe('status');
+      expect(summary?.textContent).toContain('Lines shown: 2');
+      expect(summary?.textContent).toContain('Quotations: 2');
+    });
+
+    it('keeps one summary live region in the page across loads and reports zero results', () => {
+      const summary = (): HTMLElement | null =>
+        (fixture.nativeElement as HTMLElement).querySelector('[data-testid="queue-result-summary"]');
+      const first = summary();
+      expect(first).withContext('present with results').toBeTruthy();
+
+      component.isLoading.set(true);
+      fixture.detectChanges();
+      expect(summary()).withContext('same element while loading').toBe(first);
+      expect(summary()?.textContent?.trim()).withContext('silent while loading').toBe('');
+
+      component.tasks.set([]);
+      component.isLoading.set(false);
+      fixture.detectChanges();
+      expect(summary()).withContext('same element at zero results').toBe(first);
+      expect(summary()?.textContent).toContain('Lines shown: 0');
+    });
+
+    it('makes the full quotation id reachable without a mouse', () => {
+      const badge = (fixture.nativeElement as HTMLElement).querySelector('.quotation-badge')!;
+      expect(badge.getAttribute('tabindex')).toBe('0');
+      expect(badge.getAttribute('aria-label')).toContain('q-101');
+    });
+  });
+
   describe('RFQ-aware matching in queue (spec 023 US1)', () => {
     it('shows "Correct match" button for auto-accepted line when isWriter, and hides it for non-writer', () => {
       const autoTask: MatchTask = {
@@ -620,6 +737,121 @@ describe('ResolutionQueueComponent', () => {
         }),
         jasmine.stringMatching(/^[0-9a-f-]{36}$/),
       );
+    });
+
+    describe('correction retries, notices and double clicks (P-154, PPS-198)', () => {
+      let autoTask: MatchTask;
+      const requestA = {
+        expected_current_decision_id: 'dec-1',
+        outcome: 'same_product' as const,
+        selected_match_candidate_id: 'cand-2',
+        new_product: null,
+        learn_alias: true,
+      };
+      const done = (extra: Record<string, unknown> = {}) =>
+        of({
+          decision: { ...autoTask.decision!, id: 'dec-2' },
+          superseded_decision_id: 'dec-1',
+          lines_matched_through_old_wording: [],
+          ...extra,
+        });
+      const lost = () => throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'busy' } }));
+      const closeWith = (request: unknown): void => {
+        const dialog = (component as unknown as { dialog: { open: jasmine.Spy } }).dialog;
+        dialog.open.and.returnValue({ afterClosed: () => of(request) });
+      };
+
+      beforeEach(() => {
+        autoTask = {
+          ...mockTasks[0],
+          id: 'task-auto-1',
+          status: 'auto_accepted',
+          decision: {
+            id: 'dec-1',
+            quotation_line_id: 'line-101',
+            matched_product: mockTasks[0].candidates[0].candidate_product,
+            outcome: 'same_product',
+            selected_match_candidate_id: 'cand-1',
+            decided_at: '2026-08-21T01:00:00Z',
+            decided_by: 'buyer@example.com',
+            is_automatic: true,
+            confidence: '0.8500',
+          },
+        };
+        apiService.getMatchTaskForLine.and.returnValue(of(autoTask));
+        spyOn((component as unknown as { dialog: { open: () => unknown } }).dialog, 'open');
+      });
+
+      it('replays the same Idempotency-Key when the same correction is retried after a failure', () => {
+        apiService.correctMatch.and.returnValues(lost(), done());
+        closeWith(requestA);
+
+        component.openCorrectMatchDialog(autoTask);
+        component.openCorrectMatchDialog(autoTask);
+
+        const [first, retry] = apiService.correctMatch.calls.allArgs();
+        expect(retry[2]).withContext('retry replays the key').toBe(first[2]);
+      });
+
+      it('uses a new key for a different correction', () => {
+        apiService.correctMatch.and.returnValues(lost(), done());
+        closeWith(requestA);
+        component.openCorrectMatchDialog(autoTask);
+        closeWith({ ...requestA, selected_match_candidate_id: 'cand-1' });
+        component.openCorrectMatchDialog(autoTask);
+
+        const [first, second] = apiService.correctMatch.calls.allArgs();
+        expect(second[2]).not.toBe(first[2]);
+      });
+
+      it('tells the buyer about lines still matched through the old wording and about a kept alias', () => {
+        apiService.correctMatch.and.returnValue(
+          done({ lines_matched_through_old_wording: ['l-1', 'l-2'], alias_conflict_product_id: 'prod-9' }),
+        );
+        closeWith(requestA);
+
+        component.openCorrectMatchDialog(autoTask);
+        fixture.detectChanges();
+
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="queue-dependent-lines-notice"]')?.textContent).toContain(
+          '2 other lines were matched through the old wording',
+        );
+        expect(el.querySelector('[data-testid="queue-alias-conflict-notice"]')?.textContent).toContain(
+          enCatalog.matching.resolution.correction.aliasConflictNotice,
+        );
+      });
+
+      it('opens the dependent lines in the queue itself, not through a link that leaves the list unchanged', () => {
+        apiService.correctMatch.and.returnValue(
+          done({ lines_matched_through_old_wording: ['l-1'] }),
+        );
+        closeWith(requestA);
+        component.openCorrectMatchDialog(autoTask);
+        fixture.detectChanges();
+
+        const review = (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="queue-dependent-lines-review"]',
+        ) as HTMLElement | null;
+        expect(review?.tagName).toBe('BUTTON');
+
+        apiService.getMatchTasks.calls.reset();
+        review!.click();
+
+        expect(apiService.getMatchTasks).toHaveBeenCalledWith(
+          jasmine.objectContaining({ quotation_id: autoTask.quotation.id, status: 'all' }),
+        );
+      });
+
+      it('ignores a second click on «Correct match» while the first is still loading', () => {
+        const pending$ = new Subject<MatchTask>();
+        apiService.getMatchTaskForLine.and.returnValue(pending$);
+
+        component.openCorrectMatchDialog(autoTask);
+        component.openCorrectMatchDialog(autoTask);
+
+        expect(apiService.getMatchTaskForLine).toHaveBeenCalledTimes(1);
+      });
     });
 
     it('passes quotationSupplierId equal to quotation.supplier_id and non-empty baseUnits when opening Correct dialog', () => {

@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { authGuard, guestGuard, roleGuard } from './core/auth/auth.guard';
+import { quotationReviewGuard } from './features/quotations/quotation-review/quotation-review.guard';
 import { rfqDirtyGuard } from './features/rfq/create/rfq-create.guard';
 
 export const rfqGuardrailsOwnerGuard = roleGuard('owner');
@@ -212,6 +213,7 @@ export const routes: Routes = [
       },
       {
         path: 'quotations/:id/review',
+        canDeactivate: [quotationReviewGuard],
         loadComponent: () =>
           import('./features/quotations/quotation-review/quotation-review.component').then(
             (m) => m.QuotationReviewComponent,
@@ -219,6 +221,7 @@ export const routes: Routes = [
       },
       {
         path: 'quotations/:id',
+        canDeactivate: [quotationReviewGuard],
         loadComponent: () =>
           import('./features/quotations/quotation-review/quotation-review.component').then(
             (m) => m.QuotationReviewComponent,
@@ -288,6 +291,7 @@ export const routes: Routes = [
       // --- RFQ sourcing (R4.3) ---
       {
         path: 'rfq/create',
+        title: 'rfq.pageTitle.create',
         canActivate: [roleGuard('owner', 'buyer')],
         canDeactivate: [rfqDirtyGuard],
         loadComponent: () =>
@@ -295,18 +299,21 @@ export const routes: Routes = [
       },
       {
         path: 'rfq/history',
+        title: 'rfq.pageTitle.history',
         canActivate: [roleGuard('owner', 'buyer')],
         loadComponent: () =>
           import('./features/rfq/history/history.component').then((m) => m.HistoryComponent),
       },
       {
         path: 'rfq/guardrails',
+        title: 'rfq.pageTitle.guardrails',
         canActivate: [rfqGuardrailsOwnerGuard],
         loadComponent: () =>
           import('./features/rfq/guardrails/guardrails.component').then((m) => m.GuardrailsComponent),
       },
       {
         path: 'rfq/:id/edit',
+        title: 'rfq.pageTitle.edit',
         canActivate: [roleGuard('owner', 'buyer')],
         canDeactivate: [rfqDirtyGuard],
         loadComponent: () =>
@@ -320,6 +327,7 @@ export const routes: Routes = [
       },
       {
         path: 'rfq/:id',
+        title: 'rfq.pageTitle.detail',
         canActivate: [roleGuard('owner', 'buyer')],
         loadComponent: () =>
           import('./features/rfq/detail/detail.component').then((m) => m.DetailComponent),

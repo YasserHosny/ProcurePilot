@@ -19,6 +19,12 @@
     }
   </div>
 
+  @if (duplicateSourceStatus(); as status) {
+    <div class="duplicate-banner" role="status">
+      {{ 'requests.duplicate.banner' | translate: { status: ('requests.status.' + status | translate) } }}
+    </div>
+  }
+
   @if (existingRequest()?.source; as source) {
     <div class="request-source-line" data-testid="request-source-line">
       {{ 'requests.source.from' | translate }}
@@ -75,7 +81,7 @@
   }
 
   @if (errorMessage()) {
-    <div class="error-banner" role="alert">
+    <div class="error-banner" role="alert" tabindex="-1">
       <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
       <span>{{ errorMessage() }}</span>
     </div>
@@ -96,6 +102,11 @@
                 <mat-option [value]="branch.id">{{ branch.name }}</mat-option>
               }
             </mat-select>
+            @if (form.controls.branch_id.hasError('required')) {
+              <mat-error>{{ 'requests.form.branchRequired' | translate }}</mat-error>
+            } @else if (form.controls.branch_id.errors?.['server']; as serverError) {
+              <mat-error>{{ serverError | translate }}</mat-error>
+            }
           </mat-form-field>
 
           <mat-form-field appearance="outline">
@@ -106,6 +117,9 @@
                 <mat-option [value]="cc.id">{{ cc.name }}</mat-option>
               }
             </mat-select>
+            @if (form.controls.cost_centre_id.errors?.['server']; as serverError) {
+              <mat-error>{{ serverError | translate }}</mat-error>
+            }
           </mat-form-field>
 
           <mat-form-field appearance="outline">
@@ -113,6 +127,12 @@
             <input matInput [matDatepicker]="requiredByPicker" formControlName="required_by_date" required />
             <mat-datepicker-toggle matIconSuffix [for]="requiredByPicker"></mat-datepicker-toggle>
             <mat-datepicker #requiredByPicker></mat-datepicker>
+            <mat-hint>{{ 'requests.form.requiredByHint' | translate: { format: dateFormat } }}</mat-hint>
+            @if (form.controls.required_by_date.hasError('required')) {
+              <mat-error>{{ 'requests.form.requiredByDateRequired' | translate }}</mat-error>
+            } @else if (form.controls.required_by_date.errors?.['server']; as serverError) {
+              <mat-error>{{ serverError | translate }}</mat-error>
+            }
           </mat-form-field>
         </div>
 
@@ -138,7 +158,11 @@
           }
 
           @for (lineGroup of lines.controls; track $index; let i = $index) {
-            <div class="line-row">
+            <div
+              class="line-row"
+              role="group"
+              [attr.aria-label]="'requests.form.lineGroup' | translate: { position: i + 1 }"
+            >
               <mat-form-field appearance="outline" class="line-product">
                 <mat-label>{{ 'requests.form.productLabel' | translate }}</mat-label>
                 <mat-select [formControl]="lineGroup.controls.workspace_product_id">
@@ -151,6 +175,11 @@
                     <mat-option [value]="product.id">{{ product.tenant_name }}</mat-option>
                   }
                 </mat-select>
+                @if (lineGroup.controls.workspace_product_id.hasError('required')) {
+                  <mat-error>{{ 'requests.form.productRequired' | translate }}</mat-error>
+                } @else if (lineGroup.controls.workspace_product_id.errors?.['server']; as serverError) {
+                  <mat-error>{{ serverError | translate }}</mat-error>
+                }
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="line-quantity">
@@ -162,6 +191,13 @@
                   min="0"
                   step="any"
                 />
+                @if (lineGroup.controls.quantity.hasError('required')) {
+                  <mat-error>{{ 'requests.form.quantityRequired' | translate }}</mat-error>
+                } @else if (lineGroup.controls.quantity.hasError('pattern')) {
+                  <mat-error>{{ 'requests.form.quantityPattern' | translate }}</mat-error>
+                } @else if (lineGroup.controls.quantity.errors?.['server']; as serverError) {
+                  <mat-error>{{ serverError | translate }}</mat-error>
+                }
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="line-note">
@@ -169,12 +205,10 @@
                 <input matInput [formControl]="lineGroup.controls.note" />
               </mat-form-field>
 
-              @if (existingRequest(); as req) {
-                @if (req.lines[i]; as line) {
-                  <span class="line-estimate">
-                    {{ formatEstimate(line) }}
-                  </span>
-                }
+              @if (getLineEstimate(lineGroup); as estimate) {
+                <span class="line-estimate">
+                  {{ estimate }}
+                </span>
               }
 
               @if (!form.disabled) {
@@ -183,7 +217,7 @@
                   type="button"
                   (click)="removeLine(i)"
                   class="remove-line-btn"
-                  [attr.aria-label]="'requests.form.removeLineButton' | translate"
+                  [attr.aria-label]="getRemoveLineAriaLabel(i, lineGroup)"
                 >
                   <mat-icon aria-hidden="true">close</mat-icon>
                 </button>
@@ -195,7 +229,7 @@
         @if (existingRequest(); as req) {
           @if (req.estimated_total) {
             <div class="total-row">
-              <span class="total-label">{{ 'requests.columns.estimatedTotal' | translate }}</span>
+              <span class="total-label">{{ (isEstimateStale() ? 'requests.form.staleEstimate' : 'requests.columns.estimatedTotal') | translate }}</span>
               <span class="total-value pp-figures">
                 {{ formatMoney(req.estimated_total) }}
               </span>
@@ -307,13 +341,23 @@
               mat-flat-button
               color="primary"
               type="submit"
-              [disabled]="isSaving() || form.invalid || lines.length === 0"
+              [disabled]="isSaving()"
             >
               {{ 'requests.form.saveDraftButton' | translate }}
             </button>
           }
 
           @if (existingRequest(); as existingReq) {
+            @if (existingReq.status === 'withdrawn' || existingReq.status === 'rejected') {
+              <button mat-stroked-button type="button" class="duplicate-request-btn" (click)="duplicateRequest()">
+                {{ 'requests.duplicate.button' | translate }}
+              </button>
+            }
+            @if (existingReq.status === 'draft' && !existingReq.request_group) {
+              <button mat-stroked-button type="button" class="discard-draft-btn pp-danger" (click)="discardDraft()">
+                {{ 'requests.discard.confirm' | translate }}
+              </button>
+            }
             @if (existingReq.status === 'draft') {
               <button
                 mat-flat-button

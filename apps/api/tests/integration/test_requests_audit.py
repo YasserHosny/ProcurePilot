@@ -11,10 +11,10 @@ application logic:
   action strings — proven directly by calling the `record_audit_event` SECURITY DEFINER
   function the exact way `AuditWriter.record` does (research.md R4), then confirming
   test_audit_append_only.py's immutability guarantee holds for these rows too.
-- That `RequestsService`'s own methods actually call that writer with each of these action
+- That `RequestsService`'s own methods emit each of these action
   strings — `RequestsService` has no injectable audit seam (same as `OrganisationService`),
   so rather than a live HTTP round trip this is checked here by asserting each action string
-  literally appears at a `get_audit_writer().record(...)` / `_record(...)` call site in
+  literally appears at an audit writer or transactional `record_audit_event` call site in
   `modules/requests/service.py`. The wire contract for the endpoints that trigger these is in
   tests/contract/test_approvals_contract.py and test_requests_contract.py.
 """
@@ -36,7 +36,7 @@ pytestmark = pytest.mark.skipif(
     reason="TEST_DATABASE_URL not set; needs Postgres with the R2.1 migrations",
 )
 
-# Every action string modules/requests/service.py calls the audit writer with. The two decision
+# Every audit action emitted by modules/requests/service.py. The two decision
 # actions come from f"requests.approval_step_{decision}" where decision is approved|rejected.
 REQUESTS_AUDIT_ACTIONS: tuple[str, ...] = (
     "requests.purchase_request_created",
@@ -96,9 +96,7 @@ def act_as_owner(cur: psycopg.Cursor, tenant_id: UUID | str) -> None:
     )
 
 
-def record_via_rpc(
-    cur: psycopg.Cursor, *, action: str, target: str = "{}"
-) -> None:
+def record_via_rpc(cur: psycopg.Cursor, *, action: str, target: str = "{}") -> None:
     cur.execute(
         "select record_audit_event(%s, 'success', null, null, null, %s::jsonb, null)",
         (action, target),
@@ -114,8 +112,7 @@ def test_audit_event_accepts_and_stores_every_requests_action(
         act_as_owner(cur, tenant_id)
         record_via_rpc(cur, action=action, target='{"purchase_request_id": "test"}')
         cur.execute(
-            "select action, outcome, target from audit_event "
-            "where tenant_id = %s and action = %s",
+            "select action, outcome, target from audit_event where tenant_id = %s and action = %s",
             (tenant_id, action),
         )
         assert cur.fetchone() == (action, "success", {"purchase_request_id": "test"})
@@ -139,9 +136,7 @@ def test_requests_audit_events_are_immutable_like_every_other_action(
 
         act_as_owner(cur, tenant_id)
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
-            cur.execute(
-                "delete from audit_event where tenant_id = %s", (tenant_id,)
-            )
+            cur.execute("delete from audit_event where tenant_id = %s", (tenant_id,))
 
 
 def test_every_requests_action_is_distinct_and_searchable(
@@ -164,13 +159,12 @@ def test_the_service_actually_emits_each_of_these_action_strings() -> None:
     """Closes the gap test_organisation_audit.py left to manual pre-commit verification: every
     action string above is literally present at an audit call site in the service source."""
     repo_root = Path(__file__).resolve().parents[4]
-    source = (
-        repo_root
-        / "apps/api/src/procurepilot_api/modules/requests/service.py"
-    ).read_text(encoding="utf-8")
+    source = (repo_root / "apps/api/src/procurepilot_api/modules/requests/service.py").read_text(
+        encoding="utf-8"
+    )
     for action in REQUESTS_AUDIT_ACTIONS:
         if action in ("requests.approval_step_approved", "requests.approval_step_rejected"):
-            # Emitted via f"requests.approval_step_{decision}".
-            assert 'action=f"requests.approval_step_{decision}"' in source
+            # Transactional decision audit: tests/integration/test_single_decision_audit.py.
+            assert 'f"requests.approval_step_{decision}",' in source
         else:
             assert f'action="{action}"' in source, f"{action} not emitted by the service"

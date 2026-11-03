@@ -385,6 +385,8 @@ class _FakeCursor:
         self.executed.append((statement, params))
         if statement.startswith("select status from purchase_request"):
             self.last_row = {"status": "ordered"}
+        elif statement.startswith("select id from purchase_order "):
+            self.last_row = None  # no earlier create under this idempotency key
         elif statement.startswith("select status::text as status"):
             self.last_row = {"status": "submitted", "confirmed": False}
         elif "record_audit_event" not in statement:
@@ -878,7 +880,7 @@ def test_update_draft_order_idempotency_and_allocations(monkeypatch: pytest.Monk
         order_number="PO-link",
         supplier_id=UUID(int=6),
         order_date=date(2026, 9, 19),
-        total=Money(amount=Decimal("10"), currency="USD"),
+        total=Money(amount=Decimal("16"), currency="USD"),
         tax=Money(amount=Decimal("0"), currency="USD"),
         source_reference="manual:link",
         source_request_id=req_id,
@@ -890,7 +892,7 @@ def test_update_draft_order_idempotency_and_allocations(monkeypatch: pytest.Monk
                 base_unit="each",
                 unit_price=Money(amount=Decimal("2"), currency="USD"),
                 tax=Money(amount=Decimal("0"), currency="USD"),
-                line_total=Money(amount=Decimal("10"), currency="USD"),
+                line_total=Money(amount=Decimal("16"), currency="USD"),
                 source_request_line_id=line_id,
                 workspace_product_id=product_id,
             ),
@@ -1585,3 +1587,73 @@ def test_order_client_cannot_supply_pack_snapshot(
         error["loc"] == ("lines", 0, "pack_base_quantity") and error["type"] == "extra_forbidden"
         for error in exc_info.value.errors()
     )
+
+
+def test_create_replays_when_the_first_attempt_commits_while_the_retry_waits_for_the_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """P-183 review: the replay lookup must be repeated once the request lock is held."""
+    from procurepilot_api.modules.requests.service import RequestsService
+
+    cursor = _FakeCursor()
+    lookups: list[int] = []
+    original = cursor.execute
+
+    def execute(statement: str, params: object = None) -> None:
+        original(statement, params)
+        if statement.startswith("select id from purchase_order "):
+            lookups.append(1)
+            # First look: nothing yet. After the lock: the first attempt has committed.
+            cursor.last_row = {"id": str(UUID(int=77))} if len(lookups) > 1 else None
+
+    cursor.execute = execute  # type: ignore[method-assign]
+    transaction = _RollbackContext(cursor)
+    service = OrdersService.__new__(OrdersService)
+    service._settings = None
+    monkeypatch.setattr(OrdersService, "_transaction", lambda _self, _member: transaction)
+    monkeypatch.setattr(OrdersService, "_lock_requests", lambda *_a, **_k: None)
+    monkeypatch.setattr(OrdersService, "_assert_request_still_ordered", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        OrdersService,
+        "_assert_request_allocation_available",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("allocation checked on a replay")),
+    )
+    monkeypatch.setattr(OrdersService, "_load_order_cursor", lambda _self, _cur, _id: "existing")
+    req_id, line_id, product_id = UUID(int=1), UUID(int=2), UUID(int=3)
+    monkeypatch.setattr(
+        RequestsService,
+        "validate_approved_request_for_order",
+        lambda *a, **k: SimpleNamespace(
+            lines=[
+                SimpleNamespace(id=line_id, workspace_product_id=product_id, quantity=Decimal("10"))
+            ]
+        ),
+    )
+    payload = PurchaseOrderCreate(
+        order_number="PO-R",
+        supplier_id=UUID(int=6),
+        order_date=date(2026, 9, 19),
+        total=Money(amount=Decimal("20"), currency="USD"),
+        tax=Money(amount=Decimal("0"), currency="USD"),
+        source_reference="manual:r",
+        source_request_id=req_id,
+        lines=(
+            PurchaseOrderLineInput(
+                line_number=1,
+                description="Widget",
+                ordered_quantity=Decimal("10"),
+                base_unit="each",
+                unit_price=Money(amount=Decimal("2"), currency="USD"),
+                tax=Money(amount=Decimal("0"), currency="USD"),
+                line_total=Money(amount=Decimal("20"), currency="USD"),
+                source_request_line_id=line_id,
+                workspace_product_id=product_id,
+            ),
+        ),
+    )
+
+    order, created = service.create_order(
+        bearer_token="t", member=_member(), payload=payload, idempotency_key=UUID(int=9)
+    )
+
+    assert (order, created) == ("existing", False)
