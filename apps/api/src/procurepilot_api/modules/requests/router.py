@@ -4,6 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, Query, Request, Response, status
+from pydantic import StringConstraints
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
@@ -20,6 +21,7 @@ from procurepilot_api.modules.requests.schemas import (
     PurchaseRequest,
     PurchaseRequestCreate,
     PurchaseRequestList,
+    PurchaseRequestSort,
     PurchaseRequestStatus,
     PurchaseRequestUpdate,
     QualityIssue,
@@ -71,7 +73,12 @@ def list_requests(
     status_filter: Annotated[PurchaseRequestStatus | None, Query(alias="status")] = None,
     branch_id: Annotated[UUID | None, Query()] = None,
     cursor: Annotated[str | None, Query()] = None,
-    limit: Annotated[int, Query(le=100)] = 50,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    sort: Annotated[PurchaseRequestSort, Query()] = "created_desc",
+    q: Annotated[
+        str | None, StringConstraints(strip_whitespace=True, min_length=1, max_length=100), Query()
+    ] = None,
+    mine: Annotated[bool, Query()] = False,
     eligible_for_order: Annotated[bool, Query()] = False,
 ) -> PurchaseRequestList:
     return service.list_requests(
@@ -82,6 +89,9 @@ def list_requests(
         cursor=cursor,
         limit=limit,
         eligible_for_order=eligible_for_order,
+        sort=sort,
+        q=q,
+        mine=mine,
     )
 
 

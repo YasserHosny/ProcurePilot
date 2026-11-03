@@ -60,6 +60,7 @@ from procurepilot_api.modules.requests.schemas import (
     PurchaseRequestLine,
     PurchaseRequestLineInput,
     PurchaseRequestList,
+    PurchaseRequestSort,
     PurchaseRequestStatus,
     PurchaseRequestUpdate,
     QualityIssue,
@@ -666,8 +667,12 @@ class RequestsService:
         cursor: str | None = None,
         limit: int = 50,
         eligible_for_order: bool = False,
+        sort: PurchaseRequestSort = "created_desc",
+        q: str | None = None,
+        mine: bool = False,
     ) -> PurchaseRequestList:
-        if eligible_for_order:
+        filtered_sql = q is not None or mine or sort != "created_desc"
+        if eligible_for_order and not filtered_sql and status is None and branch_id is None:
             if member is None:
                 raise UnprocessableEntityError(details={"reason": "member_required"})
             return self.list_requests_eligible_for_order(member=member, cursor=cursor, limit=limit)
@@ -675,22 +680,38 @@ class RequestsService:
         capped = _cap_limit(limit)
         offset = _decode_cursor(cursor)
 
-        try:
-            query = client.table("purchase_request").select(REQUEST_COLUMNS)
-            if status is not None:
-                query = query.eq("status", status)
-            if branch_id is not None:
-                query = query.eq("branch_id", str(branch_id))
-            response = (
-                query.order("created_at", desc=True)
-                .order("id")
-                .range(offset, offset + capped)
-                .execute()
+        if filtered_sql or eligible_for_order:
+            if member is None:
+                raise UnprocessableEntityError(details={"reason": "member_required"})
+            rows = self._list_request_rows_sql(
+                member=member,
+                status=status,
+                branch_id=branch_id,
+                q=q,
+                mine=mine,
+                sort=sort,
+                offset=offset,
+                limit=capped + 1,
+                eligible_for_order=eligible_for_order,
             )
-        except APIError as exc:
-            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        else:
+            try:
+                query = client.table("purchase_request").select(REQUEST_COLUMNS)
+                if status is not None:
+                    query = query.eq("status", status)
+                if branch_id is not None:
+                    query = query.eq("branch_id", str(branch_id))
+                response = (
+                    query.order("created_at", desc=True)
+                    .order("id")
+                    .range(offset, offset + capped)
+                    .execute()
+                )
+            except APIError as exc:
+                raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
-        rows = _rows(response.data)
+            rows = _rows(response.data)
+
         visible = rows[:capped]
         next_cursor = _encode_cursor(offset + capped) if len(rows) > capped else None
 
@@ -747,6 +768,92 @@ class RequestsService:
             for item in orderable:
                 item.has_quantity_to_order = item.id in remaining
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
+
+    def _list_request_rows_sql(
+        self,
+        *,
+        member: CurrentMember,
+        status: PurchaseRequestStatus | None,
+        branch_id: UUID | None,
+        q: str | None,
+        mine: bool,
+        sort: PurchaseRequestSort,
+        offset: int,
+        limit: int,
+        eligible_for_order: bool,
+    ) -> list[dict[str, object]]:
+        # Run the full filtered page in SQL: no matching-ID cap (including >2000 matches),
+        # no oversized PostgREST URL, and only limit+1 rows are materialised.
+        predicates = [sql.SQL("true")]
+        params: list[object] = []
+        for column, value in (
+            ("status", status),
+            ("branch_id", branch_id),
+            ("requested_by_membership_id", member.membership_id if mine else None),
+        ):
+            if value is not None:
+                predicates.append(sql.SQL("pr.{} = %s").format(sql.Identifier(column)))
+                params.append(value)
+        if q is not None:
+            # Escape LIKE syntax before adding our own substring wildcards. Parameters
+            # keep both Arabic/Latin text and SQL metacharacters as literal user input.
+            pattern = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+            predicates.append(
+                sql.SQL(
+                    "(exists (select 1 from supplier s where s.tenant_id=pr.tenant_id "
+                    "and s.id=pr.source_supplier_id and s.name ilike %s) "
+                    "or exists (select 1 from purchase_request_line l "
+                    "left join workspace_product p on p.tenant_id=l.tenant_id "
+                    "and p.id=l.workspace_product_id "
+                    "where l.tenant_id=pr.tenant_id and l.purchase_request_id=pr.id "
+                    "and (p.tenant_name ilike %s or l.note ilike %s)))"
+                )
+            )
+            params.extend([pattern] * 3)
+        if eligible_for_order:
+            predicates.append(
+                sql.SQL(
+                    f"{orderable_request_predicate('pr')} and exists (select 1 "
+                    "from approval_step ast where ast.tenant_id=pr.tenant_id "
+                    f"and ast.purchase_request_id=pr.id and {approved_step_predicate('ast')}) "
+                    "and not exists (select 1 from purchase_order po "
+                    "where po.tenant_id=pr.tenant_id and po.source_request_id=pr.id)"
+                )
+            )
+        orders = {
+            "created_desc": "pr.created_at desc, pr.id",
+            "created_asc": "pr.created_at asc, pr.id",
+            "required_by_asc": "pr.required_by_date asc, pr.id",
+            "required_by_desc": "pr.required_by_date desc, pr.id",
+            # Raw amounts across currencies are ordered numerically; cross-currency
+            # totals are not comparable. Unknown totals always follow known totals.
+            "total_desc": "pr.estimated_total_amount desc nulls last, pr.id",
+            "total_asc": "pr.estimated_total_amount asc nulls last, pr.id",
+        }
+        # The id tie-break makes a quiet table's offset pages stable. Concurrent inserts
+        # can still shift offsets; the web de-duplicates. Retain the existing cursor.
+        query = sql.SQL(
+            "select pr.* from purchase_request pr where {} order by {} limit %s offset %s"
+        ).format(sql.SQL(" and ").join(predicates), sql.SQL(orders[sort]))
+        params.extend([limit, offset])
+        claims = json.dumps(
+            {
+                "sub": str(member.user_id),
+                "tenant_id": str(member.tenant_id),
+                "role": "authenticated",
+                "member_role": member.role.value,
+            }
+        )
+        try:
+            with db.connect(
+                self._settings.database_url.get_secret_value(), row_factory=dict_row
+            ) as conn:
+                # member is resolved from the verified JWT; all joined tables retain RLS.
+                conn.execute("set local role authenticated")
+                conn.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
+                return conn.execute(query, params).fetchall()
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def list_requests_eligible_for_order(
         self, *, member: CurrentMember, cursor: str | None = None, limit: int = 50

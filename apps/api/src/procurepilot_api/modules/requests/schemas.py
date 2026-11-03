@@ -9,6 +9,11 @@ from pydantic import BaseModel, ConfigDict, Field, StrictStr
 type PurchaseRequestStatus = Literal[
     "draft", "submitted", "approved", "rejected", "withdrawn", "ordered", "delivered"
 ]
+type PurchaseRequestSort = Literal[
+    "created_desc", "created_asc", "required_by_asc", "required_by_desc", "total_desc", "total_asc"
+]
+
+
 # Terminal request states have no pending approval work; approved/ordered still progress.
 TERMINAL_REQUEST_STATUSES = ("withdrawn", "rejected", "delivered")
 
