@@ -144,6 +144,11 @@ describe('HistoryComponent', () => {
       .overrideProvider(MatSnackBar, { useValue: snackBarSpy })
       .compileComponents();
 
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    translate.use('en');
+
     fixture = TestBed.createComponent(HistoryComponent);
     component = fixture.componentInstance;
     router = TestBed.inject(Router);
@@ -202,15 +207,222 @@ describe('HistoryComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/rfq', 'rfq-multi-1']);
   });
 
-  it('should display error snackbar on load failure', () => {
+  it('initial failure shows the error state with role alert and NOT the empty state, and Retry reloads', async () => {
     rfqApiSpy.listRfqs.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
     component.loadRfqs();
-    expect(component.loading()).toBeFalse();
-    expect(snackBarSpy.open).toHaveBeenCalledWith(
-      jasmine.any(String),
-      jasmine.any(String),
-      { duration: 5000 },
-    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(snackBarSpy.open).not.toHaveBeenCalled();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const alertEl = compiled.querySelector('[role="alert"]');
+    expect(alertEl).not.toBeNull();
+    expect(alertEl?.textContent).toContain('Failed to load RFQs');
+    expect(compiled.querySelector('.empty-state')).toBeNull();
+
+    // Clicking Retry calls loadRfqs()
+    rfqApiSpy.listRfqs.and.returnValue(of(mockRfqList));
+    const retryBtn = alertEl?.querySelector('button');
+    expect(retryBtn).not.toBeNull();
+    retryBtn?.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.rfqs().length).toBe(3);
+    expect(compiled.querySelector('.error-state')).toBeNull();
+  });
+
+  it('load more appends and de-duplicates and hides the button on the last page', async () => {
+    const initialList: RfqList = {
+      items: [mockRfqs[0], mockRfqs[1]],
+      next_cursor: 'cursor-page-2',
+    };
+    rfqApiSpy.listRfqs.and.returnValue(of(initialList));
+    component.loadRfqs();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    let loadMoreBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-load-more-button"]');
+    expect(loadMoreBtn).not.toBeNull();
+
+    const secondPage: RfqList = {
+      items: [mockRfqs[1], mockRfqs[2]],
+      next_cursor: null,
+    };
+    rfqApiSpy.listRfqs.and.returnValue(of(secondPage));
+
+    loadMoreBtn?.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(rfqApiSpy.listRfqs).toHaveBeenCalledWith(undefined, 'cursor-page-2');
+    expect(component.rfqs().length).toBe(3);
+    expect(component.rfqs().map((r) => r.id)).toEqual(['rfq-draft-1', 'rfq-1', 'rfq-2']);
+    expect(component.nextCursor()).toBeNull();
+
+    loadMoreBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-load-more-button"]');
+    expect(loadMoreBtn).toBeNull();
+  });
+
+  it('double click on Load more sends one request', () => {
+    component.nextCursor.set('cursor-1');
+    const subject = new Subject<RfqList>();
+    rfqApiSpy.listRfqs.and.returnValue(subject);
+    rfqApiSpy.listRfqs.calls.reset();
+
+    component.loadMore();
+    component.loadMore();
+
+    expect(rfqApiSpy.listRfqs).toHaveBeenCalledTimes(1);
+    subject.next({ items: [], next_cursor: null });
+    subject.complete();
+  });
+
+  it('load-more failure keeps rows and shows retry', async () => {
+    component.nextCursor.set('cursor-1');
+    rfqApiSpy.listRfqs.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+
+    component.loadMore();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.rfqs().length).toBe(3);
+    const compiled = fixture.nativeElement as HTMLElement;
+    const retryBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-load-more-retry"]');
+    expect(retryBtn).not.toBeNull();
+
+    rfqApiSpy.listRfqs.and.returnValue(of({ items: [], next_cursor: null }));
+    retryBtn?.click();
+    expect(rfqApiSpy.listRfqs).toHaveBeenCalledWith(undefined, 'cursor-1');
+  });
+
+  it('the row link has the expected accessible name and navigates', async () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    translate.use('en');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const rowLinks = compiled.querySelectorAll<HTMLButtonElement>('[data-testid="rfq-row-link"]');
+    expect(rowLinks.length).toBe(3);
+
+    const ariaLabel = rowLinks[1].getAttribute('aria-label');
+    expect(ariaLabel).toContain('Open RFQ');
+    expect(ariaLabel).toContain('Sent');
+    expect(ariaLabel).toContain('Oct 1, 2026');
+
+    spyOn(component, 'onRowClick').and.callThrough();
+    rowLinks[1].click();
+    expect(component.onRowClick).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/rfq', 'rfq-1']);
+  });
+
+  it('count controls have labels', async () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    translate.use('en');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const recipientBtns = compiled.querySelectorAll<HTMLButtonElement>('[data-testid="rfq-recipients-button"]');
+    expect(recipientBtns.length).toBeGreaterThanOrEqual(2);
+    expect(recipientBtns[1].getAttribute('aria-label')).toBe('5 recipients — show list');
+
+    const responseLinks = compiled.querySelectorAll<HTMLAnchorElement>('[data-testid="rfq-responses-cell"] a');
+    expect(responseLinks.length).toBeGreaterThanOrEqual(1);
+    expect(responseLinks[0].getAttribute('aria-label')).toBe('2 responses — compare');
+  });
+
+  it('members failure falls back to session current member id', () => {
+    const api = TestBed.inject(ApiService) as jasmine.SpyObj<ApiService>;
+    api.members.and.returnValue(throwError(() => new Error('Network error')));
+    const session = TestBed.inject(SessionService);
+    spyOn(session, 'currentMember').and.returnValue({
+      id: 'u1',
+      membership_id: 'fallback-mem-1',
+      email: 'user@test.com',
+      role: 'owner',
+      preferred_locale: 'en',
+      mfa_enabled: false,
+      tenant: {
+        id: 't1',
+        name: 'Tenant 1',
+        slug: 't1',
+        region: 'us',
+        currency: 'USD',
+        tax_model: 'standard',
+        default_locale: 'en',
+        created_at: '2026-01-01',
+      },
+    });
+
+    const compFixture = TestBed.createComponent(HistoryComponent);
+    compFixture.detectChanges();
+
+    expect(compFixture.componentInstance.currentMembershipId()).toBe('fallback-mem-1');
+    expect(compFixture.componentInstance.draftActionsUnavailable()).toBeFalse();
+  });
+
+  it('members failure without session member id shows notice without crashing', async () => {
+    const api = TestBed.inject(ApiService) as jasmine.SpyObj<ApiService>;
+    api.members.and.returnValue(throwError(() => new Error('Network error')));
+    const session = TestBed.inject(SessionService);
+    spyOn(session, 'currentMember').and.returnValue({
+      id: 'u1',
+      membership_id: null,
+      email: 'user@test.com',
+      role: 'owner',
+      preferred_locale: 'en',
+      mfa_enabled: false,
+      tenant: {
+        id: 't1',
+        name: 'Tenant 1',
+        slug: 't1',
+        region: 'us',
+        currency: 'USD',
+        tax_model: 'standard',
+        default_locale: 'en',
+        created_at: '2026-01-01',
+      },
+    });
+
+    const compFixture = TestBed.createComponent(HistoryComponent);
+    compFixture.detectChanges();
+    await compFixture.whenStable();
+    compFixture.detectChanges();
+
+    expect(compFixture.componentInstance.currentMembershipId()).toBeNull();
+    expect(compFixture.componentInstance.draftActionsUnavailable()).toBeTrue();
+    const compiled = compFixture.nativeElement as HTMLElement;
+    const notice = compiled.querySelector('[data-testid="draft-actions-notice"]');
+    expect(notice).not.toBeNull();
+  });
+
+  it('polite live region announces showing N RFQs', async () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    translate.use('en');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const statusEl = compiled.querySelector('[role="status"]');
+    expect(statusEl).not.toBeNull();
+    expect(statusEl?.textContent).toContain('Showing 3 RFQs');
   });
 
   it('renders "—" for draft Sent Date and date + time with middle dot for sent RFQs', async () => {
@@ -502,6 +714,7 @@ describe('HistoryComponent', () => {
   it('renders recipientsDraftHeader for draft RFQ and sentToSuppliers for sent RFQ in popover header', async () => {
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
     translate.use('en');
     fixture.detectChanges();
     await fixture.whenStable();
@@ -532,7 +745,7 @@ describe('HistoryComponent', () => {
 
   it('provides English and Arabic recipientsDraftHeader translation keys', () => {
     for (const catalog of [enCatalog, arCatalog]) {
-      const history = (catalog.rfq as { history: Record<string, string> }).history;
+      const history = (catalog.rfq as { history: Record<string, unknown> }).history;
       expect(history['recipientsDraftHeader']).toBeTruthy();
       expect(history['recipientsDraftHeader']).toContain('{{count}}');
       expect(history['neededByPassedTitle']).toBeTruthy();
@@ -630,6 +843,40 @@ describe('HistoryComponent', () => {
         'responses',
         'actions',
       ]);
+    });
+  });
+
+  describe('accessible names contain visible text (axe label-content-name-mismatch)', () => {
+    const testCounts = [0, 1, 2, 3, 11];
+
+    it('ensures recipients and responses aria-labels contain raw count string and row-open label contains status in en', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.use('en');
+
+      for (const count of testCounts) {
+        expect(component.getRecipientsAriaLabel(count)).toContain(String(count));
+        expect(component.getResponsesAriaLabel(count)).toContain(String(count));
+      }
+
+      for (const rfq of mockRfqs) {
+        const expectedStatus = translate.instant(`rfq.history.status_${rfq.status}`);
+        expect(component.getRowAccessibleName(rfq)).toContain(expectedStatus);
+      }
+    });
+
+    it('ensures recipients and responses aria-labels contain raw count string and row-open label contains status in ar', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.use('ar');
+
+      for (const count of testCounts) {
+        expect(component.getRecipientsAriaLabel(count)).toContain(String(count));
+        expect(component.getResponsesAriaLabel(count)).toContain(String(count));
+      }
+
+      for (const rfq of mockRfqs) {
+        const expectedStatus = translate.instant(`rfq.history.status_${rfq.status}`);
+        expect(component.getRowAccessibleName(rfq)).toContain(expectedStatus);
+      }
     });
   });
 });

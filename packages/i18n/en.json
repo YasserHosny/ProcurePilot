@@ -4203,7 +4203,40 @@
       "recipientStatus_sent": "Sent",
       "recipientStatus_failed": "Failed",
       "recipientStatus_draft": "Not sent",
-      "unknownSupplier": "Unknown supplier"
+      "unknownSupplier": "Unknown supplier",
+      "retry": "Retry",
+      "loadMore": "Load more",
+      "loadingMore": "Loading more RFQs...",
+      "loadMoreError": "Failed to load more RFQs.",
+      "showingRfqs": "Showing {{count}} RFQs",
+      "showingCount": {
+        "zero": "Showing 0 RFQs",
+        "one": "Showing 1 RFQ",
+        "two": "Showing 2 RFQs",
+        "few": "Showing {{count}} RFQs",
+        "many": "Showing {{count}} RFQs",
+        "other": "Showing {{count}} RFQs"
+      },
+      "openRfqAriaLabel": "Open RFQ, {{status}}, needed by {{date}}",
+      "recipientsAriaLabelFallback": "{{count}} recipients — show list",
+      "recipientsAriaLabel": {
+        "zero": "{{count}} recipients — show list",
+        "one": "{{count}} recipient — show list",
+        "two": "{{count}} recipients — show list",
+        "few": "{{count}} recipients — show list",
+        "many": "{{count}} recipients — show list",
+        "other": "{{count}} recipients — show list"
+      },
+      "responsesAriaLabelFallback": "{{count}} responses — compare",
+      "responsesAriaLabel": {
+        "zero": "{{count}} responses — compare",
+        "one": "{{count}} response — compare",
+        "two": "{{count}} responses — compare",
+        "few": "{{count}} responses — compare",
+        "many": "{{count}} responses — compare",
+        "other": "{{count}} responses — compare"
+      },
+      "draftActionsUnavailable": "Draft actions are currently unavailable because workspace members could not be loaded."
     },
     "detail": {
       "title": "RFQ Details",
