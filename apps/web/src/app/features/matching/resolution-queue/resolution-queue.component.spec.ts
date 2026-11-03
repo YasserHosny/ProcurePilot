@@ -668,11 +668,39 @@ describe('ResolutionQueueComponent', () => {
       expect(count.textContent).not.toContain(enCatalog.matching.queue.moreAvailable);
     });
 
-    it('offers every routing reason the queue can show', () => {
+    it('offers the routing reasons the queue can return, and not one it never returns', () => {
       const labels = openSelect('queue-reason-filter');
       expect(labels).toContain(enCatalog.matching.queue.reason.auto_accepted);
       expect(labels).toContain(enCatalog.matching.queue.reason.corrected);
-      expect(labels).toContain(enCatalog.matching.queue.reason.human_decided);
+      // No queue query yields «human_decided» rows, so offering it would always show an empty list.
+      expect(labels).not.toContain(enCatalog.matching.queue.reason.human_decided);
+    });
+
+    it('widens the status to All when a reason that only resolved lines have is chosen under Open', () => {
+      expect(component.statusFilter()).toBe('open');
+      apiService.getMatchTasks.calls.reset();
+
+      component.onReasonChange('corrected');
+
+      expect(component.statusFilter()).toBe('all');
+      expect(apiService.getMatchTasks).toHaveBeenCalledWith(
+        jasmine.objectContaining({ status: 'all', reason: 'corrected' }),
+      );
+    });
+
+    it('leaves the status alone for reasons that open lines have', () => {
+      component.onReasonChange('low_confidence');
+      expect(component.statusFilter()).toBe('open');
+    });
+
+    it('does not say every line of the quote is matched when another filter is hiding lines', () => {
+      component.quotationId.set('q-101');
+      component.reasonFilter.set('low_confidence');
+      component.tasks.set([]);
+      fixture.detectChanges();
+
+      expect(el().querySelector('[data-testid="quotation-all-matched"]')).toBeNull();
+      expect(el().querySelector('.clear-filters-btn')).toBeTruthy();
     });
 
     it('treats a non-default sort as an active filter and Clear restores the default order', () => {
