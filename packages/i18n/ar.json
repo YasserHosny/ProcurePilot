@@ -3819,9 +3819,10 @@
       "cancelled": "تم إلغاء الأمر.",
       "confirmationSaved": "تم حفظ تأكيد المورّد.",
       "receiptSaved": "تم حفظ إيصال التسليم.",
-      "dateFormatHint": "يوم/شهر/سنة",
       "receivedQuantityFor": "{{product}} · الكمية المستلمة ({{unit}}، المطلوب {{ordered}})",
-      "confirmedQuantityFor": "{{product}} · الكمية المؤكدة ({{unit}}، المطلوب {{ordered}})"
+      "confirmedQuantityFor": "{{product}} · الكمية المؤكدة ({{unit}}، المطلوب {{ordered}})",
+      "dateFormatHintDayFirst": "يوم/شهر/سنة",
+      "dateFormatHintMonthFirst": "شهر/يوم/سنة"
     },
     "resultCount": "{{count}} أمر شراء",
     "loadMoreError": "تعذّر تحميل المزيد من الأوامر. الأوامر الظاهرة أعلاه ما زالت معروضة.",

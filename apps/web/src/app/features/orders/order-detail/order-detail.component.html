@@ -121,7 +121,7 @@
                 [ngModelOptions]="{standalone: true}"
                 name="confirmationDate"
               />
-              <mat-hint data-testid="date-format-hint">{{ 'orders.detail.dateFormatHint' | translate }}</mat-hint>
+              <mat-hint data-testid="date-format-hint">{{ dateFormatHintKey() | translate }}</mat-hint>
               <mat-datepicker-toggle matIconSuffix [for]="confirmationDatePicker"></mat-datepicker-toggle>
               <mat-datepicker #confirmationDatePicker></mat-datepicker>
             </mat-form-field>
@@ -149,7 +149,7 @@
                 [ngModelOptions]="{standalone: true}"
                 name="receiptDate"
               />
-              <mat-hint data-testid="date-format-hint">{{ 'orders.detail.dateFormatHint' | translate }}</mat-hint>
+              <mat-hint data-testid="date-format-hint">{{ dateFormatHintKey() | translate }}</mat-hint>
               <mat-datepicker-toggle matIconSuffix [for]="receiptDatePicker"></mat-datepicker-toggle>
               <mat-datepicker #receiptDatePicker></mat-datepicker>
             </mat-form-field>

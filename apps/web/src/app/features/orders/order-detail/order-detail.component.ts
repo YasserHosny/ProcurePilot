@@ -1,5 +1,6 @@
 import { Component, ElementRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { DateAdapter } from '@angular/material/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -15,7 +16,7 @@ import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
-import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
+import { AppDateAdapter, provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 import {
   OrdersApiService,
   type EvidenceState,
@@ -52,6 +53,7 @@ export class OrderDetailComponent implements OnInit {
   private readonly translate = inject(TranslateService);
   private readonly formatService = inject(FormatService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly dateAdapter = inject(DateAdapter) as AppDateAdapter;
 
   readonly evidence = signal<OrderEvidenceProjection | null>(null);
   readonly isLoading = signal(true);
@@ -165,6 +167,13 @@ export class OrderDetailComponent implements OnInit {
     const specific = key ? this.translate.instant(key) : null;
     this.actionError.set(specific && specific !== key ? specific : this.translate.instant('orders.saveError'));
     this.isSaving.set(false);
+  }
+
+  /** The hint follows the order the date input really parses (English US workspaces type month-first). */
+  dateFormatHintKey(): string {
+    return this.dateAdapter.isDayFirst()
+      ? 'orders.detail.dateFormatHintDayFirst'
+      : 'orders.detail.dateFormatHintMonthFirst';
   }
 
   private announce(key: string): void {

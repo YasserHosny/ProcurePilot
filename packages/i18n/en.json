@@ -3819,9 +3819,10 @@
       "cancelled": "Order cancelled.",
       "confirmationSaved": "Supplier confirmation saved.",
       "receiptSaved": "Delivery receipt saved.",
-      "dateFormatHint": "dd/mm/yyyy",
       "receivedQuantityFor": "{{product}} · Received quantity ({{unit}}, ordered {{ordered}})",
-      "confirmedQuantityFor": "{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})"
+      "confirmedQuantityFor": "{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})",
+      "dateFormatHintDayFirst": "dd/mm/yyyy",
+      "dateFormatHintMonthFirst": "mm/dd/yyyy"
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",

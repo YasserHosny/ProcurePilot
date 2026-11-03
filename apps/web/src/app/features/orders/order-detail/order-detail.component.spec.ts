@@ -1,6 +1,7 @@
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { DateAdapter } from '@angular/material/core';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
@@ -60,7 +61,7 @@ describe('OrderDetailComponent', () => {
         backToOrders: 'Back', retry: 'Retry', loadError: 'Load failed', saveError: 'Save failed', notProvided: 'Not provided',
         status: { submitted: 'Submitted' }, evidence: { pending: 'Pending' },
         detail: {
-          receivedQuantityFor: '{{product}} · Received quantity ({{unit}}, ordered {{ordered}})', confirmedQuantityFor: '{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})', receiptSaved: 'Delivery receipt saved.', submitted: 'Order submitted.', dateFormatHint: 'dd/mm/yyyy',
+          receivedQuantityFor: '{{product}} · Received quantity ({{unit}}, ordered {{ordered}})', confirmedQuantityFor: '{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})', receiptSaved: 'Delivery receipt saved.', submitted: 'Order submitted.', dateFormatHintDayFirst: 'dd/mm/yyyy', dateFormatHintMonthFirst: 'mm/dd/yyyy',
           errors: { order_not_open_for_evidence: 'This order cannot take delivery or confirmation evidence.' },
           eyebrow: 'Purchase order', createdAt: 'Created {{date}}', orderDate: 'Order date', expectedDelivery: 'Expected',
           total: 'Total', confirmation: 'Confirmation', receipt: 'Receipt', linesTitle: 'Lines', linesSubtitle: 'Evidence',
@@ -464,10 +465,17 @@ describe('OrderDetailComponent', () => {
     expect(label).not.toContain('(kg,');
   });
 
-  it('shows the expected date format under the evidence dates', () => {
+  it('shows the date order the date input actually parses, day-first or month-first', () => {
     fixture.detectChanges();
     fixture.componentInstance.receiptOpen.set(true);
     fixture.detectChanges();
     expect(byTestId('date-format-hint')?.textContent).toContain('dd/mm/yyyy');
+
+    // Review (Codex, #443): an English US workspace parses typed dates month-first.
+    const adapter = fixture.debugElement.injector.get(DateAdapter) as unknown as { isDayFirst(): boolean };
+    spyOn(adapter, 'isDayFirst').and.returnValue(false);
+    fixture.detectChanges();
+    expect(byTestId('date-format-hint')?.textContent).toContain('mm/dd/yyyy');
+    expect(byTestId('date-format-hint')?.textContent).not.toContain('dd/mm/yyyy');
   });
 });
