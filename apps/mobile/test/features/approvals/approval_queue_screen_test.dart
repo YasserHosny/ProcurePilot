@@ -167,6 +167,49 @@ void main() {
     );
 
     testWidgets(
+      'failed decision reload preserves rows and cursor for loading more',
+      (tester) async {
+        servePages();
+        await pumpQueue(tester);
+        await tester.tap(find.byKey(const Key('approvalQueueItem_0')));
+        await tester.pumpAndSettle();
+
+        fakeClient.pendingPage = (cursor, limit) async =>
+            throw Exception('reload offline');
+        await tester.tap(
+          find.byKey(const Key('approvalDecisionApproveButton')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(fakeRequestsClient.approveCalls, ['req-1']);
+        expect(find.byType(ApprovalQueueScreen), findsOneWidget);
+        expect(find.text('Requester: Sarah Connor'), findsOneWidget);
+        expect(find.text('Requester: john@example.com'), findsOneWidget);
+        expect(
+          find.text('Unable to record the decision. Please try again.'),
+          findsOneWidget,
+        );
+        expect(find.text('Showing 2 requests, more available'), findsOneWidget);
+        expect(find.text('Showing 2 requests'), findsNothing);
+        expect(tester.widget<FilledButton>(loadMore).onPressed, isNotNull);
+        expect(fakeClient.pendingCalls, [
+          (cursor: null, limit: 50),
+          (cursor: null, limit: 50),
+        ]);
+
+        servePages();
+        await tester.tap(loadMore);
+        await tester.pumpAndSettle();
+        expect(fakeClient.pendingCalls.last, (
+          cursor: 'opaque-page-2',
+          limit: 50,
+        ));
+        expect(find.text('Requester: Third'), findsOneWidget);
+        expect(find.text('Showing 3 requests'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
       'decision reload resets paging and ignores a late page response',
       (tester) async {
         servePages();

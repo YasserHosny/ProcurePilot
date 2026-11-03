@@ -41,7 +41,6 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
     final generation = ++_loadGeneration;
     setState(() {
       _loading = true;
-      _nextCursor = null;
       _loadingMore = false;
       _loadMoreError = null;
     });
