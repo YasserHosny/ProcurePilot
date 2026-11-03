@@ -131,8 +131,17 @@ export class ResolutionQueueComponent implements OnInit {
       this.reasonFilter() !== 'all' ||
       this.searchQuery().trim().length > 0 ||
       this.dateFrom() !== null ||
-      this.dateTo() !== null,
+      this.dateTo() !== null ||
+      this.sortBy() !== 'created_at' ||
+      this.sortOrder() !== 'desc',
   );
+
+  readonly currentSortValue = computed<string | null>(() => {
+    const val = `${this.sortBy()}/${this.sortOrder()}`;
+    return ['created_at/desc', 'created_at/asc', 'priority/desc', 'priority/asc'].includes(val)
+      ? val
+      : null;
+  });
 
   readonly groups = computed<readonly QuotationTaskGroup[]>(() => {
     const grouped = new Map<string, MatchQueueItem[]>();
@@ -156,7 +165,20 @@ export class ResolutionQueueComponent implements OnInit {
       this.priorityFilter.set(priority);
     }
     const reason = qp.get('reason') as MatchTaskReason | 'all' | null;
-    if (reason && ['all', 'low_confidence', 'close_candidates', 'fuzzy_match_review', 'no_candidate', 'alias_conflict', 'auto_accepted'].includes(reason)) {
+    if (
+      reason &&
+      [
+        'all',
+        'low_confidence',
+        'close_candidates',
+        'fuzzy_match_review',
+        'no_candidate',
+        'alias_conflict',
+        'auto_accepted',
+        'corrected',
+        'human_decided',
+      ].includes(reason)
+    ) {
       this.reasonFilter.set(reason);
     }
     const search = qp.get('search');
@@ -414,6 +436,16 @@ export class ResolutionQueueComponent implements OnInit {
     }
   }
 
+  onSortSelectChange(value: string): void {
+    if (!value) return;
+    this.clearCorrectionNotices();
+    const [by, order] = value.split('/') as [MatchTaskSortBy, MatchTaskSortOrder];
+    this.sortBy.set(by);
+    this.sortOrder.set(order);
+    this.syncQueryParams();
+    this.loadTasks();
+  }
+
   onSortChange(sort: Sort): void {
     if (this.isSortableColumn(sort.active)) {
       this.sortBy.set(sort.active);
@@ -432,6 +464,8 @@ export class ResolutionQueueComponent implements OnInit {
     this.searchQuery.set('');
     this.dateFrom.set(null);
     this.dateTo.set(null);
+    this.sortBy.set('created_at');
+    this.sortOrder.set('desc');
     this.syncQueryParams();
     this.loadTasks();
   }

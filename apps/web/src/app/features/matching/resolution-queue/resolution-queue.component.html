@@ -113,13 +113,20 @@
       </mat-form-field>
       <mat-form-field appearance="outline" class="filter-field">
         <mat-label>{{ 'matching.queue.filterReason' | translate }}</mat-label>
-        <mat-select [value]="reasonFilter()" (selectionChange)="onReasonChange($event.value)">
+        <mat-select
+          data-testid="queue-reason-filter"
+          [value]="reasonFilter()"
+          (selectionChange)="onReasonChange($event.value)"
+        >
           <mat-option value="all">{{ 'matching.queue.reason.all' | translate }}</mat-option>
           <mat-option value="low_confidence">{{ 'matching.queue.reason.low_confidence' | translate }}</mat-option>
           <mat-option value="close_candidates">{{ 'matching.queue.reason.close_candidates' | translate }}</mat-option>
           <mat-option value="fuzzy_match_review">{{ 'matching.queue.reason.fuzzy_match_review' | translate }}</mat-option>
           <mat-option value="no_candidate">{{ 'matching.queue.reason.no_candidate' | translate }}</mat-option>
           <mat-option value="alias_conflict">{{ 'matching.queue.reason.alias_conflict' | translate }}</mat-option>
+          <mat-option value="auto_accepted">{{ 'matching.queue.reason.auto_accepted' | translate }}</mat-option>
+          <mat-option value="corrected">{{ 'matching.queue.reason.corrected' | translate }}</mat-option>
+          <mat-option value="human_decided">{{ 'matching.queue.reason.human_decided' | translate }}</mat-option>
         </mat-select>
       </mat-form-field>
       <mat-form-field appearance="outline" class="filter-field date-field">
@@ -143,6 +150,19 @@
         />
         <mat-datepicker-toggle matIconSuffix [for]="dateToPicker"></mat-datepicker-toggle>
         <mat-datepicker #dateToPicker></mat-datepicker>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>{{ 'matching.queue.sort.label' | translate }}</mat-label>
+        <mat-select
+          data-testid="queue-sort"
+          [value]="currentSortValue()"
+          (selectionChange)="onSortSelectChange($event.value)"
+        >
+          <mat-option value="created_at/desc">{{ 'matching.queue.sort.createdDesc' | translate }}</mat-option>
+          <mat-option value="created_at/asc">{{ 'matching.queue.sort.createdAsc' | translate }}</mat-option>
+          <mat-option value="priority/desc">{{ 'matching.queue.sort.priorityDesc' | translate }}</mat-option>
+          <mat-option value="priority/asc">{{ 'matching.queue.sort.priorityAsc' | translate }}</mat-option>
+        </mat-select>
       </mat-form-field>
     </mat-card-content>
   </mat-card>
@@ -202,9 +222,9 @@
     </section>
   }
 
-  <div class="visually-hidden" data-testid="queue-result-summary" role="status" aria-live="polite">
+  <div class="queue-result-summary" data-testid="queue-result-summary" role="status" aria-live="polite">
     @if (isLoading() === false && tasksLoadFailed() === false) {
-      {{ 'matching.queue.resultSummary' | translate: { lines: tasks().length, quotations: groups().length } }}
+      {{ 'matching.queue.resultSummary' | translate: { lines: tasks().length, quotations: groups().length } }}@if (nextCursor() !== null) { · {{ 'matching.queue.moreAvailable' | translate }}}
     }
   </div>
 

@@ -9,6 +9,16 @@
   margin: 0 auto;
 }
 
+.queue-result-summary {
+  font-size: 0.825rem;
+  color: var(--pp-text-muted);
+  margin-block: 0;
+
+  &:empty {
+    display: none;
+  }
+}
+
 .visually-hidden {
   position: absolute;
   inline-size: 1px;
