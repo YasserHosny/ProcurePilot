@@ -1287,6 +1287,7 @@
   },
   "matching": {
     "queue": {
+      "refresh": "Refresh",
       "moreAvailable": "more available",
       "sort": {
         "label": "Sort by",

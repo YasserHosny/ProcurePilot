@@ -515,11 +515,33 @@ class MatchingService:
             offset %(offset)s limit %(limit)s
         """
 
+        rfq_id: UUID | None = None
         try:
             with _authenticated_db(self._settings, member) as conn:
                 with conn.cursor(row_factory=dict_row) as cur:
                     cur.execute(query, params)
                     rows = [dict(row) for row in cur.fetchall()]
+                    if quotation_id is not None:
+                        rfq_lookup_sql = (
+                            "select rt.rfq_id from rfq_response rr "
+                            "join rfq_recipient rt on rt.tenant_id = rr.tenant_id "
+                            "and rt.id = rr.rfq_recipient_id "
+                            "where rr.tenant_id = %(tenant_id)s "
+                            "and rr.quotation_id = %(quotation_id)s "
+                            "order by rr.created_at desc, rr.id desc limit 1"
+                        )
+                        cur.execute(
+                            rfq_lookup_sql,
+                            {"tenant_id": member.tenant_id, "quotation_id": quotation_id},
+                        )
+                        rfq_row = cur.fetchone()
+                        if rfq_row and rfq_row.get("rfq_id"):
+                            raw_rfq_id = rfq_row["rfq_id"]
+                            rfq_id = (
+                                raw_rfq_id
+                                if isinstance(raw_rfq_id, UUID)
+                                else UUID(str(raw_rfq_id))
+                            )
         except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -528,6 +550,7 @@ class MatchingService:
         return MatchQueueList(
             items=[_queue_item(row) for row in page_rows],
             next_cursor=_encode_cursor(offset + fetch_limit - 1) if has_more else None,
+            rfq_id=rfq_id,
         )
 
     def match_task_for_line(self, *, bearer_token: str, line_id: UUID) -> MatchTask:

@@ -1287,6 +1287,7 @@
   },
   "matching": {
     "queue": {
+      "refresh": "تحديث",
       "moreAvailable": "يوجد المزيد",
       "sort": {
         "label": "ترتيب حسب",

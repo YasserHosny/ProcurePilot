@@ -1,4 +1,4 @@
-"""The queue says which RFQ a quotation answered, so «Compare responses» can open it (P-153, PPS-197)."""
+"""The queue names the RFQ a quotation answered, so «Compare responses» can open it (P-153)."""
 
 from __future__ import annotations
 
@@ -47,7 +47,9 @@ class _Connection:
         return self._cursor
 
 
-def _service(monkeypatch: pytest.MonkeyPatch, rfq_id: UUID | None) -> tuple[MatchingService, _Cursor]:
+def _service(
+    monkeypatch: pytest.MonkeyPatch, rfq_id: UUID | None
+) -> tuple[MatchingService, _Cursor]:
     cursor = _Cursor(rfq_id)
 
     @contextmanager
@@ -62,7 +64,9 @@ def _member() -> SimpleNamespace:
     return SimpleNamespace(tenant_id=uuid4())
 
 
-def test_a_quotation_scoped_queue_names_the_rfq_it_answered(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_quotation_scoped_queue_names_the_rfq_it_answered(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     rfq_id = uuid4()
     service, _ = _service(monkeypatch, rfq_id)
 
