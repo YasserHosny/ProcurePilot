@@ -8,11 +8,13 @@ import type {
   PurchaseRequestLine,
   PurchaseRequestCreate,
   PurchaseRequestList,
-  PurchaseRequestStatus,
+  PurchaseRequestStatus as BasePurchaseRequestStatus,
   PurchaseRequestUpdate,
   RequestGroupSummary,
   RequestSource,
 } from '../../core/api/models';
+
+export type PurchaseRequestStatus = BasePurchaseRequestStatus | 'delivered';
 
 export type {
   ApprovalDecisionInput,
@@ -20,7 +22,6 @@ export type {
   PurchaseRequestLine,
   PurchaseRequestCreate,
   PurchaseRequestList,
-  PurchaseRequestStatus,
   PurchaseRequestUpdate,
   RequestGroupSummary,
   RequestSource,
@@ -37,7 +38,7 @@ export class RequestsApiService {
     limit?: number;
     eligible_for_order?: boolean;
   }): Observable<PurchaseRequestList> {
-    return this.api.listRequests(params);
+    return this.api.listRequests(params as Parameters<ApiService['listRequests']>[0]);
   }
 
   getRequest(requestId: string): Observable<PurchaseRequest> {

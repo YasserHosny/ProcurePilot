@@ -60,8 +60,13 @@
           <button mat-stroked-button color="warn" class="pp-danger" type="button" (click)="cancelOrder()" [disabled]="isSaving()" data-testid="cancel-order">
             <mat-icon aria-hidden="true">cancel</mat-icon>{{ 'orders.detail.cancel' | translate }}
           </button>
-          <button mat-flat-button color="primary" type="button" (click)="submitOrder()" [disabled]="isSaving()" data-testid="submit-order">
+          <button mat-flat-button color="primary" type="button" (click)="requestSubmit()" [disabled]="isSaving()" data-testid="submit-order">
             <mat-icon aria-hidden="true">send</mat-icon>{{ 'orders.detail.submit' | translate }}
+          </button>
+        }
+        @if (data.order.status !== 'draft' && canCancel(data.order.status)) {
+          <button mat-stroked-button color="warn" class="pp-danger" type="button" (click)="cancelOrder()" [disabled]="isSaving()" data-testid="cancel-order">
+            <mat-icon aria-hidden="true">cancel</mat-icon>{{ 'orders.detail.cancel' | translate }}
           </button>
         }
         @if (data.order.status !== 'cancelled' && data.order.status !== 'closed' && data.order.status !== 'draft') {
@@ -73,6 +78,19 @@
         }
       </div>
 
+      @if (actionError(); as actionMessage) {
+        <div class="state error" role="alert" data-testid="action-error"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ actionMessage }}</span></div>
+      }
+      @if (submitOpen()) {
+        <div class="evidence-form submit-form">
+          <h3>{{ 'orders.detail.submitConfirmTitle' | translate }}</h3>
+          <p>{{ 'orders.detail.submitConfirmMessage' | translate }}</p>
+          <div class="actions">
+            <button mat-button type="button" (click)="submitOpen.set(false)" [disabled]="isSaving()">{{ 'common.cancel' | translate }}</button>
+            <button mat-flat-button color="primary" type="button" (click)="submitOrder()" [disabled]="isSaving()" data-testid="confirm-submit">{{ 'orders.detail.submitConfirm' | translate }}</button>
+          </div>
+        </div>
+      }
       @if (cancelOpen()) {
         <div class="evidence-form cancel-form">
           <h3>{{ 'orders.detail.cancelConfirmTitle' | translate }}</h3>
@@ -134,6 +152,7 @@
             </mat-form-field>
           </div>
           @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ lineDescription(line) }} · {{ 'orders.detail.receivedQuantity' | translate }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(receiptQuantities(), line)" (ngModelChange)="setQuantity('receipt', line.id, $event)" [name]="'receipt-' + line.id" /></mat-form-field> }
+          @if (receiptQuantityError()) { <p class="field-error" role="alert" data-testid="receipt-quantity-error">{{ 'orders.detail.receiptQuantityRequired' | translate }}</p> }
           <button mat-flat-button color="primary" type="submit" [disabled]="isSaving()" data-testid="save-receipt">{{ 'orders.detail.save' | translate }}</button>
         </form>
       }
