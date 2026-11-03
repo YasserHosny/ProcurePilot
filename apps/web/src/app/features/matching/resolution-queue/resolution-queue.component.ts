@@ -36,7 +36,7 @@ import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-dat
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS } from '../match-resolution/correct-match-dialog.component';
-import { formatSweptLinesMessage, appendSweptMessage } from '../matching-api';
+import { formatSweptLinesMessage, appendSweptMessage, CorrectionKeyManager } from '../matching-api';
 
 type MatchTaskSortBy = 'created_at' | 'priority' | 'status';
 type MatchTaskSortOrder = 'asc' | 'desc';
@@ -105,6 +105,9 @@ export class ResolutionQueueComponent implements OnInit {
   readonly isConfirmingExact = signal<boolean>(false);
   readonly exactConfirmedCount = signal<number | null>(null);
   readonly exactSkippedCount = signal<number>(0);
+  readonly dependentLinesCount = signal<number>(0);
+  readonly dependentLinesQuotationId = signal<string | null>(null);
+  readonly aliasConflictNotice = signal<boolean>(false);
   readonly refreshReviews = signal<CatalogueRefreshReview[]>([]);
   readonly isLoadingRefreshReviews = signal<boolean>(true);
   readonly refreshReviewDecisionId = signal<string | null>(null);
@@ -114,6 +117,8 @@ export class ResolutionQueueComponent implements OnInit {
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
   private latestLoadRequestId = 0;
   private exactConfirmKey: string | null = null;
+  private readonly correctionKeys = new CorrectionKeyManager();
+  private readonly openingTaskLineIds = new Set<string>();
 
   isWriter(): boolean {
     return this.session.hasRole('owner', 'buyer');
@@ -339,25 +344,35 @@ export class ResolutionQueueComponent implements OnInit {
       });
   }
 
+  clearCorrectionNotices(): void {
+    this.dependentLinesCount.set(0);
+    this.dependentLinesQuotationId.set(null);
+    this.aliasConflictNotice.set(false);
+  }
+
   onStatusChange(status: MatchTaskStatus | 'all'): void {
+    this.clearCorrectionNotices();
     this.statusFilter.set(status);
     this.syncQueryParams();
     this.loadTasks();
   }
 
   onPriorityChange(priority: MatchTaskPriority | 'all'): void {
+    this.clearCorrectionNotices();
     this.priorityFilter.set(priority);
     this.syncQueryParams();
     this.loadTasks();
   }
 
   onReasonChange(reason: MatchTaskReason | 'all'): void {
+    this.clearCorrectionNotices();
     this.reasonFilter.set(reason);
     this.syncQueryParams();
     this.loadTasks();
   }
 
   onSearchChange(value: string): void {
+    this.clearCorrectionNotices();
     this.searchQuery.set(value);
     if (this.searchDebounce) {
       clearTimeout(this.searchDebounce);
@@ -371,6 +386,7 @@ export class ResolutionQueueComponent implements OnInit {
   onDateFromChange(value: Date | string | null): void {
     const next = toIsoDateOrNull(value);
     if (this.dateFrom() !== next) {
+      this.clearCorrectionNotices();
       this.dateFrom.set(next);
       this.syncQueryParams();
       this.loadTasks();
@@ -380,6 +396,7 @@ export class ResolutionQueueComponent implements OnInit {
   onDateToChange(value: Date | string | null): void {
     const next = toIsoDateOrNull(value);
     if (this.dateTo() !== next) {
+      this.clearCorrectionNotices();
       this.dateTo.set(next);
       this.syncQueryParams();
       this.loadTasks();
@@ -396,6 +413,7 @@ export class ResolutionQueueComponent implements OnInit {
   }
 
   clearFilters(): void {
+    this.clearCorrectionNotices();
     this.quotationId.set(null);
     this.statusFilter.set('open');
     this.priorityFilter.set('all');
@@ -503,10 +521,17 @@ export class ResolutionQueueComponent implements OnInit {
 
   openCorrectMatchDialog(task: MatchQueueItem): void {
     if (!this.isWriter()) return;
-    this.api.getMatchTaskForLine(task.quotation_line.id).subscribe({
+    const lineId = task.quotation_line.id;
+    if (this.openingTaskLineIds.has(lineId)) return;
+    this.openingTaskLineIds.add(lineId);
+
+    this.clearCorrectionNotices();
+
+    this.api.getMatchTaskForLine(lineId).subscribe({
       next: (fullTask) => {
         const decisionId = fullTask.decision?.id ?? task.decision?.id;
         if (!decisionId) {
+          this.openingTaskLineIds.delete(lineId);
           this.errorMessage.set(this.translate.instant('matching.resolution.errors.decisionChanged'));
           return;
         }
@@ -522,28 +547,44 @@ export class ResolutionQueueComponent implements OnInit {
             quotationSupplierId: fullTask.quotation?.supplier_id ?? null,
           },
         });
-        dialogRef.afterClosed().subscribe((request: MatchCorrectionRequest | null | undefined) => {
-          if (!request) return;
-          const key = crypto.randomUUID();
-          this.api.correctMatch(task.quotation_line.id, request, key).subscribe({
-            next: (res) => {
-              const baseMsg = this.translate.instant('matching.resolution.actions.correctSuccess');
-              const swept = formatSweptLinesMessage(this.translate, res.lines_matched_by_same_wording);
-              const msg = swept ? appendSweptMessage(baseMsg, swept) : baseMsg;
-              this.snackBar.open(
-                msg,
-                undefined,
-                { duration: 4000 },
-              );
-              this.loadTasks();
-            },
-            error: (err: unknown) => {
-              this.handleCorrectionError(err);
-            },
-          });
+        dialogRef.afterClosed().subscribe({
+          next: (request: MatchCorrectionRequest | null | undefined) => {
+            this.openingTaskLineIds.delete(lineId);
+            if (!request) return;
+            const key = this.correctionKeys.getKey(request);
+            this.api.correctMatch(lineId, request, key).subscribe({
+              next: (res) => {
+                this.correctionKeys.recordSuccess();
+                const baseMsg = this.translate.instant('matching.resolution.actions.correctSuccess');
+                const swept = formatSweptLinesMessage(this.translate, res.lines_matched_by_same_wording);
+                const msg = swept ? appendSweptMessage(baseMsg, swept) : baseMsg;
+                this.snackBar.open(
+                  msg,
+                  undefined,
+                  { duration: 4000 },
+                );
+                if (res.lines_matched_through_old_wording && res.lines_matched_through_old_wording.length > 0) {
+                  this.dependentLinesCount.set(res.lines_matched_through_old_wording.length);
+                  this.dependentLinesQuotationId.set(fullTask.quotation?.id ?? task.quotation?.id ?? task.quotation_id ?? null);
+                } else {
+                  this.dependentLinesCount.set(0);
+                  this.dependentLinesQuotationId.set(null);
+                }
+                this.aliasConflictNotice.set(Boolean(res.alias_conflict_product_id));
+                this.loadTasks();
+              },
+              error: (err: unknown) => {
+                this.handleCorrectionError(err);
+              },
+            });
+          },
+          error: () => {
+            this.openingTaskLineIds.delete(lineId);
+          },
         });
       },
       error: (err: unknown) => {
+        this.openingTaskLineIds.delete(lineId);
         this.handleError(err);
       },
     });
