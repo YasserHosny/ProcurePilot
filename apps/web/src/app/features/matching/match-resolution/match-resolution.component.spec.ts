@@ -431,8 +431,10 @@ describe('MatchResolutionComponent (T039)', () => {
     component.confirmResolution(true);
 
     expect(apiService.resolveMatch).toHaveBeenCalled();
-    expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1');
-    expect(navSpy).toHaveBeenCalledWith(['/matching', 'line-next']);
+    expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1', 'q-99');
+    expect(navSpy).toHaveBeenCalledWith(['/matching', 'line-next'], {
+      queryParams: jasmine.objectContaining({ quotation_id: 'q-99' }),
+    });
   });
 
   it('navigates to /matching and shows queue cleared toast on Resolve and Next when no tasks remain', () => {
@@ -444,13 +446,15 @@ describe('MatchResolutionComponent (T039)', () => {
 
     component.confirmResolution(true);
 
-    expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1');
+    expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1', 'q-99');
     expect(snackSpy).toHaveBeenCalledWith(
       enCatalog.matching.resolution.actions.queueCleared,
       undefined,
       { duration: 3500 },
     );
-    expect(navSpy).toHaveBeenCalledWith(['/matching']);
+    expect(navSpy).toHaveBeenCalledWith(['/matching'], {
+      queryParams: jasmine.objectContaining({ quotation_id: 'q-99' }),
+    });
   });
 
   it('displays task.matched_product name in the Matched Product box on a resolved task page', () => {
@@ -1236,7 +1240,7 @@ describe('MatchResolutionComponent (T039)', () => {
 
       component.confirmResolution(true);
 
-      expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1');
+      expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1', 'q-99');
       expect(snackSpy).toHaveBeenCalledWith(
         jasmine.stringMatching(/All match tasks resolved — queue cleared.*Also matched 2 more lines/),
         undefined,
