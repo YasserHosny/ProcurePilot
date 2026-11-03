@@ -1168,6 +1168,23 @@
         "unsupportedType": "This file type is not supported. Please upload a PDF, image, or spreadsheet.",
         "success": "Source document replaced. Extraction will begin shortly."
       },
+      "refuseConfirm": {
+        "title": "Refuse quotation?",
+        "message": "Are you sure you want to refuse this quotation? It will be marked as refused and removed from active review. This action cannot be undone.",
+        "confirm": "Refuse Quotation",
+        "cancel": "Cancel"
+      },
+      "unsavedChanges": {
+        "title": "Discard unsaved changes?",
+        "message": "You have unsaved corrections, supplier selections, or notes that will be lost if you leave this page.",
+        "confirm": "Discard Changes",
+        "cancel": "Keep Editing"
+      },
+      "processing": {
+        "title": "Extraction in progress",
+        "message": "The document is being processed. Commercial data and lines will update when extraction finishes.",
+        "timeout": "Extraction is taking longer than expected. Please refresh or retry."
+      },
       "archiveConfirm": "Archive this quotation?",
       "retryConfirm": "Re-run extraction? Existing extracted data will be replaced.",
       "archived": "Quotation archived",
