@@ -97,12 +97,12 @@
         <mat-card-content class="line-metrics-grid">
           <div class="metric-item">
             <span class="metric-label">{{ 'matching.resolution.lineDetails.quantity' | translate }}</span>
-            <span class="metric-value">{{ (l.quantity || '1') | formatQuantity }}</span>
+            <span class="metric-value">{{ (l.quantity != null && l.quantity !== '') ? (l.quantity | formatQuantity) : ('matching.queue.notAvailable' | translate) }}</span>
           </div>
           @if (l.pack) {
             <div class="metric-item">
               <span class="metric-label">{{ 'matching.resolution.lineDetails.pack' | translate }}</span>
-              <span class="metric-value">{{ l.pack.pack_count }} × {{ l.pack.unit_size }} {{ l.pack.unit || '' }}</span>
+              <span class="metric-value">{{ l.pack.pack_count }} × {{ l.pack.unit_size }} {{ l.pack.unit | unitLabel }}</span>
             </div>
           }
           @if (l.unit_price) {
@@ -114,7 +114,7 @@
           @if (l.vat_rate) {
             <div class="metric-item">
               <span class="metric-label">{{ 'matching.resolution.lineDetails.vatRate' | translate }}</span>
-              <span class="metric-value">{{ formatScore(l.vat_rate) }}%</span>
+              <span class="metric-value">{{ formatVatRate(l.vat_rate) }}</span>
             </div>
           }
           @if (l.delivery_fee) {
@@ -145,11 +145,11 @@
 
     <!-- Already Resolved Decision Banner -->
     @if (decision() || task()?.matched_product) {
-      <div class="decision-banner" role="region">
+      <div class="decision-banner" role="region" aria-labelledby="decision-banner-title" [attr.aria-label]="'matching.resolution.decision.title' | translate">
         <div class="decision-header">
           <mat-icon class="decision-icon" aria-hidden="true">check_circle</mat-icon>
           <div class="decision-title-group">
-            <h2 class="decision-title">{{ 'matching.resolution.decision.title' | translate }}</h2>
+            <h2 id="decision-banner-title" class="decision-title">{{ 'matching.resolution.decision.title' | translate }}</h2>
             @if (decision(); as dec) {
               <span class="decision-tag" [class.auto-tag]="dec.is_automatic" [class.human-tag]="!dec.is_automatic">
                 {{ (dec.is_automatic ? 'matching.resolution.decision.automatic' : 'matching.resolution.decision.human') | translate }}
@@ -193,11 +193,11 @@
 
     <!-- Landed Cost Component (US3) -->
     @if (landedCost(); as lc) {
-      <mat-card class="landed-cost-card" role="region">
+      <mat-card class="landed-cost-card" role="region" aria-labelledby="landed-cost-title" [attr.aria-label]="'matching.resolution.landedCost.title' | translate">
         <mat-card-header>
           <div class="cost-header-row">
             <div>
-              <mat-card-title class="cost-title">{{ 'matching.resolution.landedCost.title' | translate }}</mat-card-title>
+              <mat-card-title id="landed-cost-title" class="cost-title">{{ 'matching.resolution.landedCost.title' | translate }}</mat-card-title>
               <mat-card-subtitle>{{ 'matching.resolution.landedCost.subtitle' | translate }}</mat-card-subtitle>
             </div>
             <details class="landed-cost-details">
@@ -228,7 +228,7 @@
             </div>
             <div class="cost-item">
               <span class="cost-label">{{ 'matching.resolution.landedCost.discount' | translate }}</span>
-              <span class="pp-figures cost-val discount-val">-{{ lc.discount | formatMoney }}</span>
+              <span class="pp-figures cost-val discount-val">{{ (isDiscountNonZero(lc.discount) ? '-' : '') + (lc.discount | formatMoney) }}</span>
             </div>
             <div class="cost-item">
               <span class="cost-label">{{ 'matching.resolution.landedCost.otherCharges' | translate }}</span>
@@ -246,6 +246,9 @@
             <div class="norm-info">
               <span class="norm-label">{{ 'matching.resolution.landedCost.normalisedQuantity' | translate }}:</span>
               <strong class="norm-val">{{ lc.normalised_base_quantity | formatQuantity }} {{ lc.base_unit | unitLabel }}</strong>
+            </div>
+            <div class="cost-quantity-scope">
+              <span>{{ 'matching.resolution.landedCost.totalCovers' | translate: { quantity: (lc.quantity | formatQuantity), unitPrice: (lc.unit_price | formatMoney) } }}</span>
             </div>
           </div>
         </mat-card-content>
@@ -424,7 +427,7 @@
                   </div>
 
                   <!-- Live Normalised Quantity Display -->
-                  <div class="normalisation-preview" role="region" aria-live="polite">
+                  <div class="normalisation-preview" role="region" aria-live="polite" [attr.aria-label]="'matching.resolution.newProduct.liveNormalisedLabel' | translate">
                     <mat-icon aria-hidden="true">calculate</mat-icon>
                     <div class="norm-preview-body">
                       <span class="norm-preview-label">{{ 'matching.resolution.newProduct.liveNormalisedLabel' | translate }}:</span>
