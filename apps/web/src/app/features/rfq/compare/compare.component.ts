@@ -364,9 +364,18 @@ export class CompareComponent implements OnInit, OnChanges {
     if (productIds.length === 0) {
       return null;
     }
-    const replies = this.responses().filter(
+    const matched = this.responses().filter(
       (r) => r.quotation_status !== 'refused' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
     );
+    // One reply per supplier (the latest by submitted_at), as the server prices the split from.
+    const latestBySupplier = new Map<string, RfqResponseComparison>();
+    for (const reply of matched) {
+      const current = latestBySupplier.get(reply.supplier_id);
+      if (!current || reply.submitted_at >= current.submitted_at) {
+        latestBySupplier.set(reply.supplier_id, reply);
+      }
+    }
+    const replies = [...latestBySupplier.values()];
     if (replies.length < 2) {
       return null;
     }
@@ -656,7 +665,9 @@ export class CompareComponent implements OnInit, OnChanges {
           current[supplier.id] = supplier.name;
           this.supplierNames.set(current);
         },
-        error: () => undefined,
+        error: () => {
+          this.supplierLookups.delete(id);
+        },
       });
     }
   }
@@ -699,7 +710,9 @@ export class CompareComponent implements OnInit, OnChanges {
           current[product.id] = product.tenant_name;
           this.productNames.set(current);
         },
-        error: () => undefined,
+        error: () => {
+          this.productLookups.delete(id);
+        },
       });
     }
   }
