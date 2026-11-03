@@ -80,4 +80,13 @@ describe('LandingPilotComponent', () => {
     expect(mailto).toContain(`mailto:${environment.salesEmail}`);
     expect(mailto).toContain('subject=ProcurePilot%20pilot%20access%20request');
   });
+
+  it('links WhatsApp to the sales number with a prefilled message', () => {
+    const btn = fixture.debugElement.query(By.css('.pilot-whatsapp-btn'));
+    expect(btn.nativeElement.getAttribute('href')).toBe(
+      `https://wa.me/${environment.salesWhatsapp}?text=${encodeURIComponent(enCatalog.landing.pilot.whatsappMessage)}`,
+    );
+    expect(btn.nativeElement.getAttribute('target')).toBe('_blank');
+    expect(btn.nativeElement.textContent).toContain('Message us on WhatsApp');
+  });
 });
