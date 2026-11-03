@@ -51,7 +51,11 @@ describe('OrderListComponent', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    // The supplier filter loads its options on start; tests that do not care just let it empty.
+    http.match((r) => r.url.includes('/suppliers')).forEach((r) => r.flush({ items: [], next_cursor: null }));
+    http.verify();
+  });
 
   it('loads and renders purchase orders with status and total', () => {
     fixture.detectChanges();
@@ -419,5 +423,51 @@ describe('OrderListComponent', () => {
     expect(by('PO-DONE').querySelector('[data-testid="order-overdue"]')).toBeNull();
     expect(by('PO-SOON').querySelector('[data-testid="order-overdue"]')).toBeNull();
     expect(by('PO-SOON').querySelector('[data-testid="order-expected"]')?.textContent).toContain('2999');
+  });
+  // PPS-206: the API filters by supplier and order date; the page now offers both.
+  it('filters by supplier and by order date range through the API', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: null, total_count: 1 });
+    http.expectOne((r) => r.url.includes('/suppliers')).flush({
+      items: [{ id: 'sup-1', name: 'Al Dhahabi', status: 'active', created_at: '' }, { id: 'sup-2', name: 'Al Wafra', status: 'active', created_at: '' }],
+      next_cursor: null,
+    });
+    fixture.detectChanges();
+
+    const supplier = el().querySelector('[data-testid="orders-supplier-filter"]') as HTMLSelectElement;
+    expect(Array.from(supplier.options).map((o) => o.textContent?.trim())).toContain('Al Wafra');
+    supplier.value = 'sup-2';
+    supplier.dispatchEvent(new Event('change'));
+    http.expectOne('/api/v1/orders?limit=50&supplier_id=sup-2').flush({ items: [], next_cursor: null, total_count: 0 });
+    fixture.detectChanges();
+
+    const from = el().querySelector('[data-testid="orders-date-from"]') as HTMLInputElement;
+    from.value = '2026-10-01';
+    from.dispatchEvent(new Event('change'));
+    http.expectOne('/api/v1/orders?limit=50&supplier_id=sup-2&date_from=2026-10-01').flush({ items: [], next_cursor: null, total_count: 0 });
+    fixture.detectChanges();
+
+    const to = el().querySelector('[data-testid="orders-date-to"]') as HTMLInputElement;
+    to.value = '2026-10-31';
+    to.dispatchEvent(new Event('change'));
+    http.expectOne('/api/v1/orders?limit=50&supplier_id=sup-2&date_from=2026-10-01&date_to=2026-10-31')
+      .flush({ items: [], next_cursor: null, total_count: 0 });
+    fixture.detectChanges();
+    expect(el().querySelector('[data-testid="orders-no-match"]')).toBeTruthy(); // a filter is active
+  });
+  // Review (Codex, #460): suppliers beyond the first page could never be chosen in the filter.
+  it('follows the supplier cursors so every supplier can be filtered on', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [], next_cursor: null, total_count: 0 });
+    http.expectOne((r) => r.url.includes('/suppliers') && !r.url.includes('cursor')).flush({
+      items: [{ id: 'sup-1', name: 'Al Dhahabi', status: 'active', created_at: '' }],
+      next_cursor: 'page-2',
+    });
+    http.expectOne((r) => r.url.includes('/suppliers') && r.url.includes('cursor=page-2')).flush({
+      items: [{ id: 'sup-2', name: 'Al Wafra', status: 'active', created_at: '' }],
+      next_cursor: null,
+    });
+
+    expect(component.suppliers().map((s) => s.id)).toEqual(['sup-1', 'sup-2']);
   });
 });

@@ -3872,7 +3872,11 @@
       "sort": "Sort by",
       "apply": "Search",
       "noMatchTitle": "No orders match",
-      "noMatchDescription": "Change the search or the status filter to see more orders."
+      "noMatchDescription": "Change the search or the status filter to see more orders.",
+      "supplier": "Supplier",
+      "allSuppliers": "All suppliers",
+      "dateFrom": "Ordered from",
+      "dateTo": "Ordered until"
     },
     "sort": {
       "created_at_desc": "Newest first",
