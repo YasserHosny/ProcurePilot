@@ -1170,6 +1170,37 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(component.items()).toEqual([{ workspace_product_id: 'prod-1', quantity: '10' }]);
     });
 
+    // PPS-209: when the job says what it was run with, a rerun reuses exactly that.
+    it('reruns a standalone job with the risk, urgency, exclusions and weights it was run with', () => {
+      const settings = {
+        risk_tolerance: 'low' as const,
+        urgency: 'urgent' as const,
+        excluded_supplier_ids: ['supp-2'],
+        weights: { price: 0.5, preferred_supplier: 0.1, risk: 0.2, lead_time: 0.1, quality: 0.1 },
+      };
+      apiService.getBasketSplitJob.and.returnValue(of({ ...mockFeasibleJob, request_settings: settings }));
+      apiService.optimiseBasket.and.returnValue(of({ ...mockFeasibleJob, id: 'job-new', status: 'queued', result: null }));
+      component.fetchJob('job-1');
+
+      try {
+        component.rerunOptimisation();
+      } catch {
+        // Router navigation errors in the empty test router are expected.
+      }
+
+      expect(apiService.optimiseBasket).toHaveBeenCalledWith(
+        jasmine.objectContaining({
+          supplier_ids: ['supp-1', 'supp-2'],
+          items: mockFeasibleJob.items,
+          risk_tolerance: 'low',
+          urgency: 'urgent',
+          excluded_supplier_ids: ['supp-2'],
+          weights: settings.weights,
+        }),
+      );
+      expect(component.rerunNotice()).toBeFalse();
+    });
+
     it('offers preferred suppliers as well as active ones, without duplicates', () => {
       apiService.suppliers.and.callFake(((params?: { status?: string }) =>
         of({

@@ -330,6 +330,15 @@ class PackSnapshot(StrictApiModel):
     base_unit: StrictStr
 
 
+class BasketRequestSettings(BaseModel):
+    """What an advanced basket was run with, so a rerun can reuse it unchanged."""
+
+    risk_tolerance: RiskTolerance
+    urgency: BasketUrgency
+    excluded_supplier_ids: list[UUID] = Field(default_factory=list)
+    weights: OptimisationWeights
+
+
 class BasketSplitJob(BaseModel):
     id: UUID
     supplier_ids: list[UUID]
@@ -343,6 +352,7 @@ class BasketSplitJob(BaseModel):
     completed_at: datetime | None = None
     pack_snapshot: dict[str, PackSnapshot] | None = None
     rfq_id: UUID | None = None
+    request_settings: BasketRequestSettings | None = None
 
 
 class SupplierQuantityTier(StrictApiModel):
