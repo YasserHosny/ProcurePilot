@@ -146,6 +146,7 @@ describe('HistoryComponent', () => {
 
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
     translate.use('en');
 
     fixture = TestBed.createComponent(HistoryComponent);
@@ -304,6 +305,7 @@ describe('HistoryComponent', () => {
   it('the row link has the expected accessible name and navigates', async () => {
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
     translate.use('en');
     fixture.detectChanges();
     await fixture.whenStable();
@@ -327,6 +329,7 @@ describe('HistoryComponent', () => {
   it('count controls have labels', async () => {
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
     translate.use('en');
     fixture.detectChanges();
     await fixture.whenStable();
@@ -410,6 +413,7 @@ describe('HistoryComponent', () => {
   it('polite live region announces showing N RFQs', async () => {
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
     translate.use('en');
     fixture.detectChanges();
     await fixture.whenStable();
@@ -710,6 +714,7 @@ describe('HistoryComponent', () => {
   it('renders recipientsDraftHeader for draft RFQ and sentToSuppliers for sent RFQ in popover header', async () => {
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
     translate.use('en');
     fixture.detectChanges();
     await fixture.whenStable();
@@ -838,6 +843,40 @@ describe('HistoryComponent', () => {
         'responses',
         'actions',
       ]);
+    });
+  });
+
+  describe('accessible names contain visible text (axe label-content-name-mismatch)', () => {
+    const testCounts = [0, 1, 2, 3, 11];
+
+    it('ensures recipients and responses aria-labels contain raw count string and row-open label contains status in en', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.use('en');
+
+      for (const count of testCounts) {
+        expect(component.getRecipientsAriaLabel(count)).toContain(String(count));
+        expect(component.getResponsesAriaLabel(count)).toContain(String(count));
+      }
+
+      for (const rfq of mockRfqs) {
+        const expectedStatus = translate.instant(`rfq.history.status_${rfq.status}`);
+        expect(component.getRowAccessibleName(rfq)).toContain(expectedStatus);
+      }
+    });
+
+    it('ensures recipients and responses aria-labels contain raw count string and row-open label contains status in ar', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.use('ar');
+
+      for (const count of testCounts) {
+        expect(component.getRecipientsAriaLabel(count)).toContain(String(count));
+        expect(component.getResponsesAriaLabel(count)).toContain(String(count));
+      }
+
+      for (const rfq of mockRfqs) {
+        const expectedStatus = translate.instant(`rfq.history.status_${rfq.status}`);
+        expect(component.getRowAccessibleName(rfq)).toContain(expectedStatus);
+      }
     });
   });
 });

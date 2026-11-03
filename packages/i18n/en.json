@@ -4220,18 +4220,18 @@
       "openRfqAriaLabel": "Open RFQ, {{status}}, needed by {{date}}",
       "recipientsAriaLabelFallback": "{{count}} recipients — show list",
       "recipientsAriaLabel": {
-        "zero": "0 recipients — show list",
-        "one": "1 recipient — show list",
-        "two": "2 recipients — show list",
+        "zero": "{{count}} recipients — show list",
+        "one": "{{count}} recipient — show list",
+        "two": "{{count}} recipients — show list",
         "few": "{{count}} recipients — show list",
         "many": "{{count}} recipients — show list",
         "other": "{{count}} recipients — show list"
       },
       "responsesAriaLabelFallback": "{{count}} responses — compare",
       "responsesAriaLabel": {
-        "zero": "0 responses — compare",
-        "one": "1 response — compare",
-        "two": "2 responses — compare",
+        "zero": "{{count}} responses — compare",
+        "one": "{{count}} response — compare",
+        "two": "{{count}} responses — compare",
         "few": "{{count}} responses — compare",
         "many": "{{count}} responses — compare",
         "other": "{{count}} responses — compare"

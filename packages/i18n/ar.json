@@ -4220,18 +4220,18 @@
       "openRfqAriaLabel": "فتح طلب عرض الأسعار، {{status}}، مطلوب بحلول {{date}}",
       "recipientsAriaLabelFallback": "{{count}} من المستلمين — عرض القائمة",
       "recipientsAriaLabel": {
-        "zero": "0 مستلمين — عرض القائمة",
-        "one": "مستلم واحد — عرض القائمة",
-        "two": "مستلمان — عرض القائمة",
+        "zero": "{{count}} مستلمين — عرض القائمة",
+        "one": "{{count}} مستلم — عرض القائمة",
+        "two": "{{count}} مستلمان — عرض القائمة",
         "few": "{{count}} مستلمين — عرض القائمة",
         "many": "{{count}} مستلمًا — عرض القائمة",
         "other": "{{count}} مستلم — عرض القائمة"
       },
       "responsesAriaLabelFallback": "{{count}} من الردود — مقارنة",
       "responsesAriaLabel": {
-        "zero": "0 ردود — مقارنة",
-        "one": "رد واحد — مقارنة",
-        "two": "ردان — مقارنة",
+        "zero": "{{count}} ردود — مقارنة",
+        "one": "{{count}} رد — مقارنة",
+        "two": "{{count}} ردان — مقارنة",
         "few": "{{count}} ردود — مقارنة",
         "many": "{{count}} ردًا — مقارنة",
         "other": "{{count}} رد — مقارنة"

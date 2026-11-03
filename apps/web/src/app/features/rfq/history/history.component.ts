@@ -203,24 +203,24 @@ export class HistoryComponent implements OnInit {
     const locale = this.translate.getCurrentLang() || this.session.activeLocale?.() || this.translate.getFallbackLang() || 'en';
     const category = new Intl.PluralRules(locale).select(count);
     const key = `rfq.history.recipientsAriaLabel.${category}`;
-    const formatted = this.formatService.formatNumber(count);
-    const translated = this.translate.instant(key, { count: formatted });
+    const rawCount = String(count);
+    const translated = this.translate.instant(key, { count: rawCount });
     if (translated && translated !== key) {
       return translated;
     }
-    return this.translate.instant('rfq.history.recipientsAriaLabelFallback', { count: formatted });
+    return this.translate.instant('rfq.history.recipientsAriaLabelFallback', { count: rawCount });
   }
 
   getResponsesAriaLabel(count: number): string {
     const locale = this.translate.getCurrentLang() || this.session.activeLocale?.() || this.translate.getFallbackLang() || 'en';
     const category = new Intl.PluralRules(locale).select(count);
     const key = `rfq.history.responsesAriaLabel.${category}`;
-    const formatted = this.formatService.formatNumber(count);
-    const translated = this.translate.instant(key, { count: formatted });
+    const rawCount = String(count);
+    const translated = this.translate.instant(key, { count: rawCount });
     if (translated && translated !== key) {
       return translated;
     }
-    return this.translate.instant('rfq.history.responsesAriaLabelFallback', { count: formatted });
+    return this.translate.instant('rfq.history.responsesAriaLabelFallback', { count: rawCount });
   }
 
   loadRecipients(rfqId: string): void {
