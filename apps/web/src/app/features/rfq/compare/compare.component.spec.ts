@@ -1776,6 +1776,36 @@ describe('CompareComponent (RFQ)', () => {
     });
   });
 
+  describe('screen-reader states (P-159, PPS-203)', () => {
+    const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+
+    it('announces loading with a labelled spinner', () => {
+      component.isLoading.set(true);
+      fixture.detectChanges();
+
+      const loading = el().querySelector('.loading-state');
+      expect(loading?.getAttribute('role')).toBe('status');
+      expect(loading?.querySelector('mat-spinner')?.getAttribute('aria-label')).toBeTruthy();
+    });
+
+    it('announces a load error as an alert', () => {
+      component.isLoading.set(false);
+      component.errorMessage.set('Could not load');
+      fixture.detectChanges();
+
+      expect(el().querySelector('.error-state')?.getAttribute('role')).toBe('alert');
+    });
+
+    it('announces the empty state as a status', () => {
+      component.isLoading.set(false);
+      component.errorMessage.set(null);
+      component.responses.set([]);
+      fixture.detectChanges();
+
+      expect(el().querySelector('.empty-state')?.getAttribute('role')).toBe('status');
+    });
+  });
+
   describe('PPS-175: RFQ Compare Prepare Eligibility and Error Handling', () => {
     it('empty-lines reply is not eligible and shows "still being read" reason', () => {
       const translate = TestBed.inject(TranslateService);
