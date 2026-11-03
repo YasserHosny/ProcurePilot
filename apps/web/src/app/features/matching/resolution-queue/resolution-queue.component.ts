@@ -136,6 +136,16 @@ export class ResolutionQueueComponent implements OnInit {
       this.sortOrder() !== 'desc',
   );
 
+  readonly otherFiltersActive = computed<boolean>(
+    () =>
+      (this.statusFilter() !== 'open' && this.statusFilter() !== 'all') ||
+      this.priorityFilter() !== 'all' ||
+      this.reasonFilter() !== 'all' ||
+      this.searchQuery().trim().length > 0 ||
+      this.dateFrom() !== null ||
+      this.dateTo() !== null,
+  );
+
   readonly currentSortValue = computed<string | null>(() => {
     const val = `${this.sortBy()}/${this.sortOrder()}`;
     return ['created_at/desc', 'created_at/asc', 'priority/desc', 'priority/asc'].includes(val)
@@ -176,7 +186,6 @@ export class ResolutionQueueComponent implements OnInit {
         'alias_conflict',
         'auto_accepted',
         'corrected',
-        'human_decided',
       ].includes(reason)
     ) {
       this.reasonFilter.set(reason);
@@ -400,6 +409,12 @@ export class ResolutionQueueComponent implements OnInit {
   onReasonChange(reason: MatchTaskReason | 'all'): void {
     this.clearCorrectionNotices();
     this.reasonFilter.set(reason);
+    if (
+      (reason === 'auto_accepted' || reason === 'corrected') &&
+      (this.statusFilter() === 'open' || this.statusFilter() === 'in_progress')
+    ) {
+      this.statusFilter.set('all');
+    }
     this.syncQueryParams();
     this.loadTasks();
   }

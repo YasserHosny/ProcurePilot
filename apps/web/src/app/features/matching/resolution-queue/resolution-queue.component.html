@@ -126,7 +126,6 @@
           <mat-option value="alias_conflict">{{ 'matching.queue.reason.alias_conflict' | translate }}</mat-option>
           <mat-option value="auto_accepted">{{ 'matching.queue.reason.auto_accepted' | translate }}</mat-option>
           <mat-option value="corrected">{{ 'matching.queue.reason.corrected' | translate }}</mat-option>
-          <mat-option value="human_decided">{{ 'matching.queue.reason.human_decided' | translate }}</mat-option>
         </mat-select>
       </mat-form-field>
       <mat-form-field appearance="outline" class="filter-field date-field">
@@ -233,7 +232,7 @@
       <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
       <span>{{ 'common.loading' | translate }}</span>
     </div>
-  } @else if (!tasksLoadFailed() && tasks().length === 0 && quotationId()) {
+  } @else if (tasksLoadFailed() === false && tasks().length === 0 && quotationId() !== null && otherFiltersActive() === false) {
     <div class="empty-state" data-testid="quotation-all-matched">
       <mat-icon class="empty-icon" aria-hidden="true">done_all</mat-icon>
       <h2 class="empty-title">{{ 'matching.queue.allLinesMatchedTitle' | translate }}</h2>
@@ -248,7 +247,7 @@
         </button>
       </div>
     </div>
-  } @else if (!tasksLoadFailed() && tasks().length === 0 && hasActiveFilters()) {
+  } @else if (tasksLoadFailed() === false && tasks().length === 0 && hasActiveFilters() === true) {
     <div class="empty-state">
       <mat-icon class="empty-icon" aria-hidden="true">filter_alt_off</mat-icon>
       <h2 class="empty-title">{{ 'matching.queue.noFilterResults' | translate }}</h2>
@@ -257,13 +256,13 @@
         <span>{{ 'matching.queue.clearFilters' | translate }}</span>
       </button>
     </div>
-  } @else if (!tasksLoadFailed() && tasks().length === 0) {
+  } @else if (tasksLoadFailed() === false && tasks().length === 0) {
     <div class="empty-state">
       <mat-icon class="empty-icon" aria-hidden="true">done_all</mat-icon>
       <h2 class="empty-title">{{ 'matching.queue.emptyTitle' | translate }}</h2>
       <p class="empty-message">{{ 'matching.queue.emptyMessage' | translate }}</p>
     </div>
-  } @else if (!tasksLoadFailed() && tasks().length > 0) {
+  } @else if (tasksLoadFailed() === false && tasks().length > 0) {
     <section class="quotation-groups" [attr.aria-label]="'matching.queue.groupsLabel' | translate">
       @for (group of groups(); track group.quotation.id) {
         <mat-card class="quotation-group">
