@@ -153,6 +153,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-153 | PPS-197 | P-154 | PPS-198 | P-155 | PPS-199 |
 | P-156 | PPS-200 | P-157 | PPS-201 | P-158 | PPS-202 |
 | P-159 | PPS-203 | | | | |
+| P-180 | PPS-204 | P-181 | PPS-205 | | |
 | P-182 | PPS-206 | P-183 | PPS-207 | P-184 | PPS-208 |
 | P-185 | PPS-209 | P-186 | PPS-210 | P-187 | PPS-211 |
 | P-188 | PPS-212 | | | | |
@@ -397,8 +398,8 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-179 | — | Phone approvals: empty state on load failure, no refresh or paging, one-tap approve, reload on every dependency change, errors not announced. Medium; needs a device pass | — | — | To Do (PPS-173) |
 | [ ] P-180 | — | PO receipts: a blank or zero receipt moves the order to «Partially received» (reproduced live on PO-000014); receipts and confirmations accepted on draft and cancelled orders (B1–B3). High | — | — | To Do (PPS-204) |
 | [ ] P-181 | — | PO lifecycle: submit has no confirm or undo, cancel is draft-only in the UI, `closed` can never be set, a failed save replaces the whole page, timeline misses submit/cancel (B4–B8). High, owner scope call first | — | — | To Do (PPS-205) |
-| [~] P-182 | — | PO list: no search, filter or sort, offset cursor duplicates rows, one query per row, failed Load more replaces the list, approved-request menu shows only date and total (B9–B13). Medium-High | — | — | Mostly done (PPS-206), #419 merged; keyset cursor and supplier/date controls open |
-| [~] P-183 | — | PO create from a request: raw UUID banner, silent unlinked fallback, header tax and line totals unchecked, replay and re-link failures, label clash (B14–B20). Medium | — | — | Mostly done (PPS-207), #419 merged; cosmetic items open |
+| [ ] P-182 | — | PO list: no search, filter or sort, offset cursor duplicates rows, one query per row, failed Load more replaces the list, approved-request menu shows only date and total (B9–B13). Medium-High | — | — | Mostly done (PPS-206), #419 merged; keyset cursor and supplier/date controls open |
+| [ ] P-183 | — | PO create from a request: raw UUID banner, silent unlinked fallback, header tax and line totals unchecked, replay and re-link failures, label clash (B14–B20). Medium | — | — | Mostly done (PPS-207), #419 merged; cosmetic items open |
 | [ ] P-184 | — | Basket-split optimiser: archived quotations still compete, baseline omits delivery fees, urgency ignored, results expire on creation, converted RFQ still advertises a saving (B21–B26). Medium-High | — | — | To Do (PPS-208) |
 | [ ] P-185 | — | Basket split web: unknown job shows the form with a footer error, one poll error stalls the spinner, job-navigation races, standalone rerun after refresh, no next step or history, 100-row pickers (B27–B34). Medium | — | — | To Do (PPS-209) |
 | [ ] P-186 | — | Database grants on basket-split and purchase-order tables are wider than the API's role and lifecycle checks (B35–B36). Medium-High; owner decision, then migration; neutral commit text, repo is public | — | — | To Do (PPS-210) |
