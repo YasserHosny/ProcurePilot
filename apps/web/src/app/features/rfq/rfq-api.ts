@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams, HttpErrorResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 import type { QuotationStatus, BasketSplitJob } from '../../core/api/models';
@@ -9,12 +9,13 @@ export interface Rfq {
   id: string;
   tenant_id: string;
   created_by_membership_id: string;
-  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted';
+  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted' | 'cancelled';
   needed_by_date: string;
   tenant_terms: string | null;
   idempotency_key: string;
   created_at: string;
   sent_at?: string | null;
+  cancelled_at?: string | null;
 }
 
 export interface RfqLine {
@@ -71,6 +72,8 @@ export interface RfqSendResponse {
 }
 
 export interface RfqResponseLineComparison {
+  product_name?: string | null;
+  product_variant?: string | null;
   workspace_product_id: string | null;
   original_text: string;
   quoted_quantity: string;
@@ -80,12 +83,15 @@ export interface RfqResponseLineComparison {
 }
 
 export interface RfqLandedCost {
+  product_name?: string | null;
+  product_variant?: string | null;
   workspace_product_id: string;
   total_amount: string;
   total_currency: string;
 }
 
 export interface RfqResponseComparison {
+  supplier_name?: string | null;
   id: string;
   rfq_id: string;
   supplier_id: string;
@@ -141,10 +147,11 @@ export interface RfqResponseComparisonList {
 export interface RfqSummary {
   id: string;
   created_by_membership_id: string;
-  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted';
+  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted' | 'cancelled';
   needed_by_date: string;
   created_at: string;
   sent_at: string | null;
+  cancelled_at?: string | null;
   recipient_count: number;
   response_count: number;
   converted_purchase_request_id: string | null;
@@ -175,9 +182,16 @@ export class RfqApi {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiBaseUrl}/rfq`;
 
-  createRfq(payload: RfqCreatePayload): Observable<RfqCreateResponse> {
+  cancelRfq(rfqId: string, idempotencyKey?: string): Observable<Rfq> {
     const headers = new HttpHeaders({
-      'Idempotency-Key': crypto.randomUUID(),
+      'Idempotency-Key': idempotencyKey ?? crypto.randomUUID(),
+    });
+    return this.http.post<Rfq>(`${this.baseUrl}/${rfqId}/cancel`, null, { headers });
+  }
+
+  createRfq(payload: RfqCreatePayload, idempotencyKey?: string): Observable<RfqCreateResponse> {
+    const headers = new HttpHeaders({
+      'Idempotency-Key': idempotencyKey ?? crypto.randomUUID(),
     });
     return this.http.post<RfqCreateResponse>(this.baseUrl, payload, { headers });
   }
@@ -186,16 +200,16 @@ export class RfqApi {
     return this.http.get<RfqDetail>(`${this.baseUrl}/${rfqId}`);
   }
 
-  updateRfq(rfqId: string, payload: RfqCreatePayload): Observable<RfqCreateResponse> {
+  updateRfq(rfqId: string, payload: RfqCreatePayload, idempotencyKey?: string): Observable<RfqCreateResponse> {
     const headers = new HttpHeaders({
-      'Idempotency-Key': crypto.randomUUID(),
+      'Idempotency-Key': idempotencyKey ?? crypto.randomUUID(),
     });
     return this.http.put<RfqCreateResponse>(`${this.baseUrl}/${rfqId}`, payload, { headers });
   }
 
-  sendRfq(rfqId: string): Observable<RfqSendResponse> {
+  sendRfq(rfqId: string, idempotencyKey?: string): Observable<RfqSendResponse> {
     const headers = new HttpHeaders({
-      'Idempotency-Key': crypto.randomUUID(),
+      'Idempotency-Key': idempotencyKey ?? crypto.randomUUID(),
     });
     return this.http.post<RfqSendResponse>(`${this.baseUrl}/${rfqId}/send`, {}, { headers });
   }
@@ -204,8 +218,8 @@ export class RfqApi {
     return this.http.get<RfqResponseComparisonList>(`${this.baseUrl}/${rfqId}/responses`);
   }
 
-  prepareRequest(rfqId: string, payload: PrepareRequestPayload): Observable<PrepareRequestResponse> {
-    const headers = new HttpHeaders({ 'Idempotency-Key': crypto.randomUUID() });
+  prepareRequest(rfqId: string, payload: PrepareRequestPayload, idempotencyKey?: string): Observable<PrepareRequestResponse> {
+    const headers = new HttpHeaders({ 'Idempotency-Key': idempotencyKey ?? crypto.randomUUID() });
     return this.http.post<PrepareRequestResponse>(
       `${this.baseUrl}/${rfqId}/prepare-request`, payload, { headers },
     );
@@ -237,5 +251,29 @@ export class RfqApi {
 
   updateGuardrail(id: string, payload: Partial<RfqGuardrailPayload>): Observable<RfqGuardrail> {
     return this.http.patch<RfqGuardrail>(`${this.baseUrl}/guardrails/${id}`, payload);
+  }
+}
+
+/** Component-local keys survive ambiguous failures until the logical action resolves. */
+export class RfqActionKeys {
+  private readonly keys = new Map<string, string>();
+
+  get(action: string): string {
+    let key = this.keys.get(action);
+    if (!key) {
+      key = crypto.randomUUID();
+      this.keys.set(action, key);
+    }
+    return key;
+  }
+
+  clear(action: string): void { this.keys.delete(action); }
+
+  onError(action: string, error: unknown): void {
+    // Timeouts and rate limits are retryable, like network and server failures.
+    if (error instanceof HttpErrorResponse && error.status >= 400 && error.status < 500
+      && error.status !== 408 && error.status !== 429) {
+      this.clear(action);
+    }
   }
 }

@@ -626,6 +626,96 @@ describe('ResolutionQueueComponent', () => {
     });
   });
 
+  describe('sorting, count and reasons (P-153, PPS-197)', () => {
+    const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+    const openSelect = (testId: string): string[] => {
+      const trigger = el().querySelector(`[data-testid="${testId}"] .mat-mdc-select-trigger`) as HTMLElement;
+      expect(trigger).withContext(testId).toBeTruthy();
+      trigger.click();
+      fixture.detectChanges();
+      return Array.from(document.querySelectorAll('.mat-mdc-option')).map((o) => o.textContent!.trim());
+    };
+    const pick = (label: string): void => {
+      const option = Array.from(document.querySelectorAll('.mat-mdc-option')).find(
+        (o) => o.textContent!.trim() === label,
+      ) as HTMLElement;
+      expect(option).withContext(label).toBeTruthy();
+      option.click();
+      fixture.detectChanges();
+    };
+
+    it('lets the buyer sort the queue and reloads with the chosen order', () => {
+      const labels = openSelect('queue-sort');
+      expect(labels).toContain(enCatalog.matching.queue.sort.priorityDesc);
+      expect(labels).toContain(enCatalog.matching.queue.sort.createdAsc);
+
+      apiService.getMatchTasks.calls.reset();
+      pick(enCatalog.matching.queue.sort.priorityDesc);
+
+      expect(apiService.getMatchTasks).toHaveBeenCalledWith(
+        jasmine.objectContaining({ sort_by: 'priority', sort_order: 'desc' }),
+      );
+    });
+
+    it('shows how many lines and quotations are listed, and that more can be loaded', () => {
+      const count = el().querySelector('[data-testid="queue-result-summary"]') as HTMLElement;
+      expect(count.classList.contains('visually-hidden')).withContext('visible to everyone').toBeFalse();
+      expect(count.textContent).toContain('Lines shown: 2');
+      expect(count.textContent).toContain(enCatalog.matching.queue.moreAvailable);
+
+      component.nextCursor.set(null);
+      fixture.detectChanges();
+      expect(count.textContent).not.toContain(enCatalog.matching.queue.moreAvailable);
+    });
+
+    it('offers the routing reasons the queue can return, and not one it never returns', () => {
+      const labels = openSelect('queue-reason-filter');
+      expect(labels).toContain(enCatalog.matching.queue.reason.auto_accepted);
+      expect(labels).toContain(enCatalog.matching.queue.reason.corrected);
+      // No queue query yields «human_decided» rows, so offering it would always show an empty list.
+      expect(labels).not.toContain(enCatalog.matching.queue.reason.human_decided);
+    });
+
+    it('widens the status to All when a reason that only resolved lines have is chosen under Open', () => {
+      expect(component.statusFilter()).toBe('open');
+      apiService.getMatchTasks.calls.reset();
+
+      component.onReasonChange('corrected');
+
+      expect(component.statusFilter()).toBe('all');
+      expect(apiService.getMatchTasks).toHaveBeenCalledWith(
+        jasmine.objectContaining({ status: 'all', reason: 'corrected' }),
+      );
+    });
+
+    it('leaves the status alone for reasons that open lines have', () => {
+      component.onReasonChange('low_confidence');
+      expect(component.statusFilter()).toBe('open');
+    });
+
+    it('does not say every line of the quote is matched when another filter is hiding lines', () => {
+      component.quotationId.set('q-101');
+      component.reasonFilter.set('low_confidence');
+      component.tasks.set([]);
+      fixture.detectChanges();
+
+      expect(el().querySelector('[data-testid="quotation-all-matched"]')).toBeNull();
+      expect(el().querySelector('.clear-filters-btn')).toBeTruthy();
+    });
+
+    it('treats a non-default sort as an active filter and Clear restores the default order', () => {
+      component.sortBy.set('priority');
+      component.sortOrder.set('asc');
+      expect(component.hasActiveFilters()).toBeTrue();
+
+      component.clearFilters();
+
+      expect(component.sortBy()).toBe('created_at');
+      expect(component.sortOrder()).toBe('desc');
+      expect(component.hasActiveFilters()).toBeFalse();
+    });
+  });
+
   describe('RFQ-aware matching in queue (spec 023 US1)', () => {
     it('shows "Correct match" button for auto-accepted line when isWriter, and hides it for non-writer', () => {
       const autoTask: MatchTask = {

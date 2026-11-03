@@ -60,6 +60,32 @@
     </div>
   }
 
+  @if (!currentJob() && !jobNotFound() && history().length > 0) {
+    <mat-card class="history-card" data-testid="split-history">
+      <h2 class="section-title">{{ 'basketSplit.history.title' | translate }}</h2>
+      <ul class="history-list">
+        @for (job of history(); track job.id) {
+          <li>
+            <a [routerLink]="['/offers/basket-split', job.id]" class="history-row" data-testid="split-history-row">
+              <span class="history-date">{{ job.created_at | formatDate }}</span>
+              <span class="history-suppliers" dir="auto">{{ historySuppliers(job) }}</span>
+              <span class="history-items">{{ 'basketSplit.history.items' | translate: { count: job.item_count } }}</span>
+              <span class="history-status">{{ ('basketSplit.history.status.' + job.status) | translate }}</span>
+              @if (job.total_landed_cost; as total) {
+                <strong class="history-total">{{ total | formatMoney }}</strong>
+              }
+            </a>
+          </li>
+        }
+      </ul>
+      @if (hasMoreHistory()) {
+        <button mat-stroked-button type="button" (click)="loadMoreHistory()" data-testid="load-more-history">
+          {{ 'basketSplit.history.loadMore' | translate }}
+        </button>
+      }
+    </mat-card>
+  }
+
   <!-- Form View (When No Active Job / Result Displayed) -->
   @if (!currentJob() && !isLoading() && !jobNotFound()) {
     <mat-card class="form-card">

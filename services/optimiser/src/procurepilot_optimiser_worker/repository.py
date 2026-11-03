@@ -387,8 +387,16 @@ def _advanced_request_from_snapshot(
         price_quotation_ids=_price_quotation_ids(snapshot),
         hard_constraints=hard_constraints,
         soft_weights=OptimisationSoftWeights.model_validate(snapshot.get("soft_weights") or {}),
+        urgency=_urgency(snapshot),
         rule_version=str(snapshot["rule_version"]),
     )
+
+
+def _urgency(snapshot: dict[str, object]) -> str:
+    raw = snapshot.get("urgency")
+    if raw is None and isinstance(snapshot.get("hard_constraints"), dict):
+        raw = snapshot["hard_constraints"].get("urgency")  # type: ignore[union-attr]
+    return "urgent" if raw == "urgent" else "normal"
 
 
 def _hard_constraints(snapshot: dict[str, object]) -> OptimisationHardConstraints:

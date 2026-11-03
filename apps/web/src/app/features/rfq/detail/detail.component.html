@@ -44,6 +44,12 @@
         <h1 class="page-title">{{ 'rfq.detail.title' | translate }}</h1>
         <p class="page-subtitle">{{ 'rfq.detail.subtitle' | translate }}</p>
       </div>
+      @if (canCancel()) {
+        <button mat-stroked-button class="pp-danger" type="button"
+          [disabled]="cancelling()" (click)="onCancelRfq()" data-testid="rfq-detail-cancel-button">
+          {{ 'rfq.cancel.confirm' | translate }}
+        </button>
+      }
     </header>
 
     <!-- Tabs -->
@@ -142,6 +148,7 @@
                       mat-flat-button
                       color="primary"
                       type="button"
+                      [disabled]="retrying()"
                       (click)="onSendDraft()"
                       data-testid="rfq-detail-send-button"
                     >
@@ -223,6 +230,12 @@
                   }
                 </dd>
               </div>
+              @if (detail.rfq.cancelled_at) {
+                <div class="detail-field" data-testid="rfq-detail-cancelled-at">
+                  <dt>{{ 'rfq.detail.cancelledAtLabel' | translate }}</dt>
+                  <dd>{{ formatDate(detail.rfq.cancelled_at) }} · {{ formatTime(detail.rfq.cancelled_at) }}</dd>
+                </div>
+              }
             </dl>
           </mat-card>
         </div>

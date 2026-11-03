@@ -9,10 +9,12 @@ import {
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { environment } from '../../../../environments/environment';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { LandingMailMenuComponent } from '../landing-mail-menu/landing-mail-menu.component';
 
 export interface FaqItem {
   readonly id: string;
@@ -30,7 +32,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
 @Component({
   selector: 'app-landing-pilot',
   standalone: true,
-  imports: [MatButtonModule, MatIconModule, TranslatePipe],
+  imports: [LandingMailMenuComponent, MatButtonModule, MatIconModule, MatMenuModule, TranslatePipe],
   templateUrl: './landing-pilot.component.html',
   styleUrl: './landing-pilot.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -44,21 +46,6 @@ export class LandingPilotComponent implements OnDestroy {
   readonly faqItems = FAQ_ITEMS;
   readonly emailCopied = model<boolean>(false);
   private copyTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  readonly mailtoLink = computed(() => {
-    this.i18n.currentLocale();
-    const subject = this.translate.instant('landing.pilot.emailSubject');
-    const body = this.translate.instant('landing.pilot.emailBody');
-    const queryParts: string[] = [];
-    if (subject) {
-      queryParts.push(`subject=${encodeURIComponent(subject)}`);
-    }
-    if (body) {
-      queryParts.push(`body=${encodeURIComponent(body)}`);
-    }
-    const query = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
-    return `mailto:${this.salesEmail}${query}`;
-  });
 
   readonly whatsappLink = computed(() => {
     this.i18n.currentLocale();

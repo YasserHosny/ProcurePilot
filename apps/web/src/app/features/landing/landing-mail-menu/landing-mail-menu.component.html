@@ -1,0 +1,11 @@
+<mat-menu>
+  <a mat-menu-item [href]="gmailLink()" target="_blank" rel="noopener noreferrer">
+    {{ 'landing.pilot.mailGmail' | translate }}
+  </a>
+  <a mat-menu-item [href]="outlookLink()" target="_blank" rel="noopener noreferrer">
+    {{ 'landing.pilot.mailOutlook' | translate }}
+  </a>
+  <a mat-menu-item [href]="mailtoLink()">
+    {{ 'landing.pilot.mailApp' | translate }}
+  </a>
+</mat-menu>

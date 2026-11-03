@@ -62,6 +62,8 @@ interface LineFormGroup {
 }
 
 interface SavedLineInfo {
+  pack_base_quantity: string | null;
+  base_unit: string | null;
   id: string;
   workspace_product_id: string;
   quantity: string;
@@ -176,6 +178,8 @@ export class RequestFormComponent implements OnInit {
   });
 
   private submitIdempotencyKey: string | null = null;
+  private createSubmitIdempotencyKey: string | null = null;
+  private createSubmitSubmitKey: string | null = null;
   private withdrawIdempotencyKey: string | null = null;
   private currentRequestId: string | null | undefined = undefined;
   private allocationsSub?: Subscription;
@@ -231,6 +235,8 @@ export class RequestFormComponent implements OnInit {
     this.allocationsFailed.set(false);
     this.errorMessage.set(null);
     this.submitIdempotencyKey = null;
+    this.createSubmitIdempotencyKey = null;
+    this.createSubmitSubmitKey = null;
     this.withdrawIdempotencyKey = null;
     this.formChangeSignal.update((v) => v + 1);
   }
@@ -415,7 +421,106 @@ export class RequestFormComponent implements OnInit {
     this.formChangeSignal.update((v) => v + 1);
   }
 
+  getPackHint(group: FormGroup<LineFormGroup>): { size: string; unit: string; total: string | null } | null {
+    const product = this.products().find(p => p.id === group.controls.workspace_product_id.value);
+    const meta = this.savedLineMeta.get(group);
+    const readOnly = this.isReadOnly() || group.disabled;
+    const snapshot = readOnly ? meta?.pack_base_quantity : null;
+    const rawSize = snapshot ?? product?.pack?.base_quantity
+      ?? (product?.pack ? (Number(product.pack.unit_size) * product.pack.pack_count).toFixed(6) : null);
+    const unit = product?.base_unit || meta?.base_unit;
+    if (rawSize == null || !unit) {
+      return null;
+    }
+    const size = Number(rawSize);
+    if (!Number.isFinite(size) || size <= 0) {
+      return null;
+    }
+    // Disabled controls may contain localized display values; calculate from the saved decimal instead.
+    const rawQuantity = readOnly
+      ? meta?.quantity ?? group.controls.quantity.value
+      : group.controls.quantity.value;
+    const quantity = Number(rawQuantity);
+    const total = quantity * size;
+    const showTotal = (group.disabled || group.controls.quantity.valid)
+      && Number.isFinite(quantity) && quantity > 0 && Number.isFinite(total);
+    return {
+      size: this.formatService.formatExactQuantity(trimDecimal(rawSize)),
+      unit,
+      total: showTotal ? this.formatService.formatExactQuantity(trimDecimal(total.toFixed(6))) : null,
+    };
+  }
+
+  saveAndSubmit(): void {
+    if (this.isSaving() || this.isSubmitting() || this.isReadOnly()) {
+      return;
+    }
+    // Only a draft created by this action can be retried here; existing drafts keep their Submit flow.
+    if (this.isEditMode() && !this.createSubmitIdempotencyKey) {
+      return;
+    }
+    if (this.form.invalid || this.lines.length === 0) {
+      this.form.markAllAsTouched();
+      this.errorMessage.set(this.getValidationErrorMessage());
+      this.focusErrorBanner();
+      return;
+    }
+
+    this.createSubmitIdempotencyKey ??= crypto.randomUUID();
+    this.createSubmitSubmitKey ??= crypto.randomUUID();
+    this.isSaving.set(true);
+    this.errorMessage.set(null);
+    let created = this.existingRequest();
+    const draft$ = created ? of(created)
+      : this.requestsApi.createRequest(this.buildRequestPayload(), this.createSubmitIdempotencyKey);
+    draft$.pipe(
+      switchMap(draft => {
+        created = draft;
+        const payload = this.buildRequestPayload();
+        const matches = draft.branch_id === payload.branch_id
+          && (draft.cost_centre_id || null) === payload.cost_centre_id
+          && draft.required_by_date === payload.required_by_date
+          && draft.lines.length === payload.lines.length
+          && draft.lines.every((line, i) => {
+            const current = payload.lines[i];
+            return line.workspace_product_id === current.workspace_product_id
+              && Number(line.quantity) === Number(current.quantity)
+              && (line.note || null) === current.note;
+          });
+        return matches ? of(draft) : this.requestsApi.updateRequest(draft.id, payload);
+      }),
+      switchMap(draft => {
+        created = draft;
+        this.isSubmitting.set(true);
+        return this.requestsApi.submitRequest(draft.id, this.createSubmitSubmitKey!);
+      }),
+      finalize(() => {
+        this.isSaving.set(false);
+        this.isSubmitting.set(false);
+      }),
+    ).subscribe({
+      next: submitted => {
+        this.adoptSavedRequest(submitted);
+        this.form.disable();
+        this.snackBar.open(this.translate.instant(`${I18N}.submitSuccess`), undefined, { duration: 3500 });
+        this.router.navigate(['/requests', submitted.id]);
+      },
+      error: (err: unknown) => {
+        if (created) {
+          this.adoptSavedRequest(created);
+          this.snackBar.open(this.translate.instant(`${I18N}.form.draftSavedSubmitFailed`), undefined, { duration: 3500 });
+          this.router.navigate(['/requests', created.id]);
+        } else {
+          this.handleError(err);
+        }
+      },
+    });
+  }
+
   saveDraft(): void {
+    if (this.isSaving() || this.isSubmitting()) {
+      return;
+    }
     const existing = this.existingRequest();
     if (existing?.request_group) {
       return;
@@ -440,26 +545,7 @@ export class RequestFormComponent implements OnInit {
     obs.subscribe({
       next: (saved) => {
         this.isSaving.set(false);
-        this.existingRequest.set(saved);
-        this.isEditMode.set(true);
-        this.form.markAsPristine();
-        this.currentRequestId = saved.id;
-        this.currentDuplicateFrom = null;
-        this.duplicateSourceStatus.set(null);
-        this.savedLineMeta.clear();
-        for (let i = 0; i < this.lines.length; i++) {
-          const group = this.lines.at(i);
-          const savedLine = saved.lines[i];
-          if (group && savedLine) {
-            this.savedLineMeta.set(group, {
-              id: savedLine.id,
-              workspace_product_id: savedLine.workspace_product_id,
-              quantity: savedLine.quantity,
-              estimated_unit_price: savedLine.estimated_unit_price ?? null,
-            });
-          }
-        }
-        this.formChangeSignal.update((v) => v + 1);
+        this.adoptSavedRequest(saved);
         this.snackBar.open(this.translate.instant(`${I18N}.createSuccess`), undefined, {
           duration: 3500,
         });
@@ -470,6 +556,31 @@ export class RequestFormComponent implements OnInit {
         this.handleError(err);
       },
     });
+  }
+
+  private adoptSavedRequest(saved: PurchaseRequest): void {
+    this.existingRequest.set(saved);
+    this.isEditMode.set(true);
+    this.form.markAsPristine();
+    this.currentRequestId = saved.id;
+    this.currentDuplicateFrom = null;
+    this.duplicateSourceStatus.set(null);
+    this.savedLineMeta.clear();
+    for (let i = 0; i < this.lines.length; i++) {
+      const group = this.lines.at(i);
+      const savedLine = saved.lines[i];
+      if (group && savedLine) {
+        this.savedLineMeta.set(group, {
+          pack_base_quantity: savedLine.pack_base_quantity ?? null,
+          base_unit: savedLine.base_unit ?? null,
+          id: savedLine.id,
+          workspace_product_id: savedLine.workspace_product_id,
+          quantity: savedLine.quantity,
+          estimated_unit_price: savedLine.estimated_unit_price ?? null,
+        });
+      }
+    }
+    this.formChangeSignal.update((v) => v + 1);
   }
 
   submitRequest(): void {
@@ -805,6 +916,8 @@ export class RequestFormComponent implements OnInit {
             note: new FormControl<string>(line.note ?? '', { nonNullable: true }),
           });
           this.savedLineMeta.set(group, {
+            pack_base_quantity: line.pack_base_quantity ?? null,
+            base_unit: line.base_unit ?? null,
             id: line.id,
             workspace_product_id: line.workspace_product_id,
             quantity: line.quantity,

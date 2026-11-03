@@ -1287,6 +1287,14 @@
   },
   "matching": {
     "queue": {
+      "moreAvailable": "more available",
+      "sort": {
+        "label": "Sort by",
+        "createdDesc": "Newest first",
+        "createdAsc": "Oldest first",
+        "priorityDesc": "Priority: high first",
+        "priorityAsc": "Priority: low first"
+      },
       "resultSummary": "Lines shown: {{lines}} · Quotations: {{quotations}}",
       "quotationIdLabel": "Quotation {{id}}",
       "title": "Match Resolution Queue",
@@ -1876,7 +1884,18 @@
       "successSplit": "{{count}} purchase requests submitted for approval as one split."
     },
     "rerunNotice": "This form was filled from an earlier split. Check the risk tolerance, urgency, excluded suppliers and weights, then run it again.",
-    "rerunPackUnknown": "The pack sizes of this split's products are not loaded yet. Wait a moment and try Re-run again."
+    "rerunPackUnknown": "The pack sizes of this split's products are not loaded yet. Wait a moment and try Re-run again.",
+    "history": {
+      "title": "Recent splits",
+      "items": "{{count}} items",
+      "loadMore": "Show older splits",
+      "status": {
+        "queued": "Queued",
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed"
+      }
+    }
   },
   "alerts": {
     "title": "Actionable Alerts Inbox",
@@ -2393,6 +2412,11 @@
       "productLabel": "Product",
       "productRequired": "Select a product.",
       "quantityLabel": "Quantity",
+      "packsSuffix": "packs",
+      "packHint": "1 pack = {{size}} {{unit}}",
+      "packTotal": "Total {{total}} {{unit}}",
+      "saveAndSubmitButton": "Save and submit",
+      "draftSavedSubmitFailed": "Draft saved, but it could not be submitted. Review it and submit again.",
       "quantityRequired": "Quantity must be greater than zero.",
       "quantityPattern": "Quantity must be a number greater than zero.",
       "noteLabel": "Note (optional)",
@@ -3860,7 +3884,10 @@
       "dateFormatHintDayFirst": "dd/mm/yyyy",
       "dateFormatHintMonthFirst": "mm/dd/yyyy",
       "receivedQuantityFor": "{{product}} · Received quantity ({{unit}}, ordered {{ordered}})",
-      "confirmedQuantityFor": "{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})"
+      "confirmedQuantityFor": "{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})",
+      "progressLabel": "{{percent}}% received",
+      "sourceRfq": "RFQ",
+      "sourceQuotation": "Quotation"
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",
@@ -4171,6 +4198,16 @@
     }
   },
   "rfq": {
+    "cancel": {
+      "title": "Cancel this RFQ?",
+      "message": "Suppliers are not notified. Replies already received stay available.",
+      "confirm": "Cancel RFQ",
+      "keep": "Keep RFQ",
+      "success": "RFQ cancelled",
+      "notCreator": "Only the person who created this RFQ, or an owner, can cancel it",
+      "notCancellable": "This RFQ can no longer be cancelled",
+      "error": "Could not cancel this RFQ. Please try again."
+    },
     "pageTitle": {
       "history": "RFQ History",
       "create": "Create RFQ",
@@ -4262,6 +4299,9 @@
       }
     },
     "compare": {
+      "rfqCancelled": "This RFQ was cancelled — requests can no longer be prepared from it",
+      "unknownSupplier": "Unknown supplier",
+      "unknownProduct": "Unknown product",
       "title": "Compare responses",
       "subtitle": "Compare supplier responses and prepare a purchase request.",
       "supplier": "Supplier",
@@ -4328,6 +4368,7 @@
       "rfqDetailLoadError": "Failed to load RFQ details."
     },
     "history": {
+      "status_cancelled": "Cancelled",
       "title": "RFQ History",
       "subtitle": "Track your requests for quotation.",
       "createRfq": "Create RFQ",
@@ -4409,6 +4450,7 @@
       "draftActionsUnavailable": "Draft actions are currently unavailable because workspace members could not be loaded."
     },
     "detail": {
+      "cancelledAtLabel": "Cancelled",
       "title": "RFQ Details",
       "subtitle": "What was asked, who it went to and what came back.",
       "responsesReceivedTitle": "{{count}} responses received",
@@ -4505,6 +4547,8 @@
       "notSendableError": "This RFQ cannot be sent in its current state."
     },
     "guardrails": {
+      "costCentresError": "Could not load cost centres.",
+      "retryCostCentres": "Retry",
       "title": "Guardrail settings",
       "subtitle": "Define when a qualifying response may prepare a draft request.",
       "humanApprovalNote": "Guardrails only prepare DRAFT requests. A human must still approve every purchase.",
@@ -4703,6 +4747,9 @@
       "copied": "Copied",
       "emailSubject": "ProcurePilot pilot access request",
       "emailBody": "Business name:\nNumber of branches:\nHow quotations arrive:",
+      "mailGmail": "Gmail",
+      "mailOutlook": "Outlook",
+      "mailApp": "My email app",
       "whatsappCta": "Message us on WhatsApp",
       "whatsappMessage": "Hi, I'd like to know more about the ProcurePilot pilot.",
       "q1": "How do we join?",

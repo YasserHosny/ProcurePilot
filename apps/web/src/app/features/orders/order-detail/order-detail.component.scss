@@ -43,3 +43,9 @@
   .back-link, .document-actions, .actions-card, .evidence-form { display: none !important; }
   .order-detail-container { padding: 0; }
 }
+
+.source-links { display: flex; gap: 1rem; margin: 0.25rem 0 0; }
+.receipt-progress { position: relative; block-size: 1.5rem; border-radius: 999px; background: var(--pp-surface-variant, #e8ecef); overflow: hidden; }
+.receipt-progress-fill { position: absolute; inset-block: 0; inset-inline-start: 0; background: var(--pp-success-container); }
+.receipt-progress-text { position: relative; display: block; padding-inline: 0.75rem; font-size: 0.8rem; line-height: 1.5rem; color: var(--pp-text-strong); }
+@media print { .receipt-progress { display: none; } }

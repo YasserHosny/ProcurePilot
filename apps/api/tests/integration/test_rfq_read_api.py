@@ -215,3 +215,105 @@ def test_detail_counts_responses_per_recipient_with_tenant_isolation(
         recipient_id = replying_recipient_id if response_count else awaiting_recipient_id
         assert recipients[str(recipient_id)]["response_count"] == response_count
         assert client.get(f"/api/v1/rfq/{stranger_rfq_id}").status_code == 404
+
+
+def test_responses_carry_archived_display_names_without_cross_tenant_leaks(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from integration.test_rfq_responses_landed_cost import (
+        _insert_landed_cost,
+        _seed_two_product_rfq,
+    )
+
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        owner = make_workspace(cur, "rfq-names-owner")
+        ids = _seed_two_product_rfq(
+            cur, tenant_id=owner.tenant_id, membership_id=owner.membership_id
+        )
+        cur.execute(
+            "update supplier set status = 'archived' where id = %s",
+            (ids["supp1_id"],),
+        )
+        cur.execute(
+            "update workspace_product set status = 'archived' where id = %s",
+            (ids["prod_a"],),
+        )
+        cur.execute(
+            "update canonical_product set variant = 'Large' where id = "
+            "(select canonical_product_id from workspace_product where id = %s)",
+            (ids["prod_a"],),
+        )
+        cur.execute(
+            "insert into quotation_line (tenant_id,quotation_id,line_number,original_text,"
+            "quantity,unit_price_amount,unit_price_currency) "
+            "values (%s,%s,3,'Unmatched',1,1,'GBP')",
+            (owner.tenant_id, ids["quot1_id"]),
+        )
+        _insert_landed_cost(
+            cur,
+            tenant_id=owner.tenant_id,
+            quotation_line_id=ids["ql1_a"],
+            match_decision_id=ids["md1_a"],
+            quantity=Decimal("1"),
+            normalised_base_quantity=Decimal("5"),
+            unit_price_amount=Decimal("10"),
+            total_amount=Decimal("10"),
+        )
+        stranger = make_workspace(cur, "rfq-names-stranger")
+        foreign_product = make_workspace_product(cur, stranger, name="Foreign secret product")
+        foreign_rfq_id, _ = _rfq_with_reply(cur, stranger, [(foreign_product, "1")])
+        reset_role(cur)
+
+    member = CurrentMember(
+        user_id=owner.user_id,
+        tenant_id=owner.tenant_id,
+        membership_id=owner.membership_id,
+        email="rfq-names@example.test",
+        role=MemberRole.owner,
+    )
+
+    @contextmanager
+    def authenticated_db(
+        settings: Settings, current: CurrentMember
+    ) -> Iterator[psycopg.Connection]:
+        with conn.cursor() as cur:
+            _member_scope(cur, owner if current.tenant_id == owner.tenant_id else stranger)
+        yield conn
+
+    monkeypatch.setattr(rfq_service_module, "_authenticated_db", authenticated_db)
+    monkeypatch.setitem(app.dependency_overrides, current_member, lambda: member)
+    with TestClient(app) as client:
+        response = client.get(f"/api/v1/rfq/{ids['rfq_id']}/responses")
+        assert response.status_code == 200, response.text
+        assert client.get(f"/api/v1/rfq/{foreign_rfq_id}/responses").status_code == 404
+        items = response.json()["items"]
+        assert {item["supplier_id"] for item in items} == {
+            str(ids["supp1_id"]),
+            str(ids["supp2_id"]),
+        }
+        assert "Foreign secret product" not in response.text
+        assert "Al Dahabi" not in response.text
+        reply = next(item for item in items if item["id"] == str(ids["resp1_id"]))
+        # Compare all new fields together so the red run exposes every missing name.
+        assert {
+            "supplier_name": reply.get("supplier_name", "MISSING"),
+            "line_names": [line.get("product_name", "MISSING") for line in reply["lines"]],
+            "variants": [line.get("product_variant", "MISSING") for line in reply["lines"]],
+            "landed_names": [
+                cost.get("product_name", "MISSING") for cost in reply["rfq_landed_costs"]
+            ],
+        } == {
+            "supplier_name": "Supplier 1",
+            "line_names": ["ProdA", "ProdB", None],
+            "variants": ["Large", None, None],
+            "landed_names": ["ProdA"],
+        }
+        member = member.model_copy(
+            update={
+                "user_id": stranger.user_id,
+                "tenant_id": stranger.tenant_id,
+                "membership_id": stranger.membership_id,
+            }
+        )
+        assert client.get(f"/api/v1/rfq/{ids['rfq_id']}/responses").status_code == 404

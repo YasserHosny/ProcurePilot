@@ -182,7 +182,7 @@
                 }
               </mat-form-field>
 
-              <mat-form-field appearance="outline" class="line-quantity">
+              <mat-form-field appearance="outline" class="line-quantity" subscriptSizing="dynamic">
                 <mat-label>{{ 'requests.form.quantityLabel' | translate }}</mat-label>
                 <input
                   matInput
@@ -191,6 +191,17 @@
                   min="0"
                   step="any"
                 />
+                @if (!form.disabled) {
+                  <span matSuffix>{{ 'requests.form.packsSuffix' | translate }}</span>
+                }
+                @if (getPackHint(lineGroup); as hint) {
+                  <mat-hint>
+                    {{ 'requests.form.packHint' | translate: { size: hint.size, unit: hint.unit } }}
+                    @if (hint.total !== null) {
+                      {{ 'requests.form.packTotal' | translate: { total: hint.total, unit: hint.unit } }}
+                    }
+                  </mat-hint>
+                }
                 @if (lineGroup.controls.quantity.hasError('required')) {
                   <mat-error>{{ 'requests.form.quantityRequired' | translate }}</mat-error>
                 } @else if (lineGroup.controls.quantity.hasError('pattern')) {
@@ -341,9 +352,22 @@
               mat-flat-button
               color="primary"
               type="submit"
-              [disabled]="isSaving()"
+              [disabled]="isSaving() || isSubmitting()"
             >
               {{ 'requests.form.saveDraftButton' | translate }}
+            </button>
+          }
+
+          @if (!isEditMode()) {
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              class="save-and-submit-btn"
+              (click)="saveAndSubmit()"
+              [disabled]="isSaving() || isSubmitting()"
+            >
+              {{ 'requests.form.saveAndSubmitButton' | translate }}
             </button>
           }
 

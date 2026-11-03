@@ -2931,7 +2931,8 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
 
 - The RFQ's creator (whatever their current role) or any owner or buyer may read an RFQ in their
   workspace (`rfq_select` RLS policy); another workspace's RFQ returns `404`.
-- Returns the `Rfq` with its lines and recipients (`RfqDetail`), so a saved draft can be reopened
+- Returns the `Rfq`, including nullable `cancelled_at`, with its lines and recipients
+  (`RfqDetail`), so a saved draft can be reopened
   for editing.
 - Each recipient includes `response_count` (integer, default `0`): the number of `rfq_response`
   rows with that recipient's `rfq_recipient_id` and `tenant_id`.
@@ -2961,8 +2962,33 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
   moves to `sent` as soon as at least one recipient succeeds.
 - Returns `200` with the updated `Rfq` and all its `RfqRecipient`s.
 
+### `POST /rfq/{rfq_id}/cancel`
+
+- Operation ID: `cancelRfq`. No request body; `Idempotency-Key` is optional.
+- An active owner may cancel any RFQ in their workspace. An active buyer may cancel only
+  RFQs they created (`403`, `details: {"resource": "rfq", "reason": "not_creator"}`). Other
+  roles receive `403`; an unknown or cross-workspace RFQ returns `404` through RLS.
+- Cancels stored `draft`, `sent`, or `responded` RFQs, including a stored `sent` RFQ whose
+  read-time status is `expired`. Stored `converted` or `expired` RFQs return `409` with
+  `details: {"resource": "rfq", "reason": "not_cancellable"}`. A state change that prevents
+  cancellation also returns `409 not_cancellable`.
+- Returns `200` with an `Rfq` whose status is `cancelled` and `cancelled_at` is set. Repeating
+  cancellation returns the same RFQ and timestamp without another audit event.
+- Writes `rfq.cancelled` with `{"rfq_id": "..."}`. Sends no supplier notification.
+- `cancelled` is terminal. Sending returns `409 not_sendable`; editing returns `409 not_draft`.
+  Manual preparation, split creation, and split preparation return `422` with
+  `details: {"reason": "rfq_cancelled"}`. Guardrail evaluation reports `rfq_not_open`.
+- Late supplier replies remain captured in history and leave the RFQ `cancelled`.
+
 ### `GET /rfq/{rfq_id}/responses`
 
+- Display fields are optional and default to `null`: `RfqResponseComparison.supplier_name`
+  is the tenant-scoped supplier's `name`; `RfqResponseLineComparison.product_name` is the
+  matched workspace product's `tenant_name`, and `product_variant` is its joined canonical
+  product's `variant`. Unmatched lines return `null` for both product fields.
+  `RfqProductLandedCost.product_name` likewise carries the workspace product's `tenant_name`.
+  Names remain available for archived suppliers/products and are independent of catalogue
+  list pagination. All tenant-owned name joins include the tenant scope.
 - Lists every captured response to one RFQ for comparison, each with its per-line matched product
   (or an explicit `pending_match` flag when a line's extraction/matching hasn't completed yet —
   independent of and possibly lagging RFQ response capture) and quoted quantity/price.
@@ -2996,6 +3022,8 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
   request it produced. Each `RfqSummary` also carries `converted_purchase_request_ids` (every
   purchase request prepared from the RFQ — one per supplier in a split) and `request_group_id`
   (the split's group, once prepared) (spec 024).
+- Optional `status` accepts `draft`, `sent`, `responded`, `expired`, `converted`, or `cancelled`.
+  Each summary includes nullable `cancelled_at`, set for cancelled RFQs.
 - Expiry is derived at read time: a stored `sent` RFQ with `needed_by_date < current_date` reads
   as `expired`, including in the optional `status` filter.
 - Scoped per FR-016, same creator-plus-owner/buyer pattern as every list endpoint in this release.

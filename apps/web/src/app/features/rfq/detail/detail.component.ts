@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, forkJoin, of, catchError, tap, switchMap } from 'rxjs';
+import { Subject, forkJoin, of, catchError, tap, switchMap, finalize, take } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
@@ -14,7 +14,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { RfqApi, RfqDetail, RfqRecipient } from '../rfq-api';
+import { RfqActionKeys, RfqApi, RfqDetail, RfqRecipient } from '../rfq-api';
 import { FormatService } from '../../../core/format/format.service';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
@@ -68,6 +68,7 @@ const TAB_NAMES = ['details', 'items', 'recipients', 'responses'] as const;
   styleUrl: './detail.component.scss',
 })
 export class DetailComponent implements OnInit {
+  private readonly actionKeys = new RfqActionKeys();
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly rfqApi = inject(RfqApi);
@@ -88,6 +89,8 @@ export class DetailComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly selectedTabIndex = signal<number>(0);
   readonly currentMembershipId = signal<string | null>(null);
+  readonly cancelling = signal(false);
+
   readonly retrying = signal<boolean>(false);
 
   readonly displayedItemColumns = ['product', 'quantity'];
@@ -257,6 +260,61 @@ export class DetailComponent implements OnInit {
     return this.formatService.formatDate(value, { timeStyle: 'short' });
   }
 
+  canCancel(): boolean {
+    const rfq = this.rfqDetail()?.rfq;
+    return Boolean(rfq && ['draft', 'sent', 'responded', 'expired'].includes(rfq.status) &&
+      (this.session.hasRole('owner') || (this.session.hasRole('buyer') && this.isCreator())));
+  }
+
+  onCancelRfq(): void {
+    const id = this.rfqId();
+    if (!id || !this.canCancel() || this.cancelling()) return;
+    this.cancelling.set(true);
+    const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
+      width: '440px',
+      data: {
+        titleKey: 'rfq.cancel.title',
+        messageKey: 'rfq.cancel.message',
+        confirmKey: 'rfq.cancel.confirm',
+        cancelKey: 'rfq.cancel.keep',
+        isDestructive: true,
+      },
+    });
+    dialogRef.afterClosed().pipe(take(1), takeUntilDestroyed(this.destroyRef)).subscribe((confirmed: boolean | undefined) => {
+      if (!confirmed) {
+        this.cancelling.set(false);
+        return;
+      }
+      this.rfqApi.cancelRfq(id, this.actionKeys.get(`cancel:${id}`)).pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => { this.cancelling.set(false); }),
+      ).subscribe({
+        next: () => {
+          this.actionKeys.clear(`cancel:${id}`);
+          this.showCancelMessage('rfq.cancel.success');
+          this.loadRfq(id);
+        },
+        error: (err: unknown) => {
+          this.actionKeys.onError(`cancel:${id}`, err);
+          let key = 'rfq.cancel.error';
+          if (err instanceof HttpErrorResponse) {
+            if (err.status === 403 && err.error?.details?.reason === 'not_creator') {
+              key = 'rfq.cancel.notCreator';
+            } else if (err.status === 409) {
+              key = 'rfq.cancel.notCancellable';
+              this.loadRfq(id);
+            }
+          }
+          this.showCancelMessage(key);
+        },
+      });
+    });
+  }
+
+  private showCancelMessage(key: string): void {
+    this.snackBar.open(this.translate.instant(key), this.translate.instant('rfq.history.dismiss'), { duration: 5000 });
+  }
+
   getStatusClass(status: string): string {
     switch (status) {
       case 'draft': return 'status-draft';
@@ -264,6 +322,7 @@ export class DetailComponent implements OnInit {
       case 'responded': return 'status-responded';
       case 'expired': return 'status-expired';
       case 'converted': return 'status-converted';
+      case 'cancelled': return 'status-cancelled';
       default: return '';
     }
   }
@@ -301,7 +360,7 @@ export class DetailComponent implements OnInit {
       };
     }
 
-    if (recipient.status === 'sent' && (rfqStatus === 'expired' || rfqStatus === 'converted')) {
+    if (recipient.status === 'sent' && (rfqStatus === 'expired' || rfqStatus === 'converted' || rfqStatus === 'cancelled')) {
       return {
         status: 'no_reply',
         icon: 'close',
@@ -440,8 +499,9 @@ export class DetailComponent implements OnInit {
       if (confirmed) {
         if (this.retrying()) return;
         this.retrying.set(true);
-        this.rfqApi.sendRfq(id).subscribe({
+        this.rfqApi.sendRfq(id, this.actionKeys.get(`send:${id}`)).subscribe({
           next: (res) => {
+            this.actionKeys.clear(`send:${id}`);
             this.retrying.set(false);
             const total = res.recipients.length;
             const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
@@ -451,6 +511,7 @@ export class DetailComponent implements OnInit {
             this.loadRfq(id);
           },
           error: (err: unknown) => {
+            this.actionKeys.onError(`send:${id}`, err);
             this.retrying.set(false);
             let key = 'rfq.history.sendError';
             if (err instanceof HttpErrorResponse) {
@@ -486,6 +547,7 @@ export class DetailComponent implements OnInit {
   }
 
   onSendDraft(): void {
+    if (this.retrying()) return;
     if (!this.isCreator()) return;
     const detail = this.rfqDetail();
     const id = this.rfqId();
@@ -508,8 +570,12 @@ export class DetailComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((confirmed: boolean | undefined) => {
       if (confirmed) {
-        this.rfqApi.sendRfq(id).subscribe({
+        if (this.retrying()) return;
+        this.retrying.set(true);
+        this.rfqApi.sendRfq(id, this.actionKeys.get(`send:${id}`)).subscribe({
           next: (res) => {
+            this.actionKeys.clear(`send:${id}`);
+            this.retrying.set(false);
             const total = res.recipients.length;
             const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
             const key = sent === total && total > 0 ? 'rfq.history.sentSuccess' : sent > 0 ? 'rfq.create.sentPartial' : 'rfq.create.sentNone';
@@ -518,6 +584,8 @@ export class DetailComponent implements OnInit {
             this.loadRfq(id);
           },
           error: (err: unknown) => {
+            this.actionKeys.onError(`send:${id}`, err);
+            this.retrying.set(false);
             let key = 'rfq.history.sendError';
             if (err instanceof HttpErrorResponse) {
               if (err.status === 403) {

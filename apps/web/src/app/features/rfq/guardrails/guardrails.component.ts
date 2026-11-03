@@ -65,6 +65,9 @@ export class GuardrailsComponent implements OnInit {
   readonly branches = signal<readonly Branch[]>([]);
   /** Active cost centres on the selected default branch (finding 38b). */
   readonly costCentres = signal<readonly CostCentre[]>([]);
+  readonly costCentresError = signal(false);
+  readonly togglingIds = signal<ReadonlySet<string>>(new Set());
+  private costCentreGeneration = 0;
   readonly currencies = signal<readonly ReferenceOption[]>([]);
   readonly loading = signal(true);
   readonly saving = signal(false);
@@ -102,12 +105,21 @@ export class GuardrailsComponent implements OnInit {
   }
 
   private loadCostCentres(branchId: string): void {
+    const generation = ++this.costCentreGeneration;
+    this.costCentresError.set(false);
     this.costCentres.set([]);
     if (!branchId) return;
     this.api.listCostCentres({ branch_id: branchId, is_archived: false, limit: 100 }).subscribe({
-      next: (response) => this.costCentres.set(response.items),
+      next: (response) => {
+        if (branchId === this.defaultBranchId && generation === this.costCentreGeneration) this.costCentres.set(response.items);
+      },
+      error: () => {
+        if (branchId === this.defaultBranchId && generation === this.costCentreGeneration) this.costCentresError.set(true);
+      },
     });
   }
+
+  retryCostCentres(): void { this.loadCostCentres(this.defaultBranchId); }
 
   loadGuardrails(): void {
     this.loading.set(true);
@@ -118,6 +130,7 @@ export class GuardrailsComponent implements OnInit {
   }
 
   edit(guardrail: RfqGuardrail): void {
+    if (this.saving()) return;
     this.editingId.set(guardrail.id);
     this.maxOrderValue = guardrail.max_order_value_amount;
     this.currency = guardrail.max_order_value_currency;
@@ -131,12 +144,15 @@ export class GuardrailsComponent implements OnInit {
     this.errorMessage.set(null);
   }
 
-  cancelEdit(): void { this.editingId.set(null); this.resetForm(); }
+  cancelEdit(): void { if (this.saving()) return; this.editingId.set(null); this.resetForm(); }
 
   toggle(guardrail: RfqGuardrail): void {
+    if (this.saving() || this.togglingIds().has(guardrail.id)) return;
+    this.togglingIds.update((ids) => new Set([...ids, guardrail.id]));
+    const finish = () => this.togglingIds.update((ids) => new Set([...ids].filter((id) => id !== guardrail.id)));
     this.rfqApi.updateGuardrail(guardrail.id, { enabled: !guardrail.enabled }).subscribe({
-      next: (updated) => this.guardrails.update((items) => items.map((item) => item.id === updated.id ? updated : item)),
-      error: (error: unknown) => this.showError(error),
+      next: (updated) => { finish(); this.guardrails.update((items) => items.map((item) => item.id === updated.id ? updated : item)); },
+      error: (error: unknown) => { finish(); this.showError(error); },
     });
   }
 
@@ -152,6 +168,7 @@ export class GuardrailsComponent implements OnInit {
   }
 
   save(): void {
+    if (this.saving()) return;
     this.errorMessage.set(null);
     const maxValue = Number(this.maxOrderValue);
     const variance = Number(this.maxPriceVariancePercent);
@@ -183,12 +200,13 @@ export class GuardrailsComponent implements OnInit {
       enabled: this.enabled,
     };
     this.saving.set(true);
-    const request = this.editingId()
-      ? this.rfqApi.updateGuardrail(this.editingId() as string, payload)
+    const editingId = this.editingId();
+    const request = editingId
+      ? this.rfqApi.updateGuardrail(editingId, payload)
       : this.rfqApi.createGuardrail(payload);
     request.subscribe({
       next: (guardrail) => {
-        this.guardrails.update((items) => this.editingId() ? items.map((item) => item.id === guardrail.id ? guardrail : item) : [guardrail, ...items]);
+        this.guardrails.update((items) => editingId ? items.map((item) => item.id === guardrail.id ? guardrail : item) : [guardrail, ...items]);
         this.saving.set(false);
         this.cancelEdit();
       },
@@ -197,6 +215,8 @@ export class GuardrailsComponent implements OnInit {
   }
 
   private resetForm(): void {
+    ++this.costCentreGeneration;
+    this.costCentresError.set(false);
     this.maxOrderValue = '';
     this.currency = this.session.homeCurrency() ?? 'USD';
     this.minResponseCount = 1;

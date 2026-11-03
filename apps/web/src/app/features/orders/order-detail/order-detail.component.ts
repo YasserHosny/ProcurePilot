@@ -11,6 +11,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { lineDescription, packLabel } from '../pack-label';
+import { RequestsApiService } from '../../requests/requests-api';
+import type { PurchaseRequest } from '../../../core/api/models';
 import { isOrderOverdue, orderToCsv } from '../order-helpers';
 
 import { FormatService } from '../../../core/format/format.service';
@@ -53,10 +55,13 @@ export class OrderDetailComponent implements OnInit {
   private readonly ordersApi = inject(OrdersApiService);
   private readonly translate = inject(TranslateService);
   private readonly formatService = inject(FormatService);
+  private readonly requestsApi = inject(RequestsApiService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly dateAdapter = inject(DateAdapter) as AppDateAdapter;
 
   readonly evidence = signal<OrderEvidenceProjection | null>(null);
+  /** The request this order was made from, for the RFQ and quotation links; null when unknown. */
+  readonly sourceRequest = signal<PurchaseRequest | null>(null);
   readonly isLoading = signal(true);
   readonly isSaving = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -100,9 +105,50 @@ export class OrderDetailComponent implements OnInit {
       next: (value) => {
         this.evidence.set(value);
         this.isLoading.set(false);
+        this.loadSourceRequest(value.order.source_request_id);
       },
       error: () => { this.errorMessage.set(this.translate.instant('orders.loadError')); this.isLoading.set(false); },
     });
+  }
+
+  /** Best effort: without the request the page just has no RFQ or quotation links. */
+  private loadSourceRequest(requestId: string | null | undefined): void {
+    this.sourceRequest.set(null);
+    if (!requestId) return;
+    this.requestsApi.getRequest(requestId).subscribe({
+      next: (request) => this.sourceRequest.set(request),
+      error: () => this.sourceRequest.set(null),
+    });
+  }
+
+  /**
+   * How much of the order has arrived (0-100), each line weighted by its value: packs of
+   * different products are not comparable (ADR-020), a line's value is. Over-receipt counts only
+   * up to what was ordered, and 100 shows only when every line has fully arrived.
+   */
+  receivedPercent(): number {
+    const order = this.evidence()?.order;
+    const lines = this.evidence()?.lifecycle.lines ?? [];
+    if (!order || lines.length === 0) return 0;
+    const value = (lineId: string) =>
+      parseFloat(order.lines.find((line) => line.id === lineId)?.line_total.amount ?? '') || 0;
+    const total = lines.reduce((sum, line) => sum + value(line.purchase_order_line_id), 0);
+    // A PO whose lines carry no value still has progress: weigh the lines equally.
+    const weight = (lineId: string) => (total > 0 ? value(lineId) : 1);
+    const weights = lines.reduce((sum, line) => sum + weight(line.purchase_order_line_id), 0);
+    const arrived = lines.reduce((sum, line) => {
+      const ordered = parseFloat(line.ordered_quantity) || 0;
+      const received = parseFloat(line.received.quantity ?? '') || 0;
+      return sum + (ordered > 0 ? Math.min(received / ordered, 1) : 0) * weight(line.purchase_order_line_id);
+    }, 0);
+    // A line that carries no value has no weight, so completion is checked line by line.
+    const everyLineArrived = lines.every(
+      (line) =>
+        (parseFloat(line.ordered_quantity) || 0) <= 0 ||
+        (parseFloat(line.received.quantity ?? '') || 0) >= parseFloat(line.ordered_quantity),
+    );
+    const percent = Math.floor((arrived / weights) * 100 + 1e-9);
+    return everyLineArrived ? 100 : Math.min(99, percent);
   }
 
   readonly lineDescription = lineDescription;

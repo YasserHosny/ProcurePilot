@@ -40,6 +40,8 @@ def build_rfq_split_request(
             raise NotFoundError(details={"resource": "rfq"})
         if row["status"] == "converted":
             raise ConflictError(details={"reason": "rfq_already_converted"})
+        if row["status"] == "cancelled":
+            raise UnprocessableEntityError(details={"reason": "rfq_cancelled"})
         if row["status"] == "expired":
             raise UnprocessableEntityError(details={"reason": "rfq_expired"})
         cur.execute(
@@ -242,6 +244,8 @@ def prepare_requests_from_split(
                         "purchase_request_ids": [str(row["id"]) for row in cur.fetchall()],
                     }
                 )
+            if status == "cancelled":
+                raise UnprocessableEntityError(details={"reason": "rfq_cancelled"})
             if status == "expired":
                 raise UnprocessableEntityError(details={"reason": "rfq_expired"})
             if job["status"] != "completed" or not job["result"] or not job["result"]["feasible"]:

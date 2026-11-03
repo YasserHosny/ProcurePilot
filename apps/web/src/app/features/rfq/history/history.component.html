@@ -280,6 +280,13 @@
         <mat-icon aria-hidden="true">content_copy</mat-icon>
         <span>{{ 'rfq.history.duplicate' | translate }}</span>
       </a>
+      @if (canCancel(rfq)) {
+        <button mat-menu-item class="pp-danger" type="button" [disabled]="cancellingIds().has(rfq.id)"
+          (click)="onCancelRfq(rfq, $event)" data-testid="rfq-history-cancel-button">
+          <mat-icon aria-hidden="true">cancel</mat-icon>
+          <span>{{ 'rfq.cancel.confirm' | translate }}</span>
+        </button>
+      }
       @if (showCountsInMenu()) {
         <a mat-menu-item [routerLink]="['/rfq', rfq.id]" [queryParams]="{ tab: 'recipients' }">
           <mat-icon aria-hidden="true">people</mat-icon>

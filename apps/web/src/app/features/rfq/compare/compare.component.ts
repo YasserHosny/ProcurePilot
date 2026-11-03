@@ -20,7 +20,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
-import { RfqApi, RfqDetail, RfqGuardrail, RfqResponseComparison, RfqResponseLineComparison } from '../rfq-api';
+import { RfqActionKeys, RfqApi, RfqDetail, RfqGuardrail, RfqResponseComparison, RfqResponseLineComparison } from '../rfq-api';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -62,6 +62,7 @@ const MINOR_UNITS = 10_000;
   styleUrl: './compare.component.scss',
 })
 export class CompareComponent implements OnInit, OnChanges {
+  private readonly actionKeys = new RfqActionKeys();
   readonly embedded = input<boolean>(false);
   readonly rfqId = model<string>('');
 
@@ -93,6 +94,7 @@ export class CompareComponent implements OnInit, OnChanges {
   readonly currentMembershipId = signal<string | null>(null);
   readonly isSplitting = signal<boolean>(false);
   readonly preparing = signal<string | null>(null);
+  readonly sending = signal<boolean>(false);
   readonly branchesError = signal<boolean>(false);
   readonly rfqDetailError = signal<boolean>(false);
   private splitIdempotencyKey: string | null = null;
@@ -101,18 +103,19 @@ export class CompareComponent implements OnInit, OnChanges {
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
   readonly isConverted = computed<boolean>(() => this.rfqDetail()?.rfq.status === 'converted');
+  readonly isCancelled = computed<boolean>(() => this.rfqDetail()?.rfq.status === 'cancelled');
   readonly isExpired = computed<boolean>(() => this.rfqDetail()?.rfq.status === 'expired');
 
   readonly splitEligibility = computed<{
     canSplit: boolean;
-    reason: 'rfq_expired' | 'needs_two_matched' | 'mixed_currency' | 'reply_mixed_currency' | null;
+    reason: 'rfq_cancelled' | 'rfq_expired' | 'needs_two_matched' | 'mixed_currency' | 'reply_mixed_currency' | null;
     unmatchedCount: number;
     unmatchedQuotationIds: string[];
   }>(() => {
-    if (this.isExpired() || this.isConverted()) {
+    if (this.isCancelled() || this.isExpired() || this.isConverted()) {
       return {
         canSplit: false,
-        reason: this.isExpired() ? 'rfq_expired' : null,
+        reason: this.isCancelled() ? 'rfq_cancelled' : this.isExpired() ? 'rfq_expired' : null,
         unmatchedCount: 0,
         unmatchedQuotationIds: [],
       };
@@ -231,6 +234,20 @@ export class CompareComponent implements OnInit, OnChanges {
         this.resolveProducts();
       }
     });
+  }
+
+  supplierName(response: RfqResponseComparison): string {
+    return response.supplier_name?.trim() || this.supplierNames()[response.supplier_id]
+      || this.translate.instant('rfq.compare.unknownSupplier');
+  }
+
+  productName(response: RfqResponseComparison, line: RfqResponseLineComparison): string {
+    const cost = response.rfq_landed_costs?.find((item) => item.workspace_product_id === line.workspace_product_id);
+    const name = line.product_name?.trim() || cost?.product_name?.trim()
+      || (line.workspace_product_id && this.productNames()[line.workspace_product_id]);
+    const variant = line.product_variant?.trim() || cost?.product_variant?.trim();
+    if (name) return variant ? `${name} (${variant})` : name;
+    return this.translate.instant('rfq.compare.unknownProduct');
   }
 
   formatQuantity(value: string | number): string { return this.formatService.formatExactQuantity(value); }
@@ -546,6 +563,7 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   onSendDraft(): void {
+    if (this.sending()) return;
     if (!this.isCreator()) return;
     const detail = this.rfqDetail();
     const id = this.rfqId();
@@ -568,8 +586,12 @@ export class CompareComponent implements OnInit, OnChanges {
 
     dialogRef.afterClosed().subscribe((confirmed: boolean | undefined) => {
       if (confirmed) {
-        this.rfqApi.sendRfq(id).subscribe({
+        if (this.sending()) return;
+        this.sending.set(true);
+        this.rfqApi.sendRfq(id, this.actionKeys.get(`send:${id}`)).subscribe({
           next: (res) => {
+            this.actionKeys.clear(`send:${id}`);
+            this.sending.set(false);
             const total = res.recipients.length;
             const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
             const key = sent === total && total > 0 ? 'rfq.history.sentSuccess' : sent > 0 ? 'rfq.create.sentPartial' : 'rfq.create.sentNone';
@@ -579,6 +601,8 @@ export class CompareComponent implements OnInit, OnChanges {
             else this.loadData(id);
           },
           error: (err: unknown) => {
+            this.actionKeys.onError(`send:${id}`, err);
+            this.sending.set(false);
             const key = err instanceof HttpErrorResponse && err.status === 403 ? 'rfq.creatorOnly' : 'rfq.history.sendError';
             this.snackBar.open(
               this.translate.instant(key),
@@ -748,6 +772,7 @@ export class CompareComponent implements OnInit, OnChanges {
     return (
       !this.isConverted() &&
       !this.isExpired() &&
+      !this.isCancelled() &&
       !this.branchesError() &&
       !this.rfqDetailError() &&
       this.isEligible(response) &&
@@ -759,7 +784,7 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   prepareRequest(response: RfqResponseComparison): void {
-    if (this.isConverted() || this.isExpired()) return;
+    if (this.isConverted() || this.isExpired() || this.isCancelled()) return;
     if (response.quotation_status === 'refused') return;
     if (this.isPreparing(response.id)) return;
     if (!this.isEligible(response) || this.hasMixedCurrencies(response)) {
@@ -800,8 +825,9 @@ export class CompareComponent implements OnInit, OnChanges {
 
     this.preparing.set(response.id);
 
-    this.rfqApi.prepareRequest(this.rfqId(), payload).subscribe({
+    this.rfqApi.prepareRequest(this.rfqId(), payload, this.actionKeys.get(`prepare:${response.id}`)).subscribe({
       next: (res) => {
+        this.actionKeys.clear(`prepare:${response.id}`);
         this.preparing.set(null);
         const snackRef = this.snackBar.open(
           this.translate.instant('rfq.compare.prepareSuccess'),
@@ -821,6 +847,7 @@ export class CompareComponent implements OnInit, OnChanges {
         navigateToDraft();
       },
       error: (err: unknown) => {
+        this.actionKeys.onError(`prepare:${response.id}`, err);
         this.preparing.set(null);
         const reason =
           err instanceof HttpErrorResponse
@@ -840,9 +867,9 @@ export class CompareComponent implements OnInit, OnChanges {
           return;
         }
 
-        if (reason === 'rfq_expired') {
+        if (reason === 'rfq_expired' || reason === 'rfq_cancelled') {
           this.snackBar.open(
-            this.translate.instant('rfq.compare.prepareErrorRfqExpired'),
+            this.translate.instant(reason === 'rfq_cancelled' ? 'rfq.compare.rfqCancelled' : 'rfq.compare.prepareErrorRfqExpired'),
             this.translate.instant('rfq.history.dismiss'),
             { duration: 5000 },
           );
@@ -880,7 +907,7 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   splitRfq(): void {
-    if (!this.splitEligibility().canSplit || !this.isWriter() || this.isSplitting() || this.isExpired()) return;
+    if (!this.splitEligibility().canSplit || !this.isWriter() || this.isSplitting() || this.isExpired() || this.isCancelled()) return;
     const id = this.rfqId();
     if (!id) return;
 
@@ -908,9 +935,9 @@ export class CompareComponent implements OnInit, OnChanges {
             this.translate.instant('rfq.history.dismiss'),
             { duration: 5000 },
           );
-        } else if (reason === 'rfq_expired') {
+        } else if (reason === 'rfq_expired' || reason === 'rfq_cancelled') {
           this.snackBar.open(
-            this.translate.instant('rfq.compare.prepareErrorRfqExpired'),
+            this.translate.instant(reason === 'rfq_cancelled' ? 'rfq.compare.rfqCancelled' : 'rfq.compare.prepareErrorRfqExpired'),
             this.translate.instant('rfq.history.dismiss'),
             { duration: 5000 },
           );

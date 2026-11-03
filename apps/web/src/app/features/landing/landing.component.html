@@ -33,9 +33,17 @@
             {{ 'landing.hero.lede' | translate }}
           </p>
           <div class="hero-actions">
-            <a mat-flat-button color="primary" [href]="mailtoLink()" class="hero-primary-btn">
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              class="hero-primary-btn"
+              [matMenuTriggerFor]="heroMailMenu.menu"
+            >
               {{ 'landing.hero.requestAccess' | translate }}
-            </a>
+              <mat-icon iconPositionEnd aria-hidden="true">expand_more</mat-icon>
+            </button>
+            <app-landing-mail-menu #heroMailMenu />
             <a mat-stroked-button href="#gallery" class="hero-secondary-btn">
               {{ 'landing.hero.exploreScreens' | translate }}
             </a>
