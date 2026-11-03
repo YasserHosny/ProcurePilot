@@ -269,7 +269,8 @@ class RfqService:
                 cur.execute(
                     f"select r.id, r.tenant_id, r.created_by_membership_id, "
                     f"{_EFFECTIVE_STATUS_SQL} as status, r.needed_by_date, "
-                    "r.tenant_terms, r.idempotency_key, r.created_at from rfq r where r.id = %s",
+                    "r.tenant_terms, r.idempotency_key, r.created_at, r.cancelled_at "
+                    "from rfq r where r.id = %s",
                     (rfq_id,),
                 )
                 row = cur.fetchone()
@@ -314,6 +315,46 @@ class RfqService:
                 if row["status"] != "converted":
                     conversion = {"converted_purchase_request_ids": [], "request_group_id": None}
                 return RfqDetail(rfq=Rfq(**row), lines=lines, recipients=recipients, **conversion)
+
+    def cancel(self, *, member: CurrentMember, rfq_id: uuid.UUID) -> Rfq:
+        with _authenticated_db(self.settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                # Share preparation's lock so cancellation cannot interleave with conversion.
+                lock_rfq_for_preparation(cur, tenant_id=member.tenant_id, rfq_id=rfq_id)
+                cur.execute("select * from rfq where id = %s", (rfq_id,))
+                row = cur.fetchone()
+                if row is None:
+                    raise NotFoundError(details={"resource": "rfq"})
+                if row["status"] == "cancelled":
+                    return Rfq(**row)
+                if row["status"] == "converted":
+                    raise ConflictError(details={"resource": "rfq", "reason": "not_cancellable"})
+                if (
+                    member.role != "owner"
+                    and row["created_by_membership_id"] != member.membership_id
+                ):
+                    raise PermissionDeniedError(
+                        details={"resource": "rfq", "reason": "not_creator"}
+                    )
+                cur.execute("select cancel_rfq(%s) as cancelled", (rfq_id,))
+                changed = cur.fetchone()["cancelled"]
+                cur.execute("select * from rfq where id = %s", (rfq_id,))
+                row = cur.fetchone()
+                if not changed:
+                    raise ConflictError(details={"resource": "rfq", "reason": "not_cancellable"})
+                cur.execute(
+                    "select record_audit_event(%s, 'success'::audit_outcome, "
+                    "%s, %s, %s, %s::jsonb, null)",
+                    (
+                        "rfq.cancelled",
+                        member.tenant_id,
+                        member.membership_id,
+                        member.email,
+                        json.dumps({"rfq_id": str(rfq_id)}),
+                    ),
+                )
+                conn.commit()
+                return Rfq(**row)
 
     def update_draft(
         self,
@@ -757,6 +798,8 @@ class RfqService:
         with _authenticated_db(self.settings, member) as lock_conn:
             with lock_conn.cursor(row_factory=dict_row) as cur:
                 status = lock_rfq_for_preparation(cur, tenant_id=member.tenant_id, rfq_id=rfq_id)
+                if status == "cancelled":
+                    raise UnprocessableEntityError(details={"reason": "rfq_cancelled"})
                 if status == "expired":
                     raise UnprocessableEntityError(details={"reason": "rfq_expired"})
                 if status == "converted":
@@ -1193,7 +1236,7 @@ class RfqService:
         params: list[str | uuid.UUID | int] = [member.tenant_id]
 
         if status is not None:
-            if status not in ("draft", "sent", "responded", "expired", "converted"):
+            if status not in ("draft", "sent", "responded", "expired", "converted", "cancelled"):
                 raise UnprocessableEntityError(
                     details={"reason": "invalid_status", "field": "status"}
                 )
@@ -1206,6 +1249,7 @@ class RfqService:
                 {_EFFECTIVE_STATUS_SQL} as status,
                 r.needed_by_date,
                 r.created_at,
+                r.cancelled_at,
                 r.created_by_membership_id,
                 (SELECT max(rr_sent.sent_at) FROM rfq_recipient rr_sent
                  WHERE rr_sent.rfq_id = r.id) as sent_at,

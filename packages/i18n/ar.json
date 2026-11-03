@@ -1287,6 +1287,14 @@
   },
   "matching": {
     "queue": {
+      "moreAvailable": "يوجد المزيد",
+      "sort": {
+        "label": "ترتيب حسب",
+        "createdDesc": "الأحدث أولاً",
+        "createdAsc": "الأقدم أولاً",
+        "priorityDesc": "الأولوية: العالية أولاً",
+        "priorityAsc": "الأولوية: المنخفضة أولاً"
+      },
       "resultSummary": "البنود المعروضة: {{lines}} · عروض الأسعار: {{quotations}}",
       "quotationIdLabel": "عرض السعر {{id}}",
       "title": "قائمة مهام مطابقة البنود",
@@ -2393,6 +2401,11 @@
       "productLabel": "المنتج",
       "productRequired": "اختر منتجًا.",
       "quantityLabel": "الكمية",
+      "packsSuffix": "عبوات",
+      "packHint": "عبوة واحدة = {{size}} {{unit}}",
+      "packTotal": "الإجمالي {{total}} {{unit}}",
+      "saveAndSubmitButton": "حفظ وإرسال",
+      "draftSavedSubmitFailed": "تم حفظ المسودة، لكن تعذّر إرسالها. راجعها وأرسلها مرة أخرى.",
       "quantityRequired": "يجب أن تكون الكمية أكبر من صفر.",
       "quantityPattern": "يجب أن تكون الكمية رقمًا أكبر من صفر.",
       "noteLabel": "ملاحظة (اختيارية)",

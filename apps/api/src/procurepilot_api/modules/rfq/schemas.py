@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validat
 
 from procurepilot_api.modules.quotations.schemas import QuotationStatus
 
-RfqStatus = Literal["draft", "sent", "responded", "expired", "converted"]
+RfqStatus = Literal["draft", "sent", "responded", "expired", "converted", "cancelled"]
 RfqRecipientStatus = Literal["draft", "sent", "failed"]
 
 
@@ -19,6 +19,7 @@ class Rfq(BaseModel):
     tenant_id: UUID
     created_by_membership_id: UUID
     status: RfqStatus
+    cancelled_at: datetime | None = None
     needed_by_date: date
     tenant_terms: str | None = None
     idempotency_key: UUID
@@ -215,6 +216,7 @@ class RfqSummary(BaseModel):
 
     id: UUID
     status: RfqStatus
+    cancelled_at: datetime | None = None
     needed_by_date: date
     created_at: datetime
     sent_at: datetime | None = None

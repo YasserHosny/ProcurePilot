@@ -1287,6 +1287,14 @@
   },
   "matching": {
     "queue": {
+      "moreAvailable": "more available",
+      "sort": {
+        "label": "Sort by",
+        "createdDesc": "Newest first",
+        "createdAsc": "Oldest first",
+        "priorityDesc": "Priority: high first",
+        "priorityAsc": "Priority: low first"
+      },
       "resultSummary": "Lines shown: {{lines}} · Quotations: {{quotations}}",
       "quotationIdLabel": "Quotation {{id}}",
       "title": "Match Resolution Queue",
@@ -2393,6 +2401,11 @@
       "productLabel": "Product",
       "productRequired": "Select a product.",
       "quantityLabel": "Quantity",
+      "packsSuffix": "packs",
+      "packHint": "1 pack = {{size}} {{unit}}",
+      "packTotal": "Total {{total}} {{unit}}",
+      "saveAndSubmitButton": "Save and submit",
+      "draftSavedSubmitFailed": "Draft saved, but it could not be submitted. Review it and submit again.",
       "quantityRequired": "Quantity must be greater than zero.",
       "quantityPattern": "Quantity must be a number greater than zero.",
       "noteLabel": "Note (optional)",
