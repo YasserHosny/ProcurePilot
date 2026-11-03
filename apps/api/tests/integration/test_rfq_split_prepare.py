@@ -129,7 +129,7 @@ def test_round1_prepare_prices_snapshots_detail_and_replay(
             tracing.setattr(psycopg.Cursor, "execute", observed_execute)
             response = _prepare(fixture, job_id, key, cost_centre_id=str(cost_centre))
         print(f"Preparation SQL statements: {len(statements)} (including role/claims setup)")
-        assert len(statements) == 18
+        assert len(statements) == 19
         assert sum(q.startswith("insert into purchase_request ") for q in statements) == 1
         assert sum(q.startswith("insert into purchase_request_line ") for q in statements) == 1
         assert response.status_code == 201, response.text

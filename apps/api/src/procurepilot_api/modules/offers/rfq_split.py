@@ -27,15 +27,21 @@ def build_rfq_split_request(
     member: CurrentMember,
     rfq_id: UUID,
 ) -> tuple[AdvancedBasketOptimiseRequest, dict[str, object]]:
+    from procurepilot_api.modules.rfq import service as rfq_service
+
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
-            "select status from rfq where id = %s and tenant_id = %s", (rfq_id, member.tenant_id)
+            f"select {rfq_service._EFFECTIVE_STATUS_SQL} as status from rfq r "
+            "where r.id = %s and r.tenant_id = %s",
+            (rfq_id, member.tenant_id),
         )
         row = cur.fetchone()
         if row is None:
             raise NotFoundError(details={"resource": "rfq"})
         if row["status"] == "converted":
             raise ConflictError(details={"reason": "rfq_already_converted"})
+        if row["status"] == "expired":
+            raise UnprocessableEntityError(details={"reason": "rfq_expired"})
         cur.execute(
             """
             select r.id as response_id, q.id as quotation_id, rec.supplier_id,
@@ -236,6 +242,13 @@ def prepare_requests_from_split(
                         "purchase_request_ids": [str(row["id"]) for row in cur.fetchall()],
                     }
                 )
+            cur.execute(
+                f"select {rfq_service._EFFECTIVE_STATUS_SQL} as status from rfq r "
+                "where r.id = %s and r.tenant_id = %s",
+                (rfq_id, member.tenant_id),
+            )
+            if cur.fetchone()["status"] == "expired":
+                raise UnprocessableEntityError(details={"reason": "rfq_expired"})
             if job["status"] != "completed" or not job["result"] or not job["result"]["feasible"]:
                 raise ConflictError(details={"reason": "split_not_completed"})
             result = job["result"]
