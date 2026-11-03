@@ -3758,7 +3758,16 @@
       "cancelConfirmTitle": "Cancel Purchase Order?",
       "cancelConfirmMessage": "Are you sure you want to cancel this order? Any received quantity will remain consumed, and any unreceived quantity will be released back to the source request.",
       "cancelOrder": "Yes, Cancel Order",
-      "recordOutcome": "Record outcome"
+      "recordOutcome": "Record outcome",
+      "submitConfirmTitle": "Submit this purchase order?",
+      "submitConfirmMessage": "This marks the order as submitted in ProcurePilot so delivery evidence can be recorded. Nothing is sent to the supplier: share the order with them yourself. A submitted order can still be cancelled until it is fully received.",
+      "submitConfirm": "Yes, submit order",
+      "receiptQuantityRequired": "Enter a received quantity greater than zero on at least one line.",
+      "errors": {
+        "order_not_open_for_evidence": "This order is a draft, cancelled or closed, so it cannot take delivery or confirmation evidence.",
+        "order_not_cancellable": "This order is already fully received or closed, so it can no longer be cancelled.",
+        "order_already_cancelled": "This order is already cancelled."
+      }
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",

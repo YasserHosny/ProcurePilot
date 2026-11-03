@@ -37,6 +37,7 @@ test.describe('Order tracking (R3.3)', () => {
       (response) => response.url().endsWith(`/orders/${order.id}/submit`) && response.request().method() === 'POST',
     );
     await page.locator('[data-testid="submit-order"]').click();
+    await page.locator('[data-testid="confirm-submit"]').click();
     expect((await submitResponse).status()).toBe(200);
     await expect(page.locator('.status-chip')).toContainText('Submitted');
 

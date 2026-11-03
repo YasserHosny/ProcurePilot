@@ -356,6 +356,13 @@ class DeliveryReceiptCreate(StrictModel):
     source_hash: str | None = None
     lines: tuple[DeliveryReceiptLineInput, ...] = Field(min_length=1)
 
+    @model_validator(mode="after")
+    def _something_was_received(self) -> DeliveryReceiptCreate:
+        # A line left at 0 is still evidence of a delivery; a receipt of nothing is not one.
+        if not any(line.received_quantity > 0 for line in self.lines):
+            raise ValueError("a delivery receipt must receive a quantity on at least one line")
+        return self
+
 
 class PurchaseOrderList(StrictModel):
     items: tuple[PurchaseOrder, ...]
