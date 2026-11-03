@@ -69,6 +69,7 @@ export class CompareComponent implements OnInit {
 
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private comparisonRequestId = 0;
+  private refreshRequestId = 0;
 
   constructor() {
     this.destroyRef.onDestroy(() => {
@@ -353,12 +354,17 @@ export class CompareComponent implements OnInit {
       return;
     }
 
-    const requestId = ++this.comparisonRequestId;
+    const requestId = ++this.refreshRequestId;
+    const foregroundIdAtStart = this.comparisonRequestId;
     const qty = this.baseQuantityInput();
 
     this.api.compareOffers({ product_id: productId, quantity: qty }).subscribe({
       next: (comp) => {
-        if (this.selectedProductId() !== productId || requestId < this.comparisonRequestId) {
+        if (
+          this.selectedProductId() !== productId ||
+          requestId < this.refreshRequestId ||
+          this.comparisonRequestId > foregroundIdAtStart
+        ) {
           return;
         }
         this.rawComparison.set(comp);
