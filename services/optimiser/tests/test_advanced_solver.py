@@ -571,3 +571,72 @@ def test_result_built_from_open_ended_offers_stays_valid_for_a_day() -> None:
     )
 
     assert result.valid_until == computed_at + timedelta(days=1)
+
+
+def _lead_time_payload(
+    *, urgency: str, a: tuple[str, int | None], b: tuple[str, int | None]
+) -> tuple[AdvancedOptimisationInput, UUID, UUID]:
+    supplier_a, supplier_b = uuid4(), uuid4()
+    product_id = uuid4()
+    offers = [
+        _offer(product_id=product_id, supplier_id=supplier_a, total=a[0]).model_copy(
+            update={"lead_time_days": a[1]}
+        ),
+        _offer(product_id=product_id, supplier_id=supplier_b, total=b[0]).model_copy(
+            update={"lead_time_days": b[1]}
+        ),
+    ]
+    request = _request(supplier_ids=[supplier_a, supplier_b], items=[_item(product_id)])
+    request = request.model_copy(update={"urgency": urgency})
+    return AdvancedOptimisationInput(request=request, offers=offers), supplier_a, supplier_b
+
+
+def _chosen_supplier(result: object) -> UUID:
+    return result.allocation[0].supplier_id  # type: ignore[attr-defined]
+
+
+def test_normal_urgency_takes_the_cheaper_supplier_whatever_the_lead_time() -> None:
+    payload, cheap_slow, _ = _lead_time_payload(
+        urgency="normal", a=("100.0000", 10), b=("105.0000", 1)
+    )
+    assert _chosen_supplier(_advanced_solver(payload)) == cheap_slow
+
+
+def test_urgent_takes_the_slightly_dearer_supplier_that_delivers_sooner() -> None:
+    # PPS-208: each day of lead time costs about 1% of the line when urgent (10 days = +10).
+    payload, _, dear_fast = _lead_time_payload(
+        urgency="urgent", a=("100.0000", 10), b=("105.0000", 1)
+    )
+    result = _advanced_solver(payload)
+
+    assert _chosen_supplier(result) == dear_fast
+    assert any(
+        c.kind == "urgency" and "lead time" in c.description for c in result.applied_constraints
+    )
+
+
+def test_urgent_counts_an_unknown_lead_time_as_a_week() -> None:
+    payload, _, known_fast = _lead_time_payload(
+        urgency="urgent", a=("100.0000", None), b=("105.0000", 1)
+    )
+    assert _chosen_supplier(_advanced_solver(payload)) == known_fast
+
+
+def test_urgent_trade_off_stays_one_percent_a_day_at_the_web_default_price_weight() -> None:
+    # Review: with price weighted 0.4, the day cost must shrink with it. 100 and 10 days is
+    # worth 110; 120 and 1 day is worth 121.2, so the cheaper, slower supplier still wins.
+    from procurepilot_optimiser_worker.models import OptimisationSoftWeights
+
+    payload, cheap_slow, _ = _lead_time_payload(
+        urgency="urgent", a=("100.0000", 10), b=("120.0000", 1)
+    )
+    request = payload.request.model_copy(
+        update={
+            "soft_weights": OptimisationSoftWeights.model_validate(
+                {"price_competitiveness": "0.4000"}
+            )
+        }
+    )
+    payload = payload.model_copy(update={"request": request})
+
+    assert _chosen_supplier(_advanced_solver(payload)) == cheap_slow
