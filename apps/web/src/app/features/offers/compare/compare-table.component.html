@@ -1,5 +1,5 @@
 <mat-card class="table-card">
-  <table mat-table [dataSource]="offers" class="offers-table" aria-label="Supplier Offers Comparison">
+  <table mat-table [dataSource]="offers" class="offers-table" [attr.aria-label]="'compare.table.ariaLabel' | translate">
     <!-- Supplier Column -->
     <ng-container matColumnDef="supplier">
       <th mat-header-cell *matHeaderCellDef>{{ 'compare.table.supplier' | translate }}</th>

@@ -582,6 +582,50 @@ describe('ResolutionQueueComponent', () => {
     });
   });
 
+  describe('screen-reader states (P-159, PPS-203)', () => {
+    it('announces loading as a status', () => {
+      component.isLoading.set(true);
+      fixture.detectChanges();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('.loading-state')?.getAttribute('role'),
+      ).toBe('status');
+    });
+
+    it('announces how many lines and quotations are shown', () => {
+      const summary = (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="queue-result-summary"]',
+      );
+      expect(summary?.getAttribute('role')).toBe('status');
+      expect(summary?.textContent).toContain('Lines shown: 2');
+      expect(summary?.textContent).toContain('Quotations: 2');
+    });
+
+    it('keeps one summary live region in the page across loads and reports zero results', () => {
+      const summary = (): HTMLElement | null =>
+        (fixture.nativeElement as HTMLElement).querySelector('[data-testid="queue-result-summary"]');
+      const first = summary();
+      expect(first).withContext('present with results').toBeTruthy();
+
+      component.isLoading.set(true);
+      fixture.detectChanges();
+      expect(summary()).withContext('same element while loading').toBe(first);
+      expect(summary()?.textContent?.trim()).withContext('silent while loading').toBe('');
+
+      component.tasks.set([]);
+      component.isLoading.set(false);
+      fixture.detectChanges();
+      expect(summary()).withContext('same element at zero results').toBe(first);
+      expect(summary()?.textContent).toContain('Lines shown: 0');
+    });
+
+    it('makes the full quotation id reachable without a mouse', () => {
+      const badge = (fixture.nativeElement as HTMLElement).querySelector('.quotation-badge')!;
+      expect(badge.getAttribute('tabindex')).toBe('0');
+      expect(badge.getAttribute('aria-label')).toContain('q-101');
+    });
+  });
+
   describe('RFQ-aware matching in queue (spec 023 US1)', () => {
     it('shows "Correct match" button for auto-accepted line when isWriter, and hides it for non-writer', () => {
       const autoTask: MatchTask = {
