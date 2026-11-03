@@ -693,6 +693,9 @@ export class MatchResolutionComponent implements OnInit {
   executeCorrection(lineId: string, payload: MatchCorrectionRequest): void {
     if (!this.isWriter()) return;
 
+    const startLoadTaskId = this.latestLoadTaskId;
+    const startLineId = this.currentLoadedLineId ?? this.line()?.id ?? lineId;
+
     this.isSubmitting.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
@@ -703,11 +706,15 @@ export class MatchResolutionComponent implements OnInit {
 
     const key = this.correctionKeys.getKey(payload);
 
+    const hasBuyerMoved = (): boolean => {
+      const currentLineId = this.currentLoadedLineId ?? this.line()?.id ?? lineId;
+      return this.latestLoadTaskId !== startLoadTaskId || currentLineId !== startLineId;
+    };
+
     this.api.correctMatch(lineId, payload, key).subscribe({
       next: (res) => {
         this.isSubmitting.set(false);
         this.correctionKeys.recordSuccess();
-        this.decision.set(res.decision);
 
         const baseMsg = this.translate.instant('matching.resolution.actions.correctSuccess');
         const swept = formatSweptLinesMessage(this.translate, res.lines_matched_by_same_wording);
@@ -717,6 +724,10 @@ export class MatchResolutionComponent implements OnInit {
           undefined,
           { duration: 3500 },
         );
+
+        if (hasBuyerMoved()) {
+          return;
+        }
 
         this.loadTask(lineId);
         this.decision.set(res.decision);
@@ -731,6 +742,9 @@ export class MatchResolutionComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.isSubmitting.set(false);
+        if (hasBuyerMoved()) {
+          return;
+        }
         this.handleCorrectionError(err);
       },
     });

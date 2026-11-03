@@ -39,9 +39,15 @@
       <div class="banner-content">
         <span>{{ 'matching.resolution.correction.dependentLinesNotice' | translate: { count: dependentLinesCount() } }}</span>
         @if (dependentLinesQuotationId(); as qid) {
-          <a routerLink="/matching" [queryParams]="{ quotation_id: qid }" class="banner-link">
+          <button
+            mat-button
+            type="button"
+            data-testid="queue-dependent-lines-review"
+            class="banner-link"
+            (click)="reviewDependentLines(qid)"
+          >
             {{ 'matching.resolution.correction.reviewQueue' | translate }}
-          </a>
+          </button>
         }
       </div>
     </div>

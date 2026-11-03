@@ -350,6 +350,17 @@ export class ResolutionQueueComponent implements OnInit {
     this.aliasConflictNotice.set(false);
   }
 
+  reviewDependentLines(quotationId?: string | null): void {
+    const qid = quotationId ?? this.dependentLinesQuotationId();
+    if (qid) {
+      this.quotationId.set(qid);
+    }
+    this.statusFilter.set('all');
+    this.dependentLinesQuotationId.set(null);
+    this.syncQueryParams();
+    this.loadTasks();
+  }
+
   onStatusChange(status: MatchTaskStatus | 'all'): void {
     this.clearCorrectionNotices();
     this.statusFilter.set(status);
