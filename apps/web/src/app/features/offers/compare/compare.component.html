@@ -128,8 +128,30 @@
     </div>
   }
 
+  <!-- Error Alert -->
+  @if (!isLoading() && errorMessage(); as errorMsg) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-content">
+        <span class="error-text">{{ errorMsg }}</span>
+        @if (errorTraceId(); as traceId) {
+          <span class="error-trace">{{ 'common.traceId' | translate }}: {{ traceId }}</span>
+        }
+      </div>
+      <button
+        mat-stroked-button
+        type="button"
+        class="retry-btn"
+        data-testid="compare-retry"
+        (click)="fetchComparison(selectedProductId())"
+      >
+        <span>{{ 'common.retry' | translate }}</span>
+      </button>
+    </div>
+  }
+
   <!-- Populated Content -->
-  @if (!isLoading() && projected(); as proj) {
+  @if (!isLoading() && !errorMessage() && projected(); as proj) {
     @if (proj.offers.length > 0) {
       <!-- Recommended Offer Highlight Banner (US1) -->
       @if (proj.recommendation; as rec) {
@@ -165,7 +187,7 @@
         </div>
       </mat-card>
     }
-  } @else if (!isLoading() && !selectedProductId()) {
+  } @else if (!isLoading() && !errorMessage() && !selectedProductId()) {
     <!-- Empty State Before Product Selection -->
     <mat-card class="empty-state-card">
       <div class="empty-state">
