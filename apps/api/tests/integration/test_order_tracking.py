@@ -30,6 +30,14 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.fixture(autouse=True)
+def _fresh_mutation_limiter() -> None:
+    # Several tests here make five or more order mutations from one client within a minute.
+    from procurepilot_api.shared.rate_limit import mutation_limiter
+
+    mutation_limiter.reset()
+
+
 def _app(monkeypatch: pytest.MonkeyPatch, member: object) -> FastAPI:
     settings = settings_for_test_db(monkeypatch)
     app = create_app(settings)
