@@ -1,5 +1,5 @@
 import { provideHttpClient, withXhr } from '@angular/common/http';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
@@ -60,6 +60,7 @@ describe('OrderDetailComponent', () => {
         backToOrders: 'Back', retry: 'Retry', loadError: 'Load failed', saveError: 'Save failed', notProvided: 'Not provided',
         status: { submitted: 'Submitted' }, evidence: { pending: 'Pending' },
         detail: {
+          receivedQuantityFor: '{{product}} · Received quantity ({{unit}}, ordered {{ordered}})', confirmedQuantityFor: '{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})', receiptSaved: 'Delivery receipt saved.', submitted: 'Order submitted.', dateFormatHint: 'dd/mm/yyyy',
           errors: { order_not_open_for_evidence: 'This order cannot take delivery or confirmation evidence.' },
           eyebrow: 'Purchase order', createdAt: 'Created {{date}}', orderDate: 'Order date', expectedDelivery: 'Expected',
           total: 'Total', confirmation: 'Confirmation', receipt: 'Receipt', linesTitle: 'Lines', linesSubtitle: 'Evidence',
@@ -393,5 +394,57 @@ describe('OrderDetailComponent', () => {
     fixture.detectChanges();
 
     expect(byTestId('action-error')).toBeNull();
+  });
+  // P-187: saved receipts, submits and cancels were silent to a screen reader.
+  it('announces a saved receipt in a polite live region that exists before the news', () => {
+    fixture.detectChanges();
+    const region = byTestId('action-status');
+    expect(region?.getAttribute('role')).toBe('status');
+    expect(region?.getAttribute('aria-live')).toBe('polite');
+    expect(region?.textContent?.trim()).toBe('');
+
+    const component = fixture.componentInstance;
+    component.receiptReference.set('GRN-1');
+    component.receiptDate.set('2026-10-25');
+    component.setQuantity('receipt', 'line-1', '4');
+    api.recordReceipt.and.returnValue(of(component.evidence()!));
+    component.recordReceipt();
+    fixture.detectChanges();
+
+    expect(byTestId('action-status')?.textContent).toContain('Delivery receipt saved.');
+  });
+
+  // P-187: the inline confirmation did not take focus, so keyboard users were left behind it.
+  it('moves focus into the submit and cancel confirmations when they open', fakeAsync(() => {
+    showOrderAs('draft');
+    fixture.detectChanges();
+
+    byTestId('submit-order')!.click();
+    fixture.detectChanges();
+    tick();
+    expect(byTestId('submit-confirm-panel')?.contains(document.activeElement)).toBeTrue();
+
+    byTestId('cancel-order')!.click();
+    fixture.detectChanges();
+    tick();
+    expect(byTestId('cancel-confirm-panel')?.contains(document.activeElement)).toBeTrue();
+  }));
+
+  // P-187: the quantity inputs said nothing of the unit or what was ordered.
+  it('labels receipt quantities with the unit and the ordered quantity', () => {
+    fixture.detectChanges();
+    fixture.componentInstance.receiptOpen.set(true);
+    fixture.detectChanges();
+
+    const label = el().querySelector('input[name="receipt-line-1"]')?.closest('mat-form-field')?.textContent ?? '';
+    expect(label).toContain('ordered 10');
+    expect(label).toContain('kg');
+  });
+
+  it('shows the expected date format under the evidence dates', () => {
+    fixture.detectChanges();
+    fixture.componentInstance.receiptOpen.set(true);
+    fixture.detectChanges();
+    expect(byTestId('date-format-hint')?.textContent).toContain('dd/mm/yyyy');
   });
 });

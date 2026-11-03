@@ -246,4 +246,19 @@ describe('OutcomeFromOrderComponent', () => {
     component.load();
     expect(component.errorMessage()).toBe('Order not recordable');
   });
+  // P-187: «Save 1 outcomes» was a hardcoded plural.
+  it('says «Save 1 outcome» for one line, in English and Arabic', async () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const button = () => (fixture.nativeElement as HTMLElement).querySelector('[data-testid="save-outcomes"]');
+
+    expect(component.selectedCount()).toBe(1);
+    expect(button()?.textContent?.trim()).toBe('Save 1 outcome');
+    translate.use('ar');
+    fixture.detectChanges();
+    expect(button()?.textContent?.trim()).toBe('حفظ نتيجة واحدة');
+  });
 });
