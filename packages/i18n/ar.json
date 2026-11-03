@@ -2299,7 +2299,8 @@
       "duplicate_product": "هذا المنتج موجود بالفعل في بند آخر.",
       "cost_centre_not_found": "مركز التكلفة غير موجود.",
       "cost_centre_branch_mismatch": "مركز التكلفة لا ينتمي إلى الفرع المحدد.",
-      "product_not_found": "المنتج غير موجود."
+      "product_not_found": "المنتج غير موجود.",
+      "too_many_decimals": "يمكن أن تحتوي الكمية على 6 خانات عشرية كحد أقصى."
     },
     "list": {
       "newRequestButton": "طلب جديد",

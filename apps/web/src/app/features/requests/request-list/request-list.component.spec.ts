@@ -8,12 +8,12 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { By } from '@angular/platform-browser';
 import { Router, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { Subject, of, throwError } from 'rxjs';
+import { Observable, Subject, of, throwError } from 'rxjs';
 
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { SessionService } from '../../../core/auth/session.service';
-import type { Me, PurchaseRequest, Role } from '../../../core/api/models';
+import type { Branch, BranchList, Me, PurchaseRequest, Role } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
 import { RequestListComponent } from './request-list.component';
@@ -842,6 +842,51 @@ describe('RequestListComponent (T017)', () => {
       const branchCell = fixture.nativeElement.querySelector('td.mat-column-branch');
       expect(branchCell?.textContent?.trim()).toBe('South Branch');
       expect(branchCell?.textContent).not.toContain('b2');
+    });
+
+    it('Review Finding B (#426): loadBranches per-subscription state — subscribe, cancel after page one, subscribe again -> result has no duplicates and fetches every page', (done) => {
+      const page2$ = new Subject<{ items: Branch[]; next_cursor: string | null }>();
+      let firstRun = true;
+
+      organisationApi.listBranches.and.callFake((params) => {
+        if (!params?.cursor) {
+          return of({
+            items: [{ id: 'b-1', name: 'Branch 1', is_active: true, created_at: '2026-01-01T00:00:00Z' }],
+            next_cursor: 'c-1',
+          });
+        }
+        if (params.cursor === 'c-1' && firstRun) {
+          return page2$.asObservable();
+        }
+        const match = params.cursor.match(/^c-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10) + 1;
+          return of({
+            items: [{ id: `b-${num}`, name: `Branch ${num}`, is_active: true, created_at: '2026-01-01T00:00:00Z' }],
+            next_cursor: num < 50 ? `c-${num}` : null,
+          });
+        }
+        return of({ items: [], next_cursor: null });
+      });
+
+      const branches$ = (component as unknown as { loadBranches: () => Observable<BranchList> }).loadBranches();
+
+      // First subscription: page 1 arrives, then cancel before page 2
+      const sub1 = branches$.subscribe();
+      expect(organisationApi.listBranches).toHaveBeenCalledWith({ limit: 100 });
+      expect(organisationApi.listBranches).toHaveBeenCalledWith({ limit: 100, cursor: 'c-1' });
+      sub1.unsubscribe();
+
+      firstRun = false;
+      organisationApi.listBranches.calls.reset();
+
+      // Second subscription to the SAME observable
+      branches$.subscribe((result: BranchList) => {
+        expect(result.items.length).toBe(50);
+        expect(result.items[0].id).toBe('b-1');
+        expect(result.items[49].id).toBe('b-50');
+        done();
+      });
     });
   });
 });
