@@ -103,6 +103,14 @@
   }
 }
 
+.pilot-whatsapp-icon {
+  inline-size: 20px;
+  block-size: 20px;
+  flex-shrink: 0;
+  margin-inline-end: var(--pp-space-2);
+  fill: currentColor;
+}
+
 .pilot-email-row {
   display: flex;
   align-items: center;

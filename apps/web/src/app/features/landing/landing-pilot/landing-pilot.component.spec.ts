@@ -88,5 +88,23 @@ describe('LandingPilotComponent', () => {
     );
     expect(btn.nativeElement.getAttribute('target')).toBe('_blank');
     expect(btn.nativeElement.textContent).toContain('Message us on WhatsApp');
+    expect(btn.query(By.css('svg.pilot-whatsapp-icon'))).toBeTruthy();
+  });
+
+  it('opens a menu of mail options, each carrying the same draft', () => {
+    const { emailSubject, emailBody } = enCatalog.landing.pilot;
+    const subject = encodeURIComponent(emailSubject);
+    const body = encodeURIComponent(emailBody);
+    const to = encodeURIComponent(environment.salesEmail);
+
+    fixture.debugElement.query(By.css('.pilot-primary-btn')).nativeElement.click();
+    fixture.detectChanges();
+
+    const items = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[mat-menu-item]'));
+    expect(items.map((item) => item.getAttribute('href'))).toEqual([
+      `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`,
+      `https://outlook.office.com/mail/deeplink/compose?to=${to}&subject=${subject}&body=${body}`,
+      `mailto:${environment.salesEmail}?subject=${subject}&body=${body}`,
+    ]);
   });
 });

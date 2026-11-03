@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { environment } from '../../../../environments/environment';
@@ -30,7 +31,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
 @Component({
   selector: 'app-landing-pilot',
   standalone: true,
-  imports: [MatButtonModule, MatIconModule, TranslatePipe],
+  imports: [MatButtonModule, MatIconModule, MatMenuModule, TranslatePipe],
   templateUrl: './landing-pilot.component.html',
   styleUrl: './landing-pilot.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -45,19 +46,29 @@ export class LandingPilotComponent implements OnDestroy {
   readonly emailCopied = model<boolean>(false);
   private copyTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  readonly mailtoLink = computed(() => {
+  private readonly emailDraft = computed(() => {
     this.i18n.currentLocale();
-    const subject = this.translate.instant('landing.pilot.emailSubject');
-    const body = this.translate.instant('landing.pilot.emailBody');
-    const queryParts: string[] = [];
-    if (subject) {
-      queryParts.push(`subject=${encodeURIComponent(subject)}`);
-    }
-    if (body) {
-      queryParts.push(`body=${encodeURIComponent(body)}`);
-    }
-    const query = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
-    return `mailto:${this.salesEmail}${query}`;
+    return {
+      to: encodeURIComponent(this.salesEmail),
+      subject: encodeURIComponent(this.translate.instant('landing.pilot.emailSubject')),
+      body: encodeURIComponent(this.translate.instant('landing.pilot.emailBody')),
+    };
+  });
+
+  // mailto: only works where a mail app is set up, so webmail users get their own compose links.
+  readonly mailtoLink = computed(() => {
+    const { subject, body } = this.emailDraft();
+    return `mailto:${this.salesEmail}?subject=${subject}&body=${body}`;
+  });
+
+  readonly gmailLink = computed(() => {
+    const { to, subject, body } = this.emailDraft();
+    return `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`;
+  });
+
+  readonly outlookLink = computed(() => {
+    const { to, subject, body } = this.emailDraft();
+    return `https://outlook.office.com/mail/deeplink/compose?to=${to}&subject=${subject}&body=${body}`;
   });
 
   readonly whatsappLink = computed(() => {
