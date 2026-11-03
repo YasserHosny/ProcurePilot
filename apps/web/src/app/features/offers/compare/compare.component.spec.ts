@@ -338,6 +338,23 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
       expect(component.rawComparison()).toBe(b);
     });
 
+    it('does not leave the loading spinner on when a background refresh overtakes the first load', fakeAsync(() => {
+      const first$ = new Subject<OfferComparison>();
+      const refresh$ = new Subject<OfferComparison>();
+      apiService.compareOffers.and.returnValues(first$, refresh$);
+
+      component.fetchComparison(mockComparison.product.id); // foreground load, still pending
+      expect(component.isLoading()).toBeTrue();
+      component.onQuantityChange('40');
+      tick(700); // the background refresh is issued while the first load is pending
+
+      const loaded = comparisonFor('first', '111.0000');
+      first$.next(loaded);
+
+      expect(component.isLoading()).withContext('spinner released').toBeFalse();
+      expect(component.rawComparison()).toBe(loaded);
+    }));
+
     it('shows a failed comparison as an alert with Retry', () => {
       apiService.compareOffers.and.returnValue(
         throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'Offers are down', trace_id: 'tr-9' } })),
