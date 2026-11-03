@@ -413,7 +413,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Keyboard Controls bar** | 1–9 selects a candidate by rank, arrow keys navigate, O cycles through outcomes, Enter confirms the decision — the whole screen is operable without a mouse. |
+| 1 | **Keyboard Controls bar** | 1–9 selects a candidate by rank, arrow keys navigate, O cycles through outcomes, Ctrl+Enter (Cmd+Enter on macOS) confirms the decision — the whole screen is operable without a mouse. |
 | 2 | **Line detail** | The extracted line text, quantity, unit price, quoted line exposure, and any mixed-currency warning for context. This lets you compare the matching decision against the value that will later appear in Smart Compare. |
 | 3 | **Ranked Product Candidates** | Each candidate card shows the product's brand, variant, GTIN, and base unit, plus a **Match Score** and a reason breakdown (GTIN match, supplier-code match, alias hit, lexical similarity, brand/variant/pack-unit/pack-size/price agreement, and semantic signal where available — shown as "Not available" when the workspace has no semantic-matching provider configured). An explainer states plainly that this score ranks candidates — **it is not yet a calibrated probability** — so treat it as a ranking signal, not a statistical confidence level. |
 

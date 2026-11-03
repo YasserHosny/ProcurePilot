@@ -40,6 +40,7 @@ export interface RfqRecipient {
   created_at: string;
   supplier_name?: string | null;
   supplier_contact_email?: string | null;
+  response_count?: number;
 }
 
 export interface RfqDetail {
