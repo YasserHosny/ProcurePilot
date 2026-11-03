@@ -1884,7 +1884,18 @@
       "successSplit": "{{count}} purchase requests submitted for approval as one split."
     },
     "rerunNotice": "This form was filled from an earlier split. Check the risk tolerance, urgency, excluded suppliers and weights, then run it again.",
-    "rerunPackUnknown": "The pack sizes of this split's products are not loaded yet. Wait a moment and try Re-run again."
+    "rerunPackUnknown": "The pack sizes of this split's products are not loaded yet. Wait a moment and try Re-run again.",
+    "history": {
+      "title": "Recent splits",
+      "items": "{{count}} items",
+      "loadMore": "Show older splits",
+      "status": {
+        "queued": "Queued",
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed"
+      }
+    }
   },
   "alerts": {
     "title": "Actionable Alerts Inbox",

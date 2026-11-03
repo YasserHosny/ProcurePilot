@@ -13,7 +13,7 @@ from integration.smart_compare_helpers import (
     fetch_basket_jobs,
     settings_for_test_db,
 )
-from procurepilot_api.errors import ServiceUnavailableError
+from procurepilot_api.errors import ServiceUnavailableError, UnprocessableEntityError
 from procurepilot_api.modules.offers import basket_service
 from procurepilot_api.modules.offers.basket_service import BasketService
 from procurepilot_api.modules.offers.schemas import BasketItemRequest, BasketOptimiseRequest
@@ -214,3 +214,53 @@ def test_failed_enqueue_is_retried_for_the_same_idempotency_key(
         assert job.status == "queued"
         assert attempts == 2
         assert fetch_basket_jobs(context.workspace.tenant_id)[0]["status"] == "queued"
+
+
+def test_recent_splits_list_pages_newest_first_with_a_summary_of_each(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PPS-209: there was no way to find an earlier split except by its URL."""
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("basket-history") as context:
+        for supplier_id in context.supplier_ids:
+            add_costed_offer(context, supplier_id=supplier_id, amount=Decimal("3.0000"))
+        monkeypatch.setattr(basket_service, "_enqueue_redis_job", lambda *_a, **_k: None)
+        service = BasketService(settings)
+        created: list[UUID] = []
+        for quantity in ("1.000000", "2.000000", "3.000000"):
+            job, _ = service.create_job(
+                member=context.member,
+                payload=BasketOptimiseRequest(
+                    supplier_ids=context.supplier_ids,
+                    items=[
+                        BasketItemRequest(
+                            workspace_product_id=context.product_id, quantity=quantity
+                        )
+                    ],
+                ),
+            )
+            created.append(job.id)
+
+        first = service.list_jobs(member=context.member, limit=2)
+        assert [item.id for item in first.items] == [created[2], created[1]]
+        assert first.next_cursor is not None
+        assert first.items[0].status == "queued"
+        assert first.items[0].item_count == 1
+        assert len(first.items[0].supplier_ids) == 2
+
+        # A split created between pages must not repeat or hide anything.
+        service.create_job(
+            member=context.member,
+            payload=BasketOptimiseRequest(
+                supplier_ids=context.supplier_ids,
+                items=[
+                    BasketItemRequest(workspace_product_id=context.product_id, quantity="9.000000")
+                ],
+            ),
+        )
+        second = service.list_jobs(member=context.member, limit=2, cursor=first.next_cursor)
+        assert [item.id for item in second.items] == [created[0]]
+        assert second.next_cursor is None
+
+        with pytest.raises(UnprocessableEntityError):
+            service.list_jobs(member=context.member, cursor="not-a-cursor")

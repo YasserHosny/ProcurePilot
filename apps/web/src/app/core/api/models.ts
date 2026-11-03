@@ -952,6 +952,21 @@ export interface BasketRequestSettings {
   readonly weights: OptimisationWeights;
 }
 
+export interface BasketSplitJobSummary {
+  readonly id: string;
+  readonly status: BasketSplitJobStatus;
+  readonly created_at: string;
+  readonly supplier_ids: readonly string[];
+  readonly item_count: number;
+  readonly rfq_id?: string | null;
+  readonly total_landed_cost?: Money | null;
+}
+
+export interface BasketSplitJobList {
+  readonly items: readonly BasketSplitJobSummary[];
+  readonly next_cursor: string | null;
+}
+
 export interface BasketPackSnapshot {
   readonly base_quantity: string;
   readonly base_unit: string;

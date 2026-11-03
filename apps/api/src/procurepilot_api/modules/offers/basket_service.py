@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 import logging
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -30,6 +32,8 @@ from procurepilot_api.modules.offers.schemas import (
     AdvancedBasketOptimiseRequest,
     BasketOptimiseRequest,
     BasketSplitJob,
+    BasketSplitJobList,
+    BasketSplitJobSummary,
     Money,
 )
 from procurepilot_api.modules.offers.service import _authenticated_db
@@ -216,6 +220,38 @@ class BasketService:
             if code is not None:
                 row = self._fail_stuck(conn, row, code)
         return _job(row)
+
+    def list_jobs(
+        self, *, member: CurrentMember, limit: int = 20, cursor: str | None = None
+    ) -> BasketSplitJobList:
+        """Earlier splits of this workspace, newest first, paged by position (not offset)."""
+        capped = max(1, min(limit, 50))
+        after = _decode_history_cursor(cursor)
+        condition, params = "true", []
+        if after is not None:
+            condition = "(created_at, id) < (%s::timestamptz, %s::uuid)"
+            params = [after[0], after[1]]
+        with _authenticated_db(self._settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "select id, status, created_at, supplier_ids, rfq_id, "
+                    "jsonb_array_length(items) as item_count, "
+                    "result -> 'total_landed_cost' as total_landed_cost "
+                    f"from basket_split_job where {condition} "
+                    "order by created_at desc, id desc limit %s",
+                    [*params, capped + 1],
+                )
+                rows = [dict(row) for row in cur.fetchall()]
+        visible = rows[:capped]
+        return BasketSplitJobList(
+            items=[
+                BasketSplitJobSummary.model_validate(
+                    {**row, "total_landed_cost": _stored_money(row.get("total_landed_cost"))}
+                )
+                for row in visible
+            ],
+            next_cursor=(_encode_history_cursor(visible[-1]) if len(rows) > capped else None),
+        )
 
     def _stale_code(self, row: dict[str, object], *, worker_alive: bool | None) -> str | None:
         if row["status"] == "queued" and worker_alive is None:
@@ -682,6 +718,29 @@ def _job(row: dict[str, object]) -> BasketSplitJob:
             "request_settings": _request_settings(row.get("request_snapshot")),
         }
     )
+
+
+def _stored_money(value: object) -> dict[str, object] | None:
+    if isinstance(value, dict) and "amount" in value and "currency" in value:
+        return {"amount": value["amount"], "currency": value["currency"]}
+    return None
+
+
+def _encode_history_cursor(row: dict[str, object]) -> str:
+    created_at = row["created_at"]
+    assert isinstance(created_at, datetime)
+    payload = json.dumps({"c": created_at.isoformat(), "i": str(row["id"])})
+    return base64.urlsafe_b64encode(payload.encode()).decode()
+
+
+def _decode_history_cursor(value: str | None) -> tuple[str, str] | None:
+    if value is None:
+        return None
+    try:
+        data = json.loads(base64.urlsafe_b64decode(value.encode()))
+        return str(datetime.fromisoformat(str(data["c"])).isoformat()), str(UUID(str(data["i"])))
+    except (ValueError, KeyError, TypeError) as exc:
+        raise UnprocessableEntityError(details={"cursor": "invalid"}) from exc
 
 
 def _request_settings(snapshot: object) -> dict[str, object] | None:

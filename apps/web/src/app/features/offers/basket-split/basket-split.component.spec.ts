@@ -125,7 +125,10 @@ describe('BasketSplitComponent (US3, T045)', () => {
       'products',
       'optimiseBasket',
       'getBasketSplitJob',
+      'listBasketSplitJobs',
     ]);
+
+    apiService.listBasketSplitJobs.and.returnValue(of({ items: [], next_cursor: null }));
 
     mockRfqApi = jasmine.createSpyObj<RfqApi>('RfqApi', ['getRfq']);
     mockRfqApi.getRfq.and.returnValue(
@@ -1199,6 +1202,41 @@ describe('BasketSplitComponent (US3, T045)', () => {
         }),
       );
       expect(component.rerunNotice()).toBeFalse();
+    });
+
+    // PPS-209: earlier splits could only be found through their URL.
+    it('lists recent splits with a link to each and loads further pages', () => {
+      const summary = (id: string) => ({
+        id, status: 'completed' as const, created_at: '2026-11-03T10:00:00Z',
+        supplier_ids: ['supp-1', 'supp-2'], item_count: 3, total_landed_cost: { amount: '255.0000', currency: 'SAR' },
+      });
+      apiService.listBasketSplitJobs.and.returnValues(
+        of({ items: [summary('job-a')], next_cursor: 'c2' }),
+        of({ items: [summary('job-b')], next_cursor: null }),
+      );
+      component.loadHistory();
+      fixture.detectChanges();
+
+      const rows = () => Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="split-history-row"]'));
+      expect(rows().length).toBe(1);
+      expect(rows()[0].getAttribute('href')).toBe('/offers/basket-split/job-a');
+      expect(rows()[0].textContent).toContain('Supplier Alpha');
+      expect(component.hasMoreHistory()).toBeTrue();
+
+      component.loadMoreHistory();
+      fixture.detectChanges();
+
+      expect(apiService.listBasketSplitJobs).toHaveBeenCalledWith(jasmine.objectContaining({ cursor: 'c2' }));
+      expect(rows().map((r) => r.getAttribute('href'))).toEqual(['/offers/basket-split/job-a', '/offers/basket-split/job-b']);
+      expect(component.hasMoreHistory()).toBeFalse();
+    });
+
+    it('says nothing when there is no history, and keeps the form usable when it cannot be loaded', () => {
+      apiService.listBasketSplitJobs.and.returnValue(throwError(() => new Error('down')));
+      component.loadHistory();
+      fixture.detectChanges();
+      expect(component.history()).toEqual([]);
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="split-history"]')).toBeNull();
     });
 
     it('offers preferred suppliers as well as active ones, without duplicates', () => {

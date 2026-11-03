@@ -21,7 +21,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Subscription, catchError, forkJoin, interval, map, of, switchMap } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
-import type { ApiError, Product, Supplier } from '../../../core/api/models';
+import type { ApiError, BasketSplitJobSummary, Product, Supplier } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -227,6 +227,11 @@ export class BasketSplitComponent implements OnInit {
   readonly jobNotFound = signal(false);
   readonly pollFailed = signal(false);
 
+  /** Earlier splits of this workspace, newest first. */
+  readonly history = signal<BasketSplitJobSummary[]>([]);
+  private readonly historyCursor = signal<string | null>(null);
+  readonly hasMoreHistory = computed(() => this.historyCursor() !== null);
+
   /** What a screen reader hears as the job moves from queued to running to finished. */
   readonly liveStatus = computed(() => {
     switch (this.uiState()) {
@@ -244,6 +249,7 @@ export class BasketSplitComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadSuppliersAndProducts();
+    this.loadHistory();
 
     this.route.paramMap.subscribe((params) => {
       const jobId = params.get('id');
@@ -284,6 +290,44 @@ export class BasketSplitComponent implements OnInit {
         // Fallback silently if products load fails
       },
     });
+  }
+
+  /** «Supplier A, Supplier B» for a history row. */
+  historySuppliers(job: BasketSplitJobSummary): string {
+    return job.supplier_ids.map((id) => this.getSupplierName(id)).join(', ');
+  }
+
+  loadHistory(): void {
+    this.api
+      .listBasketSplitJobs({ limit: 10 })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          this.history.set([...res.items]);
+          this.historyCursor.set(res.next_cursor);
+        },
+        error: () => {
+          // History is a convenience: without it the form works as before.
+          this.history.set([]);
+          this.historyCursor.set(null);
+        },
+      });
+  }
+
+  loadMoreHistory(): void {
+    const cursor = this.historyCursor();
+    if (!cursor) return;
+    this.api
+      .listBasketSplitJobs({ limit: 10, cursor })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          const known = new Set(this.history().map((job) => job.id));
+          this.history.set([...this.history(), ...res.items.filter((job) => !known.has(job.id))]);
+          this.historyCursor.set(res.next_cursor);
+        },
+        error: () => undefined,
+      });
   }
 
   addItem(): void {
