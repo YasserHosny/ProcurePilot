@@ -1287,6 +1287,14 @@
   },
   "matching": {
     "queue": {
+      "moreAvailable": "more available",
+      "sort": {
+        "label": "Sort by",
+        "createdDesc": "Newest first",
+        "createdAsc": "Oldest first",
+        "priorityDesc": "Priority: high first",
+        "priorityAsc": "Priority: low first"
+      },
       "resultSummary": "Lines shown: {{lines}} · Quotations: {{quotations}}",
       "quotationIdLabel": "Quotation {{id}}",
       "title": "Match Resolution Queue",
