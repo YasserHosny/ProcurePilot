@@ -695,6 +695,121 @@ describe('ResolutionQueueComponent', () => {
       );
     });
 
+    describe('correction retries, notices and double clicks (P-154, PPS-198)', () => {
+      let autoTask: MatchTask;
+      const requestA = {
+        expected_current_decision_id: 'dec-1',
+        outcome: 'same_product' as const,
+        selected_match_candidate_id: 'cand-2',
+        new_product: null,
+        learn_alias: true,
+      };
+      const done = (extra: Record<string, unknown> = {}) =>
+        of({
+          decision: { ...autoTask.decision!, id: 'dec-2' },
+          superseded_decision_id: 'dec-1',
+          lines_matched_through_old_wording: [],
+          ...extra,
+        });
+      const lost = () => throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'busy' } }));
+      const closeWith = (request: unknown): void => {
+        const dialog = (component as unknown as { dialog: { open: jasmine.Spy } }).dialog;
+        dialog.open.and.returnValue({ afterClosed: () => of(request) });
+      };
+
+      beforeEach(() => {
+        autoTask = {
+          ...mockTasks[0],
+          id: 'task-auto-1',
+          status: 'auto_accepted',
+          decision: {
+            id: 'dec-1',
+            quotation_line_id: 'line-101',
+            matched_product: mockTasks[0].candidates[0].candidate_product,
+            outcome: 'same_product',
+            selected_match_candidate_id: 'cand-1',
+            decided_at: '2026-08-21T01:00:00Z',
+            decided_by: 'buyer@example.com',
+            is_automatic: true,
+            confidence: '0.8500',
+          },
+        };
+        apiService.getMatchTaskForLine.and.returnValue(of(autoTask));
+        spyOn((component as unknown as { dialog: { open: () => unknown } }).dialog, 'open');
+      });
+
+      it('replays the same Idempotency-Key when the same correction is retried after a failure', () => {
+        apiService.correctMatch.and.returnValues(lost(), done());
+        closeWith(requestA);
+
+        component.openCorrectMatchDialog(autoTask);
+        component.openCorrectMatchDialog(autoTask);
+
+        const [first, retry] = apiService.correctMatch.calls.allArgs();
+        expect(retry[2]).withContext('retry replays the key').toBe(first[2]);
+      });
+
+      it('uses a new key for a different correction', () => {
+        apiService.correctMatch.and.returnValues(lost(), done());
+        closeWith(requestA);
+        component.openCorrectMatchDialog(autoTask);
+        closeWith({ ...requestA, selected_match_candidate_id: 'cand-1' });
+        component.openCorrectMatchDialog(autoTask);
+
+        const [first, second] = apiService.correctMatch.calls.allArgs();
+        expect(second[2]).not.toBe(first[2]);
+      });
+
+      it('tells the buyer about lines still matched through the old wording and about a kept alias', () => {
+        apiService.correctMatch.and.returnValue(
+          done({ lines_matched_through_old_wording: ['l-1', 'l-2'], alias_conflict_product_id: 'prod-9' }),
+        );
+        closeWith(requestA);
+
+        component.openCorrectMatchDialog(autoTask);
+        fixture.detectChanges();
+
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="queue-dependent-lines-notice"]')?.textContent).toContain(
+          '2 other lines were matched through the old wording',
+        );
+        expect(el.querySelector('[data-testid="queue-alias-conflict-notice"]')?.textContent).toContain(
+          enCatalog.matching.resolution.correction.aliasConflictNotice,
+        );
+      });
+
+      it('opens the dependent lines in the queue itself, not through a link that leaves the list unchanged', () => {
+        apiService.correctMatch.and.returnValue(
+          done({ lines_matched_through_old_wording: ['l-1'] }),
+        );
+        closeWith(requestA);
+        component.openCorrectMatchDialog(autoTask);
+        fixture.detectChanges();
+
+        const review = (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="queue-dependent-lines-review"]',
+        ) as HTMLElement | null;
+        expect(review?.tagName).toBe('BUTTON');
+
+        apiService.getMatchTasks.calls.reset();
+        review!.click();
+
+        expect(apiService.getMatchTasks).toHaveBeenCalledWith(
+          jasmine.objectContaining({ quotation_id: autoTask.quotation.id, status: 'all' }),
+        );
+      });
+
+      it('ignores a second click on «Correct match» while the first is still loading', () => {
+        const pending$ = new Subject<MatchTask>();
+        apiService.getMatchTaskForLine.and.returnValue(pending$);
+
+        component.openCorrectMatchDialog(autoTask);
+        component.openCorrectMatchDialog(autoTask);
+
+        expect(apiService.getMatchTaskForLine).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it('passes quotationSupplierId equal to quotation.supplier_id and non-empty baseUnits when opening Correct dialog', () => {
       const autoTask: MatchTask = {
         ...mockTasks[0],

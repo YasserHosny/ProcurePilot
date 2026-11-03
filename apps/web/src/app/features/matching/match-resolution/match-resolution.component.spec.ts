@@ -3,7 +3,7 @@ import { Component, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -745,6 +745,115 @@ describe('MatchResolutionComponent (T039)', () => {
             document.getElementById(region.getAttribute('aria-labelledby')!)?.textContent?.trim());
         expect(named).withContext(region.className).toBeTruthy();
       }
+    });
+  });
+
+  describe('correction retries and stale loads (P-154, PPS-198)', () => {
+    const payloadA: MatchCorrectionRequest = {
+      expected_current_decision_id: 'dec-1',
+      outcome: 'same_product',
+      selected_match_candidate_id: 'cand-2',
+      new_product: null,
+      learn_alias: true,
+    };
+    const payloadB: MatchCorrectionRequest = { ...payloadA, selected_match_candidate_id: 'cand-1' };
+    const ok = of({
+      decision: { ...mockDecision, id: 'dec-2' },
+      superseded_decision_id: 'dec-1',
+      lines_matched_through_old_wording: [],
+    });
+    const lost = () => throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'busy' } }));
+
+    const reopenWith = (payload: MatchCorrectionRequest): void => {
+      const dialog = (component as unknown as { dialog: { open: jasmine.Spy } }).dialog;
+      (dialog.open as jasmine.Spy).and.returnValue({ afterClosed: () => of(payload) });
+      component.openCorrectMatchDialog();
+    };
+
+    beforeEach(() => {
+      component.decision.set(mockDecision);
+      spyOn((component as unknown as { dialog: { open: () => unknown } }).dialog, 'open');
+    });
+
+    it('replays the same Idempotency-Key when the same correction is retried after a failure', () => {
+      apiService.correctMatch.and.returnValues(lost(), ok);
+
+      reopenWith(payloadA);
+      reopenWith(payloadA);
+
+      const [first, retry] = apiService.correctMatch.calls.allArgs();
+      expect(first[2]).toEqual(jasmine.any(String));
+      expect(retry[2]).withContext('retry replays the key').toBe(first[2]);
+    });
+
+    it('uses a new key when the retried correction is a different one', () => {
+      apiService.correctMatch.and.returnValues(lost(), ok);
+
+      reopenWith(payloadA);
+      reopenWith(payloadB);
+
+      const [first, second] = apiService.correctMatch.calls.allArgs();
+      expect(second[2]).not.toBe(first[2]);
+    });
+
+    it('uses a new key for the next correction after one succeeded', () => {
+      apiService.correctMatch.and.returnValues(ok, ok);
+      apiService.getMatchTaskForLine.and.returnValue(of({ ...mockTask, decision: mockDecision }));
+
+      reopenWith(payloadA);
+      component.decision.set(mockDecision);
+      reopenWith(payloadA);
+
+      const [first, second] = apiService.correctMatch.calls.allArgs();
+      expect(second[2]).not.toBe(first[2]);
+    });
+
+    it('does not redraw the old line when a correction answers after the buyer moved on', () => {
+      const correction$ = new Subject<{
+        decision: MatchDecision;
+        superseded_decision_id: string;
+        lines_matched_through_old_wording: string[];
+      }>();
+      apiService.correctMatch.and.returnValue(correction$);
+      component.executeCorrection('line-99', payloadA);
+
+      apiService.getMatchTaskForLine.calls.reset();
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({ ...mockTask, id: 'task-B', quotation_line: { ...mockTask.quotation_line, id: 'line-B' } }),
+      );
+      component.loadTask('line-B');
+      apiService.getMatchTaskForLine.calls.reset();
+
+      correction$.next({
+        decision: { ...mockDecision, id: 'dec-2' },
+        superseded_decision_id: 'dec-1',
+        lines_matched_through_old_wording: ['l-1'],
+      });
+      fixture.detectChanges();
+
+      expect(apiService.getMatchTaskForLine).not.toHaveBeenCalledWith('line-99');
+      expect(component.line()?.id).toBe('line-B');
+      expect(component.dependentLinesCount()).toBe(0);
+    });
+
+    it('ignores a late response for a line the buyer already left', () => {
+      const a$ = new Subject<MatchTask>();
+      const b$ = new Subject<MatchTask>();
+      apiService.getMatchTaskForLine.and.callFake((id: string) => (id === 'line-A' ? a$ : b$));
+      const taskFor = (id: string): MatchTask => ({
+        ...mockTask,
+        id: `task-${id}`,
+        quotation_line: { ...mockTask.quotation_line, id, original_text: `text ${id}` },
+      });
+
+      component.loadTask('line-A');
+      component.loadTask('line-B');
+      b$.next(taskFor('line-B'));
+      a$.next(taskFor('line-A'));
+      fixture.detectChanges();
+
+      expect(component.line()?.id).toBe('line-B');
+      expect(component.task()?.id).toBe('task-line-B');
     });
   });
 
