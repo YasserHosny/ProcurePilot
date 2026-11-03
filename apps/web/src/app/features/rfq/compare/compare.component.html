@@ -122,6 +122,14 @@
     <div class="error-state" role="alert">
       <mat-icon color="warn" aria-hidden="true">error_outline</mat-icon>
       <p>{{ errorMessage() }}</p>
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="loadData(rfqId())"
+        data-testid="rfq-compare-retry"
+      >
+        {{ 'common.retry' | translate }}
+      </button>
     </div>
   }
 
@@ -318,7 +326,7 @@
                   >
                     {{ 'rfq.compare.openRequest' | translate }}
                   </a>
-                } @else {
+                } @else if (isWriter()) {
                   <button mat-flat-button color="primary"
                     [disabled]="!canPrepare(response) || isConverted() || isExpired()"
                     (click)="prepareRequest(response)">
@@ -329,16 +337,18 @@
               @if (!isConverted()) {
                 @if (isExpired()) {
                   <span class="disabled-reason" data-testid="expired-reason">{{ 'rfq.compare.rfqExpired' | translate }}</span>
-                } @else if (branchesError()) {
-                  <span class="disabled-reason" data-testid="branches-error-reason">{{ 'rfq.compare.branchesLoadError' | translate }}</span>
-                } @else if (rfqDetailError()) {
-                  <span class="disabled-reason" data-testid="rfq-detail-error-reason">{{ 'rfq.compare.rfqDetailLoadError' | translate }}</span>
-                } @else if (!isEligible(response)) {
-                  <span class="disabled-reason" data-testid="ineligible-reason">{{ ineligibilityReason(response) | translate }}</span>
-                } @else if (hasMixedCurrencies(response)) {
-                  <span class="disabled-reason" data-testid="mixed-currencies-reason">{{ 'rfq.compare.mixedCurrenciesNotice' | translate }}</span>
-                } @else if (!selectedBranchId()) {
-                  <span class="disabled-reason">{{ 'rfq.compare.chooseBranchFirst' | translate }}</span>
+                } @else if (isWriter()) {
+                  @if (branchesError()) {
+                    <span class="disabled-reason" data-testid="branches-error-reason">{{ 'rfq.compare.branchesLoadError' | translate }}</span>
+                  } @else if (rfqDetailError()) {
+                    <span class="disabled-reason" data-testid="rfq-detail-error-reason">{{ 'rfq.compare.rfqDetailLoadError' | translate }}</span>
+                  } @else if (!isEligible(response)) {
+                    <span class="disabled-reason" data-testid="ineligible-reason">{{ ineligibilityReason(response) | translate }}</span>
+                  } @else if (hasMixedCurrencies(response)) {
+                    <span class="disabled-reason" data-testid="mixed-currencies-reason">{{ 'rfq.compare.mixedCurrenciesNotice' | translate }}</span>
+                  } @else if (!selectedBranchId()) {
+                    <span class="disabled-reason">{{ 'rfq.compare.chooseBranchFirst' | translate }}</span>
+                  }
                 }
               }
               @if (isConverted() && !convertedPurchaseRequestId()) {
