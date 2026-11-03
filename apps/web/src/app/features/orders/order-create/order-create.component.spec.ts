@@ -300,11 +300,8 @@ describe('OrderCreateComponent', () => {
     // 3. Expected delivery date pre-filled from required_by_date
     expect(component.form.controls.expected_delivery_date.value).toEqual(new Date(2026, 9, 1));
 
-    // 4. Currency is readonly
-    const currencyInput = (fixture.nativeElement as HTMLElement).querySelector(
-      'input[formControlName="currency"]',
-    );
-    expect(currencyInput?.hasAttribute('readonly')).toBeTrue();
+    // 4. Currency is fixed by the request: the control is disabled, not editable
+    expect(component.form.controls.currency.disabled).toBeTrue();
 
     // 5. Line remaining badge says "Still to order"
     const remainingBadge = (fixture.nativeElement as HTMLElement).querySelector('.remaining-badge');
@@ -1063,5 +1060,56 @@ describe('OrderCreateComponent', () => {
       const submitButton = editFixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement;
       expect(submitButton.disabled).toBeFalse();
     });
+  });
+  // PPS-207: quantities are in packs, so the label must say so next to a pack line.
+  it('labels the quantity as packs when the product has a pack, and plainly when it has none', () => {
+    component.products.set([
+      { id: 'p-pack', tenant_name: 'Rice', base_unit: 'kilogram', pack: { pack_count: 1, unit_size: '10', base_quantity: '10' } },
+      { id: 'p-none', tenant_name: 'Loose', base_unit: 'each' },
+    ] as unknown as import('../../../core/api/models').Product[]);
+    component.lines.at(0).patchValue({ workspace_product_id: 'p-pack' });
+    expect(component.quantityLabelKey(component.lines.at(0))).toBe('orders.create.quantityPacks');
+    component.lines.at(0).patchValue({ workspace_product_id: 'p-none' });
+    expect(component.quantityLabelKey(component.lines.at(0))).toBe('orders.create.quantity');
+  });
+
+  // PPS-207: currency was a free-text box; it is now a choice that always contains the right value.
+  it('offers a currency choice that includes the home currency and the current value', () => {
+    homeCurrency.set('SAR');
+    component.form.patchValue({ currency: 'JPY' });
+    const options = component.currencyOptions();
+    expect(options).toContain('SAR');
+    expect(options).toContain('JPY');
+    expect(new Set(options).size).toBe(options.length);
+  });
+
+  it('offers only the quote currency once the order comes from a quoted request', () => {
+    fixture.destroy();
+    routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-7' });
+    requestsApiService.getRequest.and.returnValue(of({
+      id: 'req-7', branch_id: 'b1', requested_by_membership_id: 'm1', required_by_date: '2026-10-01',
+      status: 'approved',
+      lines: [{ id: 'rl-1', workspace_product_id: 'p1', quantity: '2', quoted_unit_price: { amount: '10', currency: 'EGP' } }],
+      has_incomplete_estimate: false, created_at: '2026-09-29T00:00:00Z',
+    } as unknown as import('../../../core/api/models').PurchaseRequest));
+    ordersApiService.getAllocations.and.returnValue(of({
+      source_request_id: 'req-7',
+      lines: [{ source_request_line_id: 'rl-1', requested_quantity: '2', allocated_quantity: '0', remaining_quantity: '2' }],
+    }));
+    fixture = TestBed.createComponent(OrderCreateComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.currencyOptions()).toEqual(['EGP']);
+  });
+
+  // PPS-207: the request's estimate was shown as a badge but could not be taken as the price.
+  it('lets the buyer take the request estimate as the unit price', () => {
+    component.lines.at(0).patchValue({ unit_price: null, source_request_line_id: 'rl-1' });
+    component.lines.at(0).controls.estimated_price.setValue(15);
+
+    component.useEstimate(0);
+
+    expect(component.lines.at(0).controls.unit_price.value).toBe(15);
   });
 });

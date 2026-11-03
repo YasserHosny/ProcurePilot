@@ -27,12 +27,13 @@ test('uses the workspace home currency as the default without overriding explici
   await signInUi(page, credentials.ownerEmail, credentials.ownerPassword);
 
   await page.goto('/orders/new');
-  const orderCurrency = page.locator('input[formControlName="currency"]');
-  await expect(orderCurrency).toHaveValue('EGP');
-  await orderCurrency.fill('USD');
+  const orderCurrency = page.locator('mat-select[formControlName="currency"]');
+  await expect(orderCurrency).toContainText('EGP');
+  await openAsyncSelect(page, orderCurrency);
+  await page.getByRole('option', { name: 'USD', exact: true }).click();
   const orderNumber = `E2E-CURRENCY-DEFAULT-${Date.now()}`;
   await page.locator('input[formControlName="order_number"]').fill(orderNumber);
-  await expect(orderCurrency).toHaveValue('USD');
+  await expect(orderCurrency).toContainText('USD');
 
   const supplierSelect = page.locator('mat-select[formControlName="supplier_id"]');
   await openAsyncSelect(page, supplierSelect);

@@ -144,6 +144,28 @@ export class OrderCreateComponent implements OnInit {
     return lineNetUnits(line.unit_price || 0, line.quantity || 0) + moneyUnits(line.line_tax || 0);
   }
 
+  /** Quantities are in packs when the line has a pack; say so, so they are not read as base units. */
+  quantityLabelKey(line: FormGroup<OrderLineForm>): string {
+    return this.packHint(line) ? 'orders.create.quantityPacks' : 'orders.create.quantity';
+  }
+
+  /** The currencies on offer: a quoted request fixes one; otherwise the usual ones plus the current value. */
+  currencyOptions(): string[] {
+    const current = this.form.controls.currency.value;
+    const quoted = this.quotedCurrency();
+    if (this.sourceRequest() && quoted) return [quoted];
+    const options = [this.homeCurrency, current, 'SAR', 'EGP', 'AED', 'USD', 'EUR', 'GBP']
+      .filter((code): code is string => /^[A-Z]{3}$/.test(code ?? ''));
+    return [...new Set(options)];
+  }
+
+  /** Takes the request's estimate as this line's unit price. */
+  useEstimate(index: number): void {
+    const line = this.lines.at(index);
+    const estimate = line.controls.estimated_price.value;
+    if (estimate !== null) line.controls.unit_price.setValue(estimate);
+  }
+
   packDescription(product: Product | undefined): string | null {
     return packLabel(product?.pack, product?.base_unit ?? '', this.translate, this.formatService).label;
   }
@@ -296,6 +318,7 @@ export class OrderCreateComponent implements OnInit {
           }).subscribe(({ request, allocations }) => {
             if (!request || !allocations) return;
             this.sourceRequest.set(request);
+            this.form.controls.currency.disable({ emitEvent: false });
             this.requestAllocations.set(allocations);
 
             for (const lineGroup of this.lines.controls) {
@@ -322,6 +345,7 @@ export class OrderCreateComponent implements OnInit {
         this.errorMessage.set(this.translate.instant('orders.create.sourceLoadError'));
       } else if (request && allocations) {
         this.sourceRequest.set(request);
+            this.form.controls.currency.disable({ emitEvent: false });
         this.requestAllocations.set(allocations);
         if (request.required_by_date && !this.form.controls.expected_delivery_date.value) {
           this.form.controls.expected_delivery_date.setValue(parseIsoDateLocal(request.required_by_date));
