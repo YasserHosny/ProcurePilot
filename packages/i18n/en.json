@@ -4182,7 +4182,12 @@
       "prepareErrorNoPricingForRfqProducts": "This reply does not contain prices for the requested products.",
       "prepareErrorQuotationArchived": "This quotation has been archived and cannot be converted.",
       "prepareErrorQuotationRefused": "This quotation was refused and cannot be used to prepare a request.",
-      "prepareErrorMixedCurrencies": "Prices in this reply are in more than one currency."
+      "prepareErrorMixedCurrencies": "Prices in this reply are in more than one currency.",
+      "prepareErrorRfqExpired": "This RFQ has expired and requests can no longer be prepared from it.",
+      "expiredNotice": "This RFQ has expired — requests can no longer be prepared from it",
+      "rfqExpired": "This RFQ has expired",
+      "branchesLoadError": "Failed to load branches.",
+      "rfqDetailLoadError": "Failed to load RFQ details."
     },
     "history": {
       "title": "RFQ History",
@@ -4284,6 +4289,7 @@
       "tabItems": "Items",
       "tabRecipients": "Recipients ({{count}})",
       "tabResponses": "Responses ({{count}})",
+      "tabResponsesNoCount": "Responses",
       "statusLabel": "Status",
       "sentAtLabel": "Sent date",
       "neededByLabel": "Needed by",
@@ -4355,7 +4361,9 @@
       "confirmRetryTitle": "Retry unsent recipients",
       "confirmRetryMessage": "Retry sending this RFQ to {{count}} unsent supplier(s)?",
       "confirmRetryButton": "Retry unsent recipients",
-      "cancelRetryButton": "Cancel"
+      "cancelRetryButton": "Cancel",
+      "rfqExpiredError": "This RFQ has expired and can no longer be sent.",
+      "notSendableError": "This RFQ cannot be sent in its current state."
     },
     "guardrails": {
       "title": "Guardrail settings",

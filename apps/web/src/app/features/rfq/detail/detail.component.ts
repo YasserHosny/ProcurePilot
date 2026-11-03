@@ -1,7 +1,9 @@
-import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, DestroyRef, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subject, forkJoin, of, catchError, tap, switchMap } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
@@ -75,10 +77,12 @@ export class DetailComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
   private readonly formatService = inject(FormatService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly loadTrigger$ = new Subject<string>();
 
   readonly rfqId = signal<string>('');
   readonly rfqDetail = signal<RfqDetail | null>(null);
-  readonly responseCount = signal<number>(0);
+  readonly responseCount = signal<number | null>(null);
   readonly loading = signal<boolean>(true);
   readonly isNotFound = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
@@ -89,20 +93,67 @@ export class DetailComponent implements OnInit {
   readonly displayedItemColumns = ['product', 'quantity'];
   readonly displayedRecipientColumns = ['supplier', 'contactEmail', 'status', 'reply', 'sentAt'];
 
+  constructor() {
+    this.loadTrigger$.pipe(
+      takeUntilDestroyed(this.destroyRef),
+      tap((id) => {
+        const idChanged = id !== this.rfqId();
+        this.rfqId.set(id);
+        this.loading.set(true);
+        this.isNotFound.set(false);
+        this.errorMessage.set(null);
+        if (idChanged) {
+          this.rfqDetail.set(null);
+          this.responseCount.set(null);
+        }
+      }),
+      switchMap((id) =>
+        forkJoin({
+          detail: this.rfqApi.getRfq(id).pipe(
+            catchError((err: unknown) => of({ __error: true, err })),
+          ),
+          responses: this.rfqApi.listResponses(id).pipe(
+            catchError((err: unknown) => of({ __error: true, err })),
+          ),
+        }),
+      ),
+    ).subscribe(({ detail, responses }) => {
+      this.loading.set(false);
+      if ('__error' in detail) {
+        this.rfqDetail.set(null);
+        this.responseCount.set(null);
+        const err = detail.err;
+        if (err instanceof HttpErrorResponse && err.status === 404) {
+          this.isNotFound.set(true);
+        } else {
+          this.errorMessage.set(this.translate.instant('rfq.detail.loadError'));
+        }
+      } else {
+        this.rfqDetail.set(detail);
+      }
+
+      if ('__error' in responses) {
+        this.responseCount.set(null);
+      } else {
+        this.responseCount.set(responses.items.length);
+      }
+    });
+  }
+
   ngOnInit(): void {
     this.api.members().subscribe(({ items }) => {
       const email = this.session.currentMember()?.email;
       this.currentMembershipId.set(items.find((m) => m.email === email)?.id ?? null);
     });
 
-    this.route.paramMap.subscribe((params) => {
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id');
       if (id) {
         this.loadRfq(id);
       }
     });
 
-    this.route.queryParamMap.subscribe((queryParams) => {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((queryParams) => {
       const tabParam = queryParams.get('tab');
       if (tabParam && tabParam in TAB_MAP) {
         this.selectedTabIndex.set(TAB_MAP[tabParam]);
@@ -111,34 +162,8 @@ export class DetailComponent implements OnInit {
   }
 
   loadRfq(id: string): void {
-    this.rfqId.set(id);
-    this.loading.set(true);
-    this.isNotFound.set(false);
-    this.errorMessage.set(null);
-
-    this.rfqApi.getRfq(id).subscribe({
-      next: (detail) => {
-        this.rfqDetail.set(detail);
-        this.loading.set(false);
-      },
-      error: (err: unknown) => {
-        this.loading.set(false);
-        if (err instanceof HttpErrorResponse && err.status === 404) {
-          this.isNotFound.set(true);
-        } else {
-          this.errorMessage.set(this.translate.instant('rfq.detail.loadError'));
-        }
-      },
-    });
-
-    this.rfqApi.listResponses(id).subscribe({
-      next: (res) => {
-        this.responseCount.set(res.items.length);
-      },
-      error: () => {
-        this.responseCount.set(0);
-      },
-    });
+    if (!id) return;
+    this.loadTrigger$.next(id);
   }
 
   onTabChange(index: number): void {
@@ -151,8 +176,16 @@ export class DetailComponent implements OnInit {
     });
   }
 
-  responsesReceivedTitle(): string {
+  responsesTabLabel(): string {
     const count = this.responseCount();
+    if (count === null) {
+      return this.translate.instant('rfq.detail.tabResponsesNoCount');
+    }
+    return this.translate.instant('rfq.detail.tabResponses', { count: this.formatService.formatNumber(count) });
+  }
+
+  responsesReceivedTitle(): string {
+    const count = this.responseCount() ?? 0;
     const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
     const category = new Intl.PluralRules(locale).select(count);
     const key = `rfq.detail.responsesReceived.${category}`;
@@ -425,8 +458,13 @@ export class DetailComponent implements OnInit {
                 key = 'rfq.creatorOnly';
               } else if (err.status === 422) {
                 const envelope = err.error as { details?: { reason?: string }; reason?: string } | null;
-                if (envelope?.details?.reason === 'needed_by_in_past' || envelope?.reason === 'needed_by_in_past') {
+                const reason = envelope?.details?.reason ?? envelope?.reason;
+                if (reason === 'needed_by_in_past') {
                   key = 'rfq.create.neededByPastError';
+                } else if (reason === 'rfq_expired') {
+                  key = 'rfq.detail.rfqExpiredError';
+                } else if (reason === 'not_sendable') {
+                  key = 'rfq.detail.notSendableError';
                 }
               }
             }
@@ -480,7 +518,22 @@ export class DetailComponent implements OnInit {
             this.loadRfq(id);
           },
           error: (err: unknown) => {
-            const key = err instanceof HttpErrorResponse && err.status === 403 ? 'rfq.creatorOnly' : 'rfq.history.sendError';
+            let key = 'rfq.history.sendError';
+            if (err instanceof HttpErrorResponse) {
+              if (err.status === 403) {
+                key = 'rfq.creatorOnly';
+              } else if (err.status === 422) {
+                const envelope = err.error as { details?: { reason?: string }; reason?: string } | null;
+                const reason = envelope?.details?.reason ?? envelope?.reason;
+                if (reason === 'needed_by_in_past') {
+                  key = 'rfq.create.neededByPastError';
+                } else if (reason === 'rfq_expired') {
+                  key = 'rfq.detail.rfqExpiredError';
+                } else if (reason === 'not_sendable') {
+                  key = 'rfq.detail.notSendableError';
+                }
+              }
+            }
             this.snackBar.open(
               this.translate.instant(key),
               this.translate.instant('rfq.history.dismiss'),
