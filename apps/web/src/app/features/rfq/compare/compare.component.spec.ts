@@ -1899,6 +1899,48 @@ describe('CompareComponent (RFQ)', () => {
       expect(el().querySelector('[data-testid="split-saving-hint"]')).toBeNull();
     });
 
+    it('shows no split saving when a supplier has more than one reply, since the split prices them by recorded cost', () => {
+      const costs = (supplier: string, a: string, b: string) => [
+        { workspace_product_id: 'p1', total_amount: a, total_currency: 'USD' },
+        { workspace_product_id: 'p2', total_amount: b, total_currency: 'USD' },
+      ].map((c) => ({ ...c, supplier }));
+      const reply = (id: string, supplier: string, a: string, b: string, at: string) => ({
+        ...matchedReply(id, supplier, 'p1'),
+        submitted_at: at,
+        rfq_landed_costs: costs(supplier, a, b).map(({ supplier: _s, ...c }) => c),
+      });
+      mockRfqApi.getRfq.and.returnValue(
+        of({
+          ...sentDetail,
+          lines: ['p1', 'p2'].map((product) => ({
+            id: `line-${product}`,
+            tenant_id: 'tenant-1',
+            rfq_id: 'rfq-1',
+            workspace_product_id: product,
+            quantity: '10',
+            created_at: '2026-09-25T09:00:00Z',
+          })),
+        }),
+      );
+      // Two suppliers; supp-1 sent an older and a newer reply. Without the second reply the split would save money.
+      mockRfqApi.listResponses.and.returnValue(
+        of({
+          items: [
+            reply('old', 'supp-1', '100', '200', '2026-09-25T10:00:00Z'),
+            reply('new', 'supp-1', '110', '210', '2026-09-26T10:00:00Z'),
+            reply('other', 'supp-2', '150', '120', '2026-09-25T11:00:00Z'),
+          ],
+        }),
+      );
+
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      expect(component.splitEligibility().canSplit).toBeTrue();
+      expect(component.splitSaving()).toBeNull();
+      expect(el().querySelector('[data-testid="split-saving-hint"]')).toBeNull();
+    });
+
     it('shows no Prepare prerequisites to roles that cannot prepare', () => {
       mockSession.hasRole.and.returnValue(false);
       recreate();
