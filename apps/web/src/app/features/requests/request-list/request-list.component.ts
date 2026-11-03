@@ -13,7 +13,6 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
 import { TranslatePipe,
 TranslateService } from '@ngx-translate/core';
-import { SessionService } from '../../../core/auth/session.service';
 import { RoleDirective } from '../../../core/auth/role.directive';
 import { forkJoin, of, type Observable } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -49,7 +48,6 @@ const I18N = 'requests';
   styleUrl: './request-list.component.scss',
 })
 export class RequestListComponent implements OnInit {
-  private readonly session = inject(SessionService);
   private readonly requestsApi = inject(RequestsApiService);
   private readonly organisationApi = inject(OrganisationApiService);
   private readonly formatService = inject(FormatService);
@@ -137,11 +135,14 @@ export class RequestListComponent implements OnInit {
     this.router.navigate(['/requests', request.id]);
   }
 
+  onRowKey(event: Event, request: PurchaseRequest): void {
+    if (event.target === event.currentTarget) {
+      this.navigateToDetail(request);
+    }
+  }
+
   canWithdraw(request: PurchaseRequest): boolean {
-    return request.status === 'draft' || request.status === 'submitted' ||
-      (request.status === 'ordered' &&
-        (this.session.role() === 'owner' ||
-          this.session.currentMember()?.membership_id === request.requested_by_membership_id));
+    return request.status === 'draft' || request.status === 'submitted';
   }
 
   withdrawRequest(request: PurchaseRequest): void {

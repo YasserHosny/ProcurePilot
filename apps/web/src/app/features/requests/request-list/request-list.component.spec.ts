@@ -227,6 +227,55 @@ describe('RequestListComponent (T017)', () => {
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/requests', 'r1']);
   });
 
+  it('clicking Withdraw in a row does not call navigateToDetail or router.navigate for the row', () => {
+    routerSpy.navigate.calls.reset();
+    dialogSpy.open.and.returnValue({ afterClosed: () => of(false) } as ReturnType<MatDialog['open']>);
+    const withdrawBtn = fixture.nativeElement.querySelector('button.danger-action') as HTMLButtonElement;
+    expect(withdrawBtn).toBeTruthy();
+    withdrawBtn.click();
+    expect(dialogSpy.open).toHaveBeenCalled();
+    expect(routerSpy.navigate).not.toHaveBeenCalled();
+  });
+
+  it('clicking View in a row does not trigger row click event', () => {
+    routerSpy.navigate.calls.reset();
+    const row = fixture.nativeElement.querySelector('tr.clickable-row') as HTMLTableRowElement;
+    const rowClickSpy = jasmine.createSpy('rowClick');
+    row.addEventListener('click', rowClickSpy);
+
+    const viewBtn = row.querySelector('button[aria-label="View request"]') as HTMLButtonElement;
+    expect(viewBtn).toBeTruthy();
+    viewBtn.click();
+
+    expect(rowClickSpy).not.toHaveBeenCalled();
+    expect(routerSpy.navigate).toHaveBeenCalledWith(['/requests', 'r1']);
+  });
+
+  it('navigates to detail on Enter keydown on a focused row', () => {
+    routerSpy.navigate.calls.reset();
+    const row = fixture.nativeElement.querySelector('tr.clickable-row') as HTMLTableRowElement;
+    expect(row.getAttribute('tabindex')).toBe('0');
+    row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(routerSpy.navigate).toHaveBeenCalledWith(['/requests', 'r1']);
+  });
+
+  it('pressing Enter on Withdraw button inside a row does not call router.navigate (PPS-188)', () => {
+    routerSpy.navigate.calls.reset();
+    const row = fixture.nativeElement.querySelector('tr.clickable-row') as HTMLTableRowElement;
+    const withdrawBtn = row.querySelector('button.danger-action') as HTMLButtonElement;
+    expect(withdrawBtn).toBeTruthy();
+    withdrawBtn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(routerSpy.navigate).not.toHaveBeenCalled();
+  });
+
+  it('renders a visually hidden caption for the requests table', () => {
+    const table = fixture.nativeElement.querySelector('table.requests-table');
+    const caption = table?.querySelector('caption');
+    expect(caption).toBeTruthy();
+    expect(caption?.classList.contains('visually-hidden') || caption?.classList.contains('cdk-visually-hidden')).toBeTrue();
+    expect(caption?.textContent?.trim()).toBe('Purchase requests');
+  });
+
   it('should expose create-order only for requests with an approved approval step', () => {
     expect(
       component.canCreateOrder({
@@ -342,19 +391,28 @@ describe('RequestListComponent (T017)', () => {
     });
   });
 
-  it('shows Withdraw on an ordered request and hides it on terminal requests', () => {
+  it('hides Withdraw on ordered and terminal requests and shows it on draft and submitted (PPS-188)', () => {
     for (const status of ['ordered', 'withdrawn', 'rejected', 'approved'] as const) {
       component.requests.set([{ ...mockRequests[0], status }]);
       fixture.detectChanges();
       const element = fixture.nativeElement as HTMLElement;
-      expect(Boolean(element.querySelector('button.danger-action'))).toBe(status === 'ordered');
+      expect(Boolean(element.querySelector('button.danger-action'))).toBeFalse();
+      expect(component.canWithdraw(component.requests()[0])).toBeFalse();
+    }
+
+    for (const status of ['draft', 'submitted'] as const) {
+      component.requests.set([{ ...mockRequests[0], status }]);
+      fixture.detectChanges();
+      const element = fixture.nativeElement as HTMLElement;
+      expect(Boolean(element.querySelector('button.danger-action'))).toBeTrue();
+      expect(component.canWithdraw(component.requests()[0])).toBeTrue();
     }
   });
 
   it('asks for confirmation and leaves the request unchanged when cancelled', () => {
     dialogSpy.open.and.returnValue({ afterClosed: () => of(false) } as ReturnType<MatDialog['open']>);
     requestsApi.withdrawRequest.and.returnValue(of(mockRequests[0]));
-    component.withdrawRequest({ ...mockRequests[0], status: 'ordered' });
+    component.withdrawRequest({ ...mockRequests[0], status: 'submitted' });
     expect(dialogSpy.open).toHaveBeenCalled();
     expect(requestsApi.withdrawRequest).not.toHaveBeenCalled();
   });
@@ -376,11 +434,11 @@ describe('RequestListComponent (T017)', () => {
   });
 
   for (const scenario of [
-    { label: 'requester', memberId: 'm1', role: 'buyer', visible: true },
-    { label: 'owner', memberId: 'm2', role: 'owner', visible: true },
-    { label: 'another buyer', memberId: 'm2', role: 'buyer', visible: false },
+    { label: 'requester', memberId: 'm1', role: 'buyer' },
+    { label: 'owner', memberId: 'm2', role: 'owner' },
+    { label: 'another buyer', memberId: 'm2', role: 'buyer' },
   ] as const) {
-    it(`shows ordered Withdraw only when permitted: ${scenario.label}`, () => {
+    it(`never shows ordered Withdraw regardless of role (PPS-188): ${scenario.label}`, () => {
       currentMember.set({ id: 'user-1', membership_id: scenario.memberId });
       role.set(scenario.role);
       component.requests.set([{ ...mockRequests[0], status: 'ordered' }]);
@@ -389,9 +447,23 @@ describe('RequestListComponent (T017)', () => {
       const button = (fixture.nativeElement as HTMLElement).querySelector(
         'button[aria-label="Withdraw request"]',
       );
-      expect(button !== null).toBe(scenario.visible);
+      expect(button).toBeNull();
+      expect(component.canWithdraw(component.requests()[0])).toBeFalse();
     });
   }
+
+  it('renders status chip for ordered and delivered status (PPS-188)', () => {
+    component.requests.set([
+      { ...mockRequests[0], status: 'ordered' },
+      { ...mockRequests[1], status: 'delivered' as unknown as PurchaseRequest['status'] },
+    ]);
+    fixture.detectChanges();
+
+    const chips = (fixture.nativeElement as HTMLElement).querySelectorAll('.status-chip');
+    expect(chips.length).toBe(2);
+    expect(chips[0].getAttribute('data-status')).toBe('ordered');
+    expect(chips[1].getAttribute('data-status')).toBe('delivered');
+  });
 
   it('keeps draft and submitted Withdraw visible for another buyer', () => {
     currentMember.set({ id: 'user-2', membership_id: 'm2' });

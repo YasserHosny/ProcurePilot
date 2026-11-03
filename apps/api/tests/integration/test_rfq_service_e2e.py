@@ -16,6 +16,7 @@ from procurepilot_api.errors import ConflictError, NotFoundError, UnprocessableE
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.requests import service as requests_service_module
 from procurepilot_api.modules.requests.valuation import LineEstimate
+from procurepilot_api.modules.rfq import service as rfq_service_module
 from procurepilot_api.modules.rfq.service import RfqService
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
@@ -458,6 +459,224 @@ def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> Non
                 (tenant_id,),
             )
             assert cur.fetchone()[0] == 1
+
+
+@pytest.fixture
+def prepare_case(monkeypatch: pytest.MonkeyPatch) -> tuple[RfqService, dict]:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="integrity")
+            rfq_id, response_id, _, branch_id = _seed_rfq_and_responses(
+                cur, tenant_id, membership_id
+            )
+    _patch_requests_service_for_test(
+        monkeypatch, tenant_id=tenant_id, user_id=user_id, membership_id=membership_id
+    )
+    return RfqService(get_settings()), {
+        "bearer_token": "unused-token",
+        "member": _member(tenant_id, user_id, membership_id),
+        "rfq_id": rfq_id,
+        "rfq_response_id": response_id,
+        "branch_id": branch_id,
+        "required_by_date": date.today(),
+        "idempotency_key": uuid4(),
+    }
+
+
+def test_prepare_request_recovers_interrupted_finalisation(
+    monkeypatch: pytest.MonkeyPatch, prepare_case: tuple[RfqService, dict]
+) -> None:
+    service, kwargs = prepare_case
+    original = rfq_service_module.estimate_from_source_response
+    failed = False
+
+    def fail_once_after_create(conn: psycopg.Connection, **params: object) -> dict:
+        nonlocal failed
+        with conn.cursor() as cur:
+            cur.execute(
+                "select id from purchase_request where idempotency_key = %s",
+                (kwargs["idempotency_key"],),
+            )
+            draft_exists = cur.fetchone() is not None
+        if draft_exists and not failed:
+            failed = True
+            raise RuntimeError("interrupted finalisation")
+        return original(conn, **params)
+
+    monkeypatch.setattr(rfq_service_module, "estimate_from_source_response", fail_once_after_create)
+    with pytest.raises(RuntimeError, match="interrupted finalisation"):
+        service.prepare_request(**kwargs)
+
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        assert conn.execute(
+            "select source_rfq_response_id, estimated_total_amount from purchase_request "
+            "where idempotency_key = %s",
+            (kwargs["idempotency_key"],),
+        ).fetchone() == (None, None)
+        assert (
+            conn.execute("select status from rfq where id = %s", (kwargs["rfq_id"],)).fetchone()[0]
+            == "responded"
+        )
+
+    result = service.prepare_request(**kwargs)
+    assert service.prepare_request(**kwargs) == result
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        assert conn.execute(
+            "select source_rfq_response_id, estimated_total_amount, estimated_total_currency "
+            "from purchase_request where id = %s",
+            (result.purchase_request_id,),
+        ).fetchone() == (kwargs["rfq_response_id"], Decimal("655.00"), "GBP")
+        assert conn.execute(
+            "select estimated_unit_price_amount, estimated_unit_price_currency "
+            "from purchase_request_line where purchase_request_id = %s "
+            "order by estimated_unit_price_amount",
+            (result.purchase_request_id,),
+        ).fetchall() == [(Decimal("15.50"), "GBP"), (Decimal("25.00"), "GBP")]
+        assert (
+            conn.execute("select status from rfq where id = %s", (kwargs["rfq_id"],)).fetchone()[0]
+            == "converted"
+        )
+        assert (
+            conn.execute(
+                "select count(*) from purchase_request where tenant_id = %s",
+                (kwargs["member"].tenant_id,),
+            ).fetchone()[0]
+            == 1
+        )
+
+
+@pytest.mark.parametrize("currency_source", ["quotation", "estimate", "fallback"])
+def test_prepare_request_rejects_mixed_currencies_before_create(
+    monkeypatch: pytest.MonkeyPatch,
+    prepare_case: tuple[RfqService, dict],
+    currency_source: str,
+) -> None:
+    service, kwargs = prepare_case
+    if currency_source == "quotation":
+        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+            conn.execute(
+                "update quotation_line set unit_price_currency = 'USD' where line_number = 2 "
+                "and quotation_id = (select quotation_id from rfq_response where id = %s)",
+                (kwargs["rfq_response_id"],),
+            )
+    else:
+        original = rfq_service_module.estimate_from_source_response
+
+        def mixed_estimates(conn: psycopg.Connection, **params: object) -> dict:
+            estimates = original(conn, **params)
+            first, second = estimates
+            estimates[first] = LineEstimate(Decimal("19.00"), "USD", None)
+            if currency_source == "fallback":
+                del estimates[second]
+            return estimates
+
+        monkeypatch.setattr(rfq_service_module, "estimate_from_source_response", mixed_estimates)
+
+    with pytest.raises(UnprocessableEntityError) as exc:
+        service.prepare_request(**kwargs)
+    assert exc.value.status_code == 422
+    assert exc.value.details == {"reason": "mixed_currencies", "currencies": ["GBP", "USD"]}
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        assert (
+            conn.execute(
+                "select count(*) from purchase_request where tenant_id = %s",
+                (kwargs["member"].tenant_id,),
+            ).fetchone()[0]
+            == 0
+        )
+        assert (
+            conn.execute("select status from rfq where id = %s", (kwargs["rfq_id"],)).fetchone()[0]
+            == "responded"
+        )
+
+
+@pytest.mark.parametrize("currency_source", ["quotation", "estimate"])
+def test_prepare_request_same_currency_total_is_line_sum(
+    monkeypatch: pytest.MonkeyPatch,
+    prepare_case: tuple[RfqService, dict],
+    currency_source: str,
+) -> None:
+    service, kwargs = prepare_case
+    currency = "GBP"
+    if currency_source == "estimate":
+        original = rfq_service_module.estimate_from_source_response
+        currency = "USD"
+
+        def usd_estimates(conn: psycopg.Connection, **params: object) -> dict:
+            return {
+                pid: LineEstimate(Decimal("19.00"), "USD", None) for pid in original(conn, **params)
+            }
+
+        monkeypatch.setattr(rfq_service_module, "estimate_from_source_response", usd_estimates)
+
+    result = service.prepare_request(**kwargs)
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        before = conn.execute(
+            "select estimated_total_amount, estimated_total_currency from purchase_request "
+            "where id = %s",
+            (result.purchase_request_id,),
+        ).fetchone()
+        line_total, currencies = conn.execute(
+            "select sum(quantity * estimated_unit_price_amount), "
+            "array_agg(distinct estimated_unit_price_currency) from purchase_request_line "
+            "where purchase_request_id = %s",
+            (result.purchase_request_id,),
+        ).fetchone()
+        assert before == (line_total, currency)
+        assert line_total == (Decimal("570.00") if currency == "USD" else Decimal("655.00"))
+        assert currencies == [currency]
+    assert service.prepare_request(**kwargs) == result
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        assert (
+            conn.execute(
+                "select estimated_total_amount, estimated_total_currency from purchase_request "
+                "where id = %s",
+                (result.purchase_request_id,),
+            ).fetchone()
+            == before
+        )
+
+
+def test_prepare_request_rechecks_currencies_during_finalisation(
+    monkeypatch: pytest.MonkeyPatch, prepare_case: tuple[RfqService, dict]
+) -> None:
+    service, kwargs = prepare_case
+    original = rfq_service_module.estimate_from_source_response
+    calls = 0
+
+    def changed_estimates(conn: psycopg.Connection, **params: object) -> dict:
+        nonlocal calls
+        calls += 1
+        estimates = original(conn, **params)
+        if calls == 2:
+            estimates[next(iter(estimates))] = LineEstimate(Decimal("19.00"), "USD", None)
+        return estimates
+
+    monkeypatch.setattr(rfq_service_module, "estimate_from_source_response", changed_estimates)
+    with pytest.raises(UnprocessableEntityError) as exc:
+        service.prepare_request(**kwargs)
+    assert exc.value.details == {"reason": "mixed_currencies", "currencies": ["GBP", "USD"]}
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        assert conn.execute(
+            "select source_rfq_response_id, estimated_total_amount, estimated_total_currency "
+            "from purchase_request where idempotency_key = %s",
+            (kwargs["idempotency_key"],),
+        ).fetchone() == (None, None, None)
+        assert (
+            conn.execute(
+                "select count(*) from purchase_request_line where purchase_request_id = "
+                "(select id from purchase_request where idempotency_key = %s) "
+                "and estimated_unit_price_currency is not null",
+                (kwargs["idempotency_key"],),
+            ).fetchone()[0]
+            == 0
+        )
+        assert (
+            conn.execute("select status from rfq where id = %s", (kwargs["rfq_id"],)).fetchone()[0]
+            == "responded"
+        )
+    # The committed draft is still recoverable once the effective prices are consistent.
+    service.prepare_request(**kwargs)
 
 
 def test_prepare_request_not_found() -> None:

@@ -129,6 +129,17 @@ export interface OrderEvidenceProjection {
 export interface PurchaseOrderList {
   items: PurchaseOrder[];
   next_cursor: string | null;
+  total_count?: number;
+}
+
+export interface OrderListQuery {
+  q?: string;
+  status?: string;
+  supplier_id?: string;
+  date_from?: string;
+  date_to?: string;
+  sort?: string;
+  dir?: 'asc' | 'desc';
 }
 
 export interface SupplierConfirmationCreate {
@@ -220,8 +231,12 @@ export class OrdersApiService {
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiBaseUrl;
 
-  listOrders(cursor?: string): Observable<PurchaseOrderList> {
+  listOrders(cursor?: string, filters: OrderListQuery = {}): Observable<PurchaseOrderList> {
     const query = new URLSearchParams({ limit: '50' });
+    for (const key of ['q', 'status', 'supplier_id', 'date_from', 'date_to', 'sort', 'dir'] as const) {
+      const value = filters[key];
+      if (value) query.set(key, value);
+    }
     if (cursor) query.set('cursor', cursor);
     return this.http.get<PurchaseOrderList>(`${this.base}/orders?${query.toString()}`);
   }

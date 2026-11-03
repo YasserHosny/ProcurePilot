@@ -907,6 +907,152 @@ def test_po_creation_rechecks_request_after_concurrent_withdrawal(
             assert count == 0
 
 
+def test_retried_linked_create_that_used_all_remaining_quantity_returns_the_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """P-183: a lost response must not turn the retry into «quantity exceeds allocation»."""
+    with committed_smart_context("order-create-replay") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+        payload = _base_order_payload(
+            context.supplier_ids[0], req_id, line_id, context.product_id, qty="10"
+        )
+        key = str(uuid4())
+        first = client.post("/api/v1/orders", json=payload, headers={"Idempotency-Key": key})
+        assert first.status_code == 201, first.text
+
+        retry = client.post("/api/v1/orders", json=payload, headers={"Idempotency-Key": key})
+
+        assert retry.status_code == 200, retry.text
+        assert retry.json()["id"] == first.json()["id"]
+
+
+def test_linked_draft_can_move_to_another_approved_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """P-183: changing the source request must not trip the line foreign key."""
+    with committed_smart_context("order-relink") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_a, line_a = _setup_approved_request(conn, context.workspace, context.product_id)
+            req_b, line_b = _setup_approved_request(conn, context.workspace, context.product_id)
+        payload = _base_order_payload(
+            context.supplier_ids[0], req_a, line_a, context.product_id, qty="4"
+        )
+        created = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert created.status_code == 201, created.text
+
+        moved = _base_order_payload(
+            context.supplier_ids[0], req_b, line_b, context.product_id, qty="4"
+        )
+        moved["order_number"] = created.json()["order_number"]
+        res = client.put(
+            f"/api/v1/orders/{created.json()['id']}",
+            json=moved,
+            headers={"Idempotency-Key": str(uuid4())},
+        )
+
+        assert res.status_code == 200, res.text
+        assert res.json()["source_request_id"] == str(req_b)
+        assert res.json()["lines"][0]["source_request_line_id"] == str(line_b)
+
+
+def _manual_payload(supplier_id: UUID, number: str, qty: str, price: str) -> dict[str, object]:
+    total = f"{Decimal(qty) * Decimal(price):.2f}"
+    return {
+        "order_number": number,
+        "supplier_id": str(supplier_id),
+        "order_date": "2026-09-30",
+        "source_kind": "manual",
+        "source_reference": f"test:{number}",
+        "total": {"amount": total, "currency": "USD"},
+        "tax": {"amount": "0.00", "currency": "USD"},
+        "lines": [
+            {
+                "line_number": 1,
+                "description": "Manual line",
+                "ordered_quantity": qty,
+                "base_unit": "each",
+                "unit_price": {"amount": price, "currency": "USD"},
+                "tax": {"amount": "0.00", "currency": "USD"},
+                "line_total": {"amount": total, "currency": "USD"},
+            }
+        ],
+    }
+
+
+def test_order_list_filters_searches_sorts_and_counts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """P-182: the list answers search, status, supplier, date, sort and total count."""
+    with committed_smart_context("order-list") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        one, two = context.supplier_ids[0], context.supplier_ids[1]
+        ids: dict[str, str] = {}
+        for number, supplier, qty, price in (
+            ("PO-ALPHA-1", one, "2", "10.00"),
+            ("PO-BRAVO-2", two, "10", "10.00"),
+            ("PO-CHARLIE-3", two, "1", "10.00"),
+        ):
+            res = client.post(
+                "/api/v1/orders",
+                json=_manual_payload(supplier, number, qty, price),
+                headers={"Idempotency-Key": str(uuid4())},
+            )
+            assert res.status_code == 201, res.text
+            ids[number] = res.json()["id"]
+        submitted = client.post(
+            f"/api/v1/orders/{ids['PO-BRAVO-2']}/submit",
+            headers={"Idempotency-Key": str(uuid4())},
+        )
+        assert submitted.status_code == 200, submitted.text
+
+        def numbers(**params: object) -> list[str]:
+            res = client.get("/api/v1/orders", params=params)
+            assert res.status_code == 200, res.text
+            return [item["order_number"] for item in res.json()["items"]]
+
+        assert sorted(numbers()) == ["PO-ALPHA-1", "PO-BRAVO-2", "PO-CHARLIE-3"]
+        assert numbers(q="alpha") == ["PO-ALPHA-1"]
+        assert sorted(numbers(q="Supplier 2")) == ["PO-BRAVO-2", "PO-CHARLIE-3"]
+        assert numbers(status="submitted") == ["PO-BRAVO-2"]
+        assert sorted(numbers(status="draft,submitted")) == sorted(ids)
+        assert sorted(numbers(status="all")) == sorted(ids)
+        assert sorted(numbers(supplier_id=str(two))) == ["PO-BRAVO-2", "PO-CHARLIE-3"]
+        assert numbers(date_from="2026-10-01") == []
+        assert len(numbers(date_from="2026-09-30", date_to="2026-09-30")) == 3
+        assert numbers(sort="total", dir="asc") == ["PO-CHARLIE-3", "PO-ALPHA-1", "PO-BRAVO-2"]
+        assert numbers(sort="total", dir="desc") == ["PO-BRAVO-2", "PO-ALPHA-1", "PO-CHARLIE-3"]
+        assert numbers(sort="order_number", dir="asc") == [
+            "PO-ALPHA-1",
+            "PO-BRAVO-2",
+            "PO-CHARLIE-3",
+        ]
+
+        first = client.get(
+            "/api/v1/orders", params={"limit": 2, "sort": "order_number", "dir": "asc"}
+        )
+        assert first.json()["total_count"] == 3
+        second = client.get(
+            "/api/v1/orders",
+            params={
+                "limit": 2,
+                "sort": "order_number",
+                "dir": "asc",
+                "cursor": first.json()["next_cursor"],
+            },
+        )
+        listed = [i["order_number"] for i in first.json()["items"] + second.json()["items"]]
+        assert listed == ["PO-ALPHA-1", "PO-BRAVO-2", "PO-CHARLIE-3"]
+        assert second.json()["next_cursor"] is None
+        assert first.json()["items"][0]["supplier_name"]
+        assert len(first.json()["items"][0]["lines"]) == 1
+
+
 def _serve_postgrest_from_postgres(
     monkeypatch: pytest.MonkeyPatch, reader: psycopg.Connection, workspace: Workspace
 ) -> None:

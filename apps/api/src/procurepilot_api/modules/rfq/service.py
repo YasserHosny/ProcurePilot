@@ -51,6 +51,12 @@ from procurepilot_api.shared.mailer import get_mailer
 
 logger = logging.getLogger(__name__)
 
+# Read-time expiry only: stored lifecycle states are never rewritten by a read.
+_EFFECTIVE_STATUS_SQL = (
+    "case when r.status = 'sent' and r.needed_by_date < current_date "
+    "then 'expired' else r.status end"
+)
+
 
 @contextmanager
 def _authenticated_db(settings: Settings, member: CurrentMember) -> Iterator[psycopg.Connection]:
@@ -256,7 +262,12 @@ class RfqService:
     def get_detail(self, *, member: CurrentMember, rfq_id: uuid.UUID) -> RfqDetail:
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute("select * from rfq where id = %s", (rfq_id,))
+                cur.execute(
+                    f"select r.id, r.tenant_id, r.created_by_membership_id, "
+                    f"{_EFFECTIVE_STATUS_SQL} as status, r.needed_by_date, "
+                    "r.tenant_terms, r.idempotency_key, r.created_at from rfq r where r.id = %s",
+                    (rfq_id,),
+                )
                 row = cur.fetchone()
                 if row is None:
                     raise NotFoundError(details={"resource": "rfq"})
@@ -273,7 +284,10 @@ class RfqService:
                 lines = [RfqLine(**item) for item in cur.fetchall()]
                 cur.execute(
                     """select r.*, s.name as supplier_name,
-                              s.contact_email as supplier_contact_email
+                              s.contact_email as supplier_contact_email,
+                              (select count(*) from rfq_response resp
+                               where resp.tenant_id = r.tenant_id
+                                 and resp.rfq_recipient_id = r.id) as response_count
                        from rfq_recipient r
                        left join supplier s on s.id = r.supplier_id and s.tenant_id = r.tenant_id
                        where r.rfq_id = %s
@@ -728,6 +742,14 @@ class RfqService:
         with _authenticated_db(self.settings, member) as lock_conn:
             with lock_conn.cursor(row_factory=dict_row) as cur:
                 status = lock_rfq_for_preparation(cur, tenant_id=member.tenant_id, rfq_id=rfq_id)
+                if status is not None:
+                    cur.execute(
+                        f"select {_EFFECTIVE_STATUS_SQL} as status from rfq r "
+                        "where r.id = %s and r.tenant_id = %s",
+                        (rfq_id, member.tenant_id),
+                    )
+                    if cur.fetchone()["status"] == "expired":
+                        raise UnprocessableEntityError(details={"reason": "rfq_expired"})
                 if status == "converted":
                     # A retry of the preparation that converted it gets that request back -- only a
                     # request with this key that was prepared from one of this RFQ's responses.
@@ -864,6 +886,24 @@ class RfqService:
                     lines=pr_lines,
                 )
 
+        # Validate only the products going into this request, using the same effective
+        # prices as finalisation (landed estimate when available, quoted price otherwise).
+        source_estimates = estimate_from_source_response(
+            lock_conn,
+            rfq_response_id=rfq_response_id,
+            product_ids=[line.workspace_product_id for line in pr_lines],
+        )
+        currencies = {
+            source_estimates[line.workspace_product_id].unit_price_currency
+            if line.workspace_product_id in source_estimates
+            else matched_lines[line.workspace_product_id]["unit_price_currency"]
+            for line in pr_lines
+        }
+        if len(currencies) > 1:
+            raise UnprocessableEntityError(
+                details={"reason": "mixed_currencies", "currencies": sorted(currencies)}
+            )
+
         purchase_request, created = RequestsService(self.settings).create_request(
             bearer_token=bearer_token,
             member=member,
@@ -871,11 +911,11 @@ class RfqService:
             idempotency_key=idempotency_key,
         )
 
-        if created:
+        # create_request commits independently. If finalisation rolled back on an earlier
+        # attempt, the same key returns that unlinked draft and must finish it here.
+        # Link, estimates and conversion commit together; a linked replay needs no writes.
+        if created or purchase_request.source_rfq_response_id is None:
             with lock_conn.cursor(row_factory=dict_row) as cur:
-                total_amount = 0
-                total_currency: str | None = None
-
                 cur.execute(
                     "select id, workspace_product_id, quantity from purchase_request_line "
                     "where purchase_request_id = %s and tenant_id = %s",
@@ -890,6 +930,21 @@ class RfqService:
                     rfq_response_id=rfq_response_id,
                     product_ids=list(matched_lines),
                 )
+                # Prices can change after the preflight read. Reject mixed effective
+                # currencies again before writing any estimates or converting the RFQ.
+                currencies = {
+                    source_estimates[prl["workspace_product_id"]].unit_price_currency
+                    if prl["workspace_product_id"] in source_estimates
+                    else matched_lines[prl["workspace_product_id"]]["unit_price_currency"]
+                    for prl in pr_line_rows
+                    if prl["workspace_product_id"] in matched_lines
+                }
+                if len(currencies) > 1:
+                    raise UnprocessableEntityError(
+                        details={"reason": "mixed_currencies", "currencies": sorted(currencies)}
+                    )
+                total_currency = next(iter(currencies), None)
+                total_amount = Decimal("0")
 
                 for prl in pr_line_rows:
                     pid = prl["workspace_product_id"]
@@ -916,10 +971,6 @@ class RfqService:
                             (q_amt, q_curr, landed_id, prl["id"], member.tenant_id),
                         )
                         total_amount += q_amt * qty
-                        # A single RFQ response's quoted lines share one currency in
-                        # practice (see plan.md's Task 4 note) -- take the first, don't
-                        # attempt multi-currency summation.
-                        total_currency = total_currency or q_curr
 
                 cur.execute(
                     """
@@ -1108,14 +1159,18 @@ class RfqService:
         query_filters = ["tenant_id = %s"]
         params: list[str | uuid.UUID | int] = [member.tenant_id]
 
-        if status:
-            query_filters.append("status = %s")
+        if status is not None:
+            if status not in ("draft", "sent", "responded", "expired", "converted"):
+                raise UnprocessableEntityError(
+                    details={"reason": "invalid_status", "field": "status"}
+                )
+            query_filters.append(f"({_EFFECTIVE_STATUS_SQL}) = %s")
             params.append(status)
 
         query = f"""
             SELECT
                 r.id,
-                r.status,
+                {_EFFECTIVE_STATUS_SQL} as status,
                 r.needed_by_date,
                 r.created_at,
                 r.created_by_membership_id,
@@ -1315,7 +1370,7 @@ def _validate_recipients(
 ) -> tuple[list[dict], list[uuid.UUID]]:
     rejected: list[dict] = []
     valid: list[uuid.UUID] = []
-    for supplier_id in supplier_ids:
+    for supplier_id in dict.fromkeys(supplier_ids):
         cur.execute("select id, contact_email from supplier where id = %s", (supplier_id,))
         row = cur.fetchone()
         if row is None:
@@ -1338,7 +1393,10 @@ def _decode_cursor(cursor: str | None) -> int:
     try:
         raw = base64.urlsafe_b64decode(cursor.encode("ascii"))
         payload = json.loads(raw.decode("utf-8"))
-        return payload["offset"]
+        offset = payload["offset"]
+        if type(offset) is not int or not 0 <= offset <= 1_000_000:
+            raise ValueError("Invalid cursor offset")
+        return offset
     except (KeyError, ValueError, TypeError, json.JSONDecodeError) as exc:
         raise UnprocessableEntityError(details={"cursor": "invalid_format"}) from exc
 
