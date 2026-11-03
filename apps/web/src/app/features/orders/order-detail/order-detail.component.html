@@ -25,6 +25,12 @@
           </p>
         }
         <p>{{ 'orders.detail.createdAt' | translate: { date: (data.order.created_at | formatDate) } }}</p>
+        @if (sourceRequest()?.source; as source) {
+          <p class="source-links">
+            <a [routerLink]="['/rfq', source.rfq_id]" data-testid="source-rfq-link">{{ 'orders.detail.sourceRfq' | translate }}</a>
+            <a [routerLink]="['/quotations', source.quotation_id]" data-testid="source-quotation-link">{{ 'orders.detail.sourceQuotation' | translate }}</a>
+          </p>
+        }
       </div>
       <div class="header-side">
         <span class="status-chip" [attr.data-status]="data.lifecycle.status">{{ getStatusLabel(data.lifecycle.status) }}</span>
@@ -44,6 +50,11 @@
       <mat-card><span>{{ 'orders.detail.total' | translate }}</span><strong>{{ data.order.total | formatMoney }}</strong></mat-card>
       <mat-card><span>{{ 'orders.detail.confirmation' | translate }}</span><strong>{{ getEvidenceLabel(data.lifecycle.confirmation) }}</strong></mat-card>
       <mat-card><span>{{ 'orders.detail.receipt' | translate }}</span><strong>{{ getEvidenceLabel(data.lifecycle.receipt) }}</strong></mat-card>
+    </div>
+
+    <div class="receipt-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="receivedPercent()" [attr.aria-label]="'orders.detail.progressLabel' | translate: { percent: receivedPercent() }" data-testid="receipt-progress">
+      <span class="receipt-progress-fill" [style.inline-size.%]="receivedPercent()"></span>
+      <span class="receipt-progress-text">{{ 'orders.detail.progressLabel' | translate: { percent: receivedPercent() } }}</span>
     </div>
 
     <mat-card class="evidence-card">

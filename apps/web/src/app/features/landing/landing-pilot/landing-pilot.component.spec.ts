@@ -75,12 +75,6 @@ describe('LandingPilotComponent', () => {
     }
   });
 
-  it('constructs mailto link with encoded subject and body', () => {
-    const mailto = component.mailtoLink();
-    expect(mailto).toContain(`mailto:${environment.salesEmail}`);
-    expect(mailto).toContain('subject=ProcurePilot%20pilot%20access%20request');
-  });
-
   it('links WhatsApp to the sales number with a prefilled message', () => {
     const btn = fixture.debugElement.query(By.css('.pilot-whatsapp-btn'));
     expect(btn.nativeElement.getAttribute('href')).toBe(
@@ -88,5 +82,23 @@ describe('LandingPilotComponent', () => {
     );
     expect(btn.nativeElement.getAttribute('target')).toBe('_blank');
     expect(btn.nativeElement.textContent).toContain('Message us on WhatsApp');
+    expect(btn.query(By.css('svg.pilot-whatsapp-icon'))).toBeTruthy();
+  });
+
+  it('opens a menu of mail options, each carrying the same draft', () => {
+    const { emailSubject, emailBody } = enCatalog.landing.pilot;
+    const subject = encodeURIComponent(emailSubject);
+    const body = encodeURIComponent(emailBody);
+    const to = encodeURIComponent(environment.salesEmail);
+
+    fixture.debugElement.query(By.css('.pilot-primary-btn')).nativeElement.click();
+    fixture.detectChanges();
+
+    const items = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[mat-menu-item]'));
+    expect(items.map((item) => item.getAttribute('href'))).toEqual([
+      `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`,
+      `https://outlook.office.com/mail/deeplink/compose?to=${to}&subject=${subject}&body=${body}`,
+      `mailto:${environment.salesEmail}?subject=${subject}&body=${body}`,
+    ]);
   });
 });

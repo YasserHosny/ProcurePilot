@@ -3860,7 +3860,10 @@
       "dateFormatHintDayFirst": "dd/mm/yyyy",
       "dateFormatHintMonthFirst": "mm/dd/yyyy",
       "receivedQuantityFor": "{{product}} · Received quantity ({{unit}}, ordered {{ordered}})",
-      "confirmedQuantityFor": "{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})"
+      "confirmedQuantityFor": "{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})",
+      "progressLabel": "{{percent}}% received",
+      "sourceRfq": "RFQ",
+      "sourceQuotation": "Quotation"
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",
@@ -4262,6 +4265,8 @@
       }
     },
     "compare": {
+      "unknownSupplier": "Unknown supplier",
+      "unknownProduct": "Unknown product",
       "title": "Compare responses",
       "subtitle": "Compare supplier responses and prepare a purchase request.",
       "supplier": "Supplier",
@@ -4505,6 +4510,8 @@
       "notSendableError": "This RFQ cannot be sent in its current state."
     },
     "guardrails": {
+      "costCentresError": "Could not load cost centres.",
+      "retryCostCentres": "Retry",
       "title": "Guardrail settings",
       "subtitle": "Define when a qualifying response may prepare a draft request.",
       "humanApprovalNote": "Guardrails only prepare DRAFT requests. A human must still approve every purchase.",
@@ -4703,6 +4710,9 @@
       "copied": "Copied",
       "emailSubject": "ProcurePilot pilot access request",
       "emailBody": "Business name:\nNumber of branches:\nHow quotations arrive:",
+      "mailGmail": "Gmail",
+      "mailOutlook": "Outlook",
+      "mailApp": "My email app",
       "whatsappCta": "Message us on WhatsApp",
       "whatsappMessage": "Hi, I'd like to know more about the ProcurePilot pilot.",
       "q1": "How do we join?",

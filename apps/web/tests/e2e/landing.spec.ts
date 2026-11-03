@@ -40,10 +40,15 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
     const gallerySection = page.locator('.gallery-section');
     await expect(gallerySection).toBeVisible();
 
-    // Verify hero request access CTA is primary and has mailto
+    // Verify hero request access CTA is primary and offers the mail options
     const requestAccess = page.locator('.hero-primary-btn');
     await expect(requestAccess).toBeVisible();
-    await expect(requestAccess).toHaveAttribute('href', /^mailto:/);
+    await requestAccess.click();
+    const mailOptions = page.locator('a[mat-menu-item]');
+    await expect(mailOptions).toHaveCount(3);
+    await expect(mailOptions.first()).toHaveAttribute('href', /^https:\/\/mail\.google\.com\//);
+    await expect(mailOptions.last()).toHaveAttribute('href', /^mailto:/);
+    await page.keyboard.press('Escape');
 
     // Verify Iron Systems link
     const ironSysLinks = page.locator('a[href="https://www.iron-sys.com/"]');

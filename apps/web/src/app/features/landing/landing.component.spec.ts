@@ -53,14 +53,16 @@ describe('LandingComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('establishes hero CTA hierarchy with request access as primary button and mailto with encoded subject', () => {
+  it('establishes hero CTA hierarchy with request access as primary button opening the mail menu', () => {
     const primaryBtn = fixture.debugElement.query(By.css('.hero-primary-btn'));
     expect(primaryBtn).toBeTruthy();
-    expect(primaryBtn.nativeElement.textContent.trim()).toBe('Request pilot access');
+    expect(primaryBtn.nativeElement.textContent).toContain('Request pilot access');
 
-    const href = primaryBtn.nativeElement.getAttribute('href');
-    expect(href).toContain(`mailto:${environment.salesEmail}`);
-    expect(href).toContain('subject=ProcurePilot%20pilot%20access%20request');
+    primaryBtn.nativeElement.click();
+    fixture.detectChanges();
+    const mailto = document.querySelector('a[mat-menu-item][href^="mailto:"]');
+    expect(mailto?.getAttribute('href')).toContain(`mailto:${environment.salesEmail}`);
+    expect(mailto?.getAttribute('href')).toContain('subject=ProcurePilot%20pilot%20access%20request');
 
     const secondaryBtn = fixture.debugElement.query(By.css('.hero-secondary-btn'));
     expect(secondaryBtn).toBeTruthy();

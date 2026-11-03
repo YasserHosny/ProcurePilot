@@ -9,12 +9,14 @@ import { ApiService } from '../../../core/api/api.service';
 import type { Product } from '../../../core/api/models';
 
 import { OrdersApiService } from '../orders-api';
+import { RequestsApiService } from '../../requests/requests-api';
 import { OrderDetailComponent } from './order-detail.component';
 
 describe('OrderDetailComponent', () => {
   let fixture: ComponentFixture<OrderDetailComponent>;
   let api: jasmine.SpyObj<OrdersApiService>;
   let catalogue: jasmine.SpyObj<ApiService>;
+  let requests: jasmine.SpyObj<RequestsApiService>;
   const product: Product = {
     id: 'p1', tenant_name: 'Paper', canonical_name: 'Paper', base_unit: 'kilogram',
     pack: { pack_count: 1, unit_size: '100', base_quantity: '100' }, status: 'active', created_at: '',
@@ -23,6 +25,8 @@ describe('OrderDetailComponent', () => {
   beforeEach(async () => {
     catalogue = jasmine.createSpyObj<ApiService>('ApiService', ['product']);
     catalogue.product.and.returnValue(of(product));
+    requests = jasmine.createSpyObj<RequestsApiService>('RequestsApiService', ['getRequest']);
+    requests.getRequest.and.returnValue(throwError(() => new Error('no request')));
     api = jasmine.createSpyObj<OrdersApiService>('OrdersApiService', [
       'getOrder', 'submitOrder', 'cancelOrder', 'recordConfirmation', 'recordReceipt',
     ]);
@@ -50,6 +54,7 @@ describe('OrderDetailComponent', () => {
       providers: [
         provideTranslateService(),
         { provide: ApiService, useValue: catalogue },
+        { provide: RequestsApiService, useValue: requests },
         provideHttpClient(withXhr()), provideNoopAnimations(), provideRouter([]), { provide: OrdersApiService, useValue: api },
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => 'order-1' } } } },
       ],
@@ -516,5 +521,147 @@ describe('OrderDetailComponent', () => {
     fixture = TestBed.createComponent(OrderDetailComponent);
     fixture.detectChanges();
     expect(byTestId('order-overdue')).toBeNull();
+  });
+  // PPS-212: how much of the order has arrived, at a glance.
+  it('shows how much of the order has been received as a progress bar', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const value = component.evidence()!;
+    component.evidence.set({
+      ...value,
+      lifecycle: {
+        ...value.lifecycle,
+        lines: value.lifecycle.lines.map((line) => ({
+          ...line,
+          received: { state: 'available', quantity: '4.000000', source_ids: [] },
+        })),
+      },
+    });
+    fixture.detectChanges();
+
+    const bar = byTestId('receipt-progress');
+    expect(bar?.getAttribute('role')).toBe('progressbar');
+    expect(bar?.getAttribute('aria-valuenow')).toBe('40'); // 4 of the 10 ordered
+    expect(component.receivedPercent()).toBe(40);
+  });
+
+  it('caps the progress at 100 when more than was ordered arrived', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const value = component.evidence()!;
+    component.evidence.set({
+      ...value,
+      lifecycle: {
+        ...value.lifecycle,
+        lines: value.lifecycle.lines.map((line) => ({
+          ...line,
+          received: { state: 'available', quantity: '14.000000', source_ids: [] },
+        })),
+      },
+    });
+    expect(component.receivedPercent()).toBe(100);
+  });
+
+  // PPS-212: trace the order back to the RFQ and the quotation it came from.
+  it('links to the RFQ and the quotation behind the source request', () => {
+    const base = api.getOrder('order-1');
+    base.subscribe((value) => {
+      api.getOrder.and.returnValue(of({ ...value, order: { ...value.order, source_request_id: 'req-1' } }));
+    }).unsubscribe();
+    requests.getRequest.and.returnValue(of({
+      id: 'req-1', source: { rfq_id: 'rfq-9', rfq_response_id: 'resp-1', quotation_id: 'quo-3', supplier_id: 's' },
+    } as unknown as import('../../../core/api/models').PurchaseRequest));
+    fixture = TestBed.createComponent(OrderDetailComponent);
+    fixture.detectChanges();
+
+    expect(byTestId('source-rfq-link')?.getAttribute('href')).toBe('/rfq/rfq-9');
+    expect(byTestId('source-quotation-link')?.getAttribute('href')).toBe('/quotations/quo-3');
+  });
+
+  it('shows no RFQ or quotation links, and no error, when the request cannot be loaded', () => {
+    fixture.detectChanges(); // the default spy fails
+    expect(byTestId('source-rfq-link')).toBeNull();
+    expect(byTestId('source-quotation-link')).toBeNull();
+    expect(byTestId('action-error')).toBeNull();
+  });
+  // Review (Codex): 199 of 200 packs is not «100% received».
+  it('never reads 100% until every line has fully arrived', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const value = component.evidence()!;
+    const order = { ...value.order, lines: [{ ...value.order.lines[0], ordered_quantity: '200' }] };
+    component.evidence.set({
+      ...value,
+      order,
+      lifecycle: {
+        ...value.lifecycle,
+        lines: [{ ...value.lifecycle.lines[0], ordered_quantity: '200', received: { state: 'available', quantity: '199', source_ids: [] } }],
+      },
+    });
+    expect(component.receivedPercent()).toBe(99);
+  });
+
+  // Review (Codex): packs of different products must not be added up as if they were alike.
+  it('weights each line by its value, not by its pack count', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const value = component.evidence()!;
+    const line = value.order.lines[0];
+    const money = (amount: string) => ({ amount, currency: 'GBP' });
+    component.evidence.set({
+      ...value,
+      order: {
+        ...value.order,
+        lines: [
+          { ...line, id: 'a', ordered_quantity: '50', line_total: money('50.00') }, // cheap, many packs
+          { ...line, id: 'b', ordered_quantity: '2', line_total: money('150.00') }, // dear, few packs
+        ],
+      },
+      lifecycle: {
+        ...value.lifecycle,
+        lines: [
+          { ...value.lifecycle.lines[0], purchase_order_line_id: 'a', ordered_quantity: '50', received: { state: 'available', quantity: '50', source_ids: [] } },
+          { ...value.lifecycle.lines[0], purchase_order_line_id: 'b', ordered_quantity: '2', received: { state: 'pending', quantity: null, source_ids: [] } },
+        ],
+      },
+    });
+    expect(component.receivedPercent()).toBe(25); // 50 of 200 of the order's value
+  });
+  // Review (Codex, #471): a free line that has not arrived must keep the bar below 100.
+  it('stays below 100 while a zero-value line has not arrived', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const value = component.evidence()!;
+    const line = value.order.lines[0];
+    const money = (amount: string) => ({ amount, currency: 'GBP' });
+    component.evidence.set({
+      ...value,
+      order: {
+        ...value.order,
+        lines: [
+          { ...line, id: 'paid', ordered_quantity: '10', line_total: money('100.00') },
+          { ...line, id: 'free', ordered_quantity: '5', line_total: money('0.00') },
+        ],
+      },
+      lifecycle: {
+        ...value.lifecycle,
+        lines: [
+          { ...value.lifecycle.lines[0], purchase_order_line_id: 'paid', ordered_quantity: '10', received: { state: 'available', quantity: '10', source_ids: [] } },
+          { ...value.lifecycle.lines[0], purchase_order_line_id: 'free', ordered_quantity: '5', received: { state: 'pending', quantity: null, source_ids: [] } },
+        ],
+      },
+    });
+    expect(component.receivedPercent()).toBe(99);
+
+    component.evidence.set({
+      ...component.evidence()!,
+      lifecycle: {
+        ...component.evidence()!.lifecycle,
+        lines: component.evidence()!.lifecycle.lines.map((l) => ({
+          ...l, received: { state: 'available', quantity: l.ordered_quantity, source_ids: [] },
+        })),
+      },
+    });
+    expect(component.receivedPercent()).toBe(100);
   });
 });
