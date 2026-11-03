@@ -1348,9 +1348,10 @@ def test_validation_rejects_quantity_zero(
         assert cur.fetchone()[0] == count_before, "No header must remain when quantity is 0"
 
 
-def test_validation_rejects_foreign_tenant_product(
+def test_validation_rejects_unknown_product(
     conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """A product id that is not in the caller's workspace is rejected as not found."""
     with conn.cursor() as cur:
         owner_a = make_workspace(cur, "pr-val-foreign-a")
         branch_a = _make_branch(cur, owner_a)

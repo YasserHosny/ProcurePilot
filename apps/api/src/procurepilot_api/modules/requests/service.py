@@ -1816,6 +1816,17 @@ class RequestsService:
             raise _map_psycopg_error(exc) from exc
 
         rid = str(request_id)
+        if resolved.source == "owner_fallback":
+            self._record(
+                bearer_token=bearer_token,
+                member=member,
+                action="requests.approval_step_escalated",
+                target={
+                    "purchase_request_id": rid,
+                    "approval_step_id": str(routed_step["id"]),
+                    "assigned_membership_id": str(resolved.assigned_membership_id),
+                },
+            )
         self._record(
             bearer_token=bearer_token,
             member=member,
