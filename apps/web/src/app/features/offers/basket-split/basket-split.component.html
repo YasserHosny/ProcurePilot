@@ -36,6 +36,13 @@
 
   <div class="visually-hidden" role="status" aria-live="polite" data-testid="job-status-live">{{ liveStatus() }}</div>
 
+  @if (errorMessage() && currentJob() && uiState() !== 'failed' && uiState() !== 'completed_infeasible') {
+    <div class="error-banner" role="alert" data-testid="job-error">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ errorMessage() }}</span>
+    </div>
+  }
+
   <!-- Loading Initial Data -->
   @if (isLoading() && !currentJob()) {
     <div class="loading-container">
@@ -58,6 +65,32 @@
       <span>{{ 'basketSplit.status.pollFailed' | translate }}</span>
       <button mat-stroked-button type="button" (click)="retryPolling()" data-testid="poll-retry">{{ 'basketSplit.status.pollRetry' | translate }}</button>
     </div>
+  }
+
+  @if (!currentJob() && !jobNotFound() && history().length > 0) {
+    <mat-card class="history-card" data-testid="split-history">
+      <h2 class="section-title">{{ 'basketSplit.history.title' | translate }}</h2>
+      <ul class="history-list">
+        @for (job of history(); track job.id) {
+          <li>
+            <a [routerLink]="['/offers/basket-split', job.id]" class="history-row" data-testid="split-history-row">
+              <span class="history-date">{{ job.created_at | formatDate }}</span>
+              <span class="history-suppliers" dir="auto">{{ historySuppliers(job) }}</span>
+              <span class="history-items">{{ 'basketSplit.history.items' | translate: { count: job.item_count } }}</span>
+              <span class="history-status">{{ ('basketSplit.history.status.' + job.status) | translate }}</span>
+              @if (job.total_landed_cost; as total) {
+                <strong class="history-total">{{ total | formatMoney }}</strong>
+              }
+            </a>
+          </li>
+        }
+      </ul>
+      @if (hasMoreHistory()) {
+        <button mat-stroked-button type="button" (click)="loadMoreHistory()" data-testid="load-more-history">
+          {{ 'basketSplit.history.loadMore' | translate }}
+        </button>
+      }
+    </mat-card>
   }
 
   <!-- Form View (When No Active Job / Result Displayed) -->
@@ -297,6 +330,18 @@
               <mat-icon aria-hidden="true">add</mat-icon>
               <span>{{ 'basketSplit.form.addItem' | translate }}</span>
             </button>
+          </div>
+
+          <div class="product-search">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="product-search-field">
+              <mat-label>{{ 'basketSplit.form.searchProducts' | translate }}</mat-label>
+              <input matInput type="search" (input)="onProductSearch($any($event.target).value)" (keydown.enter)="$event.preventDefault()" data-testid="product-search" />
+            </mat-form-field>
+            @if (hasMoreProducts()) {
+              <button mat-stroked-button type="button" (click)="loadMoreProducts()" data-testid="load-more-products">
+                {{ 'basketSplit.form.loadMoreProducts' | translate }}
+              </button>
+            }
           </div>
 
           <div class="items-list">

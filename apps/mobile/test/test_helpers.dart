@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -52,6 +53,16 @@ class TestAssetBundle extends AssetBundle {
 /// Returns a loaded [I18nLoader] backed by a minimal English catalogue.
 Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
   await initializeDateFormatting();
+  final pagination = <String, Object?>{};
+  for (final language in ['en', 'ar']) {
+    // Read the shared catalogue synchronously so this also works in plain unit
+    // tests without a Flutter binding and in widget tests' fake async zone.
+    final catalogue = jsonDecode(
+      File('assets/i18n/$language.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
+    pagination[language] =
+        (catalogue['approvals'] as Map<String, dynamic>)['pagination'];
+  }
   final bundle = TestAssetBundle({
     'assets/i18n/en.json': jsonEncode({
       'common': {
@@ -113,6 +124,7 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'each': 'pcs',
       },
       'approvals': {
+        'pagination': pagination['en'],
         'budgetStatus': {
           'no_budget': 'No budget configured',
           'reasons': {
@@ -188,14 +200,10 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
       'requests': {
         'split': {'siblingLink': 'Request {{id}}'},
         'autoPrepared': {
-          'title':
-              "Prepared automatically by a guardrail",
-          'draftMessage':
-              "This draft was prepared automatically by a guardrail from {{supplier}}'s quote. Review it and submit it if it is right; nothing is ordered until it is approved.",
-          'message':
-              "This request was prepared automatically by a guardrail from {{supplier}}'s quote.",
-          'unknownSupplier':
-              "the winning supplier",
+          'title': "Prepared automatically by a guardrail",
+          'draftMessage': "This draft was prepared automatically by a guardrail from {{supplier}}'s quote. Review it and submit it if it is right; nothing is ordered until it is approved.",
+          'message': "This request was prepared automatically by a guardrail from {{supplier}}'s quote.",
+          'unknownSupplier': "the winning supplier",
         },
         'title': 'Purchase Requests',
         'subtitle': 'Create and track purchase requests',
@@ -325,11 +333,13 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'comingSoon': 'قريباً',
       },
       'approvals': {
+        'pagination': pagination['ar'],
         'budgetStatus': {
           'no_budget': 'لا توجد ميزانية محددة',
           'reasons': {
             'no_budget_for_branch': 'لم يتم تحديد ميزانية لهذا الفرع',
-            'no_budget_at_cost_centre_level': 'لا توجد ميزانية على مستوى مركز التكلفة',
+            'no_budget_at_cost_centre_level':
+                'لا توجد ميزانية على مستوى مركز التكلفة',
           },
         },
         'title': 'قائمة الموافقات',
@@ -386,14 +396,11 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
       'requests': {
         'split': {'siblingLink': 'طلب {{id}}'},
         'autoPrepared': {
-          'title':
-              "أعدّته الضوابط تلقائيًا",
-          'draftMessage':
-              "أعدّت الضوابط هذه المسودة تلقائيًا من عرض سعر {{supplier}}. راجعها وأرسلها إن كانت صحيحة؛ لن يُطلب أي شيء قبل الموافقة عليها.",
+          'title': "أعدّته الضوابط تلقائيًا",
+          'draftMessage': "أعدّت الضوابط هذه المسودة تلقائيًا من عرض سعر {{supplier}}. راجعها وأرسلها إن كانت صحيحة؛ لن يُطلب أي شيء قبل الموافقة عليها.",
           'message':
               "أعدّت الضوابط هذا الطلب تلقائيًا من عرض سعر {{supplier}}.",
-          'unknownSupplier':
-              "المورّد الفائز",
+          'unknownSupplier': "المورّد الفائز",
         },
         'title': 'طلبات الشراء',
         'budgetStatus': {
@@ -441,8 +448,7 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'actionLabel': 'المخزون منخفض',
         'countRemainingLabel': 'الكمية المتبقية',
         'submittedMessage': 'تم إرسال بلاغ انخفاض المخزون.',
-        'queuedMessage':
-            'بلاغ انخفاض المخزون في قائمة الانتظار — سيتم الإرسال عند عودة الاتصال.',
+        'queuedMessage': 'بلاغ انخفاض المخزون في قائمة الانتظار — سيتم الإرسال عند عودة الاتصال.',
       },
       'about': {
         'title': 'المساعدة وحول التطبيق',
@@ -836,8 +842,10 @@ class FakeRequestsApiClient extends RequestsApiClient {
       'issueId': issueId,
       'filePath': filePath,
     });
-    if (uploadQualityIssuePhotoError != null) throw uploadQualityIssuePhotoError!;
-    if (uploadQualityIssuePhotoResult != null) return uploadQualityIssuePhotoResult!;
+    if (uploadQualityIssuePhotoError != null)
+      throw uploadQualityIssuePhotoError!;
+    if (uploadQualityIssuePhotoResult != null)
+      return uploadQualityIssuePhotoResult!;
     return QualityIssuePhoto(
       id: 'photo-1',
       deliveryQualityIssueId: issueId,
@@ -876,6 +884,9 @@ class FakeApprovalsApiClient extends ApprovalsApiClient {
 
   List<PurchaseRequest> pendingResults = [];
   Exception? pendingError;
+  final pendingCalls = <({String? cursor, int limit})>[];
+  Future<PendingApprovalsList> Function(String? cursor, int limit)? pendingPage;
+
   final approveGroupCalls = <String>[];
   final approveGroupComments = <String?>[];
   final rejectGroupCalls = <String>[];
@@ -914,6 +925,8 @@ class FakeApprovalsApiClient extends ApprovalsApiClient {
     String? cursor,
     int limit = 100,
   }) async {
+    pendingCalls.add((cursor: cursor, limit: limit));
+    if (pendingPage != null) return pendingPage!(cursor, limit);
     if (pendingError != null) throw pendingError!;
     return PendingApprovalsList(items: pendingResults);
   }

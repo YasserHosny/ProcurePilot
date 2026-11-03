@@ -209,7 +209,8 @@ class RfqService:
                     )
                     values (%s, %s, %s, 'draft', %s, %s, %s)
                     returning id, tenant_id, created_by_membership_id, status,
-                              needed_by_date, idempotency_key, tenant_terms, created_at
+                              needed_by_date, idempotency_key, tenant_terms, created_at,
+                              reference_number
                     """,
                     (
                         rfq_id,
@@ -253,8 +254,7 @@ class RfqService:
                         """
                         insert into rfq_recipient (id, tenant_id, rfq_id, supplier_id, status)
                         values (%s, %s, %s, %s, 'draft')
-                        returning id, tenant_id, rfq_id, supplier_id, status,
-                                  outbound_message_id, sent_at, created_at
+                        returning *
                         """,
                         (rec_id, member.tenant_id, rfq_id, supplier_id),
                     )
@@ -269,7 +269,8 @@ class RfqService:
                 cur.execute(
                     f"select r.id, r.tenant_id, r.created_by_membership_id, "
                     f"{_EFFECTIVE_STATUS_SQL} as status, r.needed_by_date, "
-                    "r.tenant_terms, r.idempotency_key, r.created_at, r.cancelled_at "
+                    "r.tenant_terms, r.idempotency_key, r.created_at, r.cancelled_at, "
+                    "r.reference_number "
                     "from rfq r where r.id = %s",
                     (rfq_id,),
                 )
@@ -455,7 +456,7 @@ class RfqService:
                         details={"idempotency_key": "concurrent request"}
                     )
 
-                rfq_row = _lock_rfq_for_creator(cur, member, rfq_id)
+                rfq_row = _lock_rfq_for_sender(cur, member, rfq_id)
                 rfq = Rfq(**rfq_row)
                 if rfq.status not in ("draft", "sent", "responded"):
                     raise ConflictError(details={"resource": "rfq", "reason": "not_sendable"})
@@ -538,7 +539,8 @@ class RfqService:
                     supp_row = suppliers_by_id.get(recipient.supplier_id)
                     if not supp_row or not supp_row.get("contact_email"):
                         cur.execute(
-                            "update rfq_recipient set status = 'failed' where id = %s",
+                            "update rfq_recipient set status = 'failed', "
+                            "failure_reason = 'missing_contact_email' where id = %s",
                             (recipient.id,),
                         )
                         continue
@@ -588,7 +590,14 @@ class RfqService:
                             extra={"rfq_id": str(rfq_id), "recipient_id": str(recipient.id)},
                         )
                         cur.execute(
-                            "update rfq_recipient set status = 'failed' where id = %s",
+                            """
+                            update rfq_recipient
+                            set status = 'failed',
+                                failure_reason = 'delivery_error',
+                                send_attempts = send_attempts + 1,
+                                last_attempt_at = now()
+                            where id = %s
+                            """,
                             (recipient.id,),
                         )
                         continue
@@ -596,7 +605,12 @@ class RfqService:
                     cur.execute(
                         """
                         update rfq_recipient
-                        set status = 'sent', outbound_message_id = %s, sent_at = now()
+                        set status = 'sent',
+                            outbound_message_id = %s,
+                            sent_at = now(),
+                            failure_reason = null,
+                            send_attempts = send_attempts + 1,
+                            last_attempt_at = now()
                         where id = %s
                         """,
                         (res.message_id, recipient.id),
@@ -1246,6 +1260,7 @@ class RfqService:
         query = f"""
             SELECT
                 r.id,
+                r.reference_number,
                 {_EFFECTIVE_STATUS_SQL} as status,
                 r.needed_by_date,
                 r.created_at,
@@ -1434,6 +1449,25 @@ def _lock_rfq_for_creator(cur: psycopg.Cursor, member: CurrentMember, rfq_id: uu
     if row is None:
         raise NotFoundError(details={"resource": "rfq"})
     if row["created_by_membership_id"] != member.membership_id:
+        raise PermissionDeniedError(details={"resource": "rfq", "reason": "not_creator"})
+    cur.execute("select * from rfq where id = %s for update", (rfq_id,))
+    locked = cur.fetchone()
+    if locked is None:
+        raise NotFoundError(details={"resource": "rfq"})
+    return locked
+
+
+def _lock_rfq_for_sender(cur: psycopg.Cursor, member: CurrentMember, rfq_id: uuid.UUID) -> dict:
+    """Load and row-lock an RFQ the caller may send or retry, BEFORE any side effect (email).
+
+    The RFQ's creator or an active owner of the workspace may send (PPS-179). Any other
+    member is refused up front (403 not_creator).
+    """
+    cur.execute("select * from rfq where id = %s", (rfq_id,))
+    row = cur.fetchone()
+    if row is None:
+        raise NotFoundError(details={"resource": "rfq"})
+    if member.role != "owner" and row["created_by_membership_id"] != member.membership_id:
         raise PermissionDeniedError(details={"resource": "rfq", "reason": "not_creator"})
     cur.execute("select * from rfq where id = %s for update", (rfq_id,))
     locked = cur.fetchone()

@@ -155,6 +155,8 @@ class AdvancedBasketRequest(StrictModel):
         default_factory=OptimisationHardConstraints
     )
     soft_weights: OptimisationSoftWeights = Field(default_factory=OptimisationSoftWeights)
+    # «urgent» makes lead time count heavily against price (see solver._weighted_offer_cost).
+    urgency: Literal["normal", "urgent"] = "normal"
     rule_version: StrictStr
 
     @model_validator(mode="after")
