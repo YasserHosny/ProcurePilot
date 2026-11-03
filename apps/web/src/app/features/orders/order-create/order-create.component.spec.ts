@@ -1104,12 +1104,63 @@ describe('OrderCreateComponent', () => {
   });
 
   // PPS-207: the request's estimate was shown as a badge but could not be taken as the price.
-  it('lets the buyer take the request estimate as the unit price', () => {
+  it('lets the buyer take the request estimate as the unit price when it is in the order currency', () => {
+    component.form.patchValue({ currency: 'USD' });
     component.lines.at(0).patchValue({ unit_price: null, source_request_line_id: 'rl-1' });
     component.lines.at(0).controls.estimated_price.setValue(15);
+    component.rememberEstimateCurrency('rl-1', 'USD');
 
+    expect(component.canUseEstimate(0)).toBeTrue();
     component.useEstimate(0);
 
     expect(component.lines.at(0).controls.unit_price.value).toBe(15);
+  });
+
+  // Review (Codex): an estimate in another currency must not become a price in this order's currency.
+  it('does not offer an estimate that is in a different currency than the order', () => {
+    component.form.patchValue({ currency: 'EUR' });
+    component.lines.at(0).patchValue({ unit_price: null, source_request_line_id: 'rl-2' });
+    component.lines.at(0).controls.estimated_price.setValue(15);
+    component.rememberEstimateCurrency('rl-2', 'EGP');
+
+    expect(component.canUseEstimate(0)).toBeFalse();
+    component.useEstimate(0);
+
+    expect(component.lines.at(0).controls.unit_price.value).toBeNull();
+  });
+
+  // Review (Codex): a disabled control drops out of form.value, so the totals fell back to USD.
+  it('shows the totals in the order currency when the order comes from a request', () => {
+    fixture.destroy();
+    routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-9' });
+    requestsApiService.getRequest.and.returnValue(of({
+      id: 'req-9', branch_id: 'b1', requested_by_membership_id: 'm1', required_by_date: '2026-10-01',
+      status: 'approved',
+      lines: [{ id: 'rl-1', workspace_product_id: 'p1', quantity: '2', quoted_unit_price: { amount: '10', currency: 'EGP' } }],
+      has_incomplete_estimate: false, created_at: '2026-09-29T00:00:00Z',
+    } as unknown as import('../../../core/api/models').PurchaseRequest));
+    ordersApiService.getAllocations.and.returnValue(of({
+      source_request_id: 'req-9',
+      lines: [{ source_request_line_id: 'rl-1', requested_quantity: '2', allocated_quantity: '0', remaining_quantity: '2' }],
+    }));
+    fixture = TestBed.createComponent(OrderCreateComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const total = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="order-tax-total"]');
+    expect(total?.textContent).toContain('EGP');
+    expect(total?.textContent).not.toContain('$');
+  });
+  // Review (Codex): the estimate badge labelled the estimate with the order's currency.
+  it('labels the estimate with its own currency', () => {
+    component.form.patchValue({ currency: 'EUR' });
+    component.lines.at(0).patchValue({ source_request_line_id: 'rl-3' });
+    component.lines.at(0).controls.estimated_price.setValue(15);
+    component.rememberEstimateCurrency('rl-3', 'EGP');
+    fixture.detectChanges();
+
+    const badge = (fixture.nativeElement as HTMLElement).querySelector('.estimate-badge');
+    expect(badge?.textContent).toContain('EGP');
+    expect(badge?.textContent).not.toContain('€');
   });
 });

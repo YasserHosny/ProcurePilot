@@ -159,11 +159,35 @@ export class OrderCreateComponent implements OnInit {
     return [...new Set(options)];
   }
 
-  /** Takes the request's estimate as this line's unit price. */
-  useEstimate(index: number): void {
+  // The currency each request line's estimate is in; it can differ from the quote's order currency.
+  private readonly estimateCurrencies = new Map<string, string>();
+
+  /** The currency a line's estimate is in; the order currency when it was never recorded. */
+  estimateCurrencyFor(line: FormGroup<OrderLineForm>): string {
+    return (
+      this.estimateCurrencies.get(line.controls.source_request_line_id.value ?? '') ??
+      this.form.controls.currency.value
+    );
+  }
+
+  rememberEstimateCurrency(requestLineId: string, currency: string): void {
+    this.estimateCurrencies.set(requestLineId, currency);
+  }
+
+  /** The estimate is a usable price only while the line is unpriced and the currencies agree. */
+  canUseEstimate(index: number): boolean {
     const line = this.lines.at(index);
     const estimate = line.controls.estimated_price.value;
-    if (estimate !== null) line.controls.unit_price.setValue(estimate);
+    if (estimate === null || line.controls.unit_price.value) return false;
+    const estimateCurrency = this.estimateCurrencies.get(line.controls.source_request_line_id.value ?? '');
+    return estimateCurrency === undefined || estimateCurrency === this.form.controls.currency.value;
+  }
+
+  /** Takes the request's estimate as this line's unit price. */
+  useEstimate(index: number): void {
+    if (!this.canUseEstimate(index)) return;
+    const line = this.lines.at(index);
+    line.controls.unit_price.setValue(line.controls.estimated_price.value);
   }
 
   packDescription(product: Product | undefined): string | null {
@@ -329,6 +353,9 @@ export class OrderCreateComponent implements OnInit {
               const currentQuantity = lineGroup.controls.quantity.value || 0;
               const remaining = parseFloat(allocation?.remaining_quantity || '0') + currentQuantity;
               lineGroup.controls.remaining_quantity.setValue(remaining);
+              if (requestLine?.estimated_unit_price) {
+                this.rememberEstimateCurrency(lineId, requestLine.estimated_unit_price.currency);
+              }
               lineGroup.controls.estimated_price.setValue(
                 requestLine?.estimated_unit_price ? parseFloat(requestLine.estimated_unit_price.amount) : null,
               );
@@ -386,6 +413,9 @@ export class OrderCreateComponent implements OnInit {
               : null;
             if (prefillQuotes && reqLine.quoted_unit_price) {
               this.prefilledQuotes.set(reqLine.id, parseFloat(quotedPrice!.amount));
+            }
+            if (reqLine.estimated_unit_price) {
+              this.rememberEstimateCurrency(reqLine.id, reqLine.estimated_unit_price.currency);
             }
             const lineGroup = new FormGroup<OrderLineForm>({
                 workspace_product_id: new FormControl<string | null>(reqLine.workspace_product_id || null),

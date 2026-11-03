@@ -130,7 +130,7 @@
               @if (line.controls.source_request_line_id.value) {
                 <div class="line-reference-info">
                   @if (line.controls.estimated_price.value !== null) {
-                    <span class="estimate-badge">{{ 'orders.create.estimateReference' | translate }}: {{ { amount: line.controls.estimated_price.value, currency: form.controls.currency.value } | formatMoney }}</span>
+                    <span class="estimate-badge">{{ 'orders.create.estimateReference' | translate }}: {{ { amount: line.controls.estimated_price.value, currency: estimateCurrencyFor(line) } | formatMoney }}</span>
                   }
                   <span class="remaining-badge">{{ 'orders.create.remainingQuantity' | translate }}: {{ line.controls.remaining_quantity.value }}</span>
                 </div>
@@ -189,7 +189,7 @@
               <mat-form-field appearance="outline" class="pp-figures" subscriptSizing="dynamic">
                 <mat-label>{{ 'orders.create.unitPrice' | translate }}</mat-label>
                 <input matInput type="number" step="0.01" formControlName="unit_price" />
-                @if (line.controls.estimated_price.value !== null && !line.controls.unit_price.value) {
+                @if (canUseEstimate(i)) {
                   <button matSuffix mat-button type="button" (click)="useEstimate(i)" data-testid="use-estimate">{{ 'orders.create.useEstimate' | translate }}</button>
                 }
                 @if (packHint(line); as pack) {
@@ -230,15 +230,15 @@
       <mat-card class="totals-card">
         <div>
           <span>{{ 'orders.create.linesTotalLabel' | translate }}:</span>
-          <span class="pp-figures">{{ { amount: computedTotals().linesTotal, currency: form.value.currency || 'USD' } | formatMoney }}</span>
+          <span class="pp-figures">{{ { amount: computedTotals().linesTotal, currency: form.controls.currency.value || 'USD' } | formatMoney }}</span>
         </div>
         <div class="tax-row">
           <span>{{ 'orders.create.orderTax' | translate }}:</span>
-          <span class="pp-figures" data-testid="order-tax-total">{{ { amount: computedTotals().taxTotal, currency: form.value.currency || 'USD' } | formatMoney }}</span>
+          <span class="pp-figures" data-testid="order-tax-total">{{ { amount: computedTotals().taxTotal, currency: form.controls.currency.value || 'USD' } | formatMoney }}</span>
         </div>
         <div class="grand-total">
           <span>{{ 'orders.create.orderTotal' | translate }}:</span>
-          <span class="pp-figures">{{ { amount: computedTotals().orderTotal, currency: form.value.currency || 'USD' } | formatMoney }}</span>
+          <span class="pp-figures">{{ { amount: computedTotals().orderTotal, currency: form.controls.currency.value || 'USD' } | formatMoney }}</span>
         </div>
       </mat-card>
 
