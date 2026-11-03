@@ -1499,6 +1499,12 @@ Request:
 
 ### `POST /requests/{request_id}/approve` · `POST /requests/{request_id}/reject`
 
+- Accepts an optional `Idempotency-Key` UUID header. Within the decision transaction, an
+  authorized retry with the same tenant, actor, action, request and key returns the current
+  request and approval step without another decision, audit event, notification or push enqueue.
+  Replay ignores changed comment input. A different key, actor or action follows the usual
+  conflict checks. Without the header, repeated decisions continue to return `409`.
+
 - Requires bearer auth. The caller must be the step's `assigned_membership_id` or an owner
   (FR-007).
 - Request fields: optional `comment`.
