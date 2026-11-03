@@ -1,6 +1,6 @@
 ---
 scope: company (Iron Systems) website
-status: prompt for the website session; copy marked "draft" needs Yasser's approval before it ships
+status: not used. Yasser, 2026-11-03: "the site i need it like it now" (live site stays as it is)
 created: 2026-11-02
 based_on: strategy/b2b-focus-2026-11.md (section 2, decisions B-2 to B-4)
 sources_at: website a1904c7 (lib/site.ts, app/components/Contact.tsx) · ProcurePilot docs/gtm/video/README.md (WhatsApp number)
