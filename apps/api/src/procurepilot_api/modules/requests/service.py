@@ -1335,14 +1335,8 @@ class RequestsService:
                         for row in rows:
                             if action == "submitted" or member.role is not MemberRole.owner:
                                 _require_requester(row, member)
-                    if (
-                        action in ("approved", "rejected")
-                        and comment is not None
-                        and len(comment) > 2000
-                    ):
-                        raise UnprocessableEntityError(details={"reason": "comment_too_long"})
-                    if action == "rejected" and (comment is None or not comment.strip()):
-                        raise UnprocessableEntityError(details={"reason": "comment_required"})
+                    if action in ("approved", "rejected"):
+                        _validate_decision_comment(action, comment)
                     now = _now_iso()
                     if action == "submitted":
                         total = sum(
@@ -3044,6 +3038,7 @@ class RequestsService:
             raise ConflictError(details={"reason": "no_pending_approval"})
         _require_assigned_approver_or_owner(step_row, member)
 
+        _validate_decision_comment(decision, payload.comment)
         now = _now_iso()
         decided_request, decided_step, notification_id = self._decide_and_notify(
             member=member,
@@ -3070,16 +3065,6 @@ class RequestsService:
                 )
 
         line_rows = self._fetch_lines_for(client, rid)
-        self._record(
-            bearer_token=bearer_token,
-            member=member,
-            action=f"requests.approval_step_{decision}",
-            target={
-                "purchase_request_id": rid,
-                "approval_step_id": str(decided_step["id"]),
-                "decided_by_membership_id": str(member.membership_id),
-            },
-        )
         return self._purchase_request_with_budget_status(
             client, decided_request, line_rows, decided_step
         )
@@ -3156,14 +3141,14 @@ class RequestsService:
         comment: str | None,
         now: str,
     ) -> tuple[dict[str, object], dict[str, object], UUID | None]:
-        """Atomically applies a decision and queues its notification (T037, research.md R1).
+        """Atomically applies a decision, records its audit event and queues its notification.
 
         A single raw-`psycopg` transaction (mirroring `devices/service.py`'s own
         `_authenticated_db`-style pattern — a deliberate, isolated exception to this file's
         otherwise-uniform PostgREST/`authenticated_client` style) because `push_notification`
         grants nothing to `authenticated` at all (its own migration: service-role only), so the
         notification write needs a role switch mid-transaction that PostgREST/supabase-py cannot
-        express, and because these three writes must succeed or fail together — a prior version of
+        express, and because these writes must succeed or fail together — a prior version of
         this method did them as separate PostgREST calls with no such guarantee (fixed after
         review caught it). Returns `(decided_request, decided_step, notification_id)` — the last
         is `None` only if this were ever called for a request with no requester to notify, which
@@ -3176,56 +3161,80 @@ class RequestsService:
             "role": "authenticated",
             "member_role": member.role.value,
         }
-        with db.connect(self._settings.database_url.get_secret_value()) as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute("set local role authenticated")
-                cur.execute(
-                    "select set_config('request.jwt.claims', %s, true)",
-                    (json.dumps(claims),),
-                )
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute("set local role authenticated")
+                    cur.execute(
+                        "select set_config('request.jwt.claims', %s, true)",
+                        (json.dumps(claims),),
+                    )
 
-                # Same authoritative guard the previous (non-atomic) version used: if a concurrent
-                # withdrawal already flipped the request's status, this matches zero rows and we
-                # raise before touching the step or writing a notification, leaving the step
-                # `pending` rather than stranding a `decided` step on a non-submitted request.
-                #
-                # An approved request lands directly on `ordered`, not `approved` (chunk R2.3,
-                # specs/010-mobile-approvals-receipt/research.md R1) — there is no separate
-                # "place the order" human action this release, so the same decision that approves
-                # a request is also what marks it ordered. `approval_step.status` and the audit
-                # action below still record the human's actual decision ("approved"), unchanged;
-                # only `purchase_request.status` itself takes the new terminal value.
-                decided_request, decided_step = self._apply_request_decision(
-                    cur,
-                    member=member,
-                    request_id=request_id,
-                    step_id=step_id,
-                    decision=decision,
-                    request_status="ordered" if decision == "approved" else decision,
-                    comment=comment,
-                    now=now,
-                )
+                    # Same authoritative guard the previous (non-atomic) version used: if a
+                    # concurrent withdrawal already flipped the request's status, this matches zero
+                    # rows and we raise before touching the step or writing a notification, leaving
+                    # the step `pending` rather than stranding a `decided` step on a non-submitted
+                    # request.
+                    #
+                    # An approved request lands directly on `ordered`, not `approved` (chunk R2.3,
+                    # specs/010-mobile-approvals-receipt/research.md R1) — there is no separate
+                    # "place the order" human action this release, so the same decision that
+                    # approves a request is also what marks it ordered. `approval_step.status` and
+                    # the audit action below still record the human's actual decision ("approved"),
+                    # unchanged; only `purchase_request.status` itself takes the new terminal value.
+                    decided_request, decided_step = self._apply_request_decision(
+                        cur,
+                        member=member,
+                        request_id=request_id,
+                        step_id=step_id,
+                        decision=decision,
+                        request_status="ordered" if decision == "approved" else decision,
+                        comment=comment,
+                        now=now,
+                    )
 
-                cur.execute("set local role service_role")
-                cur.execute(
-                    """
-                    insert into push_notification (tenant_id, purchase_request_id, member_id)
-                    values (%s, %s, %s)
-                    returning id
-                    """,
-                    (
-                        str(member.tenant_id),
-                        request_id,
-                        str(decided_request["requested_by_membership_id"]),
-                    ),
-                )
-                notification_row = cur.fetchone()
-                notification_id = (
-                    UUID(str(notification_row["id"])) if notification_row is not None else None
-                )
-            # Exiting the `with db.connect(...)` block here commits all three writes above
-            # atomically (or rolls all of them back if any exception was raised) — psycopg's own
-            # connection context manager semantics, the same ones `devices/service.py` relies on.
+                    target = {
+                        "purchase_request_id": request_id,
+                        "approval_step_id": str(decided_step["id"]),
+                        "decided_by_membership_id": str(member.membership_id),
+                    }
+                    if comment is not None:
+                        target["comment"] = comment
+                    cur.execute(
+                        "select record_audit_event(%s,'success',%s,%s,%s,%s,%s)",
+                        (
+                            f"requests.approval_step_{decision}",
+                            member.tenant_id,
+                            member.membership_id,
+                            member.email,
+                            Jsonb(target),
+                            get_trace_id(),
+                        ),
+                    )
+
+                    cur.execute("set local role service_role")
+                    cur.execute(
+                        """
+                        insert into push_notification (tenant_id, purchase_request_id, member_id)
+                        values (%s, %s, %s)
+                        returning id
+                        """,
+                        (
+                            str(member.tenant_id),
+                            request_id,
+                            str(decided_request["requested_by_membership_id"]),
+                        ),
+                    )
+                    notification_row = cur.fetchone()
+                    notification_id = (
+                        UUID(str(notification_row["id"])) if notification_row is not None else None
+                    )
+                # Exiting the `with db.connect(...)` block here commits all writes above
+                # atomically (or rolls all of them back if any exception was raised) — psycopg's
+                # own connection context manager semantics, the same ones `devices/service.py`
+                # relies on.
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return dict(decided_request), dict(decided_step), notification_id
 
     def _purchase_request_with_budget_status(
@@ -3834,6 +3843,13 @@ def _compute_totals(
     if len(currencies) == 1:
         return total, currencies.pop(), has_incomplete
     return None, None, has_incomplete
+
+
+def _validate_decision_comment(decision: str, comment: str | None) -> None:
+    if comment is not None and len(comment) > 2000:
+        raise UnprocessableEntityError(details={"reason": "comment_too_long"})
+    if decision == "rejected" and (comment is None or not comment.strip()):
+        raise UnprocessableEntityError(details={"reason": "comment_required"})
 
 
 def _now_iso() -> str:
