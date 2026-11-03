@@ -152,7 +152,17 @@ describe('CompareComponent (RFQ)', () => {
     });
     mockSession.hasRole.and.returnValue(true);
 
-    mockApiService = jasmine.createSpyObj('ApiService', ['listBranches', 'suppliers', 'products', 'members']);
+    mockApiService = jasmine.createSpyObj('ApiService', [
+      'listBranches',
+      'suppliers',
+      'products',
+      'members',
+      'supplier',
+      'product',
+    ]);
+    // Ids outside the first page of the lists are looked up one by one; by default they are unknown.
+    mockApiService.supplier.and.returnValue(throwError(() => new Error('not found')));
+    mockApiService.product.and.returnValue(throwError(() => new Error('not found')));
     mockApiService.members.and.returnValue(
       of({ items: [{ id: 'member-1', email: 'owner@test.com' }], next_cursor: null } as unknown as { items: Member[]; next_cursor: string | null }),
     );
@@ -1773,6 +1783,100 @@ describe('CompareComponent (RFQ)', () => {
         { duration: 5000 },
       );
       expect(component.loadData).toHaveBeenCalledWith('rfq-1');
+    });
+  });
+
+  describe('page robustness (P-156, PPS-200)', () => {
+    const matchedReply = (id: string, supplierId: string, productId: string): RfqResponseComparisonList['items'][number] => ({
+      id,
+      rfq_id: 'rfq-1',
+      supplier_id: supplierId,
+      quotation_id: `quote-${id}`,
+      quotation_status: 'reviewed',
+      submitted_at: '2026-09-25T10:00:00Z',
+      lines: [
+        {
+          workspace_product_id: productId,
+          original_text: 'x',
+          quoted_quantity: '10',
+          quoted_unit_price_amount: '5.00',
+          quoted_unit_price_currency: 'USD',
+          pending_match: false,
+        },
+      ],
+    });
+    const recreate = (): void => {
+      fixture = TestBed.createComponent(CompareComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+    };
+    const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+
+    it('shows product and supplier names that are not on the first page of the lists', () => {
+      mockRfqApi.listResponses.and.returnValue(
+        of({ items: [matchedReply('r-far', 'supp-999', 'prod-999')] }),
+      );
+      mockApiService.product.and.returnValue(of({ id: 'prod-999', tenant_name: 'Far Product' } as Product));
+      mockApiService.supplier.and.returnValue(of({ id: 'supp-999', name: 'Far Supplier' } as Supplier));
+
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      expect(mockApiService.product).toHaveBeenCalledTimes(1);
+      expect(mockApiService.product).toHaveBeenCalledWith('prod-999');
+      expect(mockApiService.supplier).toHaveBeenCalledWith('supp-999');
+      expect(el().textContent).toContain('Far Product');
+      expect(el().textContent).toContain('Far Supplier');
+      expect(el().textContent).not.toContain('prod-999');
+    });
+
+    it('does not offer Prepare request to roles that cannot prepare', () => {
+      mockSession.hasRole.and.returnValue(false);
+      recreate();
+
+      expect(el().querySelector('.prepare-buttons-row button')).toBeNull();
+    });
+
+    it('does not enable the split for two replies from the same supplier', () => {
+      mockRfqApi.listResponses.and.returnValue(
+        of({ items: [matchedReply('a', 'supp-1', 'prod-1'), matchedReply('b', 'supp-1', 'prod-1')] }),
+      );
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      expect(component.splitEligibility().canSplit).toBeFalse();
+      const split = el().querySelector('[data-testid="rfq-compare-split-button"]') as HTMLButtonElement | null;
+      expect(split?.disabled).toBeTrue();
+    });
+
+    it('offers Retry when the responses cannot be loaded', () => {
+      mockRfqApi.listResponses.and.returnValue(throwError(() => new Error('boom')));
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      const retry = el().querySelector('[data-testid="rfq-compare-retry"]') as HTMLButtonElement | null;
+      expect(retry).toBeTruthy();
+      mockRfqApi.listResponses.calls.reset();
+      mockRfqApi.listResponses.and.returnValue(of(dummyResponses));
+      retry!.click();
+      expect(mockRfqApi.listResponses).toHaveBeenCalledWith('rfq-1');
+    });
+
+    it('prepares a request once when Prepare is clicked twice', () => {
+      const pending$ = new Subject<PrepareRequestResponse>();
+      mockRfqApi.prepareRequest.and.returnValue(pending$);
+      const reply = matchedReply('solo', 'supp-1', 'prod-1');
+      component.responses.set([reply]);
+
+      component.prepareRequest(reply);
+      component.prepareRequest(reply);
+      component.prepareRequest(reply);
+
+      expect(mockRfqApi.prepareRequest).toHaveBeenCalledTimes(1);
+      expect(mockRfqApi.prepareRequest).toHaveBeenCalledWith(
+        'rfq-1',
+        jasmine.objectContaining({ rfq_response_id: 'solo' }),
+      );
     });
   });
 
