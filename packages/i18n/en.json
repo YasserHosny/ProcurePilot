@@ -2315,6 +2315,16 @@
     }
   },
   "requests": {
+    "discard": {
+      "title": "Discard this draft?",
+      "message": "The draft will be withdrawn. You can start a new request from the list.",
+      "confirm": "Discard draft",
+      "success": "Draft discarded."
+    },
+    "duplicate": {
+      "button": "Duplicate as new draft",
+      "banner": "Copied from a {{status}} request. Choose a new required-by date and review the lines."
+    },
     "errors": {
       "quantity_not_positive": "Quantity must be greater than zero.",
       "required_by_in_the_past": "The required-by date cannot be in the past.",
