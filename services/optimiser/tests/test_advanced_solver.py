@@ -500,3 +500,35 @@ def test_solver_uses_deterministic_tie_break_for_equal_cost_allocations() -> Non
     assert first == second
     assert first.allocation[0].supplier_id == supplier_a
     assert any("supplier_id" in constraint.description for constraint in first.applied_constraints)
+
+
+def test_single_supplier_baseline_includes_the_delivery_fee() -> None:
+    # P-184: the baseline sums merchandise and delivery like the split total does, so a split
+    # priced with a fee is compared with a baseline priced with its fee.
+    supplier_a, supplier_b = uuid4(), uuid4()
+    product_id = uuid4()
+    payload = AdvancedOptimisationInput(
+        request=_request(
+            supplier_ids=[supplier_a, supplier_b],
+            items=[_item(product_id)],
+        ),
+        offers=[
+            _offer(product_id=product_id, supplier_id=supplier_a, total="100.0000"),
+            _offer(product_id=product_id, supplier_id=supplier_b, total="110.0000"),
+        ],
+        supplier_terms=[
+            SupplierCommercialTerms(
+                supplier_id=supplier_a,
+                rule_version="supplier-commercial-terms-v1",
+                delivery_fee=_money("20.0000"),
+                free_delivery_threshold=_money("150.0000"),
+            )
+        ],
+    )
+
+    result = _advanced_solver(payload)
+
+    baselines = {b.supplier_id: b.total_landed_cost for b in result.single_supplier_baselines}
+    assert baselines[supplier_a] == _money("120.0000")  # 100 goods + 20 delivery, below 150
+    assert baselines[supplier_b] == _money("110.0000")  # no terms: no fee
+    assert result.total_landed_cost == _money("110.0000")

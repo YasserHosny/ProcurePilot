@@ -1530,6 +1530,7 @@
         "discount": "الخصم",
         "otherCharges": "رسوم أخرى",
         "total": "إجمالي التكلفة الواصلة",
+        "totalCovers": "الإجمالي لـ {{quantity}} × {{unitPrice}}",
         "normalisedQuantity": "الكمية الموحدة",
         "baseUnit": "الوحدة الأساسية",
         "ruleVersion": "إصدار القاعدة الحسابية",
@@ -1753,7 +1754,11 @@
       "failedMessage": "حدث خطأ أثناء تنفيذ عملية التحسين. يُرجى المحاولة مرة أخرى.",
       "noCurrentOffers": "لا توجد عروض حالية من الموردين المختارين للأصناف: {{products}}",
       "unavailableMessage": "خدمة التحسين لا تستجيب حالياً. يُرجى المحاولة مرة أخرى بعد قليل، أو التواصل مع الدعم إذا استمرت المشكلة.",
-      "timeoutMessage": "لم يكتمل التحسين في الوقت المحدد. يُرجى المحاولة مرة أخرى."
+      "timeoutMessage": "لم يكتمل التحسين في الوقت المحدد. يُرجى المحاولة مرة أخرى.",
+      "notFoundTitle": "تقسيم السلة غير موجود",
+      "notFoundMessage": "هذا التقسيم غير موجود أو غير متاح في مساحة العمل هذه. ابدأ تقسيماً جديداً.",
+      "pollFailed": "تعذّر تحميل أحدث حالة. قد يكون التقسيم ما زال قيد التشغيل.",
+      "pollRetry": "إعادة المحاولة"
     },
     "result": {
       "feasibleTitle": "التوزيع الموصى به للسلة",
@@ -1841,12 +1846,16 @@
         "allocationNotWholePacks": "يحتوي التوزيع على كميات لا يمكن تحويلها إلى عبوات كاملة.",
         "packDefinitionRequired": "تعريف العبوة مطلوب للبنود الموزعة.",
         "idempotencyKeyReused": "تم استخدام مفتاح التكرار هذا بمعاملات مختلفة مسبقاً.",
-        "generic": "تعذر إعداد طلبات الشراء."
+        "generic": "تعذر إعداد طلبات الشراء.",
+        "branchesLoadFailed": "تعذّر تحميل الفروع. أغلق هذه النافذة وحاول مرة أخرى.",
+        "costCentresLoadFailed": "تعذّر تحميل مراكز التكلفة. أغلق هذه النافذة وحاول مرة أخرى."
       }
     },
     "submit": {
       "successSplit": "تم إرسال {{count}} طلبات شراء للاعتماد كتقسيم واحد."
-    }
+    },
+    "rerunNotice": "تمت تعبئة هذا النموذج من تقسيم سابق. راجع تحمّل المخاطر والاستعجال والموردين المستبعدين والأوزان ثم شغّله مرة أخرى.",
+    "rerunPackUnknown": "لم تُحمَّل أحجام عبوات منتجات هذا التقسيم بعد. انتظر لحظة ثم أعد المحاولة."
   },
   "alerts": {
     "title": "صندوق التنبيهات الإجرائية",
@@ -4121,18 +4130,36 @@
       "noProductsMatch": "لا توجد منتجات مطابقة",
       "duplicateNotice": "تم النسخ من طلب عرض أسعار سابق — تحقق من التواريخ والموردين قبل الحفظ",
       "quantityLabel": "الكمية",
-      "quantityPlaceholder": "أدخل الكمية",
+      "quantityPlaceholder": "الكمية",
+      "quantityRequired": "الكمية مطلوبة",
+      "quantityMin": "يجب أن تكون الكمية أكبر من 0",
       "addLineButton": "إضافة سطر",
       "removeLineButton": "إزالة",
+      "productLineAria": "المنتج — البند {{line}}",
+      "quantityLineAria": "الكمية — البند {{line}}",
+      "removeLineAria": "إزالة البند {{line}}",
       "suppliersLabel": "الموردين",
       "suppliersPlaceholder": "اختر الموردين",
+      "suppliersRequired": "اختر موردًا واحدًا على الأقل.",
+      "suppliersNoEmailHint": "لا يتم عرض {{count}} من الموردين لعدم وجود بريد إلكتروني للتواصل",
+      "supplierNoEmail": "بلا بريد إلكتروني",
+      "supplierInactive": "غير نشط",
+      "initialLoadError": "تعذر تحميل المنتجات أو الموردين.",
+      "retryButton": "إعادة المحاولة",
       "neededByDateLabel": "مطلوب بحلول تاريخ",
+      "dateFormatDayFirst": "يوم/شهر/سنة",
+      "dateFormatMonthFirst": "شهر/يوم/سنة",
       "tenantTermsLabel": "الشروط والأحكام",
       "tenantTermsPlaceholder": "أدخل الشروط للموردين (اختياري)",
       "tenantTermsTooLong": "يجب ألا تتجاوز الشروط 4000 حرف.",
       "saveDraftButton": "حفظ كمسودة",
       "sendButton": "إرسال الطلب",
       "rejectedSuppliersTitle": "الموردين المرفوضين",
+      "rejectedReasons": {
+        "missing_contact_email": "لا يوجد بريد إلكتروني للتواصل",
+        "not_found": "المورد غير موجود",
+        "generic": "تعذر إضافته"
+      },
       "rfqStatusLabel": "حالة الطلب",
       "submittingButton": "جاري الحفظ...",
       "sendingButton": "جاري الإرسال...",
@@ -4216,6 +4243,7 @@
       "splitBetweenSuppliers": "تقسيم بين المورّدين",
       "needsTwoMatched": "يتطلب ردّين مطابقين",
       "differentCurrencies": "الردود بعملات مختلفة",
+      "replyMixedCurrency": "يستخدم أحد الردود أكثر من عملة واحدة، لذلك لا يمكن تقسيم الردود",
       "alreadyConverted": "تم تحويل طلب عروض الأسعار بالفعل",
       "splitError": "فشل بدء التقسيم. يُرجى المحاولة مرة أخرى.",
       "lowestLinePrice": "أقل تكلفة واصلة",

@@ -1,7 +1,7 @@
 <div class="rfq-create-container">
   <div class="header">
     <div class="header-titles">
-      <h2>{{ (isEditMode() ? 'rfq.create.editTitle' : 'rfq.create.title') | translate }}</h2>
+      <h1>{{ (isEditMode() ? 'rfq.create.editTitle' : 'rfq.create.title') | translate }}</h1>
       <p class="subtitle">{{ 'rfq.create.subtitle' | translate }}</p>
     </div>
   </div>
@@ -29,6 +29,14 @@
           <span>{{ 'rfq.create.duplicateNotice' | translate }}</span>
         </div>
       }
+      @if (initialLoadError(); as loadError) {
+        <div class="load-error-alert" role="alert">
+          <span>{{ loadError }}</span>
+          <button mat-stroked-button type="button" (click)="retryInitialLoad()">
+            {{ 'rfq.create.retryButton' | translate }}
+          </button>
+        </div>
+      }
       @if (errorMessage(); as error) {
         <mat-card class="state error" role="alert">
           <mat-card-content>{{ error }}</mat-card-content>
@@ -53,7 +61,7 @@
                   [matAutocomplete]="auto"
                   required
                   [placeholder]="'rfq.create.productIdPlaceholder' | translate"
-                  [attr.aria-label]="'rfq.create.productIdLabel' | translate"
+                  [attr.aria-label]="'rfq.create.productLineAria' | translate: { line: i + 1 }"
                 />
                 <mat-autocomplete
                   #auto="matAutocomplete"
@@ -82,9 +90,14 @@
               </mat-form-field>
               <mat-form-field appearance="outline" class="item-qty-field">
                 <mat-label>{{ 'rfq.create.quantityLabel' | translate }}</mat-label>
-                <input #quantityInput matInput type="number" step="0.01" min="0.01" formControlName="quantity" required [placeholder]="'rfq.create.quantityPlaceholder' | translate" />
+                <input #quantityInput matInput type="number" step="0.01" min="0.01" formControlName="quantity" required [placeholder]="'rfq.create.quantityPlaceholder' | translate" [attr.aria-label]="'rfq.create.quantityLineAria' | translate: { line: i + 1 }" />
+                @if (line.get('quantity')?.hasError('required')) {
+                  <mat-error>{{ 'rfq.create.quantityRequired' | translate }}</mat-error>
+                } @else if (line.get('quantity')?.hasError('min')) {
+                  <mat-error>{{ 'rfq.create.quantityMin' | translate }}</mat-error>
+                }
               </mat-form-field>
-              <button mat-icon-button type="button" color="warn" (click)="removeLine(i)" [disabled]="linesFormArray.length === 1" [attr.aria-label]="'rfq.create.removeLineButton' | translate">
+              <button mat-icon-button type="button" color="warn" (click)="removeLine(i)" [disabled]="linesFormArray.length === 1" [attr.aria-label]="'rfq.create.removeLineAria' | translate: { line: i + 1 }">
                 <mat-icon aria-hidden="true">delete</mat-icon>
               </button>
             </div>
@@ -106,7 +119,14 @@
               @for (supp of suppliers(); track supp.id) {
                 <mat-option [value]="supp.id">
                   <div class="supplier-option">
-                    <span class="supplier-name">{{ supp.name }}</span>
+                    <span class="supplier-name">
+                      {{ supp.name }}
+                      @if (!supp.contact_email) {
+                        <span class="supplier-warning"> ({{ 'rfq.create.supplierNoEmail' | translate }})</span>
+                      } @else if (supp.status === 'archived' || supp.status === 'blocked') {
+                        <span class="supplier-warning"> ({{ 'rfq.create.supplierInactive' | translate }})</span>
+                      }
+                    </span>
                     @if (supp.contact_email) {
                       <span class="supplier-email" dir="ltr">{{ supp.contact_email }}</span>
                     }
@@ -114,6 +134,12 @@
                 </mat-option>
               }
             </mat-select>
+            @if (excludedSupplierCount() > 0) {
+              <mat-hint>{{ 'rfq.create.suppliersNoEmailHint' | translate: { count: excludedSupplierCount() } }}</mat-hint>
+            }
+            @if (form.controls.supplierIds.hasError('required')) {
+              <mat-error>{{ 'rfq.create.suppliersRequired' | translate }}</mat-error>
+            }
           </mat-form-field>
         </div>
 
@@ -138,7 +164,7 @@
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>{{ 'rfq.create.tenantTermsLabel' | translate }}</mat-label>
             <textarea matInput dir="auto" formControlName="tenantTerms" rows="4" maxlength="4000" [placeholder]="'rfq.create.tenantTermsPlaceholder' | translate"></textarea>
-            <mat-hint align="end">{{ form.controls.tenantTerms.value?.length ?? 0 }} / 4000</mat-hint>
+            <mat-hint align="end"><bdi dir="ltr">{{ form.controls.tenantTerms.value?.length ?? 0 }} / 4000</bdi></mat-hint>
             @if (form.controls.tenantTerms.hasError('maxlength')) {
               <mat-error>{{ 'rfq.create.tenantTermsTooLong' | translate }}</mat-error>
             }
@@ -146,7 +172,7 @@
         </div>
 
         <div class="actions">
-          <button mat-flat-button color="primary" type="submit" [disabled]="isSaving() || rfqStatus() === 'sent'">
+          <button mat-flat-button color="primary" type="submit" [disabled]="isSaving() || rfqStatus() === 'sent' || !isDataLoaded()">
             @if (isSaving()) {
               <mat-spinner diameter="18"></mat-spinner>
               <span>{{ 'rfq.create.submittingButton' | translate }}</span>
@@ -162,9 +188,9 @@
       <mat-card class="rejections-card">
         <h4>{{ 'rfq.create.rejectedSuppliersTitle' | translate }}</h4>
         <ul>
-          @for (rej of rejectedSuppliers(); track rej) {
+          @for (rej of rejectedSuppliers(); track rej.supplier_id) {
             <li>
-              {{ rej.supplier_id }} - {{ rej.reason }}
+              {{ rejectedSupplierLabel(rej) }}
             </li>
           }
         </ul>

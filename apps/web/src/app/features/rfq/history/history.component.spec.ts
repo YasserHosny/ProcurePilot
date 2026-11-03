@@ -283,6 +283,46 @@ describe('HistoryComponent', () => {
     subject.complete();
   });
 
+  it('Load more pending, then loadRfqs() refresh, then old page resolves -> rows are exactly refreshed first page and cursor is refreshed cursor', () => {
+    component.rfqs.set([mockRfqs[0]]);
+    component.nextCursor.set('cursor-page-2');
+
+    const loadMoreSubject = new Subject<RfqList>();
+    const refreshedFirstPage: RfqList = {
+      items: [
+        {
+          ...mockRfqs[0],
+          id: 'rfq-fresh-1',
+          created_at: '2026-10-01T00:00:00Z',
+        },
+      ],
+      next_cursor: 'cursor-fresh-2',
+    };
+
+    rfqApiSpy.listRfqs.and.returnValue(loadMoreSubject);
+    component.loadMore();
+    expect(component.loadingMore()).toBeTrue();
+
+    const refreshSubject = new Subject<RfqList>();
+    rfqApiSpy.listRfqs.and.returnValue(refreshSubject);
+    component.loadRfqs();
+    refreshSubject.next(refreshedFirstPage);
+    refreshSubject.complete();
+
+    expect(component.rfqs()).toEqual(refreshedFirstPage.items);
+    expect(component.nextCursor()).toBe('cursor-fresh-2');
+
+    const oldPage: RfqList = {
+      items: [mockRfqs[1]],
+      next_cursor: 'cursor-old-page-3',
+    };
+    loadMoreSubject.next(oldPage);
+    loadMoreSubject.complete();
+
+    expect(component.rfqs()).toEqual(refreshedFirstPage.items);
+    expect(component.nextCursor()).toBe('cursor-fresh-2');
+  });
+
   it('load-more failure keeps rows and shows retry', async () => {
     component.nextCursor.set('cursor-1');
     rfqApiSpy.listRfqs.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));

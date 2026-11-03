@@ -3,7 +3,7 @@ import { Component, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -676,6 +676,184 @@ describe('MatchResolutionComponent (T039)', () => {
         expect(bar.match(/1\s*–\s*9/g)?.length).withContext(`${lang}: 1–9`).toBe(1);
         expect(bar).withContext(`${lang}: names the modifier`).toMatch(/Ctrl|⌘|Cmd/);
       }
+    });
+  });
+
+  describe('result cards (P-158, PPS-202)', () => {
+    const loadDecided = (
+      line: Partial<MatchTask['quotation_line']> = {},
+      cost: Partial<LandedCost> = {},
+    ): HTMLElement => {
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({
+          ...mockTask,
+          status: 'resolved',
+          quotation_line: { ...mockTask.quotation_line, ...line },
+          decision: mockDecision,
+        }),
+      );
+      apiService.getLandedCost.and.returnValue(of({ ...mockLandedCost, ...cost }));
+      component.loadTask('line-99');
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    };
+
+    it('shows a zero discount without a minus sign and a real discount with one', () => {
+      let el = loadDecided({}, { discount: { amount: '0.00', currency: 'GBP' } });
+      expect(el.querySelector('.discount-val')?.textContent?.trim()).not.toMatch(/^-/);
+
+      el = loadDecided({}, { discount: { amount: '1.00', currency: 'GBP' } });
+      expect(el.querySelector('.discount-val')?.textContent?.trim()).toMatch(/^-/);
+    });
+
+    it('says which quantity the landed total covers', () => {
+      const el = loadDecided();
+      expect(el.querySelector('.landed-cost-card')?.textContent).toMatch(
+        /Total for 10\s*×\s*GBP 2\.5/,
+      );
+    });
+
+    it('does not invent a quantity of 1 when the quote has none', () => {
+      const el = loadDecided({ quantity: null });
+      const metrics = Array.from(el.querySelectorAll('.line-card .metric-item'));
+      const quantity = metrics.find((m) => m.textContent?.includes('Quantity'));
+      expect(quantity?.querySelector('.metric-value')?.textContent?.trim()).toBe(
+        enCatalog.matching.queue.notAvailable,
+      );
+    });
+
+    it('labels the pack unit like the rest of the app instead of the raw code', () => {
+      const el = loadDecided({ pack: { pack_count: 1, unit_size: '2.0', unit: 'litre' } });
+      const text = el.querySelector('.line-card')?.textContent ?? '';
+      expect(text).toContain(`1 × 2.0 ${enCatalog.units.litre}`);
+      expect(text).not.toContain('litre');
+    });
+
+    it('keeps a fractional VAT rate exact', () => {
+      const el = loadDecided({ vat_rate: '0.145' });
+      expect(el.querySelector('.line-card')?.textContent).toContain('14.5%');
+    });
+
+    it('gives every region on the page an accessible name', () => {
+      const el = loadDecided();
+      const regions = Array.from(el.querySelectorAll('[role="region"]'));
+      expect(regions.length).toBeGreaterThan(0);
+      for (const region of regions) {
+        const named =
+          region.hasAttribute('aria-label') ||
+          (region.getAttribute('aria-labelledby') &&
+            document.getElementById(region.getAttribute('aria-labelledby')!)?.textContent?.trim());
+        expect(named).withContext(region.className).toBeTruthy();
+      }
+    });
+  });
+
+  describe('correction retries and stale loads (P-154, PPS-198)', () => {
+    const payloadA: MatchCorrectionRequest = {
+      expected_current_decision_id: 'dec-1',
+      outcome: 'same_product',
+      selected_match_candidate_id: 'cand-2',
+      new_product: null,
+      learn_alias: true,
+    };
+    const payloadB: MatchCorrectionRequest = { ...payloadA, selected_match_candidate_id: 'cand-1' };
+    const ok = of({
+      decision: { ...mockDecision, id: 'dec-2' },
+      superseded_decision_id: 'dec-1',
+      lines_matched_through_old_wording: [],
+    });
+    const lost = () => throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'busy' } }));
+
+    const reopenWith = (payload: MatchCorrectionRequest): void => {
+      const dialog = (component as unknown as { dialog: { open: jasmine.Spy } }).dialog;
+      (dialog.open as jasmine.Spy).and.returnValue({ afterClosed: () => of(payload) });
+      component.openCorrectMatchDialog();
+    };
+
+    beforeEach(() => {
+      component.decision.set(mockDecision);
+      spyOn((component as unknown as { dialog: { open: () => unknown } }).dialog, 'open');
+    });
+
+    it('replays the same Idempotency-Key when the same correction is retried after a failure', () => {
+      apiService.correctMatch.and.returnValues(lost(), ok);
+
+      reopenWith(payloadA);
+      reopenWith(payloadA);
+
+      const [first, retry] = apiService.correctMatch.calls.allArgs();
+      expect(first[2]).toEqual(jasmine.any(String));
+      expect(retry[2]).withContext('retry replays the key').toBe(first[2]);
+    });
+
+    it('uses a new key when the retried correction is a different one', () => {
+      apiService.correctMatch.and.returnValues(lost(), ok);
+
+      reopenWith(payloadA);
+      reopenWith(payloadB);
+
+      const [first, second] = apiService.correctMatch.calls.allArgs();
+      expect(second[2]).not.toBe(first[2]);
+    });
+
+    it('uses a new key for the next correction after one succeeded', () => {
+      apiService.correctMatch.and.returnValues(ok, ok);
+      apiService.getMatchTaskForLine.and.returnValue(of({ ...mockTask, decision: mockDecision }));
+
+      reopenWith(payloadA);
+      component.decision.set(mockDecision);
+      reopenWith(payloadA);
+
+      const [first, second] = apiService.correctMatch.calls.allArgs();
+      expect(second[2]).not.toBe(first[2]);
+    });
+
+    it('does not redraw the old line when a correction answers after the buyer moved on', () => {
+      const correction$ = new Subject<{
+        decision: MatchDecision;
+        superseded_decision_id: string;
+        lines_matched_through_old_wording: string[];
+      }>();
+      apiService.correctMatch.and.returnValue(correction$);
+      component.executeCorrection('line-99', payloadA);
+
+      apiService.getMatchTaskForLine.calls.reset();
+      apiService.getMatchTaskForLine.and.returnValue(
+        of({ ...mockTask, id: 'task-B', quotation_line: { ...mockTask.quotation_line, id: 'line-B' } }),
+      );
+      component.loadTask('line-B');
+      apiService.getMatchTaskForLine.calls.reset();
+
+      correction$.next({
+        decision: { ...mockDecision, id: 'dec-2' },
+        superseded_decision_id: 'dec-1',
+        lines_matched_through_old_wording: ['l-1'],
+      });
+      fixture.detectChanges();
+
+      expect(apiService.getMatchTaskForLine).not.toHaveBeenCalledWith('line-99');
+      expect(component.line()?.id).toBe('line-B');
+      expect(component.dependentLinesCount()).toBe(0);
+    });
+
+    it('ignores a late response for a line the buyer already left', () => {
+      const a$ = new Subject<MatchTask>();
+      const b$ = new Subject<MatchTask>();
+      apiService.getMatchTaskForLine.and.callFake((id: string) => (id === 'line-A' ? a$ : b$));
+      const taskFor = (id: string): MatchTask => ({
+        ...mockTask,
+        id: `task-${id}`,
+        quotation_line: { ...mockTask.quotation_line, id, original_text: `text ${id}` },
+      });
+
+      component.loadTask('line-A');
+      component.loadTask('line-B');
+      b$.next(taskFor('line-B'));
+      a$.next(taskFor('line-A'));
+      fixture.detectChanges();
+
+      expect(component.line()?.id).toBe('line-B');
+      expect(component.task()?.id).toBe('task-line-B');
     });
   });
 

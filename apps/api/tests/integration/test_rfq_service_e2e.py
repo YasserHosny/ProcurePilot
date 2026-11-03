@@ -545,6 +545,71 @@ def test_prepare_request_recovers_interrupted_finalisation(
         )
 
 
+def test_prepare_request_rejects_submitted_interrupted_finalisation(
+    monkeypatch: pytest.MonkeyPatch, prepare_case: tuple[RfqService, dict]
+) -> None:
+    service, kwargs = prepare_case
+    original = rfq_service_module.estimate_from_source_response
+    failed = False
+
+    def fail_once_after_create(conn: psycopg.Connection, **params: object) -> dict:
+        nonlocal failed
+        draft_exists = conn.execute(
+            "select id from purchase_request where idempotency_key = %s",
+            (kwargs["idempotency_key"],),
+        ).fetchone()
+        if draft_exists and not failed:
+            failed = True
+            raise RuntimeError("interrupted finalisation")
+        return original(conn, **params)
+
+    monkeypatch.setattr(rfq_service_module, "estimate_from_source_response", fail_once_after_create)
+    with pytest.raises(RuntimeError, match="interrupted finalisation"):
+        service.prepare_request(**kwargs)
+
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        request_id = conn.execute(
+            "select id from purchase_request where tenant_id = %s and idempotency_key = %s",
+            (kwargs["member"].tenant_id, kwargs["idempotency_key"]),
+        ).fetchone()[0]
+
+    submitted = requests_service_module.RequestsService(get_settings()).submit_request(
+        bearer_token=kwargs["bearer_token"], member=kwargs["member"], request_id=request_id
+    )
+    assert submitted.status == "submitted"
+
+    def frozen_values() -> tuple:
+        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+            request = conn.execute(
+                "select status, source_rfq_response_id, estimated_total_amount, "
+                "estimated_total_currency, has_incomplete_estimate from purchase_request "
+                "where id = %s and tenant_id = %s",
+                (request_id, kwargs["member"].tenant_id),
+            ).fetchone()
+            lines = conn.execute(
+                "select id, estimated_unit_price_amount, estimated_unit_price_currency, "
+                "estimated_unit_price_source_landed_cost_id, estimated_at "
+                "from purchase_request_line where purchase_request_id = %s and tenant_id = %s "
+                "order by id",
+                (request_id, kwargs["member"].tenant_id),
+            ).fetchall()
+            rfq_status = conn.execute(
+                "select status from rfq where id = %s", (kwargs["rfq_id"],)
+            ).fetchone()
+        return request, lines, rfq_status
+
+    before = frozen_values()
+    assert before[0][1] is None
+    with pytest.raises(ConflictError) as exc:
+        service.prepare_request(**kwargs)
+    assert exc.value.status_code == 409
+    assert exc.value.details == {
+        "resource": "purchase_request",
+        "reason": "request_not_recoverable",
+    }
+    assert frozen_values() == before
+
+
 @pytest.mark.parametrize("currency_source", ["quotation", "estimate", "fallback"])
 def test_prepare_request_rejects_mixed_currencies_before_create(
     monkeypatch: pytest.MonkeyPatch,
