@@ -116,6 +116,21 @@ def get_rfq(
     return service.get_detail(member=member, rfq_id=rfq_id)
 
 
+@router.post(
+    "/{rfq_id}/cancel",
+    status_code=status.HTTP_200_OK,
+    response_model=Rfq,
+    operation_id="cancelRfq",
+)
+def cancel_rfq(
+    rfq_id: uuid.UUID,
+    member: Annotated[CurrentMember, Depends(require_role(*RFQ_WRITE_ROLES))],
+    service: Annotated[RfqService, Depends(get_rfq_service)],
+    idempotency_key: Annotated[uuid.UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> Rfq:
+    return service.cancel(member=member, rfq_id=rfq_id)
+
+
 @router.put(
     "/{rfq_id}",
     status_code=status.HTTP_200_OK,

@@ -1886,7 +1886,18 @@
       "successSplit": "{{count}} purchase requests submitted for approval as one split."
     },
     "rerunNotice": "This form was filled from an earlier split. Check the risk tolerance, urgency, excluded suppliers and weights, then run it again.",
-    "rerunPackUnknown": "The pack sizes of this split's products are not loaded yet. Wait a moment and try Re-run again."
+    "rerunPackUnknown": "The pack sizes of this split's products are not loaded yet. Wait a moment and try Re-run again.",
+    "history": {
+      "title": "Recent splits",
+      "items": "{{count}} items",
+      "loadMore": "Show older splits",
+      "status": {
+        "queued": "Queued",
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed"
+      }
+    }
   },
   "alerts": {
     "title": "Actionable Alerts Inbox",
@@ -4189,6 +4200,16 @@
     }
   },
   "rfq": {
+    "cancel": {
+      "title": "Cancel this RFQ?",
+      "message": "Suppliers are not notified. Replies already received stay available.",
+      "confirm": "Cancel RFQ",
+      "keep": "Keep RFQ",
+      "success": "RFQ cancelled",
+      "notCreator": "Only the person who created this RFQ, or an owner, can cancel it",
+      "notCancellable": "This RFQ can no longer be cancelled",
+      "error": "Could not cancel this RFQ. Please try again."
+    },
     "pageTitle": {
       "history": "RFQ History",
       "create": "Create RFQ",
@@ -4280,6 +4301,7 @@
       }
     },
     "compare": {
+      "rfqCancelled": "This RFQ was cancelled — requests can no longer be prepared from it",
       "unknownSupplier": "Unknown supplier",
       "unknownProduct": "Unknown product",
       "title": "Compare responses",
@@ -4348,6 +4370,7 @@
       "rfqDetailLoadError": "Failed to load RFQ details."
     },
     "history": {
+      "status_cancelled": "Cancelled",
       "title": "RFQ History",
       "subtitle": "Track your requests for quotation.",
       "createRfq": "Create RFQ",
@@ -4429,6 +4452,7 @@
       "draftActionsUnavailable": "Draft actions are currently unavailable because workspace members could not be loaded."
     },
     "detail": {
+      "cancelledAtLabel": "Cancelled",
       "title": "RFQ Details",
       "subtitle": "What was asked, who it went to and what came back.",
       "responsesReceivedTitle": "{{count}} responses received",
