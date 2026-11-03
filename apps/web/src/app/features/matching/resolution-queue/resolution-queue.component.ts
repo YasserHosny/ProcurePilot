@@ -287,6 +287,8 @@ export class ResolutionQueueComponent implements OnInit {
         },
         error: (err: unknown) => {
           if (requestId !== this.latestLoadRequestId) return;
+          this.tasks.set([]);
+          this.nextCursor.set(null);
           this.isLoading.set(false);
           this.handleError(err);
         },

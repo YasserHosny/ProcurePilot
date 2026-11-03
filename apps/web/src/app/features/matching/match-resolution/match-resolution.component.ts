@@ -561,8 +561,9 @@ export class MatchResolutionComponent implements OnInit {
 
   private navigateToNextTask(resolvedLineId: string, decision?: MatchDecision): void {
     const excludeTaskId = this.task()?.id ?? resolvedLineId;
+    const quotationId = this.quotationId() || this.task()?.quotation_id || undefined;
     if (this.api.getNextMatchTask) {
-      this.api.getNextMatchTask(excludeTaskId).subscribe({
+      this.api.getNextMatchTask(excludeTaskId, quotationId).subscribe({
         next: (res) => {
           if (res.next_quotation_line_id) {
             const baseMsg = this.translate.instant('matching.resolution.actions.saveSuccess');
@@ -573,7 +574,9 @@ export class MatchResolutionComponent implements OnInit {
               undefined,
               { duration: 3500 },
             );
-            void this.router.navigate(['/matching', res.next_quotation_line_id]);
+            void this.router.navigate(['/matching', res.next_quotation_line_id], {
+              queryParams: this.backQueryParams(),
+            });
             return;
           }
           const queueClearedMsg = this.translate.instant('matching.resolution.actions.queueCleared');
@@ -584,7 +587,7 @@ export class MatchResolutionComponent implements OnInit {
             undefined,
             { duration: 3500 },
           );
-          void this.router.navigate(['/matching']);
+          void this.router.navigate(['/matching'], { queryParams: this.backQueryParams() });
         },
         error: (err: unknown) => this.handleError(err),
       });

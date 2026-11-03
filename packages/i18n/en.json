@@ -1350,6 +1350,7 @@
       "notAvailable": "Not available",
       "noFilterResults": "No match tasks match the active filters",
       "clearFilters": "Clear Filters",
+      "retry": "Retry",
       "loadMore": "Load More",
       "emptyTitle": "No match tasks found",
       "emptyMessage": "There are no quotation lines currently awaiting match resolution.",

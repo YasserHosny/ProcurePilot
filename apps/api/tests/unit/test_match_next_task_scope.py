@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any
 from uuid import UUID, uuid4
 
-from procurepilot_api.modules.matching.router import next_match_task
+from procurepilot_api.modules.matching.router import NextMatchTask, next_match_task
 
 
 class _RecordingService:
     def __init__(self, items: list[object]) -> None:
         self._items = items
-        self.calls: list[dict[str, Any]] = []
+        self.calls: list[dict[str, object]] = []
 
-    def list_match_tasks(self, **kwargs: Any) -> object:
+    def list_match_tasks(self, **kwargs: object) -> object:
         self.calls.append(kwargs)
         return SimpleNamespace(items=self._items)
 
@@ -23,12 +22,18 @@ def _task(task_id: UUID, line_id: UUID) -> object:
     return SimpleNamespace(id=task_id, quotation_line=SimpleNamespace(id=line_id))
 
 
-def _next(service: _RecordingService, **kwargs: Any) -> Any:
+def _next(
+    service: _RecordingService,
+    *,
+    exclude_task_id: UUID | None,
+    quotation_id: UUID | None,
+) -> NextMatchTask:
     return next_match_task(
         token="t",
-        member=SimpleNamespace(),
+        member=SimpleNamespace(),  # type: ignore[arg-type]
         service=service,  # type: ignore[arg-type]
-        **kwargs,
+        exclude_task_id=exclude_task_id,
+        quotation_id=quotation_id,
     )
 
 
