@@ -39,6 +39,10 @@ class FakeQuery:
         self.filters.append(("lte", column, value))
         return self
 
+    def lt(self, column: str, value: object) -> FakeQuery:
+        self.filters.append(("lt", column, value))
+        return self
+
     def order(self, column: str, *, desc: bool = False) -> FakeQuery:
         self.orders.append((column, desc))
         return self
@@ -409,7 +413,9 @@ def test_list_match_tasks_accepts_query_params_and_enriches_supplier(
     assert ("eq", "priority", "high") in client.match_task_query.filters
     assert ("eq", "reason", "low_confidence") in client.match_task_query.filters
     assert ("gte", "created_at", "2026-08-01") in client.match_task_query.filters
-    assert ("lte", "created_at", "2026-08-31") in client.match_task_query.filters
+    # «To date» is inclusive: the whole of 31 August is in, so the bound is the next midnight.
+    assert ("lt", "created_at", "2026-09-01T00:00:00+00:00") in client.match_task_query.filters
+    assert not [f for f in client.match_task_query.filters if f[:2] == ("lte", "created_at")]
     assert ("priority", False) in client.match_task_query.orders  # asc -> desc=False
     assert ("id", False) in client.match_task_query.orders
 

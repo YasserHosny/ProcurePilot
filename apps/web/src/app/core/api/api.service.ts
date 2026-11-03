@@ -691,12 +691,16 @@ export class ApiService {
     return this.http.get<MatchTask>(`${this.base}/quotation-lines/${lineId}/match-task`);
   }
 
-  getNextMatchTask(excludeTaskId?: string): Observable<{
+  getNextMatchTask(
+    excludeTaskId?: string,
+    quotationId?: string,
+  ): Observable<{
     next_task_id: string | null;
     next_quotation_line_id: string | null;
   }> {
     const query = new URLSearchParams();
     if (excludeTaskId) query.set('exclude_task_id', excludeTaskId);
+    if (quotationId) query.set('quotation_id', quotationId);
     const qs = query.toString() ? `?${query.toString()}` : '';
     return this.http.get<{
       next_task_id: string | null;

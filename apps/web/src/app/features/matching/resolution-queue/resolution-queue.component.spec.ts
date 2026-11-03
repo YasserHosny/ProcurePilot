@@ -509,6 +509,79 @@ describe('ResolutionQueueComponent', () => {
     expect(component.errorTraceId()).toBe('tr-err-1');
   });
 
+  describe('failed loads (P-153, PPS-197)', () => {
+    const failLoad = (): void => {
+      apiService.getMatchTasks.and.returnValue(
+        throwError(
+          () => new HttpErrorResponse({ status: 503, error: { message: 'busy', trace_id: 'tr-1' } }),
+        ),
+      );
+      component.loadTasks();
+      fixture.detectChanges();
+    };
+
+    it('does not claim every line is matched when the load failed for a quotation', () => {
+      component.quotationId.set('q-101');
+      component.tasks.set([]);
+      failLoad();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('[data-testid="quotation-all-matched"]')).toBeNull();
+      expect(compiled.querySelector('.error-banner')?.textContent).toContain('busy');
+    });
+
+    it('drops the previous rows instead of showing them under the error', () => {
+      expect(component.tasks().length).toBe(2);
+      failLoad();
+
+      expect(component.tasks().length).toBe(0);
+      expect((fixture.nativeElement as HTMLElement).querySelector('.match-line')).toBeNull();
+    });
+
+    it('does not offer the task Retry for an unrelated loader error', () => {
+      apiService.listCatalogueRefreshReviews.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'reviews down' } })),
+      );
+      component.loadRefreshReviews();
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('.error-banner')?.textContent).toContain('reviews down');
+      expect(compiled.querySelector('[data-testid="queue-retry"]')).toBeNull();
+    });
+
+    it('still says every line is matched when only the refresh-review load failed', () => {
+      component.quotationId.set('q-101');
+      component.tasks.set([]);
+      apiService.listCatalogueRefreshReviews.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'reviews down' } })),
+      );
+      component.loadRefreshReviews();
+      fixture.detectChanges();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('[data-testid="quotation-all-matched"]'),
+      ).toBeTruthy();
+    });
+
+    it('offers a Retry in the error banner that reloads and clears the error', () => {
+      failLoad();
+      const retry = (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="queue-retry"]',
+      ) as HTMLButtonElement | null;
+      expect(retry).withContext('retry button').toBeTruthy();
+
+      apiService.getMatchTasks.and.returnValue(of({ items: mockTasks, next_cursor: null }));
+      apiService.getMatchTasks.calls.reset();
+      retry!.click();
+      fixture.detectChanges();
+
+      expect(apiService.getMatchTasks).toHaveBeenCalledTimes(1);
+      expect(component.errorMessage()).toBeNull();
+      expect(component.tasks().length).toBe(2);
+    });
+  });
+
   describe('RFQ-aware matching in queue (spec 023 US1)', () => {
     it('shows "Correct match" button for auto-accepted line when isWriter, and hides it for non-writer', () => {
       const autoTask: MatchTask = {
