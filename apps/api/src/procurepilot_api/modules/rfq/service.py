@@ -611,6 +611,7 @@ class RfqService:
                     select
                         r.id as response_id,
                         rec.supplier_id,
+                        s.name as supplier_name,
                         r.created_at as submitted_at,
                         q.id as quotation_id,
                         q.status as quotation_status,
@@ -619,12 +620,19 @@ class RfqService:
                         ql.quantity,
                         ql.unit_price_amount,
                         ql.unit_price_currency,
-                        md.matched_workspace_product_id
+                        md.matched_workspace_product_id,
+                        wp.tenant_name as product_name,
+                        cp.variant as product_variant
                     from rfq_response r
                     join rfq_recipient rec on r.rfq_recipient_id = rec.id
+                    left join supplier s
+                      on s.id = rec.supplier_id and s.tenant_id = rec.tenant_id
                     join quotation q on r.quotation_id = q.id
                     left join quotation_line ql on r.quotation_id = ql.quotation_id
                     left join current_match_decision md on ql.id = md.quotation_line_id
+                    left join workspace_product wp
+                      on wp.id = md.matched_workspace_product_id and wp.tenant_id = ql.tenant_id
+                    left join canonical_product cp on cp.id = wp.canonical_product_id
                     -- Lines follow the RFQ's own line order (the product each line matched);
                     -- unmatched lines come last, in the supplier's document order.
                     left join lateral (
@@ -697,6 +705,7 @@ class RfqService:
                             "id": resp_id,
                             "rfq_id": rfq_id,
                             "supplier_id": row["supplier_id"],
+                            "supplier_name": row["supplier_name"],
                             "quotation_id": row["quotation_id"],
                             "submitted_at": row["submitted_at"],
                             "quotation_status": row["quotation_status"],
@@ -709,6 +718,8 @@ class RfqService:
                         responses_by_id[resp_id]["lines"].append(
                             {
                                 "workspace_product_id": row["matched_workspace_product_id"],
+                                "product_name": row["product_name"],
+                                "product_variant": row["product_variant"],
                                 "original_text": row["original_text"],
                                 "quoted_quantity": row["quantity"],
                                 "quoted_unit_price_amount": row["unit_price_amount"],
@@ -1298,10 +1309,13 @@ terms as (
   order by supplier_id, effective_from desc, created_at desc, id desc
 )
 select resp.response_id, coalesce(t.applies, false) as terms_apply,
-       rk.workspace_product_id, rk.projected_total, rk.total_currency
+       rk.workspace_product_id, rk.projected_total, rk.total_currency,
+       wp.tenant_name as product_name
 from responses resp
 left join terms t on t.supplier_id = resp.supplier_id
 left join ranked rk on rk.response_id = resp.response_id and rk.rn = 1
+left join workspace_product wp
+  on wp.id = rk.workspace_product_id and wp.tenant_id = %(tenant_id)s
 """
 
 _MONEY_QUANT = Decimal("0.0001")
@@ -1320,6 +1334,7 @@ def _rfq_landed_costs(
         landed.setdefault(row["response_id"], []).append(
             RfqProductLandedCost(
                 workspace_product_id=row["workspace_product_id"],
+                product_name=row["product_name"],
                 total_amount=Decimal(row["projected_total"]).quantize(
                     _MONEY_QUANT, rounding=ROUND_HALF_UP
                 ),
