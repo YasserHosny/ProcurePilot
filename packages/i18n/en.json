@@ -1771,7 +1771,9 @@
       "quantityRequired": "Enter a quantity greater than zero.",
       "submitButton": "Optimise Basket Split",
       "submitting": "Submitting Basket...",
-      "validationError": "Please specify two distinct suppliers and at least one item with positive quantity."
+      "validationError": "Please specify two distinct suppliers and at least one item with positive quantity.",
+      "searchProducts": "Find a product",
+      "loadMoreProducts": "Load more products"
     },
     "status": {
       "queued": "Basket split queued for optimisation...",
