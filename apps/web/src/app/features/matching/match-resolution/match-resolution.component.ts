@@ -579,7 +579,10 @@ export class MatchResolutionComponent implements OnInit {
             });
             return;
           }
-          const queueClearedMsg = this.translate.instant('matching.resolution.actions.queueCleared');
+          const clearedKey = quotationId
+            ? 'matching.queue.allLinesMatchedTitle'
+            : 'matching.resolution.actions.queueCleared';
+          const queueClearedMsg = this.translate.instant(clearedKey);
           const swept = formatSweptLinesMessage(this.translate, decision?.lines_matched_by_same_wording);
           const msg = swept ? appendSweptMessage(queueClearedMsg, swept) : queueClearedMsg;
           this.snackBar.open(
