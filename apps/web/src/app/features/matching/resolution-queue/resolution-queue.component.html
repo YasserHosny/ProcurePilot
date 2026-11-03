@@ -202,6 +202,12 @@
     </section>
   }
 
+  <div class="visually-hidden" data-testid="queue-result-summary" role="status" aria-live="polite">
+    @if (isLoading() === false && tasksLoadFailed() === false) {
+      {{ 'matching.queue.resultSummary' | translate: { lines: tasks().length, quotations: groups().length } }}
+    }
+  </div>
+
   @if (isLoading()) {
     <div class="loading-state" role="status">
       <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
@@ -238,9 +244,6 @@
       <p class="empty-message">{{ 'matching.queue.emptyMessage' | translate }}</p>
     </div>
   } @else if (!tasksLoadFailed() && tasks().length > 0) {
-    <div class="visually-hidden" data-testid="queue-result-summary" role="status" aria-live="polite">
-      {{ 'matching.queue.resultSummary' | translate: { lines: tasks().length, quotations: groups().length } }}
-    </div>
     <section class="quotation-groups" [attr.aria-label]="'matching.queue.groupsLabel' | translate">
       @for (group of groups(); track group.quotation.id) {
         <mat-card class="quotation-group">
