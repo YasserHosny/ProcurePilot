@@ -8,6 +8,7 @@ fields, one-per-request unique), cascading deletes, and FK enforcement.
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 import psycopg
@@ -1001,15 +1002,41 @@ def test_concurrent_update_vs_withdraw_loser_gets_conflict(
     withdraw_res = results.get("withdraw")
     update_res = results.get("update")
 
+    # Invariant: withdraw always succeeds (draft is a valid state to withdraw from).
+    assert not isinstance(withdraw_res, Exception), f"Withdraw unexpectedly failed: {withdraw_res}"
+
+    conn.rollback()
+    with conn.cursor() as cur:
+        act_as(cur, owner)
+        cur.execute(
+            "select status, withdrawn_at from purchase_request where id = %s",
+            (request_id,),
+        )
+        row = cur.fetchone()
+        assert row is not None
+        status, withdrawn_at = row
+        assert status == "withdrawn"
+        assert withdrawn_at is not None
+
+        cur.execute(
+            "select quantity from purchase_request_line where purchase_request_id = %s",
+            (request_id,),
+        )
+        line_rows = cur.fetchall()
+        assert len(line_rows) == 1
+        qty = line_rows[0][0]
+
+    # Deterministic invariant for every order:
+    # 1. If withdraw committed first: update is rejected with 409 not_draft; lines intact (10).
+    # 2. If update committed first while draft: update succeeds (9), then withdraw succeeds;
+    #    final state is withdrawn.
     if isinstance(update_res, ConflictError):
         assert update_res.status_code == 409
         assert update_res.details == {"reason": "not_draft"}
-        assert not isinstance(withdraw_res, Exception)
-    elif isinstance(withdraw_res, ConflictError):
-        assert withdraw_res.status_code == 409
-        assert not isinstance(update_res, Exception)
+        assert Decimal(str(qty)) == Decimal("10")
     else:
-        pytest.fail(f"Expected one ConflictError, got withdraw={withdraw_res}, update={update_res}")
+        assert not isinstance(update_res, Exception), f"Update unexpectedly failed: {update_res}"
+        assert Decimal(str(qty)) == Decimal("9.000000")
 
 
 def test_concurrent_update_vs_submit_loser_gets_conflict(
@@ -1109,15 +1136,49 @@ def test_concurrent_update_vs_submit_loser_gets_conflict(
     submit_res = results.get("submit")
     update_res = results.get("update")
 
+    # Invariant: submit always succeeds (draft is a valid state to submit from).
+    assert not isinstance(submit_res, Exception), f"Submit unexpectedly failed: {submit_res}"
+
+    conn.rollback()
+    with conn.cursor() as cur:
+        act_as(cur, owner)
+        cur.execute(
+            "select status, submitted_at from purchase_request where id = %s",
+            (request_id,),
+        )
+        row = cur.fetchone()
+        assert row is not None
+        status, submitted_at = row
+        assert status == "submitted"
+        assert submitted_at is not None
+
+        cur.execute(
+            "select quantity from purchase_request_line where purchase_request_id = %s",
+            (request_id,),
+        )
+        line_rows = cur.fetchall()
+        assert len(line_rows) == 1
+        qty = line_rows[0][0]
+
+        cur.execute(
+            "select status from approval_step where purchase_request_id = %s",
+            (request_id,),
+        )
+        step_row = cur.fetchone()
+        assert step_row is not None
+        assert step_row[0] == "pending"
+
+    # Deterministic invariant for every order:
+    # 1. If submit committed first: update is rejected with 409 not_draft; lines intact (10).
+    # 2. If update committed first while draft: update succeeds (9), then submit succeeds;
+    #    final state is submitted.
     if isinstance(update_res, ConflictError):
         assert update_res.status_code == 409
         assert update_res.details == {"reason": "not_draft"}
-        assert not isinstance(submit_res, Exception)
-    elif isinstance(submit_res, ConflictError):
-        assert submit_res.status_code == 409
-        assert not isinstance(update_res, Exception)
+        assert Decimal(str(qty)) == Decimal("10")
     else:
-        pytest.fail(f"Expected one ConflictError, got submit={submit_res}, update={update_res}")
+        assert not isinstance(update_res, Exception), f"Update unexpectedly failed: {update_res}"
+        assert Decimal(str(qty)) == Decimal("9.000000")
 
 
 def test_validation_rejects_past_date(
@@ -1467,3 +1528,265 @@ def test_create_and_update_happy_paths_preserve_response_shapes(
     assert submitted_req.status == "submitted"
     assert submitted_req.approval_step is not None
     assert submitted_req.approval_step.status == "pending"
+
+
+# ── Idempotent replay before validation tests (PR #414 review finding) ────
+
+
+def test_idempotent_replay_survives_clock_moved_past_midnight(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-replay-midnight")
+        branch = _make_branch(cur, owner)
+        product = make_workspace_product(cur, owner, name="Prod Midnight")
+        reset_role(cur)
+    conn.commit()
+
+    service = _service(conn, monkeypatch)
+    owner_cm = _current_member(owner, owner)
+
+    today = datetime.now(UTC).date()
+    idempotency_key = uuid4()
+    payload = PurchaseRequestCreate(
+        branch_id=branch,
+        required_by_date=today,
+        lines=[PurchaseRequestLineInput(workspace_product_id=product, quantity="3.000000")],
+    )
+
+    req1, created1 = service.create_request(
+        bearer_token=owner.claims(),
+        member=owner_cm,
+        payload=payload,
+        idempotency_key=idempotency_key,
+    )
+    assert created1 is True
+
+    # Move clock past midnight
+    class FakeDateTime(datetime):
+        _mock_now = datetime.now(UTC) + timedelta(days=1)
+
+        @classmethod
+        def now(cls, tz: object = None) -> datetime:
+            assert cls._mock_now is not None
+            return cls._mock_now
+
+    monkeypatch.setattr(requests_service_module, "datetime", FakeDateTime)
+
+    # Retry the same payload and key after midnight: must return 200 replay (created=False)
+    req2, created2 = service.create_request(
+        bearer_token=owner.claims(),
+        member=owner_cm,
+        payload=payload,
+        idempotency_key=idempotency_key,
+    )
+    assert created2 is False
+    assert req2.id == req1.id
+
+    # Exactly one purchase_request row and one set of lines exist in DB
+    with conn.cursor() as cur:
+        act_as(cur, owner)
+        cur.execute(
+            "select count(*) from purchase_request where id = %s",
+            (req1.id,),
+        )
+        assert cur.fetchone()[0] == 1
+        cur.execute(
+            "select count(*) from purchase_request_line where purchase_request_id = %s",
+            (req1.id,),
+        )
+        assert cur.fetchone()[0] == 1
+
+
+def test_idempotent_replay_with_invalid_payload_replays_while_new_key_rejected(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-replay-invalid")
+        branch = _make_branch(cur, owner)
+        product = make_workspace_product(cur, owner, name="Prod Invalid")
+        reset_role(cur)
+    conn.commit()
+
+    service = _service(conn, monkeypatch)
+    owner_cm = _current_member(owner, owner)
+
+    today = datetime.now(UTC).date()
+    idempotency_key = uuid4()
+    valid_payload = PurchaseRequestCreate(
+        branch_id=branch,
+        required_by_date=today + timedelta(days=2),
+        lines=[PurchaseRequestLineInput(workspace_product_id=product, quantity="1.000000")],
+    )
+
+    req1, created1 = service.create_request(
+        bearer_token=owner.claims(),
+        member=owner_cm,
+        payload=valid_payload,
+        idempotency_key=idempotency_key,
+    )
+    assert created1 is True
+
+    # Same key with payload that is now invalid (past date)
+    invalid_payload = PurchaseRequestCreate(
+        branch_id=branch,
+        required_by_date=today - timedelta(days=5),
+        lines=[PurchaseRequestLineInput(workspace_product_id=product, quantity="1.000000")],
+    )
+
+    # Replay with same key must succeed and replay original
+    req2, created2 = service.create_request(
+        bearer_token=owner.claims(),
+        member=owner_cm,
+        payload=invalid_payload,
+        idempotency_key=idempotency_key,
+    )
+    assert created2 is False
+    assert req2.id == req1.id
+
+    # A NEW key with that invalid payload returns 422 required_by_in_the_past and writes nothing
+    new_key = uuid4()
+    with pytest.raises(UnprocessableEntityError) as exc_info:
+        service.create_request(
+            bearer_token=owner.claims(),
+            member=owner_cm,
+            payload=invalid_payload,
+            idempotency_key=new_key,
+        )
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.details == {
+        "field": "required_by_date",
+        "reason": "required_by_in_the_past",
+    }
+
+    with conn.cursor() as cur:
+        act_as(cur, owner)
+        cur.execute(
+            "select count(*) from purchase_request where idempotency_key = %s",
+            (str(new_key),),
+        )
+        assert cur.fetchone()[0] == 0
+
+
+def test_idempotent_replay_skips_validation_of_products_and_cost_centre(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-replay-spy")
+        branch = _make_branch(cur, owner)
+        cc_id = _make_cost_centre(cur, owner, branch_id=branch)
+        product = make_workspace_product(cur, owner, name="Prod Spy")
+        reset_role(cur)
+    conn.commit()
+
+    service = _service(conn, monkeypatch)
+    owner_cm = _current_member(owner, owner)
+
+    key = uuid4()
+    payload = PurchaseRequestCreate(
+        branch_id=branch,
+        cost_centre_id=cc_id,
+        required_by_date=datetime.now(UTC).date() + timedelta(days=3),
+        lines=[PurchaseRequestLineInput(workspace_product_id=product, quantity="2.000000")],
+    )
+
+    req1, created1 = service.create_request(
+        bearer_token=owner.claims(),
+        member=owner_cm,
+        payload=payload,
+        idempotency_key=key,
+    )
+    assert created1 is True
+
+    # Spies for validation calls
+    validate_products_calls = 0
+    orig_validate_products = service._validate_products_exist
+
+    def spy_validate_products(*args: object, **kwargs: object) -> None:
+        nonlocal validate_products_calls
+        validate_products_calls += 1
+        return orig_validate_products(*args, **kwargs)
+
+    validate_cost_centre_calls = 0
+    orig_validate_cost_centre = service._validate_cost_centre_branch
+
+    def spy_validate_cost_centre(*args: object, **kwargs: object) -> None:
+        nonlocal validate_cost_centre_calls
+        validate_cost_centre_calls += 1
+        return orig_validate_cost_centre(*args, **kwargs)
+
+    monkeypatch.setattr(service, "_validate_products_exist", spy_validate_products)
+    monkeypatch.setattr(service, "_validate_cost_centre_branch", spy_validate_cost_centre)
+
+    # Replay
+    req2, created2 = service.create_request(
+        bearer_token=owner.claims(),
+        member=owner_cm,
+        payload=payload,
+        idempotency_key=key,
+    )
+    assert created2 is False
+    assert req2.id == req1.id
+
+    # Neither validation method should be called during replay
+    assert validate_products_calls == 0, f"Expected 0 calls, got {validate_products_calls}"
+    assert validate_cost_centre_calls == 0, f"Expected 0 calls, got {validate_cost_centre_calls}"
+
+
+def test_idempotent_key_does_not_replay_across_different_tenants(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        owner_1 = make_workspace(cur, "pr-replay-t1")
+        branch_1 = _make_branch(cur, owner_1)
+        product_1 = make_workspace_product(cur, owner_1, name="Prod T1")
+
+        owner_2 = make_workspace(cur, "pr-replay-t2")
+        branch_2 = _make_branch(cur, owner_2)
+        product_2 = make_workspace_product(cur, owner_2, name="Prod T2")
+        reset_role(cur)
+    conn.commit()
+
+    service = _service(conn, monkeypatch)
+    owner_1_cm = _current_member(owner_1, owner_1)
+    owner_2_cm = _current_member(owner_2, owner_2)
+
+    shared_key = uuid4()
+
+    # Tenant 1 creates a request with shared_key
+    payload_1 = PurchaseRequestCreate(
+        branch_id=branch_1,
+        required_by_date=datetime.now(UTC).date() + timedelta(days=5),
+        lines=[PurchaseRequestLineInput(workspace_product_id=product_1, quantity="1.000000")],
+    )
+    req_t1, created_t1 = service.create_request(
+        bearer_token=owner_1.claims(),
+        member=owner_1_cm,
+        payload=payload_1,
+        idempotency_key=shared_key,
+    )
+    assert created_t1 is True
+
+    # Tenant 2 creates a request with the SAME key
+    payload_2 = PurchaseRequestCreate(
+        branch_id=branch_2,
+        required_by_date=datetime.now(UTC).date() + timedelta(days=6),
+        lines=[PurchaseRequestLineInput(workspace_product_id=product_2, quantity="2.000000")],
+    )
+    req_t2, created_t2 = service.create_request(
+        bearer_token=owner_2.claims(),
+        member=owner_2_cm,
+        payload=payload_2,
+        idempotency_key=shared_key,
+    )
+    # Tenant 2 must NOT replay Tenant 1's request; it must create its own request normally
+    assert created_t2 is True
+    assert req_t2.id != req_t1.id
+
+    with conn.cursor() as cur:
+        act_as(cur, owner_1)
+        cur.execute("select tenant_id from purchase_request where id = %s", (req_t1.id,))
+        assert cur.fetchone()[0] == owner_1.tenant_id
+        act_as(cur, owner_2)
+        cur.execute("select tenant_id from purchase_request where id = %s", (req_t2.id,))
+        assert cur.fetchone()[0] == owner_2.tenant_id
