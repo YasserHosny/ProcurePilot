@@ -1547,6 +1547,7 @@
         "discount": "Discount",
         "otherCharges": "Other Charges",
         "total": "Total Landed Cost",
+        "totalCovers": "Total for {{quantity}} × {{unitPrice}}",
         "normalisedQuantity": "Normalised Quantity",
         "baseUnit": "Base Unit",
         "ruleVersion": "Rule Version",
@@ -2315,7 +2316,8 @@
       "duplicate_product": "This product is already on another line.",
       "cost_centre_not_found": "Cost centre not found.",
       "cost_centre_branch_mismatch": "Cost centre does not belong to the selected branch.",
-      "product_not_found": "Product not found."
+      "product_not_found": "Product not found.",
+      "too_many_decimals": "Quantity can have at most 6 decimals."
     },
     "list": {
       "newRequestButton": "New request",
@@ -3829,7 +3831,11 @@
         "order_not_open_for_evidence": "This order is a draft, cancelled or closed, so it cannot take delivery or confirmation evidence.",
         "order_not_cancellable": "This order is already fully received or closed, so it can no longer be cancelled.",
         "order_already_cancelled": "This order is already cancelled."
-      }
+      },
+      "overdue": "Overdue",
+      "exportCsv": "Export CSV",
+      "print": "Print",
+      "receiveAll": "Receive all remaining"
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",
@@ -3852,7 +3858,9 @@
       "total_asc": "Total, lowest",
       "order_number_asc": "Order number, A to Z",
       "order_number_desc": "Order number, Z to A"
-    }
+    },
+    "expectedDate": "Expected {{date}}",
+    "overdue": "Overdue"
   },
   "accounting": {
     "nav": "Accounting",
@@ -4259,6 +4267,7 @@
       "splitBetweenSuppliers": "Split between suppliers",
       "needsTwoMatched": "Needs two matched replies",
       "differentCurrencies": "Replies are in different currencies",
+      "replyMixedCurrency": "A reply uses more than one currency, so the replies cannot be split",
       "alreadyConverted": "RFQ is already converted",
       "splitError": "Failed to start split. Please try again.",
       "lowestLinePrice": "Lowest landed cost",

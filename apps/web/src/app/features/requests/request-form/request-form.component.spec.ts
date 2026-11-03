@@ -14,8 +14,8 @@ import { ApiService } from '../../../core/api/api.service';
 import type { BranchList, Member, Product, PurchaseRequest } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
-import { OrdersApiService } from '../../orders/orders-api';
-import { RequestFormComponent } from './request-form.component';
+import { OrdersApiService, type RequestAllocation } from '../../orders/orders-api';
+import { RequestFormComponent, fetchAllPages } from './request-form.component';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 const mockRequest: PurchaseRequest = {
@@ -1371,6 +1371,390 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     });
   });
 
+  describe('Review Finding A (#426): Stale allocation response on sibling navigation', () => {
+    it('two requests, A allocation response delayed until after navigating to B -> B allocations stay B and late A response never changes B canCreateOrder or isFullyOrdered', async () => {
+      const requestA: PurchaseRequest = {
+        ...mockRequest,
+        id: 'req-A',
+        status: 'approved',
+        approval_step: {
+          id: 'as-a',
+          assigned_membership_id: 'm-approver',
+          source: 'threshold_match',
+          status: 'approved',
+          comment: null,
+          decided_by_membership_id: 'm-approver',
+          decided_at: '2026-09-10T12:00:00Z',
+        },
+        lines: [
+          {
+            ...mockRequest.lines[0],
+            id: 'l1',
+            quantity: '5.000000',
+          },
+        ],
+      };
+
+      const requestB: PurchaseRequest = {
+        ...mockRequest,
+        id: 'req-B',
+        status: 'approved',
+        approval_step: {
+          id: 'as-b',
+          assigned_membership_id: 'm-approver',
+          source: 'threshold_match',
+          status: 'approved',
+          comment: null,
+          decided_by_membership_id: 'm-approver',
+          decided_at: '2026-09-10T12:00:00Z',
+        },
+        lines: [
+          {
+            ...mockRequest.lines[0],
+            id: 'l2',
+            quantity: '10.000000',
+          },
+        ],
+      };
+
+      const allocationsA: RequestAllocation = {
+        source_request_id: 'req-A',
+        lines: [
+          {
+            source_request_line_id: 'l1',
+            requested_quantity: '5.000000',
+            allocated_quantity: '5.000000',
+            remaining_quantity: '0',
+          },
+        ],
+        orders: [
+          {
+            id: 'po-1',
+            order_number: 'PO-001',
+            status: 'confirmed',
+          },
+        ],
+      };
+
+      const allocationsB: RequestAllocation = {
+        source_request_id: 'req-B',
+        lines: [
+          {
+            source_request_line_id: 'l2',
+            requested_quantity: '10.000000',
+            allocated_quantity: '0',
+            remaining_quantity: '10.000000',
+          },
+        ],
+        orders: [],
+      };
+
+      const paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'req-A' }));
+      const requestsApiSpy = jasmine.createSpyObj('RequestsApiService', [
+        'createRequest',
+        'updateRequest',
+        'submitRequest',
+        'submitGroup',
+        'withdrawRequest',
+        'withdrawGroup',
+        'getRequest',
+      ]);
+      const ordersApiSpy = jasmine.createSpyObj('OrdersApiService', ['getAllocations']);
+      const allocationsASubject = new Subject<RequestAllocation>();
+      ordersApiSpy.getAllocations.and.callFake((id: string) => {
+        if (id === 'req-A') return allocationsASubject.asObservable();
+        if (id === 'req-B') return of(allocationsB);
+        return throwError(() => new Error('Unknown id'));
+      });
+
+      const orgApiSpy = jasmine.createSpyObj('OrganisationApiService', ['listBranches', 'listCostCentres']);
+      orgApiSpy.listBranches.and.returnValue(of({ items: [], next_cursor: null }));
+      orgApiSpy.listCostCentres.and.returnValue(of({ items: [], next_cursor: null }));
+      const apiSpy = jasmine.createSpyObj('ApiService', ['members', 'products']);
+      apiSpy.members.and.returnValue(of({ items: [], next_cursor: null }));
+      apiSpy.products.and.returnValue(of({ items: [], next_cursor: null }));
+
+      requestsApiSpy.getRequest.and.callFake((id: string) => {
+        if (id === 'req-A') return of(requestA);
+        if (id === 'req-B') return of(requestB);
+        return throwError(() => new Error('Not found'));
+      });
+
+      await TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [RequestFormComponent],
+        providers: [
+          provideTranslateService(),
+          provideRouter([]),
+          { provide: RequestsApiService, useValue: requestsApiSpy },
+          { provide: OrdersApiService, useValue: ordersApiSpy },
+          { provide: OrganisationApiService, useValue: orgApiSpy },
+          { provide: ApiService, useValue: apiSpy },
+          {
+            provide: ActivatedRoute,
+            useValue: {
+              paramMap: paramMap$.asObservable(),
+              snapshot: { paramMap: convertToParamMap({ id: 'req-A' }) },
+            },
+          },
+        ],
+      })
+        .overrideComponent(RequestFormComponent, {
+          set: {
+            providers: [
+              provideAppDateAdapter(),
+              { provide: MatSnackBar, useValue: jasmine.createSpyObj('MatSnackBar', ['open']) },
+              { provide: Router, useValue: jasmine.createSpyObj('Router', ['navigate']) },
+              { provide: MatDialog, useValue: jasmine.createSpyObj('MatDialog', ['open']) },
+            ],
+          },
+        })
+        .compileComponents();
+
+      const testFixture = TestBed.createComponent(RequestFormComponent);
+      const testComp = testFixture.componentInstance;
+      testFixture.detectChanges();
+
+      expect(testComp.existingRequest()?.id).toBe('req-A');
+      expect(testComp.isAllocationsLoading()).toBeTrue();
+
+      // Navigate to sibling request B before A's allocations arrive
+      paramMap$.next(convertToParamMap({ id: 'req-B' }));
+      testFixture.detectChanges();
+
+      expect(testComp.existingRequest()?.id).toBe('req-B');
+      expect(testComp.allocations()).toEqual(allocationsB);
+      expect(testComp.canCreateOrder()).toBeTrue();
+      expect(testComp.isFullyOrdered()).toBeFalse();
+
+      // Now late allocations for A arrive
+      allocationsASubject.next(allocationsA);
+      testFixture.detectChanges();
+
+      // B's allocations and computed properties must remain intact
+      expect(testComp.allocations()).toEqual(allocationsB);
+      expect(testComp.canCreateOrder()).toBeTrue();
+      expect(testComp.isFullyOrdered()).toBeFalse();
+    });
+  });
+
+  describe('Review Finding B (#426): fetchAllPages per-subscription state', () => {
+    it('subscribe, cancel after page one, subscribe again -> result has no duplicates and fetches every page', (done) => {
+      const page2$ = new Subject<{ items: readonly string[]; next_cursor: string | null }>();
+      const fetchPage = jasmine.createSpy('fetchPage').and.callFake((cursor?: string) => {
+        if (!cursor) {
+          return of({ items: ['a', 'b'], next_cursor: 'cursor-1' });
+        }
+        return page2$.asObservable();
+      });
+
+      const obs$ = fetchAllPages(fetchPage, 50);
+
+      // First subscription: receives page 1, then cancels before page 2
+      const sub1 = obs$.subscribe();
+      expect(fetchPage).toHaveBeenCalledWith();
+      expect(fetchPage).toHaveBeenCalledWith('cursor-1');
+      sub1.unsubscribe();
+
+      // Second subscription to the SAME observable
+      fetchPage.calls.reset();
+      obs$.subscribe((items) => {
+        expect(items).toEqual(['a', 'b', 'c']);
+        done();
+      });
+
+      expect(fetchPage).toHaveBeenCalledWith();
+      expect(fetchPage).toHaveBeenCalledWith('cursor-1');
+
+      // Now complete page 2 for the second subscription
+      page2$.next({ items: ['c'], next_cursor: null });
+      page2$.complete();
+    });
+  });
+
+  describe('Review Finding C (#429): Clearing server errors on value changes', () => {
+    it('set a duplicate-product server error on line 2, change line 1 product, expect line 2 control to be valid and Save/Submit to proceed', () => {
+      component.form.controls.branch_id.setValue('b1');
+      component.form.controls.required_by_date.setValue('2026-09-15');
+      // Line 1
+      component.lines.at(0).controls.workspace_product_id.setValue('wp1');
+      component.lines.at(0).controls.quantity.setValue('10');
+      // Line 2
+      component.addLine();
+      component.lines.at(1).controls.workspace_product_id.setValue('wp1');
+      component.lines.at(1).controls.quantity.setValue('5');
+      fixture.detectChanges();
+
+      const error422 = new HttpErrorResponse({
+        status: 422,
+        error: {
+          code: 'unprocessable',
+          message: 'Duplicate product',
+          details: { field: 'lines[1].workspace_product_id', reason: 'duplicate_product' },
+        },
+      });
+      requestsApi.createRequest.and.returnValue(throwError(() => error422));
+      requestsApi.updateRequest.and.returnValue(throwError(() => error422));
+
+
+      component.saveDraft();
+      fixture.detectChanges();
+
+      expect(component.lines.at(1).controls.workspace_product_id.errors?.['server']).toBe(
+        'requests.errors.duplicate_product',
+      );
+      expect(component.form.invalid).toBeTrue();
+
+      // Change line 1 product
+      requestsApi.createRequest.calls.reset();
+      requestsApi.updateRequest.calls.reset();
+      requestsApi.createRequest.and.returnValue(of({ ...mockRequest, id: 'req-saved', lines: [] }));
+      requestsApi.updateRequest.and.returnValue(of({ ...mockRequest, id: 'req-saved', lines: [] }));
+
+      component.lines.at(0).controls.workspace_product_id.setValue('wp2');
+      fixture.detectChanges();
+
+      expect(component.lines.at(1).controls.workspace_product_id.errors?.['server']).toBeUndefined();
+      expect(component.lines.at(1).controls.workspace_product_id.valid).toBeTrue();
+      expect(component.form.valid).toBeTrue();
+
+      component.saveDraft();
+      expect(requestsApi.updateRequest).toHaveBeenCalled();
+    });
+
+    it('set a duplicate-product server error on line 2, remove line 1, expect remaining control to be valid and Save/Submit to proceed', () => {
+      component.form.controls.branch_id.setValue('b1');
+      component.form.controls.required_by_date.setValue('2026-09-15');
+      // Line 1
+      component.lines.at(0).controls.workspace_product_id.setValue('wp1');
+      component.lines.at(0).controls.quantity.setValue('10');
+      // Line 2
+      component.addLine();
+      component.lines.at(1).controls.workspace_product_id.setValue('wp1');
+      component.lines.at(1).controls.quantity.setValue('5');
+      fixture.detectChanges();
+
+      const error422 = new HttpErrorResponse({
+        status: 422,
+        error: {
+          code: 'unprocessable',
+          message: 'Duplicate product',
+          details: { field: 'lines[1].workspace_product_id', reason: 'duplicate_product' },
+        },
+      });
+      requestsApi.createRequest.and.returnValue(throwError(() => error422));
+      requestsApi.updateRequest.and.returnValue(throwError(() => error422));
+
+
+      component.saveDraft();
+      fixture.detectChanges();
+
+      expect(component.lines.at(1).controls.workspace_product_id.errors?.['server']).toBe(
+        'requests.errors.duplicate_product',
+      );
+      expect(component.form.invalid).toBeTrue();
+
+      // Remove line 1
+      requestsApi.createRequest.calls.reset();
+      requestsApi.updateRequest.calls.reset();
+      requestsApi.createRequest.and.returnValue(of({ ...mockRequest, id: 'req-saved', lines: [] }));
+      requestsApi.updateRequest.and.returnValue(of({ ...mockRequest, id: 'req-saved', lines: [] }));
+
+      component.removeLine(0);
+      fixture.detectChanges();
+
+      // Former line 2 is now line 0
+      expect(component.lines.at(0).controls.workspace_product_id.errors?.['server']).toBeUndefined();
+      expect(component.lines.at(0).controls.workspace_product_id.valid).toBeTrue();
+      expect(component.form.valid).toBeTrue();
+
+      component.saveDraft();
+      expect(requestsApi.updateRequest).toHaveBeenCalled();
+    });
+  });
+
+  describe('Review Finding D (#429): Array-shaped validation details and 6-decimal limit', () => {
+    it('rejects more than 6 decimal places client-side with quantityPattern error (1.1234567 rejected, 1.123456 accepted)', () => {
+      component.lines.at(0).controls.quantity.setValue('1.1234567');
+      expect(component.lines.at(0).controls.quantity.hasError('pattern')).toBeTrue();
+      expect(component.lines.at(0).controls.quantity.valid).toBeFalse();
+
+      component.lines.at(0).controls.quantity.setValue('1.123456');
+      expect(component.lines.at(0).controls.quantity.hasError('pattern')).toBeFalse();
+      expect(component.lines.at(0).controls.quantity.valid).toBeTrue();
+    });
+
+    it('a 422 with array-shaped details for lines[0].quantity marks line 1 quantity control, shows the inline message and the generic banner; object-shaped details still work', () => {
+      component.form.controls.branch_id.setValue('b1');
+      component.form.controls.required_by_date.setValue('2026-09-15');
+      component.lines.at(0).controls.workspace_product_id.setValue('wp1');
+      component.lines.at(0).controls.quantity.setValue('1.5');
+      fixture.detectChanges();
+
+      const arrayError422 = new HttpErrorResponse({
+        status: 422,
+        error: {
+          code: 'unprocessable',
+          message: 'Validation error',
+          details: [
+            {
+              loc: ['body', 'lines', 0, 'quantity'],
+              msg: 'String should match pattern',
+              type: 'string_pattern_mismatch',
+              field: 'lines[0].quantity',
+            },
+          ],
+        },
+      });
+      requestsApi.createRequest.and.returnValue(throwError(() => arrayError422));
+      requestsApi.updateRequest.and.returnValue(throwError(() => arrayError422));
+
+      component.saveDraft();
+      fixture.detectChanges();
+
+      // Control has server error mapped to requests.errors.too_many_decimals
+      expect(component.lines.at(0).controls.quantity.errors?.['server']).toBe(
+        'requests.errors.too_many_decimals',
+      );
+      // Inline message rendered in template
+      const qtyField = fixture.nativeElement.querySelector(
+        'mat-form-field.line-quantity',
+      );
+      expect(qtyField?.querySelector('mat-error')?.textContent?.trim()).toBe(
+        'Quantity can have at most 6 decimals.',
+      );
+      // Banner displays the generic error
+      expect(component.errorMessage()).toBe('Unable to save the purchase request. Please try again.');
+    });
+
+    it('object-shaped details still work with field-level server error and translated banner', () => {
+      component.form.controls.branch_id.setValue('b1');
+      component.form.controls.required_by_date.setValue('2026-09-15');
+      component.lines.at(0).controls.workspace_product_id.setValue('wp1');
+      component.lines.at(0).controls.quantity.setValue('1.5');
+      fixture.detectChanges();
+
+      const objectError422 = new HttpErrorResponse({
+        status: 422,
+        error: {
+          code: 'unprocessable',
+          message: 'Date in past',
+          details: { field: 'required_by_date', reason: 'required_by_in_the_past' },
+        },
+      });
+      requestsApi.createRequest.and.returnValue(throwError(() => objectError422));
+      requestsApi.updateRequest.and.returnValue(throwError(() => objectError422));
+
+      component.saveDraft();
+      fixture.detectChanges();
+
+      expect(component.form.controls.required_by_date.errors?.['server']).toBe(
+        'requests.errors.required_by_in_the_past',
+      );
+      expect(component.errorMessage()).toBe('The required-by date cannot be in the past.');
+    });
+  });
+
   describe('PPS-189 (2): Stale estimate label', () => {
     it('stale label shows when quantity changed and not when pristine', async () => {
       const draftRequest: PurchaseRequest = {
@@ -1961,6 +2345,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       requestsApi.createRequest.and.returnValue(throwError(() => error422));
       requestsApi.updateRequest.and.returnValue(throwError(() => error422));
 
+
       component.saveDraft();
       fixture.detectChanges();
 
@@ -1992,6 +2377,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       });
       requestsApi.createRequest.and.returnValue(throwError(() => error422));
       requestsApi.updateRequest.and.returnValue(throwError(() => error422));
+
 
       component.saveDraft();
       fixture.detectChanges();

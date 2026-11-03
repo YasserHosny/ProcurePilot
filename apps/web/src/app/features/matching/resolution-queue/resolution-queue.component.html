@@ -33,6 +33,33 @@
     </div>
   }
 
+  @if (dependentLinesCount() > 0) {
+    <div class="info-banner dependent-lines-banner" data-testid="queue-dependent-lines-notice" role="status">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      <div class="banner-content">
+        <span>{{ 'matching.resolution.correction.dependentLinesNotice' | translate: { count: dependentLinesCount() } }}</span>
+        @if (dependentLinesQuotationId(); as qid) {
+          <button
+            mat-button
+            type="button"
+            data-testid="queue-dependent-lines-review"
+            class="banner-link"
+            (click)="reviewDependentLines(qid)"
+          >
+            {{ 'matching.resolution.correction.reviewQueue' | translate }}
+          </button>
+        }
+      </div>
+    </div>
+  }
+
+  @if (aliasConflictNotice()) {
+    <div class="warning-banner alias-conflict-banner" data-testid="queue-alias-conflict-notice" role="status">
+      <mat-icon aria-hidden="true">warning</mat-icon>
+      <span>{{ 'matching.resolution.correction.aliasConflictNotice' | translate }}</span>
+    </div>
+  }
+
   @if (isWriter() && exactMatchCount() > 0) {
     <section class="exact-match-banner" data-testid="exact-match-banner" role="status">
       <mat-icon aria-hidden="true">task_alt</mat-icon>

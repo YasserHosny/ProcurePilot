@@ -15,7 +15,7 @@ import { Router } from '@angular/router';
 import { TranslatePipe,
 TranslateService } from '@ngx-translate/core';
 import { RoleDirective } from '../../../core/auth/role.directive';
-import { EMPTY, Subject, forkJoin, of, type Observable, type Subscription } from 'rxjs';
+import { EMPTY, Subject, defer, forkJoin, of, type Observable, type Subscription } from 'rxjs';
 import { catchError, expand, reduce, switchMap } from 'rxjs/operators';
 
 import type { ApiError, Branch, BranchList, PurchaseRequest } from '../../../core/api/models';
@@ -278,31 +278,33 @@ export class RequestListComponent implements OnInit {
   }
 
   private loadBranches(): Observable<BranchList> {
-    const HARD_CAP = 50;
-    let pageCount = 0;
+    return defer(() => {
+      const HARD_CAP = 50;
+      let pageCount = 0;
 
-    return this.organisationApi.listBranches({ limit: 100 }).pipe(
-      expand((res) => {
-        pageCount++;
-        if (res.next_cursor && pageCount < HARD_CAP) {
-          return this.organisationApi.listBranches({ limit: 100, cursor: res.next_cursor });
-        }
-        return EMPTY;
-      }),
-      reduce(
-        (acc: BranchList, res: BranchList) => ({
-          items: [...acc.items, ...res.items],
-          next_cursor: res.next_cursor,
+      return this.organisationApi.listBranches({ limit: 100 }).pipe(
+        expand((res) => {
+          pageCount++;
+          if (res.next_cursor && pageCount < HARD_CAP) {
+            return this.organisationApi.listBranches({ limit: 100, cursor: res.next_cursor });
+          }
+          return EMPTY;
         }),
-        { items: [], next_cursor: null },
-      ),
-      catchError(() =>
-        of<BranchList>({
-          items: [],
-          next_cursor: null,
-        }),
-      ),
-    );
+        reduce(
+          (acc: BranchList, res: BranchList) => ({
+            items: [...acc.items, ...res.items],
+            next_cursor: res.next_cursor,
+          }),
+          { items: [], next_cursor: null } as BranchList,
+        ),
+        catchError(() =>
+          of<BranchList>({
+            items: [],
+            next_cursor: null,
+          }),
+        ),
+      );
+    });
   }
 
   private handleError(err: unknown): void {

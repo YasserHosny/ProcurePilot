@@ -1335,14 +1335,8 @@ class RequestsService:
                         for row in rows:
                             if action == "submitted" or member.role is not MemberRole.owner:
                                 _require_requester(row, member)
-                    if (
-                        action in ("approved", "rejected")
-                        and comment is not None
-                        and len(comment) > 2000
-                    ):
-                        raise UnprocessableEntityError(details={"reason": "comment_too_long"})
-                    if action == "rejected" and (comment is None or not comment.strip()):
-                        raise UnprocessableEntityError(details={"reason": "comment_required"})
+                    if action in ("approved", "rejected"):
+                        _validate_decision_comment(action, comment)
                     now = _now_iso()
                     if action == "submitted":
                         total = sum(
@@ -1666,6 +1660,7 @@ class RequestsService:
         bearer_token: str,
         member: CurrentMember,
         request_id: UUID,
+        idempotency_key: UUID | None = None,
     ) -> PurchaseRequest:
         client = authenticated_client(self._settings, bearer_token)
         claims = {
@@ -1694,151 +1689,198 @@ class RequestsService:
                     if existing is None:
                         raise NotFoundError(details={"resource": "purchase_request"})
                     _require_ungrouped(existing)
-
-                    if str(existing["status"]) != "draft":
-                        raise ConflictError(details={"reason": "not_draft"})
                     _require_requester(existing, member)
 
-                    rid = str(request_id)
-                    cur.execute(
-                        f"select {LINE_COLUMNS} from purchase_request_line "
-                        "where purchase_request_id = %s order by position, created_at, id",
-                        (request_id,),
-                    )
-                    line_rows = cur.fetchall()
-                    if not line_rows:
-                        raise UnprocessableEntityError(details={"reason": "no_lines"})
-
-                    product_ids = [UUID(str(lr["workspace_product_id"])) for lr in line_rows]
-                    estimates = self._estimate_products(product_ids, request_id=request_id)
-
-                    now = _now_iso()
-                    for lr, est in zip(line_rows, estimates, strict=True):
+                    is_replay = False
+                    if idempotency_key is not None:
+                        cur.execute("set local role service_role")
                         cur.execute(
-                            """
-                            update purchase_request_line set
-                                estimated_unit_price_amount = %s,
-                                estimated_unit_price_currency = %s,
-                                estimated_unit_price_source_landed_cost_id = %s,
-                                estimated_at = %s
-                            where id = %s
-                            """,
+                            "select 1 from audit_event where tenant_id = %s "
+                            "and actor_membership_id = %s "
+                            "and action = %s and outcome = 'success' "
+                            "and target->>'purchase_request_id' = %s "
+                            "and target->>'idempotency_key' = %s order by id limit 1",
                             (
-                                _format_decimal(est.unit_price_amount, scale=4)
-                                if est.unit_price_amount is not None
-                                else None,
-                                est.unit_price_currency,
-                                (
-                                    str(est.source_landed_cost_id)
-                                    if est.source_landed_cost_id is not None
-                                    else None
-                                ),
-                                now,
-                                lr["id"],
+                                member.tenant_id,
+                                member.membership_id,
+                                "requests.purchase_request_submitted",
+                                str(request_id),
+                                str(idempotency_key),
                             ),
                         )
+                        replay = cur.fetchone()
+                        cur.execute("set local role authenticated")
+                        if replay is not None:
+                            is_replay = True
 
-                    quantities = [_decimal(lr["quantity"], scale=6) for lr in line_rows]
-                    total_amount, total_currency, has_incomplete = _compute_totals(
-                        quantities, estimates
-                    )
+                    if is_replay:
+                        cur.execute(
+                            f"select {LINE_COLUMNS} from purchase_request_line "
+                            "where purchase_request_id = %s order by position, created_at, id",
+                            (request_id,),
+                        )
+                        frozen_lines = cur.fetchall()
+                        cur.execute(
+                            f"select {STEP_COLUMNS} from approval_step "
+                            "where purchase_request_id = %s order by created_at desc limit 1",
+                            (request_id,),
+                        )
+                        routed_step = cur.fetchone()
+                        request_row = existing
+                        resolved = None
+                    else:
+                        if str(existing["status"]) != "draft":
+                            raise ConflictError(details={"reason": "not_draft"})
 
-                    cur.execute(
-                        f"""
-                        update purchase_request set
-                            status = 'submitted',
-                            submitted_at = %s,
-                            estimated_total_amount = %s,
-                            estimated_total_currency = %s,
-                            has_incomplete_estimate = %s,
-                            updated_at = %s
-                        where id = %s and status = 'draft'
-                        returning {REQUEST_COLUMNS}
-                        """,
-                        (
-                            now,
+                        rid = str(request_id)
+                        cur.execute(
+                            f"select {LINE_COLUMNS} from purchase_request_line "
+                            "where purchase_request_id = %s order by position, created_at, id",
+                            (request_id,),
+                        )
+                        line_rows = cur.fetchall()
+                        if not line_rows:
+                            raise UnprocessableEntityError(details={"reason": "no_lines"})
+
+                        product_ids = [UUID(str(lr["workspace_product_id"])) for lr in line_rows]
+                        estimates = self._estimate_products(product_ids, request_id=request_id)
+
+                        now = _now_iso()
+                        for lr, est in zip(line_rows, estimates, strict=True):
+                            cur.execute(
+                                """
+                                update purchase_request_line set
+                                    estimated_unit_price_amount = %s,
+                                    estimated_unit_price_currency = %s,
+                                    estimated_unit_price_source_landed_cost_id = %s,
+                                    estimated_at = %s
+                                where id = %s
+                                """,
+                                (
+                                    _format_decimal(est.unit_price_amount, scale=4)
+                                    if est.unit_price_amount is not None
+                                    else None,
+                                    est.unit_price_currency,
+                                    (
+                                        str(est.source_landed_cost_id)
+                                        if est.source_landed_cost_id is not None
+                                        else None
+                                    ),
+                                    now,
+                                    lr["id"],
+                                ),
+                            )
+
+                        quantities = [_decimal(lr["quantity"], scale=6) for lr in line_rows]
+                        total_amount, total_currency, has_incomplete = _compute_totals(
+                            quantities, estimates
+                        )
+
+                        cur.execute(
+                            f"""
+                            update purchase_request set
+                                status = 'submitted',
+                                submitted_at = %s,
+                                estimated_total_amount = %s,
+                                estimated_total_currency = %s,
+                                has_incomplete_estimate = %s,
+                                updated_at = %s
+                            where id = %s and status = 'draft'
+                            returning {REQUEST_COLUMNS}
+                            """,
                             (
-                                _format_decimal(total_amount, scale=4)
-                                if total_amount is not None
+                                now,
+                                (
+                                    _format_decimal(total_amount, scale=4)
+                                    if total_amount is not None
+                                    else None
+                                ),
+                                total_currency,
+                                has_incomplete,
+                                now,
+                                request_id,
+                            ),
+                        )
+                        request_row = cur.fetchone()
+                        if request_row is None:
+                            raise ConflictError(details={"reason": "not_draft"})
+
+                        as_of = datetime.now(UTC).date()
+                        resolved = resolve_approver(
+                            request_value=(
+                                Decimal(str(request_row["estimated_total_amount"]))
+                                if request_row.get("estimated_total_amount") is not None
                                 else None
                             ),
-                            total_currency,
-                            has_incomplete,
-                            now,
-                            request_id,
-                        ),
-                    )
-                    request_row = cur.fetchone()
-                    if request_row is None:
-                        raise ConflictError(details={"reason": "not_draft"})
+                            request_currency=(
+                                str(request_row["estimated_total_currency"])
+                                if request_row.get("estimated_total_currency") is not None
+                                else None
+                            ),
+                            branch_id=UUID(str(request_row["branch_id"])),
+                            rules=self._fetch_threshold_rules(client),
+                            delegations=self._fetch_active_delegations(client, as_of=as_of),
+                            removed_membership_ids=self._fetch_removed_membership_ids(client),
+                            owner_membership_id=self._fetch_owner_membership_id(client),
+                            as_of=as_of,
+                        )
 
-                    as_of = datetime.now(UTC).date()
-                    resolved = resolve_approver(
-                        request_value=(
-                            Decimal(str(request_row["estimated_total_amount"]))
-                            if request_row.get("estimated_total_amount") is not None
-                            else None
-                        ),
-                        request_currency=(
-                            str(request_row["estimated_total_currency"])
-                            if request_row.get("estimated_total_currency") is not None
-                            else None
-                        ),
-                        branch_id=UUID(str(request_row["branch_id"])),
-                        rules=self._fetch_threshold_rules(client),
-                        delegations=self._fetch_active_delegations(client, as_of=as_of),
-                        removed_membership_ids=self._fetch_removed_membership_ids(client),
-                        owner_membership_id=self._fetch_owner_membership_id(client),
-                        as_of=as_of,
-                    )
+                        cur.execute(
+                            f"""
+                            insert into approval_step (
+                                id, tenant_id, purchase_request_id,
+                                assigned_membership_id, source, status
+                            ) values (
+                                %s, %s, %s, %s, %s, 'pending'
+                            ) returning {STEP_COLUMNS}
+                            """,
+                            (
+                                uuid4(),
+                                member.tenant_id,
+                                request_id,
+                                resolved.assigned_membership_id,
+                                resolved.source,
+                            ),
+                        )
+                        routed_step = cur.fetchone()
 
-                    cur.execute(
-                        f"""
-                        insert into approval_step (
-                            id, tenant_id, purchase_request_id,
-                            assigned_membership_id, source, status
-                        ) values (
-                            %s, %s, %s, %s, %s, 'pending'
-                        ) returning {STEP_COLUMNS}
-                        """,
-                        (
-                            uuid4(),
-                            member.tenant_id,
-                            request_id,
-                            resolved.assigned_membership_id,
-                            resolved.source,
-                        ),
-                    )
-                    routed_step = cur.fetchone()
+                        cur.execute(
+                            f"select {LINE_COLUMNS} from purchase_request_line "
+                            "where purchase_request_id = %s order by position, created_at, id",
+                            (request_id,),
+                        )
+                        frozen_lines = cur.fetchall()
 
-                    cur.execute(
-                        f"select {LINE_COLUMNS} from purchase_request_line "
-                        "where purchase_request_id = %s order by position, created_at, id",
-                        (request_id,),
-                    )
-                    frozen_lines = cur.fetchall()
+                        audit_target: dict[str, object] = {"purchase_request_id": rid}
+                        if idempotency_key is not None:
+                            audit_target["idempotency_key"] = str(idempotency_key)
+                        self._record(
+                            cur=cur,
+                            bearer_token=bearer_token,
+                            member=member,
+                            action="requests.purchase_request_submitted",
+                            target=audit_target,
+                        )
+
+                        if resolved is not None and resolved.source == "owner_fallback":
+                            escalation_target: dict[str, object] = {
+                                "purchase_request_id": rid,
+                                "approval_step_id": str(routed_step["id"]),
+                                "assigned_membership_id": str(resolved.assigned_membership_id),
+                            }
+                            if idempotency_key is not None:
+                                escalation_target["idempotency_key"] = str(idempotency_key)
+                            self._record(
+                                cur=cur,
+                                bearer_token=bearer_token,
+                                member=member,
+                                action="requests.approval_step_escalated",
+                                target=escalation_target,
+                            )
 
         except psycopg.Error as exc:
             raise _map_psycopg_error(exc) from exc
 
-        rid = str(request_id)
-        if resolved.source == "owner_fallback":
-            self._record(
-                bearer_token=bearer_token,
-                member=member,
-                action="requests.approval_step_escalated",
-                target={
-                    "purchase_request_id": rid,
-                    "approval_step_id": str(routed_step["id"]),
-                    "assigned_membership_id": str(resolved.assigned_membership_id),
-                },
-            )
-        self._record(
-            bearer_token=bearer_token,
-            member=member,
-            action="requests.purchase_request_submitted",
-            target={"purchase_request_id": rid},
-        )
         return self._purchase_request_with_budget_status(
             client, request_row, frozen_lines, routed_step
         )
@@ -1849,24 +1891,23 @@ class RequestsService:
         bearer_token: str,
         member: CurrentMember,
         request_id: UUID,
+        idempotency_key: UUID | None = None,
     ) -> PurchaseRequest:
         client = authenticated_client(self._settings, bearer_token)
         rid = str(request_id)
-        request_row, previous_status = self._withdraw_request_row(member, request_id)
+        request_row, previous_status, is_replay = self._withdraw_request_row(
+            member, request_id, idempotency_key=idempotency_key
+        )
         line_rows = self._fetch_lines_for(client, rid)
         step_row = self._fetch_step(client, rid)
-
-        self._record(
-            bearer_token=bearer_token,
-            member=member,
-            action="requests.purchase_request_withdrawn",
-            target={"purchase_request_id": rid, "previous_status": previous_status},
-        )
         return self._purchase_request_with_budget_status(client, request_row, line_rows, step_row)
 
     def _withdraw_request_row(
-        self, member: CurrentMember, request_id: UUID
-    ) -> tuple[dict[str, object], str]:
+        self,
+        member: CurrentMember,
+        request_id: UUID,
+        idempotency_key: UUID | None = None,
+    ) -> tuple[dict[str, object], str | None, bool]:
         # Use the same transaction lock as PO creation/editing so the absence check
         # and withdrawal cannot interleave with attaching a live purchase order.
         claims = {
@@ -1895,6 +1936,32 @@ class RequestsService:
                     _require_ungrouped(existing)
                     if member.role is not MemberRole.owner:
                         _require_requester(existing, member)
+
+                    is_replay = False
+                    if idempotency_key is not None:
+                        cur.execute("set local role service_role")
+                        cur.execute(
+                            "select 1 from audit_event where tenant_id = %s "
+                            "and actor_membership_id = %s "
+                            "and action = %s and outcome = 'success' "
+                            "and target->>'purchase_request_id' = %s "
+                            "and target->>'idempotency_key' = %s order by id limit 1",
+                            (
+                                member.tenant_id,
+                                member.membership_id,
+                                "requests.purchase_request_withdrawn",
+                                str(request_id),
+                                str(idempotency_key),
+                            ),
+                        )
+                        replay = cur.fetchone()
+                        cur.execute("set local role authenticated")
+                        if replay is not None:
+                            is_replay = True
+
+                    if is_replay:
+                        return existing, None, True
+
                     previous_status = str(existing["status"])
                     if previous_status not in ("draft", "submitted", "ordered"):
                         raise ConflictError(details={"reason": "already_decided_or_withdrawn"})
@@ -1915,7 +1982,20 @@ class RequestsService:
                     row = cur.fetchone()
                     if row is None:
                         raise NotFoundError(details={"resource": "purchase_request"})
-                    return row, previous_status
+
+                    audit_target: dict[str, object] = {
+                        "purchase_request_id": str(request_id),
+                        "previous_status": previous_status,
+                    }
+                    if idempotency_key is not None:
+                        audit_target["idempotency_key"] = str(idempotency_key)
+                    self._record(
+                        cur=cur,
+                        member=member,
+                        action="requests.purchase_request_withdrawn",
+                        target=audit_target,
+                    )
+                    return row, previous_status, False
         except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -2776,11 +2856,25 @@ class RequestsService:
     def _record(
         self,
         *,
-        bearer_token: str,
+        bearer_token: str | None = None,
         member: CurrentMember,
         action: str,
         target: dict[str, object],
+        cur: psycopg.Cursor | None = None,
     ) -> None:
+        if cur is not None:
+            cur.execute(
+                "select record_audit_event(%s,'success',%s,%s,%s,%s,%s)",
+                (
+                    action,
+                    member.tenant_id,
+                    member.membership_id,
+                    member.email,
+                    Jsonb(target),
+                    get_trace_id(),
+                ),
+            )
+            return
         get_audit_writer().record(
             AuditEventCreate(
                 tenant_id=member.tenant_id,
@@ -2944,6 +3038,7 @@ class RequestsService:
             raise ConflictError(details={"reason": "no_pending_approval"})
         _require_assigned_approver_or_owner(step_row, member)
 
+        _validate_decision_comment(decision, payload.comment)
         now = _now_iso()
         decided_request, decided_step, notification_id = self._decide_and_notify(
             member=member,
@@ -2970,16 +3065,6 @@ class RequestsService:
                 )
 
         line_rows = self._fetch_lines_for(client, rid)
-        self._record(
-            bearer_token=bearer_token,
-            member=member,
-            action=f"requests.approval_step_{decision}",
-            target={
-                "purchase_request_id": rid,
-                "approval_step_id": str(decided_step["id"]),
-                "decided_by_membership_id": str(member.membership_id),
-            },
-        )
         return self._purchase_request_with_budget_status(
             client, decided_request, line_rows, decided_step
         )
@@ -3056,14 +3141,14 @@ class RequestsService:
         comment: str | None,
         now: str,
     ) -> tuple[dict[str, object], dict[str, object], UUID | None]:
-        """Atomically applies a decision and queues its notification (T037, research.md R1).
+        """Atomically applies a decision, records its audit event and queues its notification.
 
         A single raw-`psycopg` transaction (mirroring `devices/service.py`'s own
         `_authenticated_db`-style pattern — a deliberate, isolated exception to this file's
         otherwise-uniform PostgREST/`authenticated_client` style) because `push_notification`
         grants nothing to `authenticated` at all (its own migration: service-role only), so the
         notification write needs a role switch mid-transaction that PostgREST/supabase-py cannot
-        express, and because these three writes must succeed or fail together — a prior version of
+        express, and because these writes must succeed or fail together — a prior version of
         this method did them as separate PostgREST calls with no such guarantee (fixed after
         review caught it). Returns `(decided_request, decided_step, notification_id)` — the last
         is `None` only if this were ever called for a request with no requester to notify, which
@@ -3076,56 +3161,80 @@ class RequestsService:
             "role": "authenticated",
             "member_role": member.role.value,
         }
-        with db.connect(self._settings.database_url.get_secret_value()) as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute("set local role authenticated")
-                cur.execute(
-                    "select set_config('request.jwt.claims', %s, true)",
-                    (json.dumps(claims),),
-                )
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute("set local role authenticated")
+                    cur.execute(
+                        "select set_config('request.jwt.claims', %s, true)",
+                        (json.dumps(claims),),
+                    )
 
-                # Same authoritative guard the previous (non-atomic) version used: if a concurrent
-                # withdrawal already flipped the request's status, this matches zero rows and we
-                # raise before touching the step or writing a notification, leaving the step
-                # `pending` rather than stranding a `decided` step on a non-submitted request.
-                #
-                # An approved request lands directly on `ordered`, not `approved` (chunk R2.3,
-                # specs/010-mobile-approvals-receipt/research.md R1) — there is no separate
-                # "place the order" human action this release, so the same decision that approves
-                # a request is also what marks it ordered. `approval_step.status` and the audit
-                # action below still record the human's actual decision ("approved"), unchanged;
-                # only `purchase_request.status` itself takes the new terminal value.
-                decided_request, decided_step = self._apply_request_decision(
-                    cur,
-                    member=member,
-                    request_id=request_id,
-                    step_id=step_id,
-                    decision=decision,
-                    request_status="ordered" if decision == "approved" else decision,
-                    comment=comment,
-                    now=now,
-                )
+                    # Same authoritative guard the previous (non-atomic) version used: if a
+                    # concurrent withdrawal already flipped the request's status, this matches zero
+                    # rows and we raise before touching the step or writing a notification, leaving
+                    # the step `pending` rather than stranding a `decided` step on a non-submitted
+                    # request.
+                    #
+                    # An approved request lands directly on `ordered`, not `approved` (chunk R2.3,
+                    # specs/010-mobile-approvals-receipt/research.md R1) — there is no separate
+                    # "place the order" human action this release, so the same decision that
+                    # approves a request is also what marks it ordered. `approval_step.status` and
+                    # the audit action below still record the human's actual decision ("approved"),
+                    # unchanged; only `purchase_request.status` itself takes the new terminal value.
+                    decided_request, decided_step = self._apply_request_decision(
+                        cur,
+                        member=member,
+                        request_id=request_id,
+                        step_id=step_id,
+                        decision=decision,
+                        request_status="ordered" if decision == "approved" else decision,
+                        comment=comment,
+                        now=now,
+                    )
 
-                cur.execute("set local role service_role")
-                cur.execute(
-                    """
-                    insert into push_notification (tenant_id, purchase_request_id, member_id)
-                    values (%s, %s, %s)
-                    returning id
-                    """,
-                    (
-                        str(member.tenant_id),
-                        request_id,
-                        str(decided_request["requested_by_membership_id"]),
-                    ),
-                )
-                notification_row = cur.fetchone()
-                notification_id = (
-                    UUID(str(notification_row["id"])) if notification_row is not None else None
-                )
-            # Exiting the `with db.connect(...)` block here commits all three writes above
-            # atomically (or rolls all of them back if any exception was raised) — psycopg's own
-            # connection context manager semantics, the same ones `devices/service.py` relies on.
+                    target = {
+                        "purchase_request_id": request_id,
+                        "approval_step_id": str(decided_step["id"]),
+                        "decided_by_membership_id": str(member.membership_id),
+                    }
+                    if comment is not None:
+                        target["comment"] = comment
+                    cur.execute(
+                        "select record_audit_event(%s,'success',%s,%s,%s,%s,%s)",
+                        (
+                            f"requests.approval_step_{decision}",
+                            member.tenant_id,
+                            member.membership_id,
+                            member.email,
+                            Jsonb(target),
+                            get_trace_id(),
+                        ),
+                    )
+
+                    cur.execute("set local role service_role")
+                    cur.execute(
+                        """
+                        insert into push_notification (tenant_id, purchase_request_id, member_id)
+                        values (%s, %s, %s)
+                        returning id
+                        """,
+                        (
+                            str(member.tenant_id),
+                            request_id,
+                            str(decided_request["requested_by_membership_id"]),
+                        ),
+                    )
+                    notification_row = cur.fetchone()
+                    notification_id = (
+                        UUID(str(notification_row["id"])) if notification_row is not None else None
+                    )
+                # Exiting the `with db.connect(...)` block here commits all writes above
+                # atomically (or rolls all of them back if any exception was raised) — psycopg's
+                # own connection context manager semantics, the same ones `devices/service.py`
+                # relies on.
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return dict(decided_request), dict(decided_step), notification_id
 
     def _purchase_request_with_budget_status(
@@ -3734,6 +3843,13 @@ def _compute_totals(
     if len(currencies) == 1:
         return total, currencies.pop(), has_incomplete
     return None, None, has_incomplete
+
+
+def _validate_decision_comment(decision: str, comment: str | None) -> None:
+    if comment is not None and len(comment) > 2000:
+        raise UnprocessableEntityError(details={"reason": "comment_too_long"})
+    if decision == "rejected" and (comment is None or not comment.strip()):
+        raise UnprocessableEntityError(details={"reason": "comment_required"})
 
 
 def _now_iso() -> str:
