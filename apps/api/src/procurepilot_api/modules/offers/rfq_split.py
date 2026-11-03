@@ -242,12 +242,7 @@ def prepare_requests_from_split(
                         "purchase_request_ids": [str(row["id"]) for row in cur.fetchall()],
                     }
                 )
-            cur.execute(
-                f"select {rfq_service._EFFECTIVE_STATUS_SQL} as status from rfq r "
-                "where r.id = %s and r.tenant_id = %s",
-                (rfq_id, member.tenant_id),
-            )
-            if cur.fetchone()["status"] == "expired":
+            if status == "expired":
                 raise UnprocessableEntityError(details={"reason": "rfq_expired"})
             if job["status"] != "completed" or not job["result"] or not job["result"]["feasible"]:
                 raise ConflictError(details={"reason": "split_not_completed"})
