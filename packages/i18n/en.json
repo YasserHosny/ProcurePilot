@@ -1821,7 +1821,9 @@
       "splitTotal": "Split total",
       "saving": "Saving against single supplier",
       "singleSupplierTotal": "Single supplier total",
-      "infeasible": "Infeasible"
+      "infeasible": "Infeasible",
+      "standaloneNote": "This split is an estimate from stored prices. Ask these suppliers for fresh quotes to confirm it.",
+      "startRfq": "Send as an RFQ"
     },
     "actions": {
       "newSplit": "Start New Basket Split",
@@ -4285,7 +4287,8 @@
         "conflict": "The RFQ has changed. Refresh and try again.",
         "invalidValue": "Some RFQ values are invalid. Please review them and try again.",
         "serviceUnavailable": "The RFQ service is temporarily unavailable. Please try again."
-      }
+      },
+      "splitLoadError": "The basket split could not be loaded, so the RFQ form is empty. Add the products and suppliers yourself."
     },
     "compare": {
       "rfqCancelled": "This RFQ was cancelled — requests can no longer be prepared from it",

@@ -255,6 +255,12 @@ export class RfqCreateComponent implements OnInit {
       return;
     }
 
+    const fromSplitId = this.route?.snapshot?.queryParamMap?.get('from_split') ?? null;
+    if (fromSplitId) {
+      this.loadSplitData(fromSplitId);
+      return;
+    }
+
     const fromId = this.route?.snapshot?.queryParamMap?.get('from') ?? null;
     if (fromId) {
       this.loadDuplicateData(fromId);
@@ -305,6 +311,58 @@ export class RfqCreateComponent implements OnInit {
       ),
       reduce((acc, res) => acc.concat(res.items), [] as Product[]),
     );
+  }
+
+  /**
+   * Starts an RFQ from a basket split: the split's suppliers and quantities, so fresh quotes can
+   * confirm what the split only estimated. The needed-by date and terms are left for the buyer.
+   */
+  private loadSplitData(jobId: string): void {
+    this.isLoadingRfq.set(true);
+    this.errorMessage.set(null);
+    this.initialLoadError.set(null);
+
+    forkJoin({
+      products: this.loadAllActiveProducts(),
+      suppliers: this.loadAllActiveSuppliers(),
+      job: this.apiService.getBasketSplitJob(jobId),
+    }).subscribe({
+      next: ({ products, suppliers, job }) => {
+        this.products.set(products);
+        this.allLoadedSuppliers.set(suppliers);
+        this.excludedSupplierCount.set(suppliers.filter((s) => !s.contact_email).length);
+        const withEmail = suppliers.filter((s) => !!s.contact_email);
+        this.suppliers.set(withEmail);
+
+        this.linesFormArray.clear();
+        for (const item of job.items) {
+          const product = products.find((p) => p.id === item.workspace_product_id);
+          const packBase =
+            parseFloat(job.pack_snapshot?.[item.workspace_product_id]?.base_quantity ?? '') ||
+            parseFloat(product?.pack?.base_quantity ?? '') ||
+            1;
+          const packs = Math.round((parseFloat(item.quantity) / packBase) * 1e6) / 1e6;
+          this.linesFormArray.push(
+            this.fb.nonNullable.group({
+              workspace_product_id: [item.workspace_product_id, [Validators.required, this.productValidator]],
+              quantity: [String(packs), [Validators.required, Validators.min(0.01)]],
+            }),
+          );
+        }
+        if (this.linesFormArray.length === 0) this.addLine();
+
+        const sendable = new Set(withEmail.map((s) => s.id));
+        this.form.patchValue({ supplierIds: job.supplier_ids.filter((id) => sendable.has(id)) });
+        this.isDataLoaded.set(true);
+        this.isLoadingRfq.set(false);
+      },
+      error: () => {
+        // The split is only a starting point: an empty RFQ form is still useful.
+        this.isLoadingRfq.set(false);
+        this.errorMessage.set(this.translate.instant('rfq.create.splitLoadError'));
+        this.loadCreateModeData();
+      },
+    });
   }
 
   private loadDuplicateData(fromId: string): void {
