@@ -18,7 +18,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { Subscription, interval, switchMap } from 'rxjs';
+import { Subscription, catchError, forkJoin, interval, map, of, switchMap } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Product, Supplier } from '../../../core/api/models';
@@ -221,6 +221,13 @@ export class BasketSplitComponent implements OnInit {
   }
 
   private pollSubscription: Subscription | null = null;
+  /** Bumped for every job that is opened, so a slow answer for an earlier one is dropped. */
+  private jobGeneration = 0;
+  private pollFailures = 0;
+  readonly jobNotFound = signal(false);
+  readonly pollFailed = signal(false);
+  /** The form was filled from an earlier job: the buyer should confirm the commercial settings. */
+  readonly rerunNotice = signal(false);
 
   ngOnInit(): void {
     this.loadSuppliersAndProducts();
@@ -235,12 +242,21 @@ export class BasketSplitComponent implements OnInit {
 
   loadSuppliersAndProducts(): void {
     this.isLoading.set(true);
-    this.api.suppliers({ limit: 100, status: 'active' }).subscribe({
-      next: (res) => {
-        this.suppliers.set(res.items);
-        if (res.items.length >= 2 && !this.supplierId1() && !this.supplierId2()) {
-          this.supplierId1.set(res.items[0].id);
-          this.supplierId2.set(res.items[1].id);
+    // The optimiser accepts active and preferred suppliers; both belong in the pickers.
+    forkJoin({
+      active: this.api.suppliers({ limit: 100, status: 'active' }),
+      preferred: this.api.suppliers({ limit: 100, status: 'preferred' }).pipe(
+        catchError(() => of({ items: [] as Supplier[], next_cursor: null })),
+      ),
+    }).subscribe({
+      next: ({ active, preferred }) => {
+        const byId = new Map<string, Supplier>();
+        for (const supplier of [...active.items, ...preferred.items]) byId.set(supplier.id, supplier);
+        const items = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+        this.suppliers.set(items);
+        if (items.length >= 2 && !this.supplierId1() && !this.supplierId2()) {
+          this.supplierId1.set(items[0].id);
+          this.supplierId2.set(items[1].id);
         }
         this.isLoading.set(false);
       },
@@ -359,6 +375,7 @@ export class BasketSplitComponent implements OnInit {
 
     this.isSubmitting.set(true);
     this.errorMessage.set(null);
+    this.rerunNotice.set(false);
 
     const s1 = this.supplierId1();
     const s2 = this.supplierId2();
@@ -386,6 +403,7 @@ export class BasketSplitComponent implements OnInit {
           this.isSubmitting.set(false);
           this.currentJob.set(job);
           this.router.navigate(['/offers/basket-split', job.id]);
+          this.openJob();
           this.pollJob(job.id);
         },
         error: (err: unknown) => {
@@ -421,17 +439,19 @@ export class BasketSplitComponent implements OnInit {
   }
 
   rerunOptimisation(): void {
-    const rfqId = this.currentJob()?.rfq_id;
+    const job = this.currentJob();
+    const rfqId = job?.rfq_id;
     if (rfqId) {
       if (!this.isWriter() || this.isSubmitting()) return;
       this.isSubmitting.set(true);
       this.errorMessage.set(null);
       this.rfqApi.splitRfq(rfqId).subscribe({
-        next: (job) => {
+        next: (next) => {
           this.isSubmitting.set(false);
-          this.currentJob.set(job);
-          this.router.navigate(['/offers/basket-split', job.id]);
-          this.pollJob(job.id);
+          this.currentJob.set(next);
+          this.router.navigate(['/offers/basket-split', next.id]);
+          this.openJob();
+          this.pollJob(next.id);
         },
         error: (err: unknown) => {
           this.isSubmitting.set(false);
@@ -440,16 +460,25 @@ export class BasketSplitComponent implements OnInit {
       });
       return;
     }
+    if (job) {
+      // The job response carries no risk tolerance, urgency, exclusions or weights, so a rerun
+      // cannot reproduce them. Put the job's suppliers and quantities back in the form and let
+      // the buyer confirm those settings rather than silently running with the defaults.
+      this.prefillFromJob(job);
+      return;
+    }
     this.submitBasket();
   }
 
   fetchJob(jobId: string): void {
+    const generation = this.openJob();
     this.isLoading.set(true);
     this.api
       .getBasketSplitJob(jobId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (job) => {
+          if (generation !== this.jobGeneration) return;
           this.currentJob.set(job);
           this.isLoading.set(false);
           if (job.rfq_id) {
@@ -465,45 +494,125 @@ export class BasketSplitComponent implements OnInit {
           }
         },
         error: (err: unknown) => {
+          if (generation !== this.jobGeneration) return;
           this.isLoading.set(false);
+          if (err instanceof HttpErrorResponse && err.status === 404) {
+            this.currentJob.set(null);
+            this.jobNotFound.set(true);
+            return;
+          }
           this.handleError(err);
         },
       });
+  }
+
+  /** Starts a fresh job view: the previous job's poll and late answers must not touch it. */
+  private openJob(): number {
+    this.stopPolling();
+    this.jobNotFound.set(false);
+    this.pollFailed.set(false);
+    this.pollFailures = 0;
+    return ++this.jobGeneration;
+  }
+
+  private stopPolling(): void {
+    this.pollSubscription?.unsubscribe();
+    this.pollSubscription = null;
+  }
+
+  retryPolling(): void {
+    const job = this.currentJob();
+    if (!job) return;
+    this.pollFailed.set(false);
+    this.pollFailures = 0;
+    this.pollJob(job.id);
   }
 
   private pollJob(jobId: string): void {
-    this.pollSubscription?.unsubscribe();
+    this.stopPolling();
+    const generation = this.jobGeneration;
 
     this.pollSubscription = interval(1500)
       .pipe(
-        switchMap(() => this.api.getBasketSplitJob(jobId)),
+        switchMap(() =>
+          // One failed poll must not end the stream: it is retried on the next tick.
+          this.api.getBasketSplitJob(jobId).pipe(
+            map((job) => ({ job, failure: null as unknown })),
+            catchError((failure: unknown) => of({ job: null, failure })),
+          ),
+        ),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe({
-        next: (job) => {
-          this.currentJob.set(job);
-          if (job.rfq_id && !this.rfqDetail()) {
-            this.rfqApi.getRfq(job.rfq_id).subscribe({
-              next: (detail) => this.rfqDetail.set(detail),
-              error: () => this.rfqDetail.set(null),
-            });
+      .subscribe(({ job, failure }) => {
+        if (generation !== this.jobGeneration) return;
+        if (!job) {
+          if (failure instanceof HttpErrorResponse && failure.status === 404) {
+            this.stopPolling();
+            this.currentJob.set(null);
+            this.jobNotFound.set(true);
+            return;
           }
-          if (job.status === 'completed' || job.status === 'failed') {
-            this.pollSubscription?.unsubscribe();
-            this.pollSubscription = null;
+          this.pollFailures += 1;
+          if (this.pollFailures >= 3) {
+            this.stopPolling();
+            this.pollFailed.set(true);
           }
-        },
-        error: (err: unknown) => {
-          this.pollSubscription?.unsubscribe();
-          this.pollSubscription = null;
-          this.handleError(err);
-        },
+          return;
+        }
+        this.pollFailures = 0;
+        this.currentJob.set(job);
+        if (job.rfq_id && !this.rfqDetail()) {
+          this.rfqApi.getRfq(job.rfq_id).subscribe({
+            next: (detail) => this.rfqDetail.set(detail),
+            error: () => this.rfqDetail.set(null),
+          });
+        }
+        if (job.status === 'completed' || job.status === 'failed') {
+          this.stopPolling();
+        }
       });
   }
 
+  /** Base units in one pack: the size saved on the job, else the product's, else unknown. */
+  private packBaseFor(job: BasketSplitJob, productId: string): number | null {
+    const saved = parseFloat(job.pack_snapshot?.[productId]?.base_quantity ?? '');
+    if (saved > 0) return saved;
+    return this.products().some((product) => product.id === productId)
+      ? this.packBaseQuantityFor(productId)
+      : null;
+  }
+
+  /** Quantities on the job are in base units; the form takes packs. */
+  private prefillFromJob(job: BasketSplitJob): void {
+    const packBases = job.items.map((item) => this.packBaseFor(job, item.workspace_product_id));
+    if (packBases.some((base) => base === null)) {
+      // Treating an unknown pack as one unit would turn base units into packs and inflate the rerun.
+      this.errorMessage.set(this.translate.instant('basketSplit.rerunPackUnknown'));
+      return;
+    }
+    const [first, second, ...rest] = job.supplier_ids;
+    this.supplierId1.set(first ?? '');
+    this.supplierId2.set(second ?? '');
+    this.additionalSupplierIds.set([...rest]);
+    this.items.set(
+      job.items.map((item, index) => ({
+        workspace_product_id: item.workspace_product_id,
+        quantity: String(Math.round((parseFloat(item.quantity) / packBases[index]!) * 1e6) / 1e6),
+      })),
+    );
+    this.stopPolling();
+    this.currentJob.set(null);
+    this.errorMessage.set(null);
+    this.hasAttemptedSubmit.set(false);
+    this.rerunNotice.set(true);
+  }
+
   resetForm(): void {
-    this.pollSubscription?.unsubscribe();
-    this.pollSubscription = null;
+    this.jobGeneration += 1;
+    this.stopPolling();
+    this.jobNotFound.set(false);
+    this.pollFailed.set(false);
+    this.rerunNotice.set(false);
     this.currentJob.set(null);
     this.errorMessage.set(null);
     this.hasAttemptedSubmit.set(false);
