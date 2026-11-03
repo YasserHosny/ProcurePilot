@@ -2,6 +2,7 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed, fakeAsync } from '@angular/core/testing';
 import { CompareComponent } from './compare.component';
 import { formatExactQuantity, formatLocaleNumber, FormatService } from '../../../core/format/format.service';
+import { parseIsoDateLocal } from '../../../core/format/iso-date';
 import {
   RfqApi,
   RfqDetail,
@@ -1082,9 +1083,93 @@ describe('CompareComponent (RFQ)', () => {
         expect(compare['splitBetweenSuppliers']).toBeTruthy();
         expect(compare['needsTwoMatched']).toBeTruthy();
         expect(compare['differentCurrencies']).toBeTruthy();
+        expect(compare['replyMixedCurrency']).toBeTruthy();
         expect(compare['alreadyConverted']).toBeTruthy();
         expect(compare['splitError']).toBeTruthy();
       }
+    });
+
+    it('mixed-currency reply next to a single-currency reply never gets the lowest-total badge and disables split with the translated reason', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      const respMixed: RfqResponseComparison = {
+        id: 'resp-mixed',
+        rfq_id: 'rfq-1',
+        supplier_id: 'supp-mixed',
+        quotation_id: 'quote-mixed',
+        quotation_status: 'reviewed',
+        submitted_at: '2026-09-25T10:00:00Z',
+        lines: [
+          {
+            workspace_product_id: 'prod-1',
+            original_text: 'Product 1',
+            quoted_quantity: '10',
+            quoted_unit_price_amount: '5.00',
+            quoted_unit_price_currency: 'USD',
+            pending_match: false,
+          },
+          {
+            workspace_product_id: 'prod-2',
+            original_text: 'Product 2',
+            quoted_quantity: '20',
+            quoted_unit_price_amount: '10.00',
+            quoted_unit_price_currency: 'EUR',
+            pending_match: false,
+          },
+        ],
+        guardrail_evaluations: [],
+      };
+
+      const respSingle: RfqResponseComparison = {
+        id: 'resp-single',
+        rfq_id: 'rfq-1',
+        supplier_id: 'supp-single',
+        quotation_id: 'quote-single',
+        quotation_status: 'reviewed',
+        submitted_at: '2026-09-25T11:00:00Z',
+        lines: [
+          {
+            workspace_product_id: 'prod-1',
+            original_text: 'Product 1',
+            quoted_quantity: '10',
+            quoted_unit_price_amount: '20.00',
+            quoted_unit_price_currency: 'SAR',
+            pending_match: false,
+          },
+          {
+            workspace_product_id: 'prod-2',
+            original_text: 'Product 2',
+            quoted_quantity: '20',
+            quoted_unit_price_amount: '40.00',
+            quoted_unit_price_currency: 'SAR',
+            pending_match: false,
+          },
+        ],
+        guardrail_evaluations: [],
+      };
+
+      component.responses.set([respMixed, respSingle]);
+      fixture.detectChanges();
+
+      expect(component.hasLowestTotal(respMixed)).toBeFalse();
+      expect(component.lowestTotalResponseIds().has(respMixed.id)).toBeFalse();
+      const compiled = fixture.nativeElement as HTMLElement;
+      const bestChips = compiled.querySelectorAll('.pp-chip-best');
+      for (const chip of Array.from(bestChips)) {
+        const card = chip.closest('.response-card');
+        expect(card?.textContent).not.toContain('supp-mixed');
+      }
+
+      expect(component.splitEligibility().canSplit).toBeFalse();
+      const splitBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitBtn?.disabled).toBeTrue();
+
+      const reason = compiled.querySelector('[data-testid="split-disabled-reason"]');
+      expect(reason?.textContent).toContain(
+        translate.instant('rfq.compare.replyMixedCurrency'),
+      );
     });
   });
 
@@ -1938,6 +2023,54 @@ describe('CompareComponent (RFQ)', () => {
       fixture.detectChanges();
 
       expect(component.responses()[0].id).toBe('resp-B');
+    }));
+
+    it('detail Retry pending, id changes to B, A retry resolves -> B detail and requiredByDate are unchanged', fakeAsync(() => {
+      const detailARetry$ = new Subject<RfqDetail>();
+      const detailB: RfqDetail = {
+        rfq: {
+          ...sentDetail.rfq,
+          id: 'rfq-B',
+          needed_by_date: '2026-11-15',
+        },
+        lines: [],
+        recipients: [],
+      };
+      const detailA: RfqDetail = {
+        rfq: {
+          ...sentDetail.rfq,
+          id: 'rfq-A',
+          needed_by_date: '2026-10-20',
+        },
+        lines: [],
+        recipients: [],
+      };
+
+      mockRfqApi.getRfq.and.callFake((id: string) => {
+        if (id === 'rfq-A') return detailARetry$;
+        if (id === 'rfq-B') return of(detailB);
+        return of(sentDetail);
+      });
+      mockRfqApi.listResponses.and.returnValue(of({ items: [] }));
+
+      component.rfqId.set('rfq-A');
+      component.rfqDetailError.set(true);
+
+      component.reloadRfqDetail();
+
+      component.loadData('rfq-B');
+      fixture.detectChanges();
+
+      const dateB = parseIsoDateLocal('2026-11-15')!;
+      expect(component.rfqDetail()).toEqual(detailB);
+      expect(component.requiredByDate()).toEqual(dateB);
+
+      detailARetry$.next(detailA);
+      detailARetry$.complete();
+      fixture.detectChanges();
+
+      expect(component.rfqDetail()).toEqual(detailB);
+      expect(component.requiredByDate()).toEqual(dateB);
     }));
 
     it('branches failure shows the warning with Retry and Prepare disabled', fakeAsync(() => {

@@ -41,7 +41,7 @@ import { MatchResolutionCandidatesComponent } from './match-resolution-candidate
 import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS } from './correct-match-dialog.component';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
-import { formatSweptLinesMessage, appendSweptMessage } from '../matching-api';
+import { formatSweptLinesMessage, appendSweptMessage, CorrectionKeyManager } from '../matching-api';
 
 @Component({
   selector: 'app-match-resolution',
@@ -108,7 +108,10 @@ export class MatchResolutionComponent implements OnInit {
   readonly dependentLinesCount = signal<number>(0);
   readonly aliasConflictNotice = signal<boolean>(false);
   readonly isReloadable = signal<boolean>(false);
-  private correctionKey: string | null = null;
+  private readonly correctionKeys = new CorrectionKeyManager();
+  private currentLoadedLineId: string | null = null;
+  private latestLoadTaskId = 0;
+  private latestLandedCostRequestId = 0;
   private resolutionKey: string | null = null;
 
   isWriter(): boolean {
@@ -254,20 +257,31 @@ export class MatchResolutionComponent implements OnInit {
   }
 
   loadTask(id: string): void {
+    const requestId = ++this.latestLoadTaskId;
+    this.latestLandedCostRequestId++;
+    if (this.currentLoadedLineId !== id) {
+      this.correctionKeys.clear();
+      this.currentLoadedLineId = id;
+    }
     this.resolutionKey = null;
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
+    this.dependentLinesCount.set(0);
+    this.aliasConflictNotice.set(false);
 
     this.api.getMatchTaskForLine(id).subscribe({
       next: (task) => {
+        if (requestId !== this.latestLoadTaskId) return;
         this.quotationId.set(task.quotation.id);
         this.applyTask(task);
       },
       error: (err: unknown) => {
+        if (requestId !== this.latestLoadTaskId) return;
         if (err instanceof HttpErrorResponse && err.status === 404 && this.api.getMatchTasks) {
           this.api.getMatchTasks({ status: 'all', limit: 100 }).subscribe({
             next: (res) => {
+              if (requestId !== this.latestLoadTaskId) return;
               const matched = res.items.find((item) => item.id === id || item.quotation_line.id === id);
               if (matched && matched.quotation_line.id !== id) {
                 this.loadTask(matched.quotation_line.id);
@@ -276,9 +290,10 @@ export class MatchResolutionComponent implements OnInit {
               this.isLoading.set(false);
               this.handleError(err);
             },
-            error: () => {
+            error: (fallbackErr: unknown) => {
+              if (requestId !== this.latestLoadTaskId) return;
               this.isLoading.set(false);
-              this.handleError(err);
+              this.handleError(fallbackErr);
             },
           });
           return;
@@ -328,12 +343,15 @@ export class MatchResolutionComponent implements OnInit {
   }
 
   private loadLandedCost(lineId: string): void {
+    const costRequestId = ++this.latestLandedCostRequestId;
     this.api.getLandedCost(lineId).subscribe({
       next: (cost) => {
+        if (costRequestId !== this.latestLandedCostRequestId) return;
         this.landedCost.set(cost);
         this.isLoading.set(false);
       },
       error: () => {
+        if (costRequestId !== this.latestLandedCostRequestId) return;
         this.isLoading.set(false);
       },
     });
@@ -603,6 +621,43 @@ export class MatchResolutionComponent implements OnInit {
     return Math.round(num * 100);
   }
 
+  formatVatRate(rate: string | number | null | undefined): string {
+    if (rate == null || rate === '') return '';
+    let str = String(rate).trim();
+    if (!str) return '';
+    if (str.endsWith('%')) {
+      str = str.slice(0, -1).trim();
+    }
+
+    const isNegative = str.startsWith('-');
+    const unsigned = isNegative ? str.slice(1) : str;
+    const parts = unsigned.split('.');
+
+    const whole = parts[0] || '0';
+    let fraction = parts[1] || '';
+
+    // Decimal-safe multiply by 100 by shifting decimal point 2 places to the right
+    fraction = fraction.padEnd(2, '0');
+    const shiftedWhole = (whole === '0' ? '' : whole) + fraction.slice(0, 2);
+    const shiftedFraction = fraction.slice(2);
+
+    let resultWhole = shiftedWhole.replace(/^0+/, '');
+    if (resultWhole === '') {
+      resultWhole = '0';
+    }
+
+    const resultFraction = shiftedFraction.replace(/0+$/, '');
+    const sign = isNegative ? '-' : '';
+    const result = resultFraction ? `${resultWhole}.${resultFraction}` : resultWhole;
+    return `${sign}${result}%`;
+  }
+
+  isDiscountNonZero(discount?: { amount: string | number } | null): boolean {
+    if (!discount || discount.amount == null) return false;
+    const num = typeof discount.amount === 'number' ? discount.amount : parseFloat(discount.amount);
+    return !isNaN(num) && num !== 0;
+  }
+
   shouldShowSemanticSignal(candidate: MatchCandidate): boolean {
     return candidate.embedding_model !== 'stub-hash-v1';
   }
@@ -615,8 +670,6 @@ export class MatchResolutionComponent implements OnInit {
     const dec = this.decision();
     const l = this.line();
     if (!dec || !l || !this.isWriter()) return;
-
-    this.correctionKey = crypto.randomUUID();
 
     const dialogRef = this.dialog.open(CorrectMatchDialogComponent, {
       width: '640px',
@@ -640,6 +693,9 @@ export class MatchResolutionComponent implements OnInit {
   executeCorrection(lineId: string, payload: MatchCorrectionRequest): void {
     if (!this.isWriter()) return;
 
+    const startLoadTaskId = this.latestLoadTaskId;
+    const startLineId = this.currentLoadedLineId ?? this.line()?.id ?? lineId;
+
     this.isSubmitting.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
@@ -648,14 +704,17 @@ export class MatchResolutionComponent implements OnInit {
     this.aliasConflictNotice.set(false);
     this.isReloadable.set(false);
 
-    this.correctionKey ??= crypto.randomUUID();
-    const key = this.correctionKey;
+    const key = this.correctionKeys.getKey(payload);
+
+    const hasBuyerMoved = (): boolean => {
+      const currentLineId = this.currentLoadedLineId ?? this.line()?.id ?? lineId;
+      return this.latestLoadTaskId !== startLoadTaskId || currentLineId !== startLineId;
+    };
 
     this.api.correctMatch(lineId, payload, key).subscribe({
       next: (res) => {
         this.isSubmitting.set(false);
-        this.correctionKey = null;
-        this.decision.set(res.decision);
+        this.correctionKeys.recordSuccess();
 
         const baseMsg = this.translate.instant('matching.resolution.actions.correctSuccess');
         const swept = formatSweptLinesMessage(this.translate, res.lines_matched_by_same_wording);
@@ -665,6 +724,10 @@ export class MatchResolutionComponent implements OnInit {
           undefined,
           { duration: 3500 },
         );
+
+        if (hasBuyerMoved()) {
+          return;
+        }
 
         this.loadTask(lineId);
         this.decision.set(res.decision);
@@ -679,6 +742,9 @@ export class MatchResolutionComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.isSubmitting.set(false);
+        if (hasBuyerMoved()) {
+          return;
+        }
         this.handleCorrectionError(err);
       },
     });

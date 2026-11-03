@@ -62,3 +62,25 @@ export function appendSweptMessage(base: string, swept: string): string {
   const sep = trimmed.endsWith('.') || trimmed.endsWith('۔') || trimmed.endsWith('!') ? ' ' : '. ';
   return `${trimmed}${sep}${swept}`;
 }
+
+export class CorrectionKeyManager {
+  private lastAttempt: { serialized: string; key: string } | null = null;
+
+  getKey(request: MatchCorrectionRequest): string {
+    const serialized = JSON.stringify(request);
+    if (this.lastAttempt && this.lastAttempt.serialized === serialized) {
+      return this.lastAttempt.key;
+    }
+    const key = crypto.randomUUID();
+    this.lastAttempt = { serialized, key };
+    return key;
+  }
+
+  recordSuccess(): void {
+    this.lastAttempt = null;
+  }
+
+  clear(): void {
+    this.lastAttempt = null;
+  }
+}

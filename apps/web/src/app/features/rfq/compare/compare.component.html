@@ -169,6 +169,8 @@
                   {{ matchLinesLabel(splitEligibility().unmatchedCount) }}
                 </a>
               }
+            } @else if (splitEligibility().reason === 'reply_mixed_currency') {
+              <span>{{ 'rfq.compare.replyMixedCurrency' | translate }}</span>
             } @else if (splitEligibility().reason === 'mixed_currency') {
               <span>{{ 'rfq.compare.differentCurrencies' | translate }}</span>
             }
