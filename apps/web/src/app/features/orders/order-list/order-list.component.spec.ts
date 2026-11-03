@@ -40,7 +40,7 @@ describe('OrderListComponent', () => {
       orders: {
         title: 'Order Tracking', subtitle: 'Orders', refresh: 'Refresh', retry: 'Retry', loadMore: 'Load more',
         loadError: 'Load failed', open: 'Open', orderDate: 'Ordered {{date}}', createdDate: 'Created {{date}}', lineCount: '{{count}} line(s)',
-        createButton: 'Create Order', fromApprovedRequest: 'From approved request', resultCount: '{{count}} orders',
+        createButton: 'Create Order', fromApprovedRequest: 'From approved request', resultCount: '{{count}} orders', expectedDate: 'Expected {{date}}',
         fromApprovedRequestEmpty: 'No approved requests available.',
         status: { submitted: 'Submitted', draft: 'Draft' }, empty: { title: 'Empty', description: 'No orders' },
       },
@@ -399,5 +399,25 @@ describe('OrderListComponent', () => {
     http.expectOne('/api/v1/orders?limit=50&cursor=50').flush({ items: [orderRow('o2', 'PO-2')], next_cursor: null, total_count: 80 });
     expect(component.orders().map((o) => o.id)).toEqual(['o1', 'o2']);
     expect(component.totalCount()).toBe(80);
+  });
+  // P-188: the list showed neither the expected delivery date nor which orders are late.
+  it('shows the expected delivery date and flags only late open orders', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({
+      next_cursor: null, total_count: 3,
+      items: [
+        { ...orderRow('late', 'PO-LATE'), expected_delivery_date: '2020-01-01' },
+        { ...orderRow('done', 'PO-DONE'), expected_delivery_date: '2020-01-01', status: 'received' },
+        { ...orderRow('soon', 'PO-SOON'), expected_delivery_date: '2999-01-01' },
+      ],
+    });
+    fixture.detectChanges();
+
+    const rows = Array.from(el().querySelectorAll('.order-row')) as HTMLElement[];
+    const by = (n: string) => rows.find((r) => r.textContent?.includes(n))!;
+    expect(by('PO-LATE').querySelector('[data-testid="order-overdue"]')).toBeTruthy();
+    expect(by('PO-DONE').querySelector('[data-testid="order-overdue"]')).toBeNull();
+    expect(by('PO-SOON').querySelector('[data-testid="order-overdue"]')).toBeNull();
+    expect(by('PO-SOON').querySelector('[data-testid="order-expected"]')?.textContent).toContain('2999');
   });
 });

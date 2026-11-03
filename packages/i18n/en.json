@@ -3814,7 +3814,11 @@
         "order_not_open_for_evidence": "This order is a draft, cancelled or closed, so it cannot take delivery or confirmation evidence.",
         "order_not_cancellable": "This order is already fully received or closed, so it can no longer be cancelled.",
         "order_already_cancelled": "This order is already cancelled."
-      }
+      },
+      "overdue": "Overdue",
+      "exportCsv": "Export CSV",
+      "print": "Print",
+      "receiveAll": "Receive all remaining"
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",
@@ -3837,7 +3841,9 @@
       "total_asc": "Total, lowest",
       "order_number_asc": "Order number, A to Z",
       "order_number_desc": "Order number, Z to A"
-    }
+    },
+    "expectedDate": "Expected {{date}}",
+    "overdue": "Overdue"
   },
   "accounting": {
     "nav": "Accounting",
