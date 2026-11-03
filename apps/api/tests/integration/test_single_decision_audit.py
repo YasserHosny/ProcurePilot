@@ -176,7 +176,8 @@ def test_audit_failure_rolls_back_decision_and_outbox(
     ws, rid, _ = seed(conn)
     with api_as(conn, monkeypatch, ws, fail_audit=True) as client:
         response = client.post(f"/api/v1/requests/{rid}/{action}", json={"comment": "Reason"})
-        assert response.status_code >= 500, response.text
+        assert response.status_code == 503, response.text
+        assert response.json()["details"] == {"dependency": "database"}
     assert state(conn, rid) == (("submitted", "pending", None), [], [])
 
 

@@ -3061,75 +3061,80 @@ class RequestsService:
             "role": "authenticated",
             "member_role": member.role.value,
         }
-        with db.connect(self._settings.database_url.get_secret_value()) as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute("set local role authenticated")
-                cur.execute(
-                    "select set_config('request.jwt.claims', %s, true)",
-                    (json.dumps(claims),),
-                )
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute("set local role authenticated")
+                    cur.execute(
+                        "select set_config('request.jwt.claims', %s, true)",
+                        (json.dumps(claims),),
+                    )
 
-                # Same authoritative guard the previous (non-atomic) version used: if a concurrent
-                # withdrawal already flipped the request's status, this matches zero rows and we
-                # raise before touching the step or writing a notification, leaving the step
-                # `pending` rather than stranding a `decided` step on a non-submitted request.
-                #
-                # An approved request lands directly on `ordered`, not `approved` (chunk R2.3,
-                # specs/010-mobile-approvals-receipt/research.md R1) — there is no separate
-                # "place the order" human action this release, so the same decision that approves
-                # a request is also what marks it ordered. `approval_step.status` and the audit
-                # action below still record the human's actual decision ("approved"), unchanged;
-                # only `purchase_request.status` itself takes the new terminal value.
-                decided_request, decided_step = self._apply_request_decision(
-                    cur,
-                    member=member,
-                    request_id=request_id,
-                    step_id=step_id,
-                    decision=decision,
-                    request_status="ordered" if decision == "approved" else decision,
-                    comment=comment,
-                    now=now,
-                )
+                    # Same authoritative guard the previous (non-atomic) version used: if a
+                    # concurrent withdrawal already flipped the request's status, this matches zero
+                    # rows and we raise before touching the step or writing a notification, leaving
+                    # the step `pending` rather than stranding a `decided` step on a non-submitted
+                    # request.
+                    #
+                    # An approved request lands directly on `ordered`, not `approved` (chunk R2.3,
+                    # specs/010-mobile-approvals-receipt/research.md R1) — there is no separate
+                    # "place the order" human action this release, so the same decision that
+                    # approves a request is also what marks it ordered. `approval_step.status` and
+                    # the audit action below still record the human's actual decision ("approved"),
+                    # unchanged; only `purchase_request.status` itself takes the new terminal value.
+                    decided_request, decided_step = self._apply_request_decision(
+                        cur,
+                        member=member,
+                        request_id=request_id,
+                        step_id=step_id,
+                        decision=decision,
+                        request_status="ordered" if decision == "approved" else decision,
+                        comment=comment,
+                        now=now,
+                    )
 
-                target = {
-                    "purchase_request_id": request_id,
-                    "approval_step_id": str(decided_step["id"]),
-                    "decided_by_membership_id": str(member.membership_id),
-                }
-                if comment is not None:
-                    target["comment"] = comment
-                cur.execute(
-                    "select record_audit_event(%s,'success',%s,%s,%s,%s,%s)",
-                    (
-                        f"requests.approval_step_{decision}",
-                        member.tenant_id,
-                        member.membership_id,
-                        member.email,
-                        Jsonb(target),
-                        get_trace_id(),
-                    ),
-                )
+                    target = {
+                        "purchase_request_id": request_id,
+                        "approval_step_id": str(decided_step["id"]),
+                        "decided_by_membership_id": str(member.membership_id),
+                    }
+                    if comment is not None:
+                        target["comment"] = comment
+                    cur.execute(
+                        "select record_audit_event(%s,'success',%s,%s,%s,%s,%s)",
+                        (
+                            f"requests.approval_step_{decision}",
+                            member.tenant_id,
+                            member.membership_id,
+                            member.email,
+                            Jsonb(target),
+                            get_trace_id(),
+                        ),
+                    )
 
-                cur.execute("set local role service_role")
-                cur.execute(
-                    """
-                    insert into push_notification (tenant_id, purchase_request_id, member_id)
-                    values (%s, %s, %s)
-                    returning id
-                    """,
-                    (
-                        str(member.tenant_id),
-                        request_id,
-                        str(decided_request["requested_by_membership_id"]),
-                    ),
-                )
-                notification_row = cur.fetchone()
-                notification_id = (
-                    UUID(str(notification_row["id"])) if notification_row is not None else None
-                )
-            # Exiting the `with db.connect(...)` block here commits all writes above
-            # atomically (or rolls all of them back if any exception was raised) — psycopg's own
-            # connection context manager semantics, the same ones `devices/service.py` relies on.
+                    cur.execute("set local role service_role")
+                    cur.execute(
+                        """
+                        insert into push_notification (tenant_id, purchase_request_id, member_id)
+                        values (%s, %s, %s)
+                        returning id
+                        """,
+                        (
+                            str(member.tenant_id),
+                            request_id,
+                            str(decided_request["requested_by_membership_id"]),
+                        ),
+                    )
+                    notification_row = cur.fetchone()
+                    notification_id = (
+                        UUID(str(notification_row["id"])) if notification_row is not None else None
+                    )
+                # Exiting the `with db.connect(...)` block here commits all writes above
+                # atomically (or rolls all of them back if any exception was raised) — psycopg's
+                # own connection context manager semantics, the same ones `devices/service.py`
+                # relies on.
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return dict(decided_request), dict(decided_step), notification_id
 
     def _purchase_request_with_budget_status(

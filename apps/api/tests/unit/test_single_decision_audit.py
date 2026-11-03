@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 from uuid import uuid4
 
+import psycopg
 import pytest
 from unit.test_approval_decisions import (
     member,
@@ -13,7 +14,11 @@ from unit.test_approval_decisions import (
     step_row,
 )
 
-from procurepilot_api.errors import UnprocessableEntityError
+from procurepilot_api.errors import (
+    ConflictError,
+    ServiceUnavailableError,
+    UnprocessableEntityError,
+)
 from procurepilot_api.modules.requests import service as module
 from procurepilot_api.modules.requests.schemas import ApprovalDecisionInput
 from procurepilot_api.modules.requests.service import RequestsService
@@ -179,3 +184,74 @@ def test_audit_is_part_of_decision_transaction(
             "decided_by_membership_id": str(actor.membership_id),
             "comment": "Reason",
         }
+
+
+def test_decide_and_notify_translates_database_error_and_preserves_conflict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from collections.abc import Iterator
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+
+    actor = member()
+    rid, sid = uuid4(), uuid4()
+    service = RequestsService()
+    kwargs = dict(
+        member=actor,
+        request_id=str(rid),
+        step_id=str(sid),
+        decision="approved",
+        comment="Reason",
+        now="2026-11-03T00:00:00Z",
+    )
+
+    class ErrorCursor:
+        def __enter__(self) -> ErrorCursor:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            pass
+
+        def execute(self, *_: object, **__: object) -> None:
+            raise psycopg.OperationalError("database error")
+
+        def fetchone(self) -> dict[str, object] | None:
+            return None
+
+    @contextmanager
+    def connect_with_error(*_: object, **__: object) -> Iterator[object]:
+        yield SimpleNamespace(cursor=lambda **_: ErrorCursor())
+
+    monkeypatch.setattr(module.db, "connect", connect_with_error)
+    with pytest.raises(ServiceUnavailableError) as exc:
+        service._decide_and_notify(**kwargs)
+    assert exc.value.status_code == 503
+    assert exc.value.details == {"dependency": "database"}
+    assert isinstance(exc.value.__cause__, psycopg.Error)
+
+    class PassthroughCursor:
+        def __enter__(self) -> PassthroughCursor:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            pass
+
+        def execute(self, *_: object, **__: object) -> None:
+            pass
+
+        def fetchone(self) -> dict[str, object] | None:
+            return None
+
+    @contextmanager
+    def connect_ok(*_: object, **__: object) -> Iterator[object]:
+        yield SimpleNamespace(cursor=lambda **_: PassthroughCursor())
+
+    def raise_conflict(*_: object, **__: object) -> tuple[dict, dict]:
+        raise ConflictError(details={"reason": "no_pending_approval"})
+
+    monkeypatch.setattr(module.db, "connect", connect_ok)
+    monkeypatch.setattr(service, "_apply_request_decision", raise_conflict)
+    with pytest.raises(ConflictError) as exc:
+        service._decide_and_notify(**kwargs)
+    assert exc.value.status_code == 409
+    assert exc.value.details == {"reason": "no_pending_approval"}
