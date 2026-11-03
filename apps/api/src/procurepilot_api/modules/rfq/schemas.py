@@ -158,8 +158,8 @@ class GuardrailCreateInput(BaseModel):
     max_order_value_currency: str
     supplier_allowlist: list[UUID] | None = None
     category_allowlist: list[str] | None = None
-    min_response_count: int = 1
-    max_price_variance_pct: Decimal
+    min_response_count: int = Field(default=1, ge=1)
+    max_price_variance_pct: Decimal = Field(ge=0, le=1)
     default_branch_id: UUID
     default_cost_centre_id: UUID | None = None
     enabled: bool = True
@@ -177,11 +177,26 @@ class GuardrailUpdateInput(BaseModel):
     max_order_value_currency: str | None = None
     supplier_allowlist: list[UUID] | None = None
     category_allowlist: list[str] | None = None
-    min_response_count: int | None = None
-    max_price_variance_pct: Decimal | None = None
+    min_response_count: int | None = Field(default=None, ge=1)
+    max_price_variance_pct: Decimal | None = Field(default=None, ge=0, le=1)
     default_branch_id: UUID | None = None
     default_cost_centre_id: UUID | None = None
     enabled: bool | None = None
+
+    @field_validator(
+        "min_response_count",
+        "max_price_variance_pct",
+        "max_order_value_amount",
+        "max_order_value_currency",
+        "enabled",
+        mode="before",
+    )
+    @classmethod
+    def reject_explicit_null(cls, value: object) -> object:
+        # Omitted fields keep their defaults and are excluded from the PATCH update.
+        if value is None:
+            raise ValueError("Field may not be null")
+        return value
 
     @field_validator("max_order_value_currency")
     @classmethod
