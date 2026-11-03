@@ -33,6 +33,8 @@ SOLVER_VERSION = "basket-split-cp-sat-v1"
 ADVANCED_SOLVER_VERSION = "advanced-basket-cp-sat-v1"
 MONEY_QUANT = Decimal("0.0001")
 INT_SCALE = Decimal("10000")
+URGENT_DAY_COST_RATE = Decimal("0.01")  # of the line's landed cost, per day of lead time
+URGENT_UNKNOWN_LEAD_DAYS = 7
 
 
 def solve_two_supplier_split(
@@ -138,6 +140,16 @@ def solve_advanced_basket(
             description="deterministic tie-break by supplier_id, then offer_id",
         )
     )
+    if request.urgency == "urgent":
+        applied.append(
+            AppliedConstraint(
+                kind="urgency",
+                description=(
+                    "urgent: each day of lead time is costed at 1% of the line "
+                    "(an unknown lead time counts as 7 days)"
+                ),
+            )
+        )
     applied.extend(_supplier_term_applied_constraints(input_payload.supplier_terms))
     risk_notes = _risk_notes(risks_by_supplier.values())
     max_risk = request.hard_constraints.max_supplier_risk_decimal
@@ -587,6 +599,12 @@ def _weighted_offer_cost(
         * 10000
     )
     lead_time = Decimal(offer.lead_time_days or 0) * Decimal(weights.lead_time) * 100
+    if request.urgency == "urgent":
+        # Urgent baskets cost each day of lead time at about 1% of the line, and treat an
+        # unknown lead time as a week, so a slightly dearer fast supplier can win.
+        known = offer.lead_time_days
+        days = known if known is not None else URGENT_UNKNOWN_LEAD_DAYS
+        lead_time += Decimal(days) * URGENT_DAY_COST_RATE * Decimal(_money_int(offer.amount))
     quality = Decimal(weights.quality) * (
         Decimal("5000") if risk is not None and risk.insufficient_evidence else Decimal("0")
     )
