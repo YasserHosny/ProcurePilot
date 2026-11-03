@@ -1287,6 +1287,8 @@
   },
   "matching": {
     "queue": {
+      "resultSummary": "البنود المعروضة: {{lines}} · عروض الأسعار: {{quotations}}",
+      "quotationIdLabel": "عرض السعر {{id}}",
       "title": "قائمة مهام مطابقة البنود",
       "subtitle": "مراجعة وتسوية بنود عروض الأسعار التي تتطلب قرارات مطابقة بشرية أو إضافة منتجات جديدة.",
       "readOnlyBadge": "صلاحية للقراءة فقط",
@@ -1654,6 +1656,7 @@
       "reliabilityNotEnoughData": "لا توجد بيانات كافية (محايد)"
     },
     "table": {
+        "ariaLabel": "مقارنة عروض الموردين",
       "supplier": "المورد",
       "normalisedUnitPrice": "سعر الوحدة",
       "landedCostTotal": "إجمالي التكلفة الواصلة",

@@ -202,8 +202,14 @@
     </section>
   }
 
+  <div class="visually-hidden" data-testid="queue-result-summary" role="status" aria-live="polite">
+    @if (isLoading() === false && tasksLoadFailed() === false) {
+      {{ 'matching.queue.resultSummary' | translate: { lines: tasks().length, quotations: groups().length } }}
+    }
+  </div>
+
   @if (isLoading()) {
-    <div class="loading-state">
+    <div class="loading-state" role="status">
       <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
       <span>{{ 'common.loading' | translate }}</span>
     </div>
@@ -245,7 +251,13 @@
             <div class="group-heading">
               <div class="group-title-row">
                 <h2>{{ group.quotation.supplier_name || ('matching.queue.unknownSupplier' | translate) }}</h2>
-                <span class="quotation-badge" [matTooltip]="group.quotation.id">{{ truncateId(group.quotation.id) }}</span>
+                <span
+                  class="quotation-badge"
+                  tabindex="0"
+                  [matTooltip]="group.quotation.id"
+                  [attr.aria-label]="'matching.queue.quotationIdLabel' | translate: { id: group.quotation.id }"
+                  >{{ truncateId(group.quotation.id) }}</span
+                >
               </div>
               <p class="source-reference">
                 <mat-icon aria-hidden="true">description</mat-icon>

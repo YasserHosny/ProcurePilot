@@ -1287,6 +1287,8 @@
   },
   "matching": {
     "queue": {
+      "resultSummary": "Lines shown: {{lines}} · Quotations: {{quotations}}",
+      "quotationIdLabel": "Quotation {{id}}",
       "title": "Match Resolution Queue",
       "subtitle": "Review and resolve quotation lines requiring product matching decisions or catalogue additions.",
       "readOnlyBadge": "Read-Only Access",
@@ -1654,6 +1656,7 @@
       "reliabilityNotEnoughData": "Not enough data (neutral)"
     },
     "table": {
+        "ariaLabel": "Supplier offers comparison",
       "supplier": "Supplier",
       "normalisedUnitPrice": "Unit Price",
       "landedCostTotal": "Total Landed Cost",
