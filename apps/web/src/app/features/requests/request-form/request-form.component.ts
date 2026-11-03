@@ -15,7 +15,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, RouterLink, convertToParamMap } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { EMPTY, defer, forkJoin, of, Subscription, type Observable } from 'rxjs';
+import { EMPTY, combineLatest, defer, forkJoin, of, Subscription, type Observable } from 'rxjs';
 import { catchError, distinctUntilChanged, expand, finalize, reduce, switchMap, tap } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -214,10 +214,14 @@ export class RequestFormComponent implements OnInit {
     return false;
   });
 
+  readonly duplicateSourceStatus = signal<PurchaseRequest['status'] | null>(null);
+  private currentDuplicateFrom: string | null = null;
+
   private resetState(): void {
     this.allocationsSub?.unsubscribe();
     this.allocationsSub = undefined;
     this.existingRequest.set(null);
+    this.duplicateSourceStatus.set(null);
     this.form.reset({ branch_id: '', cost_centre_id: '', required_by_date: null });
     this.form.enable();
     this.lines.clear();
@@ -338,14 +342,19 @@ export class RequestFormComponent implements OnInit {
       takeUntilDestroyed(this.destroyRef),
     );
 
-    paramMap$
+    const queryParamMap$ = this.route.queryParamMap ?? of(this.route.snapshot?.queryParamMap ?? convertToParamMap({}));
+
+    combineLatest([paramMap$, queryParamMap$])
       .pipe(
-        switchMap((params) => {
+        switchMap(([params, queryParams]) => {
           const requestId = params.get('id');
-          if (this.currentRequestId !== undefined && this.currentRequestId === requestId) {
+          const duplicateFrom = requestId ? null : queryParams.get('duplicate_from');
+          if (this.currentRequestId !== undefined && this.currentRequestId === requestId
+            && this.currentDuplicateFrom === duplicateFrom) {
             return of(null);
           }
           this.currentRequestId = requestId;
+          this.currentDuplicateFrom = duplicateFrom;
           this.resetState();
           this.isLoading.set(true);
 
@@ -355,8 +364,9 @@ export class RequestFormComponent implements OnInit {
             this.loadMembers();
           }
 
-          const req$: Observable<unknown> = requestId ? this.loadRequest(requestId) : of(null);
-          const load$: Observable<unknown> = refDataLoaded ? req$ : forkJoin({ ref: refData$, req: req$ });
+          const req$: Observable<unknown> = requestId ? this.loadRequest(requestId)
+            : duplicateFrom ? this.loadDuplicate(duplicateFrom) : of(null);
+          const load$: Observable<unknown> = refDataLoaded ? req$ : refData$.pipe(switchMap(() => req$));
 
           return load$.pipe(
             catchError((err: unknown) => {
@@ -434,6 +444,8 @@ export class RequestFormComponent implements OnInit {
         this.isEditMode.set(true);
         this.form.markAsPristine();
         this.currentRequestId = saved.id;
+        this.currentDuplicateFrom = null;
+        this.duplicateSourceStatus.set(null);
         this.savedLineMeta.clear();
         for (let i = 0; i < this.lines.length; i++) {
           const group = this.lines.at(i);
@@ -555,7 +567,33 @@ export class RequestFormComponent implements OnInit {
     });
   }
 
-  private performWithdrawal(req: PurchaseRequest): void {
+  discardDraft(): void {
+    const req = this.existingRequest();
+    if (!req || req.status !== 'draft' || req.request_group) {
+      return;
+    }
+    this.dialog.open(CatalogueConfirmDialogComponent, {
+      data: {
+        titleKey: 'requests.discard.title',
+        messageKey: 'requests.discard.message',
+        confirmKey: 'requests.discard.confirm',
+        isDestructive: true,
+      },
+    }).afterClosed().subscribe((confirmed: boolean) => {
+      if (confirmed) {
+        this.performWithdrawal(req, 'requests.discard.success');
+      }
+    });
+  }
+
+  duplicateRequest(): void {
+    const req = this.existingRequest();
+    if (req?.status === 'withdrawn' || req?.status === 'rejected') {
+      this.router.navigate(['/requests/new'], { queryParams: { duplicate_from: req.id } });
+    }
+  }
+
+  private performWithdrawal(req: PurchaseRequest, successKey = `${I18N}.withdrawSuccess`): void {
     const isGroup = !!req.request_group;
 
     if (!this.withdrawIdempotencyKey) {
@@ -570,7 +608,7 @@ export class RequestFormComponent implements OnInit {
     withdrawObs$.subscribe({
       next: () => {
         this.withdrawIdempotencyKey = null;
-        this.snackBar.open(this.translate.instant(`${I18N}.withdrawSuccess`), undefined, {
+        this.snackBar.open(this.translate.instant(successKey), undefined, {
           duration: 3500,
         });
         this.router.navigate(['/requests']);
@@ -711,6 +749,32 @@ export class RequestFormComponent implements OnInit {
     ).pipe(
       catchError(() => of<Product[]>([])),
       tap((items) => this.products.set(items)),
+    );
+  }
+
+  private loadDuplicate(requestId: string): Observable<PurchaseRequest | null> {
+    return this.requestsApi.getRequest(requestId).pipe(
+      tap((req) => {
+        this.form.controls.branch_id.setValue(req.branch_id);
+        this.form.controls.cost_centre_id.setValue(
+          this.costCentres().some(cc => cc.id === req.cost_centre_id) ? req.cost_centre_id! : '',
+        );
+        for (const line of req.lines) {
+          this.addLine();
+          this.lines.at(this.lines.length - 1).patchValue({
+            workspace_product_id: line.workspace_product_id,
+            quantity: trimDecimal(line.quantity),
+            note: line.note ?? '',
+          });
+        }
+        this.duplicateSourceStatus.set(req.status);
+      }),
+      catchError(() => {
+        this.resetState();
+        this.errorMessage.set(this.translate.instant('requests.genericError'));
+        this.focusErrorBanner();
+        return of(null);
+      }),
     );
   }
 

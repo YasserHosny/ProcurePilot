@@ -1174,6 +1174,23 @@
         "unsupportedType": "This file type is not supported. Please upload a PDF, image, or spreadsheet.",
         "success": "Source document replaced. Extraction will begin shortly."
       },
+      "refuseConfirm": {
+        "title": "Refuse quotation?",
+        "message": "Are you sure you want to refuse this quotation? It will be marked as refused and removed from active review. This action cannot be undone.",
+        "confirm": "Refuse Quotation",
+        "cancel": "Cancel"
+      },
+      "unsavedChanges": {
+        "title": "Discard unsaved changes?",
+        "message": "You have unsaved corrections, supplier selections, or notes that will be lost if you leave this page.",
+        "confirm": "Discard Changes",
+        "cancel": "Keep Editing"
+      },
+      "processing": {
+        "title": "Extraction in progress",
+        "message": "The document is being processed. Commercial data and lines will update when extraction finishes.",
+        "timeout": "Extraction is taking longer than expected. Please refresh or retry."
+      },
       "archiveConfirm": "Archive this quotation?",
       "retryConfirm": "Re-run extraction? Existing extracted data will be replaced.",
       "archived": "Quotation archived",
@@ -1270,6 +1287,8 @@
   },
   "matching": {
     "queue": {
+      "resultSummary": "Lines shown: {{lines}} · Quotations: {{quotations}}",
+      "quotationIdLabel": "Quotation {{id}}",
       "title": "Match Resolution Queue",
       "subtitle": "Review and resolve quotation lines requiring product matching decisions or catalogue additions.",
       "readOnlyBadge": "Read-Only Access",
@@ -1637,6 +1656,7 @@
       "reliabilityNotEnoughData": "Not enough data (neutral)"
     },
     "table": {
+        "ariaLabel": "Supplier offers comparison",
       "supplier": "Supplier",
       "normalisedUnitPrice": "Unit Price",
       "landedCostTotal": "Total Landed Cost",
@@ -1758,7 +1778,8 @@
       "notFoundTitle": "Basket split not found",
       "notFoundMessage": "This split does not exist or is not available in this workspace. Start a new split instead.",
       "pollFailed": "The latest status could not be loaded. The split may still be running.",
-      "pollRetry": "Retry"
+      "pollRetry": "Retry",
+      "completedAnnounce": "The optimisation is complete. The result is shown below."
     },
     "result": {
       "feasibleTitle": "Recommended Basket Allocation",
@@ -2056,7 +2077,8 @@
         "no_product": "Not linked to a catalogue product",
         "zero_quantity": "Nothing ordered on this line",
         "already_recorded": "Outcome already recorded"
-      }
+      },
+      "submitOne": "Save 1 outcome"
     }
   },
   "exports": {
@@ -2293,6 +2315,16 @@
     }
   },
   "requests": {
+    "discard": {
+      "title": "Discard this draft?",
+      "message": "The draft will be withdrawn. You can start a new request from the list.",
+      "confirm": "Discard draft",
+      "success": "Draft discarded."
+    },
+    "duplicate": {
+      "button": "Duplicate as new draft",
+      "banner": "Copied from a {{status}} request. Choose a new required-by date and review the lines."
+    },
     "errors": {
       "quantity_not_positive": "Quantity must be greater than zero.",
       "required_by_in_the_past": "The required-by date cannot be in the past.",
@@ -3814,7 +3846,19 @@
         "order_not_open_for_evidence": "This order is a draft, cancelled or closed, so it cannot take delivery or confirmation evidence.",
         "order_not_cancellable": "This order is already fully received or closed, so it can no longer be cancelled.",
         "order_already_cancelled": "This order is already cancelled."
-      }
+      },
+      "overdue": "Overdue",
+      "exportCsv": "Export CSV",
+      "print": "Print",
+      "receiveAll": "Receive all remaining",
+      "submitted": "Order submitted.",
+      "cancelled": "Order cancelled.",
+      "confirmationSaved": "Supplier confirmation saved.",
+      "receiptSaved": "Delivery receipt saved.",
+      "dateFormatHintDayFirst": "dd/mm/yyyy",
+      "dateFormatHintMonthFirst": "mm/dd/yyyy",
+      "receivedQuantityFor": "{{product}} · Received quantity ({{unit}}, ordered {{ordered}})",
+      "confirmedQuantityFor": "{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})"
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",
@@ -3837,7 +3881,9 @@
       "total_asc": "Total, lowest",
       "order_number_asc": "Order number, A to Z",
       "order_number_desc": "Order number, Z to A"
-    }
+    },
+    "expectedDate": "Expected {{date}}",
+    "overdue": "Overdue"
   },
   "accounting": {
     "nav": "Accounting",

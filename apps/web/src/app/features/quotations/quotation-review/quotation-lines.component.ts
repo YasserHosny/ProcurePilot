@@ -142,7 +142,7 @@ export class QuotationLinesComponent {
       return this.drafts.get(key)!;
     }
     const amount = this.getEffectiveUnitPriceAmount(line);
-    if (!this.isWriter || this.quotation.status === 'reviewed') {
+    if (!this.isWriter || this.quotation.status === 'reviewed' || this.quotation.status === 'refused') {
       return this.formatUnitPrice(amount);
     }
     return trimDecimalZeros(amount);

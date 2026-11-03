@@ -5,7 +5,7 @@
         <mat-icon aria-hidden="true">description</mat-icon>
         <span>{{ 'quotations.review.panels.document' | translate }}</span>
       </mat-card-title>
-      @if (isWriter && quotation.status !== 'reviewed') {
+      @if (isWriter && quotation.status !== 'reviewed' && quotation.status !== 'refused') {
         <input
           #replaceDocInput
           type="file"

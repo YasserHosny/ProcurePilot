@@ -1187,4 +1187,34 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(component.suppliers().map((x) => x.id).sort()).toEqual(['supp-1', 'supp-2', 'supp-pref']);
     });
   });
+  // P-187: progress turning into a result or a failure was not announced.
+  describe('P-187 — announcements', () => {
+    it('announces progress, completion and failure in a polite live region', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+      fixture.detectChanges();
+      const region = () => (fixture.nativeElement as HTMLElement).querySelector('[data-testid="job-status-live"]');
+      expect(region()?.getAttribute('aria-live')).toBe('polite');
+
+      component.currentJob.set({ ...mockFeasibleJob, status: 'running', result: null });
+      fixture.detectChanges();
+      expect(region()?.textContent).toContain(en.basketSplit.status.running);
+
+      component.currentJob.set(mockFeasibleJob);
+      fixture.detectChanges();
+      expect(region()?.textContent).toContain(en.basketSplit.status.completedAnnounce);
+
+      component.currentJob.set({ ...mockFeasibleJob, status: 'failed', result: null });
+      fixture.detectChanges();
+      expect(region()?.textContent).toContain(en.basketSplit.status.failedMessage);
+    });
+
+    it('gives the form error banner alert semantics', () => {
+      fixture.detectChanges();
+      component.errorMessage.set('Boom');
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.error-banner')?.getAttribute('role')).toBe('alert');
+    });
+  });
 });

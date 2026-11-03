@@ -34,6 +34,8 @@
     </div>
   }
 
+  <div class="visually-hidden" role="status" aria-live="polite" data-testid="job-status-live">{{ liveStatus() }}</div>
+
   <!-- Loading Initial Data -->
   @if (isLoading() && !currentJob()) {
     <div class="loading-container">
@@ -367,7 +369,7 @@
         </div>
 
         @if (errorMessage()) {
-          <div class="error-banner">
+          <div class="error-banner" role="alert">
             <mat-icon aria-hidden="true">error_outline</mat-icon>
             <span>{{ errorMessage() }}</span>
           </div>

@@ -188,6 +188,13 @@ describe('CorrectMatchDialogComponent', () => {
     expect(text).toContain('Could be more than one of your RFQ lines');
   });
 
+  it('gives the candidate radio group an accessible name from its heading (P-159)', () => {
+    const group = fixture.nativeElement.querySelector('[role="radiogroup"]') as HTMLElement;
+    const id = group.getAttribute('aria-labelledby');
+    expect(id).withContext('aria-labelledby').toBeTruthy();
+    expect(document.getElementById(id!)?.textContent?.trim()).toBeTruthy();
+  });
+
   it('submits correction with selected candidate, expected_current_decision_id, and learn_alias', () => {
     component.selectCandidate('cand-2');
     fixture.detectChanges();

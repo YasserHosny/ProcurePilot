@@ -19,6 +19,12 @@
     }
   </div>
 
+  @if (duplicateSourceStatus(); as status) {
+    <div class="duplicate-banner" role="status">
+      {{ 'requests.duplicate.banner' | translate: { status: ('requests.status.' + status | translate) } }}
+    </div>
+  }
+
   @if (existingRequest()?.source; as source) {
     <div class="request-source-line" data-testid="request-source-line">
       {{ 'requests.source.from' | translate }}
@@ -342,6 +348,16 @@
           }
 
           @if (existingRequest(); as existingReq) {
+            @if (existingReq.status === 'withdrawn' || existingReq.status === 'rejected') {
+              <button mat-stroked-button type="button" class="duplicate-request-btn" (click)="duplicateRequest()">
+                {{ 'requests.duplicate.button' | translate }}
+              </button>
+            }
+            @if (existingReq.status === 'draft' && !existingReq.request_group) {
+              <button mat-stroked-button type="button" class="discard-draft-btn pp-danger" (click)="discardDraft()">
+                {{ 'requests.discard.confirm' | translate }}
+              </button>
+            }
             @if (existingReq.status === 'draft') {
               <button
                 mat-flat-button

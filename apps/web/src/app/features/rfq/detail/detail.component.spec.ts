@@ -144,7 +144,16 @@ describe('DetailComponent (RFQ Details)', () => {
     rfqApiSpy.listResponses.and.returnValue(of(mockResponses));
     rfqApiSpy.listGuardrails.and.returnValue(of([]));
 
-    apiSpy = jasmine.createSpyObj('ApiService', ['members', 'listBranches', 'suppliers', 'products']);
+    apiSpy = jasmine.createSpyObj('ApiService', [
+      'members',
+      'listBranches',
+      'suppliers',
+      'products',
+      'supplier',
+      'product',
+    ]);
+    apiSpy.supplier.and.returnValue(throwError(() => new Error('not found')));
+    apiSpy.product.and.returnValue(throwError(() => new Error('not found')));
     apiSpy.members.and.returnValue(of({
       items: [{
         id: 'm-creator',
