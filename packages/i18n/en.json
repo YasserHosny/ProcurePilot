@@ -2284,6 +2284,14 @@
     }
   },
   "requests": {
+    "errors": {
+      "quantity_not_positive": "Quantity must be greater than zero.",
+      "required_by_in_the_past": "The required-by date cannot be in the past.",
+      "duplicate_product": "This product is already on another line.",
+      "cost_centre_not_found": "Cost centre not found.",
+      "cost_centre_branch_mismatch": "Cost centre does not belong to the selected branch.",
+      "product_not_found": "Product not found."
+    },
     "list": {
       "newRequestButton": "New request",
       "loadMore": "Load more",
@@ -2332,15 +2340,19 @@
       "branchRequired": "Branch is required.",
       "costCentreLabel": "Cost Centre (optional)",
       "requiredByDateLabel": "Required By",
+      "requiredByHint": "Format: {{format}}",
       "requiredByDateRequired": "Required-by date is required.",
       "requiredByDateInvalid": "Enter a valid date (YYYY-MM-DD).",
       "linesTitle": "Line Items",
+      "lineGroup": "Line {{position}}",
       "addLineButton": "Add Line",
       "removeLineButton": "Remove line",
+      "removeLineWithProduct": "Remove line {{position}}: {{product}}",
       "productLabel": "Product",
       "productRequired": "Select a product.",
       "quantityLabel": "Quantity",
       "quantityRequired": "Quantity must be greater than zero.",
+      "quantityPattern": "Quantity must be a number greater than zero.",
       "noteLabel": "Note (optional)",
       "estimatedUnitPriceLabel": "Estimated Unit Price",
       "noEstimateAvailable": "No price history available for this product.",
