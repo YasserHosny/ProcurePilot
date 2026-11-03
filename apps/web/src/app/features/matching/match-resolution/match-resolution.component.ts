@@ -603,6 +603,43 @@ export class MatchResolutionComponent implements OnInit {
     return Math.round(num * 100);
   }
 
+  formatVatRate(rate: string | number | null | undefined): string {
+    if (rate == null || rate === '') return '';
+    let str = String(rate).trim();
+    if (!str) return '';
+    if (str.endsWith('%')) {
+      str = str.slice(0, -1).trim();
+    }
+
+    const isNegative = str.startsWith('-');
+    const unsigned = isNegative ? str.slice(1) : str;
+    const parts = unsigned.split('.');
+
+    const whole = parts[0] || '0';
+    let fraction = parts[1] || '';
+
+    // Decimal-safe multiply by 100 by shifting decimal point 2 places to the right
+    fraction = fraction.padEnd(2, '0');
+    const shiftedWhole = (whole === '0' ? '' : whole) + fraction.slice(0, 2);
+    const shiftedFraction = fraction.slice(2);
+
+    let resultWhole = shiftedWhole.replace(/^0+/, '');
+    if (resultWhole === '') {
+      resultWhole = '0';
+    }
+
+    const resultFraction = shiftedFraction.replace(/0+$/, '');
+    const sign = isNegative ? '-' : '';
+    const result = resultFraction ? `${resultWhole}.${resultFraction}` : resultWhole;
+    return `${sign}${result}%`;
+  }
+
+  isDiscountNonZero(discount?: { amount: string | number } | null): boolean {
+    if (!discount || discount.amount == null) return false;
+    const num = typeof discount.amount === 'number' ? discount.amount : parseFloat(discount.amount);
+    return !isNaN(num) && num !== 0;
+  }
+
   shouldShowSemanticSignal(candidate: MatchCandidate): boolean {
     return candidate.embedding_model !== 'stub-hash-v1';
   }

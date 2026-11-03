@@ -1530,6 +1530,7 @@
         "discount": "الخصم",
         "otherCharges": "رسوم أخرى",
         "total": "إجمالي التكلفة الواصلة",
+        "totalCovers": "الإجمالي لـ {{quantity}} × {{unitPrice}}",
         "normalisedQuantity": "الكمية الموحدة",
         "baseUnit": "الوحدة الأساسية",
         "ruleVersion": "إصدار القاعدة الحسابية",

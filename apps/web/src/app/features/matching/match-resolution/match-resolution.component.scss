@@ -17,7 +17,10 @@
 .cost-header-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  width: 100%;
 }
 
 .keyboard-shortcuts-bar {
@@ -80,6 +83,13 @@ kbd {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1rem;
+}
+
+.decision-details-grid > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.35rem;
 }
 
 .metric-item,
@@ -184,6 +194,7 @@ kbd {
 .landed-cost-details {
   font-size: 0.8rem;
   color: var(--pp-text-muted);
+  margin-inline-start: auto;
 
   summary {
     cursor: pointer;
@@ -211,6 +222,14 @@ kbd {
 }
 .cost-divider { margin-block: 0.75rem; }
 .cost-normalisation-row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; font-size: 0.85rem; }
+.norm-info {
+  display: inline-flex;
+  align-items: baseline;
+  column-gap: 0.35rem;
+}
+.cost-quantity-scope {
+  color: var(--pp-text-muted);
+}
 .replay-notice { display: flex; align-items: center; gap: 0.35rem; color: var(--pp-text-muted); font-size: 0.8rem; }
 
 .outcomes-radio-group {
