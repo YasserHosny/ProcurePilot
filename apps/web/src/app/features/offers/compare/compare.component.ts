@@ -300,6 +300,9 @@ export class CompareComponent implements OnInit {
           return;
         }
         this.isLoading.set(false);
+        if (this.lastAppliedRefreshId > refreshIdAtStart) {
+          return;
+        }
         this.rawComparison.set(null);
         if (err instanceof HttpErrorResponse) {
           const apiError = err.error as ApiError | undefined;
@@ -379,6 +382,9 @@ export class CompareComponent implements OnInit {
           return;
         }
         this.rawComparison.set(comp);
+        this.errorMessage.set(null);
+        this.errorTraceId.set(null);
+        this.isLoading.set(false);
         this.lastAppliedRefreshId = requestId;
       },
       error: () => {
