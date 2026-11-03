@@ -2341,6 +2341,8 @@
       "noteLabel": "Note (optional)",
       "estimatedUnitPriceLabel": "Estimated Unit Price",
       "noEstimateAvailable": "No price history available for this product.",
+      "perPack": "{{price}} / pack",
+      "staleEstimate": "Saved estimate — save to refresh",
       "cancelButton": "Cancel",
       "saveDraftButton": "Save Draft",
       "submitButton": "Submit Request",
