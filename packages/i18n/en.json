@@ -1770,7 +1770,11 @@
       "failedMessage": "An error occurred during solver execution. Please try again.",
       "noCurrentOffers": "No current offers from the selected suppliers for: {{products}}",
       "unavailableMessage": "The optimisation service is not responding. Please try again shortly, or contact support if this keeps happening.",
-      "timeoutMessage": "The optimisation did not finish in time. Please try again."
+      "timeoutMessage": "The optimisation did not finish in time. Please try again.",
+      "notFoundTitle": "Basket split not found",
+      "notFoundMessage": "This split does not exist or is not available in this workspace. Start a new split instead.",
+      "pollFailed": "The latest status could not be loaded. The split may still be running.",
+      "pollRetry": "Retry"
     },
     "result": {
       "feasibleTitle": "Recommended Basket Allocation",
@@ -1858,12 +1862,16 @@
         "allocationNotWholePacks": "The allocation contains quantities that cannot be converted to whole packs.",
         "packDefinitionRequired": "Pack definition is required for the allocated items.",
         "idempotencyKeyReused": "This idempotency key has already been used with different parameters.",
-        "generic": "Failed to prepare requests."
+        "generic": "Failed to prepare requests.",
+        "branchesLoadFailed": "The branches could not be loaded. Close this dialog and try again.",
+        "costCentresLoadFailed": "The cost centres could not be loaded. Close this dialog and try again."
       }
     },
     "submit": {
       "successSplit": "{{count}} purchase requests submitted for approval as one split."
-    }
+    },
+    "rerunNotice": "This form was filled from an earlier split. Check the risk tolerance, urgency, excluded suppliers and weights, then run it again.",
+    "rerunPackUnknown": "The pack sizes of this split's products are not loaded yet. Wait a moment and try Re-run again."
   },
   "alerts": {
     "title": "Actionable Alerts Inbox",
@@ -4138,18 +4146,36 @@
       "noProductsMatch": "No products match",
       "duplicateNotice": "Duplicated from an earlier RFQ — check the dates and suppliers before saving",
       "quantityLabel": "Quantity",
-      "quantityPlaceholder": "Enter quantity",
+      "quantityPlaceholder": "Qty",
+      "quantityRequired": "Quantity is required",
+      "quantityMin": "Quantity must be greater than 0",
       "addLineButton": "Add Line",
       "removeLineButton": "Remove",
+      "productLineAria": "Product — line {{line}}",
+      "quantityLineAria": "Quantity — line {{line}}",
+      "removeLineAria": "Remove line {{line}}",
       "suppliersLabel": "Suppliers",
       "suppliersPlaceholder": "Select suppliers",
+      "suppliersRequired": "Select at least one supplier.",
+      "suppliersNoEmailHint": "{{count}} suppliers are not listed because they have no contact email",
+      "supplierNoEmail": "no email",
+      "supplierInactive": "inactive",
+      "initialLoadError": "Failed to load products or suppliers.",
+      "retryButton": "Retry",
       "neededByDateLabel": "Needed By Date",
+      "dateFormatDayFirst": "DD/MM/YYYY",
+      "dateFormatMonthFirst": "MM/DD/YYYY",
       "tenantTermsLabel": "Terms and Conditions",
       "tenantTermsPlaceholder": "Enter terms for suppliers (optional)",
       "tenantTermsTooLong": "Terms must be 4000 characters or fewer.",
       "saveDraftButton": "Save Draft",
       "sendButton": "Send RFQ",
       "rejectedSuppliersTitle": "Rejected Suppliers",
+      "rejectedReasons": {
+        "missing_contact_email": "No contact email",
+        "not_found": "Supplier not found",
+        "generic": "Could not be added"
+      },
       "rfqStatusLabel": "RFQ Status",
       "submittingButton": "Saving...",
       "sendingButton": "Sending...",

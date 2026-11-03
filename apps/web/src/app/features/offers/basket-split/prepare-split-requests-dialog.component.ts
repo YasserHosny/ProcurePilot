@@ -147,7 +147,7 @@ export class PrepareSplitRequestsDialogComponent implements OnInit {
         this.applyBranchPreselection();
       },
       error: () => {
-        // Soft fail
+        this.errorMessage.set(this.translate.instant('basketSplit.prepareRequests.errors.branchesLoadFailed'));
       },
     });
   }
@@ -160,7 +160,7 @@ export class PrepareSplitRequestsDialogComponent implements OnInit {
         this.sanitizeSelectedCostCentre();
       },
       error: () => {
-        // Soft fail
+        this.errorMessage.set(this.translate.instant('basketSplit.prepareRequests.errors.costCentresLoadFailed'));
       },
     });
   }
