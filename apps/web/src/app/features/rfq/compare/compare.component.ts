@@ -1,6 +1,6 @@
 import { Component, OnInit, OnChanges, SimpleChanges, DestroyRef, Output, EventEmitter, inject, signal, computed, input, model, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, forkJoin, of, catchError, tap, switchMap } from 'rxjs';
+import { Subject, forkJoin, of, catchError, tap, switchMap, take, takeUntil } from 'rxjs';
 
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -103,7 +103,7 @@ export class CompareComponent implements OnInit, OnChanges {
 
   readonly splitEligibility = computed<{
     canSplit: boolean;
-    reason: 'rfq_expired' | 'needs_two_matched' | 'mixed_currency' | null;
+    reason: 'rfq_expired' | 'needs_two_matched' | 'mixed_currency' | 'reply_mixed_currency' | null;
     unmatchedCount: number;
     unmatchedQuotationIds: string[];
   }>(() => {
@@ -139,6 +139,15 @@ export class CompareComponent implements OnInit, OnChanges {
         reason: 'needs_two_matched',
         unmatchedCount: totalUnmatched,
         unmatchedQuotationIds: unmatchedQuoteIds,
+      };
+    }
+
+    if (eligibleReplies.some((r) => this.hasMixedCurrencies(r))) {
+      return {
+        canSplit: false,
+        reason: 'reply_mixed_currency',
+        unmatchedCount: 0,
+        unmatchedQuotationIds: [],
       };
     }
 
@@ -260,7 +269,11 @@ export class CompareComponent implements OnInit, OnChanges {
   private readonly comparableResponses = computed<RfqResponseComparison[] | null>(() => {
     const all = this.responses();
     const eligible = all.filter(
-      (r) => r.quotation_status !== 'refused' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
+      (r) =>
+        r.quotation_status !== 'refused' &&
+        r.lines.length > 0 &&
+        r.lines.every((l) => !l.pending_match) &&
+        !this.hasMixedCurrencies(r),
     );
     if (eligible.length < 2) {
       return null;
@@ -312,7 +325,15 @@ export class CompareComponent implements OnInit, OnChanges {
       return new Set<string>();
     }
 
-    const totals = eligible.map((r) => ({ id: r.id, total: this.responseTotal(r) ?? 0 }));
+    const totals = eligible
+      .map((r) => {
+        const total = this.responseTotal(r);
+        return total !== null ? { id: r.id, total } : null;
+      })
+      .filter((t): t is { id: string; total: number } => t !== null);
+    if (totals.length === 0) {
+      return new Set<string>();
+    }
     const minTotal = Math.min(...totals.map((t) => t.total));
     const ids = new Set<string>();
     for (const t of totals) {
@@ -480,21 +501,30 @@ export class CompareComponent implements OnInit, OnChanges {
     const id = this.rfqId();
     if (!id) return;
     this.rfqDetailError.set(false);
-    this.rfqApi.getRfq(id).subscribe({
-      next: (detail) => {
-        this.rfqDetail.set(detail);
-        this.rfqDetailError.set(false);
-        const parsedNeededBy = parseIsoDateLocal(detail.rfq.needed_by_date);
-        if (parsedNeededBy) {
-          this.requiredByDate.set(parsedNeededBy);
-        }
-        this.applyBranchPreselection();
-      },
-      error: () => {
-        this.rfqDetail.set(null);
-        this.rfqDetailError.set(true);
-      },
-    });
+    this.rfqApi
+      .getRfq(id)
+      .pipe(
+        take(1),
+        takeUntil(this.loadTrigger$),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (detail) => {
+          if (this.rfqId() !== id) return;
+          this.rfqDetail.set(detail);
+          this.rfqDetailError.set(false);
+          const parsedNeededBy = parseIsoDateLocal(detail.rfq.needed_by_date);
+          if (parsedNeededBy) {
+            this.requiredByDate.set(parsedNeededBy);
+          }
+          this.applyBranchPreselection();
+        },
+        error: () => {
+          if (this.rfqId() !== id) return;
+          this.rfqDetail.set(null);
+          this.rfqDetailError.set(true);
+        },
+      });
   }
 
   onEditDraft(): void {
@@ -569,17 +599,23 @@ export class CompareComponent implements OnInit, OnChanges {
 
   loadBranches(): void {
     this.branchesError.set(false);
-    this.api.listBranches({ is_active: true, limit: 100 }).subscribe({
-      next: (res) => {
-        this.branches.set(res.items);
-        this.branchesError.set(false);
-        this.applyBranchPreselection();
-      },
-      error: () => {
-        this.branches.set([]);
-        this.branchesError.set(true);
-      },
-    });
+    this.api
+      .listBranches({ is_active: true, limit: 100 })
+      .pipe(
+        take(1),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (res) => {
+          this.branches.set(res.items);
+          this.branchesError.set(false);
+          this.applyBranchPreselection();
+        },
+        error: () => {
+          this.branches.set([]);
+          this.branchesError.set(true);
+        },
+      });
   }
 
   onBranchChange(branchId: string): void {

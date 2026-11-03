@@ -4242,6 +4242,7 @@
       "splitBetweenSuppliers": "تقسيم بين المورّدين",
       "needsTwoMatched": "يتطلب ردّين مطابقين",
       "differentCurrencies": "الردود بعملات مختلفة",
+      "replyMixedCurrency": "يستخدم أحد الردود أكثر من عملة واحدة، لذلك لا يمكن تقسيم الردود",
       "alreadyConverted": "تم تحويل طلب عروض الأسعار بالفعل",
       "splitError": "فشل بدء التقسيم. يُرجى المحاولة مرة أخرى.",
       "lowestLinePrice": "أقل تكلفة واصلة",

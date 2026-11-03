@@ -98,6 +98,7 @@ export class HistoryComponent implements OnInit {
   readonly draftActionsUnavailable = signal<boolean>(false);
   readonly rfqs = signal<RfqSummary[]>([]);
   readonly nextCursor = signal<string | null>(null);
+  private listGeneration = 0;
   readonly recipientsCache = signal<Record<string, RecipientsCacheEntry>>({});
 
   readonly timeFormatOptions: Intl.DateTimeFormatOptions = { timeStyle: 'short' };
@@ -136,16 +137,25 @@ export class HistoryComponent implements OnInit {
   }
 
   loadRfqs(): void {
+    const generation = ++this.listGeneration;
     this.recipientsCache.set({});
     this.loading.set(true);
     this.loadError.set(false);
+    this.loadMoreError.set(false);
+    this.loadingMore.set(false);
     this.rfqApi.listRfqs().subscribe({
       next: (response) => {
+        if (generation !== this.listGeneration) {
+          return;
+        }
         this.rfqs.set(response.items);
         this.nextCursor.set(response.next_cursor);
         this.loading.set(false);
       },
       error: () => {
+        if (generation !== this.listGeneration) {
+          return;
+        }
         this.loading.set(false);
         this.loadError.set(true);
       },
@@ -158,10 +168,14 @@ export class HistoryComponent implements OnInit {
       return;
     }
 
+    const generation = this.listGeneration;
     this.loadingMore.set(true);
     this.loadMoreError.set(false);
     this.rfqApi.listRfqs(undefined, cursor).subscribe({
       next: (response) => {
+        if (generation !== this.listGeneration) {
+          return;
+        }
         const current = this.rfqs();
         const existingIds = new Set(current.map((item) => item.id));
         const uniqueItems = response.items.filter((item) => !existingIds.has(item.id));
@@ -170,6 +184,9 @@ export class HistoryComponent implements OnInit {
         this.loadingMore.set(false);
       },
       error: () => {
+        if (generation !== this.listGeneration) {
+          return;
+        }
         this.loadingMore.set(false);
         this.loadMoreError.set(true);
       },

@@ -4242,6 +4242,7 @@
       "splitBetweenSuppliers": "Split between suppliers",
       "needsTwoMatched": "Needs two matched replies",
       "differentCurrencies": "Replies are in different currencies",
+      "replyMixedCurrency": "A reply uses more than one currency, so the replies cannot be split",
       "alreadyConverted": "RFQ is already converted",
       "splitError": "Failed to start split. Please try again.",
       "lowestLinePrice": "Lowest landed cost",
