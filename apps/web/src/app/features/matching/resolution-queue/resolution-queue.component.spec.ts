@@ -626,6 +626,68 @@ describe('ResolutionQueueComponent', () => {
     });
   });
 
+  describe('sorting, count and reasons (P-153, PPS-197)', () => {
+    const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+    const openSelect = (testId: string): string[] => {
+      const trigger = el().querySelector(`[data-testid="${testId}"] .mat-mdc-select-trigger`) as HTMLElement;
+      expect(trigger).withContext(testId).toBeTruthy();
+      trigger.click();
+      fixture.detectChanges();
+      return Array.from(document.querySelectorAll('.mat-mdc-option')).map((o) => o.textContent!.trim());
+    };
+    const pick = (label: string): void => {
+      const option = Array.from(document.querySelectorAll('.mat-mdc-option')).find(
+        (o) => o.textContent!.trim() === label,
+      ) as HTMLElement;
+      expect(option).withContext(label).toBeTruthy();
+      option.click();
+      fixture.detectChanges();
+    };
+
+    it('lets the buyer sort the queue and reloads with the chosen order', () => {
+      const labels = openSelect('queue-sort');
+      expect(labels).toContain(enCatalog.matching.queue.sort.priorityDesc);
+      expect(labels).toContain(enCatalog.matching.queue.sort.createdAsc);
+
+      apiService.getMatchTasks.calls.reset();
+      pick(enCatalog.matching.queue.sort.priorityDesc);
+
+      expect(apiService.getMatchTasks).toHaveBeenCalledWith(
+        jasmine.objectContaining({ sort_by: 'priority', sort_order: 'desc' }),
+      );
+    });
+
+    it('shows how many lines and quotations are listed, and that more can be loaded', () => {
+      const count = el().querySelector('[data-testid="queue-result-summary"]') as HTMLElement;
+      expect(count.classList.contains('visually-hidden')).withContext('visible to everyone').toBeFalse();
+      expect(count.textContent).toContain('Lines shown: 2');
+      expect(count.textContent).toContain(enCatalog.matching.queue.moreAvailable);
+
+      component.nextCursor.set(null);
+      fixture.detectChanges();
+      expect(count.textContent).not.toContain(enCatalog.matching.queue.moreAvailable);
+    });
+
+    it('offers every routing reason the queue can show', () => {
+      const labels = openSelect('queue-reason-filter');
+      expect(labels).toContain(enCatalog.matching.queue.reason.auto_accepted);
+      expect(labels).toContain(enCatalog.matching.queue.reason.corrected);
+      expect(labels).toContain(enCatalog.matching.queue.reason.human_decided);
+    });
+
+    it('treats a non-default sort as an active filter and Clear restores the default order', () => {
+      component.sortBy.set('priority');
+      component.sortOrder.set('asc');
+      expect(component.hasActiveFilters()).toBeTrue();
+
+      component.clearFilters();
+
+      expect(component.sortBy()).toBe('created_at');
+      expect(component.sortOrder()).toBe('desc');
+      expect(component.hasActiveFilters()).toBeFalse();
+    });
+  });
+
   describe('RFQ-aware matching in queue (spec 023 US1)', () => {
     it('shows "Correct match" button for auto-accepted line when isWriter, and hides it for non-writer', () => {
       const autoTask: MatchTask = {

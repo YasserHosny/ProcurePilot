@@ -1287,6 +1287,14 @@
   },
   "matching": {
     "queue": {
+      "moreAvailable": "يوجد المزيد",
+      "sort": {
+        "label": "ترتيب حسب",
+        "createdDesc": "الأحدث أولاً",
+        "createdAsc": "الأقدم أولاً",
+        "priorityDesc": "الأولوية: العالية أولاً",
+        "priorityAsc": "الأولوية: المنخفضة أولاً"
+      },
       "resultSummary": "البنود المعروضة: {{lines}} · عروض الأسعار: {{quotations}}",
       "quotationIdLabel": "عرض السعر {{id}}",
       "title": "قائمة مهام مطابقة البنود",
