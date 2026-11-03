@@ -117,6 +117,29 @@
       </div>
     </header>
 
+    <!-- Extraction In-Progress Banner (PPS-159) -->
+    @if (isPollingExtraction()) {
+      <div class="extraction-processing-banner" role="status" data-testid="extraction-processing-banner">
+        <mat-spinner diameter="20" [attr.aria-label]="'common.loading' | translate"></mat-spinner>
+        <div class="processing-content">
+          <strong class="processing-title">{{ 'quotations.review.processing.title' | translate }}</strong>
+          <span class="processing-message">{{ 'quotations.review.processing.message' | translate }}</span>
+        </div>
+      </div>
+    }
+    @if (extractionPollTimedOut()) {
+      <div class="extraction-timeout-banner" role="alert" data-testid="extraction-timeout-banner">
+        <mat-icon class="timeout-icon" aria-hidden="true">hourglass_empty</mat-icon>
+        <div class="timeout-content">
+          <span class="timeout-message">{{ 'quotations.review.processing.timeout' | translate }}</span>
+        </div>
+        <button mat-stroked-button type="button" (click)="loadQuotation(quotationId(), { silent: true })">
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          <span>{{ 'quotations.review.loadError.retry' | translate }}</span>
+        </button>
+      </div>
+    }
+
     <!-- Review Banners (Versioning, Mismatch, Reconciled, Error, Keyboard Nav, Legend) -->
     <app-quotation-review-banners
       [quotation]="q"
@@ -251,7 +274,7 @@
                   id="supplier-select"
                   [value]="selectedSupplierId()"
                   (selectionChange)="selectedSupplierId.set($event.value); loadPriorQuotations()"
-                  [disabled]="!isWriter() || q.status === 'reviewed'"
+                  [disabled]="!isWriter() || q.status === 'reviewed' || q.status === 'refused'"
                   (openedChange)="onSupplierSelectOpened($event)"
                   required
                 >
@@ -294,7 +317,7 @@
                 @if (!selectedSupplierId()) {
                   <mat-hint class="required-hint">{{ 'quotations.review.header.supplierRequired' | translate }}</mat-hint>
                 }
-                @if (isWriter() && q.status !== 'reviewed') {
+                @if (isWriter() && q.status !== 'reviewed' && q.status !== 'refused') {
                   <mat-hint align="end" class="supplier-manual-add-hint">
                     <a routerLink="/suppliers/new" class="supplier-manual-add-link">
                       {{ 'quotations.review.header.supplierEmptyAction' | translate }}
@@ -336,7 +359,7 @@
                     mat-stroked-button
                     type="button"
                     (click)="acceptSupplierSuggestion()"
-                    [disabled]="!isWriter() || q.status === 'reviewed'"
+                    [disabled]="!isWriter() || q.status === 'reviewed' || q.status === 'refused'"
                   >
                     <mat-icon aria-hidden="true">done</mat-icon>
                     <span>
@@ -355,7 +378,7 @@
                     mat-stroked-button
                     type="button"
                     (click)="createSupplierFromExtraction()"
-                    [disabled]="!isWriter() || q.status === 'reviewed' || isCreatingSupplierFromExtraction() || !extractedSupplierName()"
+                    [disabled]="!isWriter() || q.status === 'reviewed' || q.status === 'refused' || isCreatingSupplierFromExtraction() || !extractedSupplierName()"
                   >
                     <mat-icon aria-hidden="true">add_business</mat-icon>
                     <span>{{ 'quotations.review.supplierMatch.createButton' | translate }}</span>
@@ -380,7 +403,7 @@
                     [value]="getEffectiveValue('quotation', q.id, 'currency', effectiveQuotationCurrency())"
                     (selectionChange)="currencySelectionChanged($event.value)"
                     (closed)="reviewFieldValue('quotation', q.id, 'currency', getEffectiveValue('quotation', q.id, 'currency', effectiveQuotationCurrency()))"
-                    [disabled]="!isWriter() || q.status === 'reviewed'"
+                    [disabled]="!isWriter() || q.status === 'reviewed' || q.status === 'refused'"
                   >
                     @for (c of currencyOptions; track c) {
                       <mat-option [value]="c">{{ c }}</mat-option>
@@ -400,7 +423,7 @@
                 @if (isCurrencyFallback(getFieldExtraction('quotation', q.id, 'currency')) && !isFieldCorrected('quotation', q.id, 'currency')) {
                   <span class="review-reason">{{ 'quotations.review.currencyFallbackReview' | translate }}</span>
                 }
-                @if (getFieldConfidence('quotation', q.id, 'currency') < 0.85 && !isFieldCorrected('quotation', q.id, 'currency')) {
+                @if (isWriter() && q.status !== 'reviewed' && q.status !== 'refused' && getFieldConfidence('quotation', q.id, 'currency') < 0.85 && !isFieldCorrected('quotation', q.id, 'currency')) {
                   <button
                     mat-icon-button
                     type="button"
@@ -434,7 +457,7 @@
                     [value]="toDate(canonicalDateValue(q, 'issue_date'))"
                     (dateChange)="getFieldExtraction('quotation', q.id, 'issue_date') && updateCorrection(getFieldExtraction('quotation', q.id, 'issue_date')!.id, toIsoDate($event.value))"
                     (blur)="reviewFieldValue('quotation', q.id, 'issue_date', canonicalDateValue(q, 'issue_date'))"
-                    [readonly]="!isWriter() || q.status === 'reviewed'"
+                    [readonly]="!isWriter() || q.status === 'reviewed' || q.status === 'refused'"
                   />
                   <mat-datepicker-toggle
                     matIconSuffix
@@ -443,7 +466,7 @@
                   ></mat-datepicker-toggle>
                   <mat-datepicker
                     #issueDatePicker
-                    [disabled]="!isWriter() || q.status === 'reviewed'"
+                    [disabled]="!isWriter() || q.status === 'reviewed' || q.status === 'refused'"
                     (closed)="reviewFieldValue('quotation', q.id, 'issue_date', canonicalDateValue(q, 'issue_date'))"
                   ></mat-datepicker>
                 </mat-form-field>
@@ -457,7 +480,7 @@
                     {{ formatConfidence(fe.confidence) }}%
                   </span>
                 }
-                @if (getFieldConfidence('quotation', q.id, 'issue_date') < 0.85 && !isFieldCorrected('quotation', q.id, 'issue_date') && canonicalDateValue(q, 'issue_date')) {
+                @if (isWriter() && q.status !== 'reviewed' && q.status !== 'refused' && getFieldConfidence('quotation', q.id, 'issue_date') < 0.85 && !isFieldCorrected('quotation', q.id, 'issue_date') && canonicalDateValue(q, 'issue_date')) {
                   <button
                     mat-icon-button
                     type="button"
@@ -494,7 +517,7 @@
                     [value]="toDate(canonicalDateValue(q, 'expiry_date'))"
                     (dateChange)="getFieldExtraction('quotation', q.id, 'expiry_date') && updateCorrection(getFieldExtraction('quotation', q.id, 'expiry_date')!.id, toIsoDate($event.value))"
                     (blur)="reviewFieldValue('quotation', q.id, 'expiry_date', canonicalDateValue(q, 'expiry_date'))"
-                    [readonly]="!isWriter() || q.status === 'reviewed'"
+                    [readonly]="!isWriter() || q.status === 'reviewed' || q.status === 'refused'"
                   />
                   <mat-datepicker-toggle
                     matIconSuffix
@@ -503,7 +526,7 @@
                   ></mat-datepicker-toggle>
                   <mat-datepicker
                     #expiryDatePicker
-                    [disabled]="!isWriter() || q.status === 'reviewed'"
+                    [disabled]="!isWriter() || q.status === 'reviewed' || q.status === 'refused'"
                     (closed)="reviewFieldValue('quotation', q.id, 'expiry_date', canonicalDateValue(q, 'expiry_date'))"
                   ></mat-datepicker>
                 </mat-form-field>
@@ -522,7 +545,7 @@
                     {{ formatConfidence(fe.confidence) }}%
                   </span>
                 }
-                @if (getFieldConfidence('quotation', q.id, 'expiry_date') < 0.85 && !isFieldCorrected('quotation', q.id, 'expiry_date') && canonicalDateValue(q, 'expiry_date')) {
+                @if (isWriter() && q.status !== 'reviewed' && q.status !== 'refused' && getFieldConfidence('quotation', q.id, 'expiry_date') < 0.85 && !isFieldCorrected('quotation', q.id, 'expiry_date') && canonicalDateValue(q, 'expiry_date')) {
                   <button
                     mat-icon-button
                     type="button"
@@ -556,7 +579,7 @@
                     (input)="onStatedTotalInput(q, $any($event.target).value, false)"
                     (change)="onStatedTotalInput(q, $any($event.target).value, false)"
                     (blur)="onStatedTotalInput(q, $any($event.target).value, true)"
-                    [readonly]="!isWriter() || q.status === 'reviewed'"
+                    [readonly]="!isWriter() || q.status === 'reviewed' || q.status === 'refused'"
                   />
                   <span matTextSuffix class="currency-suffix">{{ effectiveQuotationCurrency() | currencySymbol }}</span>
                 </mat-form-field>
@@ -570,7 +593,7 @@
                     {{ formatConfidence(fe.confidence) }}%
                   </span>
                 }
-                @if (getFieldConfidence('quotation', q.id, 'stated_total') < 0.85 && !isFieldCorrected('quotation', q.id, 'stated_total')) {
+                @if (isWriter() && q.status !== 'reviewed' && q.status !== 'refused' && getFieldConfidence('quotation', q.id, 'stated_total') < 0.85 && !isFieldCorrected('quotation', q.id, 'stated_total')) {
                   <button
                     mat-icon-button
                     type="button"
@@ -599,7 +622,7 @@
                     [checked]="effectivePricesIncludeVat(q)"
                     (change)="pricesIncludeVatToggled($event.checked)"
                     (blur)="reviewFieldValue('quotation', q.id, 'prices_include_vat', effectivePricesIncludeVat(q))"
-                    [disabled]="!isWriter() || q.status === 'reviewed'"
+                    [disabled]="!isWriter() || q.status === 'reviewed' || q.status === 'refused'"
                   >
                     {{ 'quotations.review.header.pricesIncludeVatLabel' | translate }}
                   </mat-checkbox>
@@ -614,7 +637,7 @@
                     {{ formatConfidence(fe.confidence) }}%
                   </span>
                 }
-                @if (getFieldConfidence('quotation', q.id, 'prices_include_vat') < 0.85 && !isFieldCorrected('quotation', q.id, 'prices_include_vat')) {
+                @if (isWriter() && q.status !== 'reviewed' && q.status !== 'refused' && getFieldConfidence('quotation', q.id, 'prices_include_vat') < 0.85 && !isFieldCorrected('quotation', q.id, 'prices_include_vat')) {
                   <button
                     mat-icon-button
                     type="button"
@@ -651,7 +674,7 @@
                     (input)="vatRateInputChanged(vatRateInput.value)"
                     (change)="vatRateInputChanged(vatRateInput.value)"
                     (blur)="reviewFieldValue('quotation', q.id, 'vat_rate', effectiveVatRate(q))"
-                    [readonly]="!isWriter() || q.status === 'reviewed'"
+                    [readonly]="!isWriter() || q.status === 'reviewed' || q.status === 'refused'"
                   />
                   <span matTextSuffix class="percent-suffix">%</span>
                   @if (invalidVatRate()) {
@@ -668,7 +691,7 @@
                     {{ formatConfidence(fe.confidence) }}%
                   </span>
                 }
-                @if (getFieldConfidence('quotation', q.id, 'vat_rate') < 0.85 && !isFieldCorrected('quotation', q.id, 'vat_rate')) {
+                @if (isWriter() && q.status !== 'reviewed' && q.status !== 'refused' && getFieldConfidence('quotation', q.id, 'vat_rate') < 0.85 && !isFieldCorrected('quotation', q.id, 'vat_rate')) {
                   <button
                     mat-icon-button
                     type="button"
@@ -683,7 +706,7 @@
             </div>
 
             <!-- Re-Quote Versioning Controls (US4) -->
-            @if (isWriter() && q.status !== 'reviewed') {
+            @if (isWriter() && q.status !== 'reviewed' && q.status !== 'refused') {
               <mat-divider class="section-divider"></mat-divider>
               <div class="versioning-controls">
                 <mat-checkbox
@@ -700,7 +723,7 @@
                     <mat-select
                       [value]="selectedPreviousQuotationId()"
                       (selectionChange)="selectedPreviousQuotationId.set($event.value)"
-                      [disabled]="!isWriter() || quotation()?.status === 'reviewed'"
+                      [disabled]="!isWriter() || quotation()?.status === 'reviewed' || quotation()?.status === 'refused'"
                     >
                       <mat-option [value]="null">
                         {{ 'quotations.review.versioning.selectPreviousPlaceholder' | translate }}
@@ -764,7 +787,7 @@
             </mat-card-title>
           </mat-card-header>
           <mat-card-content>
-            @if (isWriter() && q.status !== 'reviewed') {
+            @if (isWriter() && q.status !== 'reviewed' && q.status !== 'refused') {
               <mat-form-field appearance="outline" class="notes-field form-col-full">
                 <mat-label>{{ 'quotations.review.notes.label' | translate }}</mat-label>
                 <textarea

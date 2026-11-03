@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { authGuard, guestGuard, roleGuard } from './core/auth/auth.guard';
+import { quotationReviewGuard } from './features/quotations/quotation-review/quotation-review.guard';
 import { rfqDirtyGuard } from './features/rfq/create/rfq-create.guard';
 
 export const rfqGuardrailsOwnerGuard = roleGuard('owner');
@@ -212,6 +213,7 @@ export const routes: Routes = [
       },
       {
         path: 'quotations/:id/review',
+        canDeactivate: [quotationReviewGuard],
         loadComponent: () =>
           import('./features/quotations/quotation-review/quotation-review.component').then(
             (m) => m.QuotationReviewComponent,
@@ -219,6 +221,7 @@ export const routes: Routes = [
       },
       {
         path: 'quotations/:id',
+        canDeactivate: [quotationReviewGuard],
         loadComponent: () =>
           import('./features/quotations/quotation-review/quotation-review.component').then(
             (m) => m.QuotationReviewComponent,
