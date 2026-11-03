@@ -2284,7 +2284,9 @@
   },
   "requests": {
     "list": {
-      "newRequestButton": "طلب جديد"
+      "newRequestButton": "طلب جديد",
+      "loadMore": "تحميل المزيد",
+      "loadedCount": "تم تحميل {{count}} من طلبات الشراء"
     },
     "table": {
       "caption": "طلبات الشراء"
@@ -2351,6 +2353,8 @@
       "atLeastOneLineRequired": "مطلوب بند واحد على الأقل."
     },
     "empty": "لا توجد طلبات شراء بعد. أنشئ أول طلب للبدء.",
+    "listEmptyFiltered": "لا توجد طلبات شراء تطابق هذا الفلتر.",
+    "clearFilter": "إلغاء التصفية",
     "createSuccess": "تم حفظ طلب الشراء كمسودة.",
     "submitSuccess": "تم إرسال طلب الشراء للاعتماد.",
     "withdrawSuccess": "تم سحب طلب الشراء.",
