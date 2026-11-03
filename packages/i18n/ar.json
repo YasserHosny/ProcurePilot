@@ -1656,7 +1656,7 @@
       "reliabilityNotEnoughData": "لا توجد بيانات كافية (محايد)"
     },
     "table": {
-        "ariaLabel": "مقارنة عروض الموردين",
+      "ariaLabel": "مقارنة عروض الموردين",
       "supplier": "المورد",
       "normalisedUnitPrice": "سعر الوحدة",
       "landedCostTotal": "إجمالي التكلفة الواصلة",
@@ -3870,7 +3870,11 @@
       "sort": "ترتيب حسب",
       "apply": "بحث",
       "noMatchTitle": "لا توجد أوامر مطابقة",
-      "noMatchDescription": "غيّر البحث أو فلتر الحالة لعرض المزيد من الأوامر."
+      "noMatchDescription": "غيّر البحث أو فلتر الحالة لعرض المزيد من الأوامر.",
+      "supplier": "المورّد",
+      "allSuppliers": "كل الموردين",
+      "dateFrom": "تاريخ الأمر من",
+      "dateTo": "تاريخ الأمر إلى"
     },
     "sort": {
       "created_at_desc": "الأحدث أولاً",

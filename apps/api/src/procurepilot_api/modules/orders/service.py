@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import logging
 from collections.abc import Iterator
@@ -750,10 +751,10 @@ class OrdersService:
         direction: str = "desc",
     ) -> PurchaseOrderList:
         capped = max(1, min(limit, 100))
-        offset = _cursor(cursor)
         sort_column = _ORDER_SORT_COLUMNS.get(sort)
         if sort_column is None or direction not in ("asc", "desc"):
             raise UnprocessableEntityError(details={"sort": "invalid"})
+        after = _decode_keyset(cursor, sort=sort, direction=direction)
         unknown = [value for value in statuses if value not in _ORDER_STATUSES]
         if unknown:
             raise UnprocessableEntityError(details={"status": "invalid"})
@@ -784,11 +785,19 @@ class OrdersService:
         with self._transaction(member) as cur:
             cur.execute(f"select count(*) as n from purchase_order where {condition}", params)
             total_count = int(cur.fetchone()["n"])
-            # The id tie-break keeps pages stable when several orders share a sort value.
+            # Keyset paging: the page starts after the last row shown, so an order created or
+            # changed meanwhile can neither repeat a row nor hide one. The id tie-break makes the
+            # position unique when several orders share a sort value.
+            page_condition, page_params = condition, list(params)
+            if after is not None:
+                comparison = "<" if direction == "desc" else ">"
+                cast = _ORDER_SORT_CASTS[sort_column]
+                page_condition += f" and ({sort_column}, id) {comparison} (%s::{cast}, %s::uuid)"
+                page_params += [after[0], after[1]]
             cur.execute(
-                f"select {ORDER_HEADER_COLUMNS} from purchase_order where {condition} "
-                f"order by {sort_column} {direction}, id {direction} limit %s offset %s",
-                [*params, capped + 1, offset],
+                f"select {ORDER_HEADER_COLUMNS} from purchase_order where {page_condition} "
+                f"order by {sort_column} {direction}, id {direction} limit %s",
+                [*page_params, capped + 1],
             )
             rows = cur.fetchall()
             visible = rows[:capped]
@@ -814,7 +823,11 @@ class OrdersService:
         )
         return PurchaseOrderList(
             items=orders,
-            next_cursor=str(offset + capped) if len(rows) > capped else None,
+            next_cursor=(
+                _encode_keyset(visible[-1], sort=sort, sort_column=sort_column, direction=direction)
+                if len(rows) > capped
+                else None
+            ),
             total_count=total_count,
         )
 
@@ -1574,6 +1587,36 @@ _ORDER_SORT_COLUMNS = {
 
 def _escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+_ORDER_SORT_CASTS = {
+    "created_at": "timestamptz",
+    "order_date": "date",
+    "total_amount": "numeric",
+    "order_number": "text",
+}
+
+
+def _encode_keyset(row: dict[str, object], *, sort: str, sort_column: str, direction: str) -> str:
+    value = row[sort_column]
+    text = value.isoformat() if isinstance(value, (datetime, date)) else str(value)
+    payload = json.dumps({"s": sort, "d": direction, "v": text, "i": str(row["id"])})
+    return base64.urlsafe_b64encode(payload.encode()).decode()
+
+
+def _decode_keyset(value: str | None, *, sort: str, direction: str) -> tuple[str, str] | None:
+    """The sort position a page continues from; a cursor made for another sort is refused."""
+    if value is None:
+        return None
+    try:
+        data = json.loads(base64.urlsafe_b64decode(value.encode()))
+        position = (str(data["v"]), str(UUID(str(data["i"]))))
+        matches = data["s"] == sort and data["d"] == direction
+    except (ValueError, KeyError, TypeError) as exc:
+        raise UnprocessableEntityError(details={"cursor": "invalid"}) from exc
+    if not matches:
+        raise UnprocessableEntityError(details={"cursor": "invalid"})
+    return position
 
 
 def _cursor(value: str | None) -> int:

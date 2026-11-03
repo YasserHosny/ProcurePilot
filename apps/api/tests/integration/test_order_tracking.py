@@ -1231,3 +1231,99 @@ def test_retried_evidence_after_the_order_was_cancelled_replays_instead_of_refus
         with psycopg.connect(TEST_DATABASE_URL) as conn, conn.cursor() as cur:
             cur.execute(f"select count(*) from {table} where purchase_order_id = %s", (order_id,))
             assert cur.fetchone()[0] == 1
+
+
+def test_order_list_paging_is_stable_when_an_order_is_created_between_pages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PPS-206: an offset cursor repeated a row when something newer was inserted."""
+    with committed_smart_context("order-keyset") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        supplier = context.supplier_ids[0]
+
+        def create(number: str, qty: str = "1") -> None:
+            res = client.post(
+                "/api/v1/orders",
+                json=_manual_payload(supplier, number, qty, "10.00"),
+                headers={"Idempotency-Key": str(uuid4())},
+            )
+            assert res.status_code == 201, res.text
+
+        for number in ("PO-K1", "PO-K2", "PO-K3"):
+            create(number)
+
+        first = client.get("/api/v1/orders", params={"limit": 2})  # newest first: K3, K2
+        assert [i["order_number"] for i in first.json()["items"]] == ["PO-K3", "PO-K2"]
+
+        create("PO-K4")  # newer than everything already shown
+
+        second = client.get(
+            "/api/v1/orders", params={"limit": 2, "cursor": first.json()["next_cursor"]}
+        )
+        assert [i["order_number"] for i in second.json()["items"]] == ["PO-K1"]
+        assert second.json()["next_cursor"] is None
+
+
+@pytest.mark.parametrize(
+    ("sort", "direction", "expected"),
+    [
+        ("order_number", "asc", ["PO-S1", "PO-S2", "PO-S3"]),
+        ("order_number", "desc", ["PO-S3", "PO-S2", "PO-S1"]),
+        ("total", "asc", ["PO-S3", "PO-S1", "PO-S2"]),
+        ("order_date", "desc", ["PO-S3", "PO-S2", "PO-S1"]),
+    ],
+)
+def test_order_list_keyset_paging_follows_every_sort(
+    monkeypatch: pytest.MonkeyPatch, sort: str, direction: str, expected: list[str]
+) -> None:
+    with committed_smart_context(f"order-keyset-{sort.replace('_', '-')}-{direction}") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        for number, qty, order_date in (
+            ("PO-S1", "2", "2026-09-01"),
+            ("PO-S2", "9", "2026-09-02"),
+            ("PO-S3", "1", "2026-09-03"),
+        ):
+            payload = _manual_payload(context.supplier_ids[0], number, qty, "10.00")
+            payload["order_date"] = order_date
+            res = client.post(
+                "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+            )
+            assert res.status_code == 201, res.text
+
+        seen: list[str] = []
+        cursor: str | None = None
+        for _ in range(5):
+            params: dict[str, object] = {"limit": 1, "sort": sort, "dir": direction}
+            if cursor:
+                params["cursor"] = cursor
+            page = client.get("/api/v1/orders", params=params).json()
+            seen += [i["order_number"] for i in page["items"]]
+            cursor = page["next_cursor"]
+            if cursor is None:
+                break
+        assert seen == expected
+
+
+def test_order_list_refuses_a_cursor_from_another_sort_or_a_garbled_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with committed_smart_context("order-keyset-bad") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        for number in ("PO-B1", "PO-B2"):
+            client.post(
+                "/api/v1/orders",
+                json=_manual_payload(context.supplier_ids[0], number, "1", "10.00"),
+                headers={"Idempotency-Key": str(uuid4())},
+            )
+        page = client.get("/api/v1/orders", params={"limit": 1, "sort": "order_number"}).json()
+
+        other_sort = client.get(
+            "/api/v1/orders", params={"limit": 1, "cursor": page["next_cursor"]}
+        )
+        garbled = client.get("/api/v1/orders", params={"cursor": "not-a-cursor"})
+
+        assert other_sort.status_code == 422, other_sort.text
+        assert garbled.status_code == 422, garbled.text

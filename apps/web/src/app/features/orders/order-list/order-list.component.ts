@@ -12,6 +12,8 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatService } from '../../../core/format/format.service';
 import { parseIsoDateLocal } from '../../../core/format/iso-date';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { ApiService } from '../../../core/api/api.service';
+import type { Supplier } from '../../../core/api/models';
 import { RequestsApiService, type PurchaseRequest } from '../../requests/requests-api';
 import { isOrderOverdue } from '../order-helpers';
 import { OrdersApiService, type OrderListQuery, type OrderStatus, type PurchaseOrder } from '../orders-api';
@@ -38,6 +40,7 @@ import { OrdersApiService, type OrderListQuery, type OrderStatus, type PurchaseO
 export class OrderListComponent implements OnInit {
   private readonly ordersApi = inject(OrdersApiService);
   private readonly requestsApi = inject(RequestsApiService);
+  private readonly api = inject(ApiService);
   private readonly formatService = inject(FormatService);
   private readonly router = inject(Router);
   private readonly translate = inject(TranslateService);
@@ -58,6 +61,10 @@ export class OrderListComponent implements OnInit {
 
   readonly search = signal('');
   readonly statusFilter = signal('all');
+  readonly supplierFilter = signal('');
+  readonly dateFrom = signal('');
+  readonly dateTo = signal('');
+  readonly suppliers = signal<Supplier[]>([]);
   readonly sortKey = signal('created_at:desc');
   readonly statusOptions = ['all', 'draft', 'submitted', 'confirmed', 'partially_received', 'received', 'closed', 'cancelled'] as const;
   readonly sortOptions = [
@@ -66,13 +73,23 @@ export class OrderListComponent implements OnInit {
   ] as const;
 
   /** True when any filter narrows the list, so an empty result means «no match», not «no orders». */
-  readonly filtersActive = computed(() => this.search().trim() !== '' || this.statusFilter() !== 'all');
+  readonly filtersActive = computed(
+    () =>
+      this.search().trim() !== '' ||
+      this.statusFilter() !== 'all' ||
+      this.supplierFilter() !== '' ||
+      this.dateFrom() !== '' ||
+      this.dateTo() !== '',
+  );
 
   private query(): OrderListQuery {
     const [sort, dir] = this.sortKey().split(':') as [string, 'asc' | 'desc'];
     return {
       q: this.search().trim() || undefined,
       status: this.statusFilter() === 'all' ? undefined : this.statusFilter(),
+      supplier_id: this.supplierFilter() || undefined,
+      date_from: this.dateFrom() || undefined,
+      date_to: this.dateTo() || undefined,
       sort: this.sortKey() === 'created_at:desc' ? undefined : sort,
       dir: this.sortKey() === 'created_at:desc' ? undefined : dir,
     };
@@ -92,6 +109,17 @@ export class OrderListComponent implements OnInit {
     this.loadOrders();
   }
 
+  onSupplierChange(event: Event): void {
+    this.supplierFilter.set((event.target as HTMLSelectElement).value);
+    this.loadOrders();
+  }
+
+  onDateChange(which: 'from' | 'to', event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    (which === 'from' ? this.dateFrom : this.dateTo).set(value);
+    this.loadOrders();
+  }
+
   onSortChange(event: Event): void {
     this.sortKey.set((event.target as HTMLSelectElement).value);
     this.loadOrders();
@@ -105,6 +133,10 @@ export class OrderListComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadOrders();
+    this.api.suppliers({ limit: 100, status: 'all' }).subscribe({
+      next: (response) => this.suppliers.set(response.items),
+      error: () => this.suppliers.set([]), // the filter simply offers no suppliers
+    });
   }
 
   loadOrders(): void {
