@@ -11,6 +11,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { lineDescription, packLabel } from '../pack-label';
+import { RequestsApiService } from '../../requests/requests-api';
+import type { PurchaseRequest } from '../../../core/api/models';
 import { isOrderOverdue, orderToCsv } from '../order-helpers';
 
 import { FormatService } from '../../../core/format/format.service';
@@ -53,10 +55,13 @@ export class OrderDetailComponent implements OnInit {
   private readonly ordersApi = inject(OrdersApiService);
   private readonly translate = inject(TranslateService);
   private readonly formatService = inject(FormatService);
+  private readonly requestsApi = inject(RequestsApiService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly dateAdapter = inject(DateAdapter) as AppDateAdapter;
 
   readonly evidence = signal<OrderEvidenceProjection | null>(null);
+  /** The request this order was made from, for the RFQ and quotation links; null when unknown. */
+  readonly sourceRequest = signal<PurchaseRequest | null>(null);
   readonly isLoading = signal(true);
   readonly isSaving = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -100,9 +105,33 @@ export class OrderDetailComponent implements OnInit {
       next: (value) => {
         this.evidence.set(value);
         this.isLoading.set(false);
+        this.loadSourceRequest(value.order.source_request_id);
       },
       error: () => { this.errorMessage.set(this.translate.instant('orders.loadError')); this.isLoading.set(false); },
     });
+  }
+
+  /** Best effort: without the request the page just has no RFQ or quotation links. */
+  private loadSourceRequest(requestId: string | null | undefined): void {
+    this.sourceRequest.set(null);
+    if (!requestId) return;
+    this.requestsApi.getRequest(requestId).subscribe({
+      next: (request) => this.sourceRequest.set(request),
+      error: () => this.sourceRequest.set(null),
+    });
+  }
+
+  /** Share of the ordered quantity that has arrived (0-100); over-receipt counts only up to the order. */
+  receivedPercent(): number {
+    const lines = this.evidence()?.lifecycle.lines ?? [];
+    const ordered = lines.reduce((sum, line) => sum + (parseFloat(line.ordered_quantity) || 0), 0);
+    if (ordered <= 0) return 0;
+    const received = lines.reduce(
+      (sum, line) =>
+        sum + Math.min(parseFloat(line.received.quantity ?? '') || 0, parseFloat(line.ordered_quantity) || 0),
+      0,
+    );
+    return Math.min(100, Math.round((received / ordered) * 100));
   }
 
   readonly lineDescription = lineDescription;
