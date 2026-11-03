@@ -353,6 +353,34 @@ describe('CompareComponent (RFQ)', () => {
     expect(mockSnackBar.open).toHaveBeenCalled();
   });
 
+  it('reuses the draft send key after 503, clears it on success, and blocks concurrent sends', () => {
+    component.rfqDetail.set(draftDetail);
+    component.currentMembershipId.set(draftDetail.rfq.created_by_membership_id);
+    mockDialog.open.and.returnValue({
+      afterClosed: () => of(true),
+    } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+    mockRfqApi.sendRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+
+    component.onSendDraft();
+    const firstKey = mockRfqApi.sendRfq.calls.mostRecent().args[1];
+    expect(firstKey).toEqual(jasmine.any(String));
+
+    const pending = new Subject<RfqSendResponse>();
+    mockRfqApi.sendRfq.and.returnValue(pending);
+    component.onSendDraft();
+    expect(mockRfqApi.sendRfq.calls.mostRecent().args[1]).toBe(firstKey);
+    component.onSendDraft();
+    expect(mockRfqApi.sendRfq).toHaveBeenCalledTimes(2);
+    expect(mockDialog.open).toHaveBeenCalledTimes(2);
+
+    pending.next({ rfq: sentDetail.rfq, recipients: draftDetail.recipients });
+    component.onSendDraft();
+    expect(mockRfqApi.sendRfq).toHaveBeenCalledTimes(3);
+    expect(mockRfqApi.sendRfq.calls.mostRecent().args[1]).toEqual(jasmine.any(String));
+    expect(mockRfqApi.sendRfq.calls.mostRecent().args[1]).not.toBe(firstKey);
+    pending.complete();
+  });
+
   it('shows draft actions only to the RFQ creator', async () => {
     mockRfqApi.getRfq.and.returnValue(of(draftDetail));
     component.loadData('rfq-1');

@@ -95,6 +95,7 @@ export class CompareComponent implements OnInit, OnChanges {
   readonly currentMembershipId = signal<string | null>(null);
   readonly isSplitting = signal<boolean>(false);
   readonly preparing = signal<string | null>(null);
+  readonly sending = signal<boolean>(false);
   readonly branchesError = signal<boolean>(false);
   readonly rfqDetailError = signal<boolean>(false);
   private splitIdempotencyKey: string | null = null;
@@ -562,6 +563,7 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   onSendDraft(): void {
+    if (this.sending()) return;
     if (!this.isCreator()) return;
     const detail = this.rfqDetail();
     const id = this.rfqId();
@@ -584,8 +586,12 @@ export class CompareComponent implements OnInit, OnChanges {
 
     dialogRef.afterClosed().subscribe((confirmed: boolean | undefined) => {
       if (confirmed) {
-        this.rfqApi.sendRfq(id).subscribe({
+        if (this.sending()) return;
+        this.sending.set(true);
+        this.rfqApi.sendRfq(id, this.actionKeys.get(`send:${id}`)).subscribe({
           next: (res) => {
+            this.actionKeys.clear(`send:${id}`);
+            this.sending.set(false);
             const total = res.recipients.length;
             const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
             const key = sent === total && total > 0 ? 'rfq.history.sentSuccess' : sent > 0 ? 'rfq.create.sentPartial' : 'rfq.create.sentNone';
@@ -595,6 +601,8 @@ export class CompareComponent implements OnInit, OnChanges {
             else this.loadData(id);
           },
           error: (err: unknown) => {
+            this.actionKeys.onError(`send:${id}`, err);
+            this.sending.set(false);
             const key = err instanceof HttpErrorResponse && err.status === 403 ? 'rfq.creatorOnly' : 'rfq.history.sendError';
             this.snackBar.open(
               this.translate.instant(key),
