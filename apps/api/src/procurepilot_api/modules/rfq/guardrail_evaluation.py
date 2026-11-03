@@ -9,6 +9,7 @@ from uuid import UUID
 import psycopg
 
 from procurepilot_api.modules.catalogue.normalisation import normalised_base_quantity
+from procurepilot_api.modules.requests.valuation import estimate_from_source_response
 from procurepilot_api.modules.rfq.guardrails import (
     AutoPreparationGuardrail,
     GuardrailCandidate,
@@ -127,10 +128,15 @@ def compute_guardrail_evaluation(
     )
 
     cur.execute(
-        "select count(*) as cnt from rfq_line where tenant_id = %s and rfq_id = %s",
+        "select workspace_product_id, quantity from rfq_line where tenant_id = %s and rfq_id = %s",
         (tenant_id, rfq_id),
     )
-    rfq_line_count = cur.fetchone()["cnt"]
+    requested_quantity_by_product: dict[UUID, Decimal] = {}
+    for line in cur.fetchall():
+        product_id = line["workspace_product_id"]
+        requested_quantity_by_product[product_id] = (
+            requested_quantity_by_product.get(product_id, Decimal("0")) + line["quantity"]
+        )
 
     matched_product_ids = {
         row["matched_workspace_product_id"]
@@ -191,9 +197,29 @@ def compute_guardrail_evaluation(
                     workspace_product_id=product_id, unit_price_amount=unit_price
                 )
             )
-            candidate["total_amount"] += row["quantity"] * row["unit_price_amount"]
             candidate["matched_workspace_product_ids_set"].add(product_id)
             workspace_product_ids.add(product_id)
+
+    for response_id, candidate in candidates_by_id.items():
+        prepared_product_ids = (
+            requested_quantity_by_product.keys() & candidate["matched_workspace_product_ids_set"]
+        )
+        if prepared_product_ids:
+            # Preparation copies RFQ pack quantities, not quotation quantities. Reuse its
+            # effective per-pack prices and duplicate-product selection, so cap and draft agree.
+            estimates = estimate_from_source_response(
+                cur.connection,
+                rfq_response_id=response_id,
+                product_ids=list(prepared_product_ids),
+            )
+            candidate["total_amount"] = sum(
+                (
+                    requested_quantity_by_product[product_id] * estimate.unit_price_amount
+                    for product_id, estimate in estimates.items()
+                    if estimate.unit_price_amount is not None
+                ),
+                Decimal("0"),
+            )
 
     candidates = [
         GuardrailCandidate(
@@ -203,8 +229,9 @@ def compute_guardrail_evaluation(
             total_amount=item["total_amount"],
             all_lines_matched=(
                 item["response_state"] == "active"
-                and rfq_line_count > 0
-                and len(item["matched_workspace_product_ids_set"]) == rfq_line_count
+                and bool(requested_quantity_by_product)
+                and requested_quantity_by_product.keys()
+                <= item["matched_workspace_product_ids_set"]
             ),
             matched_lines=item["matched_lines"],
             captured_at=item["captured_at"],
