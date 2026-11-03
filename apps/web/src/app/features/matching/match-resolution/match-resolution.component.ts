@@ -109,6 +109,7 @@ export class MatchResolutionComponent implements OnInit {
   readonly aliasConflictNotice = signal<boolean>(false);
   readonly isReloadable = signal<boolean>(false);
   private correctionKey: string | null = null;
+  private resolutionKey: string | null = null;
 
   isWriter(): boolean {
     return this.session.hasRole('owner', 'buyer');
@@ -253,6 +254,7 @@ export class MatchResolutionComponent implements OnInit {
   }
 
   loadTask(id: string): void {
+    this.resolutionKey = null;
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
@@ -359,24 +361,45 @@ export class MatchResolutionComponent implements OnInit {
   // Keyboard navigation & confirmation
   @HostListener('window:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent): void {
-    // Ignore keyboard shortcuts if the user is typing in a text input or select
-    const target = event.target as HTMLInputElement | null;
-    const tagName = target?.tagName?.toLowerCase();
+    if (this.dialog.openDialogs.length > 0) {
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+        if (this.isWriter() && !this.isSubmitting() && !this.decision()) {
+          event.preventDefault();
+          this.confirmResolution();
+        }
+      }
+      return;
+    }
+
+    if (event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    const targetEl =
+      event.target instanceof Element
+        ? event.target
+        : (event.target as Node | null)?.parentElement ?? null;
+    const tagName = targetEl?.tagName?.toLowerCase();
     const isTextInput =
-      (tagName === 'input' && target?.type !== 'radio' && target?.type !== 'checkbox') ||
+      (tagName === 'input' &&
+        (targetEl as HTMLInputElement).type !== 'radio' &&
+        (targetEl as HTMLInputElement).type !== 'checkbox') ||
       tagName === 'textarea' ||
       tagName === 'select';
 
-    // Allow Enter inside input if Ctrl or Meta is pressed
-    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey || !isTextInput)) {
-      if (this.isWriter() && !this.isSubmitting() && !this.decision()) {
-        event.preventDefault();
-        this.confirmResolution();
-        return;
-      }
-    }
+    const isInsideSelectOrList = Boolean(
+      targetEl?.closest?.(
+        '[role="combobox"], [role="listbox"], [role="option"], mat-select, mat-radio-group.outcomes-radio-group, .outcomes-radio-group'
+      )
+    );
 
-    if (isTextInput) return;
+    if (isTextInput || isInsideSelectOrList) {
+      return;
+    }
 
     // Number keys 1-9: Select candidate by rank
     const digit = parseInt(event.key, 10);
@@ -390,16 +413,28 @@ export class MatchResolutionComponent implements OnInit {
     }
 
     // Arrow keys: Navigate between candidates
-    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+    if (event.key === 'ArrowDown') {
       event.preventDefault();
       this.navigateCandidate(1);
-    } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+      return;
+    }
+    if (event.key === 'ArrowUp') {
       event.preventDefault();
       this.navigateCandidate(-1);
-    } else if (event.key === 'o' || event.key === 'O') {
-      // Toggle outcome
+      return;
+    }
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+      event.preventDefault();
+      const isRtl = document.documentElement.dir === 'rtl';
+      const isNext = (event.key === 'ArrowRight' && !isRtl) || (event.key === 'ArrowLeft' && isRtl);
+      this.navigateCandidate(isNext ? 1 : -1);
+      return;
+    }
+
+    if (event.key === 'o' || event.key === 'O') {
       event.preventDefault();
       this.cycleOutcome();
+      return;
     }
   }
 
@@ -462,6 +497,9 @@ export class MatchResolutionComponent implements OnInit {
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
 
+    this.resolutionKey ??= crypto.randomUUID();
+    const key = this.resolutionKey;
+
     // CRITICAL: Ensure EVERY user selection is accurately serialized into the request payload!
     let payload: MatchResolutionRequest;
 
@@ -494,9 +532,10 @@ export class MatchResolutionComponent implements OnInit {
       };
     }
 
-    this.api.resolveMatch(l.id, payload).subscribe({
+    this.api.resolveMatch(l.id, payload, key).subscribe({
       next: (decision) => {
         this.isSubmitting.set(false);
+        this.resolutionKey = null;
         this.decision.set(decision);
         if (resolveNext) {
           this.navigateToNextTask(l.id, decision);
