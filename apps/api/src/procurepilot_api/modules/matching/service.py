@@ -53,7 +53,11 @@ from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.modules.quotations.schemas import Money, Pack
 from procurepilot_api.modules.quotations.schemas import decimal_string as quantity_string
-from procurepilot_api.modules.rfq.read_api import RfqContext, rfq_lines_for_quotation
+from procurepilot_api.modules.rfq.read_api import (
+    RfqContext,
+    rfq_id_for_quotation_with_conn,
+    rfq_lines_for_quotation,
+)
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 from procurepilot_api.shared.postgrest_pages import all_rows
@@ -521,27 +525,8 @@ class MatchingService:
                 with conn.cursor(row_factory=dict_row) as cur:
                     cur.execute(query, params)
                     rows = [dict(row) for row in cur.fetchall()]
-                    if quotation_id is not None:
-                        rfq_lookup_sql = (
-                            "select rt.rfq_id from rfq_response rr "
-                            "join rfq_recipient rt on rt.tenant_id = rr.tenant_id "
-                            "and rt.id = rr.rfq_recipient_id "
-                            "where rr.tenant_id = %(tenant_id)s "
-                            "and rr.quotation_id = %(quotation_id)s "
-                            "order by rr.created_at desc, rr.id desc limit 1"
-                        )
-                        cur.execute(
-                            rfq_lookup_sql,
-                            {"tenant_id": member.tenant_id, "quotation_id": quotation_id},
-                        )
-                        rfq_row = cur.fetchone()
-                        if rfq_row and rfq_row.get("rfq_id"):
-                            raw_rfq_id = rfq_row["rfq_id"]
-                            rfq_id = (
-                                raw_rfq_id
-                                if isinstance(raw_rfq_id, UUID)
-                                else UUID(str(raw_rfq_id))
-                            )
+                if quotation_id is not None:
+                    rfq_id = rfq_id_for_quotation_with_conn(conn, quotation_id)
         except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
