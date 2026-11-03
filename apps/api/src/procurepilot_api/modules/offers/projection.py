@@ -31,11 +31,6 @@ def project_landed_cost(
     # is already in — so convert it to the number of original supplier pack units the landed-cost
     # formula itself prices against, rather than treating it as a pack count.
     requested = requested_quantity.quantize(QUANTITY_QUANT, rounding=ROUND_HALF_UP)
-    quantity = Decimal(str(raw_inputs["quantity"]))
-    normalised_base_quantity = Decimal(str(raw_inputs["normalised_base_quantity"]))
-    if quantity > 0 and normalised_base_quantity > 0:
-        # A 9 L supplier pack needs twice as many packs as an 18 L catalogue pack.
-        pack_base_quantity = normalised_base_quantity / quantity
     packs_needed = (requested / pack_base_quantity).quantize(QUANTITY_QUANT, rounding=ROUND_HALF_UP)
     projected_inputs = dict(raw_inputs)
     projected_inputs["quantity"] = _quantity_string(packs_needed)

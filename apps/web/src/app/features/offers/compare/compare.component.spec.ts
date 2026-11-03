@@ -355,6 +355,23 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
       expect(component.rawComparison()).toBe(loaded);
     }));
 
+    it('keeps a newer refresh answer when a slower first load answers afterwards', fakeAsync(() => {
+      const first$ = new Subject<OfferComparison>();
+      const refresh$ = new Subject<OfferComparison>();
+      apiService.compareOffers.and.returnValues(first$, refresh$);
+
+      component.fetchComparison(mockComparison.product.id);
+      component.onQuantityChange('40');
+      tick(700);
+
+      const refreshed = comparisonFor('refreshed', '500.0000');
+      refresh$.next(refreshed);
+      first$.next(comparisonFor('first', '200.0000'));
+
+      expect(component.rawComparison()).toBe(refreshed);
+      expect(component.isLoading()).toBeFalse();
+    }));
+
     it('shows a failed comparison as an alert with Retry', () => {
       apiService.compareOffers.and.returnValue(
         throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'Offers are down', trace_id: 'tr-9' } })),
