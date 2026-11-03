@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideTranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 
@@ -166,4 +166,70 @@ describe('GuardrailsComponent', () => {
     component.save();
     expect(component.errorMessage()).toBe('rfq.guardrails.validation.maxOrderValue');
   });
+  it('captures the submitted edit and blocks cancel, edit, toggle and duplicate save while saving', () => {
+    const pending = new Subject<RfqGuardrail>();
+    rfqApi.updateGuardrail.and.returnValue(pending);
+    component.edit(guardrail);
+    component.save();
+    component.cancelEdit();
+    component.edit({ ...guardrail, id: 'other' });
+    component.toggle(guardrail);
+    component.save();
+    expect(component.editingId()).toBe(guardrail.id);
+    expect(rfqApi.updateGuardrail).toHaveBeenCalledTimes(1);
+    fixture.detectChanges();
+    const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('.form-actions button, .card-actions button'));
+    expect(buttons.every((button) => button.disabled)).toBeTrue();
+    // Even if mode changes programmatically, completion uses the submitted ID.
+    component.editingId.set(null);
+    pending.next({ ...guardrail, max_order_value_amount: '2000' });
+    expect(component.guardrails().length).toBe(1);
+    expect(component.guardrails()[0].max_order_value_amount).toBe('2000');
+  });
+
+  it('keeps new-branch options when an earlier cost-centre response arrives late', () => {
+    const old = new Subject<{ items: never[]; next_cursor: null }>();
+    const current = new Subject<{ items: ReturnType<typeof component.costCentres>; next_cursor: null }>();
+    api.listCostCentres.and.returnValues(old, current);
+    component.onBranchChange('old');
+    component.onBranchChange('new');
+    const options = [{ id: 'new-cc', name: 'New', code: 'N', branch_id: 'new', is_orphaned: false, is_archived: false, created_at: '' }];
+    current.next({ items: options, next_cursor: null });
+    old.next({ items: [], next_cursor: null });
+    expect(component.costCentres()).toEqual(options);
+  });
+
+  it('shows a cost-centre error with retry and ignores stale failures', () => {
+    const old = new Subject<{ items: never[]; next_cursor: null }>();
+    const current = new Subject<{ items: never[]; next_cursor: null }>();
+    api.listCostCentres.and.returnValues(old, current, of({ items: [], next_cursor: null }));
+    component.onBranchChange('old');
+    component.onBranchChange('new');
+    old.error(new HttpErrorResponse({ status: 503 }));
+    expect(component.costCentresError()).toBeFalse();
+    current.error(new HttpErrorResponse({ status: 503 }));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="alert"]').textContent).toContain('rfq.guardrails.costCentresError');
+    const retry = fixture.nativeElement.querySelector('[role="alert"] button') as HTMLButtonElement;
+    retry.click();
+    expect(api.listCostCentres.calls.mostRecent().args[0]?.branch_id).toBe('new');
+    expect(component.costCentresError()).toBeFalse();
+  });
+
+  it('blocks only the toggling guardrail until success or failure', () => {
+    const pending = new Subject<RfqGuardrail>();
+    rfqApi.updateGuardrail.and.returnValue(pending);
+    component.toggle(guardrail);
+    component.toggle(guardrail);
+    expect(rfqApi.updateGuardrail).toHaveBeenCalledTimes(1);
+    fixture.detectChanges();
+    expect((fixture.nativeElement.querySelector('.card-actions button:last-child') as HTMLButtonElement).disabled).toBeTrue();
+    pending.error(new HttpErrorResponse({ status: 503 }));
+    expect(component.togglingIds().has(guardrail.id)).toBeFalse();
+    rfqApi.updateGuardrail.and.returnValue(of({ ...guardrail, enabled: false }));
+    component.toggle(guardrail);
+    expect(component.togglingIds().size).toBe(0);
+    expect(component.guardrails()[0].enabled).toBeFalse();
+  });
+
 });

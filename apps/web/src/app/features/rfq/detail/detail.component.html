@@ -142,6 +142,7 @@
                       mat-flat-button
                       color="primary"
                       type="button"
+                      [disabled]="retrying()"
                       (click)="onSendDraft()"
                       data-testid="rfq-detail-send-button"
                     >

@@ -1,3 +1,4 @@
+import { RfqActionKeys } from '../rfq-api';
 import { Component, OnInit, inject, signal, ChangeDetectionStrategy, ElementRef, viewChildren } from '@angular/core';
 
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -52,6 +53,7 @@ import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/
   styleUrl: './create.component.scss',
 })
 export class RfqCreateComponent implements OnInit {
+  private readonly actionKeys = new RfqActionKeys();
   private readonly fb = inject(FormBuilder);
   private readonly rfqApi = inject(RfqApi);
   private readonly apiService = inject(ApiService);
@@ -506,6 +508,7 @@ export class RfqCreateComponent implements OnInit {
   }
 
   onSave(): void {
+    if (this.isSaving() || this.isSending()) return;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.focusFirstInvalidControl();
@@ -519,12 +522,14 @@ export class RfqCreateComponent implements OnInit {
 
     const payload = this.buildSavePayload();
     const existingId = this.rfqId();
+    const action = existingId ? `update:${existingId}` : 'create:new';
     const request$ = existingId
-      ? this.rfqApi.updateRfq(existingId, payload)
-      : this.rfqApi.createRfq(payload);
+      ? this.rfqApi.updateRfq(existingId, payload, this.actionKeys.get(action))
+      : this.rfqApi.createRfq(payload, this.actionKeys.get(action));
 
     request$.subscribe({
       next: (res) => {
+        this.actionKeys.clear(action);
         const wasCreate = existingId === null;
         this.form.markAsPristine();
         this.rfqId.set(res.rfq.id);
@@ -545,6 +550,7 @@ export class RfqCreateComponent implements OnInit {
         }
       },
       error: (err: unknown) => {
+        this.actionKeys.onError(action, err);
         this.isSaving.set(false);
         this.form.enable({ emitEvent: false });
         if (err instanceof HttpErrorResponse && err.status === 403) {
@@ -566,6 +572,7 @@ export class RfqCreateComponent implements OnInit {
   }
 
   onSend(): void {
+    if (this.isSaving() || this.isSending()) return;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.focusFirstInvalidControl();
@@ -601,7 +608,7 @@ export class RfqCreateComponent implements OnInit {
     });
 
     dialogRef.afterClosed().subscribe((confirmed) => {
-      if (!confirmed) return;
+      if (!confirmed || this.isSaving() || this.isSending()) return;
 
       if (this.form.dirty) {
         this.saveDraftAndSend(id);
@@ -612,14 +619,17 @@ export class RfqCreateComponent implements OnInit {
   }
 
   private saveDraftAndSend(id: string): void {
+    if (this.isSaving() || this.isSending()) return;
+    const action = `update:${id}`;
     this.isSaving.set(true);
     this.form.disable({ emitEvent: false });
     this.errorMessage.set(null);
     this.rejectedSuppliers.set([]);
 
     const payload = this.buildSavePayload();
-    this.rfqApi.updateRfq(id, payload).subscribe({
+    this.rfqApi.updateRfq(id, payload, this.actionKeys.get(action)).subscribe({
       next: (res) => {
+        this.actionKeys.clear(action);
         this.isSaving.set(false);
         this.form.markAsPristine();
         this.rfqStatus.set(res.rfq.status);
@@ -627,6 +637,7 @@ export class RfqCreateComponent implements OnInit {
         this.executeSend(id);
       },
       error: (err: unknown) => {
+        this.actionKeys.onError(action, err);
         this.isSaving.set(false);
         this.form.enable({ emitEvent: false });
         if (err instanceof HttpErrorResponse && err.status === 403) {
@@ -639,11 +650,14 @@ export class RfqCreateComponent implements OnInit {
   }
 
   private executeSend(id: string): void {
+    if (this.isSaving() || this.isSending()) return;
+    const action = `send:${id}`;
     this.isSending.set(true);
     this.form.disable({ emitEvent: false });
     this.errorMessage.set(null);
-    this.rfqApi.sendRfq(id).subscribe({
+    this.rfqApi.sendRfq(id, this.actionKeys.get(action)).subscribe({
       next: (res) => {
+        this.actionKeys.clear(action);
         this.form.markAsPristine();
         this.rfqStatus.set(res.rfq.status);
         this.isSending.set(false);
@@ -670,6 +684,7 @@ export class RfqCreateComponent implements OnInit {
         }
       },
       error: (err: unknown) => {
+        this.actionKeys.onError(action, err);
         this.isSending.set(false);
         this.form.enable({ emitEvent: false });
         if (err instanceof HttpErrorResponse && err.status === 403) {

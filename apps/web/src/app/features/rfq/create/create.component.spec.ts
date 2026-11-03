@@ -206,8 +206,7 @@ describe('RfqCreateComponent', () => {
     component.onSave();
     expect(rfqApiSpy.updateRfq).toHaveBeenCalledWith(
       'rfq-1',
-      jasmine.objectContaining({ needed_by_date: '2026-12-01' }),
-    );
+      jasmine.objectContaining({ needed_by_date: '2026-12-01' }), jasmine.any(String));
   });
 
   it('should call sendRfq when explicit send is triggered, show snackbar, and navigate to history', () => {
@@ -226,7 +225,7 @@ describe('RfqCreateComponent', () => {
     );
 
     component.onSend();
-    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-1');
+    expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-1', jasmine.any(String));
     expect(snackBarSpy.open).toHaveBeenCalledWith('RFQ sent. Suppliers emailed: 2', 'Close', {
       duration: 5000,
     });
@@ -339,7 +338,7 @@ describe('RfqCreateComponent', () => {
       recipient_supplier_ids: ['sup-1'],
       needed_by_date: '2026-11-15',
       tenant_terms: 'Net 30 delivery',
-    });
+    }, jasmine.any(String));
     expect(snackBarSpy.open).toHaveBeenCalledWith('Draft saved', 'Close', { duration: 4000 });
   });
 
@@ -508,8 +507,7 @@ describe('RfqCreateComponent', () => {
     });
     component.onSave();
     expect(rfqApiSpy.createRfq).toHaveBeenCalledWith(
-      jasmine.objectContaining({ needed_by_date: '2026-12-20' }),
-    );
+      jasmine.objectContaining({ needed_by_date: '2026-12-20' }), jasmine.any(String));
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain(
       'SAVE FALLBACK',
@@ -893,7 +891,7 @@ describe('RfqCreateComponent', () => {
 
       expect(dialogSpy.open).toHaveBeenCalled();
       expect(rfqApiSpy.updateRfq).toHaveBeenCalledBefore(rfqApiSpy.sendRfq);
-      expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-edit-1');
+      expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-edit-1', jasmine.any(String));
     });
 
     it('invalid form -> neither call', () => {
@@ -1621,4 +1619,40 @@ describe('RfqCreateComponent', () => {
       expect(editComp.selectedSupplierNames()).toContain('Archived Supplier');
     });
   });
+  it('keeps create and update keys separate, reuses failures and blocks duplicate saves', () => {
+    component.form.patchValue({ lines: [{ workspace_product_id: 'prod-1', quantity: '10' }], supplierIds: ['sup-1'], neededByDate: new Date(2026, 11, 1) });
+    const pending = new Subject<RfqCreateResponse>();
+    rfqApiSpy.createRfq.and.returnValue(pending);
+    component.onSave();
+    component.onSave();
+    expect(rfqApiSpy.createRfq).toHaveBeenCalledTimes(1);
+    const createKey = rfqApiSpy.createRfq.calls.mostRecent().args[1];
+    pending.error(new HttpErrorResponse({ status: 0 }));
+    rfqApiSpy.createRfq.and.returnValue(of({ rfq: { id: 'created', status: 'draft' } as Rfq, lines: [], recipients: [], rejected_recipients: [] }));
+    component.onSave();
+    expect(rfqApiSpy.createRfq.calls.mostRecent().args[1]).toBe(createKey);
+    rfqApiSpy.updateRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+    component.onSave();
+    const updateKey = rfqApiSpy.updateRfq.calls.mostRecent().args[2];
+    expect(updateKey).not.toBe(createKey);
+    component.onSave();
+    expect(rfqApiSpy.updateRfq.calls.mostRecent().args[2]).toBe(updateKey);
+  });
+
+  for (const status of [0, 503]) {
+    it(`reuses the create-form send key after ${status}, then rotates after success`, () => {
+      component.rfqId.set('rfq-1');
+      component.form.patchValue({ lines: [{ workspace_product_id: 'prod-1', quantity: '10' }], supplierIds: ['sup-1'], neededByDate: new Date(2026, 11, 1) });
+      component.form.markAsPristine();
+      rfqApiSpy.sendRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status })));
+      component.onSend();
+      const key = rfqApiSpy.sendRfq.calls.mostRecent().args[1];
+      rfqApiSpy.sendRfq.and.returnValue(of({ rfq: { id: 'rfq-1', status: 'sent' } as Rfq, recipients: [] }));
+      component.onSend();
+      expect(rfqApiSpy.sendRfq.calls.mostRecent().args[1]).toBe(key);
+      component.onSend();
+      expect(rfqApiSpy.sendRfq.calls.mostRecent().args[1]).not.toBe(key);
+    });
+  }
+
 });

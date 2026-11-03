@@ -4262,6 +4262,8 @@
       }
     },
     "compare": {
+      "unknownSupplier": "Unknown supplier",
+      "unknownProduct": "Unknown product",
       "title": "Compare responses",
       "subtitle": "Compare supplier responses and prepare a purchase request.",
       "supplier": "Supplier",
@@ -4505,6 +4507,8 @@
       "notSendableError": "This RFQ cannot be sent in its current state."
     },
     "guardrails": {
+      "costCentresError": "Could not load cost centres.",
+      "retryCostCentres": "Retry",
       "title": "Guardrail settings",
       "subtitle": "Define when a qualifying response may prepare a draft request.",
       "humanApprovalNote": "Guardrails only prepare DRAFT requests. A human must still approve every purchase.",
