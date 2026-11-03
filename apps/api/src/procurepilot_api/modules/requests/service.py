@@ -277,11 +277,21 @@ class RequestsService:
         same fix `low_stock_report` already had for this exact class of problem, applied here
         because a lost response otherwise let a client retry create a second draft (FR-011).
         """
+        client = authenticated_client(self._settings, bearer_token)
+
+        # 0. Idempotent replay BEFORE validation: an existing (tenant, key) request is resolved
+        # and replayed without re-running validations (e.g. required_by_date, product existence).
+        if idempotency_key is not None:
+            replay = self._find_idempotent_replay(
+                client=client, member=member, idempotency_key=idempotency_key
+            )
+            if replay is not None:
+                return replay, False
+
         # 1. Validation BEFORE any write and BEFORE estimate lookup
         self._validate_required_by_date(payload.required_by_date)
         self._validate_request_lines(payload.lines)
 
-        client = authenticated_client(self._settings, bearer_token)
         self._authorize_branch_for_write(client, member=member, branch_id=payload.branch_id)
         if payload.cost_centre_id is not None:
             self._validate_cost_centre_branch(
@@ -318,34 +328,6 @@ class RequestsService:
                         (json.dumps(claims),),
                     )
                     cur.execute("select pg_advisory_xact_lock(%s)", (lock_id,))
-
-                    if idempotency_key is not None:
-                        cur.execute(
-                            f"select {REQUEST_COLUMNS} from purchase_request "
-                            "where tenant_id = %s and idempotency_key = %s",
-                            (member.tenant_id, str(idempotency_key)),
-                        )
-                        existing_row = cur.fetchone()
-                        if existing_row is not None:
-                            rid = str(existing_row["id"])
-                            cur.execute(
-                                f"select {LINE_COLUMNS} from purchase_request_line "
-                                "where purchase_request_id = %s order by position, created_at, id",
-                                (rid,),
-                            )
-                            existing_lines = cur.fetchall()
-                            cur.execute(
-                                f"select {STEP_COLUMNS} from approval_step "
-                                "where purchase_request_id = %s limit 1",
-                                (rid,),
-                            )
-                            existing_step = cur.fetchone()
-                            return (
-                                self._purchase_request_with_budget_status(
-                                    client, existing_row, existing_lines, existing_step
-                                ),
-                                False,
-                            )
 
                     cur.execute(
                         f"""
@@ -413,18 +395,11 @@ class RequestsService:
 
         except psycopg.Error as exc:
             if idempotency_key is not None and getattr(exc, "sqlstate", None) == "23505":
-                existing_row = self._fetch_request_by_idempotency_key(
-                    client, idempotency_key=idempotency_key
+                replay = self._find_idempotent_replay(
+                    client=client, member=member, idempotency_key=idempotency_key
                 )
-                rid = str(existing_row["id"])
-                existing_lines = self._fetch_lines_for(client, rid)
-                existing_step = self._fetch_step(client, rid)
-                return (
-                    self._purchase_request_with_budget_status(
-                        client, existing_row, existing_lines, existing_step
-                    ),
-                    False,
-                )
+                if replay is not None:
+                    return replay, False
             raise _map_psycopg_error(exc) from exc
 
         rid = str(request_id)
@@ -440,6 +415,56 @@ class RequestsService:
             ),
             True,
         )
+
+    def _find_idempotent_replay(
+        self,
+        *,
+        client: Client,
+        member: CurrentMember,
+        idempotency_key: UUID,
+    ) -> PurchaseRequest | None:
+        claims = {
+            "sub": str(member.user_id),
+            "tenant_id": str(member.tenant_id),
+            "role": "authenticated",
+            "member_role": member.role.value,
+        }
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute("set local role authenticated")
+                    cur.execute(
+                        "select set_config('request.jwt.claims', %s, true)",
+                        (json.dumps(claims),),
+                    )
+                    cur.execute(
+                        f"select {REQUEST_COLUMNS} from purchase_request "
+                        "where tenant_id = %s and idempotency_key = %s",
+                        (member.tenant_id, str(idempotency_key)),
+                    )
+                    existing_row = cur.fetchone()
+                    if existing_row is None:
+                        return None
+
+                    rid = str(existing_row["id"])
+                    cur.execute(
+                        f"select {LINE_COLUMNS} from purchase_request_line "
+                        "where tenant_id = %s and purchase_request_id = %s "
+                        "order by position, created_at, id",
+                        (member.tenant_id, rid),
+                    )
+                    existing_lines = cur.fetchall()
+                    cur.execute(
+                        f"select {STEP_COLUMNS} from approval_step "
+                        "where tenant_id = %s and purchase_request_id = %s limit 1",
+                        (member.tenant_id, rid),
+                    )
+                    existing_step = cur.fetchone()
+                    return self._purchase_request_with_budget_status(
+                        client, existing_row, existing_lines, existing_step
+                    )
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def _fetch_request_by_idempotency_key(
         self, client: Client, *, idempotency_key: UUID
