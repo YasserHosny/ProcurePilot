@@ -396,23 +396,44 @@ describe('OrderDetailComponent', () => {
     expect(byTestId('action-error')).toBeNull();
   });
   // P-187: saved receipts, submits and cancels were silent to a screen reader.
-  it('announces a saved receipt in a polite live region that exists before the news', () => {
+  it('announces a saved receipt in a polite live region that exists before the news', fakeAsync(() => {
     fixture.detectChanges();
     const region = byTestId('action-status');
     expect(region?.getAttribute('role')).toBe('status');
     expect(region?.getAttribute('aria-live')).toBe('polite');
     expect(region?.textContent?.trim()).toBe('');
 
+    saveReceipt();
+    tick();
+    fixture.detectChanges();
+
+    expect(byTestId('action-status')?.textContent).toContain('Delivery receipt saved.');
+  }));
+
+  // Review (#P-187): the same message twice leaves the text unchanged, so nothing is announced.
+  it('re-announces when the same action is saved a second time', fakeAsync(() => {
+    fixture.detectChanges();
+    saveReceipt();
+    tick();
+    fixture.detectChanges();
+    expect(byTestId('action-status')?.textContent).toContain('Delivery receipt saved.');
+
+    saveReceipt();
+    fixture.detectChanges();
+    expect(byTestId('action-status')?.textContent?.trim()).toBe(''); // cleared, so the next text is news
+    tick();
+    fixture.detectChanges();
+    expect(byTestId('action-status')?.textContent).toContain('Delivery receipt saved.');
+  }));
+
+  function saveReceipt(): void {
     const component = fixture.componentInstance;
     component.receiptReference.set('GRN-1');
     component.receiptDate.set('2026-10-25');
     component.setQuantity('receipt', 'line-1', '4');
     api.recordReceipt.and.returnValue(of(component.evidence()!));
     component.recordReceipt();
-    fixture.detectChanges();
-
-    expect(byTestId('action-status')?.textContent).toContain('Delivery receipt saved.');
-  });
+  }
 
   // P-187: the inline confirmation did not take focus, so keyboard users were left behind it.
   it('moves focus into the submit and cancel confirmations when they open', fakeAsync(() => {
@@ -437,8 +458,10 @@ describe('OrderDetailComponent', () => {
     fixture.detectChanges();
 
     const label = el().querySelector('input[name="receipt-line-1"]')?.closest('mat-form-field')?.textContent ?? '';
+    // Order quantities are in packs (ADR-020): the fixture line is 10 packs of 25 kg.
     expect(label).toContain('ordered 10');
-    expect(label).toContain('kg');
+    expect(label).toContain('pack of 25 kg');
+    expect(label).not.toContain('(kg,');
   });
 
   it('shows the expected date format under the evidence dates', () => {

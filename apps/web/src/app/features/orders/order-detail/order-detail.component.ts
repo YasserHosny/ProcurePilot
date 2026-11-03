@@ -10,7 +10,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { lineDescription, packLabel } from '../pack-label';
-import { unitLabel } from '../../../core/format/unit-label';
 
 import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -169,7 +168,10 @@ export class OrderDetailComponent implements OnInit {
   }
 
   private announce(key: string): void {
-    this.actionStatus.set(this.translate.instant(key));
+    // Clear first: the same message twice leaves the text unchanged and a live region stays quiet.
+    this.actionStatus.set('');
+    const message = this.translate.instant(key);
+    setTimeout(() => this.actionStatus.set(message));
   }
 
   /** Moves focus into an inline confirmation once it has rendered. */
@@ -179,10 +181,14 @@ export class OrderDetailComponent implements OnInit {
     });
   }
 
+  /** Quantities on the order are in packs (ADR-020), so the unit shown is the pack when there is one. */
   quantityLabel(kind: 'confirmed' | 'received', line: PurchaseOrderLine): string {
+    const { unit, label } = packLabel(
+      line.pack_base_quantity, line.base_unit, this.translate, this.formatService,
+    );
     return this.translate.instant(`orders.detail.${kind}QuantityFor`, {
       product: lineDescription(line),
-      unit: unitLabel(this.translate, line.base_unit),
+      unit: label ?? unit,
       ordered: this.formatQuantity(line.ordered_quantity),
     });
   }
