@@ -128,14 +128,19 @@ def test_concurrent_keyed_decisions_have_one_audit_and_outbox(decision: str) -> 
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
             results = list(pool.map(lambda _: decide(), range(2)))
+        assert [200 if isinstance(result, tuple) else result for result in results] == [200, 200]
         successes = [result for result in results if isinstance(result, tuple)]
-        assert len(successes) >= 1
-        assert all(isinstance(result, tuple) or result == 409 for result in results)
         assert sum(result[2] is not None for result in successes) == 1
+        request_status = "ordered" if decision == "approved" else "rejected"
+        for request_row, step_row, _ in successes:
+            assert request_row["status"] == request_status
+            assert step_row["status"] == decision
         with module.db.connect(TEST_DATABASE_URL) as check:
             statuses, audits, pushes = state(check, rid)
-            assert statuses[:2] == ("ordered" if decision == "approved" else "rejected", decision)
+            assert statuses[:2] == (request_status, decision)
             assert len(audits) == len(pushes) == 1
+            assert audits[0][0] == f"requests.approval_step_{decision}"
+            assert audits[0][1]["idempotency_key"] == str(key)
     finally:
         with module.db.connect(TEST_DATABASE_URL) as cleanup, cleanup.cursor() as cur:
             reset_role(cur)
