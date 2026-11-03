@@ -373,6 +373,43 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
       expect(component.isLoading()).toBeFalse();
     }));
 
+    it('recovers from a failed first load when the background refresh then succeeds', fakeAsync(() => {
+      const first$ = new Subject<OfferComparison>();
+      const refresh$ = new Subject<OfferComparison>();
+      apiService.compareOffers.and.returnValues(first$, refresh$);
+
+      component.fetchComparison(mockComparison.product.id);
+      component.onQuantityChange('40');
+      tick(700);
+
+      first$.error(new HttpErrorResponse({ status: 503, error: { message: 'down' } }));
+      expect(component.errorMessage()).toBe('down');
+
+      const refreshed = comparisonFor('refreshed', '500.0000');
+      refresh$.next(refreshed);
+
+      expect(component.rawComparison()).toBe(refreshed);
+      expect(component.errorMessage()).withContext('stale error cleared').toBeNull();
+    }));
+
+    it('does not let an older failed first load wipe a refresh that already succeeded', fakeAsync(() => {
+      const first$ = new Subject<OfferComparison>();
+      const refresh$ = new Subject<OfferComparison>();
+      apiService.compareOffers.and.returnValues(first$, refresh$);
+
+      component.fetchComparison(mockComparison.product.id);
+      component.onQuantityChange('40');
+      tick(700);
+
+      const refreshed = comparisonFor('refreshed', '500.0000');
+      refresh$.next(refreshed);
+      first$.error(new HttpErrorResponse({ status: 503, error: { message: 'down' } }));
+
+      expect(component.rawComparison()).toBe(refreshed);
+      expect(component.errorMessage()).toBeNull();
+      expect(component.isLoading()).toBeFalse();
+    }));
+
     it('shows a failed comparison as an alert with Retry', () => {
       apiService.compareOffers.and.returnValue(
         throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'Offers are down', trace_id: 'tr-9' } })),
