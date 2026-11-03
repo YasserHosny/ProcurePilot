@@ -583,4 +583,26 @@ def test_read_current_offers_ignores_an_archived_quotation() -> None:
                 return read_current_offers(conn, job=job)
 
             assert offers_for(sugar_id) == []
+
+            # RFQ and advanced splits read through their own query: it must skip it too.
+            from procurepilot_optimiser_worker.repository import (
+                load_advanced_request,
+                read_current_advanced_offers,
+            )
+
+            job_id = uuid4()
+            conn.execute(
+                "insert into basket_split_job (id,tenant_id,requested_by,supplier_ids,items,"
+                "request_snapshot,status) values (%s,%s,%s,%s,%s,%s,'queued')",
+                (
+                    job_id,
+                    tenant_id,
+                    membership_id,
+                    [supplier_id, uuid4()],
+                    Jsonb([{"workspace_product_id": str(sugar_id), "quantity": "50.000000"}]),
+                    Jsonb({"rule_version": "advanced-basket-v1"}),
+                ),
+            )
+            request = load_advanced_request(conn, job_id=job_id, tenant_id=tenant_id)
+            assert read_current_advanced_offers(conn, request=request) == []
         conn.rollback()
