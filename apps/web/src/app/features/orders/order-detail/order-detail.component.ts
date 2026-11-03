@@ -141,7 +141,14 @@ export class OrderDetailComponent implements OnInit {
       const received = parseFloat(line.received.quantity ?? '') || 0;
       return sum + (ordered > 0 ? Math.min(received / ordered, 1) : 0) * weight(line.purchase_order_line_id);
     }, 0);
-    return Math.min(100, Math.floor((arrived / weights) * 100 + 1e-9));
+    // A line that carries no value has no weight, so completion is checked line by line.
+    const everyLineArrived = lines.every(
+      (line) =>
+        (parseFloat(line.ordered_quantity) || 0) <= 0 ||
+        (parseFloat(line.received.quantity ?? '') || 0) >= parseFloat(line.ordered_quantity),
+    );
+    const percent = Math.floor((arrived / weights) * 100 + 1e-9);
+    return everyLineArrived ? 100 : Math.min(99, percent);
   }
 
   readonly lineDescription = lineDescription;

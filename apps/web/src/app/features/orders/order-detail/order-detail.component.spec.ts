@@ -627,4 +627,41 @@ describe('OrderDetailComponent', () => {
     });
     expect(component.receivedPercent()).toBe(25); // 50 of 200 of the order's value
   });
+  // Review (Codex, #471): a free line that has not arrived must keep the bar below 100.
+  it('stays below 100 while a zero-value line has not arrived', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const value = component.evidence()!;
+    const line = value.order.lines[0];
+    const money = (amount: string) => ({ amount, currency: 'GBP' });
+    component.evidence.set({
+      ...value,
+      order: {
+        ...value.order,
+        lines: [
+          { ...line, id: 'paid', ordered_quantity: '10', line_total: money('100.00') },
+          { ...line, id: 'free', ordered_quantity: '5', line_total: money('0.00') },
+        ],
+      },
+      lifecycle: {
+        ...value.lifecycle,
+        lines: [
+          { ...value.lifecycle.lines[0], purchase_order_line_id: 'paid', ordered_quantity: '10', received: { state: 'available', quantity: '10', source_ids: [] } },
+          { ...value.lifecycle.lines[0], purchase_order_line_id: 'free', ordered_quantity: '5', received: { state: 'pending', quantity: null, source_ids: [] } },
+        ],
+      },
+    });
+    expect(component.receivedPercent()).toBe(99);
+
+    component.evidence.set({
+      ...component.evidence()!,
+      lifecycle: {
+        ...component.evidence()!.lifecycle,
+        lines: component.evidence()!.lifecycle.lines.map((l) => ({
+          ...l, received: { state: 'available', quantity: l.ordered_quantity, source_ids: [] },
+        })),
+      },
+    });
+    expect(component.receivedPercent()).toBe(100);
+  });
 });
