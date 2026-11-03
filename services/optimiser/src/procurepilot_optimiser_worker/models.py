@@ -173,6 +173,8 @@ class AdvancedOfferInput(OfferInput):
     source_landed_cost_id: UUID
     preferred: bool = False
     lead_time_days: int | None = Field(default=None, ge=0)
+    # When this price stops being current (landed_cost.valid_to); None for an open-ended price.
+    valid_to: datetime | None = None
 
 
 class AdvancedOptimisationInput(StrictModel):

@@ -532,3 +532,42 @@ def test_single_supplier_baseline_includes_the_delivery_fee() -> None:
     assert baselines[supplier_a] == _money("120.0000")  # 100 goods + 20 delivery, below 150
     assert baselines[supplier_b] == _money("110.0000")  # no terms: no fee
     assert result.total_landed_cost == _money("110.0000")
+
+
+def _validity_payload(valid_tos: list[datetime | None]) -> AdvancedOptimisationInput:
+    supplier_a, supplier_b = uuid4(), uuid4()
+    product_id = uuid4()
+    offers = [
+        _offer(product_id=product_id, supplier_id=supplier, total="100.0000").model_copy(
+            update={"valid_to": valid_to}
+        )
+        for supplier, valid_to in zip((supplier_a, supplier_b), valid_tos, strict=True)
+    ]
+    return AdvancedOptimisationInput(
+        request=_request(supplier_ids=[supplier_a, supplier_b], items=[_item(product_id)]),
+        offers=offers,
+    )
+
+
+def test_result_is_valid_until_the_earliest_offer_expiry() -> None:
+    from procurepilot_optimiser_worker.solver import solve_advanced_basket
+
+    # PPS-208: validity was the computation time, so every result looked expired on arrival.
+    computed_at = datetime(2026, 11, 3, 9, 0, tzinfo=UTC)
+    payload = _validity_payload([computed_at + timedelta(days=10), computed_at + timedelta(days=3)])
+
+    result = solve_advanced_basket(input_payload=payload, computed_at=computed_at)
+
+    assert result.valid_until == computed_at + timedelta(days=3)
+
+
+def test_result_built_from_open_ended_offers_stays_valid_for_a_day() -> None:
+    from procurepilot_optimiser_worker.solver import solve_advanced_basket
+
+    computed_at = datetime(2026, 11, 3, 9, 0, tzinfo=UTC)
+
+    result = solve_advanced_basket(
+        input_payload=_validity_payload([None, None]), computed_at=computed_at
+    )
+
+    assert result.valid_until == computed_at + timedelta(days=1)

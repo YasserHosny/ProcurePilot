@@ -373,12 +373,14 @@ def approve_request(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> PurchaseRequest:
     return service.approve_request(
         bearer_token=token,
         member=member,
         request_id=request_id,
         payload=payload,
+        idempotency_key=idempotency_key,
     )
 
 
@@ -392,12 +394,14 @@ def reject_request(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> PurchaseRequest:
     return service.reject_request(
         bearer_token=token,
         member=member,
         request_id=request_id,
         payload=payload,
+        idempotency_key=idempotency_key,
     )
 
 

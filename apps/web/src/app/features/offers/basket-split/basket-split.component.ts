@@ -473,10 +473,41 @@ export class BasketSplitComponent implements OnInit {
       });
       return;
     }
+    if (job?.request_settings) {
+      // The job says what it was run with, so the rerun reuses exactly that.
+      if (!this.isWriter() || this.isSubmitting()) return;
+      const settings = job.request_settings;
+      this.isSubmitting.set(true);
+      this.errorMessage.set(null);
+      this.api
+        .optimiseBasket({
+          supplier_ids: job.supplier_ids,
+          items: job.items,
+          risk_tolerance: settings.risk_tolerance,
+          urgency: settings.urgency,
+          excluded_supplier_ids: settings.excluded_supplier_ids.length > 0 ? settings.excluded_supplier_ids : undefined,
+          weights: settings.weights,
+        })
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (next) => {
+            this.isSubmitting.set(false);
+            this.currentJob.set(next);
+            this.router.navigate(['/offers/basket-split', next.id]);
+            this.openJob();
+            this.pollJob(next.id);
+          },
+          error: (err: unknown) => {
+            this.isSubmitting.set(false);
+            this.handleError(err);
+          },
+        });
+      return;
+    }
     if (job) {
-      // The job response carries no risk tolerance, urgency, exclusions or weights, so a rerun
-      // cannot reproduce them. Put the job's suppliers and quantities back in the form and let
-      // the buyer confirm those settings rather than silently running with the defaults.
+      // Older jobs carry no risk tolerance, urgency, exclusions or weights, so a rerun cannot
+      // reproduce them. Put the job's suppliers and quantities back in the form and let the
+      // buyer confirm those settings rather than silently running with the defaults.
       this.prefillFromJob(job);
       return;
     }

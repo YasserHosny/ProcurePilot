@@ -7,10 +7,11 @@ import {
 } from '@angular/core';
 import { MatIconRegistry } from '@angular/material/icon';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { provideRouter, withNavigationErrorHandler } from '@angular/router';
+import { provideRouter, TitleStrategy, withNavigationErrorHandler } from '@angular/router';
 import { MissingTranslationHandler, provideTranslateService } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
 
+import { TranslatedTitleStrategy } from './core/routing/translated-title.strategy';
 import { routes } from './app.routes';
 import { chunkLoadErrorHandler } from './core/routing/chunk-load-recovery';
 import { provideErrorReporting } from './core/observability/sentry';
@@ -31,6 +32,7 @@ export const appConfig: ApplicationConfig = {
       inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-outlined');
     }),
     provideRouter(routes, withNavigationErrorHandler(chunkLoadErrorHandler)),
+    { provide: TitleStrategy, useClass: TranslatedTitleStrategy },
     provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
     provideAnimationsAsync(),
     ...provideErrorReporting(),
