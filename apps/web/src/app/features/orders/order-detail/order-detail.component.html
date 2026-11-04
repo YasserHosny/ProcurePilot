@@ -182,7 +182,7 @@
           </div>
           @for (line of data.order.lines; track line.id) {
             <mat-form-field appearance="outline"><mat-label>{{ quantityLabel('received', line) }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(receiptQuantities(), line)" (ngModelChange)="setQuantity('receipt', line.id, $event)" [name]="'receipt-' + line.id" /></mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.receiptNote' | translate: { description: lineDescription(line) } }}</mat-label><input matInput maxlength="500" [ngModel]="receiptNotes()[line.id] ?? ''" (ngModelChange)="setReceiptNote(line.id, $event)" [name]="'receipt-note-' + line.id" [attr.data-testid]="'receipt-note-' + line.id" /></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.receiptNote' | translate: { description: lineDescription(line) } }}</mat-label><input matInput maxlength="500" [ngModel]="receiptNotes()[line.id] ?? ''" (ngModelChange)="setReceiptNote(line.id, $event)" [name]="'note-' + line.id" [attr.data-testid]="'receipt-note-' + line.id" /></mat-form-field>
           }
           @if (receiptQuantityError()) { <p class="field-error" role="alert" data-testid="receipt-quantity-error">{{ 'orders.detail.receiptQuantityRequired' | translate }}</p> }
           <button mat-flat-button color="primary" type="submit" [disabled]="isSaving()" data-testid="save-receipt">{{ 'orders.detail.save' | translate }}</button>
