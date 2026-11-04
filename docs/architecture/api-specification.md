@@ -3037,6 +3037,22 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
 
 ### `GET /rfq`
 
+- Optional `q` is trimmed; empty or whitespace-only text applies no search filter. At most
+  100 characters are accepted after trimming; longer text returns `422` with
+  `details: {"reason": "invalid_query", "field": "q"}`.
+- Search matches any recipient supplier's name or line product's `workspace_product.tenant_name`
+  by case-insensitive substring, within the caller's tenant. `%`, `_`, and `\` match literally.
+  It also matches an exact reference number: `2`, `0002`, `rfq-2`, and `RFQ-000002` match
+  reference 2, never 12 or 20. Names are searched using the original trimmed text.
+  `tenant_terms` is not searched. Arabic text is supported without diacritic removal,
+  letter normalization, or transliteration; case matching follows PostgreSQL `ILIKE`.
+- Optional `sort` accepts `created_desc` (default), `created_asc`, `needed_asc`, `needed_desc`,
+  `reference_desc`, or `reference_asc`, ordering by creation time, needed-by date, or numeric
+  reference respectively. Every order uses `id` as a tiebreaker in the same direction.
+  Unknown values return `422` with `details: {"reason": "invalid_sort", "field": "sort"}`.
+- `q`, `sort`, and `status` combine. Cursors remain offsets: clients must reuse the same
+  `q`, `sort`, and `status` for subsequent pages. Ordering is stable for unchanged data;
+  concurrent changes can shift offsets. No matches returns `{"items": [], "next_cursor": null}`.
 - Lists every RFQ visible to the caller, cursor-paginated (`limit` capped at 100), each with its
   `reference_number` (formatted as `RFQ-000123`), recipient count, response count, and — once `status = converted` — the id of the purchase
   request it produced. Each `RfqSummary` also carries `converted_purchase_request_ids` (every
