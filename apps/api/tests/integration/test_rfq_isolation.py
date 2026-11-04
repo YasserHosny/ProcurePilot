@@ -908,3 +908,216 @@ def test_an_already_converted_rfq_is_not_converted_again(
         assert cur.fetchone()[0] is True
         cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, second))
         assert cur.fetchone()[0] is False
+
+
+# --- cancel_rfq (20261103120000) and the definer hardening (20261104000300) -----------------------
+#
+# cancel_rfq cancels a draft, sent or responded RFQ for an active owner of the workspace, or for the
+# active buyer who created it. mark_rfq_converted converts only from sent, responded or expired, so a
+# cancelled RFQ returns false instead of raising a check violation.
+
+
+def _set_rfq_state(cur: psycopg.Cursor, rfq_id: UUID, status: str) -> None:
+    cur.execute("reset role")
+    cur.execute(
+        "update rfq set status = %s, "
+        "cancelled_at = case when %s = 'cancelled' then now() else null end where id = %s",
+        (status, status, rfq_id),
+    )
+
+
+def _rfq_row(cur: psycopg.Cursor, rfq_id: UUID) -> tuple[str, object]:
+    cur.execute("reset role")
+    cur.execute("select status, cancelled_at from rfq where id = %s", (rfq_id,))
+    row = cur.fetchone()
+    return str(row[0]), row[1]
+
+
+def _make_creator(cur: psycopg.Cursor, workspace: RfqWorkspace, membership_id: UUID) -> None:
+    cur.execute("reset role")
+    cur.execute(
+        "update rfq set created_by_membership_id = %s where id = %s",
+        (membership_id, workspace.rfq_id),
+    )
+
+
+def test_anon_cannot_execute_cancel_rfq_or_mark_rfq_converted(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        for call, args in (
+            ("select cancel_rfq(%s)", (alpha.rfq_id,)),
+            ("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, uuid4())),
+        ):
+            cur.execute("reset role")
+            cur.execute("set local role anon")
+            cur.execute("savepoint before_call")
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                cur.execute(call, args)
+            cur.execute("rollback to savepoint before_call")
+        assert _rfq_row(cur, alpha.rfq_id)[0] == "sent"
+
+
+@pytest.mark.parametrize("status", ["draft", "sent", "responded"])
+def test_an_owner_cancels_a_buyers_rfq_in_any_open_state(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace], status: str
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        buyer_user, buyer_membership = _add_member(cur, alpha, "buyer")
+        owner_user, _owner_membership = _add_member(cur, alpha, "owner")
+        _make_creator(cur, alpha, buyer_membership)
+        _set_rfq_state(cur, alpha.rfq_id, status)
+        _act_as_user(cur, alpha, owner_user, "owner")
+        cur.execute("select cancel_rfq(%s)", (alpha.rfq_id,))
+        assert cur.fetchone()[0] is True
+        state, cancelled_at = _rfq_row(cur, alpha.rfq_id)
+        assert state == "cancelled"
+        assert cancelled_at is not None
+        del buyer_user
+
+
+def test_a_buyer_cancels_their_own_rfq(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        buyer_user, buyer_membership = _add_member(cur, alpha, "buyer")
+        _make_creator(cur, alpha, buyer_membership)
+        _act_as_user(cur, alpha, buyer_user, "buyer")
+        cur.execute("select cancel_rfq(%s)", (alpha.rfq_id,))
+        assert cur.fetchone()[0] is True
+        assert _rfq_row(cur, alpha.rfq_id)[0] == "cancelled"
+
+
+def test_a_buyer_cannot_cancel_another_buyers_rfq(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        _creator_user, creator_membership = _add_member(cur, alpha, "buyer")
+        other_user, _other_membership = _add_member(cur, alpha, "buyer")
+        _make_creator(cur, alpha, creator_membership)
+        _act_as_user(cur, alpha, other_user, "buyer")
+        cur.execute("select cancel_rfq(%s)", (alpha.rfq_id,))
+        assert cur.fetchone()[0] is False
+        state, cancelled_at = _rfq_row(cur, alpha.rfq_id)
+        assert (state, cancelled_at) == ("sent", None)
+
+
+def test_another_workspaces_rfq_cannot_be_cancelled(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    conn, alpha, beta = rfq_workspaces
+    with conn.cursor() as cur:
+        owner_user, _owner_membership = _add_member(cur, alpha, "owner")
+        _act_as_user(cur, alpha, owner_user, "owner")
+        cur.execute("select cancel_rfq(%s)", (beta.rfq_id,))
+        assert cur.fetchone()[0] is False
+        state, cancelled_at = _rfq_row(cur, beta.rfq_id)
+        assert (state, cancelled_at) == ("sent", None)
+
+
+@pytest.mark.parametrize("role", ["viewer", "approver", "branch_manager"])
+@pytest.mark.parametrize("claim_role", ["same", "owner"])
+def test_members_who_are_not_owner_or_buyer_cannot_cancel_even_with_an_owner_claim(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+    role: str,
+    claim_role: str,
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        user_id, _membership_id = _add_member(cur, alpha, role)
+        _act_as_user(cur, alpha, user_id, role if claim_role == "same" else claim_role)
+        cur.execute("savepoint before_cancel")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute("select cancel_rfq(%s)", (alpha.rfq_id,))
+        cur.execute("rollback to savepoint before_cancel")
+        assert _rfq_row(cur, alpha.rfq_id) == ("sent", None)
+
+
+@pytest.mark.parametrize("status", ["converted", "cancelled"])
+def test_a_converted_or_cancelled_rfq_cannot_be_cancelled(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace], status: str
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        owner_user, _owner_membership = _add_member(cur, alpha, "owner")
+        _set_rfq_state(cur, alpha.rfq_id, status)
+        before = _rfq_row(cur, alpha.rfq_id)
+        _act_as_user(cur, alpha, owner_user, "owner")
+        cur.execute("select cancel_rfq(%s)", (alpha.rfq_id,))
+        assert cur.fetchone()[0] is False
+        assert _rfq_row(cur, alpha.rfq_id) == before
+
+
+def test_rfq_cancelled_at_check_requires_status_and_date_together(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute("savepoint before_status_only")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            cur.execute(
+                "update rfq set status = 'cancelled', cancelled_at = null where id = %s",
+                (alpha.rfq_id,),
+            )
+        cur.execute("rollback to savepoint before_status_only")
+        cur.execute("savepoint before_date_only")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            cur.execute("update rfq set cancelled_at = now() where id = %s", (alpha.rfq_id,))
+        cur.execute("rollback to savepoint before_date_only")
+        assert _rfq_row(cur, alpha.rfq_id) == ("sent", None)
+
+
+def test_a_cancelled_rfq_is_not_converted_and_does_not_raise(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        user_id, membership_id = _add_member(cur, alpha, "buyer")
+        request_id = _prepared_request(cur, alpha, membership_id, alpha.rfq_response_id)
+        _set_rfq_state(cur, alpha.rfq_id, "cancelled")
+        before = _rfq_row(cur, alpha.rfq_id)
+        _act_as_user(cur, alpha, user_id, "buyer")
+        cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, request_id))
+        assert cur.fetchone()[0] is False
+        assert _rfq_row(cur, alpha.rfq_id) == before
+
+
+@pytest.mark.parametrize("status", ["sent", "responded", "expired"])
+def test_mark_rfq_converted_still_converts_open_states(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace], status: str
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        user_id, membership_id = _add_member(cur, alpha, "buyer")
+        request_id = _prepared_request(cur, alpha, membership_id, alpha.rfq_response_id)
+        _set_rfq_state(cur, alpha.rfq_id, status)
+        _act_as_user(cur, alpha, user_id, "buyer")
+        cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, request_id))
+        assert cur.fetchone()[0] is True
+        assert _rfq_row(cur, alpha.rfq_id)[0] == "converted"
+
+
+def test_the_rfq_status_functions_pin_their_search_path_and_are_not_public(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    conn, _alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute(
+            "select proname, prosecdef, proconfig, "
+            "has_function_privilege('anon', oid, 'execute'), "
+            "has_function_privilege('public', oid, 'execute'), "
+            "has_function_privilege('authenticated', oid, 'execute') "
+            "from pg_proc where proname in ('cancel_rfq', 'mark_rfq_converted') order by proname"
+        )
+        rows = cur.fetchall()
+    assert [row[0] for row in rows] == ["cancel_rfq", "mark_rfq_converted"]
+    for _name, security_definer, config, anon, public, authenticated in rows:
+        assert security_definer is True
+        assert config == ["search_path=pg_catalog, public, pg_temp"]
+        assert (anon, public, authenticated) == (False, False, True)
