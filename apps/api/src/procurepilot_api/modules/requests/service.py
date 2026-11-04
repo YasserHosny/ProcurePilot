@@ -164,6 +164,10 @@ class RequestsService:
     def _validate_request_lines(self, lines: Sequence[PurchaseRequestLineInput]) -> None:
         seen: set[UUID] = set()
         for i, line in enumerate(lines):
+            if line.note is not None and len(line.note.strip()) > 500:
+                raise UnprocessableEntityError(
+                    details={"field": f"lines[{i}].note", "reason": "note_too_long"}
+                )
             try:
                 qty = Decimal(str(line.quantity))
             except Exception:

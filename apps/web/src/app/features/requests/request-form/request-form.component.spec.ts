@@ -131,6 +131,77 @@ describe('RequestFormComponent — create mode (T017)', () => {
     fixture.detectChanges();
   });
 
+  describe('PPS-186 note limits and localized quantities', () => {
+    function fillForm(): void {
+      component.form.patchValue({ branch_id: 'b1', required_by_date: '2099-01-01' });
+      component.lines.at(0).patchValue({ workspace_product_id: 'wp1', quantity: '5' });
+    }
+
+    for (const [raw, expected] of [['١٢٫٥', '12.5'], ['١٬٢٠٠', '1200'], ['1,5', '1.5'], [' ١ ٢٫٥ ', '12.5']]) {
+      it(`normalizes typed or pasted ${raw} to an ASCII string`, () => {
+        const input: HTMLInputElement = fixture.nativeElement.querySelector('.line-quantity input');
+        expect(input.type).toBe('text');
+        expect(input.inputMode).toBe('decimal');
+        input.value = raw;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        expect(component.lines.at(0).controls.quantity.value).toBe(expected);
+        expect(input.value).toBe(expected);
+        expect(component.lines.at(0).controls.quantity.valid).toBeTrue();
+      });
+    }
+
+    it('keeps letters, zero and excess decimals invalid after input normalization', () => {
+      const input: HTMLInputElement = fixture.nativeElement.querySelector('.line-quantity input');
+      for (const raw of ['abc', '١abc', '٠', '١٫١٢٣٤٥٦٧']) {
+        input.value = raw;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        expect(component.lines.at(0).controls.quantity.hasError('pattern')).withContext(raw).toBeTrue();
+      }
+    });
+
+    for (const lang of ['en', 'ar']) {
+      it(`counts Arabic note characters and rejects 501 with inline error and blocked Save (${lang})`, () => {
+        const translate = TestBed.inject(TranslateService);
+        translate.setTranslation('ar', arCatalog);
+        translate.use(lang);
+        fillForm();
+        const note = component.lines.at(0).controls.note;
+        note.setValue('م'.repeat(500));
+        fixture.detectChanges();
+        expect(note.valid).toBeTrue();
+        expect(fixture.nativeElement.querySelector('.line-note input').maxLength).toBe(500);
+        expect(fixture.nativeElement.querySelector('.line-note mat-hint')?.textContent).toContain('500 / 500');
+        note.setValue('م'.repeat(501));
+        note.markAsTouched();
+        fixture.detectChanges();
+        expect(note.hasError('maxlength')).toBeTrue();
+        expect(fixture.nativeElement.querySelector('.line-note mat-error')?.textContent)
+          .toContain(translate.instant('requests.form.noteTooLong'));
+        component.saveDraft();
+        expect(requestsApi.createRequest).not.toHaveBeenCalled();
+      });
+    }
+
+    it('validates notes loaded into an existing draft', () => {
+      requestsApi.getRequest.and.returnValue(of({ ...mockRequest,
+        lines: [{ ...mockRequest.lines[0], note: 'م'.repeat(501) }] }));
+      routeParams.next(convertToParamMap({ id: 'r1' }));
+      expect(component.lines.at(0).controls.note.hasError('maxlength')).toBeTrue();
+    });
+
+    it('maps array-shaped note_too_long server details to the inline note message', () => {
+      fillForm();
+      requestsApi.createRequest.and.returnValue(throwError(() => new HttpErrorResponse({
+        status: 422, error: { details: [{ field: 'lines[0].note', reason: 'note_too_long' }] },
+      })));
+      component.saveDraft();
+      fixture.detectChanges();
+      expect(component.lines.at(0).controls.note.errors?.['server']).toBe('requests.form.noteTooLong');
+      expect(fixture.nativeElement.querySelector('.line-note mat-error')?.textContent)
+        .toContain(TestBed.inject(TranslateService).instant('requests.form.noteTooLong'));
+    });
+  });
+
   describe('PPS-193 view leftovers', () => {
     function show(request: PurchaseRequest): HTMLElement {
       requestsApi.getRequest.and.returnValue(of(request));

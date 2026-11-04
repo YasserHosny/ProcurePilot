@@ -1,3 +1,11 @@
+/** Normalize Arabic digits and decimal separators without removing invalid input. */
+export function normaliseDigits(value: string): string {
+  return value
+    .replace(/[\u0660-\u0669]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, (digit) => String(digit.charCodeAt(0) - 0x06F0))
+    .replace(/\u066B/g, '.');
+}
+
 /**
  * Pure money input parsing helper.
  * Converts user-entered money/numeric strings into canonical decimal strings (/^-?\d+(\.\d+)?$/) or null.
@@ -23,12 +31,7 @@ export function parseMoneyInput(raw: unknown): string | null {
     return null;
   }
 
-  // Convert Arabic-Indic (٠-٩) and Extended Arabic-Indic (۰-۹) digits to ASCII
-  str = str.replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660));
-  str = str.replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0));
-
-  // Arabic decimal separator ٫ (U+066B) -> '.'
-  str = str.replace(/\u066B/g, '.');
+  str = normaliseDigits(str);
 
   // Arabic thousands separator ٬ (U+066C), spaces, NBSP (\u00A0), narrow NBSP (\u202F), apostrophes (', ’) removed
   str = str.replace(/[\u066C\s\u00A0\u202F'’]/g, '');

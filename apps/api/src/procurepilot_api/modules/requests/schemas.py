@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
 
 type PurchaseRequestStatus = Literal[
     "draft", "submitted", "approved", "rejected", "withdrawn", "ordered", "delivered"
@@ -63,6 +63,11 @@ class PurchaseRequestLineInput(StrictApiModel):
     workspace_product_id: UUID
     quantity: StrictStr = Field(pattern=r"^\d+(\.\d{1,6})?$")
     note: str | None = None
+
+    @field_validator("note")
+    @classmethod
+    def trim_note(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
 
 
 class ApprovalStep(BaseModel):
