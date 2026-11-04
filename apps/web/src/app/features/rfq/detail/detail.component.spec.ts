@@ -224,6 +224,64 @@ describe('DetailComponent (RFQ Details)', () => {
     fixture.detectChanges();
   });
 
+  describe('creator membership id (buyers cannot call the members API)', () => {
+    function createWithSession(sessionMember: object | null): DetailComponent {
+      spyOn(TestBed.inject(SessionService), 'currentMember').and.returnValue(sessionMember as never);
+      apiSpy.members.calls.reset();
+      const created = TestBed.createComponent(DetailComponent);
+      created.detectChanges();
+      return created.componentInstance;
+    }
+
+    it('reads the membership id from the session and does not call members()', () => {
+      const detail = createWithSession({ email: 'buyer@test.com', membership_id: 'm-buyer' });
+      expect(detail.currentMembershipId()).toBe('m-buyer');
+      expect(apiSpy.members).not.toHaveBeenCalled();
+    });
+
+    it('lets a buyer act as creator of their own RFQ even though members() is forbidden', () => {
+      apiSpy.members.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+      const detail = createWithSession({ email: 'buyer@test.com', membership_id: 'm-buyer' });
+      detail.rfqDetail.set({
+        ...mockSentDetail,
+        rfq: { ...mockSentDetail.rfq, created_by_membership_id: 'm-buyer' },
+      });
+      expect(detail.isCreator()).toBeTrue();
+    });
+
+    it('falls back to members() when the session has no membership id', () => {
+      const detail = createWithSession({ email: 'creator@test.com' });
+      expect(apiSpy.members).toHaveBeenCalled();
+      expect(detail.currentMembershipId()).toBe('m-creator');
+    });
+
+    it('stays without an id, and without an unhandled error, when members() is forbidden', () => {
+      apiSpy.members.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+      const detail = createWithSession({ email: 'buyer@test.com' });
+      expect(detail.currentMembershipId()).toBeNull();
+    });
+  });
+
+  describe('breadcrumb', () => {
+    it('says cancelled, not draft, for an RFQ cancelled before it was ever sent', () => {
+      component.rfqDetail.set({
+        ...mockSentDetail,
+        rfq: { ...mockSentDetail.rfq, status: 'cancelled' },
+        recipients: mockSentDetail.recipients.map((recipient) => ({ ...recipient, status: 'draft', sent_at: null })),
+      });
+      expect(component.breadcrumbText()).toBe('RFQ · Cancelled');
+    });
+
+    it('keeps the sent date for an RFQ that was sent and then cancelled', () => {
+      component.rfqDetail.set({ ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status: 'cancelled' } });
+      expect(component.breadcrumbText()).toContain('RFQ · Sent');
+    });
+
+    it('has an Arabic translation for the cancelled breadcrumb', () => {
+      expect((arCatalog as unknown as { rfq: { detail: Record<string, string> } }).rfq.detail['breadcrumbRfqCancelled']).toBeTruthy();
+    });
+  });
+
   describe('cancellation', () => {
     for (const status of [0, 503, 408, 429]) {
       it(`retains the cancel key after ${status} and rotates after success or definitive rejection`, () => {
