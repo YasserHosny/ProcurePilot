@@ -130,6 +130,53 @@ describe('RequestFormComponent — create mode (T017)', () => {
     fixture.detectChanges();
   });
 
+  describe('PPS-167 self approval marker', () => {
+    for (const locale of ['en', 'ar']) {
+      for (const status of ['pending', 'approved', 'rejected'] as const) {
+        for (const flag of [true, false, undefined]) {
+          it(`renders the marker for ${locale}, ${status}, self_approval=${flag}`, () => {
+            const translate = TestBed.inject(TranslateService);
+            translate.setTranslation('ar', arCatalog);
+            translate.use(locale);
+            const step = {
+              id: 'step-own', assigned_membership_id: 'm1',
+              source: 'owner_fallback' as const, status,
+              ...(flag === undefined ? {} : { self_approval: flag }),
+            };
+            requestsApi.getRequest.and.returnValue(of({
+              ...mockRequest, status: 'submitted', approval_step: step,
+            }));
+            routeParams.next(convertToParamMap({ id: 'r1' }));
+            fixture.detectChanges();
+            const marker = (fixture.nativeElement as HTMLElement).querySelector('.self-approval');
+            if (flag !== true) {
+              expect(marker).toBeNull();
+              return;
+            }
+            expect(marker).not.toBeNull();
+            expect(marker?.querySelector('mat-icon')?.getAttribute('aria-hidden')).toBe('true');
+            if (status === 'pending') {
+              expect(marker?.textContent).toContain(locale === 'ar'
+                ? 'مُسند إلى مقدّم الطلب'
+                : 'Assigned to the requester');
+              expect(marker?.textContent).not.toContain(locale === 'ar' ? 'المالك الوحيد' : 'the only owner');
+              expect(marker?.textContent).not.toContain('Decided by the person');
+            } else {
+              const approvedLabel = locale === 'ar' ? 'اعتماد ذاتي' : 'Self-approved';
+              const rejectedLabel = locale === 'ar' ? 'رفض ذاتي' : 'Self-rejected';
+              expect(marker?.textContent).toContain(status === 'approved' ? approvedLabel : rejectedLabel);
+              expect(marker?.textContent).not.toContain(status === 'approved' ? rejectedLabel : approvedLabel);
+              expect(marker?.textContent).toContain(locale === 'ar'
+                ? 'اتخذ القرار الشخص الذي قدّم الطلب'
+                : 'Decided by the person who submitted it');
+              expect(marker?.textContent).not.toContain('Assigned to the requester');
+            }
+          });
+        }
+      }
+    }
+  });
+
   describe('PPS-193 pack hints and Save and submit', () => {
     const product: Product = {
       id: 'wp1', tenant_name: 'Flour', canonical_name: 'Flour', base_unit: 'kg',
