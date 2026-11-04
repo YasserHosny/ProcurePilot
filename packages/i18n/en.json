@@ -3897,7 +3897,9 @@
       "errors": {
         "order_not_open_for_evidence": "This order is a draft, cancelled or closed, so it cannot take delivery or confirmation evidence.",
         "order_not_cancellable": "This order is already fully received or closed, so it can no longer be cancelled.",
-        "order_already_cancelled": "This order is already cancelled."
+        "order_already_cancelled": "This order is already cancelled.",
+        "order_not_closable": "Only an order that has been fully received can be closed.",
+        "order_already_closed": "This order is already closed."
       },
       "overdue": "Overdue",
       "exportCsv": "Export CSV",
@@ -3915,7 +3917,14 @@
       "sourceRfq": "RFQ",
       "sourceQuotation": "Quotation",
       "receiptNote": "Note for {{description}} (short receipt, damage or quality)",
-      "sourceSplit": "Basket split behind this order"
+      "sourceSplit": "Basket split behind this order",
+      "close": "Close order",
+      "closeConfirmTitle": "Close this order?",
+      "closeConfirmMessage": "Closing marks the order as finished. Nothing is sent to the supplier, and a closed order cannot be reopened, changed or cancelled.",
+      "closeConfirm": "Close order",
+      "closed": "Order closed.",
+      "timelineCancelled": "Order cancelled",
+      "timelineClosed": "Order closed"
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",

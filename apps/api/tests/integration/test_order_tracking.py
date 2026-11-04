@@ -1423,3 +1423,119 @@ def test_an_order_from_a_split_names_the_split_job_it_came_from(
         fetched = client.get(f"/api/v1/orders/{order_id}")
         assert fetched.status_code == 200, fetched.text
         assert fetched.json()["source_split_job_id"] == str(job_id)
+
+
+def _received_order(client: TestClient, context: object, conn_url: str) -> tuple[str, str]:
+    with psycopg.connect(conn_url) as conn:
+        req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+    payload = _base_order_payload(
+        context.supplier_ids[0], req_id, line_id, context.product_id, qty="10"
+    )
+    created = client.post("/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())})
+    assert created.status_code == 201, created.text
+    order_id = created.json()["id"]
+    order_line_id = created.json()["lines"][0]["id"]
+    client.post(f"/api/v1/orders/{order_id}/submit", headers={"Idempotency-Key": str(uuid4())})
+    receipt, _ = _evidence_bodies(order_line_id)
+    receipt["lines"] = [{"purchase_order_line_id": order_line_id, "received_quantity": "10"}]
+    res = client.post(
+        f"/api/v1/orders/{order_id}/receipts",
+        json=receipt,
+        headers={"Idempotency-Key": str(uuid4())},
+    )
+    assert res.json()["order"]["status"] == "received", res.text
+    return order_id, order_line_id
+
+
+def test_a_received_order_can_be_closed_and_a_retry_replays(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PPS-205: `closed` can be set, once, from received."""
+    with (
+        committed_smart_context("order-close") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        order_id, order_line_id = _received_order(client, context, TEST_DATABASE_URL)
+
+        key = str(uuid4())
+        closed = client.post(f"/api/v1/orders/{order_id}/close", headers={"Idempotency-Key": key})
+        assert closed.status_code == 200, closed.text
+        assert closed.json()["status"] == "closed"
+
+        replay = client.post(f"/api/v1/orders/{order_id}/close", headers={"Idempotency-Key": key})
+        assert replay.status_code == 200, replay.text
+        assert replay.json()["status"] == "closed"
+
+        again = client.post(
+            f"/api/v1/orders/{order_id}/close", headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert again.status_code == 409
+        assert again.json()["details"]["reason"] == "order_already_closed"
+        # A closed order stays closed and takes no more evidence or cancellation.
+        receipt, confirmation = _evidence_bodies(order_line_id)
+        for path, body in (("receipts", receipt), ("confirmations", confirmation)):
+            refused = client.post(
+                f"/api/v1/orders/{order_id}/{path}",
+                json=body,
+                headers={"Idempotency-Key": str(uuid4())},
+            )
+            assert refused.status_code == 409, refused.text
+            assert refused.json()["details"]["reason"] == "order_not_open_for_evidence"
+        cancelled = client.post(
+            f"/api/v1/orders/{order_id}/cancel", headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert cancelled.status_code == 409
+
+
+@pytest.mark.parametrize("state", ["draft", "submitted", "cancelled"])
+def test_an_order_that_is_not_received_cannot_be_closed(
+    monkeypatch: pytest.MonkeyPatch, state: str
+) -> None:
+    with (
+        committed_smart_context(f"order-close-{state}") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+        payload = _base_order_payload(
+            context.supplier_ids[0], req_id, line_id, context.product_id, qty="10"
+        )
+        created = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+        )
+        order_id = created.json()["id"]
+        if state == "submitted":
+            client.post(
+                f"/api/v1/orders/{order_id}/submit", headers={"Idempotency-Key": str(uuid4())}
+            )
+        if state == "cancelled":
+            client.post(
+                f"/api/v1/orders/{order_id}/cancel", headers={"Idempotency-Key": str(uuid4())}
+            )
+
+        res = client.post(
+            f"/api/v1/orders/{order_id}/close", headers={"Idempotency-Key": str(uuid4())}
+        )
+
+        assert res.status_code == 409, res.text
+        assert res.json()["details"]["reason"] == "order_not_closable"
+
+
+def test_a_viewer_cannot_close_an_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    with (
+        committed_smart_context("order-close-viewer") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.viewer)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        res = client.post(
+            f"/api/v1/orders/{uuid4()}/close", headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert res.status_code == 403
