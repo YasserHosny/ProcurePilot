@@ -13,6 +13,7 @@ import { BehaviorSubject, Observable, Subject, of, throwError } from 'rxjs';
 
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
+import { FormatService } from '../../../core/format/format.service';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
 import type { Branch, BranchList, Me, PurchaseRequest, Role } from '../../../core/api/models';
@@ -111,6 +112,32 @@ describe('RequestListComponent (T017)', () => {
     fixture.detectChanges();
   });
 
+  it('PPS-193 renders Created, Requested by and Lines columns with requester fallbacks in en and ar', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('ar', arCatalog);
+    component.requests.set([
+      { ...mockRequests[0], requester_name: 'Mona', requester_email: 'mona@example.com',
+        lines: [{ id: 'l1', workspace_product_id: 'p1', quantity: '2',
+          quoted_prices_include_vat: false, quoted_vat_rate: null, quoted_net_unit_price: null }] },
+      { ...mockRequests[1], requester_email: 'ali@example.com' },
+      { ...mockRequests[0], id: 'r3' },
+    ]);
+    for (const locale of ['en', 'ar']) {
+      translate.use(locale);
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelector('th.mat-column-created')?.textContent?.trim()).toBe(locale === 'en' ? 'Created' : 'تاريخ الإنشاء');
+      expect(root.querySelector('th.mat-column-requester')?.textContent?.trim()).toBe(locale === 'en' ? 'Requested by' : 'مقدّم الطلب');
+      expect(root.querySelector('th.mat-column-lines')?.textContent?.trim()).toBe(locale === 'en' ? 'Lines' : 'البنود');
+      const names = Array.from(root.querySelectorAll('td.mat-column-requester'));
+      expect(names.map(cell => cell.textContent?.trim())).toEqual(['Mona', 'ali@example.com', '—']);
+      expect(names.every(cell => cell.getAttribute('dir') === 'auto')).toBeTrue();
+      expect(root.querySelector('td.mat-column-created')?.textContent?.trim()).toBe(
+        TestBed.inject(FormatService).formatDate(mockRequests[0].created_at));
+      expect(Array.from(root.querySelectorAll('td.mat-column-lines')).map(cell => cell.textContent?.trim())).toEqual(['1', '0', '0']);
+    }
+  });
+
   it('should load requests on init', () => {
     expect(requestsApi.listRequests).toHaveBeenCalledWith({ status: undefined });
     expect(organisationApi.listBranches).toHaveBeenCalledWith({ limit: 100 });
@@ -138,7 +165,7 @@ describe('RequestListComponent (T017)', () => {
   });
 
   it('renders a Supplier column placed after Branch, showing source.supplier_name or —', () => {
-    expect(component.displayedColumns).toEqual([
+    expect(component.displayedColumns.filter(column => !['created', 'requester', 'lines'].includes(column))).toEqual([
       'requiredByDate',
       'branch',
       'supplier',
