@@ -3076,7 +3076,7 @@ def _insert_order(cur: psycopg.Cursor, workspace: Workspace, *, status: str = "d
     cur.execute(
         "insert into purchase_order (id,tenant_id,order_number,supplier_id,status,order_date,"
         "total_amount,total_currency,tax_amount,tax_currency,source_reference,created_by) "
-        "values (%s,%s,%s,%s,'draft',current_date,10,'USD',0,'USD','test',%s)",
+        "values (%s,%s,%s,%s,'draft',current_date,10,'GBP',0,'GBP','test',%s)",
         (
             order_id,
             workspace.tenant_id,
@@ -3089,7 +3089,7 @@ def _insert_order(cur: psycopg.Cursor, workspace: Workspace, *, status: str = "d
         "insert into purchase_order_line (tenant_id,purchase_order_id,line_number,description,"
         "ordered_quantity,base_unit,unit_price_amount,unit_price_currency,tax_amount,"
         "tax_currency,line_total_amount,line_total_currency) "
-        "values (%s,%s,1,'guard line',1,'each',10,'USD',0,'USD',10,'USD')",
+        "values (%s,%s,1,'guard line',1,'each',10,'GBP',0,'GBP',10,'GBP')",
         (workspace.tenant_id, order_id),
     )
     for step in {
@@ -3234,7 +3234,7 @@ def test_a_submitted_order_header_and_lines_are_frozen(
                 "insert into purchase_order_line (tenant_id,purchase_order_id,line_number,"
                 "description,ordered_quantity,base_unit,unit_price_amount,unit_price_currency,"
                 "tax_amount,tax_currency,line_total_amount,line_total_currency) "
-                "values (%s,%s,2,'late line',1,'each',1,'USD',0,'USD',1,'USD')",
+                "values (%s,%s,2,'late line',1,'each',1,'GBP',0,'GBP',1,'GBP')",
                 (alpha.tenant_id, order_id),
             )
 
@@ -3282,7 +3282,7 @@ def test_an_order_cannot_be_inserted_past_draft(
                 "insert into purchase_order (tenant_id,order_number,supplier_id,status,"
                 "order_date,total_amount,total_currency,tax_amount,tax_currency,"
                 "source_reference,created_by) "
-                "values (%s,%s,%s,'cancelled',current_date,1,'USD',0,'USD','test',%s)",
+                "values (%s,%s,%s,'cancelled',current_date,1,'GBP',0,'GBP','test',%s)",
                 (
                     alpha.tenant_id,
                     f"PO-LATE-{uuid4().hex[:8]}",
