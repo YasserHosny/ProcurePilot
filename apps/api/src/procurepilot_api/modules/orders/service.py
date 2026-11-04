@@ -556,7 +556,7 @@ class OrdersService:
         order_id: UUID,
         idempotency_key: UUID | None,
     ) -> PurchaseOrder:
-        """Take a submitted order back to a draft while no confirmation or receipt exists."""
+        """Take a submitted order back to a draft while it has no recorded evidence."""
         self._require_write(member, idempotency_key)
 
         with self._transaction(member) as cur:
@@ -568,9 +568,7 @@ class OrdersService:
             row = cur.fetchone()
             if row is None:
                 raise NotFoundError(details={"resource": "purchase_order"})
-            if row["status"] == "draft" and str(row.get("withdraw_idempotency_key")) == str(
-                idempotency_key
-            ):
+            if str(row.get("withdraw_idempotency_key")) == str(idempotency_key):
                 return self._load_order_cursor(cur, order_id)
             if row["status"] != "submitted":
                 raise ConflictError(details={"reason": "order_not_submitted"})
@@ -579,8 +577,18 @@ class OrdersService:
                 "select exists (select 1 from supplier_confirmation "
                 "where tenant_id = %s and purchase_order_id = %s) or exists "
                 "(select 1 from delivery_receipt where tenant_id = %s and purchase_order_id = %s)"
-                " as has_evidence",
-                (member.tenant_id, order_id, member.tenant_id, order_id),
+                " or exists (select 1 from purchase_record pr "
+                "join purchase_order_line pol on pol.tenant_id = pr.tenant_id "
+                "and pol.id = pr.purchase_order_line_id "
+                "where pol.tenant_id = %s and pol.purchase_order_id = %s) as has_evidence",
+                (
+                    member.tenant_id,
+                    order_id,
+                    member.tenant_id,
+                    order_id,
+                    member.tenant_id,
+                    order_id,
+                ),
             )
             if cur.fetchone()["has_evidence"]:
                 raise ConflictError(details={"reason": "order_has_evidence"})

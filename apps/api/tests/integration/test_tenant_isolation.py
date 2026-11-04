@@ -3292,7 +3292,7 @@ def test_an_order_cannot_be_inserted_past_draft(
             )
 
 
-@pytest.mark.parametrize("evidence", ["receipt", "confirmation"])
+@pytest.mark.parametrize("evidence", ["receipt", "confirmation", "outcome"])
 def test_a_submitted_order_with_evidence_cannot_go_back_to_draft(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace], evidence: str
 ) -> None:
@@ -3305,6 +3305,21 @@ def test_a_submitted_order_with_evidence_cannot_go_back_to_draft(
                 "insert into delivery_receipt (tenant_id,purchase_order_id,receipt_reference,"
                 "receipt_date,received_by,source_reference) values (%s,%s,%s,current_date,%s,'t')",
                 (alpha.tenant_id, order_id, f"GRN-{uuid4().hex[:8]}", alpha.membership_id),
+            )
+        elif evidence == "outcome":
+            cur.execute(
+                "insert into purchase_record (tenant_id,workspace_product_id,supplier_id,"
+                "recorded_by,quantity,base_unit,unit_price_amount,unit_price_currency,"
+                "total_paid_amount,total_paid_currency,delivery_result,purchase_order_line_id) "
+                "select %s,%s,%s,%s,1,'each',1,'GBP',1,'GBP','delivered',id "
+                "from purchase_order_line where purchase_order_id = %s",
+                (
+                    alpha.tenant_id,
+                    alpha.workspace_product_id,
+                    alpha.supplier_id,
+                    alpha.membership_id,
+                    order_id,
+                ),
             )
         else:
             cur.execute(

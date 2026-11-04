@@ -1,6 +1,7 @@
 -- 20261104000900_purchase_order_withdraw.sql
 --
--- A submitted order can go back to a draft while no confirmation or receipt exists (PPS-205).
+-- A submitted order can go back to a draft while no confirmation, receipt or purchase outcome
+-- exists (PPS-205).
 -- The lifecycle guard gains that one transition, with the evidence check at the table, and the
 -- withdraw call keeps its idempotency key like submit, cancel and close.
 
@@ -35,6 +36,13 @@ begin
     or exists (
       select 1 from delivery_receipt dr
       where dr.tenant_id = old.tenant_id and dr.purchase_order_id = old.id
+    )
+    or exists (
+      select 1
+      from purchase_record pr
+      join purchase_order_line pol
+        on pol.tenant_id = pr.tenant_id and pol.id = pr.purchase_order_line_id
+      where pol.tenant_id = old.tenant_id and pol.purchase_order_id = old.id
     )
   ) then
     raise exception 'a purchase order with recorded evidence cannot go back to a draft'

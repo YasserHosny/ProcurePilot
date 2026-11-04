@@ -1281,7 +1281,7 @@ ProcurePilot only; no provider-send/write/cancel method exists.
 
 State transitions for US4: create yields `draft`; `PUT /orders/{id}` may edit only `draft`;
 `POST /orders/{id}/submit` moves `draft -> submitted`; `POST /orders/{id}/withdraw` moves
-`submitted -> draft` while no confirmation or receipt exists; `POST /orders/{id}/cancel` moves a
+`submitted -> draft` while no confirmation, receipt or purchase outcome exists; `POST /orders/{id}/cancel` moves a
 cancellable order (anything but `received` or `closed`) to `cancelled`. Cancellation is internal
 and preserves receipt/confirmation evidence. `POST /orders/{id}/close` moves a `received` order to
 `closed`, which is final.

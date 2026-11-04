@@ -1700,3 +1700,63 @@ def test_a_viewer_cannot_withdraw_an_order(monkeypatch: pytest.MonkeyPatch) -> N
             f"/api/v1/orders/{uuid4()}/withdraw", headers={"Idempotency-Key": str(uuid4())}
         )
         assert res.status_code == 403
+
+
+def test_a_late_retry_of_a_withdraw_does_not_withdraw_a_resubmitted_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with (
+        committed_smart_context("order-withdraw-late-retry") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        order_id, _, _ = _submitted_order(client, context, TEST_DATABASE_URL)
+        withdraw_key = str(uuid4())
+        client.post(
+            f"/api/v1/orders/{order_id}/withdraw", headers={"Idempotency-Key": withdraw_key}
+        )
+        client.post(f"/api/v1/orders/{order_id}/submit", headers={"Idempotency-Key": str(uuid4())})
+
+        retry = client.post(
+            f"/api/v1/orders/{order_id}/withdraw", headers={"Idempotency-Key": withdraw_key}
+        )
+
+        assert retry.status_code == 200, retry.text
+        assert retry.json()["status"] == "submitted"
+
+
+def test_an_order_with_a_recorded_purchase_outcome_cannot_be_withdrawn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with (
+        committed_smart_context("order-withdraw-outcome") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        order_id, order_line_id, _ = _submitted_order(client, context, TEST_DATABASE_URL)
+        with psycopg.connect(TEST_DATABASE_URL) as conn, conn.cursor() as cur:
+            cur.execute(
+                "insert into purchase_record (tenant_id,workspace_product_id,supplier_id,"
+                "recorded_by,quantity,base_unit,unit_price_amount,unit_price_currency,"
+                "total_paid_amount,total_paid_currency,delivery_result,purchase_order_line_id) "
+                "values (%s,%s,%s,%s,1,'each',1,'GBP',1,'GBP','delivered',%s)",
+                (
+                    context.workspace.tenant_id,
+                    context.product_id,
+                    context.supplier_ids[0],
+                    context.workspace.membership_id,
+                    order_line_id,
+                ),
+            )
+            conn.commit()
+
+        res = client.post(
+            f"/api/v1/orders/{order_id}/withdraw", headers={"Idempotency-Key": str(uuid4())}
+        )
+
+        assert res.status_code == 409, res.text
+        assert res.json()["details"]["reason"] == "order_has_evidence"
