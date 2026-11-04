@@ -110,6 +110,9 @@
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>{{ 'matching.resolution.newProduct.tenantNameLabel' | translate }}</mat-label>
           <input matInput formControlName="tenant_name" required />
+          @if (productForm.get('tenant_name')?.hasError('required') && productForm.get('tenant_name')?.touched) {
+            <mat-error>{{ 'matching.resolution.newProduct.tenantNameRequired' | translate }}</mat-error>
+          }
         </mat-form-field>
 
         <div class="form-row">
@@ -132,16 +135,31 @@
                 <mat-option [value]="unit.code">{{ unit.code | unitLabel }}</mat-option>
               }
             </mat-select>
+            @if (productForm.get('base_unit')?.hasError('required') && productForm.get('base_unit')?.touched) {
+              <mat-error>{{ 'matching.resolution.newProduct.baseUnitRequired' | translate }}</mat-error>
+            }
           </mat-form-field>
 
           <mat-form-field appearance="outline">
             <mat-label>{{ 'matching.resolution.newProduct.packCountLabel' | translate }}</mat-label>
             <input matInput type="number" formControlName="pack_count" min="1" required />
+            @if (productForm.get('pack_count')?.hasError('required') && productForm.get('pack_count')?.touched) {
+              <mat-error>{{ 'matching.resolution.newProduct.packCountRequired' | translate }}</mat-error>
+            }
+            @if (productForm.get('pack_count')?.hasError('min')) {
+              <mat-error>{{ 'matching.resolution.newProduct.packCountMin' | translate }}</mat-error>
+            }
           </mat-form-field>
 
           <mat-form-field appearance="outline">
             <mat-label>{{ 'matching.resolution.newProduct.unitSizeLabel' | translate }}</mat-label>
             <input matInput formControlName="unit_size" required />
+            @if (productForm.get('unit_size')?.hasError('required') && productForm.get('unit_size')?.touched) {
+              <mat-error>{{ 'matching.resolution.newProduct.unitSizeRequired' | translate }}</mat-error>
+            }
+            @if (productForm.get('unit_size')?.hasError('pattern') && productForm.get('unit_size')?.touched) {
+              <mat-error>{{ 'matching.resolution.newProduct.unitSizePositive' | translate }}</mat-error>
+            }
           </mat-form-field>
         </div>
       </form>
@@ -172,7 +190,7 @@
       type="button"
       class="confirm-correction-btn"
       (click)="onConfirm()"
-      [disabled]="selectedOutcome() === 'same_product' && !selectedCandidateId()"
+      [disabled]="!canSave()"
     >
       {{ 'matching.resolution.correction.submit' | translate }}
     </button>
