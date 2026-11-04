@@ -664,4 +664,94 @@ describe('OrderDetailComponent', () => {
     });
     expect(component.receivedPercent()).toBe(100);
   });
+
+  // PPS-212: say why a delivery was short, or what arrived damaged, on the line itself.
+  it('sends the note typed against a line with the receipt and leaves blank notes out', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.receiptOpen.set(true);
+    component.receiptReference.set('GRN-9');
+    component.receiptDate.set('2026-10-25');
+    component.setQuantity('receipt', 'line-1', '4');
+    component.setReceiptNote('line-1', '  two cartons crushed ');
+    api.recordReceipt.and.returnValue(of(component.evidence()!));
+
+    component.recordReceipt();
+
+    const sent = api.recordReceipt.calls.mostRecent().args[1];
+    expect(sent.lines[0].note).toBe('two cartons crushed');
+
+    component.setReceiptNote('line-1', '   ');
+    component.recordReceipt();
+    expect(api.recordReceipt.calls.mostRecent().args[1].lines[0].note).toBeUndefined();
+  });
+
+  it('offers a note field on every receipt line and shows a recorded note with its receipt', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.receiptOpen.set(true);
+    fixture.detectChanges();
+    expect(byTestId('receipt-note-line-1')).toBeTruthy();
+
+    const current = component.evidence()!;
+    component.evidence.set({
+      ...current,
+      receipts: [{
+        id: 'r1', tenant_id: 't', purchase_order_id: current.order.id, receipt_reference: 'GRN-1',
+        receipt_date: '2026-10-20', received_by: 'm', source_kind: 'manual', source_reference: 'GRN-1',
+        created_at: '2026-10-20T10:00:00Z',
+        lines: [{ id: 'rl1', purchase_order_line_id: 'line-1', received_quantity: '4', note: 'Short: supplier ran out' }],
+      }] as never,
+    });
+    fixture.detectChanges();
+
+    expect(byTestId('receipt-note')?.textContent).toContain('Short: supplier ran out');
+  });
+
+  // PPS-212: a back link from the order to the basket split that produced its request.
+  it('links back to the basket split the order came from, and only then', () => {
+    fixture.detectChanges();
+    expect(byTestId('source-split-link')).toBeNull();
+
+    const component = fixture.componentInstance;
+    component.evidence.set({ ...component.evidence()!, source_split_job_id: 'job-7' });
+    fixture.detectChanges();
+
+    expect(byTestId('source-split-link')?.getAttribute('href')).toBe('/offers/basket-split/job-7');
+  });
+
+  it('does not carry a saved receipt note into the next receipt', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.receiptOpen.set(true);
+    component.receiptReference.set('GRN-10');
+    component.receiptDate.set('2026-10-25');
+    component.setQuantity('receipt', 'line-1', '4');
+    component.setReceiptNote('line-1', 'two cartons crushed');
+    api.recordReceipt.and.returnValue(of(component.evidence()!));
+
+    component.recordReceipt();
+
+    expect(component.receiptNotes()).toEqual({});
+  });
+
+  it('names the order line a recorded receipt note belongs to', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const current = component.evidence()!;
+    component.evidence.set({
+      ...current,
+      receipts: [{
+        id: 'r1', tenant_id: 't', purchase_order_id: current.order.id, receipt_reference: 'GRN-1',
+        receipt_date: '2026-10-20', received_by: 'm', source_kind: 'manual', source_reference: 'GRN-1',
+        created_at: '2026-10-20T10:00:00Z',
+        lines: [{ id: 'rl1', purchase_order_line_id: 'line-1', received_quantity: '4', note: 'Short: supplier ran out' }],
+      }] as never,
+    });
+    fixture.detectChanges();
+
+    const text = byTestId('receipt-note')?.textContent ?? '';
+    expect(text).toContain(component.lineDescription(current.order.lines[0]));
+    expect(text).toContain('Short: supplier ran out');
+  });
 });

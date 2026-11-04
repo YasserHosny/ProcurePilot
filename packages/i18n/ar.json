@@ -2470,6 +2470,10 @@
       "exceedsWarning": "سيتجاوز هذا الطلب الميزانية المتبقية لنطاقه."
     },
     "approval": {
+      "selfApproved": "اعتماد ذاتي",
+      "selfRejected": "رفض ذاتي",
+      "selfApprovedHint": "اتخذ القرار الشخص الذي قدّم الطلب",
+      "selfApprovalPending": "مُسند إلى مقدّم الطلب",
       "sectionTitle": "الاعتماد",
       "assignedTo": "معيّن إلى",
       "comment": "تعليق القرار",
@@ -2539,6 +2543,8 @@
     "notAvailable": "الإبلاغ عن مشكلة الجودة غير متاح."
   },
   "approvals": {
+    "ownRequestBadge": "طلبك أنت",
+    "selfDecisionNotAllowed": "لا يمكنك اعتماد أو رفض طلب قدّمته بنفسك. يجب أن يتخذ القرار مالك آخر أو مسؤول اعتماد.",
     "title": "قائمة الاعتماد",
     "subtitle": "الطلبات التي تنتظر قرارك.",
     "columns": {
@@ -3905,7 +3911,9 @@
       "confirmedQuantityFor": "{{product}} · الكمية المؤكدة ({{unit}}، المطلوب {{ordered}})",
       "progressLabel": "تم استلام {{percent}}٪",
       "sourceRfq": "طلب التسعير",
-      "sourceQuotation": "عرض السعر"
+      "sourceQuotation": "عرض السعر",
+      "receiptNote": "ملاحظة على {{description}} (نقص في الاستلام أو تلف أو جودة)",
+      "sourceSplit": "تقسيم السلة الذي أنتج هذا الطلب"
     },
     "resultCount": "{{count}} أمر شراء",
     "loadMoreError": "تعذّر تحميل المزيد من الأوامر. الأوامر الظاهرة أعلاه ما زالت معروضة.",

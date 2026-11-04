@@ -578,6 +578,17 @@ export class ApprovalQueueComponent implements OnInit {
     });
   }
 
+  isOwnRequest(item: QueueItem): boolean {
+    const membershipId = this.session.currentMember()?.membership_id;
+    if (!membershipId) return false;
+    const isOwn = (request: PurchaseRequest): boolean =>
+      request.approval_step?.self_approval === true &&
+      request.requested_by_membership_id === membershipId;
+    return item.kind === 'group'
+      ? item.requests.some(isOwn)
+      : isOwn(item.request);
+  }
+
   isGroupRow(item: QueueItem): item is GroupQueueItem {
     return item.kind === 'group';
   }
@@ -949,6 +960,11 @@ export class ApprovalQueueComponent implements OnInit {
     if (err instanceof HttpErrorResponse) {
       const apiError = err.error as ApiError | undefined;
       const details = apiError?.details as { reason?: string } | undefined;
+      if (err.status === 403 && details?.reason === 'self_decision_not_allowed') {
+        this.loadPendingApprovals();
+        this.errorMessage.set(this.translate.instant('approvals.selfDecisionNotAllowed'));
+        return;
+      }
       if (err.status === 409 && details?.reason === 'part_of_split') {
         this.errorMessage.set(this.translate.instant(`${I18N}.partOfSplitError`));
         return;

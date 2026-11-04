@@ -1514,6 +1514,7 @@ export interface ApprovalStep {
   readonly source: ApprovalStepSource;
   readonly status: ApprovalStepStatus;
   readonly comment?: string | null;
+  readonly self_approval?: boolean;
   readonly decided_by_membership_id?: string | null;
   readonly decided_at?: string | null;
 }

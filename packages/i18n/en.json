@@ -2470,6 +2470,10 @@
       "exceedsWarning": "This request would exceed the remaining budget for its scope."
     },
     "approval": {
+      "selfApproved": "Self-approved",
+      "selfRejected": "Self-rejected",
+      "selfApprovedHint": "Decided by the person who submitted it",
+      "selfApprovalPending": "Assigned to the requester",
       "sectionTitle": "Approval",
       "assignedTo": "Assigned to",
       "comment": "Decision comment",
@@ -2539,6 +2543,8 @@
     "notAvailable": "Quality issue reporting is not available."
   },
   "approvals": {
+    "ownRequestBadge": "Your own request",
+    "selfDecisionNotAllowed": "You can't decide a request you submitted. Another owner or approver needs to decide it.",
     "title": "Approval Queue",
     "subtitle": "Requests awaiting your decision.",
     "columns": {
@@ -3905,7 +3911,9 @@
       "confirmedQuantityFor": "{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})",
       "progressLabel": "{{percent}}% received",
       "sourceRfq": "RFQ",
-      "sourceQuotation": "Quotation"
+      "sourceQuotation": "Quotation",
+      "receiptNote": "Note for {{description}} (short receipt, damage or quality)",
+      "sourceSplit": "Basket split behind this order"
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",

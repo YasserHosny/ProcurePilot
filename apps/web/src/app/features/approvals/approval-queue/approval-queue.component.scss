@@ -219,7 +219,21 @@ td.date-cell {
 .lines-cell,
 .actions-cell,
 .requester-cell {
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.own-request-badge {
+  display: inline-block;
+  max-inline-size: 100%;
+  margin-inline-start: 0.375rem;
+  padding-inline: 0.375rem;
+  padding-block: 0.125rem;
+  border: 1px solid currentColor;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .requester-email-truncate {

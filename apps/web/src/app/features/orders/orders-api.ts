@@ -80,6 +80,7 @@ export interface DeliveryReceiptLine {
   id: string;
   purchase_order_line_id: string;
   received_quantity: string;
+  note?: string | null;
 }
 
 export interface DeliveryReceipt {
@@ -124,6 +125,8 @@ export interface OrderEvidenceProjection {
   confirmation: SupplierConfirmation | null;
   receipts: DeliveryReceipt[];
   lifecycle: LifecycleSummary;
+  /** The basket split the order's request was prepared from, when it came from one. */
+  source_split_job_id?: string | null;
 }
 
 export interface PurchaseOrderList {
@@ -163,6 +166,7 @@ export interface DeliveryReceiptCreate {
   lines: {
     purchase_order_line_id: string;
     received_quantity: string;
+    note?: string;
   }[];
 }
 
