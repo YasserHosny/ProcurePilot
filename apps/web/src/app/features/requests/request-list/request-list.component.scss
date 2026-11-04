@@ -272,3 +272,14 @@ td.date-cell {
 .clear-filter-btn {
   margin-block-start: 0.5rem;
 }
+
+@media (max-width: 767px) {
+  .mat-column-created,
+  .mat-column-requester,
+  .mat-column-lines,
+  .mat-column-branch,
+  .mat-column-supplier,
+  .mat-column-estimatedTotal {
+    display: none;
+  }
+}

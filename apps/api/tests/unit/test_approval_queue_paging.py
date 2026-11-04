@@ -332,3 +332,22 @@ def test_line_batch_fetches_every_data_api_page(
     assert [query.ranges for query in client.queries] == [
         [(start, start + 999)] for start in range(0, count + 1, 1000)
     ]
+
+
+@pytest.fixture(autouse=True)
+def sql_queue_double(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the existing hydration tests focused on the page returned by the SQL layer."""
+
+    def page(
+        self: object, *, member: object, sort: str, branch_id: object, boundary: object, limit: int
+    ) -> tuple[list[dict], int]:
+        client = module.authenticated_client(None, None)
+        query = client.table("approval_step").select("*,created_at")
+        total = len(query.rows)
+        if boundary is not None:
+            value, step_id = boundary
+            query.or_(f"created_at.lt.{value},and(created_at.eq.{value},id.gt.{step_id})")
+        rows = query.order("created_at", desc=True).order("id").range(0, limit).execute().data
+        return [{**row, "sort_value": row["created_at"]} for row in rows], total
+
+    monkeypatch.setattr(module.RequestsService, "_pending_approval_page", page)

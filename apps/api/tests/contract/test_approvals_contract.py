@@ -16,8 +16,8 @@ from procurepilot_api.modules.requests.schemas import (
     ApprovalDecisionInput,
     ApprovalStep,
     BudgetStatus,
+    PendingApprovalList,
     PurchaseRequest,
-    PurchaseRequestList,
 )
 
 # T022 [US2] — contract coverage for GET /approvals/pending and
@@ -83,22 +83,22 @@ def test_pending_queue_row_carries_every_fr005_context_field() -> None:
 
 
 def test_pending_queue_is_a_purchase_request_list() -> None:
-    queue = PurchaseRequestList(
+    queue = PendingApprovalList(
         items=[PurchaseRequest.model_validate(_queued_request())],
-        next_cursor="eyJvZmZzZXQiOjI1fQ==",
+        next_cursor="opaque",
+        total=7,
     )
+    assert queue.total == 7
     assert len(queue.items) == 1
     assert queue.next_cursor is not None
 
-    empty = PurchaseRequestList(items=[], next_cursor=None)
+    empty = PendingApprovalList(items=[], next_cursor=None, total=0)
     assert empty.items == []
     assert empty.next_cursor is None
 
 
 def test_budget_status_is_optional_and_omitted_when_no_budget_applies() -> None:
-    pr = PurchaseRequest.model_validate(
-        _queued_request(budget_status=None)
-    )
+    pr = PurchaseRequest.model_validate(_queued_request(budget_status=None))
     assert pr.budget_status is None
 
 
@@ -170,9 +170,9 @@ def test_decision_error_envelopes_map_to_the_documented_status_codes() -> None:
     assert ConflictError().status_code == 409
 
     # The reasons the approve/reject path attaches, surfaced in the envelope's `details`.
-    assert PermissionDeniedError(
-        details={"reason": "not_assigned_approver"}
-    ).details == {"reason": "not_assigned_approver"}
+    assert PermissionDeniedError(details={"reason": "not_assigned_approver"}).details == {
+        "reason": "not_assigned_approver"
+    }
     for reason in ("not_submitted", "no_pending_approval"):
         assert ConflictError(details={"reason": reason}).details == {"reason": reason}
 
@@ -190,8 +190,7 @@ def test_approval_routes_are_registered() -> None:
 def test_contract_declares_the_approval_paths() -> None:
     repo_root = Path(__file__).resolve().parents[4]
     text = (
-        repo_root
-        / "specs/008-requests-approvals/contracts/requests-approvals.openapi.yaml"
+        repo_root / "specs/008-requests-approvals/contracts/requests-approvals.openapi.yaml"
     ).read_text(encoding="utf-8")
     for path in (
         "/approvals/pending",

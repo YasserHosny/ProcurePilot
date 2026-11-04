@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -55,6 +56,8 @@ from procurepilot_api.modules.requests.schemas import (
     LowStockReportCreate,
     LowStockReportList,
     Money,
+    PendingApprovalList,
+    PendingApprovalSort,
     PurchaseRequest,
     PurchaseRequestCreate,
     PurchaseRequestLine,
@@ -718,6 +721,18 @@ class RequestsService:
         if not visible:
             return PurchaseRequestList(items=[], next_cursor=next_cursor)
 
+        if eligible_for_order:
+            assert member is not None
+            # Reuse the legacy eligible helper's per-row construction, skipping normal
+            # list enrichment so filters cannot change item content. Keep the bare path intact.
+            return PurchaseRequestList(
+                items=[
+                    self._get_request_for_member(member=member, request_id=UUID(str(row["id"])))
+                    for row in visible
+                ],
+                next_cursor=next_cursor,
+            )
+
         request_ids = [str(r["id"]) for r in visible]
         lines_by_request = self._fetch_lines_batch(client, request_ids)
         steps_by_request = self._fetch_steps_batch(client, request_ids)
@@ -911,61 +926,45 @@ class RequestsService:
         member: CurrentMember,
         cursor: str | None = None,
         limit: int = 50,
-    ) -> PurchaseRequestList:
+        sort: PendingApprovalSort = "submitted_desc",
+        branch_id: UUID | None = None,
+    ) -> PendingApprovalList:
+        boundary = _decode_approval_cursor(cursor, sort=sort, branch_id=branch_id)
         client = authenticated_client(self._settings, bearer_token)
         capped = _cap_limit(limit)
-        boundary = _decode_approval_cursor(cursor)
-
-        try:
-            query = (
-                client.table("approval_step")
-                .select(f"{STEP_COLUMNS},created_at,purchase_request!inner(status)")
-                .eq("status", "pending")
-            )
-            for status in TERMINAL_REQUEST_STATUSES:
-                query = query.neq("purchase_request.status", status)
-            if member.role is not MemberRole.owner:
-                query = query.eq("assigned_membership_id", str(member.membership_id))
-            is_sole_owner = member.role is MemberRole.owner and set(
-                self._fetch_owner_membership_ids(client)
-            ) == {member.membership_id}
-            if not is_sole_owner:
-                query = query.neq(
-                    "purchase_request.requested_by_membership_id", str(member.membership_id)
-                )
-            if boundary is not None:
-                created_at, step_id = boundary
-                query = query.or_(
-                    f"created_at.lt.{created_at},and(created_at.eq.{created_at},id.gt.{step_id})"
-                )
-            response = query.order("created_at", desc=True).order("id").range(0, capped).execute()
-        except APIError as exc:
-            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-
-        step_rows = _rows(response.data)
+        step_rows, total = self._pending_approval_page(
+            member=member, sort=sort, branch_id=branch_id, boundary=boundary, limit=capped
+        )
         visible_steps = step_rows[:capped]
         next_cursor = (
             _encode_approval_cursor(
-                str(visible_steps[-1]["created_at"]), UUID(str(visible_steps[-1]["id"]))
+                None
+                if visible_steps[-1]["sort_value"] is None
+                else str(visible_steps[-1]["sort_value"]),
+                UUID(str(visible_steps[-1]["id"])),
+                sort=sort,
+                branch_id=branch_id,
             )
             if len(step_rows) > capped
             else None
         )
         if not visible_steps:
-            return PurchaseRequestList(items=[], next_cursor=next_cursor)
+            return PendingApprovalList(items=[], next_cursor=next_cursor, total=total)
 
         request_ids = [str(step["purchase_request_id"]) for step in visible_steps]
         request_rows = self._fetch_requests_batch(client, request_ids)
         lines_by_request = self._fetch_lines_batch(client, request_ids)
-        steps_by_request = {str(step["purchase_request_id"]): step for step in visible_steps}
         member_contacts = self._fetch_member_contacts_batch(client, request_rows, visible_steps)
         auto_prepared = self._fetch_auto_prepared_batch(client, request_rows)
         sources = self._fetch_sources_batch(client, request_rows)
         request_groups = self._fetch_request_groups_batch(client, request_rows)
 
         items = []
-        for row in request_rows:
-            step = steps_by_request.get(str(row["id"]))
+        rows_by_id = {str(row["id"]): row for row in request_rows}
+        for step in visible_steps:
+            row = rows_by_id.get(str(step["purchase_request_id"]))
+            if row is None:
+                continue
             items.append(
                 self._purchase_request_with_budget_status(
                     client,
@@ -987,7 +986,52 @@ class RequestsService:
                     request_group_lookup=False,
                 )
             )
-        return PurchaseRequestList(items=items, next_cursor=next_cursor)
+        return PendingApprovalList(items=items, next_cursor=next_cursor, total=total)
+
+    def _pending_approval_page(
+        self,
+        *,
+        member: CurrentMember,
+        sort: PendingApprovalSort,
+        branch_id: UUID | None,
+        boundary: tuple[str | None, UUID] | None,
+        limit: int,
+    ) -> tuple[list[dict[str, object]], int]:
+        claims = json.dumps(
+            {
+                "sub": str(member.user_id),
+                "tenant_id": str(member.tenant_id),
+                "role": "authenticated",
+                "member_role": member.role.value,
+            }
+        )
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    # Both reads use the verified member's RLS context.
+                    cur.execute("set local role authenticated")
+                    cur.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
+                    cur.execute(
+                        "select id from membership where role = 'owner' and status = 'active'"
+                    )
+                    owners = {UUID(str(row["id"])) for row in cur.fetchall()}
+                    options = dict(
+                        sort=sort,
+                        branch_id=branch_id,
+                        membership_id=member.membership_id,
+                        is_owner=member.role is MemberRole.owner,
+                        is_sole_owner=member.role is MemberRole.owner
+                        and owners == {member.membership_id},
+                        limit=limit,
+                    )
+                    query, params = _pending_approval_query(**options, boundary=None, count=True)
+                    cur.execute(query, params)
+                    total = int(cur.fetchone()["total"])
+                    query, params = _pending_approval_query(**options, boundary=boundary)
+                    cur.execute(query, params)
+                    return cur.fetchall(), total
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def create_low_stock_report(
         self,
@@ -4223,12 +4267,88 @@ def _encode_cursor(offset: int) -> str:
     return base64.urlsafe_b64encode(raw).decode("ascii")
 
 
-def _encode_approval_cursor(created_at: str, step_id: UUID) -> str:
-    raw = json.dumps({"created_at": created_at, "id": str(step_id)}).encode("utf-8")
+_APPROVAL_SORT_COLUMNS = {
+    "submitted_desc": ("ast.created_at", "desc"),
+    "submitted_asc": ("ast.created_at", "asc"),
+    "required_by_asc": ("pr.required_by_date", "asc"),
+    "total_desc": ("pr.estimated_total_amount", "desc"),
+    "total_asc": ("pr.estimated_total_amount", "asc"),
+}
+
+
+def _pending_approval_query(
+    *,
+    sort: PendingApprovalSort,
+    branch_id: UUID | None,
+    membership_id: UUID,
+    is_owner: bool,
+    is_sole_owner: bool,
+    boundary: tuple[str | None, UUID] | None,
+    limit: int,
+    count: bool = False,
+) -> tuple[str, list[object]]:
+    column, direction = _APPROVAL_SORT_COLUMNS[sort]
+    predicates = ["ast.status = 'pending'"]
+    params: list[object] = []
+    for status in sorted(TERMINAL_REQUEST_STATUSES):
+        predicates.append("pr.status <> %s")
+        params.append(status)
+    if not is_owner:
+        predicates.append("ast.assigned_membership_id = %s")
+        params.append(membership_id)
+    if not is_sole_owner:
+        predicates.append("pr.requested_by_membership_id <> %s")
+        params.append(membership_id)
+    if branch_id is not None:
+        predicates.append("pr.branch_id = %s")
+        params.append(branch_id)
+    if boundary is not None and not count:
+        value, step_id = boundary
+        if value is None:
+            predicates.append(f"({column} is null and ast.id > %s)")
+            params.append(step_id)
+        else:
+            operator = "<" if direction == "desc" else ">"
+            predicates.append(
+                f"({column} {operator} %s or ({column} = %s and ast.id > %s) or {column} is null)"
+            )
+            params.extend([value, value, step_id])
+    projection = "count(*) as total" if count else f"ast.*, {column} as sort_value"
+    query = (
+        f"select {projection} from approval_step ast "
+        "join purchase_request pr on pr.id = ast.purchase_request_id "
+        "where " + " and ".join(predicates)
+    )
+    if not count:
+        query += f" order by {column} {direction} nulls last, ast.id asc limit %s"
+        params.append(limit + 1)
+    return query, params
+
+
+def _encode_approval_cursor(
+    value: str | None,
+    step_id: UUID,
+    *,
+    sort: PendingApprovalSort = "submitted_desc",
+    branch_id: UUID | None = None,
+) -> str:
+    raw = json.dumps(
+        {
+            "sort": sort,
+            "value": value,
+            "id": str(step_id),
+            "branch_id": str(branch_id) if branch_id else None,
+        }
+    ).encode("utf-8")
     return base64.urlsafe_b64encode(raw).decode("ascii")
 
 
-def _decode_approval_cursor(cursor: str | None) -> tuple[str, UUID] | None:
+def _decode_approval_cursor(
+    cursor: str | None,
+    *,
+    sort: PendingApprovalSort = "submitted_desc",
+    branch_id: UUID | None = None,
+) -> tuple[str | None, UUID] | None:
     if cursor is None:
         return None
     try:
@@ -4236,18 +4356,39 @@ def _decode_approval_cursor(cursor: str | None) -> tuple[str, UUID] | None:
         payload = json.loads(raw.decode("utf-8"))
         if not isinstance(payload, dict):
             raise ValueError("invalid cursor payload")
-        created_at, step_id = payload["created_at"], payload["id"]
-        if not isinstance(created_at, str) or not isinstance(step_id, str):
+        # Existing unfiltered default-sort cursors remain valid across deployment.
+        if "sort" not in payload and "created_at" in payload:
+            payload = {
+                **payload,
+                "sort": "submitted_desc",
+                "branch_id": None,
+                "value": payload["created_at"],
+            }
+        if payload["sort"] != sort or payload["branch_id"] != (
+            str(branch_id) if branch_id else None
+        ):
+            raise ValueError("cursor filter mismatch")
+        value, step_id = payload["value"], payload["id"]
+        if not isinstance(step_id, str) or (value is not None and not isinstance(value, str)):
             raise ValueError("invalid cursor fields")
-        timestamp = datetime.fromisoformat(created_at)
-        if timestamp.tzinfo is None:
-            raise ValueError("cursor timestamp requires a timezone")
-        # UTC Z avoids '+' being interpreted as a space by filter/URL parsers.
-        normalized = (
-            timestamp.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
-        )
-        return normalized, UUID(step_id)
-    except (KeyError, ValueError, TypeError, OverflowError) as exc:
+        if sort.startswith("submitted"):
+            timestamp = datetime.fromisoformat(value)
+            if timestamp.tzinfo is None:
+                raise ValueError("cursor timestamp requires a timezone")
+            value = (
+                timestamp.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+            )
+        elif value is not None:
+            if sort == "required_by_asc":
+                value = date.fromisoformat(value).isoformat()
+            # purchase_request.estimated_total_amount is numeric(18, 4).
+            elif (
+                not value.isascii()
+                or re.fullmatch(r"[+-]?[0-9]{1,14}(?:\.[0-9]{1,4})?", value) is None
+            ):
+                raise ValueError("invalid cursor amount")
+        return value, UUID(step_id)
+    except (KeyError, ValueError, TypeError, OverflowError, ArithmeticError) as exc:
         raise UnprocessableEntityError(details={"cursor": "invalid"}) from exc
 
 

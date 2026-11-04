@@ -19,6 +19,28 @@
     }
   </div>
 
+  @if (existingRequest(); as req) {
+    <section class="request-details">
+      <h2>{{ 'requests.details.title' | translate }}</h2>
+      <dl>
+        <div>
+          <dt>{{ 'requests.details.requester' | translate }}</dt>
+          <dd dir="auto">{{ req.requester_name || req.requester_email || ('requests.details.unavailable' | translate) }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'requests.details.created' | translate }}</dt>
+          <dd><time [attr.datetime]="req.created_at">{{ req.created_at | formatDate }}</time></dd>
+        </div>
+        @if (req.submitted_at) {
+          <div>
+            <dt>{{ 'requests.details.submitted' | translate }}</dt>
+            <dd><time [attr.datetime]="req.submitted_at">{{ req.submitted_at | formatDate }}</time></dd>
+          </div>
+        }
+      </dl>
+    </section>
+  }
+
   @if (duplicateSourceStatus(); as status) {
     <div class="duplicate-banner" role="status">
       {{ 'requests.duplicate.banner' | translate: { status: ('requests.status.' + status | translate) } }}
@@ -435,5 +457,20 @@
         </div>
       </form>
     </mat-card>
+  }
+  @if (existingRequest()) {
+    <section>
+      <h2>{{ 'requests.history.title' | translate }}</h2>
+      <ol class="request-history" [attr.aria-label]="'requests.history.title' | translate">
+        @for (event of history(); track event.key) {
+          <li>
+            <span>{{ 'requests.history.' + event.key | translate }}</span>
+            @if (event.actor) { <span dir="auto">{{ event.actor }}</span> }
+            <time [attr.datetime]="event.timestamp">{{ event.timestamp | formatDate }}</time>
+            @if (event.comment) { <p dir="auto">{{ event.comment }}</p> }
+          </li>
+        }
+      </ol>
+    </section>
   }
 </div>

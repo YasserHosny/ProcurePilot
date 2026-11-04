@@ -10,6 +10,7 @@ import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
+import { FormatService } from '../../../core/format/format.service';
 import { ApiService } from '../../../core/api/api.service';
 import type { BranchList, CostCentre, Member, Product, PurchaseRequest } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
@@ -130,6 +131,114 @@ describe('RequestFormComponent — create mode (T017)', () => {
     fixture.detectChanges();
   });
 
+  describe('PPS-193 view leftovers', () => {
+    function show(request: PurchaseRequest): HTMLElement {
+      requestsApi.getRequest.and.returnValue(of(request));
+      routeParams.next(convertToParamMap({ id: `${request.id}-${request.status}-${request.requester_name}-${request.requester_email}-${TestBed.inject(TranslateService).getCurrentLang()}` }));
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('renders details in drafts and read-only requests with name, email and missing requester fallbacks', () => {
+      for (const status of ['draft', 'submitted'] as const) {
+        for (const [name, email, expected] of [
+          ['Mona', 'mona@example.com', 'Mona'],
+          ['', 'mona@example.com', 'mona@example.com'],
+          ['', '', '—'],
+        ]) {
+          const root = show({ ...mockRequest, status, requester_name: name, requester_email: email,
+            submitted_at: status === 'submitted' ? '2026-08-24T12:00:00Z' : null });
+          const details = root.querySelector('.request-details');
+          expect(details?.textContent).toContain('Details');
+          expect(details?.querySelector('[dir="auto"]')?.textContent?.trim()).toBe(expected);
+          expect(details?.textContent).toContain('Requested by');
+          expect(details?.textContent).toContain('Created');
+          expect(details?.querySelector('time')?.getAttribute('datetime')).toBe(mockRequest.created_at);
+          expect(details?.querySelectorAll('time').length).toBe(status === 'submitted' ? 2 : 1);
+          expect(details?.textContent).toContain(TestBed.inject(FormatService).formatDate(mockRequest.created_at));
+        }
+      }
+    });
+
+    it('renders only timestamped history in chronological order with approval comment and decider in en and ar', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog);
+      for (const locale of ['en', 'ar']) {
+        translate.use(locale);
+        const root = show({ ...mockRequest, status: 'ordered', requester_name: 'Mona',
+          submitted_at: '2026-08-24T12:00:00Z', withdrawn_at: '2026-08-26T12:00:00Z',
+          delivered_at: '2026-08-25T12:00:00Z',
+          approval_step: { id: 'a', assigned_membership_id: 'm2', source: 'owner_fallback',
+            status: 'approved', decided_by_membership_id: 'm2', decided_at: '2026-08-24T13:00:00Z',
+            assigned_name: 'Ali', assigned_email: 'ali@example.com', comment: 'Within budget' } });
+        const history = root.querySelector('ol.request-history');
+        expect(history?.getAttribute('aria-label')).toBe(locale === 'en' ? 'History' : 'السجل');
+        const rows = Array.from(history?.querySelectorAll('li') ?? []);
+        expect(rows.length).toBe(5);
+        expect(rows[0]?.textContent).toContain(locale === 'en' ? 'Created' : 'تم الإنشاء');
+        expect(rows[0]?.textContent).toContain('Mona');
+        expect(rows[2]?.textContent).toContain(locale === 'en' ? 'Approval approved' : 'تمت الموافقة');
+        expect(rows[2]?.textContent).toContain('Ali');
+        expect(rows[2]?.textContent).toContain('Within budget');
+        expect(rows.map(row => row.querySelector('time')?.getAttribute('datetime'))).toEqual([
+          mockRequest.created_at, '2026-08-24T12:00:00Z', '2026-08-24T13:00:00Z',
+          '2026-08-25T12:00:00Z', '2026-08-26T12:00:00Z',
+        ]);
+      }
+    });
+
+    for (const status of ['approved', 'rejected'] as const) {
+      for (const [scenario, decider] of [
+        ['assigned approver', 'm2'],
+        ['delegate', 'm3'],
+        ['missing decider', undefined],
+      ] as const) {
+        for (const name of ['Ali', '']) {
+          it(`shows the correct history actor for ${status}, ${scenario}, name="${name}"`, () => {
+            const timestamp = '2026-08-24T13:00:00Z';
+            const root = show({ ...mockRequest, status, approval_step: {
+              id: 'a', assigned_membership_id: 'm2', source: 'owner_fallback', status,
+              decided_by_membership_id: decider, decided_at: timestamp,
+              assigned_name: name, assigned_email: 'ali@example.com', comment: 'Decision comment',
+            } });
+            const row = root.querySelectorAll('.request-history li')[1];
+            expect(row).toBeDefined();
+            const actor = row?.querySelector('span[dir="auto"]');
+            if (decider === 'm2') {
+              expect(actor?.textContent?.trim()).toBe(name || 'ali@example.com');
+            } else {
+              expect(actor).toBeNull();
+            }
+            expect(row?.querySelector('p')?.textContent).toBe('Decision comment');
+            expect(row?.querySelector('time')?.getAttribute('datetime')).toBe(timestamp);
+            expect(row?.querySelector('time')?.textContent).toContain(
+              TestBed.inject(FormatService).formatDate(timestamp),
+            );
+          });
+        }
+      }
+    }
+
+    it('omits absent events and clears details and history when navigating to a new request', () => {
+      const root = show({ ...mockRequest, status: 'ordered', approval_step: {
+        id: 'a', assigned_membership_id: 'm2', source: 'owner_fallback', status: 'approved',
+      } });
+      expect(root.querySelectorAll('.request-history li').length).toBe(1);
+      component.existingRequest.set({ ...mockRequest, status: 'rejected', approval_step: {
+        id: 'a', assigned_membership_id: 'm2', source: 'owner_fallback', status: 'rejected',
+        decided_by_membership_id: 'm2', decided_at: '2026-08-24T12:00:00Z', assigned_email: 'ali@example.com',
+      } });
+      fixture.detectChanges();
+      expect(root.querySelectorAll('.request-history li').length).toBe(2);
+      expect(root.querySelector('.request-history')?.textContent).toContain('Approval rejected');
+      expect(root.querySelector('.request-history')?.textContent).toContain('ali@example.com');
+      routeParams.next(convertToParamMap({}));
+      fixture.detectChanges();
+      expect(root.querySelector('.request-details')).toBeNull();
+      expect(root.querySelector('.request-history')).toBeNull();
+    });
+  });
+
   describe('PPS-167 self approval marker', () => {
     for (const locale of ['en', 'ar']) {
       for (const status of ['pending', 'approved', 'rejected'] as const) {
@@ -176,7 +285,6 @@ describe('RequestFormComponent — create mode (T017)', () => {
       }
     }
   });
-
   describe('PPS-193 pack hints and Save and submit', () => {
     const product: Product = {
       id: 'wp1', tenant_name: 'Flour', canonical_name: 'Flour', base_unit: 'kg',

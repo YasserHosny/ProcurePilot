@@ -19,6 +19,7 @@ from integration.catalogue_helpers import (
 from integration.quotation_helpers import make_quotation, make_supplier
 from integration.test_purchase_requests import (
     _add_line_no_estimate,
+    _assign_branch,
     _current_member,
     _make_branch,
     _make_member,
@@ -28,7 +29,11 @@ from integration.test_purchase_requests import (
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.errors import register_exception_handlers
 from procurepilot_api.modules.requests.router import router
-from procurepilot_api.modules.requests.service import _encode_cursor, get_requests_service
+from procurepilot_api.modules.requests.service import (
+    RequestsService,
+    _encode_cursor,
+    get_requests_service,
+)
 
 pytestmark = pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL not set")
 
@@ -244,8 +249,149 @@ def test_search_tenant_isolation(client: TestClient, data: Seed) -> None:
     assert ids(listing(client, q="Needle Fresh الوفرة")) == []
 
 
-def test_default_unchanged(client: TestClient) -> None:
-    assert listing(client) == listing(client, sort="created_desc", mine="false")
+def test_default_unchanged(client: TestClient, data: Seed, monkeypatch: pytest.MonkeyPatch) -> None:
+    def unexpected_sql(*args: object, **kwargs: object) -> None:
+        pytest.fail("The default list must retain the pre-change PostgREST path")
+
+    monkeypatch.setattr(RequestsService, "_list_request_rows_sql", unexpected_sql)
+    # Pre-change contract: all six tenant requests, newest first, ascending id on ties.
+    expected = [value for start in (4, 2, 0) for value in sorted(data.ids[start : start + 2])]
+    body = listing(client)
+    assert ids(body) == expected
+    assert body["next_cursor"] is None
+
+
+@dataclass
+class EligibleSeed:
+    conn: psycopg.Connection
+    ws: Workspace
+    member: Workspace
+    branch: UUID
+    visible: list[str]
+    hidden: str
+    foreign: str
+
+
+@pytest.fixture(scope="module")
+def eligible_data() -> Iterator[EligibleSeed]:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            ws = make_workspace(cur, "p169-parity")
+            member = _make_member(cur, ws.tenant_id, "p169-scoped", "branch_manager")
+            branch = _make_branch(cur, ws)
+            hidden_branch = _make_branch(cur, ws)
+            _assign_branch(cur, ws, member, branch)
+            foreign_ws = make_workspace(cur, "p169-parity-foreign")
+            foreign_branch = _make_branch(cur, foreign_ws)
+            requests = []
+            for tenant, request_branch in (
+                (ws, branch),
+                (ws, branch),
+                (ws, hidden_branch),
+                (foreign_ws, foreign_branch),
+            ):
+                product = make_workspace_product(cur, tenant, name="Parity product")
+                reset_role(cur)
+                request = _make_request(
+                    cur,
+                    tenant,
+                    request_branch,
+                    status="approved",
+                    requested_by_membership_id=(
+                        member.membership_id if request_branch == branch else tenant.membership_id
+                    ),
+                )
+                requests.append(str(request))
+                # Both product names and both notes match: EXISTS must not duplicate rows.
+                for _ in range(2):
+                    line = _add_line_no_estimate(cur, tenant, request, product)
+                    cur.execute(
+                        "update purchase_request_line set note='Parity note' where id=%s",
+                        (line,),
+                    )
+                cur.execute(
+                    "insert into approval_step (tenant_id,purchase_request_id,"
+                    "assigned_membership_id,source,status,decided_by_membership_id,decided_at) "
+                    "values (%s,%s,%s,'owner_fallback','approved',%s,now())",
+                    (tenant.tenant_id, request, tenant.membership_id, tenant.membership_id),
+                )
+        conn.commit()
+        yield EligibleSeed(conn, ws, member, branch, requests[:2], requests[2], requests[3])
+        conn.rollback()
+
+
+@pytest.fixture
+def eligible_client(
+    eligible_data: EligibleSeed, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[TestClient]:
+    data = eligible_data
+    service = _service(data.conn, monkeypatch)
+    # Exercise real enrichment rather than the generic helper's budget stub.
+    monkeypatch.setattr(
+        service, "_budget_status_for", RequestsService._budget_status_for.__get__(service)
+    )
+    app = FastAPI()
+    register_exception_handlers(app)
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[current_member] = lambda: _current_member(data.ws, data.member)
+    app.dependency_overrides[bearer_token] = data.member.claims
+    app.dependency_overrides[get_requests_service] = lambda: service
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"sort": "created_asc"},
+        {"mine": "true"},
+        {"q": "Parity"},
+        {"status": "approved"},
+        {"branch_id": "assigned"},
+    ],
+)
+def test_eligible_item_parity(
+    eligible_client: TestClient, eligible_data: EligibleSeed, params: dict
+) -> None:
+    bare = listing(eligible_client, eligible_for_order="true")
+    if "branch_id" in params:
+        params = {"branch_id": str(eligible_data.branch)}
+    filtered = listing(eligible_client, eligible_for_order="true", **params)
+    assert set(ids(bare)) == set(eligible_data.visible)
+    assert sorted(bare["items"], key=lambda item: item["id"]) == sorted(
+        filtered["items"], key=lambda item: item["id"]
+    )
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"q": "Parity"},
+        {"sort": "created_asc"},
+        {"mine": "true"},
+        {"eligible_for_order": "true"},
+        {"eligible_for_order": "true", "q": "Parity", "sort": "created_asc", "mine": "true"},
+    ],
+)
+def test_branch_scoped_member_isolation(
+    eligible_client: TestClient, eligible_data: EligibleSeed, params: dict
+) -> None:
+    # The other branch has an approved, matching owner-created request. Own requests
+    # intentionally bypass branch scope under the existing requester-always RLS rule.
+    result = ids(listing(eligible_client, **params))
+    assert set(result) == set(eligible_data.visible)
+    assert eligible_data.hidden not in result
+    assert eligible_data.foreign not in result
+
+
+@pytest.mark.parametrize("q", ["Parity product", "Parity note"])
+def test_multiple_matching_lines_appear_once(
+    eligible_client: TestClient, eligible_data: EligibleSeed, q: str
+) -> None:
+    body = listing(eligible_client, q=q, sort="created_asc")
+    assert set(ids(body)) == set(eligible_data.visible)
+    assert len(body["items"]) == len(eligible_data.visible)
+    assert all(len(item["lines"]) == 2 for item in body["items"])
 
 
 def test_search_pages_beyond_2000_matches(client: TestClient, data: Seed) -> None:

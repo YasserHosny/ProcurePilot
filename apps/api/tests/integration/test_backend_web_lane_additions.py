@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
@@ -128,12 +129,15 @@ def test_requests_and_approval_queue_carry_member_display_names(
             client = PsycopgSupabaseClient(conn, claims=context.workspace.claims())
             monkeypatch.setattr(requests_module, "authenticated_client", lambda *_: client)
             service = requests_module.RequestsService(settings_for_test_db(monkeypatch))
-            queued = {
-                item.id: item
-                for item in service.list_pending_approvals(
-                    bearer_token="test-token", member=member
-                ).items
-            }[request_id]
+            # Reuse the fixture transaction so authenticated SQL sees its uncommitted rows.
+            with monkeypatch.context() as patch:
+                patch.setattr(requests_module.db, "connect", lambda *_a, **_kw: nullcontext(conn))
+                queued = {
+                    item.id: item
+                    for item in service.list_pending_approvals(
+                        bearer_token="test-token", member=member
+                    ).items
+                }[request_id]
             listed = {
                 item.id: item for item in service.list_requests(bearer_token="test-token").items
             }[request_id]
@@ -185,9 +189,12 @@ def test_approval_queue_includes_requester_email_and_branch_budget_reasons(
                     )
             client = PsycopgSupabaseClient(conn, claims=context.workspace.claims())
             monkeypatch.setattr(requests_module, "authenticated_client", lambda *_: client)
-            result = requests_module.RequestsService(
-                settings_for_test_db(monkeypatch)
-            ).list_pending_approvals(bearer_token="test-token", member=member)
+            # Reuse the fixture transaction so authenticated SQL sees its uncommitted rows.
+            with monkeypatch.context() as patch:
+                patch.setattr(requests_module.db, "connect", lambda *_a, **_kw: nullcontext(conn))
+                result = requests_module.RequestsService(
+                    settings_for_test_db(monkeypatch)
+                ).list_pending_approvals(bearer_token="test-token", member=member)
             by_id = {item.id: item for item in result.items}
             assert (
                 by_id[request_ids[0]].requester_email
