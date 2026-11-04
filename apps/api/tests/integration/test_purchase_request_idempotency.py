@@ -143,6 +143,9 @@ def _build_test_client(
         service, "_fetch_owner_membership_id", lambda _client: workspace.membership_id
     )
     monkeypatch.setattr(
+        service, "_fetch_owner_membership_ids", lambda _client: [workspace.membership_id]
+    )
+    monkeypatch.setattr(
         requests_service_module,
         "get_audit_writer",
         lambda: _PsycopgAuditWriter(conn),

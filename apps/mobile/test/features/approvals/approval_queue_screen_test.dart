@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:procurepilot_mobile/core/api/models.dart';
+import 'package:procurepilot_mobile/core/api/approvals_api_client.dart';
 import 'package:procurepilot_mobile/features/approvals/approval_queue_screen.dart';
 
 import '../../test_helpers.dart';
@@ -39,6 +42,279 @@ void main() {
       );
       await tester.pumpAndSettle();
     }
+
+    final loadMore = find.byKey(const Key('approvalQueueLoadMore'));
+    final status = find.byKey(const Key('approvalQueueStatus'));
+
+    void servePages() {
+      fakeClient.pendingPage = (cursor, limit) async => cursor == null
+          ? PendingApprovalsList(
+              items: fakeClient.pendingResults,
+              nextCursor: 'opaque-page-2',
+            )
+          : PendingApprovalsList(
+              items: [
+                fakeClient.pendingResults.last,
+                pendingRequest(
+                  id: 'req-3',
+                  requester: 'third',
+                  requesterName: 'Third',
+                ),
+              ],
+            );
+    }
+
+    testWidgets('pages append with overlap de-duplicated and request counts', (
+      tester,
+    ) async {
+      servePages();
+      await pumpQueue(tester);
+      expect(find.text('Requester: Sarah Connor'), findsOneWidget);
+      expect(find.text('Showing 2 requests, more available'), findsOneWidget);
+      expect(find.text('Load more'), findsOneWidget);
+      expect(tester.widget<FilledButton>(loadMore).onPressed, isNotNull);
+      expect(
+        tester
+            .widget<Semantics>(
+              find.ancestor(of: status, matching: find.byType(Semantics)).first,
+            )
+            .properties
+            .liveRegion,
+        isTrue,
+      );
+      expect(fakeClient.pendingCalls, [(cursor: null, limit: 50)]);
+
+      await tester.tap(loadMore);
+      await tester.pumpAndSettle();
+      expect(find.text('Requester: Third'), findsOneWidget);
+      expect(find.text('Requester: john@example.com'), findsOneWidget);
+      expect(find.byType(ListTile), findsNWidgets(3));
+      expect(find.text('Showing 3 requests'), findsOneWidget);
+      expect(loadMore, findsNothing);
+      expect(fakeClient.pendingCalls.last, (
+        cursor: 'opaque-page-2',
+        limit: 50,
+      ));
+    });
+
+    testWidgets(
+      'double tap sends one page request and disables loading button',
+      (tester) async {
+        servePages();
+        await pumpQueue(tester);
+        final page = Completer<PendingApprovalsList>();
+        fakeClient.pendingPage = (cursor, limit) => page.future;
+        await tester.tap(loadMore);
+        await tester.tap(loadMore);
+        await tester.pump();
+        expect(fakeClient.pendingCalls.length, 2);
+        expect(tester.widget<FilledButton>(loadMore).onPressed, isNull);
+        expect(find.text('Loading...'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: loadMore,
+            matching: find.byType(CircularProgressIndicator),
+          ),
+          findsOneWidget,
+        );
+        page.complete(const PendingApprovalsList(items: []));
+        await tester.pumpAndSettle();
+        expect(loadMore, findsNothing);
+      },
+    );
+
+    testWidgets(
+      'load-more failure keeps rows and cursor, announces error and retries',
+      (tester) async {
+        servePages();
+        await pumpQueue(tester);
+        fakeClient.pendingPage = (cursor, limit) async =>
+            throw Exception('offline');
+        await tester.tap(loadMore);
+        await tester.pumpAndSettle();
+        expect(find.byType(ListTile), findsNWidgets(2));
+        final error = find.text(
+          'Unable to load more requests. Please try again.',
+        );
+        expect(error, findsOneWidget);
+        expect(
+          tester.widget<Text>(error).style!.color,
+          Theme.of(tester.element(error)).colorScheme.error,
+        );
+        expect(
+          tester
+              .widget<Semantics>(
+                find
+                    .ancestor(of: error, matching: find.byType(Semantics))
+                    .first,
+              )
+              .properties
+              .liveRegion,
+          isTrue,
+        );
+        expect(tester.widget<FilledButton>(loadMore).onPressed, isNotNull);
+        servePages();
+        await tester.tap(loadMore);
+        await tester.pumpAndSettle();
+        expect(error, findsNothing);
+        expect(find.text('Showing 3 requests'), findsOneWidget);
+        expect(fakeClient.pendingCalls.map((call) => call.cursor), [
+          null,
+          'opaque-page-2',
+          'opaque-page-2',
+        ]);
+      },
+    );
+
+    testWidgets(
+      'failed decision reload preserves rows and cursor for loading more',
+      (tester) async {
+        servePages();
+        await pumpQueue(tester);
+        await tester.tap(find.byKey(const Key('approvalQueueItem_0')));
+        await tester.pumpAndSettle();
+
+        fakeClient.pendingPage = (cursor, limit) async =>
+            throw Exception('reload offline');
+        await tester.tap(
+          find.byKey(const Key('approvalDecisionApproveButton')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(fakeRequestsClient.approveCalls, ['req-1']);
+        expect(find.byType(ApprovalQueueScreen), findsOneWidget);
+        expect(find.text('Requester: Sarah Connor'), findsOneWidget);
+        expect(find.text('Requester: john@example.com'), findsOneWidget);
+        expect(
+          find.text('Unable to record the decision. Please try again.'),
+          findsOneWidget,
+        );
+        expect(find.text('Showing 2 requests, more available'), findsOneWidget);
+        expect(find.text('Showing 2 requests'), findsNothing);
+        expect(tester.widget<FilledButton>(loadMore).onPressed, isNotNull);
+        expect(fakeClient.pendingCalls, [
+          (cursor: null, limit: 50),
+          (cursor: null, limit: 50),
+        ]);
+
+        servePages();
+        await tester.tap(loadMore);
+        await tester.pumpAndSettle();
+        expect(fakeClient.pendingCalls.last, (
+          cursor: 'opaque-page-2',
+          limit: 50,
+        ));
+        expect(find.text('Requester: Third'), findsOneWidget);
+        expect(find.text('Showing 3 requests'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'decision reload resets paging and ignores a late page response',
+      (tester) async {
+        servePages();
+        await pumpQueue(tester);
+        final stalePage = Completer<PendingApprovalsList>();
+        fakeClient.pendingPage = (cursor, limit) => stalePage.future;
+        await tester.tap(loadMore);
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('approvalQueueItem_0')));
+        // The page spinner remains active beneath the decision route.
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+        final fresh = pendingRequest(
+          id: 'fresh',
+          requester: 'fresh',
+          requesterName: 'Fresh',
+        );
+        fakeClient.pendingPage = (cursor, limit) async =>
+            PendingApprovalsList(items: [fresh], nextCursor: 'fresh-cursor');
+        await tester.tap(
+          find.byKey(const Key('approvalDecisionApproveButton')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Requester: Fresh'), findsOneWidget);
+        expect(find.text('Requester: Sarah Connor'), findsNothing);
+        expect(fakeClient.pendingCalls.last, (cursor: null, limit: 50));
+        expect(tester.widget<FilledButton>(loadMore).onPressed, isNotNull);
+
+        final freshPage = Completer<PendingApprovalsList>();
+        fakeClient.pendingPage = (cursor, limit) => freshPage.future;
+        await tester.tap(loadMore);
+        await tester.pump();
+        expect(fakeClient.pendingCalls.last, (
+          cursor: 'fresh-cursor',
+          limit: 50,
+        ));
+        stalePage.complete(
+          PendingApprovalsList(
+            items: [
+              pendingRequest(
+                id: 'stale',
+                requester: 'stale',
+                requesterName: 'Stale',
+              ),
+            ],
+            nextCursor: 'stale-cursor',
+          ),
+        );
+        await tester.pump();
+        expect(find.text('Requester: Stale'), findsNothing);
+        expect(tester.widget<FilledButton>(loadMore).onPressed, isNull);
+        freshPage.complete(const PendingApprovalsList(items: []));
+        await tester.pumpAndSettle();
+        expect(find.text('Showing 1 request'), findsOneWidget);
+        expect(loadMore, findsNothing);
+      },
+    );
+
+    testWidgets(
+      'a split arriving on page two counts requests and opens its decision screen',
+      (tester) async {
+        fakeClient.pendingPage = (cursor, limit) async => cursor == null
+            ? PendingApprovalsList(
+                items: [fakeClient.pendingResults.first],
+                nextCursor: 'split-page',
+              )
+            : PendingApprovalsList(items: splitApprovalRequests());
+        await pumpQueue(tester);
+        await tester.tap(loadMore);
+        await tester.pumpAndSettle();
+        expect(find.byType(ListTile), findsNWidgets(2));
+        expect(find.text('Showing 3 requests'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('approvalQueueItem_1')));
+        await tester.pumpAndSettle();
+        expect(find.text('الذهبي'), findsOneWidget);
+        expect(find.text('الوفرة'), findsOneWidget);
+        expect(
+          find.byKey(const Key('approvalDecisionApproveButton')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('Arabic pagination fits narrow width with large text', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 1000);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      // Group cards avoid unrelated single-card trailing money constraints.
+      final split = splitApprovalRequests();
+      fakeClient.pendingResults = [
+        ...split,
+        PurchaseRequest.fromJson({...split.first.toJson(), 'id': 'third'}),
+      ];
+      servePages();
+      await pumpQueue(tester, locale: 'ar');
+      expect(find.text('عرض 3 طلبات، ويتوفر المزيد'), findsOneWidget);
+      expect(find.text('تحميل المزيد'), findsOneWidget);
+      expect(Directionality.of(tester.element(status)), TextDirection.rtl);
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets(
       'renders requester name or email, never the raw membership UUID',
@@ -159,21 +435,32 @@ void main() {
 
       expect(fakeClient.approveGroupCalls, [splitGroupId]);
       expect(fakeRequestsClient.approveCalls, isEmpty);
-      expect(find.text('No requests are currently awaiting your decision.'), findsOneWidget);
+      expect(
+        find.text('No requests are currently awaiting your decision.'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('does not display a saving when the API has none', (tester) async {
+    testWidgets('does not display a saving when the API has none', (
+      tester,
+    ) async {
       fakeClient.pendingResults = [
         for (final request in splitApprovalRequests())
           PurchaseRequest.fromJson({
             ...request.toJson(),
-            'request_group': {...request.requestGroup!.toJson(), 'saving': null},
+            'request_group': {
+              ...request.requestGroup!.toJson(),
+              'saving': null,
+            },
           }),
       ];
       await pumpQueue(tester);
 
       expect(find.byType(ListTile), findsOneWidget);
-      expect(find.text('Split from RFQ rfq-1234 · 2 requests · SAR 4,063'), findsOneWidget);
+      expect(
+        find.text('Split from RFQ rfq-1234 · 2 requests · SAR 4,063'),
+        findsOneWidget,
+      );
       expect(find.textContaining('saves'), findsNothing);
     });
 

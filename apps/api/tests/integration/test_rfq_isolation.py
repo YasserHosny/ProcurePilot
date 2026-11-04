@@ -827,9 +827,15 @@ def test_an_owner_or_buyer_who_did_not_create_the_rfq_can_mark_it_converted(
         user_id, membership_id = _add_member(cur, alpha, role)
         request_id = _prepared_request(cur, alpha, membership_id, alpha.rfq_response_id)
         _act_as_user(cur, alpha, user_id, role)
-        # The plain update is still creator-only.
-        cur.execute("update rfq set status = 'converted' where id = %s", (alpha.rfq_id,))
-        assert cur.rowcount == 0
+        # A non-creator buyer cannot directly update (creator-only); an owner now can (PPS-179).
+        if role == "buyer":
+            cur.execute("update rfq set status = 'converted' where id = %s", (alpha.rfq_id,))
+            assert cur.rowcount == 0
+        else:
+            cur.execute(
+                "update rfq set needed_by_date = current_date + 10 where id = %s", (alpha.rfq_id,)
+            )
+            assert cur.rowcount == 1
         cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, request_id))
         assert cur.fetchone()[0] is True
         assert _rfq_status(cur, alpha.rfq_id) == "converted"

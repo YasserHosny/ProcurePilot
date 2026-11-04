@@ -66,6 +66,7 @@ class PurchaseRequestLineInput(StrictApiModel):
 
 
 class ApprovalStep(BaseModel):
+    self_approval: bool = False
     id: UUID
     assigned_membership_id: UUID
     assigned_name: str | None = None
