@@ -2457,6 +2457,9 @@
       "exceedsWarning": "سيتجاوز هذا الطلب الميزانية المتبقية لنطاقه."
     },
     "approval": {
+      "selfApproved": "اعتماد ذاتي",
+      "selfApprovedHint": "اتخذ القرار الشخص الذي قدّم الطلب",
+      "selfApprovalPending": "مُسند إلى مقدّم الطلب (المالك الوحيد)",
       "sectionTitle": "الاعتماد",
       "assignedTo": "معيّن إلى",
       "comment": "تعليق القرار",
@@ -2526,6 +2529,8 @@
     "notAvailable": "الإبلاغ عن مشكلة الجودة غير متاح."
   },
   "approvals": {
+    "ownRequestBadge": "طلبك أنت",
+    "selfDecisionNotAllowed": "لا يمكنك اعتماد أو رفض طلب قدّمته بنفسك. يجب أن يتخذ القرار مالك آخر أو مسؤول اعتماد.",
     "title": "قائمة الاعتماد",
     "subtitle": "الطلبات التي تنتظر قرارك.",
     "columns": {

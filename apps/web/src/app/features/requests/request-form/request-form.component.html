@@ -287,6 +287,20 @@
                 {{ 'requests.status.' + step.status | translate }}
               </span>
 
+              @if (step.self_approval) {
+                <div class="self-approval">
+                  <mat-icon aria-hidden="true">person</mat-icon>
+                  <div>
+                    @if (step.status === 'pending') {
+                      <span>{{ 'requests.approval.selfApprovalPending' | translate }}</span>
+                    } @else {
+                      <span>{{ 'requests.approval.selfApproved' | translate }}</span>
+                      <p>{{ 'requests.approval.selfApprovedHint' | translate }}</p>
+                    }
+                  </div>
+                </div>
+              }
+
               <div class="approval-meta">
                 <span>{{ 'requests.approval.assignedTo' | translate }}</span>
                 <span>{{ step.assigned_name?.trim() || step.assigned_email || (memberEmailById().get(step.assigned_membership_id) ?? step.assigned_membership_id) }}</span>

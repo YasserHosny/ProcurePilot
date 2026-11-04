@@ -214,6 +214,84 @@ describe('ApprovalQueueComponent', () => {
     fixture.detectChanges();
   });
 
+  describe('PPS-167 self approval', () => {
+    function markedRequest(flag: boolean | undefined): PurchaseRequest {
+      const step = {
+        id: 'step-own', assigned_membership_id: 'mem-requester-1',
+        source: 'owner_fallback' as const, status: 'pending' as const,
+        ...(flag === undefined ? {} : { self_approval: flag }),
+      };
+      return { ...mockPendingRequests[0], approval_step: step };
+    }
+
+    for (const locale of ['en', 'ar']) {
+      for (const flag of [true, false, undefined]) {
+        for (const split of [false, true]) {
+          it(`renders own-request badge only for true: ${locale}, ${flag}, split=${split}`, () => {
+            TestBed.inject(TranslateService).use(locale);
+            const marked = markedRequest(flag);
+            const requests = split
+              ? [markedRequest(false), { ...marked, id: 'req-other' }].map((request, i) => ({
+                  ...request,
+                  request_group: {
+                    id: 'group-own', rfq_id: 'rfq-own', position: i + 1, size: 2,
+                    combined_total: { amount: '2500', currency: 'SAR' },
+                    best_single_total: null, saving: null, sibling_request_ids: [],
+                  },
+                }))
+              : [marked];
+            component.pendingRequests.set(requests);
+            fixture.detectChanges();
+            const badges = (fixture.nativeElement as HTMLElement).querySelectorAll('.own-request-badge');
+            expect(badges.length).toBe(flag === true ? 1 : 0);
+            if (flag === true) {
+              expect(badges[0]?.textContent?.trim()).toBe(locale === 'ar' ? 'طلبك أنت' : 'Your own request');
+            }
+          });
+        }
+      }
+      for (const action of ['approve', 'reject'] as const) {
+        for (const split of [false, true]) {
+          it(`localizes refused ${action}, reloads stale rows: ${locale}, split=${split}`, () => {
+            TestBed.inject(TranslateService).use(locale);
+            const failure = throwError(() => new HttpErrorResponse({
+              status: 403, error: { message: 'Generic refusal', details: { reason: 'self_decision_not_allowed' } },
+            }));
+            requestsApi.approveRequest.and.returnValue(failure);
+            requestsApi.rejectRequest.and.returnValue(failure);
+            approvalsApi.approveGroup.and.returnValue(failure);
+            approvalsApi.rejectGroup.and.returnValue(failure);
+            approvalsApi.listPendingApprovals.and.returnValue(of({ items: [], next_cursor: null }));
+            const before = approvalsApi.listPendingApprovals.calls.count();
+            if (split) component.submitGroupDecision('group-own', action);
+            else component.submitDecision('req-001', action);
+            fixture.detectChanges();
+            const message = locale === 'ar'
+              ? 'لا يمكنك اعتماد أو رفض طلب قدّمته بنفسك. يجب أن يتخذ القرار مالك آخر أو مسؤول اعتماد.'
+              : "You can't decide a request you submitted. Another owner or approver needs to decide it.";
+            expect(component.errorMessage()).toBe(message);
+            expect((fixture.nativeElement as HTMLElement).textContent).toContain(message);
+            expect(approvalsApi.listPendingApprovals.calls.count()).toBe(before + 1);
+            expect(component.pendingRequests()).toEqual([]);
+          });
+        }
+      }
+    }
+
+    for (const reason of ['another_reason', undefined]) {
+      it(`preserves other 403 behaviour: ${reason}`, () => {
+        const before = approvalsApi.listPendingApprovals.calls.count();
+        requestsApi.approveRequest.and.returnValue(throwError(() => new HttpErrorResponse({
+          status: 403, error: { message: 'Existing refusal', trace_id: 'trace-own', details: { reason } },
+        })));
+        component.submitDecision('req-001', 'approve');
+        expect(component.errorMessage()).toBe('Existing refusal');
+        expect(component.errorTraceId()).toBe('trace-own');
+        expect(approvalsApi.listPendingApprovals.calls.count()).toBe(before);
+      });
+    }
+  });
+
   it('should load pending approvals with limit 50 on init', () => {
     expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({ limit: 50 });
     expect(organisationApi.listBranches).toHaveBeenCalledWith({ limit: 100 });

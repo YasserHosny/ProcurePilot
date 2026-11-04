@@ -2457,6 +2457,9 @@
       "exceedsWarning": "This request would exceed the remaining budget for its scope."
     },
     "approval": {
+      "selfApproved": "Self-approved",
+      "selfApprovedHint": "Decided by the person who submitted it",
+      "selfApprovalPending": "Assigned to the requester (the only owner)",
       "sectionTitle": "Approval",
       "assignedTo": "Assigned to",
       "comment": "Decision comment",
@@ -2526,6 +2529,8 @@
     "notAvailable": "Quality issue reporting is not available."
   },
   "approvals": {
+    "ownRequestBadge": "Your own request",
+    "selfDecisionNotAllowed": "You can't decide a request you submitted. Another owner or approver needs to decide it.",
     "title": "Approval Queue",
     "subtitle": "Requests awaiting your decision.",
     "columns": {
