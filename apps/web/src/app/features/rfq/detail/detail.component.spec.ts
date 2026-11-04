@@ -335,6 +335,36 @@ describe('DetailComponent (RFQ Details)', () => {
     });
   });
 
+  describe('duplicate', () => {
+    function query(testId: string): HTMLElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector(`[data-testid="${testId}"]`);
+    }
+
+    it('shows Duplicate to owners and buyers for any RFQ, and not to other roles', () => {
+      const role = spyOn(TestBed.inject(SessionService), 'hasRole');
+      component.rfqId.set(mockSentDetail.rfq.id);
+      component.rfqDetail.set({ ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status: 'converted' } });
+      role.and.callFake((...roles) => roles.includes('owner'));
+      fixture.detectChanges();
+      expect(query('rfq-detail-duplicate-button')).not.toBeNull();
+      role.and.callFake((...roles) => roles.includes('buyer'));
+      fixture.detectChanges();
+      expect(query('rfq-detail-duplicate-button')).not.toBeNull();
+      role.and.callFake((...roles) => roles.includes('viewer'));
+      fixture.detectChanges();
+      expect(query('rfq-detail-duplicate-button')).toBeNull();
+    });
+
+    it('links to the create page with this RFQ as the source', () => {
+      component.rfqId.set(mockSentDetail.rfq.id);
+      component.rfqDetail.set(mockSentDetail);
+      fixture.detectChanges();
+      const link = query('rfq-detail-duplicate-button') as HTMLAnchorElement;
+      expect(link.getAttribute('href')).toBe(`/rfq/create?from=${mockSentDetail.rfq.id}`);
+      expect(link.textContent?.trim()).toBe('Duplicate');
+    });
+  });
+
   describe('cancellation', () => {
     for (const status of [0, 503, 408, 429]) {
       it(`retains the cancel key after ${status} and rotates after success or definitive rejection`, () => {

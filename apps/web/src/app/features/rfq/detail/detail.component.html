@@ -47,11 +47,21 @@
         }
         <p class="page-subtitle">{{ 'rfq.detail.subtitle' | translate }}</p>
       </div>
-      @if (canCancel()) {
-        <button mat-stroked-button class="pp-danger" type="button"
-          [disabled]="cancelling()" (click)="onCancelRfq()" data-testid="rfq-detail-cancel-button">
-          {{ 'rfq.cancel.confirm' | translate }}
-        </button>
+      @if (canDuplicate() || canCancel()) {
+        <div class="header-actions">
+          @if (canDuplicate()) {
+            <a mat-stroked-button routerLink="/rfq/create" [queryParams]="{ from: detail.rfq.id }"
+              data-testid="rfq-detail-duplicate-button">
+              {{ 'rfq.history.duplicate' | translate }}
+            </a>
+          }
+          @if (canCancel()) {
+            <button mat-stroked-button class="pp-danger" type="button"
+              [disabled]="cancelling()" (click)="onCancelRfq()" data-testid="rfq-detail-cancel-button">
+              {{ 'rfq.cancel.confirm' | translate }}
+            </button>
+          }
+        </div>
       }
     </header>
 
