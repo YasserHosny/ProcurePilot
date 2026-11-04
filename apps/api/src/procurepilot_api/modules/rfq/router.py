@@ -81,12 +81,16 @@ def list_rfqs(
     status: str | None = None,
     cursor: str | None = None,
     limit: int = 50,
+    q: str | None = None,
+    sort: str = "created_desc",
 ) -> RfqList:
     return service.list_rfqs(
         member=member,
         status=status,
         cursor=cursor,
         limit=limit,
+        q=q,
+        sort=sort,
     )
 
 

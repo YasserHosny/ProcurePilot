@@ -68,6 +68,7 @@ export class OrderDetailComponent implements OnInit {
   readonly confirmationOpen = signal(false);
   readonly receiptOpen = signal(false);
   readonly cancelOpen = signal(false);
+  readonly closeOpen = signal(false);
   readonly submitOpen = signal(false);
   readonly actionError = signal<string | null>(null);
   /** Polite announcement of the last successful action, for screen readers. */
@@ -323,6 +324,31 @@ export class OrderDetailComponent implements OnInit {
         this.cancelOpen.set(false);
         this.isSaving.set(false);
         this.announce('orders.detail.cancelled');
+      },
+      error: (err: unknown) => this.failWith(err),
+    });
+  }
+
+  /** Closing is for an order whose goods have all arrived; it ends the order for good. */
+  canClose(status: string): boolean {
+    return status === 'received';
+  }
+
+  closeOrder(): void {
+    this.actionError.set(null);
+    this.closeOpen.set(true);
+    this.focusPanel('close-confirm-panel');
+  }
+
+  confirmClose(): void {
+    this.isSaving.set(true);
+    this.actionError.set(null);
+    this.ordersApi.closeOrder(this.orderId).subscribe({
+      next: () => {
+        this.loadOrder();
+        this.closeOpen.set(false);
+        this.isSaving.set(false);
+        this.announce('orders.detail.closed');
       },
       error: (err: unknown) => this.failWith(err),
     });

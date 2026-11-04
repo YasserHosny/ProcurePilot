@@ -35,6 +35,17 @@
 
 .page-header {
   margin-block-end: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+
+  .header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 
   .header-titles {
     display: flex;

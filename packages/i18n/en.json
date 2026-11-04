@@ -850,7 +850,8 @@
         "processing": "Extracting",
         "extracted": "Extracted",
         "failed": "Failed"
-      }
+      },
+      "removeFile": "Remove the selected file"
     },
     "queue": {
       "title": "Quotation Review Queue",
@@ -861,7 +862,8 @@
       "filterPriority": "Filter by Priority",
       "filters": {
         "dateFrom": "From date",
-        "dateTo": "To date"
+        "dateTo": "To date",
+        "dateRangeInvalid": "The start date must be on or before the end date."
       },
       "status": {
         "all": "All Statuses",
@@ -3895,7 +3897,9 @@
       "errors": {
         "order_not_open_for_evidence": "This order is a draft, cancelled or closed, so it cannot take delivery or confirmation evidence.",
         "order_not_cancellable": "This order is already fully received or closed, so it can no longer be cancelled.",
-        "order_already_cancelled": "This order is already cancelled."
+        "order_already_cancelled": "This order is already cancelled.",
+        "order_not_closable": "Only an order that has been fully received can be closed.",
+        "order_already_closed": "This order is already closed."
       },
       "overdue": "Overdue",
       "exportCsv": "Export CSV",
@@ -3913,7 +3917,14 @@
       "sourceRfq": "RFQ",
       "sourceQuotation": "Quotation",
       "receiptNote": "Note for {{description}} (short receipt, damage or quality)",
-      "sourceSplit": "Basket split behind this order"
+      "sourceSplit": "Basket split behind this order",
+      "close": "Close order",
+      "closeConfirmTitle": "Close this order?",
+      "closeConfirmMessage": "Closing marks the order as finished. Nothing is sent to the supplier, and a closed order cannot be reopened, changed or cancelled.",
+      "closeConfirm": "Close order",
+      "closed": "Order closed.",
+      "timelineCancelled": "Order cancelled",
+      "timelineClosed": "Order closed"
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",
@@ -4421,6 +4432,10 @@
       "recipientsCount": "Recipients ({{count}})",
       "responsesCount": "Responses ({{count}})",
       "noRfqs": "No RFQs found.",
+      "noRfqsForFilter": "No RFQs have this status.",
+      "clearFilter": "Show all RFQs",
+      "filterLabel": "Filter by status",
+      "filterAll": "All",
       "loading": "Loading RFQs...",
       "status_sent": "Sent",
       "status_responded": "Responded",
@@ -4475,7 +4490,22 @@
         "many": "{{count}} responses — compare",
         "other": "{{count}} responses — compare"
       },
-      "draftActionsUnavailable": "Draft actions are currently unavailable because workspace members could not be loaded."
+      "draftActionsUnavailable": "Draft actions are currently unavailable because workspace members could not be loaded.",
+      "reference": "Reference",
+      "searchLabel": "Search RFQs",
+      "searchPlaceholder": "Reference, supplier or product",
+      "clearSearch": "Clear search",
+      "sortLabel": "Sort by",
+      "noMatches": "No RFQs match your search or filter.",
+      "clearAll": "Clear search and filters",
+      "sortOptions": {
+        "created_desc": "Newest first",
+        "created_asc": "Oldest first",
+        "needed_asc": "Needed by: soonest",
+        "needed_desc": "Needed by: latest",
+        "reference_desc": "Reference: high to low",
+        "reference_asc": "Reference: low to high"
+      }
     },
     "detail": {
       "cancelledAtLabel": "Cancelled",
@@ -4573,7 +4603,17 @@
       "confirmRetryButton": "Retry unsent recipients",
       "cancelRetryButton": "Cancel",
       "rfqExpiredError": "This RFQ has expired and can no longer be sent.",
-      "notSendableError": "This RFQ cannot be sent in its current state."
+      "notSendableError": "This RFQ cannot be sent in its current state.",
+      "deliveryError": "Delivery failed",
+      "missingContactEmail": "No contact email",
+      "sendAttempts": {
+        "zero": "{{count}} attempts",
+        "one": "{{count}} attempt",
+        "two": "{{count}} attempts",
+        "few": "{{count}} attempts",
+        "many": "{{count}} attempts",
+        "other": "{{count}} attempts"
+      }
     },
     "guardrails": {
       "costCentresError": "Could not load cost centres.",

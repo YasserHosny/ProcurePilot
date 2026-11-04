@@ -157,6 +157,29 @@ describe('RfqCreateComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('keeps the create key after a lost response only while the form is unchanged', () => {
+    rfqApiSpy.createRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+    component.form.patchValue({
+      lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+      supplierIds: ['sup-1'],
+      neededByDate: new Date(2026, 11, 1),
+    });
+    component.onSave();
+    const first = rfqApiSpy.createRfq.calls.mostRecent().args[1];
+    expect(first).toEqual(jasmine.any(String));
+
+    component.onSave();
+    expect(rfqApiSpy.createRfq.calls.mostRecent().args[1]).toBe(first);
+
+    component.form.patchValue({ lines: [{ workspace_product_id: 'prod-1', quantity: '12' }] });
+    component.onSave();
+    const edited = rfqApiSpy.createRfq.calls.mostRecent().args[1];
+    expect(edited).not.toBe(first);
+
+    component.onSave();
+    expect(rfqApiSpy.createRfq.calls.mostRecent().args[1]).toBe(edited);
+  });
+
   it('rejects tenant terms over 4000 characters and accepts exactly 4000', () => {
     component.form.patchValue({
       lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],

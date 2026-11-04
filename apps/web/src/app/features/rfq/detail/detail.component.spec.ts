@@ -135,6 +135,59 @@ describe('DetailComponent (RFQ Details)', () => {
     ],
   };
 
+
+  it('shows an isolated reference below the unchanged heading, and omits absent references', () => {
+    component.rfqDetail.set({ ...mockSentDetail, rfq: { ...mockSentDetail.rfq, reference_number: 123 } });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('h1').textContent).toContain('RFQ Details');
+    expect(fixture.nativeElement.querySelector('[data-testid="rfq-reference"] bdi').textContent).toBe('RFQ-000123');
+    component.rfqDetail.set(mockSentDetail);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="rfq-reference"]')).toBeNull();
+  });
+
+  for (const owner of [true, false]) {
+    for (const draft of [true, false]) {
+      it('non-creator sending permission owner=' + owner + ', draft=' + draft, async () => {
+        spyOn(TestBed.inject(SessionService), 'hasRole').and.callFake(role => role === (owner ? 'owner' : 'buyer'));
+        component.currentMembershipId.set('other');
+        component.rfqDetail.set(draft ? mockDraftDetail : mockSentDetail);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(!!fixture.nativeElement.querySelector(draft ? '[data-testid="rfq-detail-send-button"]' : '[data-testid="rfq-detail-retry-button"]')).toBe(owner);
+        expect(fixture.nativeElement.querySelector('[data-testid="rfq-detail-edit-button"]')).toBeNull();
+      });
+    }
+  }
+
+  for (const locale of ['en', 'ar']) {
+    for (const status of ['sent', 'responded', 'expired', 'draft'] as const) {
+      it('renders send records using real ' + locale + ' catalogue on ' + status, async () => {
+        TestBed.inject(TranslateService).use(locale);
+        component.rfqDetail.set({
+          ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status },
+          recipients: [
+            { ...mockSentDetail.recipients[1], failure_reason: 'delivery_error', send_attempts: 2, last_attempt_at: '2026-10-31T12:30:00Z' },
+            { ...mockSentDetail.recipients[0], status: 'draft', failure_reason: 'missing_contact_email' },
+          ],
+        });
+        component.selectedTabIndex.set(2);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const records = fixture.nativeElement.querySelectorAll('.send-record');
+        expect(records.length).toBe(status === 'draft' ? 0 : 2);
+        if (status !== 'draft') {
+          expect(records[0].textContent).toContain(locale === 'en' ? 'Delivery failed' : 'فشل التسليم');
+          expect(records[1].textContent).toContain(locale === 'en' ? 'No contact email' : 'لا يوجد بريد إلكتروني للتواصل');
+          expect(records[0].textContent).toContain(locale === 'en' ? '2 attempts' : 'محاولتان');
+          expect(records[0].textContent).toContain(component.formatTime('2026-10-31T12:30:00Z'));
+          expect(records[1].querySelector('.send-attempts')).toBeNull();
+        }
+      });
+    }
+  }
   beforeEach(async () => {
     paramMapSubject = new BehaviorSubject(convertToParamMap({ id: 'rfq-sent-1' }));
     queryParamMapSubject = new BehaviorSubject(convertToParamMap({}));
@@ -279,6 +332,36 @@ describe('DetailComponent (RFQ Details)', () => {
 
     it('has an Arabic translation for the cancelled breadcrumb', () => {
       expect((arCatalog as unknown as { rfq: { detail: Record<string, string> } }).rfq.detail['breadcrumbRfqCancelled']).toBeTruthy();
+    });
+  });
+
+  describe('duplicate', () => {
+    function query(testId: string): HTMLElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector(`[data-testid="${testId}"]`);
+    }
+
+    it('shows Duplicate to owners and buyers for any RFQ, and not to other roles', () => {
+      const role = spyOn(TestBed.inject(SessionService), 'hasRole');
+      component.rfqId.set(mockSentDetail.rfq.id);
+      component.rfqDetail.set({ ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status: 'converted' } });
+      role.and.callFake((...roles) => roles.includes('owner'));
+      fixture.detectChanges();
+      expect(query('rfq-detail-duplicate-button')).not.toBeNull();
+      role.and.callFake((...roles) => roles.includes('buyer'));
+      fixture.detectChanges();
+      expect(query('rfq-detail-duplicate-button')).not.toBeNull();
+      role.and.callFake((...roles) => roles.includes('viewer'));
+      fixture.detectChanges();
+      expect(query('rfq-detail-duplicate-button')).toBeNull();
+    });
+
+    it('links to the create page with this RFQ as the source', () => {
+      component.rfqId.set(mockSentDetail.rfq.id);
+      component.rfqDetail.set(mockSentDetail);
+      fixture.detectChanges();
+      const link = query('rfq-detail-duplicate-button') as HTMLAnchorElement;
+      expect(link.getAttribute('href')).toBe(`/rfq/create?from=${mockSentDetail.rfq.id}`);
+      expect(link.textContent?.trim()).toBe('Duplicate');
     });
   });
 
@@ -750,7 +833,8 @@ describe('DetailComponent (RFQ Details)', () => {
     expect(compiled.querySelector('[data-testid="rfq-detail-retry-notice"]')).toBeNull();
   });
 
-  it('hides retry notice card when viewer is not creator', async () => {
+  it('hides retry notice card when viewer is a non-creator buyer', async () => {
+    spyOn(TestBed.inject(SessionService), 'hasRole').and.callFake(role => role === 'buyer');
     component.currentMembershipId.set('m-other-user');
     fixture.detectChanges();
     await fixture.whenStable();

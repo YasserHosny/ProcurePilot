@@ -6,6 +6,7 @@ import type { QuotationStatus, BasketSplitJob } from '../../core/api/models';
 import { environment } from '../../../environments/environment';
 
 export interface Rfq {
+  reference_number?: number;
   id: string;
   tenant_id: string;
   created_by_membership_id: string;
@@ -31,6 +32,9 @@ export interface RfqLine {
 }
 
 export interface RfqRecipient {
+  failure_reason?: 'delivery_error' | 'missing_contact_email' | null;
+  send_attempts?: number;
+  last_attempt_at?: string | null;
   id: string;
   tenant_id: string;
   rfq_id: string;
@@ -145,6 +149,7 @@ export interface RfqResponseComparisonList {
 }
 
 export interface RfqSummary {
+  reference_number?: number;
   id: string;
   created_by_membership_id: string;
   status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted' | 'cancelled';
@@ -232,8 +237,10 @@ export class RfqApi {
     return this.http.post<BasketSplitJob>(`${this.baseUrl}/${rfqId}/split`, {}, { headers });
   }
 
-  listRfqs(status?: string, cursor?: string, limit?: number): Observable<RfqList> {
+  listRfqs(status?: string, cursor?: string, limit?: number, q?: string, sort?: string): Observable<RfqList> {
     let params = new HttpParams();
+    if (q?.trim()) params = params.set('q', q.trim());
+    if (sort && sort !== 'created_desc') params = params.set('sort', sort);
     if (status) params = params.set('status', status);
     if (cursor) params = params.set('cursor', cursor);
     if (limit) params = params.set('limit', limit.toString());
@@ -254,16 +261,23 @@ export class RfqApi {
   }
 }
 
-/** Component-local keys survive ambiguous failures until the logical action resolves. */
+/**
+ * Component-local keys survive ambiguous failures until the logical action resolves.
+ *
+ * A key is only reused for the payload it was created for: the server answers a repeated key with
+ * the result it stored the first time and ignores a changed body, so an edited payload must start a
+ * new operation. Pass a fingerprint of the request body (e.g. its JSON) for actions that have one.
+ */
 export class RfqActionKeys {
-  private readonly keys = new Map<string, string>();
+  private readonly keys = new Map<string, { key: string; fingerprint: string | undefined }>();
 
-  get(action: string): string {
-    let key = this.keys.get(action);
-    if (!key) {
-      key = crypto.randomUUID();
-      this.keys.set(action, key);
+  get(action: string, fingerprint?: string): string {
+    const current = this.keys.get(action);
+    if (current && (fingerprint === undefined || current.fingerprint === fingerprint)) {
+      return current.key;
     }
+    const key = crypto.randomUUID();
+    this.keys.set(action, { key, fingerprint });
     return key;
   }
 
@@ -276,4 +290,9 @@ export class RfqActionKeys {
       this.clear(action);
     }
   }
+}
+
+/** Stable display identifier; older API deployments may omit the number. */
+export function formatRfqReference(n: number | null | undefined): string {
+  return n == null ? '' : `RFQ-${String(n).padStart(6, '0')}`;
 }

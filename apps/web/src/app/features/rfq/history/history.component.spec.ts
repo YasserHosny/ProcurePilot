@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { HistoryComponent } from './history.component';
+import { parseSearch, parseSort, parseStatusFilter, HistoryComponent } from './history.component';
 import { RfqApi, RfqSummary, RfqList, RfqSendResponse, RfqDetail } from '../rfq-api';
-import { Router, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, Router, provideRouter } from '@angular/router';
 import { of, throwError, Subject } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
@@ -68,6 +68,31 @@ describe('HistoryComponent', () => {
     next_cursor: null,
   };
 
+
+  it('renders an isolated reference at every width and omits absent values', () => {
+    fixture.detectChanges();
+    component.rfqs.set([{ ...mockRfqs[0], reference_number: 123 }, mockRfqs[1]]);
+    for (const narrow of [false, true]) {
+      component.isBelow768.set(narrow);
+      fixture.detectChanges();
+      const cells = fixture.nativeElement.querySelectorAll('td.mat-column-reference');
+      expect(cells.length).toBe(2);
+      expect(cells[0].textContent.trim()).toBe('RFQ-000123');
+      expect(cells[0].querySelector('bdi').dir).toBe('ltr');
+      expect(cells[1].textContent.trim()).toBe('');
+    }
+  });
+
+  for (const owner of [true, false]) {
+    it('limits non-creator draft sending by owner role: ' + owner, () => {
+      fixture.detectChanges();
+      spyOn(TestBed.inject(SessionService), 'hasRole').and.callFake(role => role === (owner ? 'owner' : 'buyer'));
+      component.currentMembershipId.set('other');
+      fixture.detectChanges();
+      expect(!!fixture.nativeElement.querySelector('[data-testid="rfq-send-button"]')).toBe(owner);
+      expect(fixture.nativeElement.querySelector('[data-testid="rfq-edit-button"]')).toBeNull();
+    });
+  }
   beforeEach(async () => {
     jasmine.clock().install();
     jasmine.clock().mockDate(new Date(2026, 9, 28));
@@ -193,6 +218,221 @@ describe('HistoryComponent', () => {
     });
   });
 
+
+  describe('search and sort', () => {
+    function input(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('input[type="search"]');
+    }
+    function type(value: string): void {
+      input().value = value;
+      input().dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
+    function enter(): void {
+      input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+    }
+    function chooseSort(): void {
+      (fixture.nativeElement.querySelector('mat-select') as HTMLElement).click();
+      fixture.detectChanges();
+      const option = Array.from(document.querySelectorAll<HTMLElement>('mat-option'))
+        .find(el => el.textContent?.trim() === 'Needed by: soonest')!;
+      option.click();
+      fixture.detectChanges();
+    }
+    it('parses absent, invalid, trimmed and capped address values', () => {
+      expect(parseSort(null)).toBe('created_desc');
+      expect(parseSort('')).toBe('created_desc');
+      expect(parseSort('invalid')).toBe('created_desc');
+      expect(parseSearch(null)).toBe('');
+      expect(parseSearch('   ')).toBe('');
+      expect(parseSearch('  RFQ-000002  ')).toBe('RFQ-000002');
+      expect(parseSearch('x'.repeat(101))).toBe('x'.repeat(100));
+    });
+    it('drops stale search responses after another search starts', () => {
+      const stale = new Subject<RfqList>();
+      rfqApiSpy.listRfqs.and.returnValue(stale);
+      type('old'); enter();
+      rfqApiSpy.listRfqs.and.returnValue(of({ items: [], next_cursor: null }));
+      type('new'); enter();
+      stale.next(mockRfqList);
+      expect(component.rfqs()).toEqual([]);
+      expect(component.nextCursor()).toBeNull();
+      jasmine.clock().tick(300);
+    });
+    it('debounces two edits into one final request', () => {
+      rfqApiSpy.listRfqs.calls.reset();
+      type('sup');
+      jasmine.clock().tick(200);
+      type('supplier');
+      jasmine.clock().tick(299);
+      expect(rfqApiSpy.listRfqs).not.toHaveBeenCalled();
+      jasmine.clock().tick(1);
+      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([[undefined, undefined, undefined, 'supplier', 'created_desc']]);
+    });
+    it('Enter reloads immediately and cancels the pending debounce', () => {
+      rfqApiSpy.listRfqs.calls.reset();
+      type('2');
+      enter();
+      expect(rfqApiSpy.listRfqs.calls.count()).toBe(1);
+      jasmine.clock().tick(300);
+      expect(rfqApiSpy.listRfqs.calls.count()).toBe(1);
+    });
+    it('clear search resets the field and reloads once', () => {
+      type('supplier');
+      rfqApiSpy.listRfqs.calls.reset();
+      (fixture.nativeElement.querySelector('[data-testid="rfq-clear-search"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      jasmine.clock().tick(300);
+      expect(input().value).toBe('');
+      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([[undefined, undefined, undefined, undefined, 'created_desc']]);
+    });
+    it('sort reloads, persists all address parameters and keeps them for pagination', () => {
+      type(' bolt ');
+      enter();
+      component.setStatusFilter('sent');
+      rfqApiSpy.listRfqs.calls.reset();
+      chooseSort();
+      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([['sent', undefined, undefined, 'bolt', 'needed_asc']]);
+      expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({
+        queryParams: { status: 'sent', q: 'bolt', sort: 'needed_asc' },
+        queryParamsHandling: 'merge', replaceUrl: true,
+      }));
+      component.nextCursor.set('next');
+      component.loadMore();
+      expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual(['sent', 'next', undefined, 'bolt', 'needed_asc']);
+    });
+    it('keeps the applied query while an edit is waiting to debounce', () => {
+      type('old'); enter();
+      type('new');
+      component.nextCursor.set('next');
+      component.loadMore();
+      expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual([undefined, 'next', undefined, 'old', 'created_desc']);
+      jasmine.clock().tick(300);
+    });
+    it('initializes valid address values, trims and caps search and defaults invalid sort', () => {
+      const route = TestBed.inject(ActivatedRoute);
+      for (const sort of ['created_desc', 'created_asc', 'needed_asc', 'needed_desc', 'reference_desc', 'reference_asc', 'invalid']) {
+        Object.defineProperty(route.snapshot, 'queryParamMap', { configurable: true, value: convertToParamMap({ status: 'sent', q: '  ' + 'x'.repeat(110) + '  ', sort }) });
+        const other = TestBed.createComponent(HistoryComponent);
+        other.detectChanges();
+        expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual(['sent', undefined, undefined, 'x'.repeat(100), sort === 'invalid' ? 'created_desc' : sort]);
+        other.destroy();
+      }
+    });
+    it('shows an empty-match state and clears all controls in one reload', () => {
+      rfqApiSpy.listRfqs.and.returnValue(of({ items: [], next_cursor: null }));
+      type('missing'); enter();
+      component.setStatusFilter('sent');
+      chooseSort();
+      expect(fixture.nativeElement.textContent).toContain('No RFQs match your search or filter.');
+      rfqApiSpy.listRfqs.calls.reset();
+      const clear = fixture.nativeElement.querySelector('[data-testid="rfq-clear-filter"]') as HTMLButtonElement;
+      expect(clear.textContent).toContain('Clear search and filters');
+      clear.click();
+      fixture.detectChanges();
+      jasmine.clock().tick(300);
+      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([[undefined, undefined, undefined, undefined, 'created_desc']]);
+      expect(fixture.nativeElement.textContent).toContain('No RFQs found.');
+      expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({ queryParams: { q: null, sort: null, status: null } }));
+    });
+    for (const locale of ['en', 'ar']) {
+      it('associates visible labels with search and sort in ' + locale, () => {
+        TestBed.inject(TranslateService).use(locale);
+        fixture.detectChanges();
+        const host = fixture.nativeElement as HTMLElement;
+        const field = input();
+        expect(field).not.toBeNull();
+        expect(field.maxLength).toBe(100);
+        const label = host.querySelector('label[for="' + field.id + '"]');
+        expect(label?.textContent).toContain(locale === 'en' ? 'Search RFQs' : 'البحث في طلبات عروض الأسعار');
+        const select = host.querySelector('mat-select')!;
+        const labels = select.getAttribute('aria-labelledby')!.split(' ').map(id => document.getElementById(id)?.textContent).join(' ');
+        expect(labels).toContain(locale === 'en' ? 'Sort by' : 'ترتيب حسب');
+      });
+    }
+  });
+
+  describe('status filter', () => {
+    function filterButtons(): HTMLButtonElement[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+          '[data-testid="rfq-status-filters"] button',
+        ),
+      );
+    }
+
+    it('parses only known statuses from the address', () => {
+      expect(parseStatusFilter('sent')).toBe('sent');
+      expect(parseStatusFilter('cancelled')).toBe('cancelled');
+      expect(parseStatusFilter('bogus')).toBeNull();
+      expect(parseStatusFilter('')).toBeNull();
+      expect(parseStatusFilter(null)).toBeNull();
+    });
+
+    it('offers All plus every status, with All pressed by default', () => {
+      const buttons = filterButtons();
+      expect(buttons.map((b) => b.textContent?.trim())).toEqual([
+        'All', 'Draft', 'Sent', 'Responded', 'Expired', 'Converted', 'Cancelled',
+      ]);
+      expect(buttons.map((b) => b.getAttribute('aria-pressed'))).toEqual(
+        ['true', 'false', 'false', 'false', 'false', 'false', 'false'],
+      );
+      const group = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-status-filters"]');
+      expect(group?.getAttribute('role')).toBe('group');
+      expect(group?.getAttribute('aria-label')).toBe('Filter by status');
+    });
+
+    it('loads the chosen status, marks it pressed and writes it to the address', () => {
+      rfqApiSpy.listRfqs.calls.reset();
+      filterButtons().find((b) => b.textContent?.trim() === 'Sent')?.click();
+      fixture.detectChanges();
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith('sent', undefined, undefined, undefined, 'created_desc');
+      expect(filterButtons().find((b) => b.textContent?.trim() === 'Sent')?.getAttribute('aria-pressed')).toBe('true');
+      expect(filterButtons()[0].getAttribute('aria-pressed')).toBe('false');
+      expect(router.navigate).toHaveBeenCalledWith(
+        [],
+        jasmine.objectContaining({ queryParams: { status: 'sent', q: null, sort: null }, replaceUrl: true }),
+      );
+    });
+
+    it('keeps the filter when loading more and clears it with All', () => {
+      component.setStatusFilter('expired');
+      rfqApiSpy.listRfqs.calls.reset();
+      component.nextCursor.set('cursor-2');
+      component.loadMore();
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith('expired', 'cursor-2', undefined, undefined, 'created_desc');
+      rfqApiSpy.listRfqs.calls.reset();
+      component.setStatusFilter(null);
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith(undefined, undefined, undefined, undefined, 'created_desc');
+      expect(router.navigate).toHaveBeenCalledWith(
+        [],
+        jasmine.objectContaining({ queryParams: { status: null, q: null, sort: null } }),
+      );
+    });
+
+    it('does not reload when the same filter is chosen again', () => {
+      component.setStatusFilter('sent');
+      rfqApiSpy.listRfqs.calls.reset();
+      component.setStatusFilter('sent');
+      expect(rfqApiSpy.listRfqs).not.toHaveBeenCalled();
+    });
+
+    it('says no RFQ has the status, with a way back, instead of the generic empty state', () => {
+      rfqApiSpy.listRfqs.and.returnValue(of({ items: [], next_cursor: null }));
+      component.setStatusFilter('cancelled');
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.textContent).toContain('No RFQs match your search or filter.');
+      const clear = host.querySelector<HTMLButtonElement>('[data-testid="rfq-clear-filter"]');
+      expect(clear).not.toBeNull();
+      rfqApiSpy.listRfqs.and.returnValue(of(mockRfqList));
+      rfqApiSpy.listRfqs.calls.reset();
+      clear?.click();
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith(undefined, undefined, undefined, undefined, 'created_desc');
+    });
+  });
+
   describe('cancellation', () => {
     for (const status of [0, 503, 408, 429]) {
       it(`retains the cancel key after ${status} and rotates after success or definitive rejection`, () => {
@@ -290,7 +530,8 @@ describe('HistoryComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/rfq', 'rfq-draft-1', 'edit']);
   });
 
-  it('routes another member’s draft to RFQ details and hides draft actions', async () => {
+  it('routes another member’s draft to RFQ details and hides draft actions for a buyer', async () => {
+    spyOn(TestBed.inject(SessionService), 'hasRole').and.callFake(role => role === 'buyer');
     component.currentMembershipId.set('different-member');
     component.onRowClick(mockRfqs[0]);
     expect(router.navigate).toHaveBeenCalledWith(['/rfq', 'rfq-draft-1']);
@@ -378,7 +619,7 @@ describe('HistoryComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(rfqApiSpy.listRfqs).toHaveBeenCalledWith(undefined, 'cursor-page-2');
+    expect(rfqApiSpy.listRfqs).toHaveBeenCalledWith(undefined, 'cursor-page-2', undefined, undefined, 'created_desc');
     expect(component.rfqs().length).toBe(3);
     expect(component.rfqs().map((r) => r.id)).toEqual(['rfq-draft-1', 'rfq-1', 'rfq-2']);
     expect(component.nextCursor()).toBeNull();
@@ -457,7 +698,7 @@ describe('HistoryComponent', () => {
 
     rfqApiSpy.listRfqs.and.returnValue(of({ items: [], next_cursor: null }));
     retryBtn?.click();
-    expect(rfqApiSpy.listRfqs).toHaveBeenCalledWith(undefined, 'cursor-1');
+    expect(rfqApiSpy.listRfqs).toHaveBeenCalledWith(undefined, 'cursor-1', undefined, undefined, 'created_desc');
   });
 
   it('the row link has the expected accessible name and navigates', async () => {
@@ -1012,6 +1253,7 @@ describe('HistoryComponent', () => {
       component.isBelow1200.set(false);
       component.isBelow768.set(false);
       expect(component.displayedColumns()).toEqual([
+        'reference',
         'status',
         'neededBy',
         'sentAt',
@@ -1025,14 +1267,14 @@ describe('HistoryComponent', () => {
     it('hides recipients and responses below 1200px', () => {
       component.isBelow1200.set(true);
       component.isBelow768.set(false);
-      expect(component.displayedColumns()).toEqual(['status', 'neededBy', 'sentAt', 'actions']);
+      expect(component.displayedColumns()).toEqual(['reference', 'status', 'neededBy', 'sentAt', 'actions']);
       expect(component.showCountsInMenu()).toBeTrue();
     });
 
     it('shows only status, neededBy, and actions below 768px', () => {
       component.isBelow1200.set(true);
       component.isBelow768.set(true);
-      expect(component.displayedColumns()).toEqual(['status', 'neededBy', 'actions']);
+      expect(component.displayedColumns()).toEqual(['reference', 'status', 'neededBy', 'actions']);
       expect(component.showCountsInMenu()).toBeTrue();
     });
 
@@ -1054,16 +1296,17 @@ describe('HistoryComponent', () => {
       // Tablet size (below 1200px, not below 768px)
       tabletSubject.next({ matches: true, breakpoints: { '(max-width: 1199.98px)': true } });
       mobileSubject.next({ matches: false, breakpoints: { '(max-width: 767.98px)': false } });
-      expect(respComp.displayedColumns()).toEqual(['status', 'neededBy', 'sentAt', 'actions']);
+      expect(respComp.displayedColumns()).toEqual(['reference', 'status', 'neededBy', 'sentAt', 'actions']);
 
       // Mobile size (below 768px)
       mobileSubject.next({ matches: true, breakpoints: { '(max-width: 767.98px)': true } });
-      expect(respComp.displayedColumns()).toEqual(['status', 'neededBy', 'actions']);
+      expect(respComp.displayedColumns()).toEqual(['reference', 'status', 'neededBy', 'actions']);
 
       // Back to desktop (above 1200px)
       tabletSubject.next({ matches: false, breakpoints: { '(max-width: 1199.98px)': false } });
       mobileSubject.next({ matches: false, breakpoints: { '(max-width: 767.98px)': false } });
       expect(respComp.displayedColumns()).toEqual([
+        'reference',
         'status',
         'neededBy',
         'sentAt',
