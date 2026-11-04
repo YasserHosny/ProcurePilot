@@ -1957,6 +1957,70 @@ describe('CompareComponent (RFQ)', () => {
       expect(cards[1].querySelector('[data-testid="coverage-badge"]')).toBeNull();
     });
 
+    it('awards no «Lowest total» when a reply has incomplete landed costs, even if printed totals point one way', () => {
+      // A prints cheaper (2,000 vs 2,100) and has full landed costs; B is missing p2's landed cost.
+      const incomplete = reply('b', 'supp-b', ['p1', 'p2'], '105.00', '1050');
+      incomplete.rfq_landed_costs = incomplete.rfq_landed_costs.slice(0, 1);
+      load([reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1150'), incomplete], ['p1', 'p2']);
+
+      expect(el().querySelector('.lowest-total-chip')).toBeNull();
+    });
+
+    it('keeps ranking on printed totals when no reply has any landed cost at all', () => {
+      const noCosts = (id: string, supplier: string, price: string) => ({
+        ...reply(id, supplier, ['p1', 'p2'], price, '0'),
+        rfq_landed_costs: [],
+      });
+      load([noCosts('a', 'supp-a', '100.00'), noCosts('b', 'supp-b', '105.00')], ['p1', 'p2']);
+
+      const cards = Array.from(el().querySelectorAll('.response-card')) as HTMLElement[];
+      expect(cards[0].querySelector('.lowest-total-chip')).toBeTruthy();
+      expect(cards[1].querySelector('.lowest-total-chip')).toBeNull();
+    });
+
+    it('awards no «Lowest total» when a supplier has delivery or minimum-order terms the totals cannot price', () => {
+      const withTerms = { ...reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000'), supplier_terms_apply: true };
+      load([withTerms, reply('b', 'supp-b', ['p1', 'p2'], '105.00', '1050')], ['p1', 'p2']);
+
+      expect(el().querySelector('.lowest-total-chip')).toBeNull();
+    });
+
+    it('shows no coverage badge for a reply that is still being read or not matched yet', () => {
+      const reading = { ...reply('read', 'supp-a', [], '0', '0'), rfq_landed_costs: [] };
+      const unmatched = reply('un', 'supp-b', ['p1', 'p2'], '100.00', '1000');
+      unmatched.lines[1] = { ...unmatched.lines[1], workspace_product_id: null as never, pending_match: true };
+      load([reading, unmatched], ['p1', 'p2']);
+
+      expect(el().querySelector('[data-testid="coverage-badge"]')).toBeNull();
+    });
+
+    it('tells the buyer when the chosen Required-by date is in the past, and the picker has a minimum', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      load([reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000')], ['p1', 'p2']);
+      mockRfqApi.prepareRequest.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 422,
+              error: { code: 'unprocessable', details: { reason: 'required_by_in_the_past' } },
+            }),
+        ),
+      );
+      component.selectedBranchId.set('branch-1');
+      mockSnackBar.open.calls.reset();
+
+      component.prepareRequest(component.responses()[0]);
+
+      expect(mockSnackBar.open.calls.mostRecent().args[0]).toBe(enCatalog.requests.errors.required_by_in_the_past);
+
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const input = el().querySelector('input[ng-reflect-mat-datepicker], input.mat-datepicker-input') as HTMLInputElement;
+      expect(input.getAttribute('min')).withContext('picker minimum').toBe(today);
+    });
+
     it('words the saving hint on a converted RFQ as a missed saving and names its basis', () => {
       load(
         [
