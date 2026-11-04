@@ -1,4 +1,4 @@
--- 20261104000300_order_and_split_role_guards.sql
+-- 20261104000500_order_and_split_role_guards.sql
 --
 -- Table-level backstops for rules the API already enforces (PPS-210):
 --
