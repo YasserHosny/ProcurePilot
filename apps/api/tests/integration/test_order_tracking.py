@@ -1458,7 +1458,7 @@ def test_a_received_order_can_be_closed_and_a_retry_replays(
         _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
         member = member_from_workspace(context.workspace, role=MemberRole.owner)
         client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
-        order_id, _ = _received_order(client, context, TEST_DATABASE_URL)
+        order_id, order_line_id = _received_order(client, context, TEST_DATABASE_URL)
 
         key = str(uuid4())
         closed = client.post(f"/api/v1/orders/{order_id}/close", headers={"Idempotency-Key": key})
@@ -1475,6 +1475,15 @@ def test_a_received_order_can_be_closed_and_a_retry_replays(
         assert again.status_code == 409
         assert again.json()["details"]["reason"] == "order_already_closed"
         # A closed order stays closed and takes no more evidence or cancellation.
+        receipt, confirmation = _evidence_bodies(order_line_id)
+        for path, body in (("receipts", receipt), ("confirmations", confirmation)):
+            refused = client.post(
+                f"/api/v1/orders/{order_id}/{path}",
+                json=body,
+                headers={"Idempotency-Key": str(uuid4())},
+            )
+            assert refused.status_code == 409, refused.text
+            assert refused.json()["details"]["reason"] == "order_not_open_for_evidence"
         cancelled = client.post(
             f"/api/v1/orders/{order_id}/cancel", headers={"Idempotency-Key": str(uuid4())}
         )
