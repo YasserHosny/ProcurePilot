@@ -221,10 +221,23 @@
     </section>
   }
 
-  <div class="queue-result-summary" data-testid="queue-result-summary" role="status" aria-live="polite">
-    @if (isLoading() === false && tasksLoadFailed() === false) {
-      {{ 'matching.queue.resultSummary' | translate: { lines: tasks().length, quotations: groups().length } }}@if (nextCursor() !== null) { · {{ 'matching.queue.moreAvailable' | translate }}}
-    }
+  <div class="queue-summary-row">
+    <div class="queue-result-summary" data-testid="queue-result-summary" role="status" aria-live="polite">
+      @if (isLoading() === false && tasksLoadFailed() === false) {
+        {{ 'matching.queue.resultSummary' | translate: { lines: tasks().length, quotations: groups().length } }}@if (nextCursor() !== null) { · {{ 'matching.queue.moreAvailable' | translate }}}
+      }
+    </div>
+    <button
+      mat-icon-button
+      type="button"
+      data-testid="queue-refresh"
+      class="queue-refresh-btn"
+      [attr.aria-label]="'matching.queue.refresh' | translate"
+      [matTooltip]="'matching.queue.refresh' | translate"
+      (click)="loadTasks()"
+    >
+      <mat-icon aria-hidden="true">refresh</mat-icon>
+    </button>
   </div>
 
   @if (isLoading()) {
@@ -237,10 +250,17 @@
       <mat-icon class="empty-icon" aria-hidden="true">done_all</mat-icon>
       <h2 class="empty-title">{{ 'matching.queue.allLinesMatchedTitle' | translate }}</h2>
       <div class="empty-actions">
-        <a mat-flat-button color="primary" routerLink="/rfq/history" class="compare-responses-btn">
-          <mat-icon aria-hidden="true">compare_arrows</mat-icon>
-          <span>{{ 'matching.queue.compareResponses' | translate }}</span>
-        </a>
+        @if (quotationRfqId() !== null) {
+          <a
+            mat-flat-button
+            color="primary"
+            [routerLink]="['/rfq/compare', quotationRfqId()!]"
+            class="compare-responses-btn"
+          >
+            <mat-icon aria-hidden="true">compare_arrows</mat-icon>
+            <span>{{ 'matching.queue.compareResponses' | translate }}</span>
+          </a>
+        }
         <button mat-stroked-button type="button" (click)="clearFilters()" class="clear-filters-btn">
           <mat-icon aria-hidden="true">clear</mat-icon>
           <span>{{ 'matching.queue.clearFilters' | translate }}</span>
