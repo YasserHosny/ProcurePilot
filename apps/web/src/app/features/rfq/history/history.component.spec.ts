@@ -158,6 +158,41 @@ describe('HistoryComponent', () => {
     jasmine.clock().uninstall();
   });
 
+  describe('creator membership id (buyers cannot call the members API)', () => {
+    const members = () => (TestBed.inject(ApiService) as unknown as jasmine.SpyObj<ApiService>).members;
+
+    function createWithSession(sessionMember: object | null): HistoryComponent {
+      spyOn(TestBed.inject(SessionService), 'currentMember').and.returnValue(sessionMember as never);
+      members().calls.reset();
+      const created = TestBed.createComponent(HistoryComponent);
+      created.detectChanges();
+      return created.componentInstance;
+    }
+
+    it('reads the membership id from the session and does not call members()', () => {
+      const history = createWithSession({ email: 'buyer@test.com', membership_id: 'm-buyer' });
+      expect(history.currentMembershipId()).toBe('m-buyer');
+      expect(history.draftActionsUnavailable()).toBeFalse();
+      expect(members()).not.toHaveBeenCalled();
+    });
+
+    it('falls back to members() when the session has no membership id', () => {
+      members().and.returnValue(
+        of({ items: [{ id: 'm-from-api', email: 'user@test.com' }], next_cursor: null } as unknown as { items: never[]; next_cursor: string | null }),
+      );
+      const history = createWithSession({ email: 'user@test.com' });
+      expect(members()).toHaveBeenCalledTimes(1);
+      expect(history.currentMembershipId()).toBe('m-from-api');
+    });
+
+    it('reports draft actions unavailable when neither source has an id', () => {
+      members().and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+      const history = createWithSession({ email: 'buyer@test.com' });
+      expect(history.currentMembershipId()).toBeNull();
+      expect(history.draftActionsUnavailable()).toBeTrue();
+    });
+  });
+
   describe('cancellation', () => {
     for (const status of [0, 503, 408, 429]) {
       it(`retains the cancel key after ${status} and rotates after success or definitive rejection`, () => {
