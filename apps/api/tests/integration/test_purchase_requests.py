@@ -1073,6 +1073,11 @@ def test_concurrent_update_vs_submit_loser_gets_conflict(
     )
     monkeypatch.setattr(
         service,
+        "_fetch_owner_membership_ids",
+        lambda _client: [owner.membership_id],
+    )
+    monkeypatch.setattr(
+        service,
         "_estimate_products",
         lambda product_ids, **_kw: [
             LineEstimate(
@@ -1518,6 +1523,11 @@ def test_create_and_update_happy_paths_preserve_response_shapes(
         service,
         "_fetch_owner_membership_id",
         lambda _client: owner.membership_id,
+    )
+    monkeypatch.setattr(
+        service,
+        "_fetch_owner_membership_ids",
+        lambda _client: [owner.membership_id],
     )
     submitted_req = service.submit_request(
         bearer_token="token",

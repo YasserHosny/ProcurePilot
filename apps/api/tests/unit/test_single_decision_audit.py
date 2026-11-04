@@ -102,10 +102,12 @@ def test_single_decision_does_not_record_a_second_audit_event(
 
 @pytest.mark.parametrize("decision", ["approved", "rejected"])
 @pytest.mark.parametrize("fail_audit", [False, True])
+@pytest.mark.parametrize("self_decision", [False, True])
 def test_audit_is_part_of_decision_transaction(
     monkeypatch: pytest.MonkeyPatch,
     decision: str,
     fail_audit: bool,
+    self_decision: bool,
 ) -> None:
     from collections.abc import Iterator
     from contextlib import contextmanager
@@ -157,7 +159,9 @@ def test_audit_is_part_of_decision_transaction(
 
     def apply(*_: object, **__: object) -> tuple[dict, dict]:
         pending.extend(["request", "step"])
-        return {"requested_by_membership_id": uuid4()}, {"id": sid}
+        return {"requested_by_membership_id": actor.membership_id if self_decision else uuid4()}, {
+            "id": sid
+        }
 
     monkeypatch.setattr(module.db, "connect", connect)
     monkeypatch.setattr(service, "_apply_request_decision", apply)
@@ -178,12 +182,15 @@ def test_audit_is_part_of_decision_transaction(
         assert sorted(persisted) == ["audit", "notification", "request", "step"]
         assert len(audits) == 1
         assert audits[0][0] == f"requests.approval_step_{decision}"
-        assert audits[0][4].obj == {
+        expected_target = {
             "purchase_request_id": str(rid),
             "approval_step_id": str(sid),
             "decided_by_membership_id": str(actor.membership_id),
             "comment": "Reason",
         }
+        if self_decision:
+            expected_target["self_approved"] = True
+        assert audits[0][4].obj == expected_target
 
 
 def test_decide_and_notify_translates_database_error_and_preserves_conflict(

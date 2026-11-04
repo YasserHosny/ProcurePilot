@@ -1,4 +1,4 @@
-import { signal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed, fakeAsync } from '@angular/core/testing';
 import { CompareComponent } from './compare.component';
 import { formatExactQuantity, formatLocaleNumber, FormatService } from '../../../core/format/format.service';
@@ -318,6 +318,29 @@ describe('CompareComponent (RFQ)', () => {
     } catch {
       // ignore
     }
+  });
+
+  describe('creator membership id (buyers cannot call the members API)', () => {
+    function createWithSession(sessionMember: { email: string; membership_id?: string } | null): CompareComponent {
+      (mockSession.currentMember as unknown as WritableSignal<object | null>).set(sessionMember);
+      mockApiService.members.calls.reset();
+      const created = TestBed.createComponent(CompareComponent);
+      created.detectChanges();
+      return created.componentInstance;
+    }
+
+    it('reads the membership id from the session and does not call members()', () => {
+      const compare = createWithSession({ email: 'buyer@test.com', membership_id: 'm-buyer' });
+      expect(compare.currentMembershipId()).toBe('m-buyer');
+      expect(mockApiService.members).not.toHaveBeenCalled();
+    });
+
+    it('stays without an id, and without an unhandled error, when members() is forbidden', () => {
+      mockApiService.members.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+      const compare = createWithSession({ email: 'buyer@test.com' });
+      expect(mockApiService.members).toHaveBeenCalledTimes(1);
+      expect(compare.currentMembershipId()).toBeNull();
+    });
   });
 
   it('shows draft notice card only when RFQ status is draft', () => {
@@ -1464,6 +1487,43 @@ describe('CompareComponent (RFQ)', () => {
       expect(compiled.querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(0);
     });
 
+    // Review: the saving is only a missed one when no split was taken and none is possible now.
+    it('words the split saving by what the RFQ can still do', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines, 'responded');
+      component.responses.set([respDahabi, respWafra]);
+      const compiled = fixture.nativeElement as HTMLElement;
+      const hintText = () => compiled.querySelector('[data-testid="split-saving-hint"]')?.textContent ?? null;
+      const withStatus = (status: string, extra: object = {}) => {
+        component.rfqDetail.set({
+          ...sentDetail,
+          rfq: { ...sentDetail.rfq, status } as RfqDetail['rfq'],
+          lines: rfqLines,
+          ...extra,
+        });
+        fixture.detectChanges();
+      };
+
+      withStatus('responded');
+      expect(hintText()).toContain('could save');
+
+      for (const status of ['cancelled', 'expired']) {
+        withStatus(status);
+        expect(hintText()).toContain('would have saved');
+        expect(hintText()).not.toContain('could save');
+      }
+
+      withStatus('converted', { converted_purchase_request_ids: ['pr-single'] }); // one supplier took it all
+      expect(hintText()).toContain('would have saved');
+
+      // The split itself converted this RFQ: the saving was taken, so it is not shown as missed.
+      withStatus('converted', { request_group_id: 'group-1', converted_purchase_request_ids: ['a', 'b'] });
+      expect(hintText()).toBeNull();
+    });
+
     it('split hint: shows SAR 60, sits right above the one Split action (splitRfq) on an open RFQ, keeps the text when converted, and has no bare route link', () => {
       const translate = TestBed.inject(TranslateService);
       translate.setTranslation('en', enCatalog, true);
@@ -1478,6 +1538,7 @@ describe('CompareComponent (RFQ)', () => {
       const hint = compiled.querySelector('[data-testid="split-saving-hint"]');
       expect(hint).not.toBeNull();
       expect(hint?.textContent).toContain('60');
+      expect(hint?.textContent).toContain('could save'); // still open: an offer worth taking
 
       // (a) open RFQ, writer, eligible -> the hint has no Split button of its own; the RFQ's one Split
       // action follows it directly and calls rfqApi.splitRfq with the RFQ id
@@ -1506,6 +1567,9 @@ describe('CompareComponent (RFQ)', () => {
       const convertedHint = compiled.querySelector('[data-testid="split-saving-hint"]');
       expect(convertedHint).not.toBeNull();
       expect(convertedHint?.textContent).toContain('60');
+      // PPS-208: on a converted RFQ it is a record of what was left on the table, not an offer.
+      expect(convertedHint?.textContent).toContain('would have saved');
+      expect(convertedHint?.textContent).not.toContain('could save');
       expect(convertedHint?.querySelector('button')).toBeNull();
       expect(compiled.querySelector('[data-testid="rfq-compare-split-button"]')).toBeNull();
 

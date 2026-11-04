@@ -64,3 +64,29 @@ def test_single_decisions_declare_optional_uuid_idempotency_header() -> None:
         assert header["in"] == "header"
         assert header["required"] is False
         assert {"type": "string", "format": "uuid"} in header["schema"]["anyOf"]
+
+
+def test_self_approval_flag_and_decision_reason_are_documented() -> None:
+    import yaml
+
+    contract = yaml.safe_load(_contract_text())
+    field = contract["components"]["schemas"]["ApprovalStep"]["properties"]["self_approval"]
+    live = create_app().openapi()["components"]["schemas"]["ApprovalStep"]["properties"][
+        "self_approval"
+    ]
+    assert field["type"] == live["type"] == "boolean"
+    assert field["default"] is live["default"] is False
+    for action in ("approve", "reject"):
+        operation = contract["paths"][f"/requests/{{request_id}}/{action}"]["post"]
+        assert "self_decision_not_allowed" in operation["description"]
+        assert "403" in operation["responses"]
+    split_path = (
+        Path(__file__).resolve().parents[4]
+        / "specs/024-rfq-basket-split/contracts/rfq-split.openapi.yaml"
+    )
+    split = yaml.safe_load(split_path.read_text())
+    for action in ("approve", "reject"):
+        response = split["paths"][f"/request-groups/{{group_id}}/{action}"]["post"]["responses"][
+            "403"
+        ]
+        assert "self_decision_not_allowed" in response["description"]

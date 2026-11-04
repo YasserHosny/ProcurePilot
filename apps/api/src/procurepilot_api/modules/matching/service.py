@@ -53,7 +53,11 @@ from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.modules.quotations.schemas import Money, Pack
 from procurepilot_api.modules.quotations.schemas import decimal_string as quantity_string
-from procurepilot_api.modules.rfq.read_api import RfqContext, rfq_lines_for_quotation
+from procurepilot_api.modules.rfq.read_api import (
+    RfqContext,
+    rfq_id_for_quotation_with_conn,
+    rfq_lines_for_quotation,
+)
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 from procurepilot_api.shared.postgrest_pages import all_rows
@@ -515,11 +519,14 @@ class MatchingService:
             offset %(offset)s limit %(limit)s
         """
 
+        rfq_id: UUID | None = None
         try:
             with _authenticated_db(self._settings, member) as conn:
                 with conn.cursor(row_factory=dict_row) as cur:
                     cur.execute(query, params)
                     rows = [dict(row) for row in cur.fetchall()]
+                if quotation_id is not None:
+                    rfq_id = rfq_id_for_quotation_with_conn(conn, quotation_id)
         except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -528,6 +535,7 @@ class MatchingService:
         return MatchQueueList(
             items=[_queue_item(row) for row in page_rows],
             next_cursor=_encode_cursor(offset + fetch_limit - 1) if has_more else None,
+            rfq_id=rfq_id,
         )
 
     def match_task_for_line(self, *, bearer_token: str, line_id: UUID) -> MatchTask:

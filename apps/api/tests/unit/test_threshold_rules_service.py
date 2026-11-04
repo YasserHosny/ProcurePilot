@@ -225,7 +225,9 @@ def test_submit_routing_creates_pending_approval_step(
     )
     monkeypatch.setattr(service, "_fetch_active_delegations", lambda _client, as_of: [])
     monkeypatch.setattr(service, "_fetch_removed_membership_ids", lambda _client: set())
-    monkeypatch.setattr(service, "_fetch_owner_membership_id", lambda _client: uuid4())
+    owner_id = uuid4()
+    monkeypatch.setattr(service, "_fetch_owner_membership_id", lambda _client: owner_id)
+    monkeypatch.setattr(service, "_fetch_owner_membership_ids", lambda _client: [owner_id])
     monkeypatch.setattr(service, "_record", lambda **_kwargs: None)
 
     result = service._create_submission_approval_step(  # noqa: SLF001
