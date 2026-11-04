@@ -7,7 +7,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, of, Subject, throwError } from 'rxjs';
 
 import { DetailComponent } from './detail.component';
 import { RfqActionKeys, RfqApi, RfqDetail, RfqRecipient, RfqResponseComparisonList, RfqSendResponse } from '../rfq-api';

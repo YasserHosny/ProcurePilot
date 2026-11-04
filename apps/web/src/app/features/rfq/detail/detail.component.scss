@@ -350,6 +350,60 @@ table {
   color: var(--pp-text-muted);
 }
 
+.needed-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-block: 10px;
+  padding-inline: 14px;
+  margin-block-end: 16px;
+  border-radius: 8px;
+  border-inline-start: 4px solid var(--pp-warning);
+  background-color: var(--pp-warning-container);
+  color: var(--pp-text-strong);
+  font-size: 14px;
+
+  mat-icon {
+    font-size: 18px;
+    inline-size: 18px;
+    block-size: 18px;
+    color: var(--pp-warning);
+    flex-shrink: 0;
+  }
+}
+
+.reminder-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-end: 16px;
+}
+
+.recipient-reminders-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.reminder-history {
+  color: var(--pp-text-muted);
+  font-size: 12px;
+}
+
+.reminder-blocked {
+  font-size: 12px;
+}
+
+.remind-button {
+  gap: 6px;
+
+  mat-icon {
+    font-size: 18px;
+    inline-size: 18px;
+    block-size: 18px;
+  }
+}
+
 .responses-tab-content {
   padding-block-start: 8px;
 }
