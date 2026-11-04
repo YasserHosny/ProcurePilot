@@ -1,9 +1,10 @@
 -- 20261104000600_rfq_status_guard.sql — a client session can only edit a draft RFQ and send it
 -- (PPS-213, P-190).
 --
--- rfq_update (20261018000009) matches the RFQ's creator but does not say which status the creator
--- may write, so a creator using the database directly could re-open a cancelled RFQ or mark one
--- converted without the API's checks and audit event. A row policy sees only row values, not the
+-- rfq_update (20261018000009, widened to an active owner by 20261104000200) matches the RFQ's
+-- creator or an owner but does not say which status they may write, so one of them using the
+-- database directly could re-open a cancelled RFQ or mark one converted without the API's checks
+-- and audit event. A row policy sees only row values, not the
 -- transition, so this BEFORE UPDATE trigger does.
 --
 -- It restricts the client roles only (`authenticated`, `anon`), and by current_user, so:
@@ -12,7 +13,7 @@
 --   * the ingestion worker (which marks an RFQ 'responded' under service_role) and the table
 --     owner are not restricted.
 -- A client role may update only a draft RFQ, with the result a draft (an edit) or 'sent' (the send
--- the API performs under the creator's own session). Nothing else changes: the API already behaves
+-- the API performs under the sender's own session, the creator or an owner). Nothing else changes: the API already behaves
 -- this way, so no API change is needed. (Creating an RFQ in another status is a separate gap; it
 -- needs a wide test-fixture change and is tracked on PPS-213.)
 --
