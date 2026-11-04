@@ -4,7 +4,7 @@
 `rfq_update` matches the RFQ's creator but says nothing about *which status* the creator writes,
 so a creator talking to the database directly could re-open a cancelled RFQ or mark one
 converted without the API's checks and audit event. The `rfq_guard_client_update` trigger
-(20261104000600) allows a client role (`authenticated`, `anon`) exactly what the API does
+(20261104000700) allows a client role (`authenticated`, `anon`) exactly what the API does
 under it -- edit a draft, send it -- and leaves every other status change to the server-side
 functions (`cancel_rfq`, `mark_rfq_converted`) and the ingestion worker (`service_role`).
 """
