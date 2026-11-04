@@ -57,6 +57,15 @@ _EFFECTIVE_STATUS_SQL = (
     "then 'expired' else r.status end"
 )
 
+_LIST_SORT_SQL = {
+    "created_desc": "r.created_at DESC, r.id DESC",
+    "created_asc": "r.created_at ASC, r.id ASC",
+    "needed_asc": "r.needed_by_date ASC, r.id ASC",
+    "needed_desc": "r.needed_by_date DESC, r.id DESC",
+    "reference_desc": "r.reference_number DESC, r.id DESC",
+    "reference_asc": "r.reference_number ASC, r.id ASC",
+}
+
 
 @contextmanager
 def _authenticated_db(settings: Settings, member: CurrentMember) -> Iterator[psycopg.Connection]:
@@ -1242,11 +1251,13 @@ class RfqService:
         status: str | None = None,
         cursor: str | None = None,
         limit: int = 50,
+        q: str | None = None,
+        sort: str = "created_desc",
     ) -> RfqList:
         capped_limit = _cap_limit(limit)
         offset = _decode_cursor(cursor)
 
-        query_filters = ["tenant_id = %s"]
+        query_filters = ["r.tenant_id = %s"]
         params: list[str | uuid.UUID | int] = [member.tenant_id]
 
         if status is not None:
@@ -1256,6 +1267,44 @@ class RfqService:
                 )
             query_filters.append(f"({_EFFECTIVE_STATUS_SQL}) = %s")
             params.append(status)
+
+        if sort not in _LIST_SORT_SQL:
+            raise UnprocessableEntityError(details={"reason": "invalid_sort", "field": "sort"})
+
+        search = q.strip() if q is not None else ""
+        if len(search) > 100:
+            raise UnprocessableEntityError(details={"reason": "invalid_query", "field": "q"})
+        if search:
+            digits = search.lower().removeprefix("rfq-").lstrip("0") or "0"
+            reference = int(digits) if digits.isascii() and digits.isdecimal() else 0
+            # The database reference is a positive bigint. Oversized numeric searches
+            # still search names, without overflowing a bigint bind parameter.
+            if reference > 2**63 - 1:
+                reference = 0
+            pattern = (
+                "%" + search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+            )
+            query_filters.append(
+                r"""(
+                    r.reference_number = %s
+                    OR EXISTS (
+                        SELECT 1 FROM rfq_recipient search_rr
+                        JOIN supplier search_s ON search_s.id = search_rr.supplier_id
+                            AND search_s.tenant_id = search_rr.tenant_id
+                        WHERE search_rr.rfq_id = r.id AND search_rr.tenant_id = r.tenant_id
+                            AND search_s.name ILIKE %s ESCAPE '\'
+                    )
+                    OR EXISTS (
+                        SELECT 1 FROM rfq_line search_rl
+                        JOIN workspace_product search_wp
+                            ON search_wp.id = search_rl.workspace_product_id
+                            AND search_wp.tenant_id = search_rl.tenant_id
+                        WHERE search_rl.rfq_id = r.id AND search_rl.tenant_id = r.tenant_id
+                            AND search_wp.tenant_name ILIKE %s ESCAPE '\'
+                    )
+                )"""
+            )
+            params.extend([reference, pattern, pattern])
 
         query = f"""
             SELECT
@@ -1288,7 +1337,7 @@ class RfqService:
                 ) as request_group_id
             FROM rfq r
             WHERE {" AND ".join(query_filters)}
-            ORDER BY r.created_at DESC, r.id DESC
+            ORDER BY {_LIST_SORT_SQL[sort]}
             LIMIT %s OFFSET %s
         """
 
