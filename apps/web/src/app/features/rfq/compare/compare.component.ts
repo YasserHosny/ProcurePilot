@@ -13,8 +13,6 @@ import { MatTableModule } from '@angular/material/table';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -28,14 +26,12 @@ import type { ApiError, Branch } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { parseIsoDateLocal, toIsoDate } from '../../../core/format/iso-date';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
-import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
 // Money is compared in 1/10 000ths so totals like 4,830 − 4,770 come out exact.
 const MINOR_UNITS = 10_000;
 
 @Component({
-  providers: [provideAppDateAdapter()],
   selector: 'app-rfq-compare',
   standalone: true,
   imports: [
@@ -49,8 +45,6 @@ const MINOR_UNITS = 10_000;
     MatSnackBarModule,
     MatSelectModule,
     MatFormFieldModule,
-    MatInputModule,
-    MatDatepickerModule,
     MatProgressSpinnerModule,
     MatIconModule,
     TranslatePipe,
@@ -87,8 +81,6 @@ export class CompareComponent implements OnInit, OnChanges {
   readonly branches = signal<readonly Branch[]>([]);
   readonly selectedBranchId = signal<string>('');
   readonly requiredByDate = signal<Date | null>(null);
-  /** The draft cannot be required before today (create_request rejects a past date). */
-  readonly minRequiredBy = new Date();
   readonly supplierNames = signal<Record<string, string>>({});
   readonly productNames = signal<Record<string, string>>({});
   readonly errorMessage = signal<string | null>(null);

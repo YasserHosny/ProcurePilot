@@ -112,12 +112,13 @@
           </button>
         </div>
       }
-      <mat-form-field appearance="outline">
-        <mat-label>{{ 'rfq.compare.requiredByLabel' | translate }}</mat-label>
-        <input matInput [matDatepicker]="picker" [min]="minRequiredBy" [(ngModel)]="requiredByDate">
-        <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
-        <mat-datepicker #picker></mat-datepicker>
-      </mat-form-field>
+      <!-- The draft follows the RFQ's own needed-by date (the date the suppliers quoted for). -->
+      @if (rfqDetail()?.rfq?.needed_by_date; as neededBy) {
+        <div class="needed-by" data-testid="needed-by">
+          <span class="needed-by-label">{{ 'rfq.compare.neededByLabel' | translate }}</span>
+          <strong class="pp-figures">{{ neededBy | formatDate }}</strong>
+        </div>
+      }
     </div>
   }
 

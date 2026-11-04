@@ -947,7 +947,7 @@ class RfqService:
                 request_payload = PurchaseRequestCreate(
                     branch_id=branch_id,
                     cost_centre_id=cost_centre_id,
-                    required_by_date=required_by_date,
+                    required_by_date=resp_row["needed_by_date"],
                     lines=pr_lines,
                 )
 
