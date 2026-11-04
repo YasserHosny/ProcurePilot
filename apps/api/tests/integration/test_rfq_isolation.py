@@ -399,9 +399,7 @@ async def test_other_tenant_rfq_detail_and_draft_update_are_not_found(
     with conn.cursor() as cur:
         cur.execute("reset role")
         cur.execute("update rfq set status = 'draft' where id = %s", (beta.rfq_id,))
-        cur.execute(
-            "select workspace_product_id from rfq_line where id = %s", (alpha.rfq_line_id,)
-        )
+        cur.execute("select workspace_product_id from rfq_line where id = %s", (alpha.rfq_line_id,))
         product_id = cur.fetchone()[0]
     conn.commit()
 
@@ -919,8 +917,8 @@ def test_an_already_converted_rfq_is_not_converted_again(
 # --- cancel_rfq (20261103120000) and the definer hardening (20261104000300) -----------------------
 #
 # cancel_rfq cancels a draft, sent or responded RFQ for an active owner of the workspace, or for the
-# active buyer who created it. mark_rfq_converted converts only from sent, responded or expired, so a
-# cancelled RFQ returns false instead of raising a check violation.
+# active buyer who created it. mark_rfq_converted converts only from sent, responded or expired,
+# so a cancelled RFQ returns false instead of raising a check violation.
 
 
 def _set_rfq_state(cur: psycopg.Cursor, rfq_id: UUID, status: str) -> None:
@@ -1127,3 +1125,53 @@ def test_the_rfq_status_functions_pin_their_search_path_and_are_not_public(
         assert security_definer is True
         assert config == ["search_path=pg_catalog, public, pg_temp"]
         assert (anon, public, authenticated) == (False, False, True)
+
+
+_OLD_MARK_RFQ_CONVERTED = """
+create or replace function mark_rfq_converted(p_rfq_id uuid, p_purchase_request_id uuid)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare v_tenant uuid := current_tenant_id();
+begin
+  if v_tenant is null or coalesce(current_membership_role(), '') not in ('owner', 'buyer') then
+    raise exception 'only an owner or buyer can convert an RFQ' using errcode = '42501';
+  end if;
+  if not exists (
+    select 1 from purchase_request pr
+    join rfq_response resp on resp.tenant_id = pr.tenant_id and resp.id = pr.source_rfq_response_id
+    join rfq_recipient rec on rec.tenant_id = resp.tenant_id and rec.id = resp.rfq_recipient_id
+    where pr.tenant_id = v_tenant and pr.id = p_purchase_request_id and rec.rfq_id = p_rfq_id
+  ) then
+    return false;
+  end if;
+  update rfq set status = 'converted'
+  where tenant_id = v_tenant and id = p_rfq_id and status not in ('draft', 'converted');
+  return found;
+end; $$;
+"""
+
+
+def test_the_previous_mark_rfq_converted_would_have_raised_on_a_cancelled_rfq(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    """Why 20261104000300 changed the state guard: the 20261019000001 definition matched 'cancelled'
+    and tripped rfq_cancelled_at_check instead of returning false. The old body is installed inside
+    a savepoint that is rolled back."""
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        user_id, membership_id = _add_member(cur, alpha, "buyer")
+        request_id = _prepared_request(cur, alpha, membership_id, alpha.rfq_response_id)
+        _set_rfq_state(cur, alpha.rfq_id, "cancelled")
+        cur.execute("reset role")
+        cur.execute("savepoint old_definition")
+        cur.execute(_OLD_MARK_RFQ_CONVERTED)
+        _act_as_user(cur, alpha, user_id, "buyer")
+        cur.execute("savepoint before_old_call")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, request_id))
+        cur.execute("rollback to savepoint before_old_call")
+        cur.execute("reset role")
+        cur.execute("rollback to savepoint old_definition")
+        _act_as_user(cur, alpha, user_id, "buyer")
+        cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, request_id))
+        assert cur.fetchone()[0] is False
+        assert _rfq_row(cur, alpha.rfq_id)[0] == "cancelled"
