@@ -81,6 +81,7 @@ export class OrderDetailComponent implements OnInit {
   readonly receiptDateModel = computed(() => parseIsoDateLocal(this.receiptDate()));
   readonly confirmationQuantities = signal<Record<string, string>>({});
   readonly receiptQuantities = signal<Record<string, string>>({});
+  readonly receiptNotes = signal<Record<string, string>>({});
 
   onConfirmationDateChange(date: Date | null): void {
     this.confirmationDate.set(toIsoDateOrNull(date) ?? '');
@@ -201,6 +202,16 @@ export class OrderDetailComponent implements OnInit {
     if (kind === 'receipt') this.receiptQuantityError.set(false);
     const target = kind === 'confirmation' ? this.confirmationQuantities : this.receiptQuantities;
     target.set({ ...target(), [lineId]: value });
+  }
+
+  setReceiptNote(lineId: string, value: string): void {
+    this.receiptNotes.set({ ...this.receiptNotes(), [lineId]: value });
+  }
+
+  /** What a recorded receipt line was for, so its note reads on its own. */
+  receiptLineName(lineId: string): string {
+    const line = this.evidence()?.order.lines.find((candidate) => candidate.id === lineId);
+    return line ? lineDescription(line) : '';
   }
 
   readonly isOverdue = isOrderOverdue;
@@ -355,12 +366,16 @@ export class OrderDetailComponent implements OnInit {
       receipt_date: this.receiptDate(),
       source_kind: 'manual',
       source_reference: this.receiptReference().trim(),
-      lines: current.order.lines.map((line) => ({
-        purchase_order_line_id: line.id,
-        received_quantity: this.quantityValue(this.receiptQuantities(), line) || '0',
-      })),
+      lines: current.order.lines.map((line) => {
+        const note = (this.receiptNotes()[line.id] ?? '').trim();
+        return {
+          purchase_order_line_id: line.id,
+          received_quantity: this.quantityValue(this.receiptQuantities(), line) || '0',
+          ...(note ? { note } : {}),
+        };
+      }),
     }).subscribe({
-      next: (value) => { this.evidence.set(value); this.receiptOpen.set(false); this.isSaving.set(false); this.announce('orders.detail.receiptSaved'); },
+      next: (value) => { this.evidence.set(value); this.receiptOpen.set(false); this.receiptNotes.set({}); this.isSaving.set(false); this.announce('orders.detail.receiptSaved'); },
       error: (err: unknown) => this.failWith(err),
     });
   }

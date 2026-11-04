@@ -49,3 +49,11 @@
 .receipt-progress-fill { position: absolute; inset-block: 0; inset-inline-start: 0; background: var(--pp-success-container); }
 .receipt-progress-text { position: relative; display: block; padding-inline: 0.75rem; font-size: 0.8rem; line-height: 1.5rem; color: var(--pp-text-strong); }
 @media print { .receipt-progress { display: none; } }
+
+.timeline .receipt-note {
+  grid-column: 2 / -1;
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--pp-text-muted);
+}

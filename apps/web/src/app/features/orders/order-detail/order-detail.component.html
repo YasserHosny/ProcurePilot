@@ -24,6 +24,11 @@
             </a>
           </p>
         }
+        @if (data.source_split_job_id; as splitJobId) {
+          <p class="source-links">
+            <a [routerLink]="['/offers/basket-split', splitJobId]" data-testid="source-split-link">{{ 'orders.detail.sourceSplit' | translate }}</a>
+          </p>
+        }
         <p>{{ 'orders.detail.createdAt' | translate: { date: (data.order.created_at | formatDate) } }}</p>
         @if (sourceRequest()?.source; as source) {
           <p class="source-links">
@@ -175,14 +180,17 @@
               <mat-datepicker #receiptDatePicker></mat-datepicker>
             </mat-form-field>
           </div>
-          @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ quantityLabel('received', line) }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(receiptQuantities(), line)" (ngModelChange)="setQuantity('receipt', line.id, $event)" [name]="'receipt-' + line.id" /></mat-form-field> }
+          @for (line of data.order.lines; track line.id) {
+            <mat-form-field appearance="outline"><mat-label>{{ quantityLabel('received', line) }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(receiptQuantities(), line)" (ngModelChange)="setQuantity('receipt', line.id, $event)" [name]="'receipt-' + line.id" /></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.receiptNote' | translate: { description: lineDescription(line) } }}</mat-label><input matInput maxlength="500" [ngModel]="receiptNotes()[line.id] ?? ''" (ngModelChange)="setReceiptNote(line.id, $event)" [name]="'note-' + line.id" [attr.data-testid]="'receipt-note-' + line.id" /></mat-form-field>
+          }
           @if (receiptQuantityError()) { <p class="field-error" role="alert" data-testid="receipt-quantity-error">{{ 'orders.detail.receiptQuantityRequired' | translate }}</p> }
           <button mat-flat-button color="primary" type="submit" [disabled]="isSaving()" data-testid="save-receipt">{{ 'orders.detail.save' | translate }}</button>
         </form>
       }
     </mat-card>
 
-    <mat-card class="timeline-card"><h2>{{ 'orders.detail.timelineTitle' | translate }}</h2><div class="timeline"><div><mat-icon aria-hidden="true">shopping_cart</mat-icon><span>{{ 'orders.detail.orderCreated' | translate }}</span><small>{{ data.order.created_at | formatDate }}</small></div>@if (data.confirmation) { <div><mat-icon aria-hidden="true">handshake</mat-icon><span>{{ 'orders.detail.confirmationRecorded' | translate }}</span><small>{{ data.confirmation.confirmed_at | formatDate }}</small></div> } @for (receipt of data.receipts; track receipt.id) { <div><mat-icon aria-hidden="true">inventory_2</mat-icon><span>{{ 'orders.detail.receiptRecorded' | translate: { reference: receipt.receipt_reference } }}</span><small>{{ receipt.receipt_date | formatDate }}</small></div> }</div></mat-card>
+    <mat-card class="timeline-card"><h2>{{ 'orders.detail.timelineTitle' | translate }}</h2><div class="timeline"><div><mat-icon aria-hidden="true">shopping_cart</mat-icon><span>{{ 'orders.detail.orderCreated' | translate }}</span><small>{{ data.order.created_at | formatDate }}</small></div>@if (data.confirmation) { <div><mat-icon aria-hidden="true">handshake</mat-icon><span>{{ 'orders.detail.confirmationRecorded' | translate }}</span><small>{{ data.confirmation.confirmed_at | formatDate }}</small></div> } @for (receipt of data.receipts; track receipt.id) { <div><mat-icon aria-hidden="true">inventory_2</mat-icon><span>{{ 'orders.detail.receiptRecorded' | translate: { reference: receipt.receipt_reference } }}</span><small>{{ receipt.receipt_date | formatDate }}</small>@for (line of receipt.lines; track line.id) { @if (line.note) { <p class="receipt-note" data-testid="receipt-note"><strong>{{ receiptLineName(line.purchase_order_line_id) }}:</strong> {{ line.note }}</p> } }</div> }</div></mat-card>
     }
   }
 </div>

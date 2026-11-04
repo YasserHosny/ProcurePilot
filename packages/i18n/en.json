@@ -3905,7 +3905,9 @@
       "confirmedQuantityFor": "{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})",
       "progressLabel": "{{percent}}% received",
       "sourceRfq": "RFQ",
-      "sourceQuotation": "Quotation"
+      "sourceQuotation": "Quotation",
+      "receiptNote": "Note for {{description}} (short receipt, damage or quality)",
+      "sourceSplit": "Basket split behind this order"
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",

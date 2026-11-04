@@ -3905,7 +3905,9 @@
       "confirmedQuantityFor": "{{product}} · الكمية المؤكدة ({{unit}}، المطلوب {{ordered}})",
       "progressLabel": "تم استلام {{percent}}٪",
       "sourceRfq": "طلب التسعير",
-      "sourceQuotation": "عرض السعر"
+      "sourceQuotation": "عرض السعر",
+      "receiptNote": "ملاحظة على {{description}} (نقص في الاستلام أو تلف أو جودة)",
+      "sourceSplit": "تقسيم السلة الذي أنتج هذا الطلب"
     },
     "resultCount": "{{count}} أمر شراء",
     "loadMoreError": "تعذّر تحميل المزيد من الأوامر. الأوامر الظاهرة أعلاه ما زالت معروضة.",
