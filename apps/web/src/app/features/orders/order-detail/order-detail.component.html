@@ -99,6 +99,11 @@
           <button mat-stroked-button type="button" (click)="confirmationOpen.set(!confirmationOpen())" [disabled]="isSaving()" data-testid="open-confirmation-form"><mat-icon aria-hidden="true">handshake</mat-icon>{{ 'orders.detail.recordConfirmation' | translate }}</button>
           <button mat-stroked-button type="button" (click)="receiptOpen.set(!receiptOpen())" [disabled]="isSaving()" data-testid="open-receipt-form"><mat-icon aria-hidden="true">inventory_2</mat-icon>{{ 'orders.detail.recordReceipt' | translate }}</button>
         }
+        @if (canClose(data.order.status)) {
+          <button mat-stroked-button type="button" (click)="closeOrder()" [disabled]="isSaving()" data-testid="close-order">
+            <mat-icon aria-hidden="true">lock</mat-icon>{{ 'orders.detail.close' | translate }}
+          </button>
+        }
         @if (canRecordOutcome(data.order.status)) {
           <a mat-stroked-button color="primary" [routerLink]="['/orders', data.order.id, 'record-outcome']" data-testid="record-outcome"><mat-icon aria-hidden="true">payments</mat-icon>{{ 'orders.detail.recordOutcome' | translate }}</a>
         }
@@ -114,6 +119,16 @@
           <div class="actions">
             <button mat-button type="button" (click)="submitOpen.set(false)" [disabled]="isSaving()">{{ 'common.cancel' | translate }}</button>
             <button mat-flat-button color="primary" type="button" (click)="submitOrder()" [disabled]="isSaving()" data-testid="confirm-submit">{{ 'orders.detail.submitConfirm' | translate }}</button>
+          </div>
+        </div>
+      }
+      @if (closeOpen()) {
+        <div class="evidence-form close-form" data-testid="close-confirm-panel">
+          <h3 tabindex="-1">{{ 'orders.detail.closeConfirmTitle' | translate }}</h3>
+          <p>{{ 'orders.detail.closeConfirmMessage' | translate }}</p>
+          <div class="actions">
+            <button mat-button type="button" (click)="closeOpen.set(false)" [disabled]="isSaving()">{{ 'common.cancel' | translate }}</button>
+            <button mat-flat-button color="primary" type="button" (click)="confirmClose()" [disabled]="isSaving()" data-testid="confirm-close">{{ 'orders.detail.closeConfirm' | translate }}</button>
           </div>
         </div>
       }
@@ -190,7 +205,7 @@
       }
     </mat-card>
 
-    <mat-card class="timeline-card"><h2>{{ 'orders.detail.timelineTitle' | translate }}</h2><div class="timeline"><div><mat-icon aria-hidden="true">shopping_cart</mat-icon><span>{{ 'orders.detail.orderCreated' | translate }}</span><small>{{ data.order.created_at | formatDate }}</small></div>@if (data.confirmation) { <div><mat-icon aria-hidden="true">handshake</mat-icon><span>{{ 'orders.detail.confirmationRecorded' | translate }}</span><small>{{ data.confirmation.confirmed_at | formatDate }}</small></div> } @for (receipt of data.receipts; track receipt.id) { <div><mat-icon aria-hidden="true">inventory_2</mat-icon><span>{{ 'orders.detail.receiptRecorded' | translate: { reference: receipt.receipt_reference } }}</span><small>{{ receipt.receipt_date | formatDate }}</small>@for (line of receipt.lines; track line.id) { @if (line.note) { <p class="receipt-note" data-testid="receipt-note"><strong>{{ receiptLineName(line.purchase_order_line_id) }}:</strong> {{ line.note }}</p> } }</div> }</div></mat-card>
+    <mat-card class="timeline-card"><h2>{{ 'orders.detail.timelineTitle' | translate }}</h2><div class="timeline"><div><mat-icon aria-hidden="true">shopping_cart</mat-icon><span>{{ 'orders.detail.orderCreated' | translate }}</span><small>{{ data.order.created_at | formatDate }}</small></div>@if (data.confirmation) { <div><mat-icon aria-hidden="true">handshake</mat-icon><span>{{ 'orders.detail.confirmationRecorded' | translate }}</span><small>{{ data.confirmation.confirmed_at | formatDate }}</small></div> } @for (receipt of data.receipts; track receipt.id) { <div><mat-icon aria-hidden="true">inventory_2</mat-icon><span>{{ 'orders.detail.receiptRecorded' | translate: { reference: receipt.receipt_reference } }}</span><small>{{ receipt.receipt_date | formatDate }}</small>@for (line of receipt.lines; track line.id) { @if (line.note) { <p class="receipt-note" data-testid="receipt-note"><strong>{{ receiptLineName(line.purchase_order_line_id) }}:</strong> {{ line.note }}</p> } }</div> }@if (data.order.status === 'cancelled') { <div data-testid="timeline-cancelled"><mat-icon aria-hidden="true">cancel</mat-icon><span>{{ 'orders.detail.timelineCancelled' | translate }}</span><small>{{ data.order.updated_at | formatDate }}</small></div> }@if (data.order.status === 'closed') { <div data-testid="timeline-closed"><mat-icon aria-hidden="true">lock</mat-icon><span>{{ 'orders.detail.timelineClosed' | translate }}</span><small>{{ data.order.updated_at | formatDate }}</small></div> }</div></mat-card>
     }
   }
 </div>

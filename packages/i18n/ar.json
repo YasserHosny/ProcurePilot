@@ -3897,7 +3897,9 @@
       "errors": {
         "order_not_open_for_evidence": "هذا الأمر مسودة أو ملغى أو مغلق، لذلك لا يقبل أدلة التسليم أو التأكيد.",
         "order_not_cancellable": "استُلم هذا الأمر بالكامل أو أُغلق، لذلك لا يمكن إلغاؤه.",
-        "order_already_cancelled": "هذا الأمر ملغى بالفعل."
+        "order_already_cancelled": "هذا الأمر ملغى بالفعل.",
+        "order_not_closable": "لا يمكن إغلاق إلا الأمر الذي استُلم بالكامل.",
+        "order_already_closed": "هذا الأمر مغلق بالفعل."
       },
       "overdue": "متأخر",
       "exportCsv": "تصدير CSV",
@@ -3915,7 +3917,14 @@
       "sourceRfq": "طلب التسعير",
       "sourceQuotation": "عرض السعر",
       "receiptNote": "ملاحظة على {{description}} (نقص في الاستلام أو تلف أو جودة)",
-      "sourceSplit": "تقسيم السلة الذي أنتج هذا الطلب"
+      "sourceSplit": "تقسيم السلة الذي أنتج هذا الطلب",
+      "close": "إغلاق الأمر",
+      "closeConfirmTitle": "إغلاق هذا الأمر؟",
+      "closeConfirmMessage": "الإغلاق يعني أن الأمر انتهى. لا يُرسل شيء إلى المورّد، ولا يمكن إعادة فتح الأمر المغلق أو تعديله أو إلغاؤه.",
+      "closeConfirm": "إغلاق الأمر",
+      "closed": "تم إغلاق الأمر.",
+      "timelineCancelled": "تم إلغاء الأمر",
+      "timelineClosed": "تم إغلاق الأمر"
     },
     "resultCount": "{{count}} أمر شراء",
     "loadMoreError": "تعذّر تحميل المزيد من الأوامر. الأوامر الظاهرة أعلاه ما زالت معروضة.",
@@ -4482,7 +4491,21 @@
         "other": "{{count}} رد — مقارنة"
       },
       "draftActionsUnavailable": "إجراءات المسودة غير متاحة حاليًا لتعذر تحميل أعضاء مساحة العمل.",
-      "reference": "الرقم المرجعي"
+      "reference": "الرقم المرجعي",
+      "searchLabel": "البحث في طلبات عروض الأسعار",
+      "searchPlaceholder": "الرقم المرجعي أو المورد أو المنتج",
+      "clearSearch": "مسح البحث",
+      "sortLabel": "ترتيب حسب",
+      "noMatches": "لا توجد طلبات عروض أسعار تطابق البحث أو التصفية.",
+      "clearAll": "مسح البحث وعوامل التصفية",
+      "sortOptions": {
+        "created_desc": "الأحدث أولاً",
+        "created_asc": "الأقدم أولاً",
+        "needed_asc": "تاريخ الاحتياج: الأقرب أولاً",
+        "needed_desc": "تاريخ الاحتياج: الأبعد أولاً",
+        "reference_desc": "الرقم المرجعي: من الأعلى إلى الأدنى",
+        "reference_asc": "الرقم المرجعي: من الأدنى إلى الأعلى"
+      }
     },
     "detail": {
       "cancelledAtLabel": "تاريخ الإلغاء",

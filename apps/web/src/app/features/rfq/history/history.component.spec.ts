@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { parseStatusFilter, HistoryComponent } from './history.component';
+import { parseSearch, parseSort, parseStatusFilter, HistoryComponent } from './history.component';
 import { RfqApi, RfqSummary, RfqList, RfqSendResponse, RfqDetail } from '../rfq-api';
-import { Router, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, Router, provideRouter } from '@angular/router';
 import { of, throwError, Subject } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
@@ -218,6 +218,141 @@ describe('HistoryComponent', () => {
     });
   });
 
+
+  describe('search and sort', () => {
+    function input(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('input[type="search"]');
+    }
+    function type(value: string): void {
+      input().value = value;
+      input().dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
+    function enter(): void {
+      input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+    }
+    function chooseSort(): void {
+      (fixture.nativeElement.querySelector('mat-select') as HTMLElement).click();
+      fixture.detectChanges();
+      const option = Array.from(document.querySelectorAll<HTMLElement>('mat-option'))
+        .find(el => el.textContent?.trim() === 'Needed by: soonest')!;
+      option.click();
+      fixture.detectChanges();
+    }
+    it('parses absent, invalid, trimmed and capped address values', () => {
+      expect(parseSort(null)).toBe('created_desc');
+      expect(parseSort('')).toBe('created_desc');
+      expect(parseSort('invalid')).toBe('created_desc');
+      expect(parseSearch(null)).toBe('');
+      expect(parseSearch('   ')).toBe('');
+      expect(parseSearch('  RFQ-000002  ')).toBe('RFQ-000002');
+      expect(parseSearch('x'.repeat(101))).toBe('x'.repeat(100));
+    });
+    it('drops stale search responses after another search starts', () => {
+      const stale = new Subject<RfqList>();
+      rfqApiSpy.listRfqs.and.returnValue(stale);
+      type('old'); enter();
+      rfqApiSpy.listRfqs.and.returnValue(of({ items: [], next_cursor: null }));
+      type('new'); enter();
+      stale.next(mockRfqList);
+      expect(component.rfqs()).toEqual([]);
+      expect(component.nextCursor()).toBeNull();
+      jasmine.clock().tick(300);
+    });
+    it('debounces two edits into one final request', () => {
+      rfqApiSpy.listRfqs.calls.reset();
+      type('sup');
+      jasmine.clock().tick(200);
+      type('supplier');
+      jasmine.clock().tick(299);
+      expect(rfqApiSpy.listRfqs).not.toHaveBeenCalled();
+      jasmine.clock().tick(1);
+      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([[undefined, undefined, undefined, 'supplier', 'created_desc']]);
+    });
+    it('Enter reloads immediately and cancels the pending debounce', () => {
+      rfqApiSpy.listRfqs.calls.reset();
+      type('2');
+      enter();
+      expect(rfqApiSpy.listRfqs.calls.count()).toBe(1);
+      jasmine.clock().tick(300);
+      expect(rfqApiSpy.listRfqs.calls.count()).toBe(1);
+    });
+    it('clear search resets the field and reloads once', () => {
+      type('supplier');
+      rfqApiSpy.listRfqs.calls.reset();
+      (fixture.nativeElement.querySelector('[data-testid="rfq-clear-search"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      jasmine.clock().tick(300);
+      expect(input().value).toBe('');
+      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([[undefined, undefined, undefined, undefined, 'created_desc']]);
+    });
+    it('sort reloads, persists all address parameters and keeps them for pagination', () => {
+      type(' bolt ');
+      enter();
+      component.setStatusFilter('sent');
+      rfqApiSpy.listRfqs.calls.reset();
+      chooseSort();
+      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([['sent', undefined, undefined, 'bolt', 'needed_asc']]);
+      expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({
+        queryParams: { status: 'sent', q: 'bolt', sort: 'needed_asc' },
+        queryParamsHandling: 'merge', replaceUrl: true,
+      }));
+      component.nextCursor.set('next');
+      component.loadMore();
+      expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual(['sent', 'next', undefined, 'bolt', 'needed_asc']);
+    });
+    it('keeps the applied query while an edit is waiting to debounce', () => {
+      type('old'); enter();
+      type('new');
+      component.nextCursor.set('next');
+      component.loadMore();
+      expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual([undefined, 'next', undefined, 'old', 'created_desc']);
+      jasmine.clock().tick(300);
+    });
+    it('initializes valid address values, trims and caps search and defaults invalid sort', () => {
+      const route = TestBed.inject(ActivatedRoute);
+      for (const sort of ['created_desc', 'created_asc', 'needed_asc', 'needed_desc', 'reference_desc', 'reference_asc', 'invalid']) {
+        Object.defineProperty(route.snapshot, 'queryParamMap', { configurable: true, value: convertToParamMap({ status: 'sent', q: '  ' + 'x'.repeat(110) + '  ', sort }) });
+        const other = TestBed.createComponent(HistoryComponent);
+        other.detectChanges();
+        expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual(['sent', undefined, undefined, 'x'.repeat(100), sort === 'invalid' ? 'created_desc' : sort]);
+        other.destroy();
+      }
+    });
+    it('shows an empty-match state and clears all controls in one reload', () => {
+      rfqApiSpy.listRfqs.and.returnValue(of({ items: [], next_cursor: null }));
+      type('missing'); enter();
+      component.setStatusFilter('sent');
+      chooseSort();
+      expect(fixture.nativeElement.textContent).toContain('No RFQs match your search or filter.');
+      rfqApiSpy.listRfqs.calls.reset();
+      const clear = fixture.nativeElement.querySelector('[data-testid="rfq-clear-filter"]') as HTMLButtonElement;
+      expect(clear.textContent).toContain('Clear search and filters');
+      clear.click();
+      fixture.detectChanges();
+      jasmine.clock().tick(300);
+      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([[undefined, undefined, undefined, undefined, 'created_desc']]);
+      expect(fixture.nativeElement.textContent).toContain('No RFQs found.');
+      expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({ queryParams: { q: null, sort: null, status: null } }));
+    });
+    for (const locale of ['en', 'ar']) {
+      it('associates visible labels with search and sort in ' + locale, () => {
+        TestBed.inject(TranslateService).use(locale);
+        fixture.detectChanges();
+        const host = fixture.nativeElement as HTMLElement;
+        const field = input();
+        expect(field).not.toBeNull();
+        expect(field.maxLength).toBe(100);
+        const label = host.querySelector('label[for="' + field.id + '"]');
+        expect(label?.textContent).toContain(locale === 'en' ? 'Search RFQs' : 'البحث في طلبات عروض الأسعار');
+        const select = host.querySelector('mat-select')!;
+        const labels = select.getAttribute('aria-labelledby')!.split(' ').map(id => document.getElementById(id)?.textContent).join(' ');
+        expect(labels).toContain(locale === 'en' ? 'Sort by' : 'ترتيب حسب');
+      });
+    }
+  });
+
   describe('status filter', () => {
     function filterButtons(): HTMLButtonElement[] {
       return Array.from(
@@ -252,12 +387,12 @@ describe('HistoryComponent', () => {
       rfqApiSpy.listRfqs.calls.reset();
       filterButtons().find((b) => b.textContent?.trim() === 'Sent')?.click();
       fixture.detectChanges();
-      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith('sent');
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith('sent', undefined, undefined, undefined, 'created_desc');
       expect(filterButtons().find((b) => b.textContent?.trim() === 'Sent')?.getAttribute('aria-pressed')).toBe('true');
       expect(filterButtons()[0].getAttribute('aria-pressed')).toBe('false');
       expect(router.navigate).toHaveBeenCalledWith(
         [],
-        jasmine.objectContaining({ queryParams: { status: 'sent' }, replaceUrl: true }),
+        jasmine.objectContaining({ queryParams: { status: 'sent', q: null, sort: null }, replaceUrl: true }),
       );
     });
 
@@ -266,13 +401,13 @@ describe('HistoryComponent', () => {
       rfqApiSpy.listRfqs.calls.reset();
       component.nextCursor.set('cursor-2');
       component.loadMore();
-      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith('expired', 'cursor-2');
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith('expired', 'cursor-2', undefined, undefined, 'created_desc');
       rfqApiSpy.listRfqs.calls.reset();
       component.setStatusFilter(null);
-      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith(undefined);
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith(undefined, undefined, undefined, undefined, 'created_desc');
       expect(router.navigate).toHaveBeenCalledWith(
         [],
-        jasmine.objectContaining({ queryParams: { status: null } }),
+        jasmine.objectContaining({ queryParams: { status: null, q: null, sort: null } }),
       );
     });
 
@@ -288,13 +423,13 @@ describe('HistoryComponent', () => {
       component.setStatusFilter('cancelled');
       fixture.detectChanges();
       const host = fixture.nativeElement as HTMLElement;
-      expect(host.textContent).toContain('No RFQs have this status.');
+      expect(host.textContent).toContain('No RFQs match your search or filter.');
       const clear = host.querySelector<HTMLButtonElement>('[data-testid="rfq-clear-filter"]');
       expect(clear).not.toBeNull();
       rfqApiSpy.listRfqs.and.returnValue(of(mockRfqList));
       rfqApiSpy.listRfqs.calls.reset();
       clear?.click();
-      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith(undefined);
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith(undefined, undefined, undefined, undefined, 'created_desc');
     });
   });
 
@@ -484,7 +619,7 @@ describe('HistoryComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(rfqApiSpy.listRfqs).toHaveBeenCalledWith(undefined, 'cursor-page-2');
+    expect(rfqApiSpy.listRfqs).toHaveBeenCalledWith(undefined, 'cursor-page-2', undefined, undefined, 'created_desc');
     expect(component.rfqs().length).toBe(3);
     expect(component.rfqs().map((r) => r.id)).toEqual(['rfq-draft-1', 'rfq-1', 'rfq-2']);
     expect(component.nextCursor()).toBeNull();
@@ -563,7 +698,7 @@ describe('HistoryComponent', () => {
 
     rfqApiSpy.listRfqs.and.returnValue(of({ items: [], next_cursor: null }));
     retryBtn?.click();
-    expect(rfqApiSpy.listRfqs).toHaveBeenCalledWith(undefined, 'cursor-1');
+    expect(rfqApiSpy.listRfqs).toHaveBeenCalledWith(undefined, 'cursor-1', undefined, undefined, 'created_desc');
   });
 
   it('the row link has the expected accessible name and navigates', async () => {

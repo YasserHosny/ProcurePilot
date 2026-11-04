@@ -237,8 +237,10 @@ export class RfqApi {
     return this.http.post<BasketSplitJob>(`${this.baseUrl}/${rfqId}/split`, {}, { headers });
   }
 
-  listRfqs(status?: string, cursor?: string, limit?: number): Observable<RfqList> {
+  listRfqs(status?: string, cursor?: string, limit?: number, q?: string, sort?: string): Observable<RfqList> {
     let params = new HttpParams();
+    if (q?.trim()) params = params.set('q', q.trim());
+    if (sort && sort !== 'created_desc') params = params.set('sort', sort);
     if (status) params = params.set('status', status);
     if (cursor) params = params.set('cursor', cursor);
     if (limit) params = params.set('limit', limit.toString());

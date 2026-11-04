@@ -1,3 +1,7 @@
+import { TestBed } from "@angular/core/testing";
+import { HttpClient, HttpParams } from "@angular/common/http";
+import { of } from "rxjs";
+import { RfqApi } from "./rfq-api";
 import { RfqActionKeys, formatRfqReference } from './rfq-api';
 
 describe('formatRfqReference', () => {
@@ -30,5 +34,25 @@ describe('RfqActionKeys', () => {
     expect(keys.get('send:rfq-1')).toBe(first);
     keys.clear('send:rfq-1');
     expect(keys.get('send:rfq-1')).not.toBe(first);
+  });
+});
+
+describe('RfqApi list parameters', () => {
+  it('omits blank search and default sort, and sends trimmed search with explicit sort', () => {
+    const http = jasmine.createSpyObj<HttpClient>('HttpClient', ['get']);
+    http.get.and.returnValue(of({ items: [], next_cursor: null }));
+    TestBed.configureTestingModule({ providers: [RfqApi, { provide: HttpClient, useValue: http }] });
+    const api = TestBed.inject(RfqApi);
+    api.listRfqs(undefined, undefined, undefined, '   ', 'created_desc');
+    let params = http.get.calls.mostRecent().args[1]?.params as HttpParams;
+    expect(params.has('q')).toBeFalse();
+    expect(params.has('sort')).toBeFalse();
+    api.listRfqs('sent', '20', 20, ' bolt ', 'needed_asc');
+    params = http.get.calls.mostRecent().args[1]?.params as HttpParams;
+    expect(params.get('q')).toBe('bolt');
+    expect(params.get('sort')).toBe('needed_asc');
+    expect(params.get('status')).toBe('sent');
+    expect(params.get('cursor')).toBe('20');
+    expect(params.get('limit')).toBe('20');
   });
 });
