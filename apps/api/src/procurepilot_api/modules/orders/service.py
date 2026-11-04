@@ -548,6 +548,53 @@ class OrdersService:
 
         return order
 
+    def close_order(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        order_id: UUID,
+        idempotency_key: UUID | None,
+    ) -> PurchaseOrder:
+        """Close an order whose goods have all been received; closed is final."""
+        self._require_write(member, idempotency_key)
+
+        with self._transaction(member) as cur:
+            cur.execute(
+                f"select {ORDER_HEADER_COLUMNS},close_idempotency_key from purchase_order "
+                "where tenant_id = %s and id = %s for update",
+                (member.tenant_id, order_id),
+            )
+            row = cur.fetchone()
+            if row is None:
+                raise NotFoundError(details={"resource": "purchase_order"})
+            if row["status"] == "closed":
+                if row.get("close_idempotency_key") and str(row["close_idempotency_key"]) == str(
+                    idempotency_key
+                ):
+                    return self._load_order_cursor(cur, order_id)
+                raise ConflictError(details={"reason": "order_already_closed"})
+            if row["status"] != "received":
+                raise ConflictError(details={"reason": "order_not_closable"})
+
+            cur.execute(
+                "select 1 from purchase_order where tenant_id = %s "
+                "and close_idempotency_key = %s and id != %s",
+                (member.tenant_id, idempotency_key, order_id),
+            )
+            if cur.fetchone() is not None:
+                raise ConflictError(details={"reason": "order_number_or_idempotency_exists"})
+
+            cur.execute(
+                "update purchase_order set status = 'closed', close_idempotency_key = %s, "
+                "updated_at = now() where tenant_id = %s and id = %s",
+                (idempotency_key, member.tenant_id, order_id),
+            )
+            order = self._load_order_cursor(cur, order_id)
+            self._audit_cursor(cur, member, "orders.purchase_order_closed", order_id)
+
+        return order
+
     @staticmethod
     def _record_edit_idempotency_key(
         *,
