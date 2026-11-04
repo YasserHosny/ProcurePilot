@@ -1039,6 +1039,9 @@ export class ApiService {
     cursor?: string;
     limit?: number;
     eligible_for_order?: boolean;
+    q?: string;
+    sort?: import('../../features/requests/requests-api').PurchaseRequestSort;
+    mine?: boolean;
   }): Observable<PurchaseRequestList> {
     const query = new URLSearchParams();
     if (params?.status) query.set('status', params.status);
@@ -1046,6 +1049,9 @@ export class ApiService {
     if (params?.cursor) query.set('cursor', params.cursor);
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
     if (params?.eligible_for_order) query.set('eligible_for_order', 'true');
+    if (params?.q?.trim()) query.set('q', params.q.trim());
+    if (params?.sort && params.sort !== 'created_desc') query.set('sort', params.sort);
+    if (params?.mine) query.set('mine', 'true');
     const qs = query.toString() ? `?${query.toString()}` : '';
     return this.http.get<PurchaseRequestList>(`${this.base}/requests${qs}`);
   }

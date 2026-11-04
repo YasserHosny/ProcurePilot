@@ -16,6 +16,14 @@ import type {
 
 export type PurchaseRequestStatus = BasePurchaseRequestStatus | 'delivered';
 
+export type PurchaseRequestSort =
+  | 'created_desc'
+  | 'created_asc'
+  | 'required_by_asc'
+  | 'required_by_desc'
+  | 'total_desc'
+  | 'total_asc';
+
 export type {
   ApprovalDecisionInput,
   PurchaseRequest,
@@ -37,6 +45,9 @@ export class RequestsApiService {
     cursor?: string;
     limit?: number;
     eligible_for_order?: boolean;
+    q?: string;
+    sort?: PurchaseRequestSort;
+    mine?: boolean;
   }): Observable<PurchaseRequestList> {
     return this.api.listRequests(params as Parameters<ApiService['listRequests']>[0]);
   }
