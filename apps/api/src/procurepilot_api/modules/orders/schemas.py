@@ -166,6 +166,7 @@ class DeliveryReceiptLine(StrictModel):
     id: UUID
     purchase_order_line_id: UUID
     received_quantity: Decimal = Field(ge=0)
+    note: str | None = None
 
     _validate_quantity_scale = field_validator("received_quantity")(
         lambda value: _require_scale(value, 6, "received quantity")
@@ -342,6 +343,14 @@ class SupplierConfirmationCreate(StrictModel):
 class DeliveryReceiptLineInput(StrictModel):
     purchase_order_line_id: UUID
     received_quantity: Decimal = Field(ge=0)
+    note: str | None = Field(default=None, max_length=500)
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def _blank_note_is_none(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
 
     _validate_quantity_scale = field_validator("received_quantity")(
         lambda value: _require_scale(value, 6, "received quantity")

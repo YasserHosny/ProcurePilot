@@ -1,6 +1,6 @@
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -393,3 +393,24 @@ def test_order_list_without_a_count_does_not_claim_zero() -> None:
     # P-182 review: the partner endpoint shares this model and cannot report a count of 0
     # next to a non-empty page.
     assert PurchaseOrderList(items=(), next_cursor=None).total_count is None
+
+
+def test_a_receipt_line_note_is_trimmed_and_blank_means_none() -> None:
+    from procurepilot_api.modules.orders.schemas import DeliveryReceiptLineInput
+
+    line_id = uuid4()
+    base = {"purchase_order_line_id": line_id, "received_quantity": "1"}
+    assert DeliveryReceiptLineInput(**base).note is None
+    assert DeliveryReceiptLineInput(**base, note="   ").note is None
+    assert DeliveryReceiptLineInput(**base, note="  two cartons damaged ").note == (
+        "two cartons damaged"
+    )
+
+
+def test_a_receipt_line_note_is_limited_to_500_characters() -> None:
+    from procurepilot_api.modules.orders.schemas import DeliveryReceiptLineInput
+
+    base = {"purchase_order_line_id": uuid4(), "received_quantity": "1"}
+    assert DeliveryReceiptLineInput(**base, note="x" * 500).note == "x" * 500
+    with pytest.raises(ValidationError):
+        DeliveryReceiptLineInput(**base, note="x" * 501)

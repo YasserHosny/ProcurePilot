@@ -1327,3 +1327,46 @@ def test_order_list_refuses_a_cursor_from_another_sort_or_a_garbled_one(
 
         assert other_sort.status_code == 422, other_sort.text
         assert garbled.status_code == 422, garbled.text
+
+
+def test_a_short_receipt_keeps_its_line_note(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PPS-212: a reason for a short or damaged delivery is stored and shown with the receipt."""
+    with (
+        committed_smart_context("order-receipt-note") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+        payload = _base_order_payload(
+            context.supplier_ids[0], req_id, line_id, context.product_id, qty="10"
+        )
+        created = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert created.status_code == 201, created.text
+        order_id = created.json()["id"]
+        order_line_id = created.json()["lines"][0]["id"]
+        client.post(f"/api/v1/orders/{order_id}/submit", headers={"Idempotency-Key": str(uuid4())})
+
+        receipt, _ = _evidence_bodies(order_line_id)
+        receipt["lines"] = [
+            {
+                "purchase_order_line_id": order_line_id,
+                "received_quantity": "3",
+                "note": "  Short: the supplier ran out; two cartons arrived crushed ",
+            }
+        ]
+        res = client.post(
+            f"/api/v1/orders/{order_id}/receipts",
+            json=receipt,
+            headers={"Idempotency-Key": str(uuid4())},
+        )
+        assert res.status_code == 200, res.text
+        expected = "Short: the supplier ran out; two cartons arrived crushed"
+        assert res.json()["receipts"][0]["lines"][0]["note"] == expected
+
+        fetched = client.get(f"/api/v1/orders/{order_id}")
+        assert fetched.json()["receipts"][0]["lines"][0]["note"] == expected

@@ -83,7 +83,7 @@ RECEIPT_COLUMNS = (
     "id,tenant_id,purchase_order_id,receipt_reference,receipt_date,received_by,source_kind,"
     "source_reference,source_hash,created_at"
 )
-RECEIPT_LINE_COLUMNS = "id,purchase_order_line_id,received_quantity"
+RECEIPT_LINE_COLUMNS = "id,purchase_order_line_id,received_quantity,note"
 WRITE_ROLES = {MemberRole.owner, MemberRole.buyer}
 
 
@@ -1048,7 +1048,7 @@ class OrdersService:
                 cur.executemany(
                     "insert into delivery_receipt_line (tenant_id,delivery_receipt_id,"
                     "purchase_order_id,"
-                    "purchase_order_line_id,received_quantity) values (%s,%s,%s,%s,%s)",
+                    "purchase_order_line_id,received_quantity,note) values (%s,%s,%s,%s,%s,%s)",
                     [
                         (
                             member.tenant_id,
@@ -1056,6 +1056,7 @@ class OrdersService:
                             order_id,
                             line.purchase_order_line_id,
                             line.received_quantity,
+                            line.note,
                         )
                         for line in payload.lines
                     ],
@@ -1508,6 +1509,7 @@ def _receipt_line_model(row: dict[str, object]) -> DeliveryReceiptLine:
             "id": row["id"],
             "purchase_order_line_id": row["purchase_order_line_id"],
             "received_quantity": row["received_quantity"],
+            "note": row.get("note"),
         },
     )
 
