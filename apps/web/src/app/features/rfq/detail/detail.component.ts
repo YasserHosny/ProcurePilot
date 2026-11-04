@@ -14,7 +14,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { RfqActionKeys, RfqApi, RfqDetail, RfqRecipient } from '../rfq-api';
+import { formatRfqReference, RfqActionKeys, RfqApi, RfqDetail, RfqRecipient } from '../rfq-api';
 import { FormatService } from '../../../core/format/format.service';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
@@ -68,6 +68,7 @@ const TAB_NAMES = ['details', 'items', 'recipients', 'responses'] as const;
   styleUrl: './detail.component.scss',
 })
 export class DetailComponent implements OnInit {
+  readonly formatRfqReference = formatRfqReference;
   private readonly actionKeys = new RfqActionKeys();
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -466,6 +467,19 @@ export class DetailComponent implements OnInit {
     return `${repliedPart} · ${overduePart}`;
   }
 
+  canSend(): boolean {
+    return this.isCreator() || this.session.hasRole('owner');
+  }
+
+  sendAttemptsText(recipient: RfqRecipient): string {
+    const count = recipient.send_attempts ?? 0;
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    return this.translate.instant(`rfq.detail.sendAttempts.${category}`, {
+      count: this.formatService.formatNumber(count),
+    });
+  }
+
   isCreator(): boolean {
     return this.rfqDetail()?.rfq.created_by_membership_id === this.currentMembershipId();
   }
@@ -477,7 +491,7 @@ export class DetailComponent implements OnInit {
 
   showRetryNotice(): boolean {
     const status = this.rfqDetail()?.rfq.status;
-    return (status === 'sent' || status === 'responded') && this.isCreator() && this.unsentRecipients().length > 0;
+    return (status === 'sent' || status === 'responded') && this.canSend() && this.unsentRecipients().length > 0;
   }
 
   unsentRecipientsTitle(): string {
@@ -494,7 +508,7 @@ export class DetailComponent implements OnInit {
   }
 
   onRetryUnsent(): void {
-    if (this.retrying() || !this.isCreator()) return;
+    if (this.retrying() || !this.canSend()) return;
     const detail = this.rfqDetail();
     const id = this.rfqId();
     if (!id || !detail) return;
@@ -567,7 +581,7 @@ export class DetailComponent implements OnInit {
 
   onSendDraft(): void {
     if (this.retrying()) return;
-    if (!this.isCreator()) return;
+    if (!this.canSend()) return;
     const detail = this.rfqDetail();
     const id = this.rfqId();
     if (!id) return;

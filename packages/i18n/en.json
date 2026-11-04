@@ -4475,7 +4475,8 @@
         "many": "{{count}} responses — compare",
         "other": "{{count}} responses — compare"
       },
-      "draftActionsUnavailable": "Draft actions are currently unavailable because workspace members could not be loaded."
+      "draftActionsUnavailable": "Draft actions are currently unavailable because workspace members could not be loaded.",
+      "reference": "Reference"
     },
     "detail": {
       "cancelledAtLabel": "Cancelled",
@@ -4573,7 +4574,17 @@
       "confirmRetryButton": "Retry unsent recipients",
       "cancelRetryButton": "Cancel",
       "rfqExpiredError": "This RFQ has expired and can no longer be sent.",
-      "notSendableError": "This RFQ cannot be sent in its current state."
+      "notSendableError": "This RFQ cannot be sent in its current state.",
+      "deliveryError": "Delivery failed",
+      "missingContactEmail": "No contact email",
+      "sendAttempts": {
+        "zero": "{{count}} attempts",
+        "one": "{{count}} attempt",
+        "two": "{{count}} attempts",
+        "few": "{{count}} attempts",
+        "many": "{{count}} attempts",
+        "other": "{{count}} attempts"
+      }
     },
     "guardrails": {
       "costCentresError": "Could not load cost centres.",

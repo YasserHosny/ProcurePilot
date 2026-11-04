@@ -6,6 +6,7 @@ import type { QuotationStatus, BasketSplitJob } from '../../core/api/models';
 import { environment } from '../../../environments/environment';
 
 export interface Rfq {
+  reference_number?: number;
   id: string;
   tenant_id: string;
   created_by_membership_id: string;
@@ -31,6 +32,9 @@ export interface RfqLine {
 }
 
 export interface RfqRecipient {
+  failure_reason?: 'delivery_error' | 'missing_contact_email' | null;
+  send_attempts?: number;
+  last_attempt_at?: string | null;
   id: string;
   tenant_id: string;
   rfq_id: string;
@@ -145,6 +149,7 @@ export interface RfqResponseComparisonList {
 }
 
 export interface RfqSummary {
+  reference_number?: number;
   id: string;
   created_by_membership_id: string;
   status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted' | 'cancelled';
@@ -276,4 +281,9 @@ export class RfqActionKeys {
       this.clear(action);
     }
   }
+}
+
+/** Stable display identifier; older API deployments may omit the number. */
+export function formatRfqReference(n: number | null | undefined): string {
+  return n == null ? '' : `RFQ-${String(n).padStart(6, '0')}`;
 }

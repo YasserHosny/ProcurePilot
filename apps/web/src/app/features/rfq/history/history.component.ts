@@ -19,7 +19,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { RfqActionKeys, RfqApi, RfqRecipient, RfqSummary } from '../rfq-api';
+import { formatRfqReference, RfqActionKeys, RfqApi, RfqRecipient, RfqSummary } from '../rfq-api';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatService } from '../../../core/format/format.service';
 import { parseIsoDateLocal } from '../../../core/format/iso-date';
@@ -70,6 +70,7 @@ export interface RecipientsCacheEntry {
   styleUrl: './history.component.scss'
 })
 export class HistoryComponent implements OnInit {
+  readonly formatRfqReference = formatRfqReference;
   private readonly actionKeys = new RfqActionKeys();
   private readonly rfqApi = inject(RfqApi);
   private readonly router = inject(Router);
@@ -90,12 +91,12 @@ export class HistoryComponent implements OnInit {
 
   readonly displayedColumns = computed(() => {
     if (this.isBelow768()) {
-      return ['status', 'neededBy', 'actions'];
+      return ['reference', 'status', 'neededBy', 'actions'];
     }
     if (this.isBelow1200()) {
-      return ['status', 'neededBy', 'sentAt', 'actions'];
+      return ['reference', 'status', 'neededBy', 'sentAt', 'actions'];
     }
-    return ['status', 'neededBy', 'sentAt', 'recipients', 'responses', 'actions'];
+    return ['reference', 'status', 'neededBy', 'sentAt', 'recipients', 'responses', 'actions'];
   });
 
   readonly showCountsInMenu = computed(() => this.isBelow1200());
@@ -419,7 +420,7 @@ export class HistoryComponent implements OnInit {
 
   onSendDraft(rfq: RfqSummary, event?: Event): void {
     event?.stopPropagation();
-    if (!this.isCreator(rfq)) return;
+    if (!this.canSend(rfq)) return;
 
     if (isDateInPast(rfq.needed_by_date)) {
       const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
@@ -487,6 +488,8 @@ export class HistoryComponent implements OnInit {
       },
     });
   }
+
+  canSend(rfq: RfqSummary): boolean { return this.isCreator(rfq) || this.session.hasRole('owner'); }
 
   isCreator(rfq: RfqSummary): boolean { return rfq.created_by_membership_id === this.currentMembershipId(); }
 
