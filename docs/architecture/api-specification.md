@@ -1493,6 +1493,20 @@ Request:
   Requests submitted by the caller are excluded unless the caller is the workspace's only
   active owner (ADR-024).
 - Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50.
+- Optional `sort`: `submitted_desc` (default, approval-step creation time descending),
+  `submitted_asc`, `required_by_asc`, `total_desc`, or `total_asc`. Required-by and total
+  sorts use request columns; null values sort last. Every sort ends with step ID ascending.
+  Totals sort by the stored amount without currency conversion.
+- Optional `branch_id` (UUID) filters requests under the same RLS visibility. Invisible,
+  nonexistent and empty branches return an empty list. Invalid sort or UUID returns `422`.
+- Returns `PendingApprovalList` with `items`, `next_cursor`, and integer `total`: the matching
+  pending-decision count for this caller, independent of cursor and limit. Assignment,
+  terminal-status and own-request exclusions apply equally to items and total. Total is
+  recalculated on each call, so decisions and submissions can change it between pages.
+- Cursors encode sort, branch, last sort value and step ID. Reusing a cursor with a different
+  sort or branch returns `422` with `details: {"cursor": "invalid"}`. Legacy unfiltered
+  default-sort cursors remain accepted. Keyset traversal preserves existing rows through
+  decisions and insertions; newly inserted rows before the cursor appear on refresh.
 - Returns `200` with `items` of `PurchaseRequest`, each embedding the full decision context
   (requester, branch, cost centre, lines, required-by date, `approval_step`, and `budget_status`
   when applicable) so the approver never has to navigate elsewhere (FR-005). Each request also

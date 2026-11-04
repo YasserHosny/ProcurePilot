@@ -183,6 +183,7 @@ def step_row(*, request_id: UUID, assignee_id: UUID) -> dict[str, object]:
         "purchase_request_id": str(request_id),
         "assigned_membership_id": str(assignee_id),
         "source": "owner_fallback",
+        "created_at": "2026-09-11T09:00:00Z",
         "status": "pending",
         "comment": None,
         "decided_by_membership_id": None,
@@ -281,6 +282,22 @@ def test_budget_status_is_attached_to_request_detail_and_pending_queue(
 ) -> None:
     service, _client, member, request_id = service_with_budget_fixture(monkeypatch)
 
+    def pending_page(
+        *, member: CurrentMember, **_kwargs: object
+    ) -> tuple[list[dict[str, object]], int]:
+        # This fixture has two owners; the requester's own request is excluded.
+        # SQL visibility is covered by the real-database queue tests.
+        rows = (
+            _client.table("approval_step")
+            .select("*")
+            .neq("purchase_request.requested_by_membership_id", str(member.membership_id))
+            .execute()
+            .data
+        )
+        return [{**row, "sort_value": row["created_at"]} for row in rows], len(rows)
+
+    monkeypatch.setattr(service, "_pending_approval_page", pending_page)
+
     detail = service.get_request(bearer_token="token", request_id=request_id)
     pending = service.list_pending_approvals(
         bearer_token="token",
@@ -292,7 +309,10 @@ def test_budget_status_is_attached_to_request_detail_and_pending_queue(
     assert detail.budget_status.remaining_amount.amount == "70.0000"
     assert detail.budget_status.remaining_amount.currency == "GBP"
 
+    assert pending.total == len(pending.items) == 1
     queued = pending.items[0]
+    assert queued.approval_step is not None
+    assert queued.approval_step.assigned_membership_id == member.membership_id
     assert queued.id == request_id
     assert queued.budget_status is not None
     assert queued.budget_status.exceeds is True
@@ -308,6 +328,7 @@ def test_budget_status_is_attached_to_request_detail_and_pending_queue(
         member=requester_member,
     )
     assert requester_pending.items == []
+    assert requester_pending.total == 0
 
 
 def test_exceeding_budget_does_not_block_approval(

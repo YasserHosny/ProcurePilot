@@ -320,6 +320,9 @@ def test_pending_queue_excludes_terminal_requests(
 def _queue_service(
     conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, workspace: Workspace
 ) -> RequestsService:
+    from contextlib import nullcontext
+
+    monkeypatch.setattr(module.db, "connect", lambda *_args, **_kwargs: nullcontext(conn))
     client = PsycopgSupabaseClient(conn, claims=workspace.claims())
     monkeypatch.setattr(module, "authenticated_client", lambda *_: client)
     service = module.RequestsService()

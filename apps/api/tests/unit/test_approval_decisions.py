@@ -418,6 +418,7 @@ def test_pending_queue_filters_non_owner_to_their_assigned_steps(
     )
     monkeypatch.setattr(service, "_budget_status_for", lambda _client, _row: None)
 
+    monkeypatch.setattr(service, "_pending_approval_page", lambda **_: ([own_step], 1))
     result = service.list_pending_approvals(bearer_token="token", member=current)
 
     assert len(result.items) == 1
@@ -469,6 +470,8 @@ def test_pending_router_passes_member_and_pagination_to_service() -> None:
         "member": current,
         "cursor": "abc",
         "limit": 25,
+        "sort": "submitted_desc",
+        "branch_id": None,
     }
 
 
