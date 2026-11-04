@@ -1,4 +1,4 @@
--- 20261104000700_rfq_reminders.sql — manual supplier reminders (PPS-176).
+-- 20261104120000_rfq_reminders.sql — manual supplier reminders (PPS-176).
 --
 -- A buyer can remind a supplier that has not answered an open RFQ. Reminders are always a person's
 -- click (never scheduled) and are limited per supplier per RFQ; the API enforces the rules
