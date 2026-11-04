@@ -198,8 +198,21 @@ paths:
       description: >
         Every field an approver needs to decide (requester, branch, cost centre, lines,
         required-by date, budget status) is embedded directly in each item (FR-005) — no further
-        navigation required.
+        navigation required. Sorting uses approval-step creation time for submitted sorts,
+        request required-by date or estimated total amount for the other sorts, then step ID
+        ascending. Null values sort last. Branch filtering respects RLS; invisible and absent
+        branches return an empty list. Total counts matching pending decisions independently
+        of cursor and limit. Cursors are bound to sort and branch; mismatches return 422.
       parameters:
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [submitted_desc, submitted_asc, required_by_asc, total_desc, total_asc]
+            default: submitted_desc
+        - name: branch_id
+          in: query
+          schema: { type: string, format: uuid }
         - name: cursor
           in: query
           schema: { type: string }
@@ -211,7 +224,10 @@ paths:
           description: Pending approval queue
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/PurchaseRequestList' }
+              schema: { $ref: '#/components/schemas/PendingApprovalList' }
+
+        '422':
+          description: Invalid sort, branch UUID, or cursor (details.cursor is invalid for cursor errors)
 
   /approvals/threshold-rules:
     get:
@@ -568,6 +584,16 @@ components:
           type: array
           items: { $ref: '#/components/schemas/PurchaseRequest' }
         next_cursor: { type: string, nullable: true }
+
+    PendingApprovalList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/PurchaseRequest' }
+        next_cursor: { type: string, nullable: true }
+        total: { type: integer, minimum: 0 }
 
     ApprovalDecisionInput:
       type: object

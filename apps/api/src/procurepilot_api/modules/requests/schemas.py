@@ -158,6 +158,17 @@ class PurchaseRequestList(BaseModel):
     next_cursor: str | None = None
 
 
+PendingApprovalSort = Literal[
+    "submitted_desc", "submitted_asc", "required_by_asc", "total_desc", "total_asc"
+]
+
+
+class PendingApprovalList(BaseModel):
+    items: list[PurchaseRequest]
+    next_cursor: str | None = None
+    total: int = Field(ge=0)
+
+
 class ApprovalDecisionInput(StrictApiModel):
     comment: str | None = None
 
