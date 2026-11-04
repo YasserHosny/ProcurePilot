@@ -3918,7 +3918,9 @@
         "order_not_cancellable": "This order is already fully received or closed, so it can no longer be cancelled.",
         "order_already_cancelled": "This order is already cancelled.",
         "order_not_closable": "Only an order that has been fully received can be closed.",
-        "order_already_closed": "This order is already closed."
+        "order_already_closed": "This order is already closed.",
+        "order_not_submitted": "Only a submitted order can be taken back to a draft.",
+        "order_has_evidence": "This order already has a supplier confirmation or a delivery receipt, so it can no longer go back to a draft."
       },
       "overdue": "Overdue",
       "exportCsv": "Export CSV",
@@ -3943,7 +3945,12 @@
       "closeConfirm": "Close order",
       "closed": "Order closed.",
       "timelineCancelled": "Order cancelled",
-      "timelineClosed": "Order closed"
+      "timelineClosed": "Order closed",
+      "withdraw": "Withdraw submission",
+      "withdrawConfirmTitle": "Take this order back to a draft?",
+      "withdrawConfirmMessage": "The order goes back to a draft you can edit, cancel or submit again. Nothing was sent to the supplier by ProcurePilot. This is only possible until a supplier confirmation or a delivery receipt is recorded.",
+      "withdrawConfirm": "Back to draft",
+      "withdrawn": "Order is a draft again."
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",

@@ -2696,6 +2696,15 @@ different response that confirms existence.
 - Records `orders.purchase_order_cancelled`. Idempotent replay with the same key returns the
   cancelled order; a different key on an already-cancelled order returns a conflict.
 
+### `POST /orders/{order_id}/withdraw`
+
+- Requires owner or buyer role and `Idempotency-Key`.
+- Takes a `submitted` order back to `draft` while no supplier confirmation or delivery receipt is
+  recorded. Any other status returns `409` with `order_not_submitted`; recorded evidence returns
+  `409` with `order_has_evidence`. A database guard enforces the same rule.
+- Records `orders.purchase_order_withdrawn`. Replay with the same key returns the draft. A retry
+  of the original submit key after a withdraw returns the draft and does not submit again.
+
 ### `POST /orders/{order_id}/close`
 
 - Requires owner or buyer role and `Idempotency-Key`.

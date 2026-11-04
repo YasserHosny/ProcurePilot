@@ -1539,3 +1539,164 @@ def test_a_viewer_cannot_close_an_order(monkeypatch: pytest.MonkeyPatch) -> None
             f"/api/v1/orders/{uuid4()}/close", headers={"Idempotency-Key": str(uuid4())}
         )
         assert res.status_code == 403
+
+
+def _submitted_order(
+    client: TestClient, context: object, conn_url: str
+) -> tuple[str, str, dict[str, object]]:
+    with psycopg.connect(conn_url) as conn:
+        req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+    payload = _base_order_payload(
+        context.supplier_ids[0], req_id, line_id, context.product_id, qty="10"
+    )
+    created = client.post("/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())})
+    assert created.status_code == 201, created.text
+    order_id = created.json()["id"]
+    order_line_id = created.json()["lines"][0]["id"]
+    submitted = client.post(
+        f"/api/v1/orders/{order_id}/submit", headers={"Idempotency-Key": str(uuid4())}
+    )
+    assert submitted.status_code == 200, submitted.text
+    return order_id, order_line_id, payload
+
+
+def test_a_submitted_order_can_be_withdrawn_back_to_a_draft_and_submitted_again(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PPS-205: undo a submit while no evidence exists; the draft is editable and re-submittable."""
+    with (
+        committed_smart_context("order-withdraw") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        order_id, _, _ = _submitted_order(client, context, TEST_DATABASE_URL)
+
+        key = str(uuid4())
+        res = client.post(f"/api/v1/orders/{order_id}/withdraw", headers={"Idempotency-Key": key})
+        assert res.status_code == 200, res.text
+        assert res.json()["status"] == "draft"
+
+        replay = client.post(
+            f"/api/v1/orders/{order_id}/withdraw", headers={"Idempotency-Key": key}
+        )
+        assert replay.status_code == 200, replay.text
+        assert replay.json()["status"] == "draft"
+
+        again = client.post(
+            f"/api/v1/orders/{order_id}/withdraw", headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert again.status_code == 409
+        assert again.json()["details"]["reason"] == "order_not_submitted"
+
+        resubmitted = client.post(
+            f"/api/v1/orders/{order_id}/submit", headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert resubmitted.status_code == 200, resubmitted.text
+        assert resubmitted.json()["status"] == "submitted"
+
+
+def test_a_retried_original_submit_does_not_resubmit_a_withdrawn_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with (
+        committed_smart_context("order-withdraw-retry") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+        payload = _base_order_payload(
+            context.supplier_ids[0], req_id, line_id, context.product_id, qty="10"
+        )
+        created = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+        )
+        order_id = created.json()["id"]
+        submit_key = str(uuid4())
+        client.post(f"/api/v1/orders/{order_id}/submit", headers={"Idempotency-Key": submit_key})
+        client.post(
+            f"/api/v1/orders/{order_id}/withdraw", headers={"Idempotency-Key": str(uuid4())}
+        )
+
+        retry = client.post(
+            f"/api/v1/orders/{order_id}/submit", headers={"Idempotency-Key": submit_key}
+        )
+
+        assert retry.status_code == 200, retry.text
+        assert retry.json()["status"] == "draft"
+
+
+@pytest.mark.parametrize("state", ["draft", "cancelled", "confirmed", "received"])
+def test_only_a_submitted_order_without_evidence_can_be_withdrawn(
+    monkeypatch: pytest.MonkeyPatch, state: str
+) -> None:
+    with (
+        committed_smart_context(f"order-withdraw-{state}") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        if state == "draft":
+            with psycopg.connect(TEST_DATABASE_URL) as conn:
+                req_id, line_id = _setup_approved_request(
+                    conn, context.workspace, context.product_id
+                )
+            created = client.post(
+                "/api/v1/orders",
+                json=_base_order_payload(
+                    context.supplier_ids[0], req_id, line_id, context.product_id, qty="10"
+                ),
+                headers={"Idempotency-Key": str(uuid4())},
+            )
+            order_id = created.json()["id"]
+        else:
+            order_id, order_line_id, _ = _submitted_order(client, context, TEST_DATABASE_URL)
+            receipt, confirmation = _evidence_bodies(order_line_id)
+            if state == "cancelled":
+                client.post(
+                    f"/api/v1/orders/{order_id}/cancel", headers={"Idempotency-Key": str(uuid4())}
+                )
+            if state == "confirmed":
+                client.post(
+                    f"/api/v1/orders/{order_id}/confirmations",
+                    json=confirmation,
+                    headers={"Idempotency-Key": str(uuid4())},
+                )
+            if state == "received":
+                receipt["lines"] = [
+                    {"purchase_order_line_id": order_line_id, "received_quantity": "10"}
+                ]
+                client.post(
+                    f"/api/v1/orders/{order_id}/receipts",
+                    json=receipt,
+                    headers={"Idempotency-Key": str(uuid4())},
+                )
+
+        res = client.post(
+            f"/api/v1/orders/{order_id}/withdraw", headers={"Idempotency-Key": str(uuid4())}
+        )
+
+        assert res.status_code == 409, res.text
+        assert res.json()["details"]["reason"] in {"order_not_submitted", "order_has_evidence"}
+        with psycopg.connect(TEST_DATABASE_URL) as conn, conn.cursor() as cur:
+            cur.execute("select status::text from purchase_order where id = %s", (order_id,))
+            assert cur.fetchone()[0] == state
+
+
+def test_a_viewer_cannot_withdraw_an_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    with (
+        committed_smart_context("order-withdraw-viewer") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.viewer)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        res = client.post(
+            f"/api/v1/orders/{uuid4()}/withdraw", headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert res.status_code == 403

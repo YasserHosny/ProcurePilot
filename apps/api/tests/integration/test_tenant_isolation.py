@@ -3165,7 +3165,6 @@ def test_a_buyer_can_start_and_update_a_basket_split_job(
         ("closed", "cancelled"),
         ("received", "draft"),
         ("received", "cancelled"),
-        ("submitted", "draft"),
         ("draft", "received"),
         ("draft", "confirmed"),
     ],
@@ -3189,6 +3188,7 @@ def test_an_order_cannot_take_a_status_the_lifecycle_does_not_allow(
     ("start", "target"),
     [
         ("draft", "submitted"),
+        ("submitted", "draft"),
         ("draft", "cancelled"),
         ("submitted", "confirmed"),
         ("submitted", "partially_received"),
@@ -3290,3 +3290,29 @@ def test_an_order_cannot_be_inserted_past_draft(
                     alpha.membership_id,
                 ),
             )
+
+
+@pytest.mark.parametrize("evidence", ["receipt", "confirmation"])
+def test_a_submitted_order_with_evidence_cannot_go_back_to_draft(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace], evidence: str
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        order_id = _insert_order(cur, alpha, status="submitted")
+        if evidence == "receipt":
+            cur.execute(
+                "insert into delivery_receipt (tenant_id,purchase_order_id,receipt_reference,"
+                "receipt_date,received_by,source_reference) values (%s,%s,%s,current_date,%s,'t')",
+                (alpha.tenant_id, order_id, f"GRN-{uuid4().hex[:8]}", alpha.membership_id),
+            )
+        else:
+            cur.execute(
+                "insert into supplier_confirmation (tenant_id,purchase_order_id,"
+                "supplier_reference,confirmed_at,recorded_by,source_reference) "
+                "values (%s,%s,%s,now(),%s,'t')",
+                (alpha.tenant_id, order_id, f"SO-{uuid4().hex[:8]}", alpha.membership_id),
+            )
+        with pytest.raises(psycopg.errors.RestrictViolation, match="evidence"):
+            cur.execute("update purchase_order set status = 'draft' where id = %s", (order_id,))
+        conn.rollback()
