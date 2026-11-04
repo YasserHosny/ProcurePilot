@@ -3549,6 +3549,40 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       });
     });
 
+    describe('Header field boxes are groups, not buttons (PPS-162 / P-130)', () => {
+      it('wraps each header control in a named group instead of a role=button that nests inputs', () => {
+        component.quotation.set({ ...mockQuotationDetail, id: 'q-a11y-1' });
+        fixture.detectChanges();
+
+        const boxes = Array.from(
+          (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('.field-box'),
+        );
+        expect(boxes.length).toBeGreaterThan(0);
+        for (const box of boxes) {
+          expect(box.getAttribute('role')).not.toBe('button');
+          expect(box.getAttribute('tabindex')).toBeNull();
+          expect(box.getAttribute('role')).toBe('group');
+          const labelledBy = box.getAttribute('aria-labelledby');
+          const name = labelledBy
+            ? (fixture.nativeElement as HTMLElement).querySelector('#' + labelledBy)?.textContent?.trim()
+            : box.getAttribute('aria-label')?.trim();
+          expect(name).withContext(box.id).toBeTruthy();
+        }
+      });
+
+      it('focusing a control inside a field box selects that field (keyboard and mouse)', () => {
+        component.quotation.set({ ...mockQuotationDetail, id: 'q-a11y-2' });
+        fixture.detectChanges();
+        const spy = spyOn(component, 'selectField').and.callThrough();
+
+        const box = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.field-box');
+        expect(box).not.toBeNull();
+        box!.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+
+        expect(spy).toHaveBeenCalledTimes(1);
+      });
+    });
+
     describe('Finding 4: Unsaved-changes guard & beforeunload', () => {
       it('allows leaving without prompt when nothing is pending', () => {
         dialogSpy.open.calls.reset();

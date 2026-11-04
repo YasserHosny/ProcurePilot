@@ -391,11 +391,9 @@
                 class="field-box"
                 [class.field-needs-review]="isCurrencyFallback(getFieldExtraction('quotation', q.id, 'currency')) && !isFieldCorrected('quotation', q.id, 'currency')"
                 [id]="'field-' + (getFieldExtraction('quotation', q.id, 'currency')?.id || 'currency')"
-                tabindex="0"
-                role="button"
-                (click)="selectField('quotation', q.id, 'currency')"
-                (keydown.enter)="selectField('quotation', q.id, 'currency')"
-                (keydown.space)="selectField('quotation', q.id, 'currency')"
+                role="group"
+                [attr.aria-label]="'quotations.review.header.currencyLabel' | translate"
+                (focusin)="selectField('quotation', q.id, 'currency')"
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.currencyLabel' | translate }}</mat-label>
@@ -440,11 +438,9 @@
               <div
                 class="field-box"
                 [id]="'field-' + (getFieldExtraction('quotation', q.id, 'issue_date')?.id || 'issue_date')"
-                tabindex="0"
-                role="button"
-                (click)="selectField('quotation', q.id, 'issue_date')"
-                (keydown.enter)="selectField('quotation', q.id, 'issue_date')"
-                (keydown.space)="selectField('quotation', q.id, 'issue_date')"
+                role="group"
+                [attr.aria-label]="'quotations.review.header.issueDateLabel' | translate"
+                (focusin)="selectField('quotation', q.id, 'issue_date')"
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.issueDateLabel' | translate }}</mat-label>
@@ -500,11 +496,9 @@
               <div
                 class="field-box"
                 [id]="'field-' + (getFieldExtraction('quotation', q.id, 'expiry_date')?.id || 'expiry_date')"
-                tabindex="0"
-                role="button"
-                (click)="selectField('quotation', q.id, 'expiry_date')"
-                (keydown.enter)="selectField('quotation', q.id, 'expiry_date')"
-                (keydown.space)="selectField('quotation', q.id, 'expiry_date')"
+                role="group"
+                [attr.aria-label]="'quotations.review.header.expiryDateLabel' | translate"
+                (focusin)="selectField('quotation', q.id, 'expiry_date')"
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.expiryDateLabel' | translate }}</mat-label>
@@ -565,11 +559,9 @@
               <div
                 class="field-box"
                 [id]="'field-' + (getFieldExtraction('quotation', q.id, 'stated_total')?.id || 'stated_total')"
-                tabindex="0"
-                role="button"
-                (click)="selectField('quotation', q.id, 'stated_total')"
-                (keydown.enter)="selectField('quotation', q.id, 'stated_total')"
-                (keydown.space)="selectField('quotation', q.id, 'stated_total')"
+                role="group"
+                [attr.aria-label]="'quotations.review.header.statedTotalLabel' | translate"
+                (focusin)="selectField('quotation', q.id, 'stated_total')"
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.statedTotalLabel' | translate }}</mat-label>
@@ -611,11 +603,9 @@
                 class="field-box vat-inclusive-field"
                 [class.field-needs-review]="getFieldConfidence('quotation', q.id, 'prices_include_vat') < 0.85 && !isFieldCorrected('quotation', q.id, 'prices_include_vat')"
                 [id]="'field-' + (getFieldExtraction('quotation', q.id, 'prices_include_vat')?.id || 'prices_include_vat')"
-                tabindex="0"
-                role="button"
-                (click)="selectField('quotation', q.id, 'prices_include_vat')"
-                (keydown.enter)="selectField('quotation', q.id, 'prices_include_vat')"
-                (keydown.space)="selectField('quotation', q.id, 'prices_include_vat')"
+                role="group"
+                [attr.aria-label]="'quotations.review.header.pricesIncludeVatLabel' | translate"
+                (focusin)="selectField('quotation', q.id, 'prices_include_vat')"
               >
                 <div class="checkbox-control-wrapper">
                   <mat-checkbox
@@ -655,11 +645,9 @@
                 class="field-box"
                 [id]="'field-' + (getFieldExtraction('quotation', q.id, 'vat_rate')?.id || 'vat_rate')"
                 [class.field-needs-review]="getFieldConfidence('quotation', q.id, 'vat_rate') < 0.85 && !isFieldCorrected('quotation', q.id, 'vat_rate')"
-                tabindex="0"
-                role="button"
-                (click)="selectField('quotation', q.id, 'vat_rate')"
-                (keydown.enter)="selectField('quotation', q.id, 'vat_rate')"
-                (keydown.space)="selectField('quotation', q.id, 'vat_rate')"
+                role="group"
+                [attr.aria-label]="'quotations.review.header.vatRateLabel' | translate"
+                (focusin)="selectField('quotation', q.id, 'vat_rate')"
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.vatRateLabel' | translate }}</mat-label>
