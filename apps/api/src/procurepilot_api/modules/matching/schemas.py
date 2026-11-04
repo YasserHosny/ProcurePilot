@@ -255,6 +255,7 @@ class MatchQueueItem(BaseModel):
 class MatchQueueList(BaseModel):
     items: list[MatchQueueItem]
     next_cursor: str | None = None
+    rfq_id: UUID | None = None
 
 
 class QuotationLineMatchState(BaseModel):

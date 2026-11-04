@@ -9,6 +9,12 @@
   margin: 0 auto;
 }
 
+.queue-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .queue-result-summary {
   font-size: 0.825rem;
   color: var(--pp-text-muted);
@@ -18,6 +24,14 @@
     margin: 0;
     padding: 0;
     min-block-size: 0;
+  }
+}
+
+.queue-refresh-btn {
+  color: var(--pp-text-muted);
+
+  &:hover {
+    color: var(--pp-text-default);
   }
 }
 
