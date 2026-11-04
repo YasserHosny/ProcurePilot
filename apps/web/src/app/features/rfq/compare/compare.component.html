@@ -244,7 +244,7 @@
                   <td mat-footer-cell *matFooterCellDef class="total-label-cell">
                     <div class="total-cell-content">
                       <span class="total-label">{{ 'rfq.compare.total' | translate }}</span>
-                      @if (hasLowestTotal(response)) {
+                      @if (hasLowestTotal(response) && lowestTotalBasis() === 'printed') {
                         <mat-chip class="pp-chip-best lowest-total-chip">
                           {{ 'rfq.compare.lowestTotal' | translate }}
                         </mat-chip>
@@ -290,6 +290,11 @@
                 <div class="landed-total" data-testid="landed-total">
                   <span>{{ 'rfq.compare.landedTotal' | translate }}</span>
                   <span class="pp-figures">{{ total | formatMoney }}</span>
+                  @if (hasLowestTotal(response) && lowestTotalBasis() === 'landed') {
+                    <mat-chip class="pp-chip-best lowest-total-chip">
+                      {{ 'rfq.compare.lowestTotal' | translate }}
+                    </mat-chip>
+                  }
                 </div>
               }
             }
@@ -362,7 +367,9 @@
                 } @else if (isExpired()) {
                   <span class="disabled-reason" data-testid="expired-reason">{{ 'rfq.compare.rfqExpired' | translate }}</span>
                 } @else if (isWriter()) {
-                  @if (branchesError()) {
+                  @if (isNeededByPast()) {
+                    <span class="disabled-reason" data-testid="needed-by-past-reason">{{ 'rfq.compare.neededByPast' | translate }}</span>
+                  } @else if (branchesError()) {
                     <span class="disabled-reason" data-testid="branches-error-reason">{{ 'rfq.compare.branchesLoadError' | translate }}</span>
                   } @else if (rfqDetailError()) {
                     <span class="disabled-reason" data-testid="rfq-detail-error-reason">{{ 'rfq.compare.rfqDetailLoadError' | translate }}</span>

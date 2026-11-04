@@ -1819,7 +1819,8 @@ describe('CompareComponent (RFQ)', () => {
       const { respDahabi, respWafra } = createD8f7fb0cFixtures();
       component.rfqDetail.set({
         ...sentDetail,
-        rfq: { ...sentDetail.rfq, status: 'responded' },
+        // Still ahead, so the date does not date this test (a past date disables Prepare).
+        rfq: { ...sentDetail.rfq, status: 'responded', needed_by_date: '2099-12-31' },
       });
       component.responses.set([respDahabi, respWafra]);
       component.selectedBranchId.set('branch-1');
