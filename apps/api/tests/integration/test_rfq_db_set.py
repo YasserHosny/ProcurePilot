@@ -615,7 +615,11 @@ def test_owner_sends_buyer_draft_and_direct_update_rls(monkeypatch: pytest.Monke
             cur.execute(
                 "select set_config('request.jwt.claims', %s, true)", (json.dumps(claims_owner),)
             )
-            cur.execute(
-                "update rfq set needed_by_date = current_date + 10 where id = %s", (rfq_id,)
-            )
-            assert cur.rowcount == 1
+            # The policy admits the owner (PPS-179); the status guard then refuses an edit of an
+            # RFQ that is no longer a draft (PPS-213).
+            cur.execute("savepoint before_owner_edit")
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                cur.execute(
+                    "update rfq set needed_by_date = current_date + 10 where id = %s", (rfq_id,)
+                )
+            cur.execute("rollback to savepoint before_owner_edit")

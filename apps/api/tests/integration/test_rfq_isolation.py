@@ -466,6 +466,9 @@ def test_only_owner_or_buyer_can_update_their_rfq(
     """Sending is an update of the rfq row; a creator who is not an owner or buyer cannot."""
     conn, alpha, _beta = rfq_workspaces
     with conn.cursor() as cur:
+        # Only a draft can be updated by a client session (rfq_guard_client_update); this test is
+        # about the row policy's role check.
+        cur.execute("update rfq set status = 'draft' where id = %s", (alpha.rfq_id,))
         _act_as(cur, alpha, role=role)
         cur.execute("update rfq set needed_by_date = needed_by_date where id = %s", (alpha.rfq_id,))
         assert cur.rowcount == updated
@@ -689,6 +692,7 @@ def test_a_promoted_member_with_a_stale_viewer_claim_can_write_rfqs(
     """The live role decides in both directions."""
     conn, alpha, _beta = rfq_workspaces
     with conn.cursor() as cur:
+        cur.execute("update rfq set status = 'draft' where id = %s", (alpha.rfq_id,))
         _act_as(cur, alpha, role="buyer", claim_role="viewer")
         cur.execute("update rfq set needed_by_date = needed_by_date where id = %s", (alpha.rfq_id,))
         assert cur.rowcount == 1
@@ -830,10 +834,15 @@ def test_an_owner_or_buyer_who_did_not_create_the_rfq_can_mark_it_converted(
             cur.execute("update rfq set status = 'converted' where id = %s", (alpha.rfq_id,))
             assert cur.rowcount == 0
         else:
-            cur.execute(
-                "update rfq set needed_by_date = current_date + 10 where id = %s", (alpha.rfq_id,)
-            )
-            assert cur.rowcount == 1
+            # The policy admits the owner (PPS-179); the status guard then refuses an edit of an
+            # RFQ that is no longer a draft (PPS-213).
+            cur.execute("savepoint before_owner_edit")
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                cur.execute(
+                    "update rfq set needed_by_date = current_date + 10 where id = %s",
+                    (alpha.rfq_id,),
+                )
+            cur.execute("rollback to savepoint before_owner_edit")
         cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, request_id))
         assert cur.fetchone()[0] is True
         assert _rfq_status(cur, alpha.rfq_id) == "converted"
