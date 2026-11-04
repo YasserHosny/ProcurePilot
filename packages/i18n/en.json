@@ -384,6 +384,9 @@
         "description": "Create and track requests for quotation across suppliers."
       },
       "compare": {
+      "landedTotal": "Landed total",
+      "coverage": "Covers {{covered}} of {{total}} products",
+      "splitSavingHintConverted": "Splitting this order between suppliers could have saved {{money}} (landed cost, VAT included).",
         "title": "Compare offers",
         "description": "Compare normalised landed costs and get evidence-backed recommendations."
       },

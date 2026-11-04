@@ -1878,6 +1878,104 @@ describe('CompareComponent (RFQ)', () => {
     });
   });
 
+  describe('landed totals, coverage and the converted hint (P-155, PPS-199)', () => {
+    const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+    const rfqLine = (product: string) => ({
+      id: `line-${product}`,
+      tenant_id: 'tenant-1',
+      rfq_id: 'rfq-1',
+      workspace_product_id: product,
+      quantity: '10',
+      created_at: '2026-09-25T09:00:00Z',
+    });
+    const reply = (id: string, supplier: string, products: string[], price: string, landed: string) => ({
+      id,
+      rfq_id: 'rfq-1',
+      supplier_id: supplier,
+      quotation_id: `quote-${id}`,
+      quotation_status: 'reviewed' as const,
+      submitted_at: '2026-09-25T10:00:00Z',
+      lines: products.map((product) => ({
+        workspace_product_id: product,
+        original_text: product,
+        quoted_quantity: '10',
+        quoted_unit_price_amount: price,
+        quoted_unit_price_currency: 'SAR',
+        pending_match: false,
+      })),
+      rfq_landed_costs: products.map((product) => ({
+        workspace_product_id: product,
+        total_amount: landed,
+        total_currency: 'SAR',
+      })),
+    });
+    const load = (replies: ReturnType<typeof reply>[], products: string[], status = 'sent'): void => {
+      mockRfqApi.getRfq.and.returnValue(
+        of({
+          ...sentDetail,
+          rfq: { ...sentDetail.rfq, status: status as RfqDetail['rfq']['status'] },
+          lines: products.map(rfqLine),
+        } as RfqDetail),
+      );
+      mockRfqApi.listResponses.and.returnValue(of({ items: replies }));
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+    };
+
+    it('marks «Lowest total» on landed totals, not on printed prices, and shows both', () => {
+      // A prints cheaper (2,000 vs 2,100) but its quote excludes VAT: landed 2,300 vs 2,100.
+      load(
+        [
+          reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1150'),
+          reply('b', 'supp-b', ['p1', 'p2'], '105.00', '1050'),
+        ],
+        ['p1', 'p2'],
+      );
+
+      const cards = Array.from(el().querySelectorAll('.response-card')) as HTMLElement[];
+      expect(cards.length).toBe(2);
+      expect(cards[0].querySelector('.lowest-total-chip')).withContext('A is not the lowest').toBeNull();
+      expect(cards[1].querySelector('.lowest-total-chip')).withContext('B is the lowest').toBeTruthy();
+      expect(cards[0].querySelector('[data-testid="landed-total"]')?.textContent).toContain('2,300');
+      expect(cards[1].querySelector('[data-testid="landed-total"]')?.textContent).toContain('2,100');
+    });
+
+    it('says how many of the RFQ products a reply covers when it misses some', () => {
+      load(
+        [
+          reply('partial', 'supp-a', ['p1', 'p2'], '100.00', '1000'),
+          reply('full', 'supp-b', ['p1', 'p2', 'p3'], '100.00', '1000'),
+        ],
+        ['p1', 'p2', 'p3'],
+      );
+
+      const cards = Array.from(el().querySelectorAll('.response-card')) as HTMLElement[];
+      expect(cards[0].querySelector('[data-testid="coverage-badge"]')?.textContent).toContain('Covers 2 of 3');
+      expect(cards[1].querySelector('[data-testid="coverage-badge"]')).toBeNull();
+    });
+
+    it('words the saving hint on a converted RFQ as a saving that could have been made', () => {
+      load(
+        [
+          { ...reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000'), rfq_landed_costs: [
+              { workspace_product_id: 'p1', total_amount: '1000', total_currency: 'SAR' },
+              { workspace_product_id: 'p2', total_amount: '1200', total_currency: 'SAR' },
+            ] },
+          { ...reply('b', 'supp-b', ['p1', 'p2'], '100.00', '1100'), rfq_landed_costs: [
+              { workspace_product_id: 'p1', total_amount: '1100', total_currency: 'SAR' },
+              { workspace_product_id: 'p2', total_amount: '1000', total_currency: 'SAR' },
+            ] },
+        ],
+        ['p1', 'p2'],
+        'converted',
+      );
+
+      const hint = el().querySelector('[data-testid="split-saving-hint"]');
+      expect(hint?.textContent).toContain('could have saved');
+      expect(hint?.textContent).toContain('landed cost');
+    });
+  });
+
   describe('page robustness (P-156, PPS-200)', () => {
     const matchedReply = (id: string, supplierId: string, productId: string): RfqResponseComparisonList['items'][number] => ({
       id,
