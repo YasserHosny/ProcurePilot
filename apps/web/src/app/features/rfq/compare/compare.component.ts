@@ -500,11 +500,27 @@ export class CompareComponent implements OnInit, OnChanges {
 
   readonly displayedColumns = ['product', 'quantity', 'unitPrice', 'totalValue'];
 
-  ngOnInit(): void {
-    this.api.members().subscribe(({ items }) => {
-      const email = this.session.currentMember()?.email;
-      this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
+  /**
+   * The viewer's own membership id comes from the session. The members list is owner-only (a buyer
+   * gets 403), so it is only a fallback for a session without the id.
+   */
+  private resolveMembershipId(): void {
+    const sessionMembershipId = this.session.currentMember()?.membership_id;
+    if (sessionMembershipId) {
+      this.currentMembershipId.set(sessionMembershipId);
+      return;
+    }
+    this.api.members().subscribe({
+      next: ({ items }) => {
+        const email = this.session.currentMember()?.email;
+        this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
+      },
+      error: () => this.currentMembershipId.set(null),
     });
+  }
+
+  ngOnInit(): void {
+    this.resolveMembershipId();
     if (!this.rfqId()) {
       this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
         const id = params.get('id');

@@ -150,6 +150,28 @@ export class HistoryComponent implements OnInit {
 
   readonly timeFormatOptions: Intl.DateTimeFormatOptions = { timeStyle: 'short' };
 
+  /**
+   * The viewer's own membership id comes from the session. The members list is owner-only (a buyer
+   * gets 403), so it is only a fallback for a session without the id.
+   */
+  private resolveMembershipId(): void {
+    const sessionMembershipId = this.session.currentMember()?.membership_id;
+    if (sessionMembershipId) {
+      this.currentMembershipId.set(sessionMembershipId);
+      return;
+    }
+    this.api.members().subscribe({
+      next: ({ items }) => {
+        const email = this.session.currentMember()?.email;
+        this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
+      },
+      error: () => {
+        this.currentMembershipId.set(null);
+        this.draftActionsUnavailable.set(true);
+      },
+    });
+  }
+
   ngOnInit(): void {
     this.breakpoint
       .observe('(max-width: 1199.98px)')
@@ -165,21 +187,7 @@ export class HistoryComponent implements OnInit {
         this.isBelow768.set(res.matches);
       });
 
-    this.api.members().subscribe({
-      next: ({ items }) => {
-        const email = this.session.currentMember()?.email;
-        this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
-      },
-      error: () => {
-        const fallbackId = this.session.currentMember()?.membership_id;
-        if (fallbackId) {
-          this.currentMembershipId.set(fallbackId);
-        } else {
-          this.currentMembershipId.set(null);
-          this.draftActionsUnavailable.set(true);
-        }
-      },
-    });
+    this.resolveMembershipId();
     this.loadRfqs();
   }
 
