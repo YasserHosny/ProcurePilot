@@ -4472,6 +4472,7 @@
       "compareResponses": "Compare responses",
       "breadcrumbRfqSent": "RFQ · Sent {{date}} · {{time}}",
       "breadcrumbRfqDraft": "RFQ · Draft",
+      "breadcrumbRfqCancelled": "RFQ · Cancelled",
       "tabDetails": "Details",
       "tabItems": "Items",
       "tabRecipients": "Recipients ({{count}})",

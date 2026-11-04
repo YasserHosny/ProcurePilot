@@ -1,4 +1,4 @@
-import { signal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed, fakeAsync } from '@angular/core/testing';
 import { CompareComponent } from './compare.component';
 import { formatExactQuantity, formatLocaleNumber, FormatService } from '../../../core/format/format.service';
@@ -318,6 +318,29 @@ describe('CompareComponent (RFQ)', () => {
     } catch {
       // ignore
     }
+  });
+
+  describe('creator membership id (buyers cannot call the members API)', () => {
+    function createWithSession(sessionMember: { email: string; membership_id?: string } | null): CompareComponent {
+      (mockSession.currentMember as unknown as WritableSignal<object | null>).set(sessionMember);
+      mockApiService.members.calls.reset();
+      const created = TestBed.createComponent(CompareComponent);
+      created.detectChanges();
+      return created.componentInstance;
+    }
+
+    it('reads the membership id from the session and does not call members()', () => {
+      const compare = createWithSession({ email: 'buyer@test.com', membership_id: 'm-buyer' });
+      expect(compare.currentMembershipId()).toBe('m-buyer');
+      expect(mockApiService.members).not.toHaveBeenCalled();
+    });
+
+    it('stays without an id, and without an unhandled error, when members() is forbidden', () => {
+      mockApiService.members.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+      const compare = createWithSession({ email: 'buyer@test.com' });
+      expect(mockApiService.members).toHaveBeenCalledTimes(1);
+      expect(compare.currentMembershipId()).toBeNull();
+    });
   });
 
   it('shows draft notice card only when RFQ status is draft', () => {
