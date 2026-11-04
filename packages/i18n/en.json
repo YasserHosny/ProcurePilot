@@ -850,7 +850,8 @@
         "processing": "Extracting",
         "extracted": "Extracted",
         "failed": "Failed"
-      }
+      },
+      "removeFile": "Remove the selected file"
     },
     "queue": {
       "title": "Quotation Review Queue",

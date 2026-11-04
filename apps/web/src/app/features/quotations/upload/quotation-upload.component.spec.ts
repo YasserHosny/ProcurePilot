@@ -102,6 +102,28 @@ describe('QuotationUploadComponent (T036)', () => {
     fixture.detectChanges();
   });
 
+  describe('Dropzone keyboard access and names (PPS-162 / P-130)', () => {
+    it('keeps the file input focusable for keyboard users (not display:none)', () => {
+      const input = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('input[type="file"]');
+      expect(input).not.toBeNull();
+      const style = getComputedStyle(input as HTMLInputElement);
+      expect(style.display).not.toBe('none');
+      expect(style.visibility).not.toBe('hidden');
+      expect((input as HTMLInputElement).tabIndex).toBeGreaterThanOrEqual(0);
+      (input as HTMLInputElement).focus();
+      expect(document.activeElement).toBe(input);
+    });
+
+    it('names the remove-selected-file button for what it does', () => {
+      component.selectedFile.set(new File(['x'], 'quote.pdf', { type: 'application/pdf' }));
+      fixture.detectChanges();
+      const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.selected-file-card button');
+      expect(button).not.toBeNull();
+      expect(button?.getAttribute('aria-label')).toBe(enCatalog.quotations.upload.removeFile);
+      expect(button?.getAttribute('aria-label')).not.toBe(enCatalog.quotations.review.corrections.cancelCorrection);
+    });
+  });
+
   it('should initialize in idle state with no selected file', () => {
     expect(component.uploadState()).toBe('idle');
     expect(component.selectedFile()).toBeNull();

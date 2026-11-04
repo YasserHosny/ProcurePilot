@@ -71,8 +71,29 @@
 }
 
 .dropzone-hint { font-size: 0.875rem; }
-.file-browse-label { cursor: pointer; }
-.file-input { display: none; }
+.file-browse-label {
+  position: relative;
+  cursor: pointer;
+}
+
+// Visually hidden, not display:none: a hidden input cannot be focused, so keyboard-only users could
+// not choose a file. The label's button shows the focus ring instead.
+.file-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.file-browse-label:focus-within .browse-btn {
+  outline: 2px solid var(--pp-primary);
+  outline-offset: 2px;
+}
 
 .browse-btn {
   padding: 0.5rem 1.25rem;
