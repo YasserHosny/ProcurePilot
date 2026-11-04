@@ -4709,7 +4709,18 @@
         "11": "November",
         "12": "December"
       },
-      "unknownProduct": "Unknown product"
+      "unknownProduct": "Unknown product",
+      "reminderSubject": "Reminder: request for quotation — {{tenant}} — needed by {{date}}",
+      "reminderGreeting": "Hello,",
+      "reminderIntro": "This is a reminder of a request for quotation from {{tenant}}.",
+      "reminderReference": "Reference",
+      "reminderSentDate": "Sent",
+      "reminderItemsHeading": "Requested items",
+      "reminderNeededBy": "Needed by",
+      "reminderIgnore": "If you have already replied, please ignore this reminder.",
+      "reminderReplyInstructions": "Please reply directly to this email or send your quotation to:",
+      "reminderThanks": "Thank you.",
+      "reminderEnglishSummary": "This is a reminder of a request for quotation from {{tenant}}."
     },
     "autoPreparedEmail": {
       "subject": "Draft request ready to review — {{supplier}}",

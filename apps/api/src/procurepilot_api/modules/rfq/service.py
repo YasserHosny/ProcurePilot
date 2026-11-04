@@ -4,7 +4,7 @@ import logging
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 import httpx
@@ -18,6 +18,7 @@ from procurepilot_api.errors import (  # noqa: E501
     ConflictError,
     NotFoundError,
     PermissionDeniedError,
+    ReminderDeliveryFailedError,
     ServiceUnavailableError,
     UnprocessableEntityError,
 )
@@ -27,7 +28,12 @@ from procurepilot_api.modules.requests.schemas import (
 )
 from procurepilot_api.modules.requests.service import RequestsService
 from procurepilot_api.modules.requests.valuation import estimate_from_source_response
-from procurepilot_api.modules.rfq.email import RfqEmailLine, render_rfq_email
+from procurepilot_api.modules.rfq.email import (
+    RenderedRfqEmail,
+    RfqEmailLine,
+    render_reminder_email,
+    render_rfq_email,
+)
 from procurepilot_api.modules.rfq.guardrail_evaluation import compute_guardrail_evaluation
 from procurepilot_api.modules.rfq.guardrails import explain_guardrail_evaluations
 from procurepilot_api.modules.rfq.schemas import (
@@ -42,6 +48,7 @@ from procurepilot_api.modules.rfq.schemas import (
     RfqPrepareRequestResponse,
     RfqProductLandedCost,
     RfqRecipient,
+    RfqReminderPreview,
     RfqResponseComparison,
     RfqResponseComparisonList,
     RfqSummary,
@@ -125,8 +132,7 @@ def lock_rfq_for_preparation(
         (f"rfq-prepare:{tenant_id}:{rfq_id}",),
     )
     cur.execute(
-        f"select {_EFFECTIVE_STATUS_SQL} as status from rfq r "
-        "where r.id = %s and r.tenant_id = %s",
+        f"select {_EFFECTIVE_STATUS_SQL} as status from rfq r where r.id = %s and r.tenant_id = %s",
         (rfq_id, tenant_id),
     )
     row = cur.fetchone()
@@ -309,7 +315,21 @@ class RfqService:
                        order by r.created_at, r.id""",
                     (rfq_id,),
                 )
-                recipients = [RfqRecipient(**item) for item in cur.fetchall()]
+                now = datetime.now(UTC)
+                recipients = []
+                for item in cur.fetchall():
+                    recipient = RfqRecipient(**item)
+                    reason = _reminder_reason(
+                        member=member,
+                        created_by_membership_id=row["created_by_membership_id"],
+                        effective_status=str(row["status"]),
+                        needed_by_date=row["needed_by_date"],
+                        recipient=recipient,
+                        now=now,
+                    )
+                    recipient.can_remind = reason is None
+                    recipient.remind_blocked_reason = reason
+                    recipients.append(recipient)
                 cur.execute(
                     """select coalesce(array_agg(pr.id order by pr.created_at,pr.id), '{}')
                               as converted_purchase_request_ids,
@@ -654,6 +674,161 @@ class RfqService:
 
                 conn.commit()
                 return rfq, all_recipients
+
+    def get_reminder_preview(
+        self,
+        *,
+        member: CurrentMember,
+        rfq_id: uuid.UUID,
+        recipient_id: uuid.UUID,
+    ) -> RfqReminderPreview:
+        with _authenticated_db(self.settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                rfq_row = _reminder_rfq_row(cur, member, rfq_id, lock=False)
+                recipient_row = _fetch_reminder_recipient(
+                    cur, rfq_id=rfq_id, recipient_id=recipient_id
+                )
+                recipient = RfqRecipient(**recipient_row)
+                reason = _reminder_reason(
+                    member=member,
+                    created_by_membership_id=rfq_row["created_by_membership_id"],
+                    effective_status=str(rfq_row["effective_status"]),
+                    needed_by_date=rfq_row["needed_by_date"],
+                    recipient=recipient,
+                    now=datetime.now(UTC),
+                )
+                rendered, _reply_to = _render_reminder(
+                    cur, member=member, rfq_row=rfq_row, recipient_row=recipient_row
+                )
+                return RfqReminderPreview(
+                    subject=rendered.subject,
+                    body_text=rendered.text,
+                    locale=rendered.locale,
+                    allowed=reason is None,
+                    blocked_reason=reason,
+                )
+
+    def send_reminder(
+        self,
+        *,
+        member: CurrentMember,
+        rfq_id: uuid.UUID,
+        recipient_id: uuid.UUID,
+        idempotency_key: uuid.UUID,
+    ) -> RfqRecipient:
+        mailer = get_mailer()
+        with _authenticated_db(self.settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "select pg_try_advisory_xact_lock(hashtextextended(%s, 0)) as locked",
+                    (f"rfq-reminder:{idempotency_key}",),
+                )
+                if not cur.fetchone()["locked"]:
+                    raise UnprocessableEntityError(
+                        details={"idempotency_key": "concurrent request"}
+                    )
+
+                rfq_row = _reminder_rfq_row(cur, member, rfq_id, lock=True)
+                recipient_row = _fetch_reminder_recipient(
+                    cur, rfq_id=rfq_id, recipient_id=recipient_id
+                )
+
+                existing = _find_reminder_event(cur, member.tenant_id, idempotency_key)
+                if existing is not None:
+                    target = existing["target"] or {}
+                    if target.get("rfq_id") != str(rfq_id) or target.get("recipient_id") != str(
+                        recipient_id
+                    ):
+                        raise ConflictError(
+                            details={
+                                "resource": "rfq_reminder",
+                                "reason": "idempotency_key_reused",
+                            }
+                        )
+                    replay_row = _fetch_reminder_recipient(
+                        cur, rfq_id=rfq_id, recipient_id=recipient_id
+                    )
+                    replay = _reminder_recipient_response(member, rfq_row, replay_row)
+                    if "can_remind" in target:
+                        replay.can_remind = bool(target["can_remind"])
+                    if "remind_blocked_reason" in target:
+                        replay.remind_blocked_reason = target["remind_blocked_reason"]
+                    return replay
+
+                recipient = RfqRecipient(**recipient_row)
+                reason = _reminder_reason(
+                    member=member,
+                    created_by_membership_id=rfq_row["created_by_membership_id"],
+                    effective_status=str(rfq_row["effective_status"]),
+                    needed_by_date=rfq_row["needed_by_date"],
+                    recipient=recipient,
+                    now=datetime.now(UTC),
+                )
+                if reason is not None:
+                    raise UnprocessableEntityError(details={"reason": reason})
+
+                rendered, reply_to = _render_reminder(
+                    cur, member=member, rfq_row=rfq_row, recipient_row=recipient_row
+                )
+                outbound_id = recipient.outbound_message_id or ""
+                headers = {"In-Reply-To": outbound_id, "References": outbound_id}
+                if reply_to:
+                    headers["Reply-To"] = reply_to
+                send_kwargs = {
+                    "to": recipient.supplier_contact_email or "",
+                    "subject": rendered.subject,
+                    "body": rendered.text,
+                    "html": rendered.html,
+                    "from_name": rendered.from_name,
+                    "headers": headers,
+                }
+                try:
+                    mailer.send(**send_kwargs)
+                except (httpx.HTTPError, RuntimeError) as exc:
+                    logger.exception(
+                        "RFQ reminder delivery failed",
+                        extra={
+                            "rfq_id": str(rfq_id),
+                            "recipient_id": str(recipient_id),
+                        },
+                    )
+                    raise ReminderDeliveryFailedError(
+                        details={"reason": "reminder_delivery_failed"}
+                    ) from exc
+
+                cur.execute(
+                    "update rfq_recipient "
+                    "set reminder_count = reminder_count + 1, last_reminder_at = now() "
+                    "where id = %s and rfq_id = %s returning *",
+                    (recipient_id, rfq_id),
+                )
+                updated = cur.fetchone()
+                response_row = _fetch_reminder_recipient(
+                    cur, rfq_id=rfq_id, recipient_id=recipient_id
+                )
+                response = _reminder_recipient_response(member, rfq_row, response_row)
+                cur.execute(
+                    "select record_audit_event(%s, 'success'::audit_outcome, "
+                    "%s, %s, %s, %s::jsonb, null)",
+                    (
+                        "rfq.reminder_sent",
+                        member.tenant_id,
+                        member.membership_id,
+                        member.email,
+                        json.dumps(
+                            {
+                                "rfq_id": str(rfq_id),
+                                "recipient_id": str(recipient_id),
+                                "idempotency_key": str(idempotency_key),
+                                "reminder_count": updated["reminder_count"],
+                                "can_remind": response.can_remind,
+                                "remind_blocked_reason": response.remind_blocked_reason,
+                            }
+                        ),
+                    ),
+                )
+                conn.commit()
+                return response
 
     def list_responses(
         self,
@@ -1523,6 +1698,179 @@ def _lock_rfq_for_sender(cur: psycopg.Cursor, member: CurrentMember, rfq_id: uui
     if locked is None:
         raise NotFoundError(details={"resource": "rfq"})
     return locked
+
+
+def _reminder_rfq_row(
+    cur: psycopg.Cursor, member: CurrentMember, rfq_id: uuid.UUID, *, lock: bool
+) -> dict:
+    query = f"select r.*, {_EFFECTIVE_STATUS_SQL} as effective_status from rfq r where r.id = %s"
+    cur.execute(query, (rfq_id,))
+    row = cur.fetchone()
+    if row is None:
+        raise NotFoundError(details={"resource": "rfq"})
+    if member.role != "owner" and row["created_by_membership_id"] != member.membership_id:
+        raise PermissionDeniedError(details={"resource": "rfq", "reason": "not_creator"})
+    if lock:
+        cur.execute("select id from rfq where id = %s for update", (rfq_id,))
+        if cur.fetchone() is None:
+            raise NotFoundError(details={"resource": "rfq"})
+        cur.execute(query, (rfq_id,))
+        row = cur.fetchone()
+    return row
+
+
+def _fetch_reminder_recipient(
+    cur: psycopg.Cursor, *, rfq_id: uuid.UUID, recipient_id: uuid.UUID
+) -> dict:
+    cur.execute(
+        """select r.*, s.name as supplier_name,
+                  s.contact_email as supplier_contact_email,
+                  (select count(*) from rfq_response resp
+                   where resp.tenant_id = r.tenant_id
+                     and resp.rfq_recipient_id = r.id) as response_count
+           from rfq_recipient r
+           left join supplier s on s.id = r.supplier_id and s.tenant_id = r.tenant_id
+           where r.rfq_id = %s and r.id = %s""",
+        (rfq_id, recipient_id),
+    )
+    row = cur.fetchone()
+    if row is None:
+        raise NotFoundError(details={"resource": "rfq_recipient"})
+    return row
+
+
+def _reminder_block_reason(
+    *,
+    effective_status: str,
+    needed_by_date: date,
+    recipient: RfqRecipient,
+    now: datetime,
+) -> str | None:
+    if effective_status not in ("sent", "responded") or needed_by_date < now.date():
+        return "rfq_not_open"
+    if recipient.status != "sent" or not recipient.outbound_message_id:
+        return "not_delivered"
+    if recipient.response_count > 0:
+        return "replied"
+    if recipient.sent_at is None or now - recipient.sent_at < timedelta(hours=24):
+        return "too_early"
+    if recipient.last_reminder_at is not None and now - recipient.last_reminder_at < timedelta(
+        hours=24
+    ):
+        return "cooldown"
+    if recipient.reminder_count >= 2:
+        return "limit_reached"
+    return None
+
+
+def _reminder_reason(
+    *,
+    member: CurrentMember,
+    created_by_membership_id: uuid.UUID,
+    effective_status: str,
+    needed_by_date: date,
+    recipient: RfqRecipient,
+    now: datetime,
+) -> str | None:
+    if member.role not in ("owner", "buyer"):
+        return "not_permitted"
+    if member.role == "buyer" and created_by_membership_id != member.membership_id:
+        return "not_permitted"
+    return _reminder_block_reason(
+        effective_status=effective_status,
+        needed_by_date=needed_by_date,
+        recipient=recipient,
+        now=now,
+    )
+
+
+def _reminder_recipient_response(
+    member: CurrentMember, rfq_row: dict, recipient_row: dict
+) -> RfqRecipient:
+    recipient = RfqRecipient(**recipient_row)
+    reason = _reminder_reason(
+        member=member,
+        created_by_membership_id=rfq_row["created_by_membership_id"],
+        effective_status=str(rfq_row["effective_status"]),
+        needed_by_date=rfq_row["needed_by_date"],
+        recipient=recipient,
+        now=datetime.now(UTC),
+    )
+    recipient.can_remind = reason is None
+    recipient.remind_blocked_reason = reason
+    return recipient
+
+
+def _render_reminder(
+    cur: psycopg.Cursor,
+    *,
+    member: CurrentMember,
+    rfq_row: dict,
+    recipient_row: dict,
+) -> tuple[RenderedRfqEmail, str | None]:
+    cur.execute("select name, default_locale from tenant where id = %s", (member.tenant_id,))
+    tenant_row = cur.fetchone()
+    cur.execute(
+        "select contact_email, preferred_locale from supplier where id = %s",
+        (recipient_row["supplier_id"],),
+    )
+    supplier_row = cur.fetchone() or {}
+    locale = supplier_row.get("preferred_locale") or tenant_row["default_locale"]
+    cur.execute(
+        """select l.quantity, wp.tenant_name, cp.base_unit,
+                  pd.pack_count, pd.unit_size
+           from rfq_line l
+           join workspace_product wp on wp.id = l.workspace_product_id
+           left join canonical_product cp on cp.id = wp.canonical_product_id
+           left join (
+             select workspace_product_id, min(pack_count) as pack_count,
+                    min(unit_size) as unit_size
+             from pack_definition group by workspace_product_id
+             having count(*) = 1
+           ) pd on pd.workspace_product_id = wp.id
+           where l.rfq_id = %s
+           order by l.position, l.created_at, l.id""",
+        (rfq_row["id"],),
+    )
+    email_lines = [
+        RfqEmailLine(
+            product_name=line["tenant_name"] or t("rfq.email.unknownProduct", locale),
+            quantity=line["quantity"],
+            unit_code=line["base_unit"] or "each",
+            pack_count=line["pack_count"],
+            unit_size=line["unit_size"],
+        )
+        for line in cur.fetchall()
+    ]
+    cur.execute("select * from tenant_email_config where tenant_id = %s", (member.tenant_id,))
+    email_config_row = cur.fetchone()
+    reply_to = None
+    if email_config_row and email_config_row["enabled"]:
+        reply_to = email_config_row["forwarding_address"]
+    sent_at = recipient_row["sent_at"] or rfq_row["created_at"]
+    rendered = render_reminder_email(
+        tenant_name=tenant_row["name"],
+        locale=locale,
+        reference_number=rfq_row["reference_number"],
+        sent_date=sent_at.date(),
+        needed_by=rfq_row["needed_by_date"],
+        lines=email_lines,
+        reply_to=reply_to,
+    )
+    return rendered, reply_to
+
+
+def _find_reminder_event(
+    cur: psycopg.Cursor, tenant_id: uuid.UUID, idempotency_key: uuid.UUID
+) -> dict | None:
+    cur.execute(
+        """select target from audit_event
+           where tenant_id = %s and action = 'rfq.reminder_sent'
+             and target->>'idempotency_key' = %s
+           order by id desc limit 1""",
+        (tenant_id, str(idempotency_key)),
+    )
+    return cur.fetchone()
 
 
 def _cap_limit(limit: int) -> int:
