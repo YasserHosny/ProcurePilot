@@ -718,6 +718,18 @@ class RequestsService:
         if not visible:
             return PurchaseRequestList(items=[], next_cursor=next_cursor)
 
+        if eligible_for_order:
+            assert member is not None
+            # Reuse the legacy eligible helper's per-row construction, skipping normal
+            # list enrichment so filters cannot change item content. Keep the bare path intact.
+            return PurchaseRequestList(
+                items=[
+                    self._get_request_for_member(member=member, request_id=UUID(str(row["id"])))
+                    for row in visible
+                ],
+                next_cursor=next_cursor,
+            )
+
         request_ids = [str(r["id"]) for r in visible]
         lines_by_request = self._fetch_lines_batch(client, request_ids)
         steps_by_request = self._fetch_steps_batch(client, request_ids)
