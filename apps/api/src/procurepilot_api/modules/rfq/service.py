@@ -116,8 +116,7 @@ def lock_rfq_for_preparation(
         (f"rfq-prepare:{tenant_id}:{rfq_id}",),
     )
     cur.execute(
-        f"select {_EFFECTIVE_STATUS_SQL} as status from rfq r "
-        "where r.id = %s and r.tenant_id = %s",
+        f"select {_EFFECTIVE_STATUS_SQL} as status from rfq r where r.id = %s and r.tenant_id = %s",
         (rfq_id, tenant_id),
     )
     row = cur.fetchone()
@@ -948,7 +947,7 @@ class RfqService:
                 request_payload = PurchaseRequestCreate(
                     branch_id=branch_id,
                     cost_centre_id=cost_centre_id,
-                    required_by_date=resp_row["needed_by_date"],
+                    required_by_date=required_by_date,
                     lines=pr_lines,
                 )
 

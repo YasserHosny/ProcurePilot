@@ -384,9 +384,6 @@
         "description": "إنشاء وإرسال وتتبع طلبات عروض الأسعار."
       },
       "compare": {
-      "landedTotal": "الإجمالي بتكلفة الوصول",
-      "coverage": "يغطي {{covered}} من {{total}} منتجات",
-      "splitSavingHintConverted": "كان تقسيم هذا الطلب بين الموردين سيوفر {{money}} (تكلفة الوصول شاملة الضريبة).",
         "title": "مقارنة العروض",
         "description": "مقارنة التكلفة الواصلة وأحجام العبوات بين الموردين."
       },
@@ -4371,7 +4368,7 @@
       "alreadyConverted": "تم تحويل طلب عروض الأسعار بالفعل",
       "splitError": "فشل بدء التقسيم. يُرجى المحاولة مرة أخرى.",
       "lowestLinePrice": "أقل تكلفة واصلة",
-      "splitSavingHint": "تقسيم هذا الطلب بين الموردين قد يوفّر {{money}}.",
+      "splitSavingHint": "تقسيم هذا الطلب بين الموردين قد يوفّر {{money}} (تكلفة الوصول شاملة الضريبة).",
       "openPreparedRequest": "فتح مسودة الطلب",
       "openRequest": "فتح الطلب",
       "convertedReason": "تم تحويل طلب عروض الأسعار بالفعل إلى طلب شراء.",
@@ -4390,7 +4387,9 @@
       "rfqExpired": "انتهت صلاحية طلب عرض الأسعار",
       "branchesLoadError": "فشل تحميل الفروع.",
       "rfqDetailLoadError": "فشل تحميل تفاصيل طلب عرض الأسعار.",
-      "splitSavingHintConverted": "كان تقسيم هذا الطلب بين الموردين سيوفّر {{money}}."
+      "splitSavingHintConverted": "كان تقسيم هذا الطلب بين الموردين سيوفّر {{money}} (تكلفة الوصول شاملة الضريبة).",
+      "landedTotal": "الإجمالي بتكلفة الوصول",
+      "coverage": "يغطي {{covered}} من {{total}} منتجات"
     },
     "history": {
       "status_cancelled": "ملغى",

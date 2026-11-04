@@ -384,9 +384,6 @@
         "description": "Create and track requests for quotation across suppliers."
       },
       "compare": {
-      "landedTotal": "Landed total",
-      "coverage": "Covers {{covered}} of {{total}} products",
-      "splitSavingHintConverted": "Splitting this order between suppliers could have saved {{money}} (landed cost, VAT included).",
         "title": "Compare offers",
         "description": "Compare normalised landed costs and get evidence-backed recommendations."
       },
@@ -4371,7 +4368,7 @@
       "alreadyConverted": "RFQ is already converted",
       "splitError": "Failed to start split. Please try again.",
       "lowestLinePrice": "Lowest landed cost",
-      "splitSavingHint": "Splitting this order between suppliers could save {{money}}.",
+      "splitSavingHint": "Splitting this order between suppliers could save {{money}} (landed cost, VAT included).",
       "openPreparedRequest": "Open draft request",
       "openRequest": "Open request",
       "convertedReason": "This RFQ is already converted into a request.",
@@ -4390,7 +4387,9 @@
       "rfqExpired": "This RFQ has expired",
       "branchesLoadError": "Failed to load branches.",
       "rfqDetailLoadError": "Failed to load RFQ details.",
-      "splitSavingHintConverted": "Splitting this order between suppliers would have saved {{money}}."
+      "splitSavingHintConverted": "Splitting this order between suppliers would have saved {{money}} (landed cost, VAT included).",
+      "landedTotal": "Landed total",
+      "coverage": "Covers {{covered}} of {{total}} products"
     },
     "history": {
       "status_cancelled": "Cancelled",

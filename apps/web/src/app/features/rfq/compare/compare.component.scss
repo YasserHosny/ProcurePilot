@@ -359,3 +359,17 @@
     inline-size: 48px;
   }
 }
+
+.landed-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-block-end: 16px;
+  font-weight: 600;
+}
+
+.coverage-badge {
+  display: inline-block;
+  margin-block-end: 8px;
+  color: var(--pp-text-muted);
+}

@@ -209,6 +209,9 @@
             </mat-card-subtitle>
           </mat-card-header>
           <mat-card-content>
+            @if (coverageLabel(response); as coverage) {
+              <span class="coverage-badge" data-testid="coverage-badge">{{ coverage }}</span>
+            }
             @if (response.quotation_status === 'refused') {
               <div role="status">
                 <strong>{{ 'rfq.compare.refused' | translate }}</strong>
@@ -282,6 +285,12 @@
                 <tr mat-row *matRowDef="let row; columns: displayedColumns;" [class.best]="isLowestLinePrice(response, row)"></tr>
                 <tr mat-footer-row *matFooterRowDef="displayedColumns" class="total-row"></tr>
               </table>
+              @if (landedTotal(response); as total) {
+                <div class="landed-total" data-testid="landed-total">
+                  <span>{{ 'rfq.compare.landedTotal' | translate }}</span>
+                  <span class="pp-figures">{{ total | formatMoney }}</span>
+                </div>
+              }
             }
             @if (response.quotation_status !== 'refused' && unmatchedCount(response) > 0) {
               <div class="pending-warning">

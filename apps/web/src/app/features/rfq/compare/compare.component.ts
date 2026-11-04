@@ -349,7 +349,54 @@ export class CompareComponent implements OnInit, OnChanges {
     return eligible;
   });
 
+  private readonly rfqProductIds = computed(() =>
+    new Set((this.rfqDetail()?.lines ?? []).map((line) => line.workspace_product_id)),
+  );
+
+  landedTotal(response: RfqResponseComparison): { amount: number; currency: string } | null {
+    const products = this.rfqProductIds();
+    if (products.size === 0) return null;
+    const costs = new Map(
+      (response.rfq_landed_costs ?? [])
+        .filter((cost) => products.has(cost.workspace_product_id))
+        .map((cost) => [cost.workspace_product_id, cost]),
+    );
+    if (costs.size !== products.size) return null;
+    const currencies = new Set([...costs.values()].map((cost) => cost.total_currency));
+    if (currencies.size !== 1) return null;
+    let total = 0;
+    for (const cost of costs.values()) {
+      const amount = Number(cost.total_amount);
+      if (!Number.isFinite(amount)) return null;
+      total += Math.round(amount * MINOR_UNITS);
+    }
+    return { amount: total / MINOR_UNITS, currency: [...currencies][0] };
+  }
+
+  coverageLabel(response: RfqResponseComparison): string | null {
+    const products = this.rfqProductIds();
+    if (response.quotation_status === 'refused' || products.size === 0) return null;
+    const covered = new Set(response.lines
+      .filter((line) => !line.pending_match && line.workspace_product_id && products.has(line.workspace_product_id))
+      .map((line) => line.workspace_product_id)).size;
+    return covered < products.size ? this.translate.instant('rfq.compare.coverage', {
+      covered: this.formatService.formatNumber(covered),
+      total: this.formatService.formatNumber(products.size),
+    }) : null;
+  }
+
   readonly lowestTotalResponseIds = computed<Set<string>>(() => {
+    const replies = this.responses().filter(
+      (r) => r.quotation_status !== 'refused' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
+    );
+    const landed = replies.map((reply) => ({ id: reply.id, total: this.landedTotal(reply) }));
+    if (landed.length >= 2 && landed.every((entry) => entry.total !== null)
+      && new Set(landed.map((entry) => entry.total?.currency)).size === 1) {
+      const minimum = Math.min(...landed.map((entry) => Math.round(entry.total!.amount * MINOR_UNITS)));
+      return new Set(landed.filter((entry) => Math.round(entry.total!.amount * MINOR_UNITS) === minimum)
+        .map((entry) => entry.id));
+    }
+
     const eligible = this.comparableResponses();
     if (!eligible) {
       return new Set<string>();

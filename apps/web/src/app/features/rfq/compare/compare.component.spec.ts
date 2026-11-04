@@ -1910,6 +1910,9 @@ describe('CompareComponent (RFQ)', () => {
       })),
     });
     const load = (replies: ReturnType<typeof reply>[], products: string[], status = 'sent'): void => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
       mockRfqApi.getRfq.and.returnValue(
         of({
           ...sentDetail,
@@ -1954,7 +1957,7 @@ describe('CompareComponent (RFQ)', () => {
       expect(cards[1].querySelector('[data-testid="coverage-badge"]')).toBeNull();
     });
 
-    it('words the saving hint on a converted RFQ as a saving that could have been made', () => {
+    it('words the saving hint on a converted RFQ as a missed saving and names its basis', () => {
       load(
         [
           { ...reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000'), rfq_landed_costs: [
@@ -1971,7 +1974,7 @@ describe('CompareComponent (RFQ)', () => {
       );
 
       const hint = el().querySelector('[data-testid="split-saving-hint"]');
-      expect(hint?.textContent).toContain('could have saved');
+      expect(hint?.textContent).toContain('would have saved');
       expect(hint?.textContent).toContain('landed cost');
     });
   });
