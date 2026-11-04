@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { HistoryComponent } from './history.component';
+import { parseStatusFilter, HistoryComponent } from './history.component';
 import { RfqApi, RfqSummary, RfqList, RfqSendResponse, RfqDetail } from '../rfq-api';
 import { Router, provideRouter } from '@angular/router';
 import { of, throwError, Subject } from 'rxjs';
@@ -215,6 +215,86 @@ describe('HistoryComponent', () => {
       const history = createWithSession({ email: 'buyer@test.com' });
       expect(history.currentMembershipId()).toBeNull();
       expect(history.draftActionsUnavailable()).toBeTrue();
+    });
+  });
+
+  describe('status filter', () => {
+    function filterButtons(): HTMLButtonElement[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+          '[data-testid="rfq-status-filters"] button',
+        ),
+      );
+    }
+
+    it('parses only known statuses from the address', () => {
+      expect(parseStatusFilter('sent')).toBe('sent');
+      expect(parseStatusFilter('cancelled')).toBe('cancelled');
+      expect(parseStatusFilter('bogus')).toBeNull();
+      expect(parseStatusFilter('')).toBeNull();
+      expect(parseStatusFilter(null)).toBeNull();
+    });
+
+    it('offers All plus every status, with All pressed by default', () => {
+      const buttons = filterButtons();
+      expect(buttons.map((b) => b.textContent?.trim())).toEqual([
+        'All', 'Draft', 'Sent', 'Responded', 'Expired', 'Converted', 'Cancelled',
+      ]);
+      expect(buttons.map((b) => b.getAttribute('aria-pressed'))).toEqual(
+        ['true', 'false', 'false', 'false', 'false', 'false', 'false'],
+      );
+      const group = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-status-filters"]');
+      expect(group?.getAttribute('role')).toBe('group');
+      expect(group?.getAttribute('aria-label')).toBe('Filter by status');
+    });
+
+    it('loads the chosen status, marks it pressed and writes it to the address', () => {
+      rfqApiSpy.listRfqs.calls.reset();
+      filterButtons().find((b) => b.textContent?.trim() === 'Sent')?.click();
+      fixture.detectChanges();
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith('sent');
+      expect(filterButtons().find((b) => b.textContent?.trim() === 'Sent')?.getAttribute('aria-pressed')).toBe('true');
+      expect(filterButtons()[0].getAttribute('aria-pressed')).toBe('false');
+      expect(router.navigate).toHaveBeenCalledWith(
+        [],
+        jasmine.objectContaining({ queryParams: { status: 'sent' }, replaceUrl: true }),
+      );
+    });
+
+    it('keeps the filter when loading more and clears it with All', () => {
+      component.setStatusFilter('expired');
+      rfqApiSpy.listRfqs.calls.reset();
+      component.nextCursor.set('cursor-2');
+      component.loadMore();
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith('expired', 'cursor-2');
+      rfqApiSpy.listRfqs.calls.reset();
+      component.setStatusFilter(null);
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith(undefined);
+      expect(router.navigate).toHaveBeenCalledWith(
+        [],
+        jasmine.objectContaining({ queryParams: { status: null } }),
+      );
+    });
+
+    it('does not reload when the same filter is chosen again', () => {
+      component.setStatusFilter('sent');
+      rfqApiSpy.listRfqs.calls.reset();
+      component.setStatusFilter('sent');
+      expect(rfqApiSpy.listRfqs).not.toHaveBeenCalled();
+    });
+
+    it('says no RFQ has the status, with a way back, instead of the generic empty state', () => {
+      rfqApiSpy.listRfqs.and.returnValue(of({ items: [], next_cursor: null }));
+      component.setStatusFilter('cancelled');
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.textContent).toContain('No RFQs have this status.');
+      const clear = host.querySelector<HTMLButtonElement>('[data-testid="rfq-clear-filter"]');
+      expect(clear).not.toBeNull();
+      rfqApiSpy.listRfqs.and.returnValue(of(mockRfqList));
+      rfqApiSpy.listRfqs.calls.reset();
+      clear?.click();
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith(undefined);
     });
   });
 

@@ -22,6 +22,27 @@
     </div>
   </div>
 
+  <div class="filter-bar" role="group" [attr.aria-label]="'rfq.history.filterLabel' | translate" data-testid="rfq-status-filters">
+    <button
+      type="button"
+      mat-stroked-button
+      class="filter-btn"
+      [class.active]="statusFilter() === null"
+      [attr.aria-pressed]="statusFilter() === null"
+      (click)="setStatusFilter(null)"
+    >{{ 'rfq.history.filterAll' | translate }}</button>
+    @for (status of statusFilters; track status) {
+      <button
+        type="button"
+        mat-stroked-button
+        class="filter-btn"
+        [class.active]="statusFilter() === status"
+        [attr.aria-pressed]="statusFilter() === status"
+        (click)="setStatusFilter(status)"
+      >{{ 'rfq.history.status_' + status | translate }}</button>
+    }
+  </div>
+
   <mat-card class="content-card">
     @if (loading()) {
       <div class="loading-state">
@@ -39,7 +60,14 @@
     } @else if (rfqs().length === 0) {
       <div class="empty-state">
         <mat-icon aria-hidden="true">history</mat-icon>
-        <p>{{ 'rfq.history.noRfqs' | translate }}</p>
+        @if (statusFilter() !== null) {
+          <p>{{ 'rfq.history.noRfqsForFilter' | translate }}</p>
+          <button mat-stroked-button type="button" (click)="setStatusFilter(null)" data-testid="rfq-clear-filter">
+            {{ 'rfq.history.clearFilter' | translate }}
+          </button>
+        } @else {
+          <p>{{ 'rfq.history.noRfqs' | translate }}</p>
+        }
       </div>
     } @else {
       <div class="results-info" role="status" aria-live="polite" data-testid="rfq-count-status">

@@ -7,7 +7,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize, take } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
@@ -44,6 +44,20 @@ export interface RecipientsCacheEntry {
   recipients?: RfqRecipient[];
 }
 
+export const RFQ_STATUS_FILTERS = [
+  'draft',
+  'sent',
+  'responded',
+  'expired',
+  'converted',
+  'cancelled',
+] as const;
+
+/** The status in the address, or null when it is missing or not a known status. */
+export function parseStatusFilter(value: string | null | undefined): string | null {
+  return value && (RFQ_STATUS_FILTERS as readonly string[]).includes(value) ? value : null;
+}
+
 @Component({
   selector: 'app-rfq-history',
   standalone: true,
@@ -74,6 +88,7 @@ export class HistoryComponent implements OnInit {
   private readonly actionKeys = new RfqActionKeys();
   private readonly rfqApi = inject(RfqApi);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
@@ -105,6 +120,8 @@ export class HistoryComponent implements OnInit {
   readonly loadError = signal<boolean>(false);
   readonly loadingMore = signal<boolean>(false);
   readonly loadMoreError = signal<boolean>(false);
+  readonly statusFilters = RFQ_STATUS_FILTERS;
+  readonly statusFilter = signal<string | null>(null);
   readonly draftActionsUnavailable = signal<boolean>(false);
   readonly rfqs = signal<RfqSummary[]>([]);
   readonly nextCursor = signal<string | null>(null);
@@ -188,7 +205,23 @@ export class HistoryComponent implements OnInit {
         this.isBelow768.set(res.matches);
       });
 
+    this.statusFilter.set(parseStatusFilter(this.route.snapshot.queryParamMap.get('status')));
     this.resolveMembershipId();
+    this.loadRfqs();
+  }
+
+  /** Filter the list by status (null shows every RFQ) and keep the choice in the address. */
+  setStatusFilter(status: string | null): void {
+    if (this.statusFilter() === status) {
+      return;
+    }
+    this.statusFilter.set(status);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { status },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
     this.loadRfqs();
   }
 
@@ -199,7 +232,7 @@ export class HistoryComponent implements OnInit {
     this.loadError.set(false);
     this.loadMoreError.set(false);
     this.loadingMore.set(false);
-    this.rfqApi.listRfqs().subscribe({
+    this.rfqApi.listRfqs(this.statusFilter() ?? undefined).subscribe({
       next: (response) => {
         if (generation !== this.listGeneration) {
           return;
@@ -227,7 +260,7 @@ export class HistoryComponent implements OnInit {
     const generation = this.listGeneration;
     this.loadingMore.set(true);
     this.loadMoreError.set(false);
-    this.rfqApi.listRfqs(undefined, cursor).subscribe({
+    this.rfqApi.listRfqs(this.statusFilter() ?? undefined, cursor).subscribe({
       next: (response) => {
         if (generation !== this.listGeneration) {
           return;
