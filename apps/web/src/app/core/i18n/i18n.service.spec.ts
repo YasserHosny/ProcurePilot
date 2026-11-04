@@ -23,6 +23,8 @@ class FakeSessionService {
     () => this.member()?.preferred_locale ?? this.member()?.tenant.default_locale ?? 'en',
   );
   readonly signedInInteractively: WritableSignal<boolean> = signal(false);
+  accessToken: string | null = null;
+  refreshToken: string | null = null;
 
   login(): void {
     this.signedInInteractively.set(true);
@@ -324,6 +326,23 @@ describe('I18nService', () => {
     expect(dirService.currentDirection()).toBe('rtl');
     expect(localStorage.getItem('pp.locale')).toBe('ar');
     expect(localStorage.getItem(LOCALE_CHOSEN_STORAGE_KEY)).toBeNull();
+  });
+
+  // PPS-211 B40: the session restores asynchronously while this service is built, so a signed-in
+  // person on / was shown the guest default (Arabic) until their own language arrived.
+  it('keeps the last used language on / while a stored session is being restored', () => {
+    localStorage.setItem('pp.locale', 'en');
+    fakeSession.refreshToken = 'stored-refresh-token';
+    currentPathname = '/';
+    const service = TestBed.inject(I18nService);
+
+    TestBed.flushEffects();
+    expect(service.currentLocale()).toBe('en');
+    expect(service.isRtl()).toBeFalse();
+
+    fakeSession.restore();
+    TestBed.flushEffects();
+    expect(service.currentLocale()).toBe('ar');
   });
 
   it('yields English on reload for a guest on / after explicit setLocale(en)', () => {

@@ -78,8 +78,11 @@ export class I18nService {
       initialLocale = this.session.activeLocale();
     } else {
       const pathname = this.getLocationPathname();
+      // A stored session is restored asynchronously, so a signed-in person looks like a guest
+      // for a moment; the Arabic first-visit default is for real guests, not for them.
+      const restoringSession = !!(this.session.accessToken || this.session.refreshToken);
       const isDefaultArabicRoute =
-        pathname === '/' || pathname === '' || pathname === '/auth/sign-in';
+        !restoringSession && (pathname === '/' || pathname === '' || pathname === '/auth/sign-in');
       if (isDefaultArabicRoute) {
         const chosen = localStorage.getItem(LOCALE_CHOSEN_STORAGE_KEY) as Locale | null;
         initialLocale = chosen === 'en' || chosen === 'ar' ? chosen : 'ar';
