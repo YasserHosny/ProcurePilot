@@ -99,6 +99,11 @@
           <button mat-stroked-button type="button" (click)="confirmationOpen.set(!confirmationOpen())" [disabled]="isSaving()" data-testid="open-confirmation-form"><mat-icon aria-hidden="true">handshake</mat-icon>{{ 'orders.detail.recordConfirmation' | translate }}</button>
           <button mat-stroked-button type="button" (click)="receiptOpen.set(!receiptOpen())" [disabled]="isSaving()" data-testid="open-receipt-form"><mat-icon aria-hidden="true">inventory_2</mat-icon>{{ 'orders.detail.recordReceipt' | translate }}</button>
         }
+        @if (canWithdraw(data.order.status, data)) {
+          <button mat-stroked-button type="button" (click)="withdrawOrder()" [disabled]="isSaving()" data-testid="withdraw-order">
+            <mat-icon aria-hidden="true">undo</mat-icon>{{ 'orders.detail.withdraw' | translate }}
+          </button>
+        }
         @if (canClose(data.order.status)) {
           <button mat-stroked-button type="button" (click)="closeOrder()" [disabled]="isSaving()" data-testid="close-order">
             <mat-icon aria-hidden="true">lock</mat-icon>{{ 'orders.detail.close' | translate }}
@@ -119,6 +124,16 @@
           <div class="actions">
             <button mat-button type="button" (click)="submitOpen.set(false)" [disabled]="isSaving()">{{ 'common.cancel' | translate }}</button>
             <button mat-flat-button color="primary" type="button" (click)="submitOrder()" [disabled]="isSaving()" data-testid="confirm-submit">{{ 'orders.detail.submitConfirm' | translate }}</button>
+          </div>
+        </div>
+      }
+      @if (withdrawOpen()) {
+        <div class="evidence-form withdraw-form" data-testid="withdraw-confirm-panel">
+          <h3 tabindex="-1">{{ 'orders.detail.withdrawConfirmTitle' | translate }}</h3>
+          <p>{{ 'orders.detail.withdrawConfirmMessage' | translate }}</p>
+          <div class="actions">
+            <button mat-button type="button" (click)="withdrawOpen.set(false)" [disabled]="isSaving()">{{ 'common.cancel' | translate }}</button>
+            <button mat-flat-button color="primary" type="button" (click)="confirmWithdraw()" [disabled]="isSaving()" data-testid="confirm-withdraw">{{ 'orders.detail.withdrawConfirm' | translate }}</button>
           </div>
         </div>
       }
