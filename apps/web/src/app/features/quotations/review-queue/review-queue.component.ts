@@ -85,6 +85,11 @@ export class ReviewQueueComponent implements OnInit {
   readonly dateTo = signal<string | null>(null);
   readonly dateFromModel = computed(() => parseIsoDateLocal(this.dateFrom()));
   readonly dateToModel = computed(() => parseIsoDateLocal(this.dateTo()));
+  readonly dateRangeInvalid = computed(() => {
+    const from = this.dateFrom();
+    const to = this.dateTo();
+    return from !== null && to !== null && from > to;
+  });
   readonly sortBy = signal<ReviewTaskSortBy>('created_at');
   readonly sortOrder = signal<ReviewTaskSortOrder>('desc');
   readonly errorMessage = signal<string | null>(null);
@@ -162,10 +167,18 @@ export class ReviewQueueComponent implements OnInit {
     }
     this.isLoadingMore.set(false);
 
-    this.isLoading.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
     this.nextCursor.set(null);
+
+    if (this.dateRangeInvalid()) {
+      // From after To can never match: show the error instead of asking the API.
+      this.tasks.set([]);
+      this.isLoading.set(false);
+      return;
+    }
+
+    this.isLoading.set(true);
 
     const status = this.statusFilter();
     const priority = this.priorityFilter();

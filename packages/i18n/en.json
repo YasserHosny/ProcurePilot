@@ -861,7 +861,8 @@
       "filterPriority": "Filter by Priority",
       "filters": {
         "dateFrom": "From date",
-        "dateTo": "To date"
+        "dateTo": "To date",
+        "dateRangeInvalid": "The start date must be on or before the end date."
       },
       "status": {
         "all": "All Statuses",

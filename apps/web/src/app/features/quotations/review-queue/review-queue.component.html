@@ -112,6 +112,11 @@
         <mat-datepicker-toggle matIconSuffix [for]="dateToPicker"></mat-datepicker-toggle>
         <mat-datepicker #dateToPicker></mat-datepicker>
       </mat-form-field>
+      @if (dateRangeInvalid()) {
+        <p class="date-range-error" role="alert" data-testid="date-range-error">
+          {{ 'quotations.queue.filters.dateRangeInvalid' | translate }}
+        </p>
+      }
 
       <button
         mat-stroked-button
