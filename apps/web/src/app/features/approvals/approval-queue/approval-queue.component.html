@@ -57,6 +57,9 @@
               } @else {
                 {{ reqInfo.text }}
               }
+              @if (isOwnRequest(row)) {
+                <span class="own-request-badge">{{ 'approvals.ownRequestBadge' | translate }}</span>
+              }
             </td>
           </ng-container>
 
