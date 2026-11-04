@@ -142,6 +142,9 @@ export class RequestListComponent implements OnInit {
 
   readonly displayedColumns: readonly string[] = [
     'requiredByDate',
+    'created',
+    'requester',
+    'lines',
     'branch',
     'supplier',
     'status',
@@ -286,6 +289,10 @@ export class RequestListComponent implements OnInit {
   
   navigateToCreateOrder(request: PurchaseRequest): void {
     this.router.navigate(['/orders/new'], { queryParams: { source_request_id: request.id } });
+  }
+
+  formatCreated(value: string): string {
+    return this.formatService.formatDate(value);
   }
 
   formatRequiredBy(value: string | null | undefined): string {

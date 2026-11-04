@@ -2400,7 +2400,10 @@
       "requiredByDate": "Required By",
       "status": "Status",
       "estimatedTotal": "Estimated Total",
-      "actions": "Actions"
+      "actions": "Actions",
+      "created": "Created",
+      "requester": "Requested by",
+      "lines": "Lines"
     },
     "source": {
       "from": "From",
@@ -2508,7 +2511,23 @@
       "withdrawConfirmTitle": "Withdraw this split?",
       "withdrawConfirmMessageAll": "Withdraws all {{count}} requests of this split? Any committed budget will be released."
     },
-    "partOfSplitError": "This request is part of a split. Please use the split action to submit, decide, or withdraw all requests together."
+    "partOfSplitError": "This request is part of a split. Please use the split action to submit, decide, or withdraw all requests together.",
+    "details": {
+      "title": "Details",
+      "requester": "Requested by",
+      "created": "Created",
+      "submitted": "Submitted",
+      "unavailable": "—"
+    },
+    "history": {
+      "title": "History",
+      "created": "Created",
+      "submitted": "Submitted",
+      "approved": "Approval approved",
+      "rejected": "Approval rejected",
+      "withdrawn": "Withdrawn",
+      "delivered": "Delivered"
+    }
   },
   "delivery": {
     "title": "Confirm Delivery",

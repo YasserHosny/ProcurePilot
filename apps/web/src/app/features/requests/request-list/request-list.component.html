@@ -107,6 +107,21 @@
             </td>
           </ng-container>
 
+          <ng-container matColumnDef="created">
+            <th mat-header-cell *matHeaderCellDef>{{ 'requests.columns.created' | translate }}</th>
+            <td mat-cell *matCellDef="let req"><time [attr.datetime]="req.created_at">{{ formatCreated(req.created_at) }}</time></td>
+          </ng-container>
+
+          <ng-container matColumnDef="requester">
+            <th mat-header-cell *matHeaderCellDef>{{ 'requests.columns.requester' | translate }}</th>
+            <td mat-cell *matCellDef="let req" dir="auto">{{ req.requester_name || req.requester_email || ('requests.details.unavailable' | translate) }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="lines">
+            <th mat-header-cell *matHeaderCellDef>{{ 'requests.columns.lines' | translate }}</th>
+            <td mat-cell *matCellDef="let req">{{ req.lines.length }}</td>
+          </ng-container>
+
           <ng-container matColumnDef="branch">
             <th mat-header-cell *matHeaderCellDef>
               {{ 'requests.columns.branch' | translate }}

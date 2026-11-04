@@ -8,13 +8,13 @@ import type {
   PurchaseRequestLine,
   PurchaseRequestCreate,
   PurchaseRequestList,
-  PurchaseRequestStatus as BasePurchaseRequestStatus,
+  PurchaseRequestStatus,
   PurchaseRequestUpdate,
   RequestGroupSummary,
   RequestSource,
 } from '../../core/api/models';
 
-export type PurchaseRequestStatus = BasePurchaseRequestStatus | 'delivered';
+export type { PurchaseRequestStatus };
 
 export type PurchaseRequestSort =
   | 'created_desc'
@@ -49,7 +49,7 @@ export class RequestsApiService {
     sort?: PurchaseRequestSort;
     mine?: boolean;
   }): Observable<PurchaseRequestList> {
-    return this.api.listRequests(params as Parameters<ApiService['listRequests']>[0]);
+    return this.api.listRequests(params);
   }
 
   getRequest(requestId: string): Observable<PurchaseRequest> {

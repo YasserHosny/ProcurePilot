@@ -154,6 +154,24 @@ export class RequestFormComponent implements OnInit {
   readonly existingRequest = signal<PurchaseRequest | null>(null);
   readonly isEditMode = signal<boolean>(false);
 
+  readonly history = computed(() => {
+    const req = this.existingRequest();
+    const events: { key: string; timestamp: string; actor?: string; comment?: string | null }[] = [];
+    if (!req) return events;
+    if (req.created_at) events.push({ key: 'created', timestamp: req.created_at,
+      actor: req.requester_name || req.requester_email || undefined });
+    if (req.submitted_at) events.push({ key: 'submitted', timestamp: req.submitted_at });
+    const approval = req.approval_step;
+    if (approval?.decided_at && (approval.status === 'approved' || approval.status === 'rejected')) {
+      events.push({ key: approval.status, timestamp: approval.decided_at,
+        actor: approval.decided_by_membership_id === approval.assigned_membership_id
+          ? approval.assigned_name || approval.assigned_email || undefined : undefined, comment: approval.comment });
+    }
+    if (req.withdrawn_at) events.push({ key: 'withdrawn', timestamp: req.withdrawn_at });
+    if (req.delivered_at) events.push({ key: 'delivered', timestamp: req.delivered_at });
+    return events.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+  });
+
   readonly allocations = signal<RequestAllocation | null>(null);
   readonly isAllocationsLoading = signal<boolean>(false);
   readonly allocationsFailed = signal<boolean>(false);

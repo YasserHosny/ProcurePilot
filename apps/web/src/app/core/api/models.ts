@@ -1464,6 +1464,7 @@ export interface BranchRoleAssignmentCreate {
 // --- requests + approvals (008) ---------------------------------------------
 
 export type PurchaseRequestStatus =
+  | 'delivered'
   | 'draft'
   | 'submitted'
   | 'approved'
@@ -1568,6 +1569,7 @@ export interface PurchaseRequest {
   readonly approval_step?: ApprovalStep | null;
   readonly submitted_at?: string | null;
   readonly withdrawn_at?: string | null;
+  readonly delivered_at?: string | null;
   readonly created_at: string;
   readonly updated_at?: string;
 }
