@@ -164,7 +164,8 @@ export class RequestFormComponent implements OnInit {
     const approval = req.approval_step;
     if (approval?.decided_at && (approval.status === 'approved' || approval.status === 'rejected')) {
       events.push({ key: approval.status, timestamp: approval.decided_at,
-        actor: approval.assigned_name || approval.assigned_email || undefined, comment: approval.comment });
+        actor: approval.decided_by_membership_id === approval.assigned_membership_id
+          ? approval.assigned_name || approval.assigned_email || undefined : undefined, comment: approval.comment });
     }
     if (req.withdrawn_at) events.push({ key: 'withdrawn', timestamp: req.withdrawn_at });
     if (req.delivered_at) events.push({ key: 'delivered', timestamp: req.delivered_at });

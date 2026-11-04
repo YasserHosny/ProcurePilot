@@ -169,7 +169,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
           submitted_at: '2026-08-24T12:00:00Z', withdrawn_at: '2026-08-26T12:00:00Z',
           delivered_at: '2026-08-25T12:00:00Z',
           approval_step: { id: 'a', assigned_membership_id: 'm2', source: 'owner_fallback',
-            status: 'approved', decided_at: '2026-08-24T13:00:00Z',
+            status: 'approved', decided_by_membership_id: 'm2', decided_at: '2026-08-24T13:00:00Z',
             assigned_name: 'Ali', assigned_email: 'ali@example.com', comment: 'Within budget' } });
         const history = root.querySelector('ol.request-history');
         expect(history?.getAttribute('aria-label')).toBe(locale === 'en' ? 'History' : 'السجل');
@@ -187,6 +187,38 @@ describe('RequestFormComponent — create mode (T017)', () => {
       }
     });
 
+    for (const status of ['approved', 'rejected'] as const) {
+      for (const [scenario, decider] of [
+        ['assigned approver', 'm2'],
+        ['delegate', 'm3'],
+        ['missing decider', undefined],
+      ] as const) {
+        for (const name of ['Ali', '']) {
+          it(`shows the correct history actor for ${status}, ${scenario}, name="${name}"`, () => {
+            const timestamp = '2026-08-24T13:00:00Z';
+            const root = show({ ...mockRequest, status, approval_step: {
+              id: 'a', assigned_membership_id: 'm2', source: 'owner_fallback', status,
+              decided_by_membership_id: decider, decided_at: timestamp,
+              assigned_name: name, assigned_email: 'ali@example.com', comment: 'Decision comment',
+            } });
+            const row = root.querySelectorAll('.request-history li')[1];
+            expect(row).toBeDefined();
+            const actor = row?.querySelector('span[dir="auto"]');
+            if (decider === 'm2') {
+              expect(actor?.textContent?.trim()).toBe(name || 'ali@example.com');
+            } else {
+              expect(actor).toBeNull();
+            }
+            expect(row?.querySelector('p')?.textContent).toBe('Decision comment');
+            expect(row?.querySelector('time')?.getAttribute('datetime')).toBe(timestamp);
+            expect(row?.querySelector('time')?.textContent).toContain(
+              TestBed.inject(FormatService).formatDate(timestamp),
+            );
+          });
+        }
+      }
+    }
+
     it('omits absent events and clears details and history when navigating to a new request', () => {
       const root = show({ ...mockRequest, status: 'ordered', approval_step: {
         id: 'a', assigned_membership_id: 'm2', source: 'owner_fallback', status: 'approved',
@@ -194,7 +226,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
       expect(root.querySelectorAll('.request-history li').length).toBe(1);
       component.existingRequest.set({ ...mockRequest, status: 'rejected', approval_step: {
         id: 'a', assigned_membership_id: 'm2', source: 'owner_fallback', status: 'rejected',
-        decided_at: '2026-08-24T12:00:00Z', assigned_email: 'ali@example.com',
+        decided_by_membership_id: 'm2', decided_at: '2026-08-24T12:00:00Z', assigned_email: 'ali@example.com',
       } });
       fixture.detectChanges();
       expect(root.querySelectorAll('.request-history li').length).toBe(2);
