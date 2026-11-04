@@ -585,9 +585,10 @@ export class RfqCreateComponent implements OnInit {
     const payload = this.buildSavePayload();
     const existingId = this.rfqId();
     const action = existingId ? `update:${existingId}` : 'create:new';
+    const key = this.actionKeys.get(action, JSON.stringify(payload));
     const request$ = existingId
-      ? this.rfqApi.updateRfq(existingId, payload, this.actionKeys.get(action))
-      : this.rfqApi.createRfq(payload, this.actionKeys.get(action));
+      ? this.rfqApi.updateRfq(existingId, payload, key)
+      : this.rfqApi.createRfq(payload, key);
 
     request$.subscribe({
       next: (res) => {
@@ -689,7 +690,7 @@ export class RfqCreateComponent implements OnInit {
     this.rejectedSuppliers.set([]);
 
     const payload = this.buildSavePayload();
-    this.rfqApi.updateRfq(id, payload, this.actionKeys.get(action)).subscribe({
+    this.rfqApi.updateRfq(id, payload, this.actionKeys.get(action, JSON.stringify(payload))).subscribe({
       next: (res) => {
         this.actionKeys.clear(action);
         this.isSaving.set(false);
