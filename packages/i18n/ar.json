@@ -2361,7 +2361,20 @@
     "list": {
       "newRequestButton": "طلب جديد",
       "loadMore": "تحميل المزيد",
-      "loadedCount": "تم تحميل {{count}} من طلبات الشراء"
+      "loadedCount": "تم تحميل {{count}} من طلبات الشراء",
+      "searchLabel": "البحث في الطلبات",
+      "searchPlaceholder": "المورد أو المنتج أو الملاحظة",
+      "clearSearch": "مسح البحث",
+      "sortLabel": "ترتيب حسب",
+      "sort": {
+        "created_desc": "الأحدث أولاً",
+        "created_asc": "الأقدم أولاً",
+        "required_by_asc": "تاريخ الاحتياج (الأقرب)",
+        "required_by_desc": "تاريخ الاحتياج (الأبعد)",
+        "total_desc": "الإجمالي (الأعلى)",
+        "total_asc": "الإجمالي (الأدنى)"
+      },
+      "mineToggle": "طلباتي"
     },
     "table": {
       "caption": "طلبات الشراء"
@@ -2439,8 +2452,8 @@
       "atLeastOneLineRequired": "مطلوب بند واحد على الأقل."
     },
     "empty": "لا توجد طلبات شراء بعد. أنشئ أول طلب للبدء.",
-    "listEmptyFiltered": "لا توجد طلبات شراء تطابق هذا الفلتر.",
-    "clearFilter": "إلغاء التصفية",
+    "listEmptyFiltered": "لا توجد طلبات شراء تطابق عوامل التصفية هذه.",
+    "clearFilter": "مسح عوامل التصفية",
     "createSuccess": "تم حفظ طلب الشراء كمسودة.",
     "submitSuccess": "تم إرسال طلب الشراء للاعتماد.",
     "withdrawSuccess": "تم سحب طلب الشراء.",

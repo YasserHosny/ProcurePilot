@@ -3050,3 +3050,243 @@ def test_new_public_tables_grant_nothing_to_client_roles_by_default(
             """
         )
         assert cur.fetchall() == []
+
+
+# --- role and lifecycle guards at the table (PPS-210) -----------------------------------------
+
+
+def _insert_split_job(cur: psycopg.Cursor, workspace: Workspace) -> UUID:
+    job_id = uuid4()
+    cur.execute(
+        "insert into basket_split_job (id,tenant_id,requested_by,supplier_ids,items,status) "
+        "values (%s,%s,%s,%s,'[]'::jsonb,'queued')",
+        (
+            job_id,
+            workspace.tenant_id,
+            workspace.membership_id,
+            [str(workspace.supplier_id), str(uuid4())],
+        ),
+    )
+    return job_id
+
+
+def _insert_order(cur: psycopg.Cursor, workspace: Workspace, *, status: str = "draft") -> UUID:
+    """A purchase order with one line, created as the acting member (an owner)."""
+    order_id = uuid4()
+    cur.execute(
+        "insert into purchase_order (id,tenant_id,order_number,supplier_id,status,order_date,"
+        "total_amount,total_currency,tax_amount,tax_currency,source_reference,created_by) "
+        "values (%s,%s,%s,%s,'draft',current_date,10,'GBP',0,'GBP','test',%s)",
+        (
+            order_id,
+            workspace.tenant_id,
+            f"PO-GUARD-{uuid4().hex[:8]}",
+            workspace.supplier_id,
+            workspace.membership_id,
+        ),
+    )
+    cur.execute(
+        "insert into purchase_order_line (tenant_id,purchase_order_id,line_number,description,"
+        "ordered_quantity,base_unit,unit_price_amount,unit_price_currency,tax_amount,"
+        "tax_currency,line_total_amount,line_total_currency) "
+        "values (%s,%s,1,'guard line',1,'each',10,'GBP',0,'GBP',10,'GBP')",
+        (workspace.tenant_id, order_id),
+    )
+    for step in {
+        "draft": [],
+        "submitted": ["submitted"],
+        "confirmed": ["submitted", "confirmed"],
+        "partially_received": ["submitted", "partially_received"],
+        "received": ["submitted", "received"],
+        "cancelled": ["cancelled"],
+        "closed": ["submitted", "received", "closed"],
+    }[status]:
+        cur.execute(
+            "update purchase_order set status = %s::purchase_order_status where id = %s",
+            (step, order_id),
+        )
+    return order_id
+
+
+def test_a_viewer_cannot_start_or_change_a_basket_split_job(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        job_id = _insert_split_job(cur, alpha)
+        viewer_user_id, _ = _insert_second_member(cur, alpha, role="viewer", label="split-viewer")
+        _act_as_role(cur, alpha, viewer_user_id, "viewer")
+
+        cur.execute("select count(*) from basket_split_job where id = %s", (job_id,))
+        assert cur.fetchone() == (1,)  # reading stays open to every member
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            _insert_split_job(cur, alpha)
+        conn.rollback()
+
+
+def test_a_viewer_update_or_delete_of_a_basket_split_job_changes_nothing(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        job_id = _insert_split_job(cur, alpha)
+        viewer_user_id, _ = _insert_second_member(cur, alpha, role="viewer", label="split-viewer2")
+        _act_as_role(cur, alpha, viewer_user_id, "viewer")
+
+        cur.execute("update basket_split_job set status = 'running' where id = %s", (job_id,))
+        assert cur.rowcount == 0
+        cur.execute("delete from basket_split_job where id = %s", (job_id,))
+        assert cur.rowcount == 0
+        cur.execute("select status from basket_split_job where id = %s", (job_id,))
+        assert cur.fetchone() == ("queued",)
+
+
+def test_a_buyer_can_start_and_update_a_basket_split_job(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        buyer_user_id, _ = _insert_second_member(cur, alpha, role="buyer", label="split-buyer")
+        _act_as_role(cur, alpha, buyer_user_id, "buyer")
+        job_id = _insert_split_job(cur, alpha)
+        cur.execute("update basket_split_job set status = 'running' where id = %s", (job_id,))
+        assert cur.rowcount == 1
+
+
+@pytest.mark.parametrize(
+    ("start", "target"),
+    [
+        ("cancelled", "draft"),
+        ("cancelled", "submitted"),
+        ("closed", "received"),
+        ("closed", "cancelled"),
+        ("received", "draft"),
+        ("received", "cancelled"),
+        ("submitted", "draft"),
+        ("draft", "received"),
+        ("draft", "confirmed"),
+    ],
+)
+def test_an_order_cannot_take_a_status_the_lifecycle_does_not_allow(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace], start: str, target: str
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        order_id = _insert_order(cur, alpha, status=start)
+        with pytest.raises(psycopg.errors.RestrictViolation, match="status"):
+            cur.execute(
+                "update purchase_order set status = %s::purchase_order_status where id = %s",
+                (target, order_id),
+            )
+        conn.rollback()
+
+
+@pytest.mark.parametrize(
+    ("start", "target"),
+    [
+        ("draft", "submitted"),
+        ("draft", "cancelled"),
+        ("submitted", "confirmed"),
+        ("submitted", "partially_received"),
+        ("confirmed", "received"),
+        ("partially_received", "received"),
+        ("partially_received", "cancelled"),
+        ("submitted", "cancelled"),
+    ],
+)
+def test_an_order_follows_the_lifecycle_the_api_uses(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace], start: str, target: str
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        order_id = _insert_order(cur, alpha, status=start)
+        cur.execute(
+            "update purchase_order set status = %s::purchase_order_status where id = %s",
+            (target, order_id),
+        )
+        assert cur.rowcount == 1
+
+
+def test_a_submitted_order_header_and_lines_are_frozen(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        order_id = _insert_order(cur, alpha, status="submitted")
+        cur.execute("savepoint header_edit")
+        with pytest.raises(psycopg.errors.RestrictViolation, match="draft"):
+            cur.execute("update purchase_order set total_amount = 1 where id = %s", (order_id,))
+        cur.execute("rollback to savepoint header_edit")
+
+        cur.execute(
+            "update purchase_order_line set unit_price_amount = 1 where purchase_order_id = %s",
+            (order_id,),
+        )
+        assert cur.rowcount == 0
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into purchase_order_line (tenant_id,purchase_order_id,line_number,"
+                "description,ordered_quantity,base_unit,unit_price_amount,unit_price_currency,"
+                "tax_amount,tax_currency,line_total_amount,line_total_currency) "
+                "values (%s,%s,2,'late line',1,'each',1,'GBP',0,'GBP',1,'GBP')",
+                (alpha.tenant_id, order_id),
+            )
+
+
+def test_a_draft_order_header_and_lines_stay_editable(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        order_id = _insert_order(cur, alpha)
+        cur.execute("update purchase_order set total_amount = 2 where id = %s", (order_id,))
+        assert cur.rowcount == 1
+        cur.execute(
+            "update purchase_order_line set unit_price_amount = 2 where purchase_order_id = %s",
+            (order_id,),
+        )
+        assert cur.rowcount == 1
+
+
+def test_a_line_cannot_be_moved_into_an_order_that_is_no_longer_a_draft(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        draft_id = _insert_order(cur, alpha)
+        submitted_id = _insert_order(cur, alpha, status="submitted")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "update purchase_order_line set purchase_order_id = %s, line_number = 9 "
+                "where purchase_order_id = %s",
+                (submitted_id, draft_id),
+            )
+
+
+def test_an_order_cannot_be_inserted_past_draft(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into purchase_order (tenant_id,order_number,supplier_id,status,"
+                "order_date,total_amount,total_currency,tax_amount,tax_currency,"
+                "source_reference,created_by) "
+                "values (%s,%s,%s,'cancelled',current_date,1,'GBP',0,'GBP','test',%s)",
+                (
+                    alpha.tenant_id,
+                    f"PO-LATE-{uuid4().hex[:8]}",
+                    alpha.supplier_id,
+                    alpha.membership_id,
+                ),
+            )

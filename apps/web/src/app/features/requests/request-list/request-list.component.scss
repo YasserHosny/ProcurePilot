@@ -46,11 +46,17 @@
 
 .filter-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
 }
 
+.search-field {
+  flex: 1 1 240px;
+}
+
 .status-filter {
+  flex: 0 1 180px;
   min-inline-size: 180px;
 
   @include bp.mobile {

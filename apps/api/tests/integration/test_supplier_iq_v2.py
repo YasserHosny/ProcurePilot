@@ -215,7 +215,7 @@ def _seed_orders(context: object) -> None:
                           (id, tenant_id, order_number, supplier_id, status, order_date,
                            expected_delivery_date, total_amount, total_currency, tax_amount,
                            tax_currency, source_reference, created_by)
-                        values (%s, %s, %s, %s, 'received', %s, %s, 10, 'GBP', 0,
+                        values (%s, %s, %s, %s, 'draft', %s, %s, 10, 'GBP', 0,
                                 'GBP', %s, %s)
                         """,
                         (
@@ -245,6 +245,13 @@ def _seed_orders(context: object) -> None:
                             order_id,
                             context.product_id,
                         ),
+                    )
+                    # Lines are only written while the order is a draft; move it on afterwards.
+                    cur.execute(
+                        "update purchase_order set status = 'submitted' where id = %s", (order_id,)
+                    )
+                    cur.execute(
+                        "update purchase_order set status = 'received' where id = %s", (order_id,)
                     )
                     cur.execute(
                         """

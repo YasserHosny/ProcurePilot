@@ -204,17 +204,23 @@ def test_ordered_withdrawal_api_and_committed_spend(
                     "insert into purchase_order "
                     "(tenant_id,order_number,supplier_id,status,order_date,total_amount,"
                     "total_currency,tax_currency,source_reference,created_by,source_request_id) "
-                    "values (%s,%s,%s,%s,current_date,100,'GBP','GBP',%s,%s,%s)",
+                    "values (%s,%s,%s,'draft',current_date,100,'GBP','GBP',%s,%s,%s) returning id",
                     (
                         ws.tenant_id,
                         str(uuid4()),
                         quote.supplier_id,
-                        po_status,
                         str(uuid4()),
                         ws.membership_id,
                         request_id,
                     ),
                 )
+                order_id = cur.fetchone()[0]
+                if po_status != "draft":  # orders are inserted as drafts and then move on
+                    cur.execute(
+                        "update purchase_order set status = %s::purchase_order_status "
+                        "where id = %s",
+                        (po_status, order_id),
+                    )
             who = {"requester": requester, "owner": ws, "other": other}[actor]
             act_as(cur, who)
         client = PsycopgSupabaseClient(conn)

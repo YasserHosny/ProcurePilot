@@ -34,6 +34,28 @@
       <mat-option value="rejected">{{ 'requests.status.rejected' | translate }}</mat-option>
       <mat-option value="withdrawn">{{ 'requests.status.withdrawn' | translate }}</mat-option>
     </mat-select>
+    <mat-form-field class="search-field" subscriptSizing="dynamic">
+      <mat-label>{{ 'requests.list.searchLabel' | translate }}</mat-label>
+      <input #searchInput matInput type="search" maxlength="100" [value]="searchText()"
+        [placeholder]="'requests.list.searchPlaceholder' | translate" (input)="onSearchInput($event)" />
+      @if (searchText()) {
+        <button mat-icon-button matSuffix type="button" class="clear-search-btn"
+          [attr.aria-label]="'requests.list.clearSearch' | translate" (click)="clearSearch()">
+          <mat-icon aria-hidden="true">close</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
+      <mat-label>{{ 'requests.list.sortLabel' | translate }}</mat-label>
+      <mat-select [value]="sortOption()" (selectionChange)="onSortChange($event.value)">
+        @for (sort of sortOptions; track sort) {
+          <mat-option [value]="sort">{{ ('requests.list.sort.' + sort) | translate }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-slide-toggle [checked]="mineFilter()" (change)="onMineToggleChange($event.checked)">
+      {{ 'requests.list.mineToggle' | translate }}
+    </mat-slide-toggle>
   </div>
 
   @if (errorMessage()) {
@@ -49,7 +71,7 @@
   }
 
   <div class="visually-hidden" aria-live="polite" role="status" aria-atomic="true">
-    @if (!isLoading() && requests().length > 0) {
+    @if (!isLoading() && !errorMessage()) {
       {{ 'requests.list.loadedCount' | translate: { count: requests().length } }}
     }
   </div>
@@ -63,7 +85,7 @@
     } @else if (requests().length === 0) {
       <div class="empty-state">
         <mat-icon class="empty-icon" aria-hidden="true">description</mat-icon>
-        @if (statusFilter()) {
+        @if (hasActiveFilters()) {
           <p class="empty-message">{{ 'requests.listEmptyFiltered' | translate }}</p>
           <button mat-stroked-button type="button" class="clear-filter-btn" (click)="clearFilter()">
             {{ 'requests.clearFilter' | translate }}
