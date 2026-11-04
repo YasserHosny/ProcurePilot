@@ -851,7 +851,7 @@ export class CompareComponent implements OnInit, OnChanges {
 
     this.preparing.set(response.id);
 
-    this.rfqApi.prepareRequest(this.rfqId(), payload, this.actionKeys.get(`prepare:${response.id}`)).subscribe({
+    this.rfqApi.prepareRequest(this.rfqId(), payload, this.actionKeys.get(`prepare:${response.id}`, JSON.stringify(payload))).subscribe({
       next: (res) => {
         this.actionKeys.clear(`prepare:${response.id}`);
         this.preparing.set(null);

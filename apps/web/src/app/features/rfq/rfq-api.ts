@@ -259,16 +259,23 @@ export class RfqApi {
   }
 }
 
-/** Component-local keys survive ambiguous failures until the logical action resolves. */
+/**
+ * Component-local keys survive ambiguous failures until the logical action resolves.
+ *
+ * A key is only reused for the payload it was created for: the server answers a repeated key with
+ * the result it stored the first time and ignores a changed body, so an edited payload must start a
+ * new operation. Pass a fingerprint of the request body (e.g. its JSON) for actions that have one.
+ */
 export class RfqActionKeys {
-  private readonly keys = new Map<string, string>();
+  private readonly keys = new Map<string, { key: string; fingerprint: string | undefined }>();
 
-  get(action: string): string {
-    let key = this.keys.get(action);
-    if (!key) {
-      key = crypto.randomUUID();
-      this.keys.set(action, key);
+  get(action: string, fingerprint?: string): string {
+    const current = this.keys.get(action);
+    if (current && (fingerprint === undefined || current.fingerprint === fingerprint)) {
+      return current.key;
     }
+    const key = crypto.randomUUID();
+    this.keys.set(action, { key, fingerprint });
     return key;
   }
 

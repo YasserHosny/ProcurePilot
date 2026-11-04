@@ -2600,6 +2600,23 @@ describe('CompareComponent (RFQ)', () => {
     expect(fixture.nativeElement.textContent).not.toContain('unknown-product-uuid');
   });
 
+  it('rotates the prepare key when the branch changes after an ambiguous failure', () => {
+    const reply = dummyResponses.items[0];
+    component.selectedBranchId.set('branch-1');
+    component.requiredByDate.set(new Date(2026, 11, 1));
+    mockRfqApi.prepareRequest.and.returnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+    component.prepareRequest(reply);
+    const first = mockRfqApi.prepareRequest.calls.mostRecent().args[2];
+    component.prepareRequest(reply);
+    expect(mockRfqApi.prepareRequest.calls.mostRecent().args[2]).toBe(first);
+    component.selectedBranchId.set('branch-2');
+    component.prepareRequest(reply);
+    const changed = mockRfqApi.prepareRequest.calls.mostRecent().args[2];
+    expect(changed).not.toBe(first);
+    component.prepareRequest(reply);
+    expect(mockRfqApi.prepareRequest.calls.mostRecent().args[2]).toBe(changed);
+  });
+
   it('reuses prepare keys on ambiguous failure and drops them on success or definitive rejection', () => {
     const reply = dummyResponses.items[0];
     component.selectedBranchId.set('branch-1');
