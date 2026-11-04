@@ -2361,7 +2361,20 @@
     "list": {
       "newRequestButton": "New request",
       "loadMore": "Load more",
-      "loadedCount": "{{count}} requests loaded"
+      "loadedCount": "{{count}} requests loaded",
+      "searchLabel": "Search requests",
+      "searchPlaceholder": "Supplier, product or note",
+      "clearSearch": "Clear search",
+      "sortLabel": "Sort by",
+      "sort": {
+        "created_desc": "Newest first",
+        "created_asc": "Oldest first",
+        "required_by_asc": "Required by (soonest)",
+        "required_by_desc": "Required by (latest)",
+        "total_desc": "Total (highest)",
+        "total_asc": "Total (lowest)"
+      },
+      "mineToggle": "My requests"
     },
     "table": {
       "caption": "Purchase requests"
@@ -2439,8 +2452,8 @@
       "atLeastOneLineRequired": "At least one line item is required."
     },
     "empty": "No purchase requests yet. Create your first request to get started.",
-    "listEmptyFiltered": "No purchase requests match this filter.",
-    "clearFilter": "Clear filter",
+    "listEmptyFiltered": "No purchase requests match these filters.",
+    "clearFilter": "Clear filters",
     "createSuccess": "Purchase request saved as a draft.",
     "submitSuccess": "Purchase request submitted for approval.",
     "withdrawSuccess": "Purchase request withdrawn.",
