@@ -113,6 +113,9 @@
           @if (productForm.get('tenant_name')?.hasError('required') && productForm.get('tenant_name')?.touched) {
             <mat-error>{{ 'matching.resolution.newProduct.tenantNameRequired' | translate }}</mat-error>
           }
+          @if (productForm.get('tenant_name')?.hasError('maxlength')) {
+            <mat-error>{{ 'matching.resolution.newProduct.tenantNameMaxLength' | translate }}</mat-error>
+          }
         </mat-form-field>
 
         <div class="form-row">
