@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import { test, expect, type Page } from '@playwright/test';
 
@@ -39,10 +40,15 @@ test.describe('Requests and Approvals Accessibility @a11y', () => {
   let workspace: Credentials;
   let ownerToken: string;
   let draftRequestId: string;
+  let branchId: string;
+  let productId: string;
+  const requestIds: string[] = [];
 
   test.beforeAll(async () => {
     workspace = credentials();
     ownerToken = await signInOwner();
+
+    const marker = `a11y-${randomUUID()}`;
 
     // 1. Seed a branch so the request form branch dropdown is populated
     const branch = await apiAsUser<{ id: string }>(
@@ -50,7 +56,7 @@ test.describe('Requests and Approvals Accessibility @a11y', () => {
       'POST',
       '/organisation/branches',
       {
-        name: `A11y Branch ${Date.now()}`,
+        name: marker,
         address: '10 Queensway',
         region: 'GB',
       },
@@ -58,8 +64,11 @@ test.describe('Requests and Approvals Accessibility @a11y', () => {
 
     // 2. Seed a catalogue product for line items
     const product = await createTestProduct(ownerToken, {
-      tenant_name: `A11y Item ${Date.now()}`,
+      tenant_name: marker,
     });
+
+    branchId = branch.id;
+    productId = product.id;
 
     const futureDate = new Date(Date.now() + 30 * 86_400_000).toISOString().split('T')[0]!;
 
@@ -67,17 +76,36 @@ test.describe('Requests and Approvals Accessibility @a11y', () => {
     const draft = await apiAsUser<{ id: string }>(ownerToken, 'POST', '/requests', {
       branch_id: branch.id,
       required_by_date: futureDate,
-      lines: [{ workspace_product_id: product.id, quantity: '5' }],
+      lines: [{ workspace_product_id: product.id, quantity: '5', note: `${marker}-draft` }],
     });
     draftRequestId = draft.id;
+    requestIds.push(draft.id);
 
     // 4. Seed and submit a request so the approval queue has a real pending item
     const submitted = await apiAsUser<{ id: string }>(ownerToken, 'POST', '/requests', {
       branch_id: branch.id,
       required_by_date: futureDate,
-      lines: [{ workspace_product_id: product.id, quantity: '10' }],
+      lines: [{ workspace_product_id: product.id, quantity: '10', note: `${marker}-submitted` }],
     });
+    requestIds.push(submitted.id);
     await apiAsUser(ownerToken, 'POST', `/requests/${submitted.id}/submit`);
+  });
+
+  test.afterAll(async () => {
+    for (const id of requestIds) {
+      const request = await apiAsUser<{ status: string }>(ownerToken, 'GET', `/requests/${id}`);
+      if (request.status === 'draft' || request.status === 'submitted') {
+        await apiAsUser(ownerToken, 'POST', `/requests/${id}/withdraw`);
+      }
+    }
+    if (productId) await apiAsUser(ownerToken, 'DELETE', `/products/${productId}`);
+    if (branchId) await apiAsUser(ownerToken, 'PATCH', `/organisation/branches/${branchId}`, {
+      is_active: false, confirm_dependents: true,
+    });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await ensureEnglish(page);
   });
 
   async function signInUser(page: Page) {
@@ -154,6 +182,19 @@ test.describe('Requests and Approvals Accessibility @a11y', () => {
     expect(results.violations, describeViolations(results)).toEqual([]);
   });
 
+  test('invalid request submission in English has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    await signInUser(page);
+    await ensureEnglish(page);
+    await page.goto('/requests/new');
+    await page.getByRole('button', { name: 'Save Draft', exact: true }).click();
+    await expect(page.locator('.error-banner[role="alert"]')).toBeVisible();
+    for (const [label, message] of [['Branch', 'Branch is required'], ['Required By', 'Required-by date is required'], ['Product', 'Select a product'], ['Quantity', 'Quantity must be greater than zero']]) {
+      await expect(page.getByLabel(label!, { exact: true })).toHaveAccessibleDescription(new RegExp(message!));
+    }
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
   // --- Arabic (RTL) WCAG 2.1 AA Scans ---
   // Declared after English scans so persisted locale changes do not affect earlier tests.
 
@@ -208,4 +249,19 @@ test.describe('Requests and Approvals Accessibility @a11y', () => {
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);
   });
+
+  test('invalid request submission in Arabic has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    await signInUser(page);
+    await switchToArabic(page);
+    await page.goto('/requests/new');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await page.getByRole('button', { name: 'حفظ كمسودة', exact: true }).click();
+    await expect(page.locator('.error-banner[role="alert"]')).toBeVisible();
+    for (const [label, message] of [['الفرع', 'الفرع مطلوب'], ['مطلوب بحلول', 'تاريخ الاستحقاق مطلوب'], ['المنتج', 'اختر منتجًا'], ['الكمية', 'يجب أن تكون الكمية أكبر من صفر']]) {
+      await expect(page.getByLabel(label!, { exact: true })).toHaveAccessibleDescription(new RegExp(message!));
+    }
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
 });
