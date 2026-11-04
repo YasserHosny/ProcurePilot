@@ -1275,19 +1275,21 @@ ProcurePilot only; no provider-send/write/cancel method exists.
 | `submit_idempotency_key` | uuid | Nullable unique per tenant |
 | `edit_idempotency_key` | uuid | Nullable unique per tenant |
 | `cancel_idempotency_key` | uuid | Nullable unique per tenant |
+| `close_idempotency_key` | uuid | Nullable unique per tenant |
 | `created_at` / `updated_at` | timestamptz | Audit fields |
 
 State transitions for US4: create yields `draft`; `PUT /orders/{id}` may edit only `draft`;
 `POST /orders/{id}/submit` moves `draft -> submitted`; `POST /orders/{id}/cancel` moves a
 cancellable order (anything but `received` or `closed`) to `cancelled`. Cancellation is internal
-and preserves receipt/confirmation evidence.
+and preserves receipt/confirmation evidence. `POST /orders/{id}/close` moves a `received` order to
+`closed`, which is final.
 
 Evidence transitions (spec 016 FR-021): recording a supplier confirmation moves `submitted ->
 confirmed`; recording a delivery receipt moves `submitted | confirmed | partially_received` to
 `partially_received`, or to `received` once every line's cumulative received quantity reaches its
 ordered quantity. Evidence never moves an order backwards and leaves `draft`, `cancelled` and
-`closed` unchanged. Each change is audited as `orders.purchase_order_status_changed`. Nothing sets
-`closed` yet.
+`closed` unchanged. Each change is audited as `orders.purchase_order_status_changed`. Only the
+close endpoint sets `closed`.
 
 ## `PurchaseOrderLine`
 

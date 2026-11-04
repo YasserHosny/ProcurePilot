@@ -28,7 +28,7 @@ describe('OrderDetailComponent', () => {
     requests = jasmine.createSpyObj<RequestsApiService>('RequestsApiService', ['getRequest']);
     requests.getRequest.and.returnValue(throwError(() => new Error('no request')));
     api = jasmine.createSpyObj<OrdersApiService>('OrdersApiService', [
-      'getOrder', 'submitOrder', 'cancelOrder', 'recordConfirmation', 'recordReceipt',
+      'getOrder', 'submitOrder', 'cancelOrder', 'closeOrder', 'recordConfirmation', 'recordReceipt',
     ]);
     api.getOrder.and.returnValue(of({
       order: {
@@ -753,5 +753,78 @@ describe('OrderDetailComponent', () => {
     const text = byTestId('receipt-note')?.textContent ?? '';
     expect(text).toContain(component.lineDescription(current.order.lines[0]));
     expect(text).toContain('Short: supplier ran out');
+  });
+
+  // PPS-205: `closed` can be set, from received only, behind a confirmation.
+  it('offers Close only on received orders and asks first', fakeAsync(() => {
+    const offered: Record<string, boolean> = {};
+    for (const status of ['draft', 'submitted', 'confirmed', 'partially_received', 'received', 'closed', 'cancelled']) {
+      fixture = TestBed.createComponent(OrderDetailComponent);
+      showOrderAs(status);
+      fixture.detectChanges();
+      offered[status] = byTestId('close-order') !== null;
+    }
+    expect(offered).toEqual({
+      draft: false, submitted: false, confirmed: false, partially_received: false,
+      received: true, closed: false, cancelled: false,
+    });
+
+    fixture = TestBed.createComponent(OrderDetailComponent);
+    showOrderAs('received');
+    fixture.detectChanges();
+    byTestId('close-order')!.click();
+    fixture.detectChanges();
+    tick();
+    expect(api.closeOrder).not.toHaveBeenCalled();
+    expect(byTestId('close-confirm-panel')?.contains(document.activeElement)).toBeTrue();
+  }));
+
+  it('closes the order after confirmation, reloads it and announces it', fakeAsync(() => {
+    showOrderAs('received');
+    fixture.detectChanges();
+    api.closeOrder.and.returnValue(of({} as unknown as import('../orders-api').PurchaseOrder));
+    byTestId('close-order')!.click();
+    fixture.detectChanges();
+
+    byTestId('confirm-close')!.click();
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    expect(api.closeOrder).toHaveBeenCalledTimes(1);
+    expect(byTestId('close-confirm-panel')).toBeNull();
+    expect(byTestId('action-status')?.textContent).toContain('closed');
+  }));
+
+  it('keeps the order on screen and says why when closing fails', () => {
+    showOrderAs('received');
+    fixture.detectChanges();
+    api.closeOrder.and.returnValue(throwError(() => ({
+      status: 409, error: { code: 'conflict', details: { reason: 'order_not_closable' } },
+    })));
+    fixture.componentInstance.closeOrder();
+    fixture.componentInstance.confirmClose();
+    fixture.detectChanges();
+
+    expect(byTestId('order-lines')).toBeTruthy();
+    expect(byTestId('action-error')?.getAttribute('role')).toBe('alert');
+  });
+
+  // PPS-205: the timeline said nothing of how an order ended.
+  it('puts a cancelled or closed order\'s ending in the timeline', () => {
+    showOrderAs('cancelled');
+    fixture.detectChanges();
+    expect(byTestId('timeline-cancelled')).toBeTruthy();
+
+    fixture = TestBed.createComponent(OrderDetailComponent);
+    showOrderAs('closed');
+    fixture.detectChanges();
+    expect(byTestId('timeline-closed')).toBeTruthy();
+
+    fixture = TestBed.createComponent(OrderDetailComponent);
+    showOrderAs('submitted');
+    fixture.detectChanges();
+    expect(byTestId('timeline-cancelled')).toBeNull();
+    expect(byTestId('timeline-closed')).toBeNull();
   });
 });

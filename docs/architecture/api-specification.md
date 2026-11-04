@@ -2696,6 +2696,14 @@ different response that confirms existence.
 - Records `orders.purchase_order_cancelled`. Idempotent replay with the same key returns the
   cancelled order; a different key on an already-cancelled order returns a conflict.
 
+### `POST /orders/{order_id}/close`
+
+- Requires owner or buyer role and `Idempotency-Key`.
+- Moves a `received` order to `closed`; any other status returns `409` with
+  `order_not_closable`. Closed is final: no evidence, edits or cancellation follow.
+- Records `orders.purchase_order_closed`. Replay with the same key returns the closed order; a
+  different key on an already-closed order returns `409` with `order_already_closed`.
+
 ### `POST /orders/{order_id}/submit`
 
 - Requires owner or buyer role and `Idempotency-Key`.
