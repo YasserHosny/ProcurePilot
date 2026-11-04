@@ -161,6 +161,7 @@ def test_decision_records_one_audit_and_retry_conflicts(
                 "approval_step_id": str(sid),
                 "decided_by_membership_id": str(ws.membership_id),
                 "comment": comment,
+                "self_approved": True,
             },
         )
     ]

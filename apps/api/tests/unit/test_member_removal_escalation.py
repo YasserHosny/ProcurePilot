@@ -113,12 +113,17 @@ def _prepare(
     recorded: list[dict[str, Any]] = []
     monkeypatch.setattr(requests_module, "authenticated_client", lambda _settings, _token: client)
 
+    resolved_owner_id = owner_id or uuid4()
+
     def _fetch_owner(_client: object) -> UUID:
         if owner_raises:
             raise AssertionError("owner lookup should not run when nothing is pending")
-        return owner_id or uuid4()
+        return resolved_owner_id
 
     monkeypatch.setattr(service, "_fetch_owner_membership_id", _fetch_owner)
+    monkeypatch.setattr(
+        service, "_fetch_owner_membership_ids", lambda client: [_fetch_owner(client)]
+    )
     monkeypatch.setattr(service, "_record", lambda **kwargs: recorded.append(kwargs))
     return service, client, recorded
 

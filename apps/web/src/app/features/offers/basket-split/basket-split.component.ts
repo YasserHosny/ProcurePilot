@@ -18,7 +18,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { Subscription, catchError, forkJoin, interval, map, of, switchMap } from 'rxjs';
+import { EMPTY, Subscription, catchError, expand, forkJoin, interval, map, of, reduce, switchMap } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, BasketSplitJobSummary, Product, Supplier } from '../../../core/api/models';
@@ -103,6 +103,13 @@ export class BasketSplitComponent implements OnInit {
   readonly rfqDetail = signal<RfqDetail | null>(null);
   readonly suppliers = signal<Supplier[]>([]);
   readonly products = signal<Product[]>([]);
+  /** Cursor for the next page of the current product list; null when it is complete. */
+  readonly productsCursor = signal<string | null>(null);
+  readonly hasMoreProducts = computed(() => this.productsCursor() !== null);
+  private productQuery = '';
+  /** Bumped by every new product search, so a slower answer to an older one is dropped. */
+  private productGeneration = 0;
+  private productSearchTimer: ReturnType<typeof setTimeout> | null = null;
   readonly isLoading = signal<boolean>(false);
   readonly isSubmitting = signal<boolean>(false);
 
@@ -265,14 +272,12 @@ export class BasketSplitComponent implements OnInit {
     this.isLoading.set(true);
     // The optimiser accepts active and preferred suppliers; both belong in the pickers.
     forkJoin({
-      active: this.api.suppliers({ limit: 100, status: 'active' }),
-      preferred: this.api.suppliers({ limit: 100, status: 'preferred' }).pipe(
-        catchError(() => of({ items: [] as Supplier[], next_cursor: null })),
-      ),
+      active: this.allSuppliers('active'),
+      preferred: this.allSuppliers('preferred').pipe(catchError(() => of([] as Supplier[]))),
     }).subscribe({
       next: ({ active, preferred }) => {
         const byId = new Map<string, Supplier>();
-        for (const supplier of [...active.items, ...preferred.items]) byId.set(supplier.id, supplier);
+        for (const supplier of [...active, ...preferred]) byId.set(supplier.id, supplier);
         const items = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
         this.suppliers.set(items);
         if (items.length >= 2 && !this.supplierId1() && !this.supplierId2()) {
@@ -287,11 +292,71 @@ export class BasketSplitComponent implements OnInit {
     this.api.products({ limit: 100, status: 'active' }).subscribe({
       next: (res) => {
         this.products.set(res.items);
+        this.productsCursor.set(res.next_cursor);
       },
       error: () => {
         // Fallback silently if products load fails
       },
     });
+  }
+
+  /** Every page of the suppliers with this status (the API pages at 100). */
+  private allSuppliers(status: 'active' | 'preferred') {
+    return this.api.suppliers({ limit: 100, status }).pipe(
+      expand((res) =>
+        res.next_cursor ? this.api.suppliers({ limit: 100, status, cursor: res.next_cursor }) : EMPTY,
+      ),
+      reduce((all, res) => [...all, ...res.items], [] as Supplier[]),
+    );
+  }
+
+  /** Products already chosen stay available whatever the search shows. */
+  private mergeProducts(found: Product[], keepChosen = true): void {
+    const chosen = new Set(this.items().map((item) => item.workspace_product_id).filter(Boolean));
+    const byId = new Map<string, Product>();
+    for (const product of keepChosen ? this.products().filter((p) => chosen.has(p.id)) : []) byId.set(product.id, product);
+    for (const product of found) byId.set(product.id, product);
+    this.products.set([...byId.values()]);
+  }
+
+  /** Searches the catalogue by name after a short pause; an empty search lists the first page again. */
+  onProductSearch(query: string): void {
+    if (this.productSearchTimer) clearTimeout(this.productSearchTimer);
+    this.productSearchTimer = setTimeout(() => {
+      this.productQuery = query.trim();
+      const generation = ++this.productGeneration;
+      this.api
+        .products({ limit: 100, status: 'active', q: this.productQuery || undefined })
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (res) => {
+            if (generation !== this.productGeneration) return;
+            this.mergeProducts(res.items);
+            this.productsCursor.set(res.next_cursor);
+          },
+          error: () => undefined, // the list stays as it was
+        });
+    }, 300);
+  }
+
+  /** The next page of the current list (all products, or the current search). */
+  loadMoreProducts(): void {
+    const cursor = this.productsCursor();
+    if (!cursor) return;
+    const generation = this.productGeneration;
+    this.api
+      .products({ limit: 100, status: 'active', cursor, q: this.productQuery || undefined })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          if (generation !== this.productGeneration) return;
+          const byId = new Map(this.products().map((product) => [product.id, product] as const));
+          for (const product of res.items) byId.set(product.id, product);
+          this.products.set([...byId.values()]);
+          this.productsCursor.set(res.next_cursor);
+        },
+        error: () => undefined,
+      });
   }
 
   /** «Supplier A, Supplier B» for a history row. */
@@ -573,6 +638,7 @@ export class BasketSplitComponent implements OnInit {
           if (generation !== this.jobGeneration) return;
           this.currentJob.set(job);
           this.isLoading.set(false);
+          this.resolveMissingProducts(job);
           if (job.rfq_id) {
             this.rfqApi.getRfq(job.rfq_id).subscribe({
               next: (detail) => this.rfqDetail.set(detail),
@@ -596,6 +662,25 @@ export class BasketSplitComponent implements OnInit {
           this.handleError(err);
         },
       });
+  }
+
+  /** A job can use products beyond the first page the page loads: look those up by id. */
+  private resolveMissingProducts(job: BasketSplitJob): void {
+    const known = new Set(this.products().map((product) => product.id));
+    for (const item of job.items) {
+      if (known.has(item.workspace_product_id)) continue;
+      this.api
+        .product(item.workspace_product_id)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (product) => {
+            if (!this.products().some((p) => p.id === product.id)) {
+              this.products.set([...this.products(), product]);
+            }
+          },
+          error: () => undefined, // the id stays as the label
+        });
+    }
   }
 
   /** Starts a fresh job view: the previous job's poll and late answers must not touch it. */
