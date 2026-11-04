@@ -42,6 +42,9 @@
     <header class="page-header">
       <div class="header-titles">
         <h1 class="page-title">{{ 'rfq.detail.title' | translate }}</h1>
+        @if (formatRfqReference(detail.rfq.reference_number); as reference) {
+          <p class="page-subtitle" data-testid="rfq-reference"><bdi dir="ltr">{{ reference }}</bdi></p>
+        }
         <p class="page-subtitle">{{ 'rfq.detail.subtitle' | translate }}</p>
       </div>
       @if (canCancel()) {
@@ -134,16 +137,18 @@
                   <h2>{{ 'rfq.compare.draftNoticeTitle' | translate }}</h2>
                   <p>{{ 'rfq.compare.draftNoticeDescription' | translate }}</p>
                 </div>
-                @if (isCreator()) {
+                @if (canSend()) {
                   <div class="draft-notice-actions">
-                    <button
-                      mat-stroked-button
-                      type="button"
-                      (click)="onEditDraft()"
-                      data-testid="rfq-detail-edit-button"
-                    >
-                      {{ 'rfq.compare.editDraft' | translate }}
-                    </button>
+                    @if (isCreator()) {
+                      <button
+                        mat-stroked-button
+                        type="button"
+                        (click)="onEditDraft()"
+                        data-testid="rfq-detail-edit-button"
+                      >
+                        {{ 'rfq.compare.editDraft' | translate }}
+                      </button>
+                    }
                     <button
                       mat-flat-button
                       color="primary"
@@ -320,6 +325,24 @@
                         {{ 'rfq.detail.recipientStatus_' + recipient.status | translate }}
                       </span>
                     </div>
+                    @if ((recipient.status === 'failed' || recipient.status === 'draft') &&
+                      (detail.rfq.status === 'sent' || detail.rfq.status === 'responded' || detail.rfq.status === 'expired')) {
+                      <div class="send-record text-muted">
+                        @if (recipient.failure_reason === 'delivery_error') {
+                          <div>{{ 'rfq.detail.deliveryError' | translate }}</div>
+                        } @else if (recipient.failure_reason === 'missing_contact_email') {
+                          <div>{{ 'rfq.detail.missingContactEmail' | translate }}</div>
+                        }
+                        @if ((recipient.send_attempts ?? 0) > 0) {
+                          <div class="send-attempts">
+                            {{ sendAttemptsText(recipient) }}
+                            @if (recipient.last_attempt_at) {
+                              · {{ formatDate(recipient.last_attempt_at) }} · {{ formatTime(recipient.last_attempt_at) }}
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
                   </td>
                 </ng-container>
 

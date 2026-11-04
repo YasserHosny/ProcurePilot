@@ -68,6 +68,31 @@ describe('HistoryComponent', () => {
     next_cursor: null,
   };
 
+
+  it('renders an isolated reference at every width and omits absent values', () => {
+    fixture.detectChanges();
+    component.rfqs.set([{ ...mockRfqs[0], reference_number: 123 }, mockRfqs[1]]);
+    for (const narrow of [false, true]) {
+      component.isBelow768.set(narrow);
+      fixture.detectChanges();
+      const cells = fixture.nativeElement.querySelectorAll('td.mat-column-reference');
+      expect(cells.length).toBe(2);
+      expect(cells[0].textContent.trim()).toBe('RFQ-000123');
+      expect(cells[0].querySelector('bdi').dir).toBe('ltr');
+      expect(cells[1].textContent.trim()).toBe('');
+    }
+  });
+
+  for (const owner of [true, false]) {
+    it('limits non-creator draft sending by owner role: ' + owner, () => {
+      fixture.detectChanges();
+      spyOn(TestBed.inject(SessionService), 'hasRole').and.callFake(role => role === (owner ? 'owner' : 'buyer'));
+      component.currentMembershipId.set('other');
+      fixture.detectChanges();
+      expect(!!fixture.nativeElement.querySelector('[data-testid="rfq-send-button"]')).toBe(owner);
+      expect(fixture.nativeElement.querySelector('[data-testid="rfq-edit-button"]')).toBeNull();
+    });
+  }
   beforeEach(async () => {
     jasmine.clock().install();
     jasmine.clock().mockDate(new Date(2026, 9, 28));
@@ -290,7 +315,8 @@ describe('HistoryComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/rfq', 'rfq-draft-1', 'edit']);
   });
 
-  it('routes another member’s draft to RFQ details and hides draft actions', async () => {
+  it('routes another member’s draft to RFQ details and hides draft actions for a buyer', async () => {
+    spyOn(TestBed.inject(SessionService), 'hasRole').and.callFake(role => role === 'buyer');
     component.currentMembershipId.set('different-member');
     component.onRowClick(mockRfqs[0]);
     expect(router.navigate).toHaveBeenCalledWith(['/rfq', 'rfq-draft-1']);
@@ -1012,6 +1038,7 @@ describe('HistoryComponent', () => {
       component.isBelow1200.set(false);
       component.isBelow768.set(false);
       expect(component.displayedColumns()).toEqual([
+        'reference',
         'status',
         'neededBy',
         'sentAt',
@@ -1025,14 +1052,14 @@ describe('HistoryComponent', () => {
     it('hides recipients and responses below 1200px', () => {
       component.isBelow1200.set(true);
       component.isBelow768.set(false);
-      expect(component.displayedColumns()).toEqual(['status', 'neededBy', 'sentAt', 'actions']);
+      expect(component.displayedColumns()).toEqual(['reference', 'status', 'neededBy', 'sentAt', 'actions']);
       expect(component.showCountsInMenu()).toBeTrue();
     });
 
     it('shows only status, neededBy, and actions below 768px', () => {
       component.isBelow1200.set(true);
       component.isBelow768.set(true);
-      expect(component.displayedColumns()).toEqual(['status', 'neededBy', 'actions']);
+      expect(component.displayedColumns()).toEqual(['reference', 'status', 'neededBy', 'actions']);
       expect(component.showCountsInMenu()).toBeTrue();
     });
 
@@ -1054,16 +1081,17 @@ describe('HistoryComponent', () => {
       // Tablet size (below 1200px, not below 768px)
       tabletSubject.next({ matches: true, breakpoints: { '(max-width: 1199.98px)': true } });
       mobileSubject.next({ matches: false, breakpoints: { '(max-width: 767.98px)': false } });
-      expect(respComp.displayedColumns()).toEqual(['status', 'neededBy', 'sentAt', 'actions']);
+      expect(respComp.displayedColumns()).toEqual(['reference', 'status', 'neededBy', 'sentAt', 'actions']);
 
       // Mobile size (below 768px)
       mobileSubject.next({ matches: true, breakpoints: { '(max-width: 767.98px)': true } });
-      expect(respComp.displayedColumns()).toEqual(['status', 'neededBy', 'actions']);
+      expect(respComp.displayedColumns()).toEqual(['reference', 'status', 'neededBy', 'actions']);
 
       // Back to desktop (above 1200px)
       tabletSubject.next({ matches: false, breakpoints: { '(max-width: 1199.98px)': false } });
       mobileSubject.next({ matches: false, breakpoints: { '(max-width: 767.98px)': false } });
       expect(respComp.displayedColumns()).toEqual([
+        'reference',
         'status',
         'neededBy',
         'sentAt',

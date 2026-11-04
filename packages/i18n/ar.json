@@ -4469,7 +4469,8 @@
         "many": "{{count}} ردًا — مقارنة",
         "other": "{{count}} رد — مقارنة"
       },
-      "draftActionsUnavailable": "إجراءات المسودة غير متاحة حاليًا لتعذر تحميل أعضاء مساحة العمل."
+      "draftActionsUnavailable": "إجراءات المسودة غير متاحة حاليًا لتعذر تحميل أعضاء مساحة العمل.",
+      "reference": "الرقم المرجعي"
     },
     "detail": {
       "cancelledAtLabel": "تاريخ الإلغاء",
@@ -4567,7 +4568,17 @@
       "confirmRetryButton": "إعادة المحاولة للمستلمين الذين لم يستلموا",
       "cancelRetryButton": "إلغاء",
       "rfqExpiredError": "انتهت صلاحية طلب عرض الأسعار هذا ولم يعد بالإمكان إرساله.",
-      "notSendableError": "لا يمكن إرسال طلب عرض الأسعار هذا في حالته الحالية."
+      "notSendableError": "لا يمكن إرسال طلب عرض الأسعار هذا في حالته الحالية.",
+      "deliveryError": "فشل التسليم",
+      "missingContactEmail": "لا يوجد بريد إلكتروني للتواصل",
+      "sendAttempts": {
+        "zero": "لا محاولات ({{count}})",
+        "one": "محاولة واحدة ({{count}})",
+        "two": "محاولتان ({{count}})",
+        "few": "{{count}} محاولات",
+        "many": "{{count}} محاولة",
+        "other": "{{count}} محاولة"
+      }
     },
     "guardrails": {
       "costCentresError": "تعذر تحميل مراكز التكلفة.",
