@@ -294,7 +294,11 @@
                     @if (step.status === 'pending') {
                       <span>{{ 'requests.approval.selfApprovalPending' | translate }}</span>
                     } @else {
-                      <span>{{ 'requests.approval.selfApproved' | translate }}</span>
+                      @if (step.status === 'approved') {
+                        <span>{{ 'requests.approval.selfApproved' | translate }}</span>
+                      } @else if (step.status === 'rejected') {
+                        <span>{{ 'requests.approval.selfRejected' | translate }}</span>
+                      }
                       <p>{{ 'requests.approval.selfApprovedHint' | translate }}</p>
                     }
                   </div>

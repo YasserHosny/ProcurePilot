@@ -2458,8 +2458,9 @@
     },
     "approval": {
       "selfApproved": "اعتماد ذاتي",
+      "selfRejected": "رفض ذاتي",
       "selfApprovedHint": "اتخذ القرار الشخص الذي قدّم الطلب",
-      "selfApprovalPending": "مُسند إلى مقدّم الطلب (المالك الوحيد)",
+      "selfApprovalPending": "مُسند إلى مقدّم الطلب",
       "sectionTitle": "الاعتماد",
       "assignedTo": "معيّن إلى",
       "comment": "تعليق القرار",

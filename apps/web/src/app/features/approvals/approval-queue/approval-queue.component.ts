@@ -579,9 +579,14 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   isOwnRequest(item: QueueItem): boolean {
+    const membershipId = this.session.currentMember()?.membership_id;
+    if (!membershipId) return false;
+    const isOwn = (request: PurchaseRequest): boolean =>
+      request.approval_step?.self_approval === true &&
+      request.requested_by_membership_id === membershipId;
     return item.kind === 'group'
-      ? item.requests.some((request) => request.approval_step?.self_approval === true)
-      : item.request.approval_step?.self_approval === true;
+      ? item.requests.some(isOwn)
+      : isOwn(item.request);
   }
 
   isGroupRow(item: QueueItem): item is GroupQueueItem {

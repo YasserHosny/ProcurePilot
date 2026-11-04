@@ -2458,8 +2458,9 @@
     },
     "approval": {
       "selfApproved": "Self-approved",
+      "selfRejected": "Self-rejected",
       "selfApprovedHint": "Decided by the person who submitted it",
-      "selfApprovalPending": "Assigned to the requester (the only owner)",
+      "selfApprovalPending": "Assigned to the requester",
       "sectionTitle": "Approval",
       "assignedTo": "Assigned to",
       "comment": "Decision comment",

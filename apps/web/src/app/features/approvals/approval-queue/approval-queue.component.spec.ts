@@ -92,11 +92,12 @@ describe('ApprovalQueueComponent', () => {
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
   let routerSpy: jasmine.SpyObj<Router>;
   const role = signal<Role | null>('buyer');
-  let sessionSpy: { hasRole: jasmine.Spy; role: typeof role };
+  let sessionSpy: { hasRole: jasmine.Spy; role: typeof role; currentMember: jasmine.Spy };
 
   beforeEach(async () => {
     role.set('buyer');
     sessionSpy = {
+      currentMember: jasmine.createSpy('currentMember').and.returnValue({ membership_id: 'mem-requester-1' }),
       hasRole: jasmine.createSpy('hasRole').and.callFake((...roles: readonly Role[]) => {
         const current = role();
         return current ? roles.includes(current) : false;
@@ -224,6 +225,25 @@ describe('ApprovalQueueComponent', () => {
       return { ...mockPendingRequests[0], approval_step: step };
     }
 
+    for (const split of [false, true]) {
+      for (const viewer of ['another-member', null]) {
+        it(`hides a colleague's self-approval badge: split=${split}, viewer=${viewer}`, () => {
+          sessionSpy.currentMember.and.returnValue(viewer ? { membership_id: viewer } : null);
+          const request = markedRequest(true);
+          component.pendingRequests.set(split ? [{
+            ...request,
+            request_group: {
+              id: 'group-own', rfq_id: 'rfq-own', position: 1, size: 1,
+              combined_total: { amount: '1250', currency: 'SAR' },
+              best_single_total: null, saving: null, sibling_request_ids: [],
+            },
+          }] : [request]);
+          fixture.detectChanges();
+          expect((fixture.nativeElement as HTMLElement).querySelector('.own-request-badge')).toBeNull();
+        });
+      }
+    }
+
     for (const locale of ['en', 'ar']) {
       for (const flag of [true, false, undefined]) {
         for (const split of [false, true]) {
@@ -231,7 +251,7 @@ describe('ApprovalQueueComponent', () => {
             TestBed.inject(TranslateService).use(locale);
             const marked = markedRequest(flag);
             const requests = split
-              ? [markedRequest(false), { ...marked, id: 'req-other' }].map((request, i) => ({
+              ? [{ ...markedRequest(true), requested_by_membership_id: 'another-member' }, { ...marked, id: 'req-other' }].map((request, i) => ({
                   ...request,
                   request_group: {
                     id: 'group-own', rfq_id: 'rfq-own', position: i + 1, size: 2,

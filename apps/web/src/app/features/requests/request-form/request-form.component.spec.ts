@@ -157,11 +157,15 @@ describe('RequestFormComponent — create mode (T017)', () => {
             expect(marker?.querySelector('mat-icon')?.getAttribute('aria-hidden')).toBe('true');
             if (status === 'pending') {
               expect(marker?.textContent).toContain(locale === 'ar'
-                ? 'مُسند إلى مقدّم الطلب (المالك الوحيد)'
-                : 'Assigned to the requester (the only owner)');
+                ? 'مُسند إلى مقدّم الطلب'
+                : 'Assigned to the requester');
+              expect(marker?.textContent).not.toContain(locale === 'ar' ? 'المالك الوحيد' : 'the only owner');
               expect(marker?.textContent).not.toContain('Decided by the person');
             } else {
-              expect(marker?.textContent).toContain(locale === 'ar' ? 'اعتماد ذاتي' : 'Self-approved');
+              const approvedLabel = locale === 'ar' ? 'اعتماد ذاتي' : 'Self-approved';
+              const rejectedLabel = locale === 'ar' ? 'رفض ذاتي' : 'Self-rejected';
+              expect(marker?.textContent).toContain(status === 'approved' ? approvedLabel : rejectedLabel);
+              expect(marker?.textContent).not.toContain(status === 'approved' ? rejectedLabel : approvedLabel);
               expect(marker?.textContent).toContain(locale === 'ar'
                 ? 'اتخذ القرار الشخص الذي قدّم الطلب'
                 : 'Decided by the person who submitted it');
