@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -4368,7 +4369,11 @@ def _decode_approval_cursor(
         elif value is not None:
             if sort == "required_by_asc":
                 value = date.fromisoformat(value).isoformat()
-            elif not Decimal(value).is_finite():
+            # purchase_request.estimated_total_amount is numeric(18, 4).
+            elif (
+                not value.isascii()
+                or re.fullmatch(r"[+-]?[0-9]{1,14}(?:\.[0-9]{1,4})?", value) is None
+            ):
                 raise ValueError("invalid cursor amount")
         return value, UUID(step_id)
     except (KeyError, ValueError, TypeError, OverflowError, ArithmeticError) as exc:

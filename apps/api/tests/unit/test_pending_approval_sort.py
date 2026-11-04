@@ -198,11 +198,48 @@ def test_sql_reads_use_authenticated_claims_and_identical_filters(
         ("total_asc", "NaN"),
         ("total_desc", "Infinity"),
         ("total_asc", "bad"),
+        *[
+            (sort, value)
+            for sort in ("total_asc", "total_desc")
+            for value in (
+                "1E+200000",
+                "١٢٣",
+                "100000000000000",
+                "-100000000000000",
+                "1.00001",
+                "1e1",
+                "1_000",
+                " 12",
+                "12.",
+                ".12",
+            )
+        ],
         ("submitted_asc", None),
         ("required_by_asc", "bad"),
     ],
 )
 def test_invalid_cursor_values(sort: str, value: str | None) -> None:
     cursor = service._encode_approval_cursor(value, uuid4(), sort=sort)
-    with pytest.raises(UnprocessableEntityError):
+    with pytest.raises(UnprocessableEntityError) as error:
         service._decode_approval_cursor(cursor, sort=sort)
+    assert error.value.status_code == 422
+    assert error.value.details == {"cursor": "invalid"}
+
+
+@pytest.mark.parametrize("sort", ["total_asc", "total_desc"])
+@pytest.mark.parametrize("value", ["99999999999999.9999", "-99999999999999.9999", "+12.3400", "0"])
+def test_valid_amount_cursor_boundary(sort: str, value: str) -> None:
+    step_id = uuid4()
+    cursor = service._encode_approval_cursor(value, step_id, sort=sort)
+    assert service._decode_approval_cursor(cursor, sort=sort) == (value, step_id)
+
+
+def test_legacy_default_cursor_remains_valid() -> None:
+    import base64
+    import json
+
+    step_id = uuid4()
+    cursor = base64.urlsafe_b64encode(
+        json.dumps({"created_at": "2026-10-01T00:00:00Z", "id": str(step_id)}).encode()
+    ).decode()
+    assert service._decode_approval_cursor(cursor) == ("2026-10-01T00:00:00.000000Z", step_id)
