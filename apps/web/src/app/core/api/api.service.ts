@@ -60,6 +60,8 @@ import type {
   Member,
   Offer,
   OfferComparison,
+  PendingApprovalList,
+  PendingApprovalSort,
   PresignRequest,
   PresignResponse,
   PriceHistoryResponse,
@@ -1149,14 +1151,18 @@ export class ApiService {
   }
 
   listPendingApprovals(params?: {
+    sort?: PendingApprovalSort;
+    branch_id?: string;
     cursor?: string;
     limit?: number;
-  }): Observable<PurchaseRequestList> {
+  }): Observable<PendingApprovalList> {
     const query = new URLSearchParams();
+    if (params?.sort) query.set('sort', params.sort);
+    if (params?.branch_id) query.set('branch_id', params.branch_id);
     if (params?.cursor) query.set('cursor', params.cursor);
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
     const qs = query.toString() ? `?${query.toString()}` : '';
-    return this.http.get<PurchaseRequestList>(`${this.base}/approvals/pending${qs}`);
+    return this.http.get<PendingApprovalList>(`${this.base}/approvals/pending${qs}`);
   }
 
   listThresholdRules(params?: {

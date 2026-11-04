@@ -2568,6 +2568,34 @@
     "selfDecisionNotAllowed": "You can't decide a request you submitted. Another owner or approver needs to decide it.",
     "title": "Approval Queue",
     "subtitle": "Requests awaiting your decision.",
+    "sort": {
+      "label": "Sort by",
+      "options": {
+        "submitted_desc": "Newest first",
+        "submitted_asc": "Oldest first",
+        "required_by_asc": "Required by (soonest)",
+        "total_desc": "Highest total",
+        "total_asc": "Lowest total"
+      }
+    },
+    "filter": {
+      "branch": "Branch",
+      "allBranches": "All branches",
+      "clear": "Clear filters",
+      "chipRemove": "Remove filter: {{filter}}"
+    },
+    "total": {
+      "zero": "{{count}} pending decisions",
+      "one": "{{count}} pending decision",
+      "two": "{{count}} pending decisions",
+      "few": "{{count}} pending decisions",
+      "many": "{{count}} pending decisions",
+      "other": "{{count}} pending decisions"
+    },
+    "announce": {
+      "sorted": "Sorted by {{sort}}, {{count}}"
+    },
+    "emptyFiltered": "No pending decisions match these filters.",
     "columns": {
       "requester": "Requester",
       "branch": "Branch",
@@ -2609,6 +2637,7 @@
     "pagination": {
       "loadMore": "Load more",
       "loading": "Loading...",
+      "showingOf": "Showing {{loaded}} of {{total}}",
       "showing": {
         "zero": "Showing 0 requests",
         "one": "Showing 1 request",

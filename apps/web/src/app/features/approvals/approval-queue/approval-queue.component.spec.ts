@@ -1,17 +1,18 @@
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, type ParamMap } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { Subject, of, throwError } from 'rxjs';
+import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { PurchaseRequest, Role } from '../../../core/api/models';
+import type { PendingApprovalList, PurchaseRequest, Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { RequestsApiService } from '../../requests/requests-api';
 import { OrganisationApiService } from '../../settings/organisation-api';
@@ -91,8 +92,57 @@ describe('ApprovalQueueComponent', () => {
   let dialogSpy: jasmine.SpyObj<MatDialog>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
   let routerSpy: jasmine.SpyObj<Router>;
+  let queryParamMapSubject: BehaviorSubject<ParamMap>;
   const role = signal<Role | null>('buyer');
   let sessionSpy: { hasRole: jasmine.Spy; role: typeof role; currentMember: jasmine.Spy };
+
+  async function configureQueue(initialParams: Record<string, string> = {}): Promise<void> {
+    queryParamMapSubject = new BehaviorSubject<ParamMap>(convertToParamMap(initialParams));
+
+    await TestBed.configureTestingModule({
+      imports: [ApprovalQueueComponent],
+      providers: [
+        provideTranslateService(),
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            queryParamMap: queryParamMapSubject.asObservable(),
+            snapshot: {
+              get queryParamMap() {
+                return queryParamMapSubject.value;
+              },
+            },
+          },
+        },
+        { provide: ApprovalsApiService, useValue: approvalsApi },
+        { provide: RequestsApiService, useValue: requestsApi },
+        { provide: OrganisationApiService, useValue: organisationApi },
+        { provide: ApiService, useValue: api },
+        { provide: SessionService, useValue: sessionSpy },
+        { provide: Router, useValue: routerSpy },
+      ],
+    })
+      .overrideComponent(ApprovalQueueComponent, {
+        set: {
+          providers: [
+            { provide: MatDialog, useValue: dialogSpy },
+            { provide: MatSnackBar, useValue: snackBarSpy },
+            { provide: SessionService, useValue: sessionSpy },
+            { provide: Router, useValue: routerSpy },
+          ],
+        },
+      })
+      .compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.setTranslation('ar', arCatalog);
+    translate.use('en');
+
+    fixture = TestBed.createComponent(ApprovalQueueComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  }
 
   beforeEach(async () => {
     role.set('buyer');
@@ -128,7 +178,7 @@ describe('ApprovalQueueComponent', () => {
     } as unknown as ReturnType<MatSnackBar['open']>);
 
     approvalsApi.listPendingApprovals.and.returnValue(
-      of({ items: mockPendingRequests, next_cursor: null }),
+      of({ items: mockPendingRequests, next_cursor: null, total: mockPendingRequests.length }),
     );
     organisationApi.listBranches.and.returnValue(
       of({
@@ -181,38 +231,7 @@ describe('ApprovalQueueComponent', () => {
       }),
     );
 
-    await TestBed.configureTestingModule({
-      imports: [ApprovalQueueComponent],
-      providers: [
-        provideTranslateService(),
-        { provide: ApprovalsApiService, useValue: approvalsApi },
-        { provide: RequestsApiService, useValue: requestsApi },
-        { provide: OrganisationApiService, useValue: organisationApi },
-        { provide: ApiService, useValue: api },
-        { provide: SessionService, useValue: sessionSpy },
-        { provide: Router, useValue: routerSpy },
-      ],
-    })
-      .overrideComponent(ApprovalQueueComponent, {
-        set: {
-          providers: [
-            { provide: MatDialog, useValue: dialogSpy },
-            { provide: MatSnackBar, useValue: snackBarSpy },
-            { provide: SessionService, useValue: sessionSpy },
-            { provide: Router, useValue: routerSpy },
-          ],
-        },
-      })
-      .compileComponents();
-
-    const translate = TestBed.inject(TranslateService);
-    translate.setTranslation('en', enCatalog);
-    translate.setTranslation('ar', arCatalog);
-    translate.use('en');
-
-    fixture = TestBed.createComponent(ApprovalQueueComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
+    await configureQueue();
   });
 
   describe('PPS-167 self approval', () => {
@@ -281,7 +300,7 @@ describe('ApprovalQueueComponent', () => {
             requestsApi.rejectRequest.and.returnValue(failure);
             approvalsApi.approveGroup.and.returnValue(failure);
             approvalsApi.rejectGroup.and.returnValue(failure);
-            approvalsApi.listPendingApprovals.and.returnValue(of({ items: [], next_cursor: null }));
+            approvalsApi.listPendingApprovals.and.returnValue(of({ items: [], next_cursor: null , total: 0}));
             const before = approvalsApi.listPendingApprovals.calls.count();
             if (split) component.submitGroupDecision('group-own', action);
             else component.submitDecision('req-001', action);
@@ -351,7 +370,7 @@ describe('ApprovalQueueComponent', () => {
             },
           },
         ],
-        next_cursor: null,
+        next_cursor: null, total: 0,
       }),
     );
     component.loadPendingApprovals();
@@ -435,7 +454,7 @@ describe('ApprovalQueueComponent', () => {
       },
     ];
     approvalsApi.listPendingApprovals.and.returnValue(
-      of({ items: requestsWithRequesterInfo, next_cursor: null }),
+      of({ items: requestsWithRequesterInfo, next_cursor: null , total: 0}),
     );
     component.loadPendingApprovals();
     fixture.detectChanges();
@@ -517,7 +536,7 @@ describe('ApprovalQueueComponent', () => {
       },
     ];
     approvalsApi.listPendingApprovals.and.returnValue(
-      of({ items: requestsWithStatuses, next_cursor: null }),
+      of({ items: requestsWithStatuses, next_cursor: null , total: 0}),
     );
     component.loadPendingApprovals();
     fixture.detectChanges();
@@ -546,7 +565,7 @@ describe('ApprovalQueueComponent', () => {
       budget_status: null,
     };
     approvalsApi.listPendingApprovals.and.returnValue(
-      of({ items: [requestWithoutBudget], next_cursor: null }),
+      of({ items: [requestWithoutBudget], next_cursor: null , total: 0}),
     );
     component.loadPendingApprovals();
     fixture.detectChanges();
@@ -573,7 +592,7 @@ describe('ApprovalQueueComponent', () => {
 
   it('should show empty state when there are no pending requests', () => {
     approvalsApi.listPendingApprovals.and.returnValue(
-      of({ items: [], next_cursor: null }),
+      of({ items: [], next_cursor: null , total: 0}),
     );
     component.loadPendingApprovals();
     fixture.detectChanges();
@@ -719,7 +738,7 @@ describe('ApprovalQueueComponent', () => {
       ],
     };
     approvalsApi.listPendingApprovals.and.returnValue(
-      of({ items: [testRequest], next_cursor: null }),
+      of({ items: [testRequest], next_cursor: null , total: 0}),
     );
     component.loadPendingApprovals();
     fixture.detectChanges();
@@ -792,7 +811,7 @@ describe('ApprovalQueueComponent', () => {
     ];
 
     approvalsApi.listPendingApprovals.and.returnValue(
-      of({ items: testRequests, next_cursor: null }),
+      of({ items: testRequests, next_cursor: null , total: 0}),
     );
     component.loadPendingApprovals();
     fixture.detectChanges();
@@ -1044,7 +1063,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('two pending requests in one group render as one row with the combined total and the saving', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockGroupedRequests, next_cursor: null }),
+        of({ items: mockGroupedRequests, next_cursor: null , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
@@ -1061,7 +1080,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('Approve calls /request-groups/{id}/approve once (not two single approves)', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockGroupedRequests, next_cursor: null }),
+        of({ items: mockGroupedRequests, next_cursor: null , total: 0}),
       );
       approvalsApi.approveGroup.and.returnValue(of(mockGroupedRequests));
       dialogSpy.open.and.returnValue({
@@ -1095,7 +1114,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('an ungrouped request is unchanged', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [mockPendingRequests[0]], next_cursor: null }),
+        of({ items: [mockPendingRequests[0]], next_cursor: null , total: 0}),
       );
       requestsApi.approveRequest.and.returnValue(of(mockPendingRequests[0]));
       dialogSpy.open.and.returnValue({
@@ -1121,7 +1140,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('Reject calls /request-groups/{id}/reject once with comment', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockGroupedRequests, next_cursor: null }),
+        of({ items: mockGroupedRequests, next_cursor: null , total: 0}),
       );
       approvalsApi.rejectGroup.and.returnValue(of(mockGroupedRequests));
       dialogSpy.open.and.returnValue({
@@ -1147,7 +1166,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('expanding group row shows each request supplier, lines and total', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockGroupedRequests, next_cursor: null }),
+        of({ items: mockGroupedRequests, next_cursor: null , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
@@ -1167,7 +1186,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('part_of_split shows the message pointing to the group action', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [mockPendingRequests[0]], next_cursor: null }),
+        of({ items: [mockPendingRequests[0]], next_cursor: null , total: 0}),
       );
       const errorResp = new HttpErrorResponse({
         error: { code: 'conflict', message: 'Conflict', details: { reason: 'part_of_split' } },
@@ -1199,7 +1218,7 @@ describe('ApprovalQueueComponent', () => {
       const page2Item2 = { ...mockPendingRequests[0], id: 'req-p2-1' }; // new
 
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [page1Item1, page1Item2], next_cursor: 'cursor-page-2' }),
+        of({ items: [page1Item1, page1Item2], next_cursor: 'cursor-page-2' , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
@@ -1215,7 +1234,7 @@ describe('ApprovalQueueComponent', () => {
 
       // Next page returns page2Item1 (duplicate) and page2Item2 (new), with next_cursor: null
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [page2Item1, page2Item2], next_cursor: null }),
+        of({ items: [page2Item1, page2Item2], next_cursor: null , total: 0}),
       );
 
       loadMoreBtn.click();
@@ -1241,7 +1260,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('pagination: button hidden when no cursor on initial load', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: null }),
+        of({ items: mockPendingRequests, next_cursor: null , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
@@ -1257,7 +1276,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('pagination: failure keeps loaded rows, shows error banner and keeps load more available to retry', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: 'cursor-retry' }),
+        of({ items: mockPendingRequests, next_cursor: 'cursor-retry' , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
@@ -1290,7 +1309,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('pagination: plain new Error from listPendingApprovals during loadMore shows localized loadError text, not raw message', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: 'cursor-retry' }),
+        of({ items: mockPendingRequests, next_cursor: 'cursor-retry' , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
@@ -1308,7 +1327,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('pagination: loadMore failure shows translated loadError for non-envelope HttpErrorResponse and envelope message for real API errors', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: 'cursor-retry' }),
+        of({ items: mockPendingRequests, next_cursor: 'cursor-retry' , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
@@ -1393,12 +1412,12 @@ describe('ApprovalQueueComponent', () => {
 
     it('pagination: double click does not fire two requests and shows loading spinner', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: 'cursor-slow' }),
+        of({ items: mockPendingRequests, next_cursor: 'cursor-slow' , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
 
-      const pendingSubject = new Subject<{ items: PurchaseRequest[]; next_cursor: string | null }>();
+      const pendingSubject = new Subject<PendingApprovalList>();
       approvalsApi.listPendingApprovals.calls.reset();
       approvalsApi.listPendingApprovals.and.returnValue(pendingSubject);
 
@@ -1422,7 +1441,7 @@ describe('ApprovalQueueComponent', () => {
       });
 
       // Complete in-flight
-      pendingSubject.next({ items: [], next_cursor: null });
+      pendingSubject.next({ items: [], next_cursor: null, total: 0 });
       pendingSubject.complete();
       fixture.detectChanges();
 
@@ -1431,7 +1450,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('stale loadMore in flight during loadPendingApprovals does not leave isLoadingMore stuck true', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: 'cursor-1' }),
+        of({ items: mockPendingRequests, next_cursor: 'cursor-1' , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
@@ -1440,7 +1459,7 @@ describe('ApprovalQueueComponent', () => {
       expect(component.isLoadingMore()).toBeFalse();
 
       // Start loadMore with pending observable
-      const pendingLoadMore$ = new Subject<{ items: PurchaseRequest[]; next_cursor: string | null }>();
+      const pendingLoadMore$ = new Subject<PendingApprovalList>();
       approvalsApi.listPendingApprovals.calls.reset();
       approvalsApi.listPendingApprovals.and.returnValue(pendingLoadMore$);
 
@@ -1451,13 +1470,13 @@ describe('ApprovalQueueComponent', () => {
 
       // While loadMore is in flight, a decision or reload triggers loadPendingApprovals()
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: 'cursor-2' }),
+        of({ items: mockPendingRequests, next_cursor: 'cursor-2' , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
 
       // Old loadMore resolves now (stale response)
-      pendingLoadMore$.next({ items: [], next_cursor: null });
+      pendingLoadMore$.next({ items: [], next_cursor: null, total: 0 });
       pendingLoadMore$.complete();
       fixture.detectChanges();
 
@@ -1467,7 +1486,7 @@ describe('ApprovalQueueComponent', () => {
       // Assert a new loadMore works once reload returned cursor-2
       approvalsApi.listPendingApprovals.calls.reset();
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [], next_cursor: null }),
+        of({ items: [], next_cursor: null , total: 0}),
       );
       component.loadMore();
       fixture.detectChanges();
@@ -1482,7 +1501,7 @@ describe('ApprovalQueueComponent', () => {
     it('decisions reload first page and reset cursor clearing accumulated rows', () => {
       const page1Item = { ...mockPendingRequests[0], id: 'req-single' };
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [page1Item], next_cursor: 'cur-page-2' }),
+        of({ items: [page1Item], next_cursor: 'cur-page-2' , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
@@ -1490,7 +1509,7 @@ describe('ApprovalQueueComponent', () => {
       // Load page 2
       const page2Item = { ...mockPendingRequests[1], id: 'req-page-2' };
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [page2Item], next_cursor: 'cur-page-3' }),
+        of({ items: [page2Item], next_cursor: 'cur-page-3' , total: 0}),
       );
       component.loadMore();
       fixture.detectChanges();
@@ -1499,7 +1518,7 @@ describe('ApprovalQueueComponent', () => {
       // Now approve req-single
       requestsApi.approveRequest.and.returnValue(of(page1Item));
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [page2Item], next_cursor: null }),
+        of({ items: [page2Item], next_cursor: null , total: 0}),
       );
 
       component.submitDecision('req-single', 'approve');
@@ -1583,7 +1602,7 @@ describe('ApprovalQueueComponent', () => {
       requestsApi.getRequest.and.returnValue(siblingSubject);
 
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [partialGroupReq1], next_cursor: null }),
+        of({ items: [partialGroupReq1], next_cursor: null , total: 0}),
       );
 
       component.loadPendingApprovals();
@@ -1651,7 +1670,7 @@ describe('ApprovalQueueComponent', () => {
       requestsApi.getRequest.and.returnValue(throwError(() => new Error('Fetch failed')));
 
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [partialGroupReq1], next_cursor: null }),
+        of({ items: [partialGroupReq1], next_cursor: null , total: 0}),
       );
 
       component.loadPendingApprovals();
@@ -1717,7 +1736,7 @@ describe('ApprovalQueueComponent', () => {
       // Sibling fetch fails.
       requestsApi.getRequest.and.returnValue(throwError(() => new Error('Fetch failed')));
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [splitReq1], next_cursor: 'cursor-page-2' }),
+        of({ items: [splitReq1], next_cursor: 'cursor-page-2' , total: 0}),
       );
 
       component.loadPendingApprovals();
@@ -1736,7 +1755,7 @@ describe('ApprovalQueueComponent', () => {
 
       // User clicks Load more: next page brings in splitReq2!
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [splitReq2], next_cursor: null }),
+        of({ items: [splitReq2], next_cursor: null , total: 0}),
       );
       const loadMoreBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
       loadMoreBtn.click();
@@ -1800,7 +1819,7 @@ describe('ApprovalQueueComponent', () => {
       requestsApi.getRequest.and.returnValue(of(invalidSiblingReq2));
 
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [partialGroupReq1], next_cursor: null }),
+        of({ items: [partialGroupReq1], next_cursor: null , total: 0}),
       );
 
       component.loadPendingApprovals();
@@ -1846,7 +1865,7 @@ describe('ApprovalQueueComponent', () => {
       };
 
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [completeGroupReq1, completeGroupReq2], next_cursor: null }),
+        of({ items: [completeGroupReq1, completeGroupReq2], next_cursor: null , total: 0}),
       );
 
       component.loadPendingApprovals();
@@ -1880,7 +1899,7 @@ describe('ApprovalQueueComponent', () => {
       requestsApi.getRequest.and.returnValue(pendingSiblingSubject);
 
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [partialGroupReq], next_cursor: null }),
+        of({ items: [partialGroupReq], next_cursor: null , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
@@ -1895,7 +1914,7 @@ describe('ApprovalQueueComponent', () => {
         request_group: null,
       };
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [freshReq], next_cursor: null }),
+        of({ items: [freshReq], next_cursor: null , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
@@ -1972,7 +1991,7 @@ describe('ApprovalQueueComponent', () => {
       requestsApi.getRequest.and.returnValue(siblingSubject);
 
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [completeReq1, completeReq2, incompleteReq1], next_cursor: 'cur-page2' }),
+        of({ items: [completeReq1, completeReq2, incompleteReq1], next_cursor: 'cur-page2' , total: 0}),
       );
 
       component.loadPendingApprovals();
@@ -2001,7 +2020,7 @@ describe('ApprovalQueueComponent', () => {
       expect(requestsApi.getRequest).toHaveBeenCalledWith('req-inc-2');
 
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [], next_cursor: null }),
+        of({ items: [], next_cursor: null , total: 0}),
       );
       component.loadMore();
       fixture.detectChanges();
@@ -2078,7 +2097,7 @@ describe('ApprovalQueueComponent', () => {
       requestsApi.getRequest.and.returnValue(siblingSubject);
 
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [incompleteReq1, completeReq1, completeReq2], next_cursor: 'cur-page2' }),
+        of({ items: [incompleteReq1, completeReq1, completeReq2], next_cursor: 'cur-page2' , total: 0}),
       );
 
       component.loadPendingApprovals();
@@ -2107,7 +2126,7 @@ describe('ApprovalQueueComponent', () => {
       expect(requestsApi.getRequest).toHaveBeenCalledWith('req-inc-2');
 
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [], next_cursor: null }),
+        of({ items: [], next_cursor: null , total: 0}),
       );
       component.loadMore();
       fixture.detectChanges();
@@ -2130,7 +2149,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('renders cleanly in RTL direction', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: 'cur-ar' }),
+        of({ items: mockPendingRequests, next_cursor: 'cur-ar' , total: 0}),
       );
       component.loadPendingApprovals();
 
@@ -2148,6 +2167,353 @@ describe('ApprovalQueueComponent', () => {
       translate.use('en');
       fixture.detectChanges();
     });
+  });
+
+  describe('P-177 (PPS-171) queue sort, branch filter and result count', () => {
+    const list = (
+      items: readonly PurchaseRequest[],
+      next_cursor: string | null = null,
+      total = items.length,
+    ): PendingApprovalList => ({ items, next_cursor, total });
+
+    describe('initial URL state', () => {
+      beforeEach(async () => {
+        TestBed.resetTestingModule();
+        approvalsApi.listPendingApprovals.calls.reset();
+        organisationApi.listBranches.calls.reset();
+        routerSpy.navigate.calls.reset();
+        await configureQueue({ sort: 'required_by_asc', branch: 'branch-north' });
+      });
+
+      it('restores a valid sort and branch from the URL and loads with them', () => {
+        expect(component.sortOption()).toBe('required_by_asc');
+        expect(component.branchFilter()).toBe('branch-north');
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
+          sort: 'required_by_asc',
+          branch_id: 'branch-north',
+          limit: 50,
+        });
+      });
+    });
+
+    describe('invalid URL state', () => {
+      beforeEach(async () => {
+        TestBed.resetTestingModule();
+        approvalsApi.listPendingApprovals.calls.reset();
+        organisationApi.listBranches.calls.reset();
+        routerSpy.navigate.calls.reset();
+        await configureQueue({ sort: 'bogus', branch: 'branch-unknown' });
+      });
+
+      it('falls back to the default sort silently and drops an unknown branch', () => {
+        expect(component.sortOption()).toBe('submitted_desc');
+        expect(component.branchFilter()).toBe('');
+        const last = approvalsApi.listPendingApprovals.calls.mostRecent().args[0];
+        expect(last?.sort).toBeUndefined();
+        expect(last?.branch_id).toBeUndefined();
+        expect(routerSpy.navigate).toHaveBeenCalledWith([], {
+          queryParams: { sort: null, branch: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      });
+    });
+
+    it('changing sort resets rows, cursor and groups, writes the URL and reloads without a cursor', () => {
+      component.pendingRequests.set([...mockPendingRequests]);
+      component.nextCursor.set('old-cursor');
+      component.groupSiblings.set(new Map([['grp', [...mockPendingRequests]]]));
+      component.groupStatus.set(new Map([['grp', 'complete']]));
+      approvalsApi.listPendingApprovals.calls.reset();
+      approvalsApi.listPendingApprovals.and.returnValue(new Subject<PendingApprovalList>());
+
+      component.onSortChange('submitted_asc');
+
+      expect(component.pendingRequests()).toEqual([]);
+      expect(component.nextCursor()).toBeNull();
+      expect(component.groupSiblings().size).toBe(0);
+      expect(component.groupStatus().size).toBe(0);
+      const params = approvalsApi.listPendingApprovals.calls.mostRecent().args[0];
+      expect(params?.sort).toBe('submitted_asc');
+      expect(params?.cursor).toBeUndefined();
+      expect(routerSpy.navigate).toHaveBeenCalledWith([], {
+        queryParams: { sort: 'submitted_asc', branch: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    });
+
+    it('changing branch resets and reloads page 1 with the branch and current sort', () => {
+      component.sortOption.set('total_desc');
+      approvalsApi.listPendingApprovals.calls.reset();
+      approvalsApi.listPendingApprovals.and.returnValue(new Subject<PendingApprovalList>());
+
+      component.onBranchChange('branch-south');
+
+      expect(component.branchFilter()).toBe('branch-south');
+      expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({
+        sort: 'total_desc',
+        branch_id: 'branch-south',
+        limit: 50,
+      });
+      expect(routerSpy.navigate).toHaveBeenCalledWith([], {
+        queryParams: { sort: 'total_desc', branch: 'branch-south' },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    });
+
+    it('Load more sends the same sort and branch with the cursor', () => {
+      component.sortOption.set('required_by_asc');
+      component.branchFilter.set('branch-north');
+      component.nextCursor.set('cursor-2');
+      approvalsApi.listPendingApprovals.calls.reset();
+      approvalsApi.listPendingApprovals.and.returnValue(of(list([], null, 120)));
+
+      component.loadMore();
+
+      expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
+        sort: 'required_by_asc',
+        branch_id: 'branch-north',
+        cursor: 'cursor-2',
+        limit: 50,
+      });
+    });
+
+    it('ignores a late response from the previous query after a sort change', () => {
+      const first = new Subject<PendingApprovalList>();
+      approvalsApi.listPendingApprovals.and.returnValue(first);
+      component.onSortChange('submitted_asc');
+
+      const second = new Subject<PendingApprovalList>();
+      approvalsApi.listPendingApprovals.and.returnValue(second);
+      component.onSortChange('total_desc');
+
+      second.next(list([mockPendingRequests[1]], null, 1));
+      second.complete();
+      fixture.detectChanges();
+      expect(component.pendingRequests().map((r) => r.id)).toEqual(['req-002']);
+      expect(component.totalCount()).toBe(1);
+
+      first.next(list([mockPendingRequests[0]], null, 99));
+      first.complete();
+      fixture.detectChanges();
+      expect(component.pendingRequests().map((r) => r.id)).toEqual(['req-002']);
+      expect(component.totalCount()).toBe(1);
+    });
+
+    it('Clear resets sort and branch, removes the chips and writes defaults out of the URL', () => {
+      component.onSortChange('submitted_asc');
+      component.onBranchChange('branch-north');
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelectorAll('.filter-chip').length).toBe(2);
+
+      const clear = fixture.nativeElement.querySelector(
+        '[data-testid="clear-filters-btn"]',
+      ) as HTMLButtonElement;
+      expect(clear).toBeTruthy();
+      clear.click();
+      fixture.detectChanges();
+
+      expect(component.sortOption()).toBe('submitted_desc');
+      expect(component.branchFilter()).toBe('');
+      expect(fixture.nativeElement.querySelectorAll('.filter-chip').length).toBe(0);
+      expect(routerSpy.navigate).toHaveBeenCalledWith([], {
+        queryParams: { sort: null, branch: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    });
+
+    it('renders a chip per active filter whose remove button names what it removes', () => {
+      component.onSortChange('required_by_asc');
+      component.onBranchChange('branch-north');
+      fixture.detectChanges();
+
+      const chips = Array.from(
+        fixture.nativeElement.querySelectorAll('.filter-chip'),
+      ) as HTMLElement[];
+      expect(chips.length).toBe(2);
+      const buttons = chips.map(
+        (chip) => chip.querySelector('.chip-remove') as HTMLButtonElement,
+      );
+      expect(buttons[0].getAttribute('aria-label')).toContain('Required by (soonest)');
+      expect(buttons[1].getAttribute('aria-label')).toContain('North Branch');
+
+      buttons[1].click();
+      fixture.detectChanges();
+      expect(component.branchFilter()).toBe('');
+      expect(component.sortOption()).toBe('required_by_asc');
+      expect(fixture.nativeElement.querySelectorAll('.filter-chip').length).toBe(1);
+
+      const remainingRemove = fixture.nativeElement.querySelector(
+        '.chip-remove',
+      ) as HTMLButtonElement;
+      remainingRemove.click();
+      fixture.detectChanges();
+      expect(component.sortOption()).toBe('submitted_desc');
+      expect(fixture.nativeElement.querySelectorAll('.filter-chip').length).toBe(0);
+    });
+
+    it('formats the pending decision count for singular, plural and zero in English', () => {
+      component.totalCount.set(1);
+      expect(component.totalCountLabel()).toBe('1 pending decision');
+      component.totalCount.set(12);
+      expect(component.totalCountLabel()).toBe('12 pending decisions');
+      component.totalCount.set(0);
+      expect(component.totalCountLabel()).toBe('0 pending decisions');
+    });
+
+    it('uses the real Arabic catalogue and Latin digits for the count and sort labels', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.use('ar');
+
+      component.totalCount.set(1);
+      expect(component.totalCountLabel()).toBe('قرار معلق واحد');
+      component.totalCount.set(2);
+      expect(component.totalCountLabel()).toBe('قراران معلقان');
+      component.totalCount.set(3);
+      expect(component.totalCountLabel()).toBe('3 قرارات معلقة');
+      component.totalCount.set(12);
+      expect(component.totalCountLabel()).toBe('12 قرارًا معلقًا');
+      component.totalCount.set(0);
+      expect(component.totalCountLabel()).toBe('لا توجد قرارات معلقة');
+      expect(component.sortOptionLabel('submitted_asc')).toBe('الأقدم أولاً');
+    });
+
+    it('shows the total under the title and loaded-vs-total in the pagination status', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(of(list(mockPendingRequests, null, 120)));
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const count = fixture.nativeElement.querySelector('[data-testid="approval-total-count"]');
+      expect(count?.textContent?.trim()).toBe('120 pending decisions');
+      const status = fixture.nativeElement.querySelector('[data-testid="pagination-status"]');
+      expect(status?.textContent).toContain('Showing 2 of 120');
+    });
+
+    it('shows the default empty state with no filters and the filtered empty state with Clear when a filter is active', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(of(list([], null, 0)));
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('[data-testid="empty-default"]')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('[data-testid="empty-filtered"]')).toBeNull();
+
+      component.onSortChange('submitted_asc');
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('[data-testid="empty-default"]')).toBeNull();
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="empty-filtered"]')?.textContent,
+      ).toContain('No pending decisions match these filters.');
+      expect(fixture.nativeElement.querySelector('[data-testid="clear-filters-btn"]')).toBeTruthy();
+    });
+
+    it('announces the sort and new count in a polite live region', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(of(list(mockPendingRequests, null, 12)));
+      component.onSortChange('submitted_asc');
+      fixture.detectChanges();
+
+      const live = fixture.nativeElement.querySelector(
+        '[data-testid="queue-announcement"]',
+      ) as HTMLElement;
+      expect(live.getAttribute('aria-live')).toBe('polite');
+      expect(live.textContent).toContain('Sorted by Oldest first, 12 pending decisions');
+
+      TestBed.inject(TranslateService).use('ar');
+      fixture.detectChanges();
+      expect(live.textContent).toContain('تم الترتيب حسب الأقدم أولاً، 12 قرارًا معلقًا');
+    });
+
+    it('reloads page 1 with the current sort and branch after a decision', () => {
+      component.sortOption.set('total_asc');
+      component.branchFilter.set('branch-south');
+      requestsApi.approveRequest.and.returnValue(
+        of({ ...mockPendingRequests[0], status: 'approved' } as PurchaseRequest),
+      );
+      approvalsApi.listPendingApprovals.calls.reset();
+      approvalsApi.listPendingApprovals.and.returnValue(of(list([], null, 0)));
+
+      component.submitDecision('req-001', 'approve');
+
+      expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
+        sort: 'total_asc',
+        branch_id: 'branch-south',
+        limit: 50,
+      });
+    });
+
+    it('updates controls and reloads when the URL changes (back/forward)', () => {
+      approvalsApi.listPendingApprovals.calls.reset();
+      queryParamMapSubject.next(
+        convertToParamMap({ sort: 'total_asc', branch: 'branch-south' }),
+      );
+      fixture.detectChanges();
+
+      expect(component.sortOption()).toBe('total_asc');
+      expect(component.branchFilter()).toBe('branch-south');
+      expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({
+        sort: 'total_asc',
+        branch_id: 'branch-south',
+        limit: 50,
+      });
+    });
+
+    it('does not write the default sort to the URL', () => {
+      component.onSortChange('submitted_asc');
+      routerSpy.navigate.calls.reset();
+
+      component.onSortChange('submitted_desc');
+
+      expect(routerSpy.navigate).toHaveBeenCalledWith([], {
+        queryParams: { sort: null, branch: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    });
+  });
+});
+
+describe('Approvals API P-177 params', () => {
+  let approvalsApiService: ApprovalsApiService;
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        ApiService,
+        ApprovalsApiService,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
+    });
+    approvalsApiService = TestBed.inject(ApprovalsApiService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpMock.verify());
+
+  it('sends sort and branch_id only when set and returns total', () => {
+    approvalsApiService
+      .listPendingApprovals({
+        sort: 'required_by_asc',
+        branch_id: 'branch-north',
+        cursor: 'c1',
+        limit: 50,
+      })
+      .subscribe((res) => expect(res.total).toBe(0));
+
+    const req = httpMock.expectOne((r) => r.url.startsWith('/api/v1/approvals/pending'));
+    expect(req.request.url).toBe(
+      '/api/v1/approvals/pending?sort=required_by_asc&branch_id=branch-north&cursor=c1&limit=50',
+    );
+    req.flush({ items: [], next_cursor: null, total: 0 });
+
+    approvalsApiService.listPendingApprovals({ limit: 50 }).subscribe();
+    const plain = httpMock.expectOne('/api/v1/approvals/pending?limit=50');
+    plain.flush({ items: [], next_cursor: null, total: 0 });
   });
 });
 
