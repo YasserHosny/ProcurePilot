@@ -4389,7 +4389,8 @@
       "rfqDetailLoadError": "Failed to load RFQ details.",
       "splitSavingHintConverted": "Splitting this order between suppliers would have saved {{money}} (landed cost, VAT included).",
       "landedTotal": "Landed total",
-      "coverage": "Covers {{covered}} of {{total}} products"
+      "coverage": "Covers {{covered}} of {{total}} products",
+      "neededByLabel": "Needed by (from the RFQ)"
     },
     "history": {
       "status_cancelled": "Cancelled",

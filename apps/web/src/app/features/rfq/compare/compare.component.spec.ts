@@ -1994,7 +1994,7 @@ describe('CompareComponent (RFQ)', () => {
       expect(el().querySelector('[data-testid="coverage-badge"]')).toBeNull();
     });
 
-    it('tells the buyer when the chosen Required-by date is in the past, and the picker has a minimum', () => {
+    it('tells the buyer when the RFQ date is already in the past instead of blaming unmatched lines', () => {
       const translate = TestBed.inject(TranslateService);
       translate.setTranslation('en', enCatalog, true);
       translate.use('en');
@@ -2014,11 +2014,19 @@ describe('CompareComponent (RFQ)', () => {
       component.prepareRequest(component.responses()[0]);
 
       expect(mockSnackBar.open.calls.mostRecent().args[0]).toBe(enCatalog.requests.errors.required_by_in_the_past);
+    });
 
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      const input = el().querySelector('input[ng-reflect-mat-datepicker], input.mat-datepicker-input') as HTMLInputElement;
-      expect(input.getAttribute('min')).withContext('picker minimum').toBe(today);
+    it('shows the RFQ\'s needed-by date read-only: the draft follows it, so there is nothing to edit', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      load([reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000')], ['p1', 'p2']);
+
+      const neededBy = el().querySelector('[data-testid="needed-by"]');
+      expect(neededBy).withContext('needed-by block').toBeTruthy();
+      expect(neededBy?.textContent).toContain(enCatalog.rfq.compare.neededByLabel);
+      expect(neededBy?.textContent).toContain('2026');
+      expect(el().querySelector('input.mat-datepicker-input')).withContext('no editable date').toBeNull();
     });
 
     it('words the saving hint on a converted RFQ as a missed saving and names its basis', () => {

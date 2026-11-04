@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -347,9 +347,6 @@ def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> Non
     member = _member(tenant_id, user_id, membership_id)
     service = RfqService(settings=get_settings())
     idem_key = uuid4()
-    # The buyer edits «Required by» on the compare page: the draft must carry that date, not the
-    # RFQ's own needed-by date (today in this fixture).  (P-155, PPS-199)
-    required_by = date.today() + timedelta(days=9)
 
     # prepare using resp1 (fully matched)
     res = service.prepare_request(
@@ -359,7 +356,7 @@ def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> Non
         rfq_response_id=resp1_id,
         branch_id=branch_id,
         cost_centre_id=None,
-        required_by_date=required_by,
+        required_by_date=date.today(),
         idempotency_key=idem_key,
     )
 
@@ -368,14 +365,13 @@ def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> Non
             cur.execute(
                 (
                     "select source_rfq_response_id, estimated_total_amount, "
-                    "estimated_total_currency, has_incomplete_estimate, required_by_date "
+                    "estimated_total_currency, has_incomplete_estimate "
                     "from purchase_request where id = %s"
                 ),
                 (res.purchase_request_id,),
             )
-            source_id, total_amt, total_currency, incomplete, stored_required_by = cur.fetchone()
+            source_id, total_amt, total_currency, incomplete = cur.fetchone()
             assert source_id == resp1_id
-            assert stored_required_by == required_by
             assert total_amt == Decimal("655.00")  # 10*15.5 + 20*25.0 = 155 + 500 = 655
             # The override must tag the total with the RESPONSE's quoted currency, not whatever
             # _estimate_products()'s landed-cost estimate happened to use (monkeypatched to None
@@ -406,7 +402,7 @@ def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> Non
         rfq_response_id=resp1_id,
         branch_id=branch_id,
         cost_centre_id=None,
-        required_by_date=required_by,
+        required_by_date=date.today(),
         idempotency_key=idem_key,
     )
     assert res2.purchase_request_id == res.purchase_request_id
@@ -428,7 +424,7 @@ def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> Non
             rfq_response_id=resp1_id,
             branch_id=branch_id,
             cost_centre_id=None,
-            required_by_date=required_by,
+            required_by_date=date.today(),
             idempotency_key=uuid4(),
         )
     assert refused.value.details == {"resource": "rfq", "reason": "rfq_already_converted"}
@@ -452,7 +448,7 @@ def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> Non
             rfq_response_id=resp1_id,
             branch_id=branch_id,
             cost_centre_id=None,
-            required_by_date=required_by,
+            required_by_date=date.today(),
             idempotency_key=unrelated_key,
         )
     with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:

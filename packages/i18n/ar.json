@@ -4389,7 +4389,8 @@
       "rfqDetailLoadError": "فشل تحميل تفاصيل طلب عرض الأسعار.",
       "splitSavingHintConverted": "كان تقسيم هذا الطلب بين الموردين سيوفّر {{money}} (تكلفة الوصول شاملة الضريبة).",
       "landedTotal": "الإجمالي بتكلفة الوصول",
-      "coverage": "يغطي {{covered}} من {{total}} منتجات"
+      "coverage": "يغطي {{covered}} من {{total}} منتجات",
+      "neededByLabel": "مطلوب بتاريخ (من طلب عرض الأسعار)"
     },
     "history": {
       "status_cancelled": "ملغى",
