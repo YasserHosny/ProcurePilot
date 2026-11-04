@@ -114,7 +114,7 @@
       }
       <mat-form-field appearance="outline">
         <mat-label>{{ 'rfq.compare.requiredByLabel' | translate }}</mat-label>
-        <input matInput [matDatepicker]="picker" [(ngModel)]="requiredByDate">
+        <input matInput [matDatepicker]="picker" [min]="minRequiredBy" [(ngModel)]="requiredByDate">
         <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
         <mat-datepicker #picker></mat-datepicker>
       </mat-form-field>

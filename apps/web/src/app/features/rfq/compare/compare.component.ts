@@ -87,6 +87,8 @@ export class CompareComponent implements OnInit, OnChanges {
   readonly branches = signal<readonly Branch[]>([]);
   readonly selectedBranchId = signal<string>('');
   readonly requiredByDate = signal<Date | null>(null);
+  /** The draft cannot be required before today (create_request rejects a past date). */
+  readonly minRequiredBy = new Date();
   readonly supplierNames = signal<Record<string, string>>({});
   readonly productNames = signal<Record<string, string>>({});
   readonly errorMessage = signal<string | null>(null);
@@ -375,7 +377,15 @@ export class CompareComponent implements OnInit, OnChanges {
 
   coverageLabel(response: RfqResponseComparison): string | null {
     const products = this.rfqProductIds();
-    if (response.quotation_status === 'refused' || products.size === 0) return null;
+    // A reply still being read, or with lines not matched yet, has unknown coverage, not a gap.
+    if (
+      response.quotation_status === 'refused' ||
+      products.size === 0 ||
+      response.lines.length === 0 ||
+      response.lines.some((line) => line.pending_match)
+    ) {
+      return null;
+    }
     const covered = new Set(response.lines
       .filter((line) => !line.pending_match && line.workspace_product_id && products.has(line.workspace_product_id))
       .map((line) => line.workspace_product_id)).size;
@@ -389,12 +399,21 @@ export class CompareComponent implements OnInit, OnChanges {
     const replies = this.responses().filter(
       (r) => r.quotation_status !== 'refused' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
     );
+    // A supplier's delivery fee or minimum order is not in a per-product total; only the split prices
+    // it (as splitSaving does), so no reply can be called the cheapest while such terms apply.
+    if (replies.some((reply) => reply.supplier_terms_apply)) {
+      return new Set<string>();
+    }
     const landed = replies.map((reply) => ({ id: reply.id, total: this.landedTotal(reply) }));
     if (landed.length >= 2 && landed.every((entry) => entry.total !== null)
       && new Set(landed.map((entry) => entry.total?.currency)).size === 1) {
       const minimum = Math.min(...landed.map((entry) => Math.round(entry.total!.amount * MINOR_UNITS)));
       return new Set(landed.filter((entry) => Math.round(entry.total!.amount * MINOR_UNITS) === minimum)
         .map((entry) => entry.id));
+    }
+    // Some replies have landed costs and some do not: printed totals would mix VAT bases, so no chip.
+    if (replies.some((reply) => (reply.rfq_landed_costs ?? []).length > 0)) {
+      return new Set<string>();
     }
 
     const eligible = this.comparableResponses();
@@ -968,6 +987,8 @@ export class CompareComponent implements OnInit, OnChanges {
           message = this.translate.instant('rfq.compare.prepareErrorQuotationRefused');
         } else if (reason === 'mixed_currencies') {
           message = this.translate.instant('rfq.compare.prepareErrorMixedCurrencies');
+        } else if (reason === 'required_by_in_the_past') {
+          message = this.translate.instant('requests.errors.required_by_in_the_past');
         }
 
         this.snackBar.open(
