@@ -293,9 +293,14 @@ def test_purchase_prefill_exposes_net_paid_and_separate_tax(
                 "update purchase_order_line set tax_amount=180, line_total_amount=1380 where id=%s",
                 (line,),
             )
+            # A submitted order's header is frozen; set the tax fixture with the guard off.
+            conn.execute(
+                "alter table purchase_order disable trigger purchase_order_lifecycle_guard"
+            )
             conn.execute(
                 "update purchase_order set tax_amount=180, total_amount=1380 where id=%s", (order,)
             )
+            conn.execute("alter table purchase_order enable trigger purchase_order_lifecycle_guard")
             conn.commit()
         [prefill] = (
             SavingsService(settings)
