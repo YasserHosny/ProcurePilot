@@ -1,4 +1,4 @@
--- 20261104000300_rfq_status_guard.sql — a client session can only edit a draft RFQ and send it
+-- 20261104000600_rfq_status_guard.sql — a client session can only edit a draft RFQ and send it
 -- (PPS-213, P-190).
 --
 -- rfq_update (20261018000009) matches the RFQ's creator but does not say which status the creator
@@ -40,7 +40,7 @@ $$;
 comment on function rfq_guard_client_update() is
   'BEFORE UPDATE guard on rfq: a client role (authenticated, anon) may only update a draft RFQ and
    leave it a draft or sent; every other status change goes through cancel_rfq,
-   mark_rfq_converted or the ingestion worker. 20261104000300.';
+   mark_rfq_converted or the ingestion worker. 20261104000600.';
 
 create trigger rfq_guard_client_update
   before update on rfq
