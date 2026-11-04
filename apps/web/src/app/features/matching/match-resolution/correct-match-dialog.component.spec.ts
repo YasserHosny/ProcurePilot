@@ -212,18 +212,34 @@ describe('CorrectMatchDialogComponent', () => {
       expect(save().disabled).toBeFalse();
     });
 
-    it('disables Save for a new product until it is valid, and says what is missing', () => {
+    it('disables Save for a new product until it is valid, and says what is missing straight away', () => {
       component.selectOutcome('no_match_new_product');
       fixture.detectChanges();
       expect(save().disabled).toBeTrue();
-
-      component.productForm.get('base_unit')?.markAsTouched();
-      fixture.detectChanges();
+      // Save cannot be clicked to reveal errors, so they show as soon as the form appears.
       expect(fixture.nativeElement.textContent).toContain(enCatalog.matching.resolution.newProduct.baseUnitRequired);
 
       component.productForm.patchValue({ base_unit: 'litre' });
       fixture.detectChanges();
+      expect(save().disabled).withContext('unit size still missing').toBeTrue();
+      expect(fixture.nativeElement.textContent).toContain(enCatalog.matching.resolution.newProduct.unitSizeRequired);
+
+      component.productForm.patchValue({ unit_size: '10' });
+      fixture.detectChanges();
       expect(save().disabled).toBeFalse();
+    });
+
+    it('leaves Unit Size blank when the line carries no pack, so a pack size is never invented', () => {
+      expect(mockLine.pack).toBeUndefined();
+      expect(component.productForm.get('unit_size')?.value).toBe('');
+    });
+
+    it('explains a product name that is too long, even though it was prefilled and untouched', () => {
+      component.selectOutcome('no_match_new_product');
+      component.productForm.patchValue({ tenant_name: 'x'.repeat(201) });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain(enCatalog.matching.resolution.newProduct.tenantNameMaxLength);
     });
   });
 
