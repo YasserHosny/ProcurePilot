@@ -4390,7 +4390,8 @@
       "splitSavingHintConverted": "Splitting this order between suppliers would have saved {{money}} (landed cost, VAT included).",
       "landedTotal": "Landed total",
       "coverage": "Covers {{covered}} of {{total}} products",
-      "neededByLabel": "Needed by (from the RFQ)"
+      "neededByLabel": "Needed by (from the RFQ)",
+      "neededByPast": "The RFQ's needed-by date has passed, so a request cannot be prepared from it. Create a new RFQ to order from these suppliers."
     },
     "history": {
       "status_cancelled": "Cancelled",

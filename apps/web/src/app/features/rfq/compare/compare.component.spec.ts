@@ -1941,6 +1941,9 @@ describe('CompareComponent (RFQ)', () => {
       expect(cards[1].querySelector('.lowest-total-chip')).withContext('B is the lowest').toBeTruthy();
       expect(cards[0].querySelector('[data-testid="landed-total"]')?.textContent).toContain('2,300');
       expect(cards[1].querySelector('[data-testid="landed-total"]')?.textContent).toContain('2,100');
+      // The chip sits next to the landed figure that earned it, not next to the printed total.
+      expect(cards[1].querySelector('[data-testid="landed-total"] .lowest-total-chip')).toBeTruthy();
+      expect(cards[1].querySelector('tr.total-row .lowest-total-chip')).toBeNull();
     });
 
     it('says how many of the RFQ products a reply covers when it misses some', () => {
@@ -1983,6 +1986,47 @@ describe('CompareComponent (RFQ)', () => {
       load([withTerms, reply('b', 'supp-b', ['p1', 'p2'], '105.00', '1050')], ['p1', 'p2']);
 
       expect(el().querySelector('.lowest-total-chip')).toBeNull();
+    });
+
+    it('disables Prepare with a reason when a responded RFQ\'s needed-by date has passed', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      mockRfqApi.getRfq.and.returnValue(
+        of({
+          ...sentDetail,
+          rfq: { ...sentDetail.rfq, status: 'responded', needed_by_date: '2020-01-01' },
+          lines: ['p1', 'p2'].map(rfqLine),
+        } as RfqDetail),
+      );
+      mockRfqApi.listResponses.and.returnValue(of({ items: [reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000')] }));
+      component.loadData('rfq-1');
+      component.selectedBranchId.set('branch-1');
+      fixture.detectChanges();
+
+      const button = el().querySelector('.prepare-buttons-row button') as HTMLButtonElement;
+      expect(button.disabled).toBeTrue();
+      expect(el().querySelector('[data-testid="needed-by-past-reason"]')?.textContent).toContain(
+        enCatalog.rfq.compare.neededByPast,
+      );
+    });
+
+    it('keeps Prepare available when a responded RFQ\'s needed-by date is still ahead', () => {
+      mockRfqApi.getRfq.and.returnValue(
+        of({
+          ...sentDetail,
+          rfq: { ...sentDetail.rfq, status: 'responded', needed_by_date: '2099-12-31' },
+          lines: ['p1', 'p2'].map(rfqLine),
+        } as RfqDetail),
+      );
+      mockRfqApi.listResponses.and.returnValue(of({ items: [reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000')] }));
+      component.loadData('rfq-1');
+      component.selectedBranchId.set('branch-1');
+      fixture.detectChanges();
+
+      const button = el().querySelector('.prepare-buttons-row button') as HTMLButtonElement;
+      expect(button.disabled).toBeFalse();
+      expect(el().querySelector('[data-testid="needed-by-past-reason"]')).toBeNull();
     });
 
     it('shows no coverage badge for a reply that is still being read or not matched yet', () => {
