@@ -1370,3 +1370,56 @@ def test_a_short_receipt_keeps_its_line_note(monkeypatch: pytest.MonkeyPatch) ->
 
         fetched = client.get(f"/api/v1/orders/{order_id}")
         assert fetched.json()["receipts"][0]["lines"][0]["note"] == expected
+
+
+def test_an_order_from_a_split_names_the_split_job_it_came_from(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PPS-212: the order page can link back to the basket split that produced its request."""
+    with (
+        committed_smart_context("order-split-link") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        _serve_postgrest_from_postgres(monkeypatch, reader, context.workspace)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+        payload = _base_order_payload(
+            context.supplier_ids[0], req_id, line_id, context.product_id, qty="10"
+        )
+        created = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert created.status_code == 201, created.text
+        order_id = created.json()["id"]
+        assert client.get(f"/api/v1/orders/{order_id}").json()["source_split_job_id"] is None
+
+        job_id, group_id = uuid4(), uuid4()
+        with psycopg.connect(TEST_DATABASE_URL) as conn, conn.cursor() as cur:
+            # The group's own rows (RFQ, job) are not what this proves; skip their foreign keys.
+            cur.execute("set local session_replication_role = replica")
+            cur.execute(
+                "insert into purchase_request_group (id,tenant_id,rfq_id,basket_split_job_id,"
+                "branch_id,combined_total_amount,combined_total_currency,idempotency_key,"
+                "created_by_membership_id) select %s,%s,%s,%s,branch_id,1,'USD',%s,%s "
+                "from purchase_request where id = %s",
+                (
+                    group_id,
+                    context.workspace.tenant_id,
+                    uuid4(),
+                    job_id,
+                    uuid4(),
+                    context.workspace.membership_id,
+                    req_id,
+                ),
+            )
+            cur.execute(
+                "update purchase_request set request_group_id = %s where id = %s",
+                (group_id, req_id),
+            )
+            conn.commit()
+
+        fetched = client.get(f"/api/v1/orders/{order_id}")
+        assert fetched.status_code == 200, fetched.text
+        assert fetched.json()["source_split_job_id"] == str(job_id)

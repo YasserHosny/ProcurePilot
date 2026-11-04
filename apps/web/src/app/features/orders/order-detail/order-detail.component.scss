@@ -49,3 +49,9 @@
 .receipt-progress-fill { position: absolute; inset-block: 0; inset-inline-start: 0; background: var(--pp-success-container); }
 .receipt-progress-text { position: relative; display: block; padding-inline: 0.75rem; font-size: 0.8rem; line-height: 1.5rem; color: var(--pp-text-strong); }
 @media print { .receipt-progress { display: none; } }
+
+.receipt-note {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--mat-sys-on-surface-variant, inherit);
+}

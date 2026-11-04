@@ -1079,7 +1079,34 @@ class OrdersService:
             confirmation=latest_confirmation,
             receipts=receipts,
             lifecycle=lifecycle,
+            source_split_job_id=self._source_split_job_id(client, order),
         )
+
+    @staticmethod
+    def _source_split_job_id(client: Client, order: PurchaseOrder) -> UUID | None:
+        """The basket split behind the order's request, when the request came from one."""
+        if order.source_request_id is None:
+            return None
+        request = _rows(
+            client.table("purchase_request")
+            .select("request_group_id")
+            .eq("id", str(order.source_request_id))
+            .limit(1)
+            .execute()
+            .data
+        )
+        group_id = request[0]["request_group_id"] if request else None
+        if group_id is None:
+            return None
+        group = _rows(
+            client.table("purchase_request_group")
+            .select("basket_split_job_id")
+            .eq("id", str(group_id))
+            .limit(1)
+            .execute()
+            .data
+        )
+        return UUID(str(group[0]["basket_split_job_id"])) if group else None
 
     @contextmanager
     def _transaction(self, member: CurrentMember) -> Iterator[psycopg.Cursor]:

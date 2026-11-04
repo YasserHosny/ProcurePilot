@@ -245,6 +245,8 @@ class OrderEvidenceProjection(StrictModel):
     confirmation: SupplierConfirmation | None = None
     receipts: tuple[DeliveryReceipt, ...] = ()
     lifecycle: LifecycleSummary
+    # The basket split the order's request was prepared from, when it came from one.
+    source_split_job_id: UUID | None = None
 
 
 # Prices carry up to four decimals and quantities six; stored totals are rounded to cents.
