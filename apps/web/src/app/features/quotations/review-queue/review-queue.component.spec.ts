@@ -196,6 +196,40 @@ describe('ReviewQueueComponent (T052)', () => {
     );
   });
 
+  it('an inverted date range shows an error and does not query the API (PPS-163)', () => {
+    apiService.getReviewTasks.calls.reset();
+    component.onDateFromChange('2026-10-22');
+    expect(apiService.getReviewTasks).toHaveBeenCalledTimes(1);
+    apiService.getReviewTasks.calls.reset();
+
+    component.onDateToChange('2026-10-01');
+    fixture.detectChanges();
+
+    expect(component.dateRangeInvalid()).toBeTrue();
+    expect(apiService.getReviewTasks).not.toHaveBeenCalled();
+    const error = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="date-range-error"]');
+    expect(error).not.toBeNull();
+    expect(error?.getAttribute('role')).toBe('alert');
+    expect(component.tasks()).toEqual([]);
+    expect(component.isLoading()).toBeFalse();
+  });
+
+  it('fixing an inverted date range clears the error and loads again (PPS-163)', () => {
+    component.onDateFromChange('2026-10-22');
+    component.onDateToChange('2026-10-01');
+    fixture.detectChanges();
+    apiService.getReviewTasks.calls.reset();
+
+    component.onDateToChange('2026-10-30');
+    fixture.detectChanges();
+
+    expect(component.dateRangeInvalid()).toBeFalse();
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="date-range-error"]'),
+    ).toBeNull();
+    expect(apiService.getReviewTasks).toHaveBeenCalledTimes(1);
+  });
+
   it('discards older filter response when newer filter request responds first (a)', () => {
     const subjectA = new Subject<{ items: ReviewTask[]; next_cursor: string | null }>();
     const subjectB = new Subject<{ items: ReviewTask[]; next_cursor: string | null }>();

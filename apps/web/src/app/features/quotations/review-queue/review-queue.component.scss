@@ -77,6 +77,13 @@
   min-width: 170px;
 }
 
+.date-range-error {
+  margin: 0;
+  flex: 1 0 100%;
+  color: var(--pp-error);
+  font-size: 0.875rem;
+}
+
 .table-card {
   border-radius: 12px;
 }
