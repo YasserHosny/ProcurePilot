@@ -4,10 +4,13 @@ import { A11yModule } from '@angular/cdk/a11y';
 import { OverlayModule, ConnectedPosition } from '@angular/cdk/overlay';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { finalize, take } from 'rxjs';
+import { finalize, take, Subject, debounceTime, filter } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
@@ -58,6 +61,15 @@ export function parseStatusFilter(value: string | null | undefined): string | nu
   return value && (RFQ_STATUS_FILTERS as readonly string[]).includes(value) ? value : null;
 }
 
+export const RFQ_SORTS = ['created_desc', 'created_asc', 'needed_asc', 'needed_desc', 'reference_desc', 'reference_asc'] as const;
+export type RfqSort = typeof RFQ_SORTS[number];
+export function parseSort(value: string | null | undefined): RfqSort {
+  return RFQ_SORTS.includes(value as RfqSort) ? value as RfqSort : 'created_desc';
+}
+export function parseSearch(value: string | null | undefined): string {
+  return (value ?? '').trim().slice(0, 100);
+}
+
 @Component({
   selector: 'app-rfq-history',
   standalone: true,
@@ -68,6 +80,9 @@ export function parseStatusFilter(value: string | null | undefined): string | nu
     OverlayModule,
     RouterModule,
     MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
     MatTableModule,
     MatProgressSpinnerModule,
     MatIconModule,
@@ -125,6 +140,13 @@ export class HistoryComponent implements OnInit {
   readonly draftActionsUnavailable = signal<boolean>(false);
   readonly rfqs = signal<RfqSummary[]>([]);
   readonly nextCursor = signal<string | null>(null);
+  readonly searchText = signal('');
+  readonly sort = signal<RfqSort>('created_desc');
+  readonly sorts = RFQ_SORTS;
+  private appliedQuery = '';
+  private readonly searchChanges = new Subject<number>();
+  private searchRevision = 0;
+  readonly hasActiveFilters = computed(() => !!this.searchText().trim() || this.statusFilter() !== null);
   private listGeneration = 0;
   readonly recipientsCache = signal<Record<string, RecipientsCacheEntry>>({});
 
@@ -206,6 +228,14 @@ export class HistoryComponent implements OnInit {
       });
 
     this.statusFilter.set(parseStatusFilter(this.route.snapshot.queryParamMap.get('status')));
+    this.searchText.set(parseSearch(this.route.snapshot.queryParamMap.get('q')));
+    this.appliedQuery = this.searchText();
+    this.sort.set(parseSort(this.route.snapshot.queryParamMap.get('sort')));
+    this.searchChanges.pipe(
+      debounceTime(300),
+      filter(revision => revision === this.searchRevision),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(() => this.applyFilters());
     this.resolveMembershipId();
     this.loadRfqs();
   }
@@ -216,9 +246,42 @@ export class HistoryComponent implements OnInit {
       return;
     }
     this.statusFilter.set(status);
+    this.applyFilters();
+  }
+
+  onSearchInput(value: string): void {
+    this.searchText.set(value.slice(0, 100));
+    this.searchChanges.next(++this.searchRevision);
+  }
+
+  clearSearch(): void {
+    this.searchText.set('');
+    this.applyFilters();
+  }
+
+  setSort(value: string): void {
+    this.sort.set(parseSort(value));
+    this.applyFilters();
+  }
+
+  clearFilters(): void {
+    this.searchText.set('');
+    this.sort.set('created_desc');
+    this.statusFilter.set(null);
+    this.applyFilters();
+  }
+
+  applyFilters(): void {
+    ++this.searchRevision;
+    this.appliedQuery = parseSearch(this.searchText());
+    this.searchText.set(this.appliedQuery);
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { status },
+      queryParams: {
+        status: this.statusFilter(),
+        q: this.appliedQuery || null,
+        sort: this.sort() === 'created_desc' ? null : this.sort(),
+      },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
@@ -232,7 +295,7 @@ export class HistoryComponent implements OnInit {
     this.loadError.set(false);
     this.loadMoreError.set(false);
     this.loadingMore.set(false);
-    this.rfqApi.listRfqs(this.statusFilter() ?? undefined).subscribe({
+    this.rfqApi.listRfqs(this.statusFilter() ?? undefined, undefined, undefined, this.appliedQuery || undefined, this.sort()).subscribe({
       next: (response) => {
         if (generation !== this.listGeneration) {
           return;
@@ -253,14 +316,14 @@ export class HistoryComponent implements OnInit {
 
   loadMore(): void {
     const cursor = this.nextCursor();
-    if (this.loadingMore() || !cursor) {
+    if (this.loading() || this.loadingMore() || !cursor) {
       return;
     }
 
     const generation = this.listGeneration;
     this.loadingMore.set(true);
     this.loadMoreError.set(false);
-    this.rfqApi.listRfqs(this.statusFilter() ?? undefined, cursor).subscribe({
+    this.rfqApi.listRfqs(this.statusFilter() ?? undefined, cursor, undefined, this.appliedQuery || undefined, this.sort()).subscribe({
       next: (response) => {
         if (generation !== this.listGeneration) {
           return;

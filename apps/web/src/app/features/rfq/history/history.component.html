@@ -22,6 +22,29 @@
     </div>
   </div>
 
+  <div class="search-sort-bar">
+    <mat-form-field appearance="outline">
+      <mat-label>{{ 'rfq.history.searchLabel' | translate }}</mat-label>
+      <input #searchInput matInput type="search" maxlength="100"
+        [value]="searchText()" [placeholder]="'rfq.history.searchPlaceholder' | translate"
+        (input)="onSearchInput(searchInput.value)" (keydown.enter)="applyFilters()">
+      @if (searchText()) {
+        <button mat-icon-button matSuffix type="button" (click)="clearSearch()"
+          [attr.aria-label]="'rfq.history.clearSearch' | translate" data-testid="rfq-clear-search">
+          <mat-icon aria-hidden="true">close</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>{{ 'rfq.history.sortLabel' | translate }}</mat-label>
+      <mat-select [value]="sort()" (selectionChange)="setSort($event.value)">
+        @for (option of sorts; track option) {
+          <mat-option [value]="option">{{ 'rfq.history.sortOptions.' + option | translate }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
   <div class="filter-bar" role="group" [attr.aria-label]="'rfq.history.filterLabel' | translate" data-testid="rfq-status-filters">
     <button
       type="button"
@@ -60,10 +83,10 @@
     } @else if (rfqs().length === 0) {
       <div class="empty-state">
         <mat-icon aria-hidden="true">history</mat-icon>
-        @if (statusFilter() !== null) {
-          <p>{{ 'rfq.history.noRfqsForFilter' | translate }}</p>
-          <button mat-stroked-button type="button" (click)="setStatusFilter(null)" data-testid="rfq-clear-filter">
-            {{ 'rfq.history.clearFilter' | translate }}
+        @if (hasActiveFilters()) {
+          <p>{{ 'rfq.history.noMatches' | translate }}</p>
+          <button mat-stroked-button type="button" (click)="clearFilters()" data-testid="rfq-clear-filter">
+            {{ 'rfq.history.clearAll' | translate }}
           </button>
         } @else {
           <p>{{ 'rfq.history.noRfqs' | translate }}</p>

@@ -348,3 +348,14 @@ td.mat-mdc-cell:last-of-type {
     font-weight: 600;
   }
 }
+
+.search-sort-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pp-space-3, 12px);
+
+  mat-form-field {
+    flex: 1 1 240px;
+    min-inline-size: 0;
+  }
+}

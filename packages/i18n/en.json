@@ -4482,7 +4482,21 @@
         "other": "{{count}} responses — compare"
       },
       "draftActionsUnavailable": "Draft actions are currently unavailable because workspace members could not be loaded.",
-      "reference": "Reference"
+      "reference": "Reference",
+      "searchLabel": "Search RFQs",
+      "searchPlaceholder": "Reference, supplier or product",
+      "clearSearch": "Clear search",
+      "sortLabel": "Sort by",
+      "noMatches": "No RFQs match your search or filter.",
+      "clearAll": "Clear search and filters",
+      "sortOptions": {
+        "created_desc": "Newest first",
+        "created_asc": "Oldest first",
+        "needed_asc": "Needed by: soonest",
+        "needed_desc": "Needed by: latest",
+        "reference_desc": "Reference: high to low",
+        "reference_asc": "Reference: low to high"
+      }
     },
     "detail": {
       "cancelledAtLabel": "Cancelled",
