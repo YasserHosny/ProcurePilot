@@ -3253,3 +3253,40 @@ def test_a_draft_order_header_and_lines_stay_editable(
             (order_id,),
         )
         assert cur.rowcount == 1
+
+
+def test_a_line_cannot_be_moved_into_an_order_that_is_no_longer_a_draft(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        draft_id = _insert_order(cur, alpha)
+        submitted_id = _insert_order(cur, alpha, status="submitted")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "update purchase_order_line set purchase_order_id = %s, line_number = 9 "
+                "where purchase_order_id = %s",
+                (submitted_id, draft_id),
+            )
+
+
+def test_an_order_cannot_be_inserted_past_draft(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into purchase_order (tenant_id,order_number,supplier_id,status,"
+                "order_date,total_amount,total_currency,tax_amount,tax_currency,"
+                "source_reference,created_by) "
+                "values (%s,%s,%s,'cancelled',current_date,1,'USD',0,'USD','test',%s)",
+                (
+                    alpha.tenant_id,
+                    f"PO-LATE-{uuid4().hex[:8]}",
+                    alpha.supplier_id,
+                    alpha.membership_id,
+                ),
+            )

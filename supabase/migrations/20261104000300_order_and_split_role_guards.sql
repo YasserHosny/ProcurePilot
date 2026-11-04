@@ -31,7 +31,7 @@ create policy basket_split_job_owner_buyer_delete on basket_split_job
   for delete to authenticated
   using (tenant_id = current_tenant_id() and current_member_role() in ('owner', 'buyer'));
 
--- 2. purchase_order lines: insert and update only while the order is a draft -----------------
+-- 2. purchase_order and its lines: orders start as drafts; lines change only on a draft order -----------------
 
 drop policy if exists purchase_order_line_owner_buyer_insert on purchase_order_line;
 drop policy if exists purchase_order_line_owner_buyer_update on purchase_order_line;
@@ -66,6 +66,24 @@ create policy purchase_order_line_owner_buyer_update on purchase_order_line
   with check (
     tenant_id = current_tenant_id()
     and current_member_role() in ('owner', 'buyer')
+    and exists (
+      select 1
+      from purchase_order po
+      where po.tenant_id = purchase_order_line.tenant_id
+        and po.id = purchase_order_line.purchase_order_id
+        and po.status = 'draft'
+    )
+  );
+
+-- Orders start as drafts: the API never sets a status on insert.
+drop policy if exists purchase_order_owner_buyer_insert on purchase_order;
+
+create policy purchase_order_owner_buyer_insert on purchase_order
+  for insert to authenticated
+  with check (
+    tenant_id = current_tenant_id()
+    and current_member_role() in ('owner', 'buyer')
+    and status = 'draft'
   );
 
 -- 3. purchase_order: status transitions and a frozen header -----------------------------------
