@@ -195,6 +195,38 @@ describe('CorrectMatchDialogComponent', () => {
     expect(document.getElementById(id!)?.textContent?.trim()).toBeTruthy();
   });
 
+  describe('new-product and unchanged guards (P-151, PPS-195)', () => {
+    const save = (): HTMLButtonElement =>
+      fixture.nativeElement.querySelector('.confirm-correction-btn') as HTMLButtonElement;
+
+    it('leaves Base Unit blank so the buyer chooses it, instead of defaulting to the first unit', () => {
+      expect(component.productForm.get('base_unit')?.value).toBe('');
+    });
+
+    it('disables Save while the choice is the current match, and enables it once another is picked', () => {
+      expect(save().disabled).toBeTrue();
+
+      component.selectCandidate('cand-2');
+      fixture.detectChanges();
+
+      expect(save().disabled).toBeFalse();
+    });
+
+    it('disables Save for a new product until it is valid, and says what is missing', () => {
+      component.selectOutcome('no_match_new_product');
+      fixture.detectChanges();
+      expect(save().disabled).toBeTrue();
+
+      component.productForm.get('base_unit')?.markAsTouched();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain(enCatalog.matching.resolution.newProduct.baseUnitRequired);
+
+      component.productForm.patchValue({ base_unit: 'litre' });
+      fixture.detectChanges();
+      expect(save().disabled).toBeFalse();
+    });
+  });
+
   it('submits correction with selected candidate, expected_current_decision_id, and learn_alias', () => {
     component.selectCandidate('cand-2');
     fixture.detectChanges();
