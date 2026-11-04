@@ -836,10 +836,15 @@ def test_an_owner_or_buyer_who_did_not_create_the_rfq_can_mark_it_converted(
             cur.execute("update rfq set status = 'converted' where id = %s", (alpha.rfq_id,))
             assert cur.rowcount == 0
         else:
-            cur.execute(
-                "update rfq set needed_by_date = current_date + 10 where id = %s", (alpha.rfq_id,)
-            )
-            assert cur.rowcount == 1
+            # The policy admits the owner (PPS-179); the status guard then refuses an edit of an
+            # RFQ that is no longer a draft (PPS-213).
+            cur.execute("savepoint before_owner_edit")
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                cur.execute(
+                    "update rfq set needed_by_date = current_date + 10 where id = %s",
+                    (alpha.rfq_id,),
+                )
+            cur.execute("rollback to savepoint before_owner_edit")
         cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, request_id))
         assert cur.fetchone()[0] is True
         assert _rfq_status(cur, alpha.rfq_id) == "converted"
