@@ -280,6 +280,11 @@ export class DetailComponent implements OnInit {
     return this.formatService.formatDate(value, { timeStyle: 'short' });
   }
 
+  /** Any owner or buyer can start a new RFQ from this one, whatever its status. */
+  canDuplicate(): boolean {
+    return this.session.hasRole('owner', 'buyer');
+  }
+
   canCancel(): boolean {
     const rfq = this.rfqDetail()?.rfq;
     return Boolean(rfq && ['draft', 'sent', 'responded', 'expired'].includes(rfq.status) &&
