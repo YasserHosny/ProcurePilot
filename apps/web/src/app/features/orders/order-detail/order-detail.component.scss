@@ -50,8 +50,10 @@
 .receipt-progress-text { position: relative; display: block; padding-inline: 0.75rem; font-size: 0.8rem; line-height: 1.5rem; color: var(--pp-text-strong); }
 @media print { .receipt-progress { display: none; } }
 
-.receipt-note {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--mat-sys-on-surface-variant, inherit);
+.timeline .receipt-note {
+  grid-column: 2 / -1;
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--pp-text-muted);
 }

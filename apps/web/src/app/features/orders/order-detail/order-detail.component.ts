@@ -208,6 +208,12 @@ export class OrderDetailComponent implements OnInit {
     this.receiptNotes.set({ ...this.receiptNotes(), [lineId]: value });
   }
 
+  /** What a recorded receipt line was for, so its note reads on its own. */
+  receiptLineName(lineId: string): string {
+    const line = this.evidence()?.order.lines.find((candidate) => candidate.id === lineId);
+    return line ? lineDescription(line) : '';
+  }
+
   readonly isOverdue = isOrderOverdue;
 
   /** Hands the browser a file to save; separate so tests do not need a real download. */
@@ -369,7 +375,7 @@ export class OrderDetailComponent implements OnInit {
         };
       }),
     }).subscribe({
-      next: (value) => { this.evidence.set(value); this.receiptOpen.set(false); this.isSaving.set(false); this.announce('orders.detail.receiptSaved'); },
+      next: (value) => { this.evidence.set(value); this.receiptOpen.set(false); this.receiptNotes.set({}); this.isSaving.set(false); this.announce('orders.detail.receiptSaved'); },
       error: (err: unknown) => this.failWith(err),
     });
   }
