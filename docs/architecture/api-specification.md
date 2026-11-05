@@ -425,6 +425,18 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 - Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50,
   optional `status` (`open`, `in_progress`, `resolved`, or `all`) defaulting to `open`, optional
   `priority` (`low`, `normal`, or `high`).
+- Optional `supplier_id` (UUID), `reason` (`ready_to_authorise`, `low_confidence`,
+  `arithmetic_mismatch`, `read_failure`, `review_required`, `no_supplier_match`,
+  `currency_unresolved`, `date_unparsed`, `merged_line_items`, `line_count_mismatch`,
+  `total_unverified`), and `quotation_status` (`pending`, `extracting`, `extracted`,
+  `in_review`, `reviewed`, `refused`) narrow the queue before pagination. Lifecycle status
+  belongs to the quotation; `status` belongs to the review task.
+- Existing optional `search` (supplier name or quotation ID prefix, at most 200 characters),
+  `date_from` and `date_to` (inclusive calendar day or timestamp), `sort_by` (`created_at`,
+  `stated_total`, `priority`, `status`; default `created_at`), and `sort_order` (`asc`, `desc`;
+  default `desc`) combine with all filters using AND. Ordering retains the ID tie-breaker.
+- Supplier filtering intersects supplier-name search. A supplier outside the JWT tenant
+  returns an empty list. Unknown reason/lifecycle values or malformed supplier UUIDs return `422`.
 - Returns `200` with `items` containing `ReviewTask` resources and nullable `next_cursor`.
 - Review task fields include `id`, `quotation_id`, `status`, `priority`, `reason`, `created_at`,
   and optional `resolved_at`.

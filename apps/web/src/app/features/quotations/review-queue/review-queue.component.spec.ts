@@ -1,10 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, type WritableSignal } from '@angular/core';
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
+import { MatSelectHarness } from '@angular/material/select/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router, type ParamMap, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
 import type { Quotation, ReviewTask, ReviewTaskPriority, Role } from '../../../core/api/models';
@@ -60,11 +63,13 @@ describe('ReviewQueueComponent (T052)', () => {
   beforeEach(async () => {
     apiService = jasmine.createSpyObj('ApiService', [
       'getReviewTasks',
+      'suppliers',
       'archiveQuotation',
       'refuseQuotation',
       'updateReviewTaskPriority',
     ]);
     apiService.getReviewTasks.and.returnValue(of({ items: mockTasks, next_cursor: null }));
+    apiService.suppliers.and.returnValue(of({ items: [], next_cursor: null }));
     apiService.archiveQuotation.and.returnValue(of(mockQuotation));
     apiService.refuseQuotation.and.returnValue(of(mockQuotation));
     apiService.updateReviewTaskPriority.and.returnValue(of(mockTasks[0]));
@@ -696,6 +701,138 @@ describe('ReviewQueueComponent (T052)', () => {
       spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
     });
 
+    describe('supplier, reason and lifecycle filters', () => {
+      const supplierId = '11111111-1111-1111-1111-111111111111';
+      function restoreNewFilters(): ComponentFixture<ReviewQueueComponent> {
+        const params = convertToParamMap({ supplier_id: supplierId, reason: 'read_failure', quotation_status: 'in_review' });
+        const nextFixture = TestBed.createComponent(ReviewQueueComponent);
+        (nextFixture.componentInstance as unknown as { route: object }).route = {
+          snapshot: { queryParamMap: params }, queryParamMap: of(params),
+        };
+        nextFixture.detectChanges();
+        return nextFixture;
+      }
+
+      it('restores all three from URL and sends them on initial and next-page requests', () => {
+        apiService.getReviewTasks.and.returnValue(of({ items: mockTasks, next_cursor: 'page-2' }));
+        const nextFixture = restoreNewFilters();
+        expect(apiService.getReviewTasks).toHaveBeenCalledWith(jasmine.objectContaining({
+          supplier_id: supplierId, reason: 'read_failure', quotation_status: 'in_review',
+        }));
+        nextFixture.componentInstance.loadMore();
+        expect(apiService.getReviewTasks).toHaveBeenCalledWith(jasmine.objectContaining({
+          cursor: 'page-2', supplier_id: supplierId, reason: 'read_failure', quotation_status: 'in_review',
+        }));
+      });
+
+      it('renders chips inside the labelled set and removes each through its button', () => {
+        const nextFixture = restoreNewFilters();
+        const el = nextFixture.nativeElement as HTMLElement;
+        for (const [chip, param] of [['supplier', 'supplier_id'], ['reason', 'reason'], ['lifecycle', 'quotation_status']]) {
+          expect(el.querySelector(`mat-chip-set[aria-label] [data-testid="chip-${chip}"]`)).not.toBeNull();
+          const button = el.querySelector<HTMLButtonElement>(`[data-testid="remove-${chip}-chip"]`);
+          expect(button?.getAttribute('aria-label')).toBeTruthy();
+          button?.click();
+          nextFixture.detectChanges();
+          expect(el.querySelector(`[data-testid="chip-${chip}"]`)).toBeNull();
+          expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({
+            queryParams: jasmine.objectContaining({ [param]: null }),
+          }));
+        }
+        expect(nextFixture.componentInstance.hasActiveFilters()).toBeFalse();
+      });
+
+      it('clears new filters and shows filtered empty state and count', () => {
+        apiService.getReviewTasks.and.returnValue(of({ items: [], next_cursor: null }));
+        const nextFixture = restoreNewFilters();
+        const el = nextFixture.nativeElement as HTMLElement;
+        expect(nextFixture.componentInstance.hasActiveFilters()).toBeTrue();
+        expect(nextFixture.componentInstance.resultCountText()).toContain('0');
+        expect(el.textContent).toContain(enCatalog.quotations.queue.noFilterResults);
+        el.querySelector<HTMLButtonElement>('[data-testid="clear-filters-btn"]')!.click();
+        nextFixture.detectChanges();
+        expect(nextFixture.componentInstance.hasActiveFilters()).toBeFalse();
+        expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({
+          queryParams: jasmine.objectContaining({ supplier_id: null, reason: null, quotation_status: null }),
+        }));
+      });
+
+      it('loads supplier options and selects each filter with labelled controls', async () => {
+        apiService.suppliers.and.returnValue(of({ items: [
+          { id: supplierId, name: 'Acme', status: 'active', created_at: '2026-01-01T00:00:00Z' },
+          { id: '22222222-2222-2222-2222-222222222222', name: 'Zeta', status: 'active', created_at: '2026-01-01T00:00:00Z' },
+        ], next_cursor: null }));
+        const nextFixture = TestBed.createComponent(ReviewQueueComponent);
+        nextFixture.detectChanges();
+        expect(apiService.suppliers).toHaveBeenCalledWith({ limit: 100, status: 'all' });
+        const loader = TestbedHarnessEnvironment.loader(nextFixture);
+        for (const [name, label] of [
+          ['supplier', 'Acme'], ['reason', enCatalog.quotations.queue.reason.read_failure],
+          ['lifecycle', enCatalog.quotations.review.status.in_review],
+        ]) {
+          const select = await loader.getHarness(MatSelectHarness.with({ selector: `[data-testid="filter-${name}"]` }));
+          expect(await (await select.host()).getAttribute('aria-label')).toBeTruthy();
+          await select.open();
+          await select.clickOptions({ text: label });
+        }
+        expect(apiService.getReviewTasks).toHaveBeenCalledWith(jasmine.objectContaining({
+          supplier_id: supplierId, reason: 'read_failure', quotation_status: 'in_review',
+        }));
+        expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({
+          queryParams: jasmine.objectContaining({ supplier_id: supplierId, reason: 'read_failure', quotation_status: 'in_review' }),
+        }));
+        const el = nextFixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="chip-supplier"]')?.textContent).toContain('Acme');
+      });
+
+      it('restores changed URLs and resets new filters when navigating back', () => {
+        const params = new BehaviorSubject(convertToParamMap({ supplier_id: supplierId, reason: 'read_failure', quotation_status: 'in_review' }));
+        const nextFixture = TestBed.createComponent(ReviewQueueComponent);
+        (nextFixture.componentInstance as unknown as { route: object }).route = {
+          snapshot: { queryParamMap: params.value }, queryParamMap: params,
+        };
+        nextFixture.detectChanges();
+        params.next(convertToParamMap({ reason: 'line_count_mismatch', quotation_status: 'refused' }));
+        expect(nextFixture.componentInstance.supplierFilter()).toBeNull();
+        expect(nextFixture.componentInstance.reasonFilter()).toBe('line_count_mismatch');
+        expect(nextFixture.componentInstance.lifecycleFilter()).toBe('refused');
+        params.next(convertToParamMap({}));
+        expect(nextFixture.componentInstance.hasActiveFilters()).toBeFalse();
+        expect(nextFixture.componentInstance.reasonFilter()).toBe('all');
+        expect(nextFixture.componentInstance.lifecycleFilter()).toBe('all');
+      });
+
+      it('ignores invalid supplier, reason and lifecycle URL values', () => {
+        const nextFixture = TestBed.createComponent(ReviewQueueComponent);
+        const params = convertToParamMap({ supplier_id: 'invalid', reason: 'invalid', quotation_status: 'invalid' });
+        (nextFixture.componentInstance as unknown as { route: object }).route = {
+          snapshot: { queryParamMap: params }, queryParamMap: of(params),
+        };
+        nextFixture.detectChanges();
+        expect(nextFixture.componentInstance.hasActiveFilters()).toBeFalse();
+      });
+
+      it('has bilingual labels and removal copy for every new filter', () => {
+        for (const catalog of [enCatalog, arCatalog]) {
+          const filters = catalog.quotations.queue.filters as Record<string, string>;
+          const chips = catalog.quotations.queue.filterChips as Record<string, string>;
+          for (const key of ['supplier', 'allSuppliers', 'reason', 'allReasons', 'lifecycle', 'allLifecycles']) {
+            expect(filters[key]).withContext(key).toBeTruthy();
+          }
+          for (const key of ['removeSupplier', 'removeReason', 'removeLifecycle']) {
+            expect(chips[key]).withContext(key).toBeTruthy();
+          }
+        }
+        for (const catalog of [enCatalog, arCatalog]) {
+          const reasons = catalog.quotations.queue.reason as Record<string, string>;
+          const statuses = catalog.quotations.review.status as Record<string, string>;
+          for (const reason of component.reasons) expect(reasons[reason]).toBeTruthy();
+          for (const status of component.lifecycles) expect(statuses[status]).toBeTruthy();
+        }
+        expect(Object.keys(enCatalog.quotations.queue.filters).sort()).toEqual(Object.keys(arCatalog.quotations.queue.filters).sort());
+      });
+    });
+
     describe('URL restore on init', () => {
       it('restores filters, search, sort, and date range from query params on load', async () => {
         const queryParams = {
@@ -928,6 +1065,9 @@ describe('ReviewQueueComponent (T052)', () => {
 
         expect(router.navigate).toHaveBeenCalledWith([], {
           queryParams: {
+            supplier_id: null,
+            reason: null,
+            quotation_status: null,
             status: 'resolved',
             priority: null,
             search: null,
@@ -946,6 +1086,9 @@ describe('ReviewQueueComponent (T052)', () => {
 
         expect(router.navigate).toHaveBeenCalledWith([], {
           queryParams: {
+            supplier_id: null,
+            reason: null,
+            quotation_status: null,
             status: null,
             priority: null,
             search: null,
@@ -964,6 +1107,9 @@ describe('ReviewQueueComponent (T052)', () => {
 
         expect(router.navigate).toHaveBeenCalledWith([], {
           queryParams: {
+            supplier_id: null,
+            reason: null,
+            quotation_status: null,
             status: null,
             priority: 'high',
             search: null,
@@ -982,6 +1128,9 @@ describe('ReviewQueueComponent (T052)', () => {
 
         expect(router.navigate).toHaveBeenCalledWith([], {
           queryParams: {
+            supplier_id: null,
+            reason: null,
+            quotation_status: null,
             status: null,
             priority: null,
             search: 'Supplier A',
@@ -1000,6 +1149,9 @@ describe('ReviewQueueComponent (T052)', () => {
 
         expect(router.navigate).toHaveBeenCalledWith([], {
           queryParams: {
+            supplier_id: null,
+            reason: null,
+            quotation_status: null,
             status: null,
             priority: null,
             search: null,
@@ -1017,6 +1169,9 @@ describe('ReviewQueueComponent (T052)', () => {
 
         expect(router.navigate).toHaveBeenCalledWith([], {
           queryParams: {
+            supplier_id: null,
+            reason: null,
+            quotation_status: null,
             status: null,
             priority: null,
             search: null,
@@ -1035,6 +1190,9 @@ describe('ReviewQueueComponent (T052)', () => {
 
         expect(router.navigate).toHaveBeenCalledWith([], {
           queryParams: {
+            supplier_id: null,
+            reason: null,
+            quotation_status: null,
             status: null,
             priority: null,
             search: null,
@@ -1084,6 +1242,9 @@ describe('ReviewQueueComponent (T052)', () => {
 
         expect(router.navigate).toHaveBeenCalledWith([], {
           queryParams: {
+            supplier_id: null,
+            reason: null,
+            quotation_status: null,
             status: null,
             priority: null,
             search: null,

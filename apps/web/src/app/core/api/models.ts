@@ -446,6 +446,21 @@ export type ReviewTaskReason =
   | 'line_count_mismatch'
   | 'total_unverified';
 
+export interface ReviewTaskFilters {
+  cursor?: string;
+  limit?: number;
+  status?: ReviewTaskStatus | 'all';
+  priority?: ReviewTaskPriority;
+  supplier_id?: string;
+  reason?: ReviewTaskReason;
+  quotation_status?: QuotationStatus;
+  search?: string;
+  date_from?: string;
+  date_to?: string;
+  sort_by?: 'created_at' | 'stated_total' | 'priority' | 'status';
+  sort_order?: 'asc' | 'desc';
+}
+
 export interface ReviewTask {
   readonly id: string;
   readonly quotation_id: string;

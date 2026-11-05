@@ -863,7 +863,13 @@
       "filters": {
         "dateFrom": "من تاريخ",
         "dateTo": "إلى تاريخ",
-        "dateRangeInvalid": "يجب أن يكون تاريخ البداية قبل تاريخ النهاية أو مساويًا له."
+        "dateRangeInvalid": "يجب أن يكون تاريخ البداية قبل تاريخ النهاية أو مساويًا له.",
+        "supplier": "المورد",
+        "allSuppliers": "جميع الموردين",
+        "reason": "السبب",
+        "allReasons": "جميع الأسباب",
+        "lifecycle": "حالة عرض السعر",
+        "allLifecycles": "جميع حالات عروض الأسعار"
       },
       "status": {
         "all": "جميع الحالات",
@@ -954,7 +960,10 @@
         "removeStatus": "إزالة تصفية الحالة",
         "removePriority": "إزالة تصفية الأولوية",
         "removeSearch": "إزالة تصفية البحث",
-        "removeDateRange": "إزالة تصفية نطاق التاريخ"
+        "removeDateRange": "إزالة تصفية نطاق التاريخ",
+        "removeSupplier": "إزالة تصفية المورد",
+        "removeReason": "إزالة تصفية السبب",
+        "removeLifecycle": "إزالة تصفية حالة عرض السعر"
       },
       "resultsCount": {
         "one": "نتيجة واحدة",

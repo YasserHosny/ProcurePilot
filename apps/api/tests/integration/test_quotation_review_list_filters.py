@@ -278,3 +278,62 @@ def test_adapter_rejects_unknown_embeds(
     query = query.order("unknown(id)") if ordering else query.eq("unknown.id", workspace.tenant_id)
     with pytest.raises(NotImplementedError, match="unknown embed"):
         query.execute()
+
+
+@pytest.mark.parametrize("filter_name", ["supplier_id", "reason", "quotation_status", "combined"])
+def test_queue_filters_narrow_before_pagination(
+    conn: psycopg.Connection, workspace: Workspace, filter_name: str
+) -> None:
+    with conn.cursor() as cur:
+        supplier = make_supplier(cur, workspace, "Selected Supplier")
+        other_supplier = make_supplier(cur, workspace, "Other Supplier")
+    quotation_id, target = _task(conn, workspace, supplier)
+    _task(conn, workspace, other_supplier)
+    _, other_task = _task(conn, workspace, supplier)
+    with conn.cursor() as cur:
+        cur.execute("update quotation set status='in_review' where id=%s", (quotation_id,))
+        cur.execute("update review_task set reason='total_unverified' where id=%s", (other_task,))
+    service = QuotationService()
+    if filter_name == "supplier_id":
+        result = service.list_review_tasks(bearer_token="test-token", supplier_id=supplier)
+        assert {task.id for task in result.items} == {target, other_task}
+    elif filter_name == "reason":
+        result = service.list_review_tasks(bearer_token="test-token", reason="total_unverified")
+        assert [task.id for task in result.items] == [other_task]
+    elif filter_name == "quotation_status":
+        result = service.list_review_tasks(bearer_token="test-token", quotation_status="in_review")
+        assert [task.id for task in result.items] == [target]
+    else:
+        result = service.list_review_tasks(
+            bearer_token="test-token",
+            supplier_id=supplier,
+            reason="line_count_mismatch",
+            quotation_status="in_review",
+            search="Selected",
+            status="open",
+            limit=1,
+        )
+        assert [task.id for task in result.items] == [target]
+        assert result.next_cursor is None
+        assert (
+            service.list_review_tasks(
+                bearer_token="test-token", supplier_id=other_supplier, search="Selected"
+            ).items
+            == []
+        )
+
+
+def test_other_tenant_supplier_filter_returns_empty(
+    conn: psycopg.Connection, workspace: Workspace
+) -> None:
+    _task(conn, workspace)
+    with conn.cursor() as cur:
+        other = make_workspace(cur, "other-queue-filter")
+        act_as(cur, other)
+        supplier = make_supplier(cur, other, "Other Tenant Supplier")
+    _task(conn, other, supplier)
+    with conn.cursor() as cur:
+        act_as(cur, workspace)
+    result = QuotationService().list_review_tasks(bearer_token="test-token", supplier_id=supplier)
+    assert result.items == []
+    assert result.next_cursor is None

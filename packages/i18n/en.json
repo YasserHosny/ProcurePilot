@@ -863,7 +863,13 @@
       "filters": {
         "dateFrom": "From date",
         "dateTo": "To date",
-        "dateRangeInvalid": "The start date must be on or before the end date."
+        "dateRangeInvalid": "The start date must be on or before the end date.",
+        "supplier": "Supplier",
+        "allSuppliers": "All suppliers",
+        "reason": "Reason",
+        "allReasons": "All reasons",
+        "lifecycle": "Lifecycle",
+        "allLifecycles": "All lifecycle statuses"
       },
       "status": {
         "all": "All Statuses",
@@ -954,7 +960,10 @@
         "removeStatus": "Remove status filter",
         "removePriority": "Remove priority filter",
         "removeSearch": "Remove search filter",
-        "removeDateRange": "Remove date range filter"
+        "removeDateRange": "Remove date range filter",
+        "removeSupplier": "Remove supplier filter",
+        "removeReason": "Remove reason filter",
+        "removeLifecycle": "Remove lifecycle filter"
       },
       "resultsCount": {
         "one": "{{count}} result",

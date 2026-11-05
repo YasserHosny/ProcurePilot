@@ -89,8 +89,8 @@ import type {
   QuotationMatches,
   QuotationReviewPatch,
   ReviewTask,
+  ReviewTaskFilters,
   ReviewTaskPriority,
-  ReviewTaskStatus,
   Role,
   SavingEvidence,
   SavingList,
@@ -585,22 +585,17 @@ export class ApiService {
     return this.http.get<Job>(`${this.base}/jobs/${jobId}`);
   }
 
-  getReviewTasks(params?: {
-    cursor?: string;
-    limit?: number;
-    status?: ReviewTaskStatus | 'all';
-    priority?: ReviewTaskPriority;
-    search?: string;
-    date_from?: string;
-    date_to?: string;
-    sort_by?: 'created_at' | 'stated_total' | 'priority' | 'status';
-    sort_order?: 'asc' | 'desc';
-  }): Observable<{ items: ReviewTask[]; next_cursor: string | null }> {
+  getReviewTasks(
+    params?: ReviewTaskFilters,
+  ): Observable<{ items: ReviewTask[]; next_cursor: string | null }> {
     const query = new URLSearchParams();
     if (params?.cursor) query.set('cursor', params.cursor);
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.status) query.set('status', params.status);
     if (params?.priority) query.set('priority', params.priority);
+    if (params?.supplier_id) query.set('supplier_id', params.supplier_id);
+    if (params?.reason) query.set('reason', params.reason);
+    if (params?.quotation_status) query.set('quotation_status', params.quotation_status);
     if (params?.search) query.set('search', params.search);
     if (params?.date_from) query.set('date_from', params.date_from);
     if (params?.date_to) query.set('date_to', params.date_to);
