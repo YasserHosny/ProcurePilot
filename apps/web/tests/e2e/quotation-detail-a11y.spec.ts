@@ -134,6 +134,17 @@ test.describe('Populated quotation screens accessibility @a11y', () => {
       await expectNoViolations();
     });
 
+    test(`the review queue with supplier, reason and lifecycle filters in ${label} has no WCAG 2.1 AA violations @a11y`, async () => {
+      await open(
+        '/quotations?status=all&reason=arithmetic_mismatch&quotation_status=in_review',
+        '[data-testid="chip-reason"]',
+        dir,
+      );
+      await expect(page.locator('[data-testid="chip-lifecycle"]')).toBeVisible();
+      await expect(page.locator('[data-testid="clear-filters-btn"]')).toBeVisible();
+      await expectNoViolations();
+    });
+
     // Selecting a file starts the upload in the same tick, so the file card and its remove button never render.
     test.fixme(`the upload page with a chosen file in ${label} has no WCAG 2.1 AA violations @a11y`, async () => {
       await open('/quotations/upload', 'input.file-input', dir);

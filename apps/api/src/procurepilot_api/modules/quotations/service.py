@@ -30,10 +30,12 @@ from procurepilot_api.modules.quotations.schemas import (
     QuotationCreate,
     QuotationDetail,
     QuotationLine,
+    QuotationStatus,
     QuotationVersionReference,
     ReviewTask,
     ReviewTaskList,
     ReviewTaskPriority,
+    ReviewTaskReason,
     ReviewTaskStatus,
     decimal_string,
 )
@@ -180,6 +182,9 @@ class QuotationService:
         limit: int = 50,
         status: ReviewTaskStatus | str = "open",
         priority: ReviewTaskPriority | None = None,
+        supplier_id: UUID | None = None,
+        reason: ReviewTaskReason | None = None,
+        quotation_status: QuotationStatus | None = None,
         search: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
@@ -228,6 +233,12 @@ class QuotationService:
                 query = query.in_("quotation.supplier_id", supplier_ids)
             elif id_bounds is not None:
                 query = query.gte("quotation_id", id_bounds[0]).lte("quotation_id", id_bounds[1])
+            if supplier_id is not None:
+                query = query.eq("quotation.supplier_id", str(supplier_id))
+            if reason is not None:
+                query = query.eq("reason", reason)
+            if quotation_status is not None:
+                query = query.eq("quotation.status", quotation_status)
             if status != "all":
                 query = query.eq("status", status)
             if priority is not None:

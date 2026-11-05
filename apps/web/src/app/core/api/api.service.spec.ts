@@ -21,6 +21,23 @@ describe('ApiService - Member display names (PPS-125)', () => {
 
   afterEach(() => http.verify());
 
+  it('serializes review queue filters together with existing search and paging', () => {
+    const supplierId = '11111111-1111-1111-1111-111111111111';
+    service.getReviewTasks({
+      supplier_id: supplierId, reason: 'read_failure', quotation_status: 'in_review',
+      search: 'Acme & Sons', status: 'all', cursor: 'page-2',
+    }).subscribe();
+    const request = http.expectOne((req) => req.url.startsWith('/api/v1/review-tasks?'));
+    const params = new URL(request.request.url, 'http://localhost').searchParams;
+    expect(params.get('supplier_id')).toBe(supplierId);
+    expect(params.get('reason')).toBe('read_failure');
+    expect(params.get('quotation_status')).toBe('in_review');
+    expect(params.get('search')).toBe('Acme & Sons');
+    expect(params.get('status')).toBe('all');
+    expect(params.get('cursor')).toBe('page-2');
+    request.flush({ items: [], next_cursor: null });
+  });
+
   it('renameMember PATCHes /api/v1/members/{id} with display_name', () => {
     service.renameMember('mem-1', 'Nadia Mansour').subscribe();
 
