@@ -37,19 +37,27 @@
           <!-- Candidate Card Header -->
           <div class="cand-header">
             <div class="cand-rank-group">
-              <span class="cand-rank-badge">#{{ cand.rank }}</span>
-              <span class="cand-key-hint"><kbd>{{ cand.rank }}</kbd></span>
+              @if (!cand.reasons.manual) {
+                <span class="cand-rank-badge">#{{ cand.rank }}</span>
+                <span class="cand-key-hint"><kbd>{{ cand.rank }}</kbd></span>
+              }
             </div>
-            <div
-              class="cand-confidence-badge"
-              [class.high]="formatScore(cand.confidence) >= 90"
-              [class.medium]="(formatScore(cand.confidence) >= 70 && formatScore(cand.confidence) < 90) || isRfqCandidate(cand)"
-              [class.low]="formatScore(cand.confidence) < 70 && !isRfqCandidate(cand)"
-              [class.rfq-info]="isRfqCandidate(cand)"
-            >
-              <span class="conf-score">{{ formatScore(cand.confidence) }}%</span>
-              <span class="conf-label">{{ 'matching.resolution.candidates.confidence' | translate }}</span>
-            </div>
+            @if (cand.reasons.manual) {
+              <div class="cand-confidence-badge medium">
+                <span class="conf-label">{{ 'matching.resolution.picker.manualBadge' | translate }}</span>
+              </div>
+            } @else {
+              <div
+                class="cand-confidence-badge"
+                [class.high]="formatScore(cand.confidence) >= 90"
+                [class.medium]="(formatScore(cand.confidence) >= 70 && formatScore(cand.confidence) < 90) || isRfqCandidate(cand)"
+                [class.low]="formatScore(cand.confidence) < 70 && !isRfqCandidate(cand)"
+                [class.rfq-info]="isRfqCandidate(cand)"
+              >
+                <span class="conf-score">{{ formatScore(cand.confidence) }}%</span>
+                <span class="conf-label">{{ 'matching.resolution.candidates.confidence' | translate }}</span>
+              </div>
+            }
           </div>
 
           <!-- Product Overview -->

@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { ApiService } from '../../../core/api/api.service';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -158,6 +159,7 @@ describe('CorrectMatchDialogComponent', () => {
       providers: [
         provideTranslateService(),
         { provide: MatDialogRef, useValue: mockDialogRef },
+        { provide: ApiService, useValue: jasmine.createSpyObj('ApiService', ['products', 'addManualCandidate']) },
         { provide: MAT_DIALOG_DATA, useValue: mockDialogData },
       ],
     }).compileComponents();
@@ -169,6 +171,39 @@ describe('CorrectMatchDialogComponent', () => {
     fixture = TestBed.createComponent(CorrectMatchDialogComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  });
+
+  const manualCandidate: MatchCandidate = {
+    id: 'cand-manual',
+    quotation_line_id: 'line-1',
+    candidate_product: {
+      id: 'prod-manual',
+      tenant_name: 'Picked From Catalogue 5L',
+      canonical_name: 'Picked From Catalogue',
+      base_unit: 'litre',
+      status: 'active',
+    },
+    confidence: '0.0000',
+    reasons: { alias_hit: false, gtin_match: false, supplier_code_match: false, manual: true },
+    rank: 1,
+    scoring_version: 'manual-v1',
+    created_at: '2026-08-20T00:00:00Z',
+  };
+
+  it('offers the catalogue picker and lists the product it records, selected (P-151)', () => {
+    expect(fixture.nativeElement.querySelector('app-product-picker')).not.toBeNull();
+    component.onManualCandidate(manualCandidate);
+    fixture.detectChanges();
+    expect(component.selectedCandidateId()).toBe('cand-manual');
+    expect(component.selectedOutcome()).toBe('same_product');
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Picked From Catalogue 5L');
+    expect(text).toContain('Picked by you');
+    expect(text).not.toContain('Picked by you 0%');
+    expect(text).not.toMatch(/Picked From Catalogue 5L\s*0%/);
+    // Picking the same product again does not add a second row.
+    component.onManualCandidate(manualCandidate);
+    expect(component.allCandidates().filter((c) => c.id === 'cand-manual').length).toBe(1);
   });
 
   it('renders line text and candidates list with RFQ badges', () => {

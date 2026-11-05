@@ -1,0 +1,43 @@
+<section class="product-picker" aria-labelledby="product-picker-title">
+  <h3 id="product-picker-title" class="picker-title">{{ 'matching.resolution.picker.title' | translate }}</h3>
+  <p class="picker-hint">{{ 'matching.resolution.picker.hint' | translate }}</p>
+
+  <mat-form-field appearance="outline" class="picker-field">
+    <mat-label>{{ 'matching.resolution.picker.searchLabel' | translate }}</mat-label>
+    <input
+      matInput
+      type="search"
+      autocomplete="off"
+      [placeholder]="'matching.resolution.picker.searchPlaceholder' | translate"
+      (input)="onInput($event)"
+    />
+    <mat-icon matSuffix aria-hidden="true">search</mat-icon>
+  </mat-form-field>
+
+  @if (error(); as err) {
+    <p class="picker-error" role="alert">
+      {{ (err === 'search' ? 'matching.resolution.picker.searchFailed' : 'matching.resolution.picker.pickFailed') | translate }}
+    </p>
+  }
+
+  @if (results().length > 0) {
+    <ul class="picker-results">
+      @for (product of results(); track product.id) {
+        <li>
+          <button
+            type="button"
+            class="picker-result"
+            data-testid="picker-result"
+            [disabled]="adding()"
+            (click)="pick(product)"
+          >
+            <strong>{{ product.tenant_name }}</strong>
+            <span class="picker-meta">{{ product.canonical_name }}</span>
+          </button>
+        </li>
+      }
+    </ul>
+  } @else if (searched() && !searching() && !error()) {
+    <p class="picker-empty" data-testid="picker-empty">{{ 'matching.resolution.picker.empty' | translate }}</p>
+  }
+</section>

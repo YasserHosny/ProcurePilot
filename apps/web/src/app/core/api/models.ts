@@ -537,6 +537,7 @@ export interface MatchReason {
   readonly feature_score?: FeatureScore | null;
   readonly rfq?: RfqMatchReason | null;
   readonly measured?: Record<string, string> | null;
+  readonly manual?: boolean;
 }
 
 export interface MatchCandidate {

@@ -38,6 +38,7 @@ import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { computeBaseQuantity } from '../../catalogue/normalisation';
 
 import { MatchResolutionCandidatesComponent } from './match-resolution-candidates.component';
+import { ProductPickerComponent } from './product-picker.component';
 import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS } from './correct-match-dialog.component';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
@@ -69,6 +70,7 @@ import { formatSweptLinesMessage, appendSweptMessage, CorrectionKeyManager } fro
     FormatDatePipe,
     FormatMoneyPipe,
     MatchResolutionCandidatesComponent,
+    ProductPickerComponent,
   ],
   templateUrl: './match-resolution.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -355,6 +357,15 @@ export class MatchResolutionComponent implements OnInit {
         this.isLoading.set(false);
       },
     });
+  }
+
+  /** A catalogue product the buyer picked was recorded as a candidate: list it and select it. */
+  onManualCandidate(candidate: MatchCandidate): void {
+    if (!this.candidates().some((c) => c.id === candidate.id)) {
+      this.candidates.update((list) => [...list, candidate]);
+    }
+    this.selectCandidate(candidate.id);
+    this.selectedOutcome.set('same_product');
   }
 
   selectCandidate(candidateId: string): void {
