@@ -4828,7 +4828,6 @@
         "12": "ديسمبر"
       },
       "unknownProduct": "منتج غير معروف",
-      "reminderSubject": "تذكير: طلب عرض سعر — {{tenant}} — مطلوب قبل {{date}}",
       "reminderGreeting": "مرحباً،",
       "reminderIntro": "تذكير بطلب عرض سعر من {{tenant}}.",
       "reminderReference": "المرجع",

@@ -4828,7 +4828,6 @@
         "12": "December"
       },
       "unknownProduct": "Unknown product",
-      "reminderSubject": "Reminder: request for quotation — {{tenant}} — needed by {{date}}",
       "reminderGreeting": "Hello,",
       "reminderIntro": "This is a reminder of a request for quotation from {{tenant}}.",
       "reminderReference": "Reference",
