@@ -2847,7 +2847,7 @@
       "rejected": "رفضه {{name}}",
       "withdrawn": "سُحب الطلب",
       "viewDetails": "عرض التفاصيل",
-      "viewDetailsLabel": "عرض تفاصيل طلب {{requester}}، {{total}}",
+      "viewDetailsLabel": "عرض التفاصيل، طلب {{requester}}، {{total}}",
       "routing": {
         "threshold_match": "وفق قاعدة حد الإنفاق",
         "group_threshold_match": "وفق الإجمالي المجمع للتقسيم",
