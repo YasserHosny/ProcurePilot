@@ -112,3 +112,30 @@ def test_line_context_match_hash_number_in_python_and_sql_agree() -> None:
     from procurepilot_api.modules.matching.service import _line_context_matches
 
     assert _line_context_matches("#12", _ctx())
+
+
+@pytest.mark.parametrize("term", ["%", "-", ".", "#", " ", "ً"])
+def test_separator_only_term_does_not_match_every_name(term: str) -> None:
+    from procurepilot_api.modules.matching.service import (
+        _line_context_matches,
+        queue_search_filter_sql,
+    )
+
+    assert not _line_context_matches(term, _ctx(line_number=7, quotation_id="zz"))
+    # The SQL predicate for a term with no word keeps only the id arms.
+    assert "original_text" not in queue_search_filter_sql(has_words=False)
+    assert queue_search_filter_sql(has_words=False, has_ids=False) == "false"
+    assert "original_text" in queue_search_filter_sql(has_words=True)
+
+
+def test_needle_matches_after_the_attached_definite_article() -> None:
+    assert search_matches("شمس", ["زيت عباد الشمس"])
+    assert search_matches("أرز", ["الأرز البسمتي"])
+    assert search_matches("الشمس", ["زيت عباد الشمس"])
+    assert not search_matches("مس", ["زيت عباد الشمس"])
+
+
+def test_sql_filter_has_the_article_arm() -> None:
+    from procurepilot_api.modules.matching.service import queue_search_filter_sql
+
+    assert "'%% ال'" in queue_search_filter_sql(has_words=True)

@@ -9,6 +9,7 @@ from procurepilot_api.db import connect
 from procurepilot_api.modules.matching.search_text import (
     fold_search_text,
     search_matches,
+    search_words,
     sql_fold_expression,
 )
 
@@ -40,12 +41,16 @@ def test_sql_word_start_agrees_with_python() -> None:
         queue_search_filter_sql,
     )
 
-    sql = queue_search_filter_sql()
+    sql = queue_search_filter_sql(has_words=True)
     cases = [
         ("زيت", "زیت زيتون", "x"),
         ("oil", "Olive\noil", "x"),
         ("live", "Olive/oil", "x"),
         ("يتون", "زيتون", "x"),
+        ("olive-oil", "Olive / oil", "x"),
+        ("شمس", "زيت عباد الشمس", "x"),
+        ("أرز", "الأرز البسمتي", "x"),
+        ("مس", "زيت عباد الشمس", "x"),
     ]
     with connect(TEST_DATABASE_URL) as conn, conn.cursor() as cur:
         for term, text, supplier in cases:
@@ -56,9 +61,8 @@ def test_sql_word_start_agrees_with_python() -> None:
                 {
                     "t": text,
                     "s": supplier,
-                    "search": _escape_like(term.lower()),
                     "search_ids": _escape_like(term.lower()),
-                    "search_folded": _escape_like(fold_search_text(term)),
+                    "search_folded": _escape_like(search_words(term)),
                 },
             )
             row = cur.fetchone()

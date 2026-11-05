@@ -28,6 +28,7 @@ _TASHKEEL_CLASS = "ً-ٰٟـ"  # harakat, dagger alef, tatweel
 _TASHKEEL = re.compile(f"[{_TASHKEEL_CLASS}]")
 # Whitespace, ASCII punctuation/symbols and the Arabic comma, semicolon and question mark.
 _SEPARATOR_CLASS = r"\s!-/:-@\[-`{-~\u060c\u061b\u061f"
+_ARTICLE = "\u0627\u0644"  # ال, the attached definite article
 _SEPARATORS = re.compile(f"[{_SEPARATOR_CLASS}]+")
 
 
@@ -49,7 +50,9 @@ def search_matches(term: str, haystacks: Iterable[object]) -> bool:
     for haystack in haystacks:
         if haystack is None:
             continue
-        if f" {needle}" in f" {search_words(str(haystack))}":
+        padded = f" {search_words(str(haystack))}"
+        # A word also starts after its attached definite article: «الشمس» for "شمس".
+        if f" {needle}" in padded or f" {_ARTICLE}{needle}" in padded:
             return True
     return False
 
@@ -67,3 +70,6 @@ def sql_word_expression(column: str) -> str:
     return (
         f"btrim(regexp_replace({sql_fold_expression(column)}, '[{_SEPARATOR_CLASS}]+', ' ', 'g'))"
     )
+
+
+SQL_ARTICLE = _ARTICLE
