@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import type { MatchCandidate } from '../../../core/api/models';
 import { MatchResolutionCandidatesComponent } from './match-resolution-candidates.component';
@@ -44,6 +45,20 @@ describe('MatchResolutionCandidatesComponent', () => {
 
     fixture = TestBed.createComponent(MatchResolutionCandidatesComponent);
     component = fixture.componentInstance;
+  });
+
+  it('shows scores with Arabic-Indic digits in Arabic and Latin digits in English (P-159)', () => {
+    component.candidates = [baseCandidate];
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.conf-score').textContent).toContain('65%');
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('ar', arCatalog);
+    translate.use('ar');
+    fixture.detectChanges();
+    const score = fixture.nativeElement.querySelector('.conf-score').textContent as string;
+    expect(score).toMatch(/[٠-٩]/);
+    expect(score).not.toMatch(/[0-9]/);
   });
 
   it('displays "Your RFQ line {n}" when candidate has rfq_line_id and pack_check is not conflict', () => {

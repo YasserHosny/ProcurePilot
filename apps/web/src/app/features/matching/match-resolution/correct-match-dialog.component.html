@@ -47,7 +47,7 @@
                     [class.low]="formatScore(cand.confidence) < 70 && !isRfqCandidate(cand)"
                     [class.rfq-info]="isRfqCandidate(cand)"
                   >
-                    {{ formatScore(cand.confidence) }}%
+                    {{ formatScore(cand.confidence) | formatPercent }}
                   </div>
                 }
               </div>

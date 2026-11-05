@@ -19,6 +19,7 @@ import type {
   ProductCreate,
   QuotationLineSummary,
 } from '../../../core/api/models';
+import { FormatPercentPipe } from '../../../core/format/percent.pipe';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 import { ProductPickerComponent } from './product-picker.component';
@@ -28,16 +29,22 @@ export interface CorrectMatchDialogData {
   readonly candidates: readonly MatchCandidate[];
   readonly expectedCurrentDecisionId: string;
   readonly currentCandidateId?: string | null;
-  readonly baseUnits?: readonly BaseUnit[];
+  readonly baseUnits?: readonly SelectableUnit[];
   readonly quotationSupplierId?: string | null;
 }
 
-export const FALLBACK_BASE_UNITS: BaseUnit[] = [
-  { code: 'litre', label_en: 'Litre (L)', label_ar: 'لتر (L)', dimension: 'volume' },
-  { code: 'millilitre', label_en: 'Millilitre (ml)', label_ar: 'مليلتر (ml)', dimension: 'volume' },
-  { code: 'kilogram', label_en: 'Kilogram (kg)', label_ar: 'كيلوغرام (kg)', dimension: 'mass' },
-  { code: 'gram', label_en: 'Gram (g)', label_ar: 'غرام (g)', dimension: 'mass' },
-  { code: 'each', label_en: 'Each (item)', label_ar: 'حبة / قطعة', dimension: 'count' },
+/**
+ * A unit the pickers can offer. A unit from the API carries the server's labels; the built-in
+ * fallback carries only its code and takes its label from the i18n catalogue (`unitNames`).
+ */
+export type SelectableUnit = Pick<BaseUnit, 'code' | 'dimension'> & Partial<BaseUnit>;
+
+export const FALLBACK_BASE_UNITS: SelectableUnit[] = [
+  { code: 'litre', dimension: 'volume' },
+  { code: 'millilitre', dimension: 'volume' },
+  { code: 'kilogram', dimension: 'mass' },
+  { code: 'gram', dimension: 'mass' },
+  { code: 'each', dimension: 'count' },
 ];
 
 @Component({
@@ -57,6 +64,7 @@ export const FALLBACK_BASE_UNITS: BaseUnit[] = [
     MatSelectModule,
     TranslatePipe,
     UnitLabelPipe,
+    FormatPercentPipe,
     FormatQuantityPipe,
     ProductPickerComponent,
   ],

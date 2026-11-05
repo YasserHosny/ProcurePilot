@@ -20,7 +20,6 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ApiService } from '../../../core/api/api.service';
 import type {
   ApiError,
-  BaseUnit,
   LandedCost,
   MatchCandidate,
   MatchCorrectionRequest,
@@ -39,7 +38,12 @@ import { computeBaseQuantity } from '../../catalogue/normalisation';
 
 import { MatchResolutionCandidatesComponent } from './match-resolution-candidates.component';
 import { ProductPickerComponent } from './product-picker.component';
-import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS } from './correct-match-dialog.component';
+import {
+  CorrectMatchDialogComponent,
+  FALLBACK_BASE_UNITS,
+  type SelectableUnit,
+} from './correct-match-dialog.component';
+import { FormatPercentPipe } from '../../../core/format/percent.pipe';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 import { formatSweptLinesMessage, appendSweptMessage, CorrectionKeyManager } from '../matching-api';
@@ -65,6 +69,7 @@ import { formatSweptLinesMessage, appendSweptMessage, CorrectionKeyManager } fro
     MatDialogModule,
     MatTooltipModule,
     TranslatePipe,
+    FormatPercentPipe,
     FormatQuantityPipe,
     UnitLabelPipe,
     FormatDatePipe,
@@ -97,7 +102,7 @@ export class MatchResolutionComponent implements OnInit {
   readonly decision = signal<MatchDecision | null>(null);
   readonly landedCost = signal<LandedCost | null>(null);
 
-  readonly baseUnits = signal<BaseUnit[]>([]);
+  readonly baseUnits = signal<SelectableUnit[]>([]);
   readonly suppliers = signal<Supplier[]>([]);
 
   // Selected candidate and outcome
@@ -673,8 +678,9 @@ export class MatchResolutionComponent implements OnInit {
     return candidate.embedding_model !== 'stub-hash-v1';
   }
 
-  localizedUnitLabel(unit: BaseUnit): string {
-    return this.translate.getCurrentLang() === 'ar' ? unit.label_ar : unit.label_en;
+  localizedUnitLabel(unit: SelectableUnit): string {
+    const label = this.translate.getCurrentLang() === 'ar' ? unit.label_ar : unit.label_en;
+    return label || this.translate.instant(`matching.resolution.unitNames.${unit.code}`);
   }
 
   openCorrectMatchDialog(): void {

@@ -20,7 +20,6 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ApiService } from '../../../core/api/api.service';
 import type {
   ApiError,
-  BaseUnit,
   CatalogueRefreshReview,
   MatchCorrectionRequest,
   MatchQueueItem,
@@ -32,10 +31,11 @@ import type {
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { FormatPercentPipe } from '../../../core/format/percent.pipe';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
-import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS } from '../match-resolution/correct-match-dialog.component';
+import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS, type SelectableUnit } from '../match-resolution/correct-match-dialog.component';
 import { formatSweptLinesMessage, appendSweptMessage, CorrectionKeyManager } from '../matching-api';
 
 type MatchTaskSortBy = 'created_at' | 'priority' | 'status';
@@ -70,6 +70,7 @@ export interface QuotationTaskGroup {
     UnitLabelPipe,
     FormatDatePipe,
     FormatMoneyPipe,
+    FormatPercentPipe,
   ],
   templateUrl: './resolution-queue.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -113,7 +114,7 @@ export class ResolutionQueueComponent implements OnInit {
   readonly refreshReviewDecisionId = signal<string | null>(null);
   readonly quotationId = signal<string | null>(null);
   readonly quotationRfqId = signal<string | null>(null);
-  readonly baseUnits = signal<BaseUnit[]>([]);
+  readonly baseUnits = signal<SelectableUnit[]>([]);
   readonly collapsedGroupIds = signal<ReadonlySet<string>>(new Set<string>());
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
   private latestLoadRequestId = 0;

@@ -1634,6 +1634,13 @@
         "searchFailed": "The search failed. Try again.",
         "pickFailed": "That product could not be added. Try again.",
         "manualBadge": "Picked by you"
+      },
+      "unitNames": {
+        "litre": "Litre (L)",
+        "millilitre": "Millilitre (ml)",
+        "kilogram": "Kilogram (kg)",
+        "gram": "Gram (g)",
+        "each": "Each (item)"
       }
     }
   },
