@@ -198,3 +198,54 @@ def test_missing_idempotency_key(reminder: tuple) -> None:
     client, rfq, recipient, _ = reminder
     assert client.post(path(rfq, recipient)).status_code == 422
     assert not FakeMailer.sent_messages
+
+
+def test_cooldown_starts_when_the_mail_is_sent(
+    reminder: tuple, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time
+
+    client, rfq, recipient, _ = reminder
+    original_send = FakeMailer.send
+
+    def slow_send(self: FakeMailer, **kwargs: object) -> object:
+        time.sleep(1.2)
+        return original_send(self, **kwargs)
+
+    monkeypatch.setattr(FakeMailer, "send", slow_send)
+    with psycopg.connect(DB) as conn:
+        before = conn.execute("select clock_timestamp()").fetchone()[0]
+    result = client.post(path(rfq, recipient), headers={"Idempotency-Key": str(uuid4())})
+    assert result.status_code == 200, result.text
+    with psycopg.connect(DB) as conn:
+        recorded = conn.execute(
+            "select last_reminder_at from rfq_recipient where id=%s", (recipient,)
+        ).fetchone()[0]
+    assert (recorded - before).total_seconds() >= 1.0
+
+
+def test_replay_returns_the_current_recipient_state(reminder: tuple) -> None:
+    client, rfq, recipient, _ = reminder
+    first_key = {"Idempotency-Key": str(uuid4())}
+    assert client.post(path(rfq, recipient), headers=first_key).status_code == 200
+    with psycopg.connect(DB) as conn:
+        conn.execute(
+            "update rfq_recipient set last_reminder_at=now()-interval '25 hours' where id=%s",
+            (recipient,),
+        )
+    assert (
+        client.post(path(rfq, recipient), headers={"Idempotency-Key": str(uuid4())}).status_code
+        == 200
+    )
+    with psycopg.connect(DB) as conn:
+        conn.execute(
+            "update rfq_recipient set last_reminder_at=now()-interval '25 hours' where id=%s",
+            (recipient,),
+        )
+    replay = client.post(path(rfq, recipient), headers=first_key)
+    assert replay.status_code == 200, replay.text
+    current = client.get(f"/api/v1/rfq/{rfq}").json()["recipients"][0]
+    assert replay.json()["reminder_count"] == current["reminder_count"] == 2
+    assert replay.json()["remind_blocked_reason"] == current["remind_blocked_reason"]
+    assert replay.json()["can_remind"] == current["can_remind"]
+    assert len(FakeMailer.sent_messages) == 2
