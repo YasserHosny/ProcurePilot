@@ -187,6 +187,59 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
     expect(note.textContent).toContain('Showing only');
   });
 
+  describe('searchable product selector (P-157)', () => {
+    const found = {
+      id: '00000000-0000-4000-8000-0000000000ff',
+      tenant_name: 'Olive Oil 5L',
+      canonical_name: 'Olive Oil',
+      base_unit: 'L',
+      pack: { pack_count: 1, unit_size: '5.0' },
+      status: 'active' as const,
+      created_at: '2026-08-01T00:00:00Z',
+    };
+
+    function type(text: string): void {
+      const input = fixture.nativeElement.querySelector('[data-testid="product-search"]') as HTMLInputElement;
+      input.value = text;
+      input.dispatchEvent(new Event('input'));
+    }
+
+    it('shows the selected product name in the search box', () => {
+      const input = fixture.nativeElement.querySelector('[data-testid="product-search"]') as HTMLInputElement;
+      expect(input.value).toContain('Semi-Skimmed Milk 2L');
+    });
+
+    it('searches the whole catalogue once the typing pauses, not just the first page', fakeAsync(() => {
+      apiService.products.calls.reset();
+      apiService.products.and.returnValue(of({ items: [found], next_cursor: null }));
+      type('ol');
+      type('oliv');
+      tick(400);
+      fixture.detectChanges();
+      expect(apiService.products).toHaveBeenCalledOnceWith({ q: 'oliv', limit: 20, status: 'active' });
+      expect(component.productOptions().map((p) => p.id)).toEqual([found.id]);
+    }));
+
+    it('picking a result compares that product, even one outside the first page', fakeAsync(() => {
+      apiService.product.and.returnValue(of(found));
+      apiService.compareOffers.calls.reset();
+      component.onProductPicked(found);
+      tick();
+      expect(component.selectedProductId()).toBe(found.id);
+      expect(apiService.compareOffers).toHaveBeenCalled();
+      expect(component.productSearchText()).toBeNull();
+    }));
+
+    it('says so when the search fails, and keeps the current product', fakeAsync(() => {
+      apiService.products.and.returnValue(throwError(() => new Error('boom')));
+      type('oliv');
+      tick(400);
+      fixture.detectChanges();
+      expect(component.productSearchFailed()).toBeTrue();
+      expect(fixture.nativeElement.querySelector('[data-testid="product-search-error"]')).not.toBeNull();
+    }));
+  });
+
   it('should exclude expired offers from active visible offers by default', () => {
     const visible = component.visibleOffers();
     expect(visible.length).toBe(2);

@@ -34,18 +34,34 @@
       <!-- Product Selector -->
       <mat-form-field appearance="outline" class="product-field">
         <mat-label>{{ 'compare.productLabel' | translate }}</mat-label>
-        <mat-select
-          [value]="selectedProductId()"
-          (selectionChange)="onProductChange($event.value)"
+        <input
+          matInput
+          type="text"
+          autocomplete="off"
+          data-testid="product-search"
+          [value]="productInputText()"
           [placeholder]="'compare.selectProductPrompt' | translate"
+          [matAutocomplete]="productAuto"
+          (input)="onProductSearch($any($event.target).value)"
+        />
+        <mat-icon matSuffix aria-hidden="true">search</mat-icon>
+        <mat-autocomplete
+          #productAuto="matAutocomplete"
+          (optionSelected)="onProductPicked($event.option.value)"
+          (closed)="onProductSearchClosed()"
         >
-          @for (prod of products(); track prod.id) {
-            <mat-option [value]="prod.id">
+          @for (prod of productOptions(); track prod.id) {
+            <mat-option [value]="prod">
               {{ prod.tenant_name }}
               @if (prod.variant) { ({{ prod.variant }}) }
             </mat-option>
           }
-        </mat-select>
+        </mat-autocomplete>
+        @if (productSearchFailed()) {
+          <mat-hint class="product-search-error" data-testid="product-search-error" role="alert">
+            {{ 'compare.productSearchFailed' | translate }}
+          </mat-hint>
+        }
       </mat-form-field>
 
       <!-- Instant Quantity Input (SC-002: <150ms client-side recompute) -->
