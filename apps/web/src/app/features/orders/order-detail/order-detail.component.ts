@@ -69,6 +69,7 @@ export class OrderDetailComponent implements OnInit {
   readonly receiptOpen = signal(false);
   readonly cancelOpen = signal(false);
   readonly closeOpen = signal(false);
+  readonly withdrawOpen = signal(false);
   readonly submitOpen = signal(false);
   readonly actionError = signal<string | null>(null);
   /** Polite announcement of the last successful action, for screen readers. */
@@ -324,6 +325,31 @@ export class OrderDetailComponent implements OnInit {
         this.cancelOpen.set(false);
         this.isSaving.set(false);
         this.announce('orders.detail.cancelled');
+      },
+      error: (err: unknown) => this.failWith(err),
+    });
+  }
+
+  /** A submit can be undone until a supplier confirmation or a receipt is on record. */
+  canWithdraw(status: string, evidence: OrderEvidenceProjection): boolean {
+    return status === 'submitted' && !evidence.confirmation && evidence.receipts.length === 0;
+  }
+
+  withdrawOrder(): void {
+    this.actionError.set(null);
+    this.withdrawOpen.set(true);
+    this.focusPanel('withdraw-confirm-panel');
+  }
+
+  confirmWithdraw(): void {
+    this.isSaving.set(true);
+    this.actionError.set(null);
+    this.ordersApi.withdrawOrder(this.orderId).subscribe({
+      next: () => {
+        this.loadOrder();
+        this.withdrawOpen.set(false);
+        this.isSaving.set(false);
+        this.announce('orders.detail.withdrawn');
       },
       error: (err: unknown) => this.failWith(err),
     });

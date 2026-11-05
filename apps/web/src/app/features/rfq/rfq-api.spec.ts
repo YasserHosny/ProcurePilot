@@ -1,8 +1,9 @@
 import { TestBed } from "@angular/core/testing";
-import { HttpClient, HttpParams } from "@angular/common/http";
+import { HttpClient, HttpParams, provideHttpClient, withXhr } from "@angular/common/http";
+import { HttpTestingController, provideHttpClientTesting } from "@angular/common/http/testing";
 import { of } from "rxjs";
 import { RfqApi } from "./rfq-api";
-import { RfqActionKeys, formatRfqReference } from './rfq-api';
+import { RfqActionKeys, RfqRecipient, RfqReminderPreview, formatRfqReference } from './rfq-api';
 
 describe('formatRfqReference', () => {
   it('pads references without truncating and omits missing values', () => {
@@ -54,5 +55,60 @@ describe('RfqApi list parameters', () => {
     expect(params.get('status')).toBe('sent');
     expect(params.get('cursor')).toBe('20');
     expect(params.get('limit')).toBe('20');
+  });
+});
+
+describe('RfqApi reminder endpoints', () => {
+  let api: RfqApi;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(withXhr()), provideHttpClientTesting()] });
+    api = TestBed.inject(RfqApi);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  it('fetches the reminder preview for a recipient', () => {
+    let result: RfqReminderPreview | undefined;
+    api.previewReminder('rfq-1', 'rec-1').subscribe((preview) => { result = preview; });
+
+    const request = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/recipients/rec-1/reminder-preview'));
+    expect(request.request.method).toBe('GET');
+    const preview: RfqReminderPreview = {
+      subject: 'Reminder: RFQ-000001',
+      body_text: 'Hello supplier',
+      locale: 'ar',
+      allowed: true,
+      blocked_reason: null,
+    };
+    request.flush(preview);
+
+    expect(result).toEqual(preview);
+  });
+
+  it('posts a reminder with the caller-supplied idempotency key and no body', () => {
+    const keys = new RfqActionKeys();
+    const key = keys.get('remind:rfq-1:rec-1');
+    let result: RfqRecipient | undefined;
+    api.sendReminder('rfq-1', 'rec-1', key).subscribe((recipient) => { result = recipient; });
+
+    const request = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/recipients/rec-1/reminder'));
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toBeNull();
+    expect(request.request.headers.get('Idempotency-Key')).toBe(key);
+
+    request.flush({ id: 'rec-1', reminder_count: 1, can_remind: false });
+    expect(result?.reminder_count).toBe(1);
+    expect(result?.can_remind).toBeFalse();
+  });
+
+  it('generates a fallback idempotency key when the caller does not supply one', () => {
+    api.sendReminder('rfq-1', 'rec-1').subscribe();
+
+    const request = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/recipients/rec-1/reminder'));
+    expect(request.request.headers.get('Idempotency-Key')).toEqual(jasmine.any(String));
+    request.flush({ id: 'rec-1' });
   });
 });

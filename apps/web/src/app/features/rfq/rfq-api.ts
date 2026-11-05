@@ -46,6 +46,18 @@ export interface RfqRecipient {
   supplier_name?: string | null;
   supplier_contact_email?: string | null;
   response_count?: number;
+  reminder_count?: number;
+  last_reminder_at?: string | null;
+  can_remind?: boolean;
+  remind_blocked_reason?: string | null;
+}
+
+export interface RfqReminderPreview {
+  subject: string;
+  body_text: string;
+  locale: string;
+  allowed: boolean;
+  blocked_reason: string | null;
 }
 
 export interface RfqDetail {
@@ -221,6 +233,21 @@ export class RfqApi {
 
   listResponses(rfqId: string): Observable<RfqResponseComparisonList> {
     return this.http.get<RfqResponseComparisonList>(`${this.baseUrl}/${rfqId}/responses`);
+  }
+
+  previewReminder(rfqId: string, recipientId: string): Observable<RfqReminderPreview> {
+    return this.http.get<RfqReminderPreview>(
+      `${this.baseUrl}/${rfqId}/recipients/${recipientId}/reminder-preview`,
+    );
+  }
+
+  sendReminder(rfqId: string, recipientId: string, idempotencyKey?: string): Observable<RfqRecipient> {
+    const headers = new HttpHeaders({
+      'Idempotency-Key': idempotencyKey ?? crypto.randomUUID(),
+    });
+    return this.http.post<RfqRecipient>(
+      `${this.baseUrl}/${rfqId}/recipients/${recipientId}/reminder`, null, { headers },
+    );
   }
 
   prepareRequest(rfqId: string, payload: PrepareRequestPayload, idempotencyKey?: string): Observable<PrepareRequestResponse> {

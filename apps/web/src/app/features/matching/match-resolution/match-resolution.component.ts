@@ -678,7 +678,8 @@ export class MatchResolutionComponent implements OnInit {
         candidates: this.candidates(),
         expectedCurrentDecisionId: dec.id,
         currentCandidateId: dec.selected_match_candidate_id ?? null,
-        baseUnits: this.baseUnits(),
+        // The unit list loads in parallel: until it arrives (or if it is empty) offer the built-in units.
+        baseUnits: this.baseUnits().length > 0 ? this.baseUnits() : FALLBACK_BASE_UNITS,
         quotationSupplierId: this.task()?.quotation?.supplier_id ?? null,
       },
     });

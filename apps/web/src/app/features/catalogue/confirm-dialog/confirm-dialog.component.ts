@@ -15,6 +15,11 @@ export interface ConfirmDialogData {
   readonly isDestructive?: boolean;
   readonly warningKey?: string;
   readonly warningParams?: Record<string, unknown>;
+  readonly showConfirm?: boolean;
+  readonly listItems?: readonly string[];
+  readonly previewSubject?: string;
+  readonly previewBody?: string;
+  readonly previewLocale?: string;
   readonly [key: string]: unknown;
 }
 

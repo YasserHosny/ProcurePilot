@@ -775,6 +775,17 @@ describe('MatchResolutionComponent (T039)', () => {
       spyOn((component as unknown as { dialog: { open: () => unknown } }).dialog, 'open');
     });
 
+    it('opens the Correct-match dialog with the built-in units while the unit list has not arrived', () => {
+      component.baseUnits.set([]);
+      const dialog = (component as unknown as { dialog: { open: jasmine.Spy } }).dialog;
+      (dialog.open as jasmine.Spy).and.returnValue({ afterClosed: () => of(null) });
+
+      component.openCorrectMatchDialog();
+
+      const data = (dialog.open as jasmine.Spy).calls.mostRecent().args[1].data;
+      expect(data.baseUnits.length).withContext('units offered').toBeGreaterThan(0);
+    });
+
     it('replays the same Idempotency-Key when the same correction is retried after a failure', () => {
       apiService.correctMatch.and.returnValues(lost(), ok);
 

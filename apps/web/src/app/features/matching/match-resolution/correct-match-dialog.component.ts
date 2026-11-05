@@ -79,9 +79,11 @@ export class CorrectMatchDialogComponent {
     canonical_name: [''],
     variant: [''],
     gtin: ['', [Validators.pattern(/^(\d{8}|\d{12}|\d{13}|\d{14})?$/)]],
-    base_unit: [this.data.baseUnits?.[0]?.code ?? '', [Validators.required]],
+    // Left blank on purpose: a default would silently normalise a 10 kg pack as «pcs».
+    base_unit: ['', [Validators.required]],
     pack_count: [this.data.line.pack?.pack_count ?? 1, [Validators.required, Validators.min(1)]],
-    unit_size: [this.data.line.pack?.unit_size ?? '1.0', [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)]],
+    // Blank when the line has no pack: a made-up «1.0» would turn a 10 kg pack into a 1 kg one.
+    unit_size: [this.data.line.pack?.unit_size ?? '', [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)]],
     preferred_supplier_id: [this.data.quotationSupplierId ?? null],
   });
 
@@ -92,6 +94,10 @@ export class CorrectMatchDialogComponent {
 
   selectOutcome(outcome: MatchOutcome): void {
     this.selectedOutcome.set(outcome);
+    if (outcome === 'no_match_new_product') {
+      // Save stays disabled until the form is valid, so it cannot be clicked to reveal what is missing.
+      this.productForm.markAllAsTouched();
+    }
   }
 
   formatScore(score: string | number | undefined | null): number {
@@ -102,6 +108,15 @@ export class CorrectMatchDialogComponent {
 
   isRfqCandidate(cand: MatchCandidate): boolean {
     return Boolean(cand.reasons?.rfq && !cand.reasons.rfq.not_in_rfq && cand.reasons.rfq.rfq_line_id);
+  }
+
+  /** Save only changes something: a different match, or a valid new product. */
+  canSave(): boolean {
+    if (this.selectedOutcome() === 'no_match_new_product') {
+      return this.productForm.valid;
+    }
+    const chosen = this.selectedCandidateId();
+    return chosen !== null && chosen !== (this.data.currentCandidateId ?? null);
   }
 
   onConfirm(): void {

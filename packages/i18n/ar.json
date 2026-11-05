@@ -1254,6 +1254,18 @@
         "delivery_fee": "رسوم التوصيل",
         "suggested_currency": "العملة المقترحة",
         "pack_details": "تفاصيل العبوة"
+      },
+      "retryDialog": {
+        "title": "إعادة تشغيل الاستخراج؟",
+        "message": "ستُستبدل البيانات المستخرجة الحالية.",
+        "confirm": "إعادة تشغيل الاستخراج",
+        "cancel": "إلغاء"
+      },
+      "archiveDialog": {
+        "title": "أرشفة عرض السعر هذا؟",
+        "message": "سيخرج من صندوق الوارد ويمكن استعادته لاحقًا.",
+        "confirm": "أرشفة",
+        "cancel": "إلغاء"
       }
     },
     "audit": {
@@ -2570,6 +2582,35 @@
     "selfDecisionNotAllowed": "لا يمكنك اعتماد أو رفض طلب قدّمته بنفسك. يجب أن يتخذ القرار مالك آخر أو مسؤول اعتماد.",
     "title": "قائمة الاعتماد",
     "subtitle": "الطلبات التي تنتظر قرارك.",
+    "sort": {
+      "label": "الترتيب حسب",
+      "options": {
+        "submitted_desc": "الأحدث أولاً",
+        "submitted_asc": "الأقدم أولاً",
+        "required_by_asc": "الأقرب موعدًا للاستحقاق",
+        "total_desc": "الأعلى إجمالاً",
+        "total_asc": "الأدنى إجمالاً"
+      }
+    },
+    "filter": {
+      "branch": "الفرع",
+      "allBranches": "كل الفروع",
+      "clear": "مسح عوامل التصفية",
+      "chipRemove": "إزالة عامل التصفية: {{filter}}",
+      "retry": "إعادة المحاولة"
+    },
+    "total": {
+      "zero": "لا توجد طلبات معلقة",
+      "one": "طلب معلق واحد",
+      "two": "طلبان معلقان",
+      "few": "{{count}} طلبات معلقة",
+      "many": "{{count}} طلبًا معلقًا",
+      "other": "{{count}} طلب معلق"
+    },
+    "announce": {
+      "sorted": "تم الترتيب حسب {{sort}}، {{count}}"
+    },
+    "emptyFiltered": "لا توجد طلبات معلقة تطابق عوامل التصفية هذه.",
     "columns": {
       "requester": "مقدم الطلب",
       "branch": "الفرع",
@@ -2611,6 +2652,7 @@
     "pagination": {
       "loadMore": "تحميل المزيد",
       "loading": "جارٍ التحميل...",
+      "showingOf": "عرض {{loaded}} من {{total}}",
       "showing": {
         "zero": "عرض 0 طلب",
         "one": "عرض طلب واحد",
@@ -2627,7 +2669,8 @@
         "many": "عرض {{count}} طلبًا، ويتوفر المزيد",
         "other": "عرض {{count}} طلب، ويتوفر المزيد"
       },
-      "loadError": "تعذر تحميل المزيد من الطلبات. يرجى المحاولة مرة أخرى."
+      "loadError": "تعذر تحميل المزيد من الطلبات. يرجى المحاولة مرة أخرى.",
+      "pageLoadError": "تعذر تحميل الطلبات المعلقة. يرجى المحاولة مرة أخرى."
     },
     "requestCount": {
       "zero": "لا توجد طلبات",
@@ -3920,7 +3963,9 @@
         "order_not_cancellable": "استُلم هذا الأمر بالكامل أو أُغلق، لذلك لا يمكن إلغاؤه.",
         "order_already_cancelled": "هذا الأمر ملغى بالفعل.",
         "order_not_closable": "لا يمكن إغلاق إلا الأمر الذي استُلم بالكامل.",
-        "order_already_closed": "هذا الأمر مغلق بالفعل."
+        "order_already_closed": "هذا الأمر مغلق بالفعل.",
+        "order_not_submitted": "لا يمكن إعادة إلى مسودة إلا الأمر المُقدَّم.",
+        "order_has_evidence": "لدى هذا الأمر تأكيد من المورّد أو إيصال استلام أو نتيجة شراء مسجّلة، فلا يمكن إعادته إلى مسودة."
       },
       "overdue": "متأخر",
       "exportCsv": "تصدير CSV",
@@ -3945,7 +3990,12 @@
       "closeConfirm": "إغلاق الأمر",
       "closed": "تم إغلاق الأمر.",
       "timelineCancelled": "تم إلغاء الأمر",
-      "timelineClosed": "تم إغلاق الأمر"
+      "timelineClosed": "تم إغلاق الأمر",
+      "withdraw": "سحب التقديم",
+      "withdrawConfirmTitle": "إعادة هذا الأمر إلى مسودة؟",
+      "withdrawConfirmMessage": "يعود الأمر إلى مسودة يمكنك تعديلها أو إلغاؤها أو تقديمها من جديد. لم يرسل بروكيور بايلوت شيئًا إلى المورّد. هذا ممكن فقط قبل تسجيل تأكيد من المورّد أو إيصال استلام.",
+      "withdrawConfirm": "العودة إلى مسودة",
+      "withdrawn": "عاد الأمر إلى مسودة."
     },
     "resultCount": "{{count}} أمر شراء",
     "loadMoreError": "تعذّر تحميل المزيد من الأوامر. الأوامر الظاهرة أعلاه ما زالت معروضة.",
@@ -4406,7 +4456,7 @@
       "alreadyConverted": "تم تحويل طلب عروض الأسعار بالفعل",
       "splitError": "فشل بدء التقسيم. يُرجى المحاولة مرة أخرى.",
       "lowestLinePrice": "أقل تكلفة واصلة",
-      "splitSavingHint": "تقسيم هذا الطلب بين الموردين قد يوفّر {{money}}.",
+      "splitSavingHint": "تقسيم هذا الطلب بين الموردين قد يوفّر {{money}} (تكلفة الوصول شاملة الضريبة).",
       "openPreparedRequest": "فتح مسودة الطلب",
       "openRequest": "فتح الطلب",
       "convertedReason": "تم تحويل طلب عروض الأسعار بالفعل إلى طلب شراء.",
@@ -4425,7 +4475,11 @@
       "rfqExpired": "انتهت صلاحية طلب عرض الأسعار",
       "branchesLoadError": "فشل تحميل الفروع.",
       "rfqDetailLoadError": "فشل تحميل تفاصيل طلب عرض الأسعار.",
-      "splitSavingHintConverted": "كان تقسيم هذا الطلب بين الموردين سيوفّر {{money}}."
+      "splitSavingHintConverted": "كان تقسيم هذا الطلب بين الموردين سيوفّر {{money}} (تكلفة الوصول شاملة الضريبة).",
+      "landedTotal": "الإجمالي بتكلفة الوصول",
+      "coverage": "يغطي {{covered}} من {{total}} منتجات",
+      "neededByLabel": "مطلوب بتاريخ (من طلب عرض الأسعار)",
+      "neededByPast": "انقضى تاريخ الحاجة في طلب عرض الأسعار، لذا لا يمكن إعداد طلب شراء منه. أنشئ طلب عرض أسعار جديداً للشراء من هؤلاء الموردين."
     },
     "history": {
       "status_cancelled": "ملغى",
@@ -4634,6 +4688,39 @@
         "few": "{{count}} محاولات",
         "many": "{{count}} محاولة",
         "other": "{{count}} محاولة"
+      },
+      "remindersSent": "التذكيرات المرسلة: {{count}}",
+      "lastReminderAt": "آخر تذكير:",
+      "sendReminder": "إرسال تذكير",
+      "remindAllAwaiting": "تذكير كل من لم يرد",
+      "reminders": "التذكيرات",
+      "reminderPreviewTitle": "إرسال تذكير",
+      "reminderPreviewMessage": "هذا هو البريد الإلكتروني الذي سيستلمه المورد.",
+      "reminderSend": "إرسال التذكير",
+      "reminderCancel": "إلغاء",
+      "reminderSent": "تم إرسال التذكير.",
+      "reminderSendError": "تعذر إرسال التذكير. حاول مرة أخرى.",
+      "reminderDeliveryFailed": "تعذر تسليم التذكير. لم يُسجَّل شيء، لذا حاول مرة أخرى.",
+      "reminderPreviewError": "تعذر تحميل معاينة التذكير. حاول مرة أخرى.",
+      "remindAllConfirmTitle": "تذكير جميع الموردين الذين لم يردوا",
+      "remindAllConfirmMessage": "هل تريد إرسال تذكير إلى {{count}} من الموردين الذين لم يردوا؟",
+      "remindAllConfirmButton": "إرسال التذكيرات",
+      "remindAllResult": "تم إرسال {{sent}} وفشل {{failed}}",
+      "reminderBlockedRfqNotOpen": "لم يعد طلب عرض الأسعار هذا مفتوحاً للتذكيرات.",
+      "reminderBlockedNotDelivered": "لم يتم تسليم طلب عرض الأسعار إلى هذا المورد.",
+      "reminderBlockedReplied": "رد هذا المورد بالفعل.",
+      "reminderBlockedTooEarly": "يمكن إرسال التذكيرات بعد 24 ساعة من إرسال طلب عرض الأسعار.",
+      "reminderBlockedCooldown": "أُرسل تذكير مؤخراً. حاول مرة أخرى لاحقاً.",
+      "reminderBlockedLimitReached": "لا يمكن إرسال المزيد من التذكيرات إلى هذا المورد.",
+      "reminderBlockedNotPermitted": "ليس لديك إذن لتذكير هذا المورد.",
+      "neededInDaysTitle": "مطلوب خلال {{count}} يوم ولم يرد بعض الموردين",
+      "neededInDays": {
+        "zero": "مطلوب اليوم ولم يرد بعض الموردين",
+        "one": "مطلوب خلال يوم واحد ولم يرد بعض الموردين",
+        "two": "مطلوب خلال يومين ولم يرد بعض الموردين",
+        "few": "مطلوب خلال {{count}} أيام ولم يرد بعض الموردين",
+        "many": "مطلوب خلال {{count}} يوماً ولم يرد بعض الموردين",
+        "other": "مطلوب خلال {{count}} يوم ولم يرد بعض الموردين"
       }
     },
     "guardrails": {
@@ -4730,7 +4817,18 @@
         "11": "نوفمبر",
         "12": "ديسمبر"
       },
-      "unknownProduct": "منتج غير معروف"
+      "unknownProduct": "منتج غير معروف",
+      "reminderSubject": "تذكير: طلب عرض سعر — {{tenant}} — مطلوب قبل {{date}}",
+      "reminderGreeting": "مرحباً،",
+      "reminderIntro": "تذكير بطلب عرض سعر من {{tenant}}.",
+      "reminderReference": "المرجع",
+      "reminderSentDate": "تاريخ الإرسال",
+      "reminderItemsHeading": "العناصر المطلوبة",
+      "reminderNeededBy": "مطلوب قبل",
+      "reminderIgnore": "إذا كنت قد قمت بالرد بالفعل، فيرجى تجاهل هذا التذكير.",
+      "reminderReplyInstructions": "يرجى الرد مباشرة على هذا البريد أو إرسال عرض السعر إلى:",
+      "reminderThanks": "شكراً لكم.",
+      "reminderEnglishSummary": "This is a reminder of a request for quotation from {{tenant}}."
     },
     "autoPreparedEmail": {
       "subject": "مسودة طلب جاهزة للمراجعة — {{supplier}}",

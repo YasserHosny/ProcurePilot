@@ -306,6 +306,13 @@ export class OrdersApiService {
     return this.http.put<PurchaseOrder>(`${this.base}/orders/${encodeURIComponent(orderId)}`, payload, { headers });
   }
 
+  withdrawOrder(orderId: string, idempotencyKey?: string): Observable<PurchaseOrder> {
+    const headers = idempotencyKey
+      ? new HttpHeaders({ 'Idempotency-Key': idempotencyKey })
+      : this.idempotencyHeaders();
+    return this.http.post<PurchaseOrder>(`${this.base}/orders/${encodeURIComponent(orderId)}/withdraw`, {}, { headers });
+  }
+
   closeOrder(orderId: string, idempotencyKey?: string): Observable<PurchaseOrder> {
     const headers = idempotencyKey
       ? new HttpHeaders({ 'Idempotency-Key': idempotencyKey })

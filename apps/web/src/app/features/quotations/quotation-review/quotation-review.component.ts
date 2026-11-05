@@ -1552,10 +1552,13 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   }
 
   private proceedWithArchive(q: QuotationDetail): void {
-    if (!window.confirm(this.translate.instant('quotations.review.archiveConfirm'))) {
-      return;
-    }
+    this.confirmWithDialog('quotations.review.archiveDialog').subscribe((confirmed) => {
+      if (!confirmed) return;
+      this.executeArchive(q);
+    });
+  }
 
+  private executeArchive(q: QuotationDetail): void {
     this.isArchiving.set(true);
     this.errorMessage.set(null);
 
@@ -1582,10 +1585,27 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   retryExtraction(): void {
     const q = this.quotation();
     if (!q) return;
-    if (!window.confirm(this.translate.instant('quotations.review.retryConfirm'))) {
-      return;
-    }
+    this.confirmWithDialog('quotations.review.retryDialog').subscribe((confirmed) => {
+      if (!confirmed) return;
+      this.executeRetryExtraction(q);
+    });
+  }
 
+  private confirmWithDialog(keyPrefix: string): Observable<boolean> {
+    return this.dialog
+      .open(CatalogueConfirmDialogComponent, {
+        width: '440px',
+        data: {
+          titleKey: `${keyPrefix}.title`,
+          messageKey: `${keyPrefix}.message`,
+          confirmKey: `${keyPrefix}.confirm`,
+          cancelKey: `${keyPrefix}.cancel`,
+        },
+      })
+      .afterClosed();
+  }
+
+  private executeRetryExtraction(q: QuotationDetail): void {
     this.isRetryingExtraction.set(true);
     this.errorMessage.set(null);
 
@@ -1696,7 +1716,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   }
 
   canRetryExtraction(q: QuotationDetail): boolean {
-    return q.status === 'extracted' || q.status === 'in_review' || q.status === 'refused';
+    return q.status === 'extracted' || q.status === 'in_review';
   }
 
   computeLineTotal(line: QuotationDetail['lines'][number]): string | null {

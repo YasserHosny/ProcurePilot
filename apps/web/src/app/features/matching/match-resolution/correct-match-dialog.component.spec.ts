@@ -195,6 +195,54 @@ describe('CorrectMatchDialogComponent', () => {
     expect(document.getElementById(id!)?.textContent?.trim()).toBeTruthy();
   });
 
+  describe('new-product and unchanged guards (P-151, PPS-195)', () => {
+    const save = (): HTMLButtonElement =>
+      fixture.nativeElement.querySelector('.confirm-correction-btn') as HTMLButtonElement;
+
+    it('leaves Base Unit blank so the buyer chooses it, instead of defaulting to the first unit', () => {
+      expect(component.productForm.get('base_unit')?.value).toBe('');
+    });
+
+    it('disables Save while the choice is the current match, and enables it once another is picked', () => {
+      expect(save().disabled).toBeTrue();
+
+      component.selectCandidate('cand-2');
+      fixture.detectChanges();
+
+      expect(save().disabled).toBeFalse();
+    });
+
+    it('disables Save for a new product until it is valid, and says what is missing straight away', () => {
+      component.selectOutcome('no_match_new_product');
+      fixture.detectChanges();
+      expect(save().disabled).toBeTrue();
+      // Save cannot be clicked to reveal errors, so they show as soon as the form appears.
+      expect(fixture.nativeElement.textContent).toContain(enCatalog.matching.resolution.newProduct.baseUnitRequired);
+
+      component.productForm.patchValue({ base_unit: 'litre' });
+      fixture.detectChanges();
+      expect(save().disabled).withContext('unit size still missing').toBeTrue();
+      expect(fixture.nativeElement.textContent).toContain(enCatalog.matching.resolution.newProduct.unitSizeRequired);
+
+      component.productForm.patchValue({ unit_size: '10' });
+      fixture.detectChanges();
+      expect(save().disabled).toBeFalse();
+    });
+
+    it('leaves Unit Size blank when the line carries no pack, so a pack size is never invented', () => {
+      expect(mockLine.pack).toBeUndefined();
+      expect(component.productForm.get('unit_size')?.value).toBe('');
+    });
+
+    it('explains a product name that is too long, even though it was prefilled and untouched', () => {
+      component.selectOutcome('no_match_new_product');
+      component.productForm.patchValue({ tenant_name: 'x'.repeat(201) });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain(enCatalog.matching.resolution.newProduct.tenantNameMaxLength);
+    });
+  });
+
   it('submits correction with selected candidate, expected_current_decision_id, and learn_alias', () => {
     component.selectCandidate('cand-2');
     fixture.detectChanges();

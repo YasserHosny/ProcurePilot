@@ -548,6 +548,69 @@ class OrdersService:
 
         return order
 
+    def withdraw_order(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        order_id: UUID,
+        idempotency_key: UUID | None,
+    ) -> PurchaseOrder:
+        """Take a submitted order back to a draft while it has no recorded evidence."""
+        self._require_write(member, idempotency_key)
+
+        with self._transaction(member) as cur:
+            cur.execute(
+                f"select {ORDER_HEADER_COLUMNS},withdraw_idempotency_key from purchase_order "
+                "where tenant_id = %s and id = %s for update",
+                (member.tenant_id, order_id),
+            )
+            row = cur.fetchone()
+            if row is None:
+                raise NotFoundError(details={"resource": "purchase_order"})
+            if str(row.get("withdraw_idempotency_key")) == str(idempotency_key):
+                return self._load_order_cursor(cur, order_id)
+            if row["status"] != "submitted":
+                raise ConflictError(details={"reason": "order_not_submitted"})
+
+            cur.execute(
+                "select exists (select 1 from supplier_confirmation "
+                "where tenant_id = %s and purchase_order_id = %s) or exists "
+                "(select 1 from delivery_receipt where tenant_id = %s and purchase_order_id = %s)"
+                " or exists (select 1 from purchase_record pr "
+                "join purchase_order_line pol on pol.tenant_id = pr.tenant_id "
+                "and pol.id = pr.purchase_order_line_id "
+                "where pol.tenant_id = %s and pol.purchase_order_id = %s) as has_evidence",
+                (
+                    member.tenant_id,
+                    order_id,
+                    member.tenant_id,
+                    order_id,
+                    member.tenant_id,
+                    order_id,
+                ),
+            )
+            if cur.fetchone()["has_evidence"]:
+                raise ConflictError(details={"reason": "order_has_evidence"})
+
+            cur.execute(
+                "select 1 from purchase_order where tenant_id = %s "
+                "and withdraw_idempotency_key = %s and id != %s",
+                (member.tenant_id, idempotency_key, order_id),
+            )
+            if cur.fetchone() is not None:
+                raise ConflictError(details={"reason": "order_number_or_idempotency_exists"})
+
+            cur.execute(
+                "update purchase_order set status = 'draft', withdraw_idempotency_key = %s, "
+                "updated_at = now() where tenant_id = %s and id = %s",
+                (idempotency_key, member.tenant_id, order_id),
+            )
+            order = self._load_order_cursor(cur, order_id)
+            self._audit_cursor(cur, member, "orders.purchase_order_withdrawn", order_id)
+
+        return order
+
     def close_order(
         self,
         *,

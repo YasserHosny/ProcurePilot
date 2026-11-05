@@ -1254,6 +1254,18 @@
         "delivery_fee": "Delivery fee",
         "suggested_currency": "Suggested currency",
         "pack_details": "Pack details"
+      },
+      "retryDialog": {
+        "title": "Re-run extraction?",
+        "message": "Existing extracted data will be replaced.",
+        "confirm": "Re-run extraction",
+        "cancel": "Cancel"
+      },
+      "archiveDialog": {
+        "title": "Archive this quotation?",
+        "message": "It leaves the inbox and can be restored later.",
+        "confirm": "Archive",
+        "cancel": "Cancel"
       }
     },
     "audit": {
@@ -2570,6 +2582,35 @@
     "selfDecisionNotAllowed": "You can't decide a request you submitted. Another owner or approver needs to decide it.",
     "title": "Approval Queue",
     "subtitle": "Requests awaiting your decision.",
+    "sort": {
+      "label": "Sort by",
+      "options": {
+        "submitted_desc": "Newest first",
+        "submitted_asc": "Oldest first",
+        "required_by_asc": "Required by (soonest)",
+        "total_desc": "Highest total",
+        "total_asc": "Lowest total"
+      }
+    },
+    "filter": {
+      "branch": "Branch",
+      "allBranches": "All branches",
+      "clear": "Clear filters",
+      "chipRemove": "Remove filter: {{filter}}",
+      "retry": "Retry"
+    },
+    "total": {
+      "zero": "{{count}} pending requests",
+      "one": "{{count}} pending request",
+      "two": "{{count}} pending requests",
+      "few": "{{count}} pending requests",
+      "many": "{{count}} pending requests",
+      "other": "{{count}} pending requests"
+    },
+    "announce": {
+      "sorted": "Sorted by {{sort}}, {{count}}"
+    },
+    "emptyFiltered": "No pending requests match these filters.",
     "columns": {
       "requester": "Requester",
       "branch": "Branch",
@@ -2611,6 +2652,7 @@
     "pagination": {
       "loadMore": "Load more",
       "loading": "Loading...",
+      "showingOf": "Showing {{loaded}} of {{total}}",
       "showing": {
         "zero": "Showing 0 requests",
         "one": "Showing 1 request",
@@ -2627,7 +2669,8 @@
         "many": "Showing {{count}} requests, more available",
         "other": "Showing {{count}} requests, more available"
       },
-      "loadError": "Unable to load more requests. Please try again."
+      "loadError": "Unable to load more requests. Please try again.",
+      "pageLoadError": "Unable to load pending requests. Please try again."
     },
     "requestCount": {
       "zero": "{{count}} requests",
@@ -3920,7 +3963,9 @@
         "order_not_cancellable": "This order is already fully received or closed, so it can no longer be cancelled.",
         "order_already_cancelled": "This order is already cancelled.",
         "order_not_closable": "Only an order that has been fully received can be closed.",
-        "order_already_closed": "This order is already closed."
+        "order_already_closed": "This order is already closed.",
+        "order_not_submitted": "Only a submitted order can be taken back to a draft.",
+        "order_has_evidence": "This order already has a supplier confirmation, a delivery receipt or a recorded purchase outcome, so it can no longer go back to a draft."
       },
       "overdue": "Overdue",
       "exportCsv": "Export CSV",
@@ -3945,7 +3990,12 @@
       "closeConfirm": "Close order",
       "closed": "Order closed.",
       "timelineCancelled": "Order cancelled",
-      "timelineClosed": "Order closed"
+      "timelineClosed": "Order closed",
+      "withdraw": "Withdraw submission",
+      "withdrawConfirmTitle": "Take this order back to a draft?",
+      "withdrawConfirmMessage": "The order goes back to a draft you can edit, cancel or submit again. Nothing was sent to the supplier by ProcurePilot. This is only possible until a supplier confirmation or a delivery receipt is recorded.",
+      "withdrawConfirm": "Back to draft",
+      "withdrawn": "Order is a draft again."
     },
     "resultCount": "{{count}} orders",
     "loadMoreError": "More orders could not be loaded. The orders above are still shown.",
@@ -4406,7 +4456,7 @@
       "alreadyConverted": "RFQ is already converted",
       "splitError": "Failed to start split. Please try again.",
       "lowestLinePrice": "Lowest landed cost",
-      "splitSavingHint": "Splitting this order between suppliers could save {{money}}.",
+      "splitSavingHint": "Splitting this order between suppliers could save {{money}} (landed cost, VAT included).",
       "openPreparedRequest": "Open draft request",
       "openRequest": "Open request",
       "convertedReason": "This RFQ is already converted into a request.",
@@ -4425,7 +4475,11 @@
       "rfqExpired": "This RFQ has expired",
       "branchesLoadError": "Failed to load branches.",
       "rfqDetailLoadError": "Failed to load RFQ details.",
-      "splitSavingHintConverted": "Splitting this order between suppliers would have saved {{money}}."
+      "splitSavingHintConverted": "Splitting this order between suppliers would have saved {{money}} (landed cost, VAT included).",
+      "landedTotal": "Landed total",
+      "coverage": "Covers {{covered}} of {{total}} products",
+      "neededByLabel": "Needed by (from the RFQ)",
+      "neededByPast": "The RFQ's needed-by date has passed, so a request cannot be prepared from it. Create a new RFQ to order from these suppliers."
     },
     "history": {
       "status_cancelled": "Cancelled",
@@ -4634,6 +4688,39 @@
         "few": "{{count}} attempts",
         "many": "{{count}} attempts",
         "other": "{{count}} attempts"
+      },
+      "remindersSent": "Reminders sent: {{count}}",
+      "lastReminderAt": "Last reminder:",
+      "sendReminder": "Send reminder",
+      "remindAllAwaiting": "Remind all awaiting",
+      "reminders": "Reminders",
+      "reminderPreviewTitle": "Send reminder",
+      "reminderPreviewMessage": "This is the email the supplier will receive.",
+      "reminderSend": "Send reminder",
+      "reminderCancel": "Cancel",
+      "reminderSent": "Reminder sent.",
+      "reminderSendError": "Could not send the reminder. Try again.",
+      "reminderDeliveryFailed": "The reminder could not be delivered. Nothing was recorded, so try again.",
+      "reminderPreviewError": "Could not load the reminder preview. Try again.",
+      "remindAllConfirmTitle": "Remind all awaiting suppliers",
+      "remindAllConfirmMessage": "Send a reminder to {{count}} awaiting supplier(s)?",
+      "remindAllConfirmButton": "Send reminders",
+      "remindAllResult": "{{sent}} sent, {{failed}} failed",
+      "reminderBlockedRfqNotOpen": "This RFQ is no longer open for reminders.",
+      "reminderBlockedNotDelivered": "The RFQ was not delivered to this supplier.",
+      "reminderBlockedReplied": "This supplier has replied.",
+      "reminderBlockedTooEarly": "Reminders can be sent 24 hours after the RFQ was sent.",
+      "reminderBlockedCooldown": "A reminder was sent recently. Try again later.",
+      "reminderBlockedLimitReached": "No more reminders can be sent to this supplier.",
+      "reminderBlockedNotPermitted": "You do not have permission to remind this supplier.",
+      "neededInDaysTitle": "Needed in {{count}} day(s) and some suppliers have not replied",
+      "neededInDays": {
+        "zero": "Needed today and some suppliers have not replied",
+        "one": "Needed in {{count}} day and some suppliers have not replied",
+        "two": "Needed in {{count}} days and some suppliers have not replied",
+        "few": "Needed in {{count}} days and some suppliers have not replied",
+        "many": "Needed in {{count}} days and some suppliers have not replied",
+        "other": "Needed in {{count}} days and some suppliers have not replied"
       }
     },
     "guardrails": {
@@ -4730,7 +4817,18 @@
         "11": "November",
         "12": "December"
       },
-      "unknownProduct": "Unknown product"
+      "unknownProduct": "Unknown product",
+      "reminderSubject": "Reminder: request for quotation — {{tenant}} — needed by {{date}}",
+      "reminderGreeting": "Hello,",
+      "reminderIntro": "This is a reminder of a request for quotation from {{tenant}}.",
+      "reminderReference": "Reference",
+      "reminderSentDate": "Sent",
+      "reminderItemsHeading": "Requested items",
+      "reminderNeededBy": "Needed by",
+      "reminderIgnore": "If you have already replied, please ignore this reminder.",
+      "reminderReplyInstructions": "Please reply directly to this email or send your quotation to:",
+      "reminderThanks": "Thank you.",
+      "reminderEnglishSummary": "This is a reminder of a request for quotation from {{tenant}}."
     },
     "autoPreparedEmail": {
       "subject": "Draft request ready to review — {{supplier}}",

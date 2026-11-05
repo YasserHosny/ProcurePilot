@@ -90,3 +90,27 @@ def test_self_approval_flag_and_decision_reason_are_documented() -> None:
             "403"
         ]
         assert "self_decision_not_allowed" in response["description"]
+
+
+def test_pending_sort_filter_and_count_contract() -> None:
+    import yaml
+
+    contract = yaml.safe_load(_contract_text())
+    live = create_app().openapi()
+    documented = contract["paths"]["/approvals/pending"]["get"]
+    actual = live["paths"]["/api/v1/approvals/pending"]["get"]
+    params = {p["name"]: p["schema"] for p in actual["parameters"]}
+    docs = {p["name"]: p["schema"] for p in documented["parameters"]}
+    assert params["sort"]["enum"] == docs["sort"]["enum"]
+    assert params["sort"]["default"] == docs["sort"]["default"] == "submitted_desc"
+    assert {"type": "string", "format": "uuid"} in params["branch_id"]["anyOf"]
+    assert docs["branch_id"]["format"] == "uuid"
+    for operation in (documented, actual):
+        assert operation["responses"]["200"]["content"]["application/json"]["schema"][
+            "$ref"
+        ].endswith("/PendingApprovalList")
+    for schema in (contract, live):
+        model = schema["components"]["schemas"]["PendingApprovalList"]
+        assert "total" in model["required"]
+        assert model["properties"]["total"]["type"] == "integer"
+        assert "total" not in schema["components"]["schemas"]["PurchaseRequestList"]["properties"]

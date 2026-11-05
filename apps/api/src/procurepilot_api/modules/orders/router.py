@@ -190,6 +190,24 @@ def cancel_order(
     )
 
 
+@router.post("/orders/{order_id}/withdraw", response_model=PurchaseOrder)
+@mutation_limiter.limit(_order_limit)
+def withdraw_order(
+    request: Request,
+    order_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[OrdersService, Depends(get_orders_service)],
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> PurchaseOrder:
+    return service.withdraw_order(
+        bearer_token=token,
+        member=member,
+        order_id=order_id,
+        idempotency_key=idempotency_key,
+    )
+
+
 @router.post("/orders/{order_id}/close", response_model=PurchaseOrder)
 @mutation_limiter.limit(_order_limit)
 def close_order(

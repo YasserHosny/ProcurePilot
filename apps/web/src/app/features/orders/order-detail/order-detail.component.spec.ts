@@ -28,7 +28,7 @@ describe('OrderDetailComponent', () => {
     requests = jasmine.createSpyObj<RequestsApiService>('RequestsApiService', ['getRequest']);
     requests.getRequest.and.returnValue(throwError(() => new Error('no request')));
     api = jasmine.createSpyObj<OrdersApiService>('OrdersApiService', [
-      'getOrder', 'submitOrder', 'cancelOrder', 'closeOrder', 'recordConfirmation', 'recordReceipt',
+      'getOrder', 'submitOrder', 'cancelOrder', 'closeOrder', 'withdrawOrder', 'recordConfirmation', 'recordReceipt',
     ]);
     api.getOrder.and.returnValue(of({
       order: {
@@ -67,7 +67,7 @@ describe('OrderDetailComponent', () => {
         status: { submitted: 'Submitted' }, evidence: { pending: 'Pending' },
         detail: {
           receivedQuantityFor: '{{product}} · Received quantity ({{unit}}, ordered {{ordered}})', confirmedQuantityFor: '{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})', receiptSaved: 'Delivery receipt saved.', submitted: 'Order submitted.', dateFormatHintDayFirst: 'dd/mm/yyyy', dateFormatHintMonthFirst: 'mm/dd/yyyy',
-          errors: { order_not_open_for_evidence: 'This order cannot take delivery or confirmation evidence.' },
+          errors: { order_not_open_for_evidence: 'This order cannot take delivery or confirmation evidence.', order_has_evidence: 'It already has a supplier confirmation or a delivery receipt.' }, withdrawn: 'Order is a draft again.', closed: 'Order closed.',
           eyebrow: 'Purchase order', createdAt: 'Created {{date}}', orderDate: 'Order date', expectedDelivery: 'Expected',
           total: 'Total', confirmation: 'Confirmation', receipt: 'Receipt', linesTitle: 'Lines', linesSubtitle: 'Evidence',
           ordered: 'Ordered', confirmed: 'Confirmed', received: 'Received', remaining: 'Remaining', fromRequest: 'From request', actionsTitle: 'Actions',
@@ -826,5 +826,67 @@ describe('OrderDetailComponent', () => {
     fixture.detectChanges();
     expect(byTestId('timeline-cancelled')).toBeNull();
     expect(byTestId('timeline-closed')).toBeNull();
+  });
+
+  // PPS-205: undo a submit while nothing has been confirmed or received.
+  it('offers Withdraw only on a submitted order that has no confirmation or receipt', () => {
+    const offered: Record<string, boolean> = {};
+    for (const status of ['draft', 'submitted', 'confirmed', 'partially_received', 'received', 'closed', 'cancelled']) {
+      fixture = TestBed.createComponent(OrderDetailComponent);
+      showOrderAs(status);
+      fixture.detectChanges();
+      offered[status] = byTestId('withdraw-order') !== null;
+    }
+    expect(offered).toEqual({
+      draft: false, submitted: true, confirmed: false, partially_received: false,
+      received: false, closed: false, cancelled: false,
+    });
+
+    fixture = TestBed.createComponent(OrderDetailComponent);
+    showOrderAs('submitted');
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.evidence.set({
+      ...component.evidence()!,
+      receipts: [{ id: 'r1', lines: [] }] as never,
+    });
+    fixture.detectChanges();
+    expect(byTestId('withdraw-order')).toBeNull();
+  });
+
+  it('asks before taking a submitted order back to a draft, then reloads it and says so', fakeAsync(() => {
+    showOrderAs('submitted');
+    fixture.detectChanges();
+    api.withdrawOrder.and.returnValue(of({} as unknown as import('../orders-api').PurchaseOrder));
+
+    byTestId('withdraw-order')!.click();
+    fixture.detectChanges();
+    tick();
+    expect(api.withdrawOrder).not.toHaveBeenCalled();
+    expect(byTestId('withdraw-confirm-panel')?.contains(document.activeElement)).toBeTrue();
+
+    byTestId('confirm-withdraw')!.click();
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    expect(api.withdrawOrder).toHaveBeenCalledTimes(1);
+    expect(byTestId('withdraw-confirm-panel')).toBeNull();
+    expect(byTestId('action-status')?.textContent).toContain('draft');
+  }));
+
+  it('keeps the order on screen and says why when withdrawing fails', () => {
+    showOrderAs('submitted');
+    fixture.detectChanges();
+    api.withdrawOrder.and.returnValue(throwError(() => ({
+      status: 409, error: { code: 'conflict', details: { reason: 'order_has_evidence' } },
+    })));
+    fixture.componentInstance.withdrawOrder();
+    fixture.componentInstance.confirmWithdraw();
+    fixture.detectChanges();
+
+    expect(byTestId('order-lines')).toBeTruthy();
+    expect(byTestId('action-error')?.getAttribute('role')).toBe('alert');
+    expect(byTestId('action-error')?.textContent).toContain('already has a supplier confirmation');
   });
 });

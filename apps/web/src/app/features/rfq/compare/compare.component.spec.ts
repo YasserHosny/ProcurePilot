@@ -1819,7 +1819,8 @@ describe('CompareComponent (RFQ)', () => {
       const { respDahabi, respWafra } = createD8f7fb0cFixtures();
       component.rfqDetail.set({
         ...sentDetail,
-        rfq: { ...sentDetail.rfq, status: 'responded' },
+        // Still ahead, so the date does not date this test (a past date disables Prepare).
+        rfq: { ...sentDetail.rfq, status: 'responded', needed_by_date: '2099-12-31' },
       });
       component.responses.set([respDahabi, respWafra]);
       component.selectedBranchId.set('branch-1');
@@ -1875,6 +1876,223 @@ describe('CompareComponent (RFQ)', () => {
         { duration: 5000 },
       );
       expect(component.loadData).toHaveBeenCalledWith('rfq-1');
+    });
+  });
+
+  describe('landed totals, coverage and the converted hint (P-155, PPS-199)', () => {
+    const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+    const rfqLine = (product: string) => ({
+      id: `line-${product}`,
+      tenant_id: 'tenant-1',
+      rfq_id: 'rfq-1',
+      workspace_product_id: product,
+      quantity: '10',
+      created_at: '2026-09-25T09:00:00Z',
+    });
+    const reply = (id: string, supplier: string, products: string[], price: string, landed: string) => ({
+      id,
+      rfq_id: 'rfq-1',
+      supplier_id: supplier,
+      quotation_id: `quote-${id}`,
+      quotation_status: 'reviewed' as const,
+      submitted_at: '2026-09-25T10:00:00Z',
+      lines: products.map((product) => ({
+        workspace_product_id: product,
+        original_text: product,
+        quoted_quantity: '10',
+        quoted_unit_price_amount: price,
+        quoted_unit_price_currency: 'SAR',
+        pending_match: false,
+      })),
+      rfq_landed_costs: products.map((product) => ({
+        workspace_product_id: product,
+        total_amount: landed,
+        total_currency: 'SAR',
+      })),
+    });
+    const load = (replies: ReturnType<typeof reply>[], products: string[], status = 'sent'): void => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      mockRfqApi.getRfq.and.returnValue(
+        of({
+          ...sentDetail,
+          rfq: { ...sentDetail.rfq, status: status as RfqDetail['rfq']['status'] },
+          lines: products.map(rfqLine),
+        } as RfqDetail),
+      );
+      mockRfqApi.listResponses.and.returnValue(of({ items: replies }));
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+    };
+
+    it('marks «Lowest total» on landed totals, not on printed prices, and shows both', () => {
+      // A prints cheaper (2,000 vs 2,100) but its quote excludes VAT: landed 2,300 vs 2,100.
+      load(
+        [
+          reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1150'),
+          reply('b', 'supp-b', ['p1', 'p2'], '105.00', '1050'),
+        ],
+        ['p1', 'p2'],
+      );
+
+      const cards = Array.from(el().querySelectorAll('.response-card')) as HTMLElement[];
+      expect(cards.length).toBe(2);
+      expect(cards[0].querySelector('.lowest-total-chip')).withContext('A is not the lowest').toBeNull();
+      expect(cards[1].querySelector('.lowest-total-chip')).withContext('B is the lowest').toBeTruthy();
+      expect(cards[0].querySelector('[data-testid="landed-total"]')?.textContent).toContain('2,300');
+      expect(cards[1].querySelector('[data-testid="landed-total"]')?.textContent).toContain('2,100');
+      // The chip sits next to the landed figure that earned it, not next to the printed total.
+      expect(cards[1].querySelector('[data-testid="landed-total"] .lowest-total-chip')).toBeTruthy();
+      expect(cards[1].querySelector('tr.total-row .lowest-total-chip')).toBeNull();
+    });
+
+    it('says how many of the RFQ products a reply covers when it misses some', () => {
+      load(
+        [
+          reply('partial', 'supp-a', ['p1', 'p2'], '100.00', '1000'),
+          reply('full', 'supp-b', ['p1', 'p2', 'p3'], '100.00', '1000'),
+        ],
+        ['p1', 'p2', 'p3'],
+      );
+
+      const cards = Array.from(el().querySelectorAll('.response-card')) as HTMLElement[];
+      expect(cards[0].querySelector('[data-testid="coverage-badge"]')?.textContent).toContain('Covers 2 of 3');
+      expect(cards[1].querySelector('[data-testid="coverage-badge"]')).toBeNull();
+    });
+
+    it('awards no «Lowest total» when a reply has incomplete landed costs, even if printed totals point one way', () => {
+      // A prints cheaper (2,000 vs 2,100) and has full landed costs; B is missing p2's landed cost.
+      const incomplete = reply('b', 'supp-b', ['p1', 'p2'], '105.00', '1050');
+      incomplete.rfq_landed_costs = incomplete.rfq_landed_costs.slice(0, 1);
+      load([reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1150'), incomplete], ['p1', 'p2']);
+
+      expect(el().querySelector('.lowest-total-chip')).toBeNull();
+    });
+
+    it('keeps ranking on printed totals when no reply has any landed cost at all', () => {
+      const noCosts = (id: string, supplier: string, price: string) => ({
+        ...reply(id, supplier, ['p1', 'p2'], price, '0'),
+        rfq_landed_costs: [],
+      });
+      load([noCosts('a', 'supp-a', '100.00'), noCosts('b', 'supp-b', '105.00')], ['p1', 'p2']);
+
+      const cards = Array.from(el().querySelectorAll('.response-card')) as HTMLElement[];
+      expect(cards[0].querySelector('.lowest-total-chip')).toBeTruthy();
+      expect(cards[1].querySelector('.lowest-total-chip')).toBeNull();
+    });
+
+    it('awards no «Lowest total» when a supplier has delivery or minimum-order terms the totals cannot price', () => {
+      const withTerms = { ...reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000'), supplier_terms_apply: true };
+      load([withTerms, reply('b', 'supp-b', ['p1', 'p2'], '105.00', '1050')], ['p1', 'p2']);
+
+      expect(el().querySelector('.lowest-total-chip')).toBeNull();
+    });
+
+    it('disables Prepare with a reason when a responded RFQ\'s needed-by date has passed', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      mockRfqApi.getRfq.and.returnValue(
+        of({
+          ...sentDetail,
+          rfq: { ...sentDetail.rfq, status: 'responded', needed_by_date: '2020-01-01' },
+          lines: ['p1', 'p2'].map(rfqLine),
+        } as RfqDetail),
+      );
+      mockRfqApi.listResponses.and.returnValue(of({ items: [reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000')] }));
+      component.loadData('rfq-1');
+      component.selectedBranchId.set('branch-1');
+      fixture.detectChanges();
+
+      const button = el().querySelector('.prepare-buttons-row button') as HTMLButtonElement;
+      expect(button.disabled).toBeTrue();
+      expect(el().querySelector('[data-testid="needed-by-past-reason"]')?.textContent).toContain(
+        enCatalog.rfq.compare.neededByPast,
+      );
+    });
+
+    it('keeps Prepare available when a responded RFQ\'s needed-by date is still ahead', () => {
+      mockRfqApi.getRfq.and.returnValue(
+        of({
+          ...sentDetail,
+          rfq: { ...sentDetail.rfq, status: 'responded', needed_by_date: '2099-12-31' },
+          lines: ['p1', 'p2'].map(rfqLine),
+        } as RfqDetail),
+      );
+      mockRfqApi.listResponses.and.returnValue(of({ items: [reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000')] }));
+      component.loadData('rfq-1');
+      component.selectedBranchId.set('branch-1');
+      fixture.detectChanges();
+
+      const button = el().querySelector('.prepare-buttons-row button') as HTMLButtonElement;
+      expect(button.disabled).toBeFalse();
+      expect(el().querySelector('[data-testid="needed-by-past-reason"]')).toBeNull();
+    });
+
+    it('shows no coverage badge for a reply that is still being read or not matched yet', () => {
+      const reading = { ...reply('read', 'supp-a', [], '0', '0'), rfq_landed_costs: [] };
+      const unmatched = reply('un', 'supp-b', ['p1', 'p2'], '100.00', '1000');
+      unmatched.lines[1] = { ...unmatched.lines[1], workspace_product_id: null as never, pending_match: true };
+      load([reading, unmatched], ['p1', 'p2']);
+
+      expect(el().querySelector('[data-testid="coverage-badge"]')).toBeNull();
+    });
+
+    it('tells the buyer when the RFQ date is already in the past instead of blaming unmatched lines', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      load([reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000')], ['p1', 'p2']);
+      mockRfqApi.prepareRequest.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 422,
+              error: { code: 'unprocessable', details: { reason: 'required_by_in_the_past' } },
+            }),
+        ),
+      );
+      component.selectedBranchId.set('branch-1');
+      mockSnackBar.open.calls.reset();
+
+      component.prepareRequest(component.responses()[0]);
+
+      expect(mockSnackBar.open.calls.mostRecent().args[0]).toBe(enCatalog.requests.errors.required_by_in_the_past);
+    });
+
+    it('shows the RFQ\'s needed-by date read-only: the draft follows it, so there is nothing to edit', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      load([reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000')], ['p1', 'p2']);
+
+      const neededBy = el().querySelector('[data-testid="needed-by"]');
+      expect(neededBy).withContext('needed-by block').toBeTruthy();
+      expect(neededBy?.textContent).toContain(enCatalog.rfq.compare.neededByLabel);
+      expect(neededBy?.textContent).toContain('2026');
+      expect(el().querySelector('input.mat-datepicker-input')).withContext('no editable date').toBeNull();
+    });
+
+    it('words the saving hint on a converted RFQ as a missed saving and names its basis', () => {
+      load(
+        [
+          { ...reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000'), rfq_landed_costs: [
+              { workspace_product_id: 'p1', total_amount: '1000', total_currency: 'SAR' },
+              { workspace_product_id: 'p2', total_amount: '1200', total_currency: 'SAR' },
+            ] },
+          { ...reply('b', 'supp-b', ['p1', 'p2'], '100.00', '1100'), rfq_landed_costs: [
+              { workspace_product_id: 'p1', total_amount: '1100', total_currency: 'SAR' },
+              { workspace_product_id: 'p2', total_amount: '1000', total_currency: 'SAR' },
+            ] },
+        ],
+        ['p1', 'p2'],
+        'converted',
+      );
+
+      const hint = el().querySelector('[data-testid="split-saving-hint"]');
+      expect(hint?.textContent).toContain('would have saved');
+      expect(hint?.textContent).toContain('landed cost');
     });
   });
 

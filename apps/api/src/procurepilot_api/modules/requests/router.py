@@ -18,6 +18,8 @@ from procurepilot_api.modules.requests.schemas import (
     LowStockReport,
     LowStockReportCreate,
     LowStockReportList,
+    PendingApprovalList,
+    PendingApprovalSort,
     PurchaseRequest,
     PurchaseRequestCreate,
     PurchaseRequestList,
@@ -95,17 +97,21 @@ def list_requests(
     )
 
 
-@router.get("/approvals/pending", response_model=PurchaseRequestList)
+@router.get("/approvals/pending", response_model=PendingApprovalList)
 def list_pending_approvals(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
+    sort: Annotated[PendingApprovalSort, Query()] = "submitted_desc",
+    branch_id: Annotated[UUID | None, Query()] = None,
     cursor: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(le=100)] = 50,
-) -> PurchaseRequestList:
+) -> PendingApprovalList:
     return service.list_pending_approvals(
         bearer_token=token,
         member=member,
+        sort=sort,
+        branch_id=branch_id,
         cursor=cursor,
         limit=limit,
     )
