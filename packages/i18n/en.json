@@ -2649,7 +2649,7 @@
     "announce": {
       "sorted": "Sorted by {{sort}}, {{count}}"
     },
-    "emptyFiltered": "No pending requests match these filters.",
+    "emptyFiltered": "No pending requests in this branch.",
     "columns": {
       "requester": "Requester",
       "branch": "Branch",

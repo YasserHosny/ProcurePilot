@@ -201,7 +201,9 @@ def api_as(
 
     class Cursor(psycopg.Cursor):
         def execute(self, query: object, params: object = None, **kwargs: object) -> Cursor:
-            if "purchase_request_group" in str(query):
+            statement = str(query)
+            # Approval list/count joins are not group-enrichment queries.
+            if "purchase_request_group" in statement and "from approval_step" not in statement:
                 queries.append("group")
             return super().execute(query, params, **kwargs)
 

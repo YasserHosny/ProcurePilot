@@ -56,7 +56,10 @@ def test_keyset_dataset(sort: str, mutation: str) -> None:
     conn.row_factory = sqlite3.Row
     conn.executescript("""
         create table purchase_request (id text, status text, branch_id text,
-            requested_by_membership_id text, required_by_date text, estimated_total_amount numeric);
+            requested_by_membership_id text, required_by_date text, estimated_total_amount numeric,
+            tenant_id text, request_group_id text);
+        create table purchase_request_group (id text, tenant_id text,
+            combined_total_amount numeric);
         create table approval_step (id text, purchase_request_id text, status text,
             assigned_membership_id text, created_at text);
     """)
@@ -64,7 +67,8 @@ def test_keyset_dataset(sort: str, mutation: str) -> None:
     values = [2, None, 1, 2, None, 3, 1]
     for i, value in enumerate(values, 1):
         conn.execute(
-            "insert into purchase_request values (?, ?, ?, ?, ?, ?)",
+            "insert into purchase_request (id, status, branch_id, requested_by_membership_id, "
+            "required_by_date, estimated_total_amount) values (?, ?, ?, ?, ?, ?)",
             (
                 str(UUID(int=i)),
                 "submitted",
@@ -103,6 +107,9 @@ def test_keyset_dataset(sort: str, mutation: str) -> None:
             boundary=boundary,
             limit=2,
         )
+        # SQLite expressions lack column affinity; emulate Postgres numeric parameter typing.
+        if boundary is not None and sort.startswith("total") and boundary[0] is not None:
+            params[-4:-2] = [float(boundary[0]), float(boundary[0])]
         rows = conn.execute(
             query.replace("%s", "?"), [str(p) if isinstance(p, UUID) else p for p in params]
         ).fetchall()
@@ -121,7 +128,8 @@ def test_keyset_dataset(sort: str, mutation: str) -> None:
         elif len(seen) == 2 and mutation == "submission":
             # A new row before the boundary must not shift the remaining rows.
             conn.execute(
-                "insert into purchase_request values (?, ?, ?, ?, ?, ?)",
+                "insert into purchase_request (id, status, branch_id, requested_by_membership_id, "
+                "required_by_date, estimated_total_amount) values (?, ?, ?, ?, ?, ?)",
                 (
                     str(UUID(int=99)),
                     "submitted",
@@ -189,7 +197,8 @@ def test_sql_reads_use_authenticated_claims_and_identical_filters(
         assert predicate in count_query and predicate in page_query
     assert page_params[: len(count_params)] == count_params
     assert "limit" not in count_query
-    assert "tenant_id =" not in count_query  # Isolation depends on authenticated RLS.
+    assert "prg.tenant_id = pr.tenant_id" in count_query
+    assert "prg.id = pr.request_group_id" in count_query
 
 
 @pytest.mark.parametrize(
@@ -243,3 +252,58 @@ def test_legacy_default_cursor_remains_valid() -> None:
         json.dumps({"created_at": "2026-10-01T00:00:00Z", "id": str(step_id)}).encode()
     ).decode()
     assert service._decode_approval_cursor(cursor) == ("2026-10-01T00:00:00.000000Z", step_id)
+
+
+@pytest.mark.parametrize("sort", ["total_desc", "total_asc"])
+@pytest.mark.parametrize("limit", [1, 2])
+def test_group_total_keyset(sort: str, limit: int) -> None:
+    import sqlite3
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.executescript("""
+        create table purchase_request (id text, tenant_id text, request_group_id text,
+            status text, estimated_total_amount numeric);
+        create table purchase_request_group (id text, tenant_id text,
+            combined_total_amount numeric);
+        create table approval_step (id text, purchase_request_id text, status text);
+        insert into purchase_request_group values ('group', 'tenant', 100.2500);
+        insert into purchase_request values ('1', 'tenant', 'group', 'submitted', 1);
+        insert into purchase_request values ('2', 'tenant', 'group', 'submitted', 2);
+        insert into purchase_request values ('3', 'tenant', null, 'submitted', 50);
+    """)
+    for i in range(1, 4):
+        conn.execute(
+            "insert into approval_step values (?, ?, 'pending')", (str(UUID(int=i)), str(i))
+        )
+    options = dict(
+        sort=sort,
+        branch_id=None,
+        membership_id=uuid4(),
+        is_owner=True,
+        is_sole_owner=True,
+        limit=limit,
+    )
+    boundary = None
+    seen = []
+    while True:
+        query, params = service._pending_approval_query(**options, boundary=boundary, count=True)
+        assert conn.execute(query.replace("%s", "?"), params).fetchone()["total"] == 3
+        query, params = service._pending_approval_query(**options, boundary=boundary)
+        # SQLite expressions lack column affinity; emulate Postgres numeric parameter typing.
+        if boundary is not None and sort.startswith("total") and boundary[0] is not None:
+            params[-4:-2] = [float(boundary[0]), float(boundary[0])]
+        rows = conn.execute(
+            query.replace("%s", "?"), [str(p) if isinstance(p, UUID) else p for p in params]
+        ).fetchall()
+        page = rows[:limit]
+        assert len(seen) < 3
+        seen.extend(row["purchase_request_id"] for row in page)
+        if len(rows) <= limit:
+            break
+        last = page[-1]
+        cursor = service._encode_approval_cursor(
+            str(last["sort_value"]), UUID(last["id"]), sort=sort
+        )
+        boundary = service._decode_approval_cursor(cursor, sort=sort)
+    assert seen == (["1", "2", "3"] if sort == "total_desc" else ["3", "1", "2"])
