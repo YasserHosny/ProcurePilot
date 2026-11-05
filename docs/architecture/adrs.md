@@ -506,3 +506,46 @@
   write the request status, so they must keep the request lock order they already use. Exports and
   reports that group by status will show `approved` for newly approved requests until an order exists.
   There is no schema change and nothing to apply to the hosted database.
+
+## ADR-026 — RFQ Lifecycle: Expiry Is Derived, Cancel Is Terminal, Reminders Are Manual
+
+- **Status:** Accepted (2026-11-02 audit P-142 / PPS-176; owner decisions 2026-11-03 to 2026-11-06)
+- **Context:** An RFQ had a status `expired` that nothing set, no way to withdraw one, and no
+  per-supplier reply state, so a sent RFQ whose needed-by date had passed still read «Sent» and a
+  supplier that had not answered looked the same as one that had.
+- **Options considered:**
+  1. A scheduled job that writes `expired`. Rejected: a second writer of the status, a lag between
+     the date passing and the row changing, and nothing to run it on demand in tests.
+  2. «Close» as a soft state that can be reopened. Rejected by the owner: «Cancel» says what happens
+     (nothing more is sent or prepared) and a reopen path would need its own rules.
+  3. Scheduled or automatic reminders. Rejected by the owner: a message to a supplier is always a
+     person's click (constitution: no autonomous purchasing, automation prepares and a human acts).
+- **Decision:**
+  - **Expiry is derived at read time.** The stored status stays `sent`; readers use the one SQL
+    fragment `_EFFECTIVE_STATUS_SQL` (`sent` with `needed_by_date < current_date` reads as `expired`).
+    `lock_rfq_for_preparation` returns the effective status, so prepare, split and the guardrail
+    path refuse an expired RFQ. Nothing writes `expired`.
+  - **Cancel is terminal.** `cancel_rfq(uuid)` (SECURITY DEFINER, pinned search path) sets `cancelled`
+    and `cancelled_at` for a draft, sent or responded RFQ, by an active owner or by the creating
+    buyer. It emails nobody; lines, recipients and received replies stay. Nothing can be sent, split
+    or prepared from a cancelled RFQ. A converted or already cancelled RFQ cannot be cancelled.
+  - **Owner can act.** An owner may send, retry and cancel a buyer's RFQ (`rfq_update` and
+    `rfq_recipient_update` admit the owner); a buyer acts on RFQs they created.
+  - **Per-supplier reply state.** Each recipient shows awaiting, replied or no reply; the list shows
+    the count of replies.
+  - **Reminders are manual, per supplier, and bounded.** An owner, or a buyer on their own RFQ, may
+    remind a supplier only while the RFQ is open (effective status `sent` or `responded`, needed-by
+    date not passed), the send succeeded, there is no reply, at least 24 hours have passed since
+    the RFQ was sent, 24 hours since the last reminder, and fewer than two reminders were sent. The
+    first failing rule is reported, in that order: `rfq_not_open`, `not_delivered`, `replied`,
+    `too_early`, `cooldown`, `limit_reached`. The person sees the exact email first; the send writes
+    an `rfq.reminder_sent` audit event and updates `reminder_count` / `last_reminder_at` in one
+    transaction; the subject is «Re: » plus the RFQ email's subject so mail clients group it, and
+    the message carries `In-Reply-To` / `References` of the original.
+  - **Send-then-commit is accepted.** The reminder email is sent before its counters commit. A crash
+    in that gap can allow one duplicate reminder; the owner chose to keep this (option A, 2026-11-06)
+    over record-then-send with compensation.
+- **Consequences:** The status a reader sees depends on the date, so every reader must use the shared
+  fragment and a stored `sent` is not by itself «open». `rfq.status` has one more value
+  (`cancelled`) that exports and reports must handle. Reminders add two columns to `rfq_recipient`
+  and one audit action; the rules above are enforced in the API, not by the database.
