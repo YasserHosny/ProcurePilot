@@ -124,7 +124,7 @@ class Fixture:
             cur.execute("reset role")
             cur.execute(
                 "update purchase_request set status = %s where id = %s",
-                ("ordered" if decision == "approved" else decision, self.request_of[step_id]),
+                (decision, self.request_of[step_id]),
             )
 
     def act_as(self, who: Workspace) -> psycopg.Cursor:
@@ -413,7 +413,7 @@ def test_the_only_owner_can_be_assigned_their_own_request(conn: psycopg.Connecti
         step_id = cur.fetchone()[0]
         cur.execute("savepoint decide")
         cur.execute("reset role")
-        cur.execute("update purchase_request set status='ordered' where id=%s", (request_id,))
+        cur.execute("update purchase_request set status='approved' where id=%s", (request_id,))
         cur.execute("set local role authenticated")
         _decide(cur, step_id, "approved", sole.membership_id)
 
