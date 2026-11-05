@@ -180,7 +180,7 @@
             </div>
             <div>
               <strong>{{ 'matching.resolution.decision.confidence' | translate }}</strong>
-              <span>{{ formatScore(dec.confidence) }}%</span>
+              <span>{{ formatScore(dec.confidence) | formatPercent }}</span>
             </div>
             <div>
               <strong>{{ 'matching.resolution.decision.decidedAt' | translate }}</strong>
@@ -264,6 +264,10 @@
       [hasDecision]="decision() !== null || !!task()?.matched_product"
       (candidateSelected)="selectCandidate($event)"
     ></app-match-resolution-candidates>
+
+    @if (isWriter() && !decision() && !task()?.matched_product && line(); as pickerLine) {
+      <app-product-picker [lineId]="pickerLine.id" (picked)="onManualCandidate($event)" />
+    }
 
     <!-- Outcomes Selection Section -->
     @if (isWriter() && !decision() && !task()?.matched_product) {

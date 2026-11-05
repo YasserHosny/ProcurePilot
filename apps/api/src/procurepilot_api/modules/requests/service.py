@@ -140,9 +140,9 @@ DELEGATION_COLUMNS = (
     "id,delegator_membership_id,delegate_membership_id,starts_on,ends_on,created_at"
 )
 BUDGET_COLUMNS = "id,amount,currency,period,period_start,scope,branch_id,cost_centre_id"
-# Statuses whose estimate counts against a budget. An approved request moves straight to
-# "ordered" (spec 010) and later "delivered", so both stay committed spend; draft, rejected
-# and withdrawn requests never count.
+# Statuses whose estimate counts against a budget. An approved request stays "approved" until a
+# live purchase order moves it to "ordered" (ADR-025), later "delivered"; approved, ordered and
+# delivered all count as committed spend (draft, rejected and withdrawn do not).
 COMMITTED_SPEND_STATUSES = ("submitted", "approved", "ordered", "delivered")
 # Matches the Data API max_rows (supabase/config.toml); a full page means "fetch the next".
 COMMITTED_SPEND_PAGE_SIZE = 1000
@@ -1519,7 +1519,11 @@ class RequestsService:
                     if action != "withdrawn" and statuses != {expected}:
                         raise ConflictError(details={"reason": f"not_{expected}"})
                     if action == "withdrawn" and (
-                        len(statuses) != 1 or not statuses <= {"draft", "submitted", "ordered"}
+                        not statuses
+                        or not (
+                            statuses <= {"approved", "ordered"}
+                            or statuses in ({"draft"}, {"submitted"})
+                        )
                     ):
                         raise ConflictError(details={"reason": "already_decided_or_withdrawn"})
                     if (
@@ -1667,7 +1671,7 @@ class RequestsService:
                                     request_id=str(row["id"]),
                                     step_id=str(step_by_request[str(row["id"])]["id"]),
                                     decision=action,
-                                    request_status="ordered" if action == "approved" else action,
+                                    request_status=action,
                                     comment=comment,
                                     now=now,
                                 )
@@ -1676,7 +1680,7 @@ class RequestsService:
                             rows = [request for request, _ in decided]
                             steps = [step for _, step in decided]
                         else:
-                            if statuses == {"ordered"}:
+                            if statuses & {"approved", "ordered"}:
                                 cur.execute(
                                     "select 1 from purchase_order where "
                                     "source_request_id=any(%s::uuid[]) and status<>'cancelled' "
@@ -2174,9 +2178,9 @@ class RequestsService:
                         return existing, None, True
 
                     previous_status = str(existing["status"])
-                    if previous_status not in ("draft", "submitted", "ordered"):
+                    if previous_status not in ("draft", "submitted", "approved", "ordered"):
                         raise ConflictError(details={"reason": "already_decided_or_withdrawn"})
-                    if previous_status == "ordered":
+                    if previous_status in ("approved", "ordered"):
                         cur.execute(
                             "select 1 from purchase_order where source_request_id = %s "
                             "and status <> 'cancelled' limit 1",
@@ -3481,20 +3485,14 @@ class RequestsService:
                     # rows and we raise before touching the step or writing a notification, leaving
                     # the step `pending` rather than stranding a `decided` step on a non-submitted
                     # request.
-                    #
-                    # An approved request lands directly on `ordered`, not `approved` (chunk R2.3,
-                    # specs/010-mobile-approvals-receipt/research.md R1) — there is no separate
-                    # "place the order" human action this release, so the same decision that
-                    # approves a request is also what marks it ordered. `approval_step.status` and
-                    # the audit action below still record the human's actual decision ("approved"),
-                    # unchanged; only `purchase_request.status` itself takes the new terminal value.
+                    # Approval remains approved until a live purchase order exists (ADR-025).
                     decided_request, decided_step = self._apply_request_decision(
                         cur,
                         member=member,
                         request_id=request_id,
                         step_id=step_id,
                         decision=decision,
-                        request_status="ordered" if decision == "approved" else decision,
+                        request_status=decision,
                         comment=comment,
                         now=now,
                     )

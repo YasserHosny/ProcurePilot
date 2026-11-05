@@ -208,7 +208,7 @@ def prepare_decision_service(
     return service, client, recorded
 
 
-def test_assigned_approver_can_approve_with_recorded_human_decision(
+def test_assigned_approver_returns_approved_with_recorded_human_decision(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     request_id = uuid4()

@@ -131,7 +131,7 @@ def test_concurrent_keyed_decisions_have_one_audit_and_outbox(decision: str) -> 
         assert [200 if isinstance(result, tuple) else result for result in results] == [200, 200]
         successes = [result for result in results if isinstance(result, tuple)]
         assert sum(result[2] is not None for result in successes) == 1
-        request_status = "ordered" if decision == "approved" else "rejected"
+        request_status = "approved" if decision == "approved" else "rejected"
         for request_row, step_row, _ in successes:
             assert request_row["status"] == request_status
             assert step_row["status"] == decision

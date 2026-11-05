@@ -8,7 +8,12 @@ from uuid import UUID
 import psycopg
 import pytest
 
-from integration.catalogue_helpers import TEST_DATABASE_URL, act_as, make_workspace
+from integration.catalogue_helpers import (
+    TEST_DATABASE_URL,
+    act_as,
+    execute_as_table_owner,
+    make_workspace,
+)
 from integration.quotation_helpers import PsycopgSupabaseClient
 from integration.smart_compare_helpers import member_from_workspace
 from integration.test_approvals import (
@@ -51,7 +56,9 @@ def test_queue_traversal_survives_mutation(
         for index in range(7):
             request = _make_submitted_request(cur, owner, branch)
             step = _make_pending_step(cur, owner.tenant_id, request, owner.membership_id)
-            cur.execute(
+            execute_as_table_owner(
+                cur,
+                owner,
                 "update approval_step set created_at="
                 "'2026-10-01T12:00:00.123456Z'::timestamptz + "
                 "%s * interval '1 microsecond' where id=%s",
@@ -69,7 +76,9 @@ def test_queue_traversal_survives_mutation(
     with conn.cursor() as cur:
         if mutation == "decision":
             decided = first.items[0].id
-            cur.execute(
+            execute_as_table_owner(
+                cur,
+                owner,
                 "update approval_step set status='approved', decided_at=now(), "
                 "decided_by_membership_id=%s where purchase_request_id=%s",
                 (owner.membership_id, decided),
@@ -78,8 +87,11 @@ def test_queue_traversal_survives_mutation(
         else:
             new = _make_submitted_request(cur, owner, branch)
             step = _make_pending_step(cur, owner.tenant_id, new, owner.membership_id)
-            cur.execute(
-                "update approval_step set created_at='2026-10-02T00:00:00Z' where id=%s", (step,)
+            execute_as_table_owner(
+                cur,
+                owner,
+                "update approval_step set created_at='2026-10-02T00:00:00Z' where id=%s",
+                (step,),
             )
     seen = [item.id for item in first.items]
     cursor = first.next_cursor

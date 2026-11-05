@@ -470,3 +470,39 @@
   requests the owner did not submit. The rule is application-layer routing and decision logic, so it
   is tested at the service and API level, not in the database; it makes no change to tenant
   isolation.
+
+## ADR-025 — An Approved Request Stays «Approved» Until a Purchase Order Exists
+
+- **Status:** Accepted (2026-11-04, owner decision on P-174 / PPS-168, confirmed 2026-11-03)
+- **Context:** Approving a request sets `purchase_request.status` to `ordered` (chunk R2.3, spec 010
+  R1), although no purchase order exists yet; creating a purchase order never touches the request.
+  The request page therefore shows «Ordered» next to «Approved» and still offers «Create purchase
+  order», the list shows «Ordered» for requests that have no order, and in Arabic the label reads as
+  «requested». The `approved` value already exists in `purchase_request_status`, and the order code
+  already accepts both `approved` and `ordered` as orderable.
+- **Options considered:**
+  1. Relabel «Ordered» in the clients while no order exists. Rejected: each client would derive the
+     meaning separately and filters, the phone and exports would still disagree.
+  2. Add a new status value. Rejected: `approved` is already in the enum.
+  3. Use `approved` for approved requests and move to `ordered` when an order exists. Chosen.
+- **Decision:**
+  - A single, keyed or split approval sets the request to `approved`. The approval step still
+    records `approved`; the request status now says the same.
+  - A request becomes `ordered` when its first live purchase order (any status except cancelled)
+    takes quantity from it, in the same transaction as the order change and under the existing
+    request advisory locks. It returns to `approved` when its last live order is cancelled.
+  - Unchanged: the orderable statuses (`approved`, `ordered`), delivery confirmation requiring
+    `ordered`, committed-spend statuses, the approval step, notifications.
+  - Withdrawal is allowed from `draft`, `submitted` and `approved`, and from `ordered` under the
+    rules it has today. A rejected request stays terminal.
+  - Clients show the request status as it is. «Create purchase order» is offered while the request is
+    `approved`, and for a legacy `ordered` request that has no live order.
+  - The Arabic label for `ordered` is reworded so it reads as «order placed», not «requested».
+- **Legacy data:** No migration and no backfill. Requests already `ordered` without an order keep
+  their status and still offer «Create purchase order» (the clients above). Moving them to `approved`
+  is a one-off data change that touches existing rows of every tenant, including demo tenants, so it
+  is left to an explicit operator decision and is not part of this change.
+- **Consequences:** The status says what is true at every step. Order creation and cancellation now
+  write the request status, so they must keep the request lock order they already use. Exports and
+  reports that group by status will show `approved` for newly approved requests until an order exists.
+  There is no schema change and nothing to apply to the hosted database.

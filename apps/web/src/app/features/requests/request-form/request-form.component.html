@@ -459,7 +459,7 @@
             }
           }
 
-          @if (canWithdraw() && existingRequest()?.status === 'submitted') {
+          @if (canWithdraw() && existingRequest()?.status !== 'draft') {
             <button
               mat-stroked-button
               type="button"

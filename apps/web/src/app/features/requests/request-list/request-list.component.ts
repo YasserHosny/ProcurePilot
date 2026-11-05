@@ -318,7 +318,7 @@ export class RequestListComponent implements OnInit {
   }
 
   canWithdraw(request: PurchaseRequest): boolean {
-    return request.status === 'draft' || request.status === 'submitted';
+    return ['draft', 'submitted', 'approved', 'ordered'].includes(request.status);
   }
 
   withdrawRequest(request: PurchaseRequest): void {

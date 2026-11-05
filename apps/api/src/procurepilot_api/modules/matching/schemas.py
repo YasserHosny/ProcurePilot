@@ -70,6 +70,7 @@ class MatchReason(BaseModel):
     feature_score: FeatureScore | None = None
     rfq: RfqMatchReason | None = None
     measured: dict[str, str] | None = None
+    manual: bool = False
 
 
 class ProductSummary(BaseModel):
@@ -169,6 +170,10 @@ class MatchTask(BaseModel):
     created_at: datetime
     resolved_at: datetime | None = None
     supplier_name: str | None = None
+
+
+class ManualCandidateRequest(StrictApiModel):
+    product_id: UUID
 
 
 class MatchResolutionRequest(StrictApiModel):

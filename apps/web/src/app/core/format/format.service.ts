@@ -67,6 +67,19 @@ export function formatLocaleNumber(
 }
 
 /**
+ * A match score already expressed as a whole percent (`85`) with locale digits and percent sign
+ * (`85%` / `٨٥٪`). The score is a rank, not a probability; this only formats it.
+ */
+export function formatScorePercent(value: number | null | undefined, locale = 'en'): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return '—';
+  return new Intl.NumberFormat(locale, {
+    style: 'percent',
+    maximumFractionDigits: 0,
+    ...(isArabicLocale(locale) ? { numberingSystem: 'arab' } : {}),
+  }).format(Math.round(value) / 100);
+}
+
+/**
  * Pure locale-aware quantity formatter preserving up to 6 fraction digits
  * (for numeric(18,6) values), trimming trailing zeroes, and Arabic-Indic digits when locale is 'ar'.
  */

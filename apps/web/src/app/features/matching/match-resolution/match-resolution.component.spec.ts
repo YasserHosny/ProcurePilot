@@ -6,10 +6,11 @@ import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Subject, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
-import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
+import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
 import type {
+  MatchCandidate,
   LandedCost,
   MatchCorrectionRequest,
   MatchDecision,
@@ -17,6 +18,7 @@ import type {
   Role,
 } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
+import { FALLBACK_BASE_UNITS } from './correct-match-dialog.component';
 import { MatchResolutionComponent } from './match-resolution.component';
 
 @Component({ standalone: true, template: '<p>dialog</p>' })
@@ -251,6 +253,46 @@ describe('MatchResolutionComponent (T039)', () => {
     expect(component.candidates().length).toBe(2);
     expect(component.selectedCandidateId()).toBe('cand-1');
     expect(component.selectedOutcome()).toBe('same_product');
+  });
+
+  it('adds a catalogue product the buyer picked as the selected candidate (P-151)', () => {
+    expect(fixture.nativeElement.querySelector('app-product-picker')).not.toBeNull();
+    const picked: MatchCandidate = {
+    id: 'cand-manual',
+    quotation_line_id: 'line-1',
+    candidate_product: {
+      id: 'prod-manual',
+      tenant_name: 'Picked From Catalogue 5L',
+      canonical_name: 'Picked From Catalogue',
+      base_unit: 'litre',
+      status: 'active',
+    },
+    confidence: '0.0000',
+    reasons: { alias_hit: false, gtin_match: false, supplier_code_match: false, manual: true },
+    rank: 1,
+    scoring_version: 'manual-v1',
+    created_at: '2026-08-20T00:00:00Z',
+  };
+    component.onManualCandidate(picked);
+    expect(component.candidates().length).toBe(3);
+    expect(component.selectedCandidateId()).toBe('cand-manual');
+    expect(component.selectedOutcome()).toBe('same_product');
+    component.onManualCandidate(picked);
+    expect(component.candidates().length).toBe(3);
+  });
+
+  it('labels the built-in fallback units from the i18n catalogue, not hardcoded strings (P-159)', () => {
+    expect(FALLBACK_BASE_UNITS.every((u) => !('label_en' in u) && !('label_ar' in u))).toBeTrue();
+    const litre = FALLBACK_BASE_UNITS.find((u) => u.code === 'litre')!;
+    expect(component.localizedUnitLabel(litre)).toBe('Litre (L)');
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('ar', arCatalog);
+    translate.use('ar');
+    expect(component.localizedUnitLabel(litre)).toBe(arCatalog.matching.resolution.unitNames.litre);
+    // A unit from the API keeps the server's label (here in Arabic).
+    expect(
+      component.localizedUnitLabel({ code: 'x', label_en: 'Server', label_ar: 'خادم', dimension: 'count' }),
+    ).toBe('خادم');
   });
 
   it('should require explicit candidate selection for close-candidate tasks', () => {

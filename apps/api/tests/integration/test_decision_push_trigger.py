@@ -222,9 +222,10 @@ def test_decision_writes_one_queued_push_notification_and_enqueues_it(
         decision="approved",
     )
 
-    # Lands on "ordered", not "approved" (chunk R2.3, research.md R1) — the push-notification
-    # write-and-enqueue behavior this test exists to prove is unaffected by that status value.
-    assert result.status == "ordered"
+    # An approval leaves the request on "approved" until a live purchase order exists (ADR-025) —
+    # the push-notification write-and-enqueue behavior this test exists to prove is unaffected by
+    # that status value.
+    assert result.status == "approved"
     rows = _push_rows(conn, request_id)
     assert len(rows) == 1
     notification_id, status, row_request_id, member_id = rows[0]

@@ -137,7 +137,8 @@ def render_reminder_email(
     reference = f"RFQ-{reference_number:06d}"
     sent_label = _date(sent_date, lang)
     date_label = _date(needed_by, lang)
-    subject = t("rfq.email.reminderSubject", lang, tenant=tenant_name, date=date_label)
+    # "Re:" plus the RFQ email's own subject, so mail clients group the reminder under it.
+    subject = "Re: " + t("rfq.email.subject", lang, tenant=tenant_name, date=date_label)
     from_name = t("rfq.email.fromName", lang, tenant=tenant_name)
     greeting = t("rfq.email.reminderGreeting", lang)
     intro = t("rfq.email.reminderIntro", lang, tenant=tenant_name)

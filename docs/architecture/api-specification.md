@@ -486,6 +486,14 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 - `decision` carries `supersedes_decision_id` and `learned_from_decision_id` (nullable uuid). The
   decision returned is the current one (head of the chain, ADR-022).
 
+### `POST /quotation-lines/{line_id}/match-candidates/manual`
+
+- Requires bearer auth and owner or buyer role. Body: `{ "product_id": uuid }`.
+- Records an active catalogue product the buyer picked as a candidate for the line, so a decision can
+  point at it. The row has scoring version `manual-v1`, confidence `0.0000`, no signal and
+  `reasons.manual = true`. Picking the same product again returns the existing candidate.
+- A product that is archived returns `409`; a product or line of another tenant returns `404`.
+
 ### `POST /quotation-lines/{line_id}/match/corrections`
 
 - Requires bearer auth and owner or buyer role; requires an `Idempotency-Key` (uuid) header.
@@ -1472,8 +1480,8 @@ Request:
 
 ### `POST /requests/{request_id}/withdraw`
 
-- The requester or a workspace owner may withdraw a `draft`, `submitted`, or `ordered` request.
-- An `ordered` request may be withdrawn only when no purchase order references it with a status
+- The requester or a workspace owner may withdraw a `draft`, `submitted`, `approved`, or `ordered` request.
+- An `approved` or `ordered` request may be withdrawn only when no purchase order references it with a status
   other than `cancelled`. Even a draft PO blocks withdrawal (`409`, `purchase_order_exists`).
 - Sets `status = withdrawn`, stamps `withdrawn_at`, and records
   `requests.purchase_request_withdrawn` with `previous_status` in the audit target.
@@ -1538,10 +1546,12 @@ steps the recorded decider is the requester. A requester decision's audit target
 - Records a human decision — sets `status`, `decided_by_membership_id`, and `decided_at`
   together on the step (FR-006, enforced by the `approval_step` check constraint), and audits
   `requests.approval_step_approved` / `requests.approval_step_rejected` recording that human
-  decision unchanged. The request row itself moves to **`ordered`** on approval (not `approved` —
-  as of chunk R2.3, `010-mobile-approvals-receipt`, there is no separate "place the order" human
-  action this release, so the same decision that approves a request is also what marks it
-  ordered) or to `rejected` on rejection. The request row is updated before the step so a
+  decision unchanged. The request row moves to **`approved`** on approval (ADR-025), or to
+  `rejected` on rejection. It becomes `ordered` when a live purchase order first takes quantity
+  from it, and returns to `approved` when its last live order is cancelled or detached.
+  These order-side writes share the order transaction and existing request advisory locks.
+  Legacy `ordered` requests without an order remain unchanged and orderable.
+  The request row is updated before the step so a
   concurrent withdrawal cannot strand a decided step on a non-submitted request.
 - Returns `200` with the `PurchaseRequest`.
 - Returns `403` (`not_assigned_approver`) when the caller is neither the assignee nor an owner.

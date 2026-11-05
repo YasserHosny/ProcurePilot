@@ -1,0 +1,65 @@
+.product-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-block-start: 16px;
+}
+
+.picker-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.picker-hint {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant, #5f6368);
+  font-size: 0.875rem;
+}
+
+.picker-field {
+  width: 100%;
+}
+
+.picker-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.picker-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 12px;
+  text-align: start;
+  border: 1px solid var(--mat-sys-outline-variant, #cac4d0);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    background: var(--mat-sys-surface-container-high, #ece6f0);
+  }
+}
+
+.picker-meta {
+  color: var(--mat-sys-on-surface-variant, #5f6368);
+  font-size: 0.8125rem;
+}
+
+.picker-error {
+  margin: 0;
+  color: var(--mat-sys-error, #b3261e);
+}
+
+.picker-empty {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant, #5f6368);
+}

@@ -18,7 +18,7 @@
       <h3 class="section-title" id="candidates-title">{{ 'matching.resolution.correction.candidatesTitle' | translate }}</h3>
 
       <div class="candidates-list" role="radiogroup" aria-labelledby="candidates-title">
-        @for (cand of data.candidates; track cand.id) {
+        @for (cand of allCandidates(); track cand.id) {
           <label
             class="dialog-candidate-item"
             [class.selected]="selectedOutcome() === 'same_product' && selectedCandidateId() === cand.id"
@@ -33,17 +33,23 @@
             />
             <div class="cand-row-content">
               <div class="cand-row-header">
-                <span class="cand-rank">#{{ cand.rank }}</span>
+                @if (!cand.reasons.manual) {
+                  <span class="cand-rank">#{{ cand.rank }}</span>
+                }
                 <strong class="cand-name">{{ cand.candidate_product.tenant_name }}</strong>
-                <div
-                  class="cand-score-badge"
-                  [class.high]="formatScore(cand.confidence) >= 90"
-                  [class.medium]="(formatScore(cand.confidence) >= 70 && formatScore(cand.confidence) < 90) || isRfqCandidate(cand)"
-                  [class.low]="formatScore(cand.confidence) < 70 && !isRfqCandidate(cand)"
-                  [class.rfq-info]="isRfqCandidate(cand)"
-                >
-                  {{ formatScore(cand.confidence) }}%
-                </div>
+                @if (cand.reasons.manual) {
+                  <div class="cand-score-badge medium">{{ 'matching.resolution.picker.manualBadge' | translate }}</div>
+                } @else {
+                  <div
+                    class="cand-score-badge"
+                    [class.high]="formatScore(cand.confidence) >= 90"
+                    [class.medium]="(formatScore(cand.confidence) >= 70 && formatScore(cand.confidence) < 90) || isRfqCandidate(cand)"
+                    [class.low]="formatScore(cand.confidence) < 70 && !isRfqCandidate(cand)"
+                    [class.rfq-info]="isRfqCandidate(cand)"
+                  >
+                    {{ formatScore(cand.confidence) | formatPercent }}
+                  </div>
+                }
               </div>
 
               <!-- RFQ Badges -->
@@ -102,6 +108,7 @@
           </div>
         </label>
       </div>
+      <app-product-picker [lineId]="data.line.id" (picked)="onManualCandidate($event)" />
     </section>
 
     <!-- New product form when selected -->

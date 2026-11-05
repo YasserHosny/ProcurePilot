@@ -7,6 +7,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe } from '@ngx-translate/core';
 
 import type { MatchCandidate, MatchOutcome } from '../../../core/api/models';
+import { FormatPercentPipe } from '../../../core/format/percent.pipe';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 
@@ -37,6 +38,7 @@ export interface RenderedSignal {
     MatDividerModule,
     MatTooltipModule,
     TranslatePipe,
+    FormatPercentPipe,
     FormatQuantityPipe,
     UnitLabelPipe,
   ],

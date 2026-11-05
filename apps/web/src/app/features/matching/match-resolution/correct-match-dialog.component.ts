@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, inject, signal } from '@angular/core';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -19,24 +19,32 @@ import type {
   ProductCreate,
   QuotationLineSummary,
 } from '../../../core/api/models';
+import { FormatPercentPipe } from '../../../core/format/percent.pipe';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
+import { ProductPickerComponent } from './product-picker.component';
 
 export interface CorrectMatchDialogData {
   readonly line: QuotationLineSummary;
   readonly candidates: readonly MatchCandidate[];
   readonly expectedCurrentDecisionId: string;
   readonly currentCandidateId?: string | null;
-  readonly baseUnits?: readonly BaseUnit[];
+  readonly baseUnits?: readonly SelectableUnit[];
   readonly quotationSupplierId?: string | null;
 }
 
-export const FALLBACK_BASE_UNITS: BaseUnit[] = [
-  { code: 'litre', label_en: 'Litre (L)', label_ar: 'لتر (L)', dimension: 'volume' },
-  { code: 'millilitre', label_en: 'Millilitre (ml)', label_ar: 'مليلتر (ml)', dimension: 'volume' },
-  { code: 'kilogram', label_en: 'Kilogram (kg)', label_ar: 'كيلوغرام (kg)', dimension: 'mass' },
-  { code: 'gram', label_en: 'Gram (g)', label_ar: 'غرام (g)', dimension: 'mass' },
-  { code: 'each', label_en: 'Each (item)', label_ar: 'حبة / قطعة', dimension: 'count' },
+/**
+ * A unit the pickers can offer. A unit from the API carries the server's labels; the built-in
+ * fallback carries only its code and takes its label from the i18n catalogue (`unitNames`).
+ */
+export type SelectableUnit = Pick<BaseUnit, 'code' | 'dimension'> & Partial<BaseUnit>;
+
+export const FALLBACK_BASE_UNITS: SelectableUnit[] = [
+  { code: 'litre', dimension: 'volume' },
+  { code: 'millilitre', dimension: 'volume' },
+  { code: 'kilogram', dimension: 'mass' },
+  { code: 'gram', dimension: 'mass' },
+  { code: 'each', dimension: 'count' },
 ];
 
 @Component({
@@ -56,7 +64,9 @@ export const FALLBACK_BASE_UNITS: BaseUnit[] = [
     MatSelectModule,
     TranslatePipe,
     UnitLabelPipe,
+    FormatPercentPipe,
     FormatQuantityPipe,
+    ProductPickerComponent,
   ],
   templateUrl: './correct-match-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -72,6 +82,20 @@ export class CorrectMatchDialogComponent {
     this.data.currentCandidateId ?? (this.data.candidates.length > 0 ? this.data.candidates[0].id : null),
   );
   readonly learnAlias = signal<boolean>(true);
+
+  /** Catalogue products the buyer picked in this dialog, recorded as manual candidates (P-151). */
+  private readonly pickedCandidates = signal<MatchCandidate[]>([]);
+  readonly allCandidates = computed<readonly MatchCandidate[]>(() => [
+    ...this.data.candidates,
+    ...this.pickedCandidates().filter((p) => !this.data.candidates.some((c) => c.id === p.id)),
+  ]);
+
+  onManualCandidate(candidate: MatchCandidate): void {
+    if (!this.pickedCandidates().some((c) => c.id === candidate.id)) {
+      this.pickedCandidates.update((list) => [...list, candidate]);
+    }
+    this.selectCandidate(candidate.id);
+  }
 
   readonly productForm: FormGroup = this.fb.group({
     tenant_name: [this.data.line.original_text, [Validators.required, Validators.maxLength(200)]],

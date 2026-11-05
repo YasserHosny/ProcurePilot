@@ -24,12 +24,13 @@ Two new enum values on the existing `purchase_request_status` type, and new colu
 delivery half of the lifecycle (research.md R1).
 
 **Status**: `draft | submitted | approved | rejected | withdrawn` (unchanged) `| ordered |
-delivered` (new). `ordered` and `delivered` are reachable only from `approved` — there is no path
-from `draft`/`submitted`/`rejected`/`withdrawn` directly to either, and no path backward out of
-`delivered`. This feature does not add a distinct "place the order" human action (spec.md scope):
-an approved request is considered `ordered` the moment a human approved it, so in practice the
-mobile client transitions `approved -> ordered` automatically alongside approval, and a branch
-member's own action is what transitions `ordered -> delivered`.
+delivered` (new). Under ADR-025, approval leaves the request `approved`. Creating or attaching
+its first live purchase order moves it to `ordered` in the order transaction under the existing
+request advisory locks. Cancelling or detaching its last live order returns it to `approved`.
+A live order references the request through `source_request_id` and has `status <> 'cancelled'`.
+A branch member's delivery confirmation transitions `ordered -> delivered`; an `approved`
+request cannot be confirmed delivered. Legacy `ordered` requests without an order are unchanged.
+
 
 | Field (new) | Type | Required | Notes |
 |---|---:|:---:|---|
@@ -132,8 +133,8 @@ draft -> submitted -> approved -> ordered -> delivered
        \-> withdrawn
 ```
 
-- `approved -> ordered`: automatic, alongside the existing approval decision (no new human action
-  this release — spec.md scope).
+- `approved -> ordered`: first live purchase order is created or attached (ADR-025).
+- `ordered -> approved`: last live purchase order is cancelled or detached; terminal requests stay unchanged.
 - `ordered -> delivered`: a branch member's delivery-confirmation action (spec.md Story 2),
   stamping `delivered_at`, `delivery_confirmed_by_membership_id`, per-line `quantity_received`, and
   the derived `has_delivery_discrepancy` flag.

@@ -1624,6 +1624,23 @@
         "invalidCandidate": "Selected candidate is not valid for this quotation line.",
         "alreadyDecided": "This quotation line already has a recorded decision.",
         "genericError": "Unable to resolve match decision. Please try again."
+      },
+      "picker": {
+        "title": "Pick another product",
+        "hint": "Search your catalogue when none of the suggestions is right.",
+        "searchLabel": "Search the catalogue",
+        "searchPlaceholder": "Type at least 2 characters",
+        "empty": "No active product matches that search.",
+        "searchFailed": "The search failed. Try again.",
+        "pickFailed": "That product could not be added. Try again.",
+        "manualBadge": "Picked by you"
+      },
+      "unitNames": {
+        "litre": "Litre (L)",
+        "millilitre": "Millilitre (ml)",
+        "kilogram": "Kilogram (kg)",
+        "gram": "Gram (g)",
+        "each": "Each (item)"
       }
     }
   },
@@ -4820,7 +4837,6 @@
         "12": "December"
       },
       "unknownProduct": "Unknown product",
-      "reminderSubject": "Reminder: request for quotation — {{tenant}} — needed by {{date}}",
       "reminderGreeting": "Hello,",
       "reminderIntro": "This is a reminder of a request for quotation from {{tenant}}.",
       "reminderReference": "Reference",
