@@ -4,7 +4,7 @@ import base64
 import json
 import logging
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import NamedTuple
@@ -747,6 +747,17 @@ class RequestsService:
         sources = self._fetch_sources_batch(client, visible)
         request_groups = self._fetch_request_groups_batch(client, visible)
 
+        budgets = self._fetch_budget_rows(client)
+        spend_cache: dict[UUID, list[SpendRow]] = {}
+
+        def committed_spend(budget: BudgetRow) -> list[SpendRow]:
+            if budget.id not in spend_cache:
+                spend_cache[budget.id] = self._fetch_committed_spend_rows(client, budget)
+            return spend_cache[budget.id]
+
+        def budget_status_for(row: dict[str, object]) -> BudgetStatus | None:
+            return _compute_request_budget_status(row, budgets, committed_spend)
+
         items = []
         for row in visible:
             step = steps_by_request.get(str(row["id"]))
@@ -769,6 +780,7 @@ class RequestsService:
                     source_lookup=False,
                     request_group=request_groups.get(str(row["id"])),
                     request_group_lookup=False,
+                    budget_status_for=budget_status_for,
                 )
             )
         if member is not None:
@@ -3552,6 +3564,7 @@ class RequestsService:
         source_lookup: bool = True,
         request_group: RequestGroupSummary | None = None,
         request_group_lookup: bool = True,
+        budget_status_for: Callable[[dict[str, object]], BudgetStatus | None] | None = None,
     ) -> PurchaseRequest:
         if requester_lookup:
             member_contacts = self._fetch_member_contacts_batch(
@@ -3575,7 +3588,11 @@ class RequestsService:
             request_row,
             line_rows,
             step_row,
-            budget_status=self._budget_status_for(client, request_row),
+            budget_status=(
+                budget_status_for(request_row)
+                if budget_status_for is not None
+                else self._budget_status_for(client, request_row)
+            ),
             quoted_prices=self._quoted_prices_for(request_row, line_rows),
             requester=requester,
             assignee=assignee,
@@ -3771,27 +3788,10 @@ class RequestsService:
         client: Client,
         request_row: dict[str, object],
     ) -> BudgetStatus | None:
-        return compute_budget_status(
-            request_id=UUID(str(request_row["id"])),
-            request_amount=(
-                Decimal(str(request_row["estimated_total_amount"]))
-                if request_row.get("estimated_total_amount") is not None
-                else None
-            ),
-            request_currency=(
-                str(request_row["estimated_total_currency"])
-                if request_row.get("estimated_total_currency") is not None
-                else None
-            ),
-            branch_id=UUID(str(request_row["branch_id"])),
-            cost_centre_id=(
-                UUID(str(request_row["cost_centre_id"]))
-                if request_row.get("cost_centre_id")
-                else None
-            ),
-            required_by=_parse_date(request_row["required_by_date"]),
-            budgets=self._fetch_budget_rows(client),
-            committed_spend=lambda budget: self._fetch_committed_spend_rows(client, budget),
+        return _compute_request_budget_status(
+            request_row,
+            self._fetch_budget_rows(client),
+            lambda budget: self._fetch_committed_spend_rows(client, budget),
         )
 
     def _create_quality_issue_photo_url(self, client: Client, storage_path: str) -> str:
@@ -3802,6 +3802,33 @@ class RequestsService:
         except Exception as exc:
             raise ServiceUnavailableError(details={"dependency": "supabase_storage"}) from exc
         return _signed_url(result)
+
+
+def _compute_request_budget_status(
+    request_row: dict[str, object],
+    budgets: list[BudgetRow],
+    committed_spend: Callable[[BudgetRow], list[SpendRow]],
+) -> BudgetStatus | None:
+    return compute_budget_status(
+        request_id=UUID(str(request_row["id"])),
+        request_amount=(
+            Decimal(str(request_row["estimated_total_amount"]))
+            if request_row.get("estimated_total_amount") is not None
+            else None
+        ),
+        request_currency=(
+            str(request_row["estimated_total_currency"])
+            if request_row.get("estimated_total_currency") is not None
+            else None
+        ),
+        branch_id=UUID(str(request_row["branch_id"])),
+        cost_centre_id=(
+            UUID(str(request_row["cost_centre_id"])) if request_row.get("cost_centre_id") else None
+        ),
+        required_by=_parse_date(request_row["required_by_date"]),
+        budgets=budgets,
+        committed_spend=committed_spend,
+    )
 
 
 def get_requests_service() -> RequestsService:
