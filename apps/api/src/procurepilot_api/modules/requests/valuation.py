@@ -30,6 +30,8 @@ left join lateral (
   limit 1
 ) lc on true
 where resp.id = %(rfq_response_id)s
+  and (%(tenant_id)s::uuid is null or (resp.tenant_id = %(tenant_id)s
+       and ql.tenant_id = %(tenant_id)s and md.tenant_id = %(tenant_id)s))
   and md.matched_workspace_product_id = any(%(product_ids)s)
   and ql.unit_price_amount is not null
 order by ql.line_number
@@ -85,15 +87,21 @@ def estimate_from_source_response(
     *,
     rfq_response_id: UUID,
     product_ids: list[UUID],
+    tenant_id: UUID | None = None,
 ) -> dict[UUID, LineEstimate]:
     """Per-pack landed prices (falling back to the quoted price) of the RFQ response a request
     was prepared from. A request prepared from a response is valued at that response's prices,
     never at another supplier's (the estimate must not silently change between prepare and
-    submit)."""
+    submit). With `tenant_id` the read is confined to that workspace, for callers that run it
+    outside the caller's database role."""
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             SOURCE_RESPONSE_QUOTE_LINES_SQL,
-            {"rfq_response_id": rfq_response_id, "product_ids": product_ids},
+            {
+                "rfq_response_id": rfq_response_id,
+                "product_ids": product_ids,
+                "tenant_id": tenant_id,
+            },
         )
         rows = cur.fetchall()
     estimates: dict[UUID, LineEstimate] = {}

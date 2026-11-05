@@ -2710,7 +2710,7 @@ class RequestsService:
         with db.connect(db_url) as conn:
             conn.execute("set local role authenticated")
             conn.execute("select set_config('request.jwt.claims', %s, true)", (json.dumps(claims),))
-            sourced: dict[UUID, LineEstimate] = {}
+            source_response_id = None
             if request_id is not None:
                 with conn.cursor() as cur:
                     cur.execute(
@@ -2718,16 +2718,24 @@ class RequestsService:
                         (request_id,),
                     )
                     row = cur.fetchone()
-                if row is not None and row[0] is not None:
-                    sourced = estimate_from_source_response(
-                        conn, rfq_response_id=row[0], product_ids=product_ids
-                    )
-            return [
-                sourced[pid]
-                if pid in sourced
-                else estimate_line_value(conn, workspace_product_id=pid)
-                for pid in product_ids
-            ]
+                if row is not None:
+                    source_response_id = row[0]
+            latest = {
+                pid: estimate_line_value(conn, workspace_product_id=pid) for pid in product_ids
+            }
+            sourced: dict[UUID, LineEstimate] = {}
+            if source_response_id is not None:
+                # A requester may no longer read RFQ tables (a role change after they prepared
+                # the request), but the request is still valued at its source response, so this
+                # read leaves the caller's role and is confined to the caller's workspace.
+                conn.execute("reset role")
+                sourced = estimate_from_source_response(
+                    conn,
+                    rfq_response_id=source_response_id,
+                    product_ids=product_ids,
+                    tenant_id=member.tenant_id,
+                )
+            return [sourced.get(pid, latest[pid]) for pid in product_ids]
 
     def _insert_lines(
         self,
