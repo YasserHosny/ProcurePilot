@@ -163,6 +163,13 @@
         ></app-compare-recommendation>
       }
 
+      @if (rawComparison()?.offers_truncated) {
+        <p class="offers-truncated" data-testid="offers-truncated" role="status">
+          <mat-icon aria-hidden="true">info</mat-icon>
+          {{ 'compare.offersTruncated' | translate }}
+        </p>
+      }
+
       <!-- Comparison Grid (FR-001) -->
       <app-compare-table
         [offers]="visibleOffers()"

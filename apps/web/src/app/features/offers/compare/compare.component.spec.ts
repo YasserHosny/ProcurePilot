@@ -177,6 +177,16 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
     expect(component.recommendedOffer()?.id).toBe('offer-1');
   });
 
+  it('tells the buyer when the offer list was cut at its cap, and not otherwise (P-157)', () => {
+    expect(fixture.nativeElement.querySelector('[data-testid="offers-truncated"]')).toBeNull();
+    component.rawComparison.set({ ...mockComparison, offers_truncated: true });
+    fixture.detectChanges();
+    const note = fixture.nativeElement.querySelector('[data-testid="offers-truncated"]') as HTMLElement;
+    expect(note).not.toBeNull();
+    expect(note.getAttribute('role')).toBe('status');
+    expect(note.textContent).toContain('Showing only');
+  });
+
   it('should exclude expired offers from active visible offers by default', () => {
     const visible = component.visibleOffers();
     expect(visible.length).toBe(2);

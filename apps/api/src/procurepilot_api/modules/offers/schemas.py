@@ -146,6 +146,7 @@ class OfferComparison(BaseModel):
     product: ProductRef
     requested_quantity: str
     offers: list[Offer]
+    offers_truncated: bool = False
     recommendation: Recommendation | None
 
 

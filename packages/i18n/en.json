@@ -1728,7 +1728,8 @@
       "viewScorecard": "View Scorecard",
       "backToCatalogue": "Back to Catalogue",
       "recordPurchase": "Record Purchase"
-    }
+    },
+    "offersTruncated": "Showing only the most recent offers. This product has more than the list can hold, so a cheaper offer may be missing."
   },
   "productIntelligence": {
     "title": "Product Price Intelligence",
