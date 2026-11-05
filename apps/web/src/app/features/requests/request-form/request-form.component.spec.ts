@@ -1420,6 +1420,40 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       expect(siblingLinks.length).toBe(1);
     });
 
+    for (const lang of ['en', 'ar']) {
+      for (const supplier of ['Sibling supplier', null]) {
+        it(`PPS-189 labels sibling with position and supplier ${supplier} (${lang})`, () => {
+          const translate = TestBed.inject(TranslateService);
+          translate.setTranslation('ar', arCatalog);
+          translate.use(lang);
+          const request = {
+            ...groupedRequest,
+            request_group: {
+              ...groupedRequest.request_group!,
+              siblings: [{ id: 'r2', position: 2, supplier_name: supplier }],
+            },
+          };
+          requestsApi.getRequest.and.returnValue(of(request));
+          const hostFixture = TestBed.createComponent(RequestFormComponent);
+          hostFixture.detectChanges();
+          const link = (hostFixture.nativeElement as HTMLElement).querySelector('a.sibling-link');
+          const position = lang === 'ar' ? '2 من 2' : '2 of 2';
+          expect(link?.textContent?.trim()).toBe(supplier ? `${position} · Sibling supplier` : position);
+          const directive = hostFixture.debugElement.query(By.css('a.sibling-link')).injector.get(RouterLink);
+          const input = (directive as unknown as Record<string, () => unknown>)['routerLinkInput']();
+          expect(input).toEqual(['/requests', 'r2']);
+        });
+      }
+    }
+
+    it('PPS-189 keeps legacy labels when siblings are missing', () => {
+      requestsApi.getRequest.and.returnValue(of(groupedRequest));
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+      const link = (hostFixture.nativeElement as HTMLElement).querySelector('a.sibling-link');
+      expect(link?.textContent?.trim()).toBe('Request r2');
+    });
+
     it('a grouped draft renders read-only with no Save and explains why', () => {
       requestsApi.getRequest.and.returnValue(of(groupedRequest));
       const hostFixture = TestBed.createComponent(RequestFormComponent);

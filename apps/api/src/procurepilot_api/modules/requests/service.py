@@ -70,6 +70,7 @@ from procurepilot_api.modules.requests.schemas import (
     QualityIssueCreate,
     QualityIssueList,
     QualityIssuePhoto,
+    RequestGroupSibling,
     RequestGroupSummary,
     RequestSource,
     ThresholdRule,
@@ -3619,7 +3620,8 @@ class RequestsService:
             rows = _rows(
                 client.table("purchase_request")
                 .select(
-                    "id,request_group_id,created_at,"
+                    "id,request_group_id,created_at,source_rfq_id,source_rfq_response_id,"
+                    "source_quotation_id,source_supplier_id,"
                     "request_group:purchase_request_group!purchase_request_request_group_fkey("
                     f"id,{GROUP_TOTAL_COLUMNS})"
                 )
@@ -3630,7 +3632,18 @@ class RequestsService:
             )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        return _request_group_summaries(rows)
+        sources = self._fetch_sources_batch(client, rows)
+        return _request_group_summaries(
+            [
+                {
+                    **row,
+                    "supplier_name": sources[str(row["id"])].supplier_name
+                    if str(row["id"]) in sources
+                    else None,
+                }
+                for row in rows
+            ]
+        )
 
     def _fetch_request_groups_sql(
         self,
@@ -3647,9 +3660,10 @@ class RequestsService:
             return {}
         columns = ", ".join(f"g.{c}" for c in GROUP_TOTAL_COLUMNS.split(","))
         rows = conn.execute(
-            f"select pr.id, pr.request_group_id, pr.created_at, {columns} "
+            f"select pr.id, pr.request_group_id, pr.created_at, s.name as supplier_name, {columns} "
             "from purchase_request pr join purchase_request_group g "
             "on g.tenant_id = pr.tenant_id and g.id = pr.request_group_id "
+            "left join supplier s on s.tenant_id = pr.tenant_id and s.id = pr.source_supplier_id "
             "where pr.tenant_id = %s and pr.request_group_id = any(%s::uuid[])",
             (member.tenant_id, group_ids),
         ).fetchall()
@@ -3908,6 +3922,15 @@ def _request_group_summaries(
                 ),
                 saving=_money(group["saving_amount"], group["saving_currency"]),
                 sibling_request_ids=[UUID(str(s["id"])) for s in siblings if s is not row],
+                siblings=[
+                    RequestGroupSibling(
+                        id=UUID(str(s["id"])),
+                        position=index,
+                        supplier_name=s.get("supplier_name"),
+                    )
+                    for index, s in enumerate(siblings, 1)
+                    if s is not row
+                ],
             )
     return summaries
 

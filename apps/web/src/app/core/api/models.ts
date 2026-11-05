@@ -1537,6 +1537,12 @@ export interface AutoPreparedProvenance {
   readonly created_at: string;
 }
 
+export interface RequestGroupSibling {
+  readonly id: string;
+  readonly position: number;
+  readonly supplier_name: string | null;
+}
+
 export interface RequestGroupSummary {
   readonly id: string;
   readonly rfq_id: string;
@@ -1546,6 +1552,7 @@ export interface RequestGroupSummary {
   readonly best_single_total?: Money | null;
   readonly saving?: Money | null;
   readonly sibling_request_ids: readonly string[];
+  readonly siblings?: readonly RequestGroupSibling[];
 }
 
 export interface PurchaseRequest {
