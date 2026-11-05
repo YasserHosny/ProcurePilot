@@ -80,6 +80,7 @@ from procurepilot_api.modules.requests.schemas import (
 from procurepilot_api.modules.requests.valuation import (
     LineEstimate,
     QuotedPrice,
+    estimate_from_source_quotation,
     estimate_from_source_response,
     estimate_line_value,
     quoted_prices_from_source_response,
@@ -309,7 +310,7 @@ class RequestsService:
 
         # 2. Estimates & Totals
         product_ids = [line.workspace_product_id for line in payload.lines]
-        estimates = self._estimate_products(product_ids)
+        estimates = self._estimate_products(product_ids, member=member)
         quantities = [line.quantity for line in payload.lines]
         total_amount, total_currency, has_incomplete = _compute_totals(quantities, estimates)
         pack_quantities = self._fetch_pack_quantities_batch(
@@ -1273,7 +1274,9 @@ class RequestsService:
                     new_line_rows: list[dict[str, object]] | None = None
                     if patch.lines is not None:
                         product_ids = [ln.workspace_product_id for ln in patch.lines]
-                        estimates = self._estimate_products(product_ids, request_id=request_id)
+                        estimates = self._estimate_products(
+                            product_ids, member=member, request_id=request_id
+                        )
                         quantities = [ln.quantity for ln in patch.lines]
                         total_amount, total_currency, has_incomplete = _compute_totals(
                             quantities, estimates
@@ -1953,7 +1956,9 @@ class RequestsService:
                             raise UnprocessableEntityError(details={"reason": "no_lines"})
 
                         product_ids = [UUID(str(lr["workspace_product_id"])) for lr in line_rows]
-                        estimates = self._estimate_products(product_ids, request_id=request_id)
+                        estimates = self._estimate_products(
+                            product_ids, member=member, request_id=request_id
+                        )
 
                         now = _now_iso()
                         for lr, est in zip(line_rows, estimates, strict=True):
@@ -2688,25 +2693,41 @@ class RequestsService:
     # ── internal helpers ──────────────────────────────────────────────
 
     def _estimate_products(
-        self, product_ids: list[UUID], *, request_id: UUID | None = None
+        self, product_ids: list[UUID], *, member: CurrentMember, request_id: UUID | None = None
     ) -> list[LineEstimate]:
         """Per-pack estimates. A request prepared from an RFQ response is valued at that
         response's quoted prices; any product not on it (or any other request) falls back to
-        the latest landed cost per pack."""
+        the latest landed cost per pack.
+
+        Read inside the caller's own database role and claims, so a product, request or quote
+        of another workspace has no estimate (PPS-185)."""
         db_url = self._settings.database_url.get_secret_value()
+        claims = {
+            "sub": str(member.user_id),
+            "tenant_id": str(member.tenant_id),
+            "role": "authenticated",
+            "member_role": member.role.value,
+        }
         with db.connect(db_url) as conn:
-            sourced: dict[UUID, LineEstimate] = {}
+            conn.execute("set local role authenticated")
+            conn.execute("select set_config('request.jwt.claims', %s, true)", (json.dumps(claims),))
+            source_quotation_id = None
             if request_id is not None:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "select source_rfq_response_id from purchase_request where id = %s",
+                        "select source_quotation_id from purchase_request where id = %s",
                         (request_id,),
                     )
                     row = cur.fetchone()
-                if row is not None and row[0] is not None:
-                    sourced = estimate_from_source_response(
-                        conn, rfq_response_id=row[0], product_ids=product_ids
-                    )
+                if row is not None:
+                    source_quotation_id = row[0]
+            sourced: dict[UUID, LineEstimate] = {}
+            if source_quotation_id is not None:
+                # The request's own snapshot of the quotation it was prepared from, read through
+                # the quotation tables, not the RFQ tables a requester may no longer read.
+                sourced = estimate_from_source_quotation(
+                    conn, quotation_id=source_quotation_id, product_ids=product_ids
+                )
             return [
                 sourced[pid]
                 if pid in sourced
