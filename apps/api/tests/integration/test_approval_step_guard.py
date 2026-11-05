@@ -49,6 +49,7 @@ def _member(cur: psycopg.Cursor, tenant_id: UUID, label: str, role: str) -> Work
 class Fixture:
     def __init__(self, conn: psycopg.Connection) -> None:
         self.conn = conn
+        self.request_of: dict[UUID, UUID] = {}
         with conn.cursor() as cur:
             self.owner = make_workspace(cur, "stepguard", role="owner")
             self.owner2 = _member(cur, self.owner.tenant_id, "owner2", "owner")
@@ -61,7 +62,7 @@ class Fixture:
                 (self.branch_id, self.owner.tenant_id),
             )
 
-    def request(self, status: str = "submitted") -> UUID:
+    def request(self, status: str = "submitted", by: Workspace | None = None) -> UUID:
         request_id = uuid4()
         with self.conn.cursor() as cur:
             cur.execute("reset role")
@@ -73,16 +74,23 @@ class Fixture:
                     request_id,
                     self.owner.tenant_id,
                     self.branch_id,
-                    self.requester.membership_id,
+                    (by or self.requester).membership_id,
                     status,
                 ),
             )
         return request_id
 
-    def step(self, *, status: str = "pending", assigned: Workspace | None = None) -> UUID:
+    def step(
+        self,
+        *,
+        status: str = "pending",
+        assigned: Workspace | None = None,
+        requested_by: Workspace | None = None,
+    ) -> UUID:
         """A step created as the table owner (the guard only restricts client roles)."""
-        request_id = self.request()
+        request_id = self.request(by=requested_by)
         step_id = uuid4()
+        self.request_of[step_id] = request_id
         assigned = assigned or self.approver
         with self.conn.cursor() as cur:
             cur.execute("reset role")
@@ -109,6 +117,15 @@ class Fixture:
                     ),
                 )
         return step_id
+
+    def settle(self, step_id: UUID, decision: str) -> None:
+        """Move the request as the API does before it records the step's decision."""
+        with self.conn.cursor() as cur:
+            cur.execute("reset role")
+            cur.execute(
+                "update purchase_request set status = %s where id = %s",
+                ("ordered" if decision == "approved" else decision, self.request_of[step_id]),
+            )
 
     def act_as(self, who: Workspace) -> psycopg.Cursor:
         cur = self.conn.cursor()
@@ -154,6 +171,7 @@ def _denied(conn: psycopg.Connection) -> None:
 @pytest.mark.parametrize("decision", ["approved", "rejected"])
 def test_the_assigned_approver_can_decide(fx: Fixture, decision: str) -> None:
     step_id = fx.step()
+    fx.settle(step_id, decision)
     cur = fx.act_as(fx.approver)
     _decide(cur, step_id, decision, fx.approver.membership_id, "ok")
     assert fx.row(step_id)[:2] == (decision, fx.approver.membership_id)
@@ -162,6 +180,7 @@ def test_the_assigned_approver_can_decide(fx: Fixture, decision: str) -> None:
 @pytest.mark.parametrize("decision", ["approved", "rejected"])
 def test_an_owner_can_decide_a_step_assigned_to_someone_else(fx: Fixture, decision: str) -> None:
     step_id = fx.step()
+    fx.settle(step_id, decision)
     cur = fx.act_as(fx.owner)
     _decide(cur, step_id, decision, fx.owner.membership_id)
     assert fx.row(step_id)[:2] == (decision, fx.owner.membership_id)
@@ -198,6 +217,7 @@ def test_an_owner_can_hand_a_pending_step_to_an_owner_when_its_approver_leaves(
 
 def test_a_member_who_is_not_the_assignee_cannot_decide(fx: Fixture) -> None:
     step_id = fx.step()
+    fx.settle(step_id, "approved")
     cur = fx.act_as(fx.other)
     # Either refused outright, or the step is not even visible to this member (no row updated).
     try:
@@ -209,6 +229,7 @@ def test_a_member_who_is_not_the_assignee_cannot_decide(fx: Fixture) -> None:
 
 def test_the_requester_cannot_decide_their_own_request(fx: Fixture) -> None:
     step_id = fx.step()
+    fx.settle(step_id, "approved")
     cur = fx.act_as(fx.requester)
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         _decide(cur, step_id, "approved", fx.requester.membership_id)
@@ -217,6 +238,7 @@ def test_the_requester_cannot_decide_their_own_request(fx: Fixture) -> None:
 
 def test_a_decision_cannot_name_another_member_as_the_decider(fx: Fixture) -> None:
     step_id = fx.step()
+    fx.settle(step_id, "approved")
     cur = fx.act_as(fx.approver)
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         _decide(cur, step_id, "approved", fx.owner.membership_id)
@@ -327,3 +349,152 @@ def test_the_table_owner_is_not_restricted(fx: Fixture) -> None:
             (step_id,),
         )
         cur.execute("delete from approval_step where id=%s", (step_id,))
+
+
+# ---- inserting a step (review findings F1) -----------------------------------------------
+
+
+def _insert_step(cur: psycopg.Cursor, fx: Fixture, request_id: UUID, assigned: Workspace) -> None:
+    cur.execute(
+        "insert into approval_step "
+        "(tenant_id,purchase_request_id,assigned_membership_id,source,status) "
+        "values (%s,%s,%s,'threshold_match','pending')",
+        (fx.owner.tenant_id, request_id, assigned.membership_id),
+    )
+
+
+def test_a_step_cannot_be_inserted_for_a_request_that_is_not_submitted(fx: Fixture) -> None:
+    request_id = fx.request(status="draft")
+    cur = fx.act_as(fx.requester)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _insert_step(cur, fx, request_id, fx.approver)
+    _denied(fx.conn)
+
+
+def test_a_step_cannot_be_inserted_on_someone_elses_request(fx: Fixture) -> None:
+    request_id = fx.request()
+    cur = fx.act_as(fx.other)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _insert_step(cur, fx, request_id, fx.approver)
+    _denied(fx.conn)
+
+
+def test_a_requester_cannot_assign_the_step_to_themselves(fx: Fixture) -> None:
+    request_id = fx.request()
+    cur = fx.act_as(fx.requester)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _insert_step(cur, fx, request_id, fx.requester)
+    _denied(fx.conn)
+
+
+def test_the_only_owner_can_be_assigned_their_own_request(conn: psycopg.Connection) -> None:
+    with conn.cursor() as cur:
+        sole = make_workspace(cur, "stepguard-sole", role="owner")
+        branch_id = uuid4()
+        cur.execute(
+            "insert into branch (id,tenant_id,name,region) values (%s,%s,'Main','GB')",
+            (branch_id, sole.tenant_id),
+        )
+        request_id = uuid4()
+        cur.execute(
+            "insert into purchase_request "
+            "(id,tenant_id,branch_id,requested_by_membership_id,required_by_date,status) "
+            "values (%s,%s,%s,%s,current_date + interval '7 days','submitted')",
+            (request_id, sole.tenant_id, branch_id, sole.membership_id),
+        )
+        cur.execute("set local role authenticated")
+        cur.execute("select set_config('request.jwt.claims', %s, true)", (sole.claims(),))
+        cur.execute(
+            "insert into approval_step "
+            "(tenant_id,purchase_request_id,assigned_membership_id,source,status) "
+            "values (%s,%s,%s,'owner_fallback','pending') returning id",
+            (sole.tenant_id, request_id, sole.membership_id),
+        )
+        step_id = cur.fetchone()[0]
+        cur.execute("savepoint decide")
+        cur.execute("reset role")
+        cur.execute("update purchase_request set status='ordered' where id=%s", (request_id,))
+        cur.execute("set local role authenticated")
+        _decide(cur, step_id, "approved", sole.membership_id)
+
+
+# ---- deciding your own request (F2) ------------------------------------------------------
+
+
+def test_an_owner_cannot_decide_a_request_they_submitted_while_another_owner_exists(
+    fx: Fixture,
+) -> None:
+    step_id = fx.step(assigned=fx.owner, requested_by=fx.owner)
+    fx.settle(step_id, "approved")
+    cur = fx.act_as(fx.owner)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _decide(cur, step_id, "approved", fx.owner.membership_id)
+    _denied(fx.conn)
+
+
+def test_the_assignee_cannot_decide_a_request_they_submitted(fx: Fixture) -> None:
+    step_id = fx.step(assigned=fx.approver, requested_by=fx.approver)
+    fx.settle(step_id, "approved")
+    cur = fx.act_as(fx.approver)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _decide(cur, step_id, "approved", fx.approver.membership_id)
+    _denied(fx.conn)
+
+
+# ---- owner authority is live, not the token's claim (F3) ---------------------------------
+
+
+def test_an_owner_demoted_after_their_token_was_issued_cannot_decide(fx: Fixture) -> None:
+    step_id = fx.step()
+    fx.settle(step_id, "approved")
+    with fx.conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute("update membership set role='viewer' where id=%s", (fx.owner2.membership_id,))
+    cur = fx.act_as(fx.owner2)  # the claim still says owner
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _decide(cur, step_id, "approved", fx.owner2.membership_id)
+    _denied(fx.conn)
+
+
+def test_an_owner_demoted_after_their_token_was_issued_cannot_reassign(fx: Fixture) -> None:
+    step_id = fx.step()
+    with fx.conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute("update membership set role='viewer' where id=%s", (fx.owner2.membership_id,))
+    cur = fx.act_as(fx.owner2)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        cur.execute(
+            "update approval_step set assigned_membership_id=%s, source='owner_fallback' "
+            "where id=%s",
+            (fx.owner.membership_id, step_id),
+        )
+    _denied(fx.conn)
+
+
+# ---- a decision matches the request (F4) -------------------------------------------------
+
+
+@pytest.mark.parametrize("request_status", ["submitted", "withdrawn", "draft"])
+def test_a_step_cannot_be_decided_unless_its_request_was_decided_the_same_way(
+    fx: Fixture, request_status: str
+) -> None:
+    step_id = fx.step()
+    with fx.conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute(
+            "update purchase_request set status=%s where id=%s",
+            (request_status, fx.request_of[step_id]),
+        )
+    cur = fx.act_as(fx.approver)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _decide(cur, step_id, "approved", fx.approver.membership_id)
+    _denied(fx.conn)
+
+
+def test_an_approval_cannot_be_recorded_on_a_rejected_request(fx: Fixture) -> None:
+    step_id = fx.step()
+    fx.settle(step_id, "rejected")
+    cur = fx.act_as(fx.approver)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _decide(cur, step_id, "approved", fx.approver.membership_id)
+    _denied(fx.conn)

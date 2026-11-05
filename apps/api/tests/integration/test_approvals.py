@@ -252,7 +252,9 @@ def _seed_step_for_visibility(
     act_as(cur, owner)
     branch_id = _make_branch(cur, owner)
     request_id = _make_submitted_request(cur, requester, branch_id)
+    act_as(cur, requester)  # routing runs as the member who submits
     step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
+    act_as(cur, owner)
     return owner, requester, approver, other, step_id
 
 

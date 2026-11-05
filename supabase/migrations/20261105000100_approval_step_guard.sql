@@ -7,7 +7,7 @@
 -- rewrite who a step is assigned to, or delete it.
 --
 -- This trigger gives the database the same rules the API already follows under `authenticated`:
---   * insert: a pending step (routing at submission time);
+--   * insert: a pending step, by the requester of a submitted request (routing at submission);
 --   * update: decide a pending step -- as its assignee or an owner -- recording yourself as the
 --     decider; or, as an owner, hand a pending step to an owner (the approver left the workspace);
 --   * delete: never, and a decided step is never changed.
@@ -22,6 +22,8 @@ as $$
 declare
   is_owner boolean;
   acting_membership uuid;
+  request_row record;
+  sole_owner boolean;
 begin
   if current_user not in ('authenticated', 'anon') then
     return coalesce(new, old);
@@ -32,17 +34,39 @@ begin
       using errcode = '42501';
   end if;
 
+  -- Owner authority and identity are read live (current_membership_role / _id), never from the
+  -- token's member_role claim, so a demoted owner loses it on their next statement.
+  is_owner := coalesce(current_membership_role() = 'owner', false);
+  acting_membership := current_membership_id();
+
   if tg_op = 'INSERT' then
     if new.status <> 'pending' then
       raise exception 'an approval step is created pending'
+        using errcode = '42501';
+    end if;
+    -- Routing runs when the requester submits: the request is submitted and theirs, and it is not
+    -- routed to themselves unless they are the workspace's only active owner (ADR-024).
+    select pr.status, pr.requested_by_membership_id into request_row
+      from purchase_request pr
+      where pr.tenant_id = new.tenant_id and pr.id = new.purchase_request_id;
+    if request_row.status::text is distinct from 'submitted'
+       or request_row.requested_by_membership_id is distinct from acting_membership then
+      raise exception 'an approval step is created when its requester submits the request'
+        using errcode = '42501';
+    end if;
+    if new.assigned_membership_id = acting_membership and not (
+         is_owner and not exists (
+           select 1 from membership m
+           where m.tenant_id = new.tenant_id and m.role = 'owner' and m.status = 'active'
+             and m.id <> acting_membership)
+       ) then
+      raise exception 'a request is not routed to its own requester'
         using errcode = '42501';
     end if;
     return new;
   end if;
 
   -- UPDATE
-  is_owner := current_member_role() = 'owner';
-  acting_membership := current_membership_id();
 
   if old.status <> 'pending' then
     raise exception 'a decided approval step cannot be changed'
@@ -93,6 +117,29 @@ begin
   if not (is_owner or old.assigned_membership_id = acting_membership) then
     raise exception 'only the assigned approver or an owner can decide this step'
       using errcode = '42501';
+  end if;
+
+  -- The API moves the request first (approved -> ordered, rejected -> rejected) and then records
+  -- the step, so the request must already carry the same outcome.
+  select pr.status, pr.requested_by_membership_id into request_row
+    from purchase_request pr
+    where pr.tenant_id = old.tenant_id and pr.id = old.purchase_request_id;
+  if request_row.status::text is distinct from (case new.status::text when 'approved' then 'ordered'
+                                                          else new.status::text end) then
+    raise exception 'a step is decided together with its request'
+      using errcode = '42501';
+  end if;
+
+  -- ADR-024: nobody decides a request they submitted unless they are the only active owner.
+  if request_row.requested_by_membership_id = acting_membership then
+    sole_owner := is_owner and not exists (
+      select 1 from membership m
+      where m.tenant_id = old.tenant_id and m.role = 'owner' and m.status = 'active'
+        and m.id <> acting_membership);
+    if not sole_owner then
+      raise exception 'a request cannot be decided by the member who submitted it'
+        using errcode = '42501';
+    end if;
   end if;
 
   return new;
