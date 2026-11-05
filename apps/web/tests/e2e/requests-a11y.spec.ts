@@ -11,13 +11,14 @@ import {
 } from './support/api';
 
 /**
- * Accessibility for Purchase Requests and Approval Queue (chunk 008, T046, FR-012, FR-013).
+ * Accessibility for Purchase Requests and Approvals (chunk 008, T046, FR-012, FR-013).
  *
- * WCAG 2.1 AA across the four request/approval surfaces in both English and Arabic (RTL):
+ * WCAG 2.1 AA across the five request/approval surfaces in both English and Arabic (RTL):
  * 1. Request Creation (/requests/new)
  * 2. Request List (/requests)
  * 3. Request Detail (/requests/:id)
  * 4. Approval Queue (/approvals)
+ * 5. Approval Detail (/approvals/:requestId)
  *
  * Asserted with zero violations using request data seeded via API helpers.
  */
@@ -40,6 +41,7 @@ test.describe('Requests and Approvals Accessibility @a11y', () => {
   let workspace: Credentials;
   let ownerToken: string;
   let draftRequestId: string;
+  let submittedRequestId: string;
   let branchId: string;
   let productId: string;
   const requestIds: string[] = [];
@@ -87,6 +89,7 @@ test.describe('Requests and Approvals Accessibility @a11y', () => {
       required_by_date: futureDate,
       lines: [{ workspace_product_id: product.id, quantity: '10', note: `${marker}-submitted` }],
     });
+    submittedRequestId = submitted.id;
     requestIds.push(submitted.id);
     await apiAsUser(ownerToken, 'POST', `/requests/${submitted.id}/submit`);
   });
@@ -182,6 +185,19 @@ test.describe('Requests and Approvals Accessibility @a11y', () => {
     expect(results.violations, describeViolations(results)).toEqual([]);
   });
 
+  test('the approval detail screen in English has no WCAG 2.1 AA violations @a11y', async ({
+    page,
+  }) => {
+    await signInUser(page);
+    await ensureEnglish(page);
+    await page.goto(`/approvals/${submittedRequestId}`);
+    await expect(page.locator('h1')).toBeVisible();
+    await expect(page.locator('h1')).toContainText('Request');
+    await page.waitForLoadState('networkidle');
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
   test('invalid request submission in English has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
     await signInUser(page);
     await ensureEnglish(page);
@@ -245,6 +261,20 @@ test.describe('Requests and Approvals Accessibility @a11y', () => {
     await page.goto('/approvals');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await expect(page.locator('.approval-queue-title')).toContainText('قائمة الاعتماد');
+    await page.waitForLoadState('networkidle');
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
+  test('the approval detail screen in Arabic has no WCAG 2.1 AA violations @a11y', async ({
+    page,
+  }) => {
+    await signInUser(page);
+    await switchToArabic(page);
+    await page.goto(`/approvals/${submittedRequestId}`);
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await expect(page.locator('h1')).toBeVisible();
+    await expect(page.locator('h1')).toContainText('الطلب');
     await page.waitForLoadState('networkidle');
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);
