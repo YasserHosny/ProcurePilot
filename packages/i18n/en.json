@@ -2533,6 +2533,8 @@
       "marker": "Split {{position}} of {{size}}",
       "siblingsLabel": "Other requests in this split",
       "siblingLink": "Request {{id}}",
+      "siblingLabel": "{{position}} of {{size}} · {{supplier}}",
+      "siblingPosition": "{{position}} of {{size}}",
       "readOnlyReason": "Part of a split: these requests are submitted and approved together",
       "submitBoth": "Submits both requests of this split",
       "submitAll": "Submits all {{count}} requests of this split",

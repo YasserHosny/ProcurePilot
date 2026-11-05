@@ -70,11 +70,24 @@
         @if (group.sibling_request_ids.length > 0) {
           <span class="split-siblings">
             · {{ 'requests.split.siblingsLabel' | translate }}:
-            @for (siblingId of group.sibling_request_ids; track siblingId; let last = $last) {
-              <a [routerLink]="['/requests', siblingId]" class="sibling-link">
-                {{ 'requests.split.siblingLink' | translate: { id: siblingId.slice(0, 8) } }}
-              </a>
-              @if (!last) { , }
+            @if (group.siblings; as siblings) {
+              @for (sibling of siblings; track sibling.id; let last = $last) {
+                <a [routerLink]="['/requests', sibling.id]" class="sibling-link">
+                  @if (sibling.supplier_name) {
+                    {{ 'requests.split.siblingLabel' | translate: { position: sibling.position, size: group.size, supplier: sibling.supplier_name } }}
+                  } @else {
+                    {{ 'requests.split.siblingPosition' | translate: { position: sibling.position, size: group.size } }}
+                  }
+                </a>
+                @if (!last) {, }
+              }
+            } @else {
+              @for (siblingId of group.sibling_request_ids; track siblingId; let last = $last) {
+                <a [routerLink]="['/requests', siblingId]" class="sibling-link">
+                  {{ 'requests.split.siblingLink' | translate: { id: siblingId.slice(0, 8) } }}
+                </a>
+                @if (!last) { , }
+              }
             }
           </span>
         }

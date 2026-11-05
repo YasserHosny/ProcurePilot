@@ -2533,6 +2533,8 @@
       "marker": "تقسيم {{position}} من {{size}}",
       "siblingsLabel": "الطلبات الأخرى في هذا التقسيم",
       "siblingLink": "طلب {{id}}",
+      "siblingLabel": "{{position}} من {{size}} · {{supplier}}",
+      "siblingPosition": "{{position}} من {{size}}",
       "readOnlyReason": "جزء من تقسيم: يتم إرسال هذه الطلبات واعتمادها معًا",
       "submitBoth": "إرسال كلا طلبي هذا التقسيم",
       "submitAll": "إرسال جميع الطلبات الـ {{count}} لهذا التقسيم",

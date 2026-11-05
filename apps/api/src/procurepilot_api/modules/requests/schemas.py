@@ -105,6 +105,12 @@ class RequestSource(BaseModel):
     supplier_name: str | None = None
 
 
+class RequestGroupSibling(BaseModel):
+    id: UUID
+    position: int
+    supplier_name: str | None = None
+
+
 class RequestGroupSummary(BaseModel):
     id: UUID
     rfq_id: UUID
@@ -114,6 +120,7 @@ class RequestGroupSummary(BaseModel):
     best_single_total: Money | None
     saving: Money | None
     sibling_request_ids: list[UUID]
+    siblings: list[RequestGroupSibling] = Field(default_factory=list)
 
 
 class PurchaseRequest(BaseModel):
