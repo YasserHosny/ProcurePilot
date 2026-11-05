@@ -583,6 +583,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'approvals/:requestId',
+        loadComponent: () =>
+          import('./features/approvals/approval-detail/approval-detail.component').then(
+            (m) => m.ApprovalDetailComponent,
+          ),
+      },
+      {
         path: 'approvals',
         loadComponent: () =>
           import('./features/approvals/approval-queue/approval-queue.component').then(

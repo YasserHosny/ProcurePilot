@@ -604,6 +604,8 @@ class RequestsService:
                         contact_ids = [request_row["requested_by_membership_id"]]
                         if step_row:
                             contact_ids.append(step_row["assigned_membership_id"])
+                            if step_row.get("decided_by_membership_id"):
+                                contact_ids.append(step_row["decided_by_membership_id"])
                         contacts = {
                             str(row["id"]): _member_contact(row)
                             for row in conn.execute(
@@ -649,12 +651,14 @@ class RequestsService:
 
         requester = contacts.get(str(request_row["requested_by_membership_id"]))
         assignee = contacts.get(str(step_row["assigned_membership_id"])) if step_row else None
+        decider = contacts.get(str(step_row.get("decided_by_membership_id"))) if step_row else None
         return _purchase_request(
             request_row,
             line_rows,
             step_row,
             requester=requester,
             assignee=assignee,
+            decider=decider,
             auto_prepared=(
                 AutoPreparedProvenance.model_validate(auto_prepared_row)
                 if auto_prepared_row
@@ -773,6 +777,9 @@ class RequestsService:
                         if step is not None
                         else None
                     ),
+                    decider=member_contacts.get(str(step.get("decided_by_membership_id")))
+                    if step
+                    else None,
                     requester_lookup=False,
                     auto_prepared=auto_prepared.get(str(row["id"])),
                     auto_prepared_lookup=False,
@@ -993,6 +1000,9 @@ class RequestsService:
                         if step is not None
                         else None
                     ),
+                    decider=member_contacts.get(str(step.get("decided_by_membership_id")))
+                    if step
+                    else None,
                     requester_lookup=False,
                     auto_prepared=auto_prepared.get(str(row["id"])),
                     auto_prepared_lookup=False,
@@ -1770,7 +1780,7 @@ class RequestsService:
         contacts = conn.execute(
             "select pr.id, m.email as requester_email, m.display_name as requester_name, "
             "a.email as assigned_email, a.display_name as assigned_name, s.name as "
-            "supplier_name, "
+            "supplier_name, d.email as decided_email, d.display_name as decided_name, "
             "row_to_json(e) as auto_prepared from purchase_request pr "
             "left join membership m on m.id=pr.requested_by_membership_id and "
             "m.tenant_id=pr.tenant_id "
@@ -1778,6 +1788,8 @@ class RequestsService:
             "ast.tenant_id=pr.tenant_id "
             "left join membership a on a.id=ast.assigned_membership_id and "
             "a.tenant_id=pr.tenant_id "
+            "left join membership d on d.id=ast.decided_by_membership_id and "
+            "d.tenant_id=pr.tenant_id "
             "left join supplier s on s.id=pr.source_supplier_id and s.tenant_id=pr.tenant_id "
             "left join auto_preparation_event e on e.purchase_request_id=pr.id and "
             "e.tenant_id=pr.tenant_id "
@@ -1847,6 +1859,7 @@ class RequestsService:
                     request_group=summaries[rid],
                     requester=MemberContact(contact["requester_email"], contact["requester_name"]),
                     assignee=MemberContact(contact["assigned_email"], contact["assigned_name"]),
+                    decider=MemberContact(contact["decided_email"], contact["decided_name"]),
                     source=source,
                     auto_prepared=AutoPreparedProvenance.model_validate(auto) if auto else None,
                     quoted_prices=self._quoted_prices_for(row, request_lines),
@@ -3555,6 +3568,7 @@ class RequestsService:
         *,
         requester: MemberContact | None = None,
         assignee: MemberContact | None = None,
+        decider: MemberContact | None = None,
         requester_lookup: bool = True,
         auto_prepared: AutoPreparedProvenance | None = None,
         auto_prepared_lookup: bool = True,
@@ -3571,6 +3585,11 @@ class RequestsService:
             requester = member_contacts.get(str(request_row["requested_by_membership_id"]))
             assignee = (
                 member_contacts.get(str(step_row["assigned_membership_id"])) if step_row else None
+            )
+            decider = (
+                member_contacts.get(str(step_row.get("decided_by_membership_id")))
+                if step_row
+                else None
             )
         if auto_prepared_lookup:
             auto_prepared = self._fetch_auto_prepared_batch(client, [request_row]).get(
@@ -3594,6 +3613,7 @@ class RequestsService:
             quoted_prices=self._quoted_prices_for(request_row, line_rows),
             requester=requester,
             assignee=assignee,
+            decider=decider,
             auto_prepared=auto_prepared,
             source=source,
             request_group=request_group,
@@ -3750,6 +3770,11 @@ class RequestsService:
         membership_ids = {str(row["requested_by_membership_id"]) for row in request_rows}
         membership_ids.update(
             str(row["assigned_membership_id"]) for row in step_rows if row is not None
+        )
+        membership_ids.update(
+            str(row["decided_by_membership_id"])
+            for row in step_rows
+            if row is not None and row.get("decided_by_membership_id")
         )
         if not membership_ids:
             return {}
@@ -3919,6 +3944,7 @@ def _purchase_request(
     quoted_prices: dict[UUID, QuotedPrice] | None = None,
     requester: MemberContact | None = None,
     assignee: MemberContact | None = None,
+    decider: MemberContact | None = None,
     auto_prepared: AutoPreparedProvenance | None = None,
     source: RequestSource | None = None,
     request_group: RequestGroupSummary | None = None,
@@ -3953,6 +3979,7 @@ def _purchase_request(
                 step_row,
                 requester_membership_id=UUID(str(row["requested_by_membership_id"])),
                 assignee=assignee,
+                decider=decider,
             )
             if step_row
             else None
@@ -4037,7 +4064,11 @@ def _replay_group_response(rows: list[dict[str, object]]) -> list[PurchaseReques
 
 
 def _approval_step(
-    row: dict[str, object], *, requester_membership_id: UUID, assignee: MemberContact | None = None
+    row: dict[str, object],
+    *,
+    requester_membership_id: UUID,
+    assignee: MemberContact | None = None,
+    decider: MemberContact | None = None,
 ) -> ApprovalStep:
     return ApprovalStep(
         self_approval=str(
@@ -4050,6 +4081,8 @@ def _approval_step(
         assigned_membership_id=UUID(str(row["assigned_membership_id"])),
         assigned_name=assignee.name if assignee else None,
         assigned_email=assignee.email if assignee else None,
+        decided_name=decider.name if decider and row.get("decided_by_membership_id") else None,
+        decided_email=decider.email if decider and row.get("decided_by_membership_id") else None,
         source=str(row["source"]),
         status=str(row["status"]),
         comment=row.get("comment"),

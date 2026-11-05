@@ -500,6 +500,8 @@ components:
           description: Derived; pending assignee or recorded decider is the requester (ADR-024).
         id: { type: string, format: uuid }
         assigned_membership_id: { type: string, format: uuid }
+        decided_name: { type: string, nullable: true }
+        decided_email: { type: string, format: email, nullable: true }
         assigned_name: { type: string, nullable: true }
         assigned_email: { type: string, format: email, nullable: true }
         source: { $ref: '#/components/schemas/ApprovalStepSource' }

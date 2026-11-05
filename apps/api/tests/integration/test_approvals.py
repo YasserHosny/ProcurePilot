@@ -425,3 +425,50 @@ def test_member_removal_escalates_only_live_pending_steps(
         removed_membership_id=removed.membership_id,
     )
     assert count == 1
+
+
+def test_approved_request_get_includes_recorded_decider_contact(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from procurepilot_api.deps import bearer_token, current_member
+    from procurepilot_api.errors import register_exception_handlers
+    from procurepilot_api.modules.requests.router import router
+    from procurepilot_api.modules.requests.schemas import ApprovalDecisionInput
+    from procurepilot_api.modules.requests.service import get_requests_service
+
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "approval-detail-owner")
+        approver = _make_member(cur, owner.tenant_id, "approval-detail-decider", "approver")
+        cur.execute(
+            "update membership set display_name = 'ليلى' where id = %s", (approver.membership_id,)
+        )
+        act_as(cur, owner)
+        branch = _make_branch(cur, owner)
+        request = _make_submitted_request(cur, owner, branch)
+        _make_pending_step(cur, owner.tenant_id, request, approver.membership_id)
+    service = _queue_service(conn, monkeypatch, owner)
+    monkeypatch.setattr(module, "enqueue_push_job", lambda *_: None)
+    approved = service.approve_request(
+        bearer_token="test",
+        member=member_from_workspace(approver),
+        request_id=request,
+        payload=ApprovalDecisionInput(),
+    )
+    assert approved.approval_step is not None
+    assert approved.approval_step.decided_name == "ليلى"
+    app = FastAPI()
+    register_exception_handlers(app)
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[current_member] = lambda: member_from_workspace(owner)
+    app.dependency_overrides[bearer_token] = lambda: "test"
+    app.dependency_overrides[get_requests_service] = lambda: service
+    with TestClient(app) as client:
+        response = client.get(f"/api/v1/requests/{request}")
+    assert response.status_code == 200, response.text
+    assert response.json()["approval_step"]["decided_name"] == "ليلى"
+    assert (
+        response.json()["approval_step"]["decided_email"] == "approval-detail-decider@example.test"
+    )

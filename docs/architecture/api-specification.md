@@ -3210,3 +3210,7 @@ contract: `specs/024-rfq-basket-split/contracts/rfq-split.openapi.yaml`.
 - Accepts `Idempotency-Key` (required).
 - Withdraws every request of the split.
 - Returns `200` with the group's requests, all withdrawn.
+
+Approval steps include nullable `decided_name` and `decided_email`, resolved from the recorded
+decider membership in the same contact batch as the requester and assignee. Pending steps
+return null for both. Request visibility and cross-tenant not-found behavior are unchanged.

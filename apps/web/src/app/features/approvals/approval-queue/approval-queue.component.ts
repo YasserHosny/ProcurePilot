@@ -31,7 +31,7 @@ import { MatSelect, MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import type { ParamMap } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { EMPTY, Observable, defer, forkJoin, of } from 'rxjs';
@@ -217,6 +217,7 @@ export class ApprovalDecisionDialogComponent {
   standalone: true,
   imports: [
     NgTemplateOutlet,
+    RouterLink,
     MatCardModule,
     MatTableModule,
     MatButtonModule,

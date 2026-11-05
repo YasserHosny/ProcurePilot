@@ -1473,7 +1473,7 @@ export type PurchaseRequestStatus =
   | 'rejected'
   | 'withdrawn';
 export type ApprovalStepStatus = 'pending' | 'approved' | 'rejected';
-export type ApprovalStepSource = 'threshold_match' | 'delegate' | 'owner_fallback';
+export type ApprovalStepSource = 'threshold_match' | 'group_threshold_match' | 'delegate' | 'owner_fallback';
 
 export type BudgetStatusValue = 'within' | 'near' | 'over' | 'no_budget';
 
@@ -1513,6 +1513,8 @@ export interface ApprovalStep {
   readonly assigned_membership_id: string;
   readonly assigned_name?: string | null;
   readonly assigned_email?: string | null;
+  readonly decided_name?: string | null;
+  readonly decided_email?: string | null;
   readonly source: ApprovalStepSource;
   readonly status: ApprovalStepStatus;
   readonly comment?: string | null;

@@ -5,7 +5,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ActivatedRoute, Router, convertToParamMap, type ParamMap } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, DefaultUrlSerializer, provideRouter, type ParamMap } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 
@@ -105,6 +105,7 @@ describe('ApprovalQueueComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ApprovalQueueComponent],
       providers: [
+        provideRouter([]),
         provideTranslateService(),
         {
           provide: ActivatedRoute,
@@ -147,6 +148,14 @@ describe('ApprovalQueueComponent', () => {
     fixture.detectChanges();
   }
 
+  it('links single requests to details with requester and total in the accessible name', () => {
+    const link = fixture.nativeElement.querySelector('a[href="/approvals/req-001"]') as HTMLAnchorElement;
+    expect(link).not.toBeNull();
+    expect(link.textContent).toContain('View details');
+    expect(link.getAttribute('aria-label')).toContain(component.getRequesterDisplay(mockPendingRequests[0]));
+    expect(link.getAttribute('aria-label')).toContain('SAR 1,250');
+  });
+
   beforeEach(async () => {
     role.set('buyer');
     sessionSpy = {
@@ -175,7 +184,12 @@ describe('ApprovalQueueComponent', () => {
     api = jasmine.createSpyObj('ApiService', ['products']);
     dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
-    routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    routerSpy = jasmine.createSpyObj('Router', ['navigate', 'createUrlTree', 'serializeUrl', 'navigateByUrl'], {
+      events: new Subject(),
+    });
+    const serializer = new DefaultUrlSerializer();
+    routerSpy.createUrlTree.and.callFake((commands: readonly string[]) => serializer.parse(commands.join('/')));
+    routerSpy.serializeUrl.and.callFake(tree => serializer.serialize(tree));
     snackBarSpy.open.and.returnValue({
       onAction: () => of(undefined),
     } as unknown as ReturnType<MatSnackBar['open']>);
@@ -1650,6 +1664,11 @@ describe('ApprovalQueueComponent', () => {
       component.toggleExpand('grp-split-1');
       fixture.detectChanges();
 
+      for (const id of ['req-split-1', 'req-split-2']) {
+        const detailLink = fixture.nativeElement.querySelector(`a[href="/approvals/${id}"]`) as HTMLAnchorElement;
+        expect(detailLink).not.toBeNull();
+        expect(detailLink.getAttribute('aria-label')).toContain('View details');
+      }
       const expandedText = fixture.nativeElement.textContent;
       expect(expandedText).toContain('Supplier A');
       expect(expandedText).toContain('Supplier B');
@@ -2811,6 +2830,7 @@ describe('ApprovalDecisionDialogComponent', () => {
     TestBed.configureTestingModule({
       imports: [ApprovalDecisionDialogComponent],
       providers: [
+        provideRouter([]),
         provideTranslateService(),
         {
           provide: MAT_DIALOG_DATA,
@@ -2849,6 +2869,7 @@ describe('ApprovalDecisionDialogComponent', () => {
     TestBed.configureTestingModule({
       imports: [ApprovalDecisionDialogComponent],
       providers: [
+        provideRouter([]),
         provideTranslateService(),
         {
           provide: MAT_DIALOG_DATA,
@@ -2886,6 +2907,7 @@ describe('ApprovalDecisionDialogComponent', () => {
     TestBed.configureTestingModule({
       imports: [ApprovalDecisionDialogComponent],
       providers: [
+        provideRouter([]),
         provideTranslateService(),
         {
           provide: MAT_DIALOG_DATA,
@@ -2923,6 +2945,7 @@ describe('ApprovalDecisionDialogComponent', () => {
     TestBed.configureTestingModule({
       imports: [ApprovalDecisionDialogComponent],
       providers: [
+        provideRouter([]),
         provideTranslateService(),
         {
           provide: MAT_DIALOG_DATA,
@@ -2959,6 +2982,7 @@ describe('ApprovalDecisionDialogComponent', () => {
     TestBed.configureTestingModule({
       imports: [ApprovalDecisionDialogComponent],
       providers: [
+        provideRouter([]),
         provideTranslateService(),
         {
           provide: MAT_DIALOG_DATA,
