@@ -54,7 +54,7 @@
                 [class.low]="formatScore(cand.confidence) < 70 && !isRfqCandidate(cand)"
                 [class.rfq-info]="isRfqCandidate(cand)"
               >
-                <span class="conf-score">{{ formatScore(cand.confidence) }}%</span>
+                <span class="conf-score">{{ formatScore(cand.confidence) | formatPercent }}</span>
                 <span class="conf-label">{{ 'matching.resolution.candidates.confidence' | translate }}</span>
               </div>
             }
@@ -138,10 +138,10 @@
                       @if (sig.isTextOnly) {
                         <span class="sig-text">{{ sig.textKey | translate }}</span>
                       } @else if (sig.isFullSentence) {
-                        <span class="sig-sentence">{{ sig.labelKey | translate: { percent: sig.percent } }}</span>
+                        <span class="sig-sentence">{{ sig.labelKey | translate: { percent: (sig.percent | formatQuantity) } }}</span>
                       } @else {
                         <span class="sig-label">{{ sig.labelKey | translate }}</span>
-                        <span class="sig-score">{{ sig.percent }}%</span>
+                        <span class="sig-score">{{ sig.percent | formatPercent }}</span>
                       }
                     </div>
                   }

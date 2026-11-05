@@ -372,7 +372,7 @@
                       <span>{{ 'matching.queue.topCandidate' | translate }}</span>
                       @if (task.top_candidate; as candidate) {
                         <strong>{{ candidate.product_name }}</strong>
-                        <small>{{ 'matching.queue.matchScore' | translate: { score: formatScore(candidate.confidence) + '%' } }}</small>
+                        <small>{{ 'matching.queue.matchScore' | translate: { score: (formatScore(candidate.confidence) | formatPercent) } }}</small>
                       } @else {
                         <strong>{{ 'matching.queue.noCandidateEvidence' | translate }}</strong>
                       }

@@ -180,7 +180,7 @@
             </div>
             <div>
               <strong>{{ 'matching.resolution.decision.confidence' | translate }}</strong>
-              <span>{{ formatScore(dec.confidence) }}%</span>
+              <span>{{ formatScore(dec.confidence) | formatPercent }}</span>
             </div>
             <div>
               <strong>{{ 'matching.resolution.decision.decidedAt' | translate }}</strong>
