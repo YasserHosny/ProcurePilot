@@ -26,6 +26,9 @@ _FOLD_TO = "".join(v for k, v in _LETTER_FOLDS.items() if k != v)
 _TABLE = str.maketrans(_FOLD_FROM, _FOLD_TO)
 _TASHKEEL_CLASS = "ً-ٰٟـ"  # harakat, dagger alef, tatweel
 _TASHKEEL = re.compile(f"[{_TASHKEEL_CLASS}]")
+# Whitespace, ASCII punctuation/symbols and the Arabic comma, semicolon and question mark.
+_SEPARATOR_CLASS = r"\s!-/:-@\[-`{-~\u060c\u061b\u061f"
+_SEPARATORS = re.compile(f"[{_SEPARATOR_CLASS}]+")
 
 
 def fold_search_text(text: str) -> str:
@@ -33,16 +36,20 @@ def fold_search_text(text: str) -> str:
     return _TASHKEEL.sub("", text.lower()).translate(_TABLE)
 
 
+def search_words(text: str) -> str:
+    """Folded text with every separator run collapsed to one space (word boundaries)."""
+    return _SEPARATORS.sub(" ", fold_search_text(text)).strip()
+
+
 def search_matches(term: str, haystacks: Iterable[object]) -> bool:
     """True when the folded term starts a word (or a run of words) in any haystack."""
-    needle = fold_search_text(term).strip()
+    needle = search_words(term)
     if not needle:
         return True
     for haystack in haystacks:
         if haystack is None:
             continue
-        padded = f" {fold_search_text(str(haystack))}"
-        if f" {needle}" in padded:
+        if f" {needle}" in f" {search_words(str(haystack))}":
             return True
     return False
 
@@ -52,4 +59,11 @@ def sql_fold_expression(column: str) -> str:
     return (
         f"translate(regexp_replace(lower({column}), '[{_TASHKEEL_CLASS}]', '', 'g'), "
         f"'{_FOLD_FROM}', '{_FOLD_TO}')"
+    )
+
+
+def sql_word_expression(column: str) -> str:
+    """SQL twin of ``search_words`` (before the caller adds the leading space)."""
+    return (
+        f"btrim(regexp_replace({sql_fold_expression(column)}, '[{_SEPARATOR_CLASS}]+', ' ', 'g'))"
     )

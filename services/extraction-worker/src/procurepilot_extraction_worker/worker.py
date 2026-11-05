@@ -233,7 +233,7 @@ def _persist_result(
                     tenant_id,
                     quotation_id,
                     line.line_number,
-                    _normalise_line_text(line.original_text),
+                    line.original_text,
                     _safe_numeric(_field_value(line, "quantity")),
                     pack_count,
                     unit_size,
@@ -653,14 +653,6 @@ _UNIT_ALIASES: dict[str, str] = {
     "قطعة": "each",
     "عبوة": "each",
 }
-
-
-_LINE_TEXT_LETTERS = str.maketrans({"\u06cc": "\u064a", "\u06a9": "\u0643"})
-
-
-def _normalise_line_text(text: str) -> str:
-    """Store Persian-keyboard yeh (ی) and keheh (ک) as the Arabic ي and ك so searches match."""
-    return text.translate(_LINE_TEXT_LETTERS)
 
 
 def _normalise_pack_unit(raw: object) -> str | None:

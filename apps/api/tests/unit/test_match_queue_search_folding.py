@@ -88,3 +88,27 @@ def test_queue_sql_filter_folds_columns_and_skips_the_reason_code() -> None:
     assert "translate(" in sql
     assert "%(search_folded)s" in sql
     assert "original_text" in sql and "supplier_name" in sql
+
+
+def test_word_start_after_any_separator() -> None:
+    assert search_matches("oil", ["Olive\noil 5L"])  # newline
+    assert search_matches("oil", ["Olive/oil"])
+    assert search_matches("oil", ["Olive (oil)"])
+    assert search_matches("زيت", ["زيتون،زيت"])  # Arabic comma
+    assert search_matches("olive  oil", ["Olive - oil"])  # needle spacing is collapsed
+    assert not search_matches("live", ["Olive/oil"])
+
+
+def test_sql_filter_escapes_id_arms_and_matches_hash_line_number() -> None:
+    from procurepilot_api.modules.matching.service import queue_search_filter_sql
+
+    sql = queue_search_filter_sql()
+    assert "'#' || line_number::text" in sql
+    assert "%(search_ids)s" in sql  # escaped term for the id arms
+    assert "%(search)s" not in sql
+
+
+def test_line_context_match_hash_number_in_python_and_sql_agree() -> None:
+    from procurepilot_api.modules.matching.service import _line_context_matches
+
+    assert _line_context_matches("#12", _ctx())

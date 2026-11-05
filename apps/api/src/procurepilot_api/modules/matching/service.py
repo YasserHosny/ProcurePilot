@@ -50,9 +50,9 @@ from procurepilot_api.modules.matching.schemas import (
 from procurepilot_api.modules.matching.scoring import SCORING_VERSION, decimal_string
 from procurepilot_api.modules.matching.search import build_similarity_candidates
 from procurepilot_api.modules.matching.search_text import (
-    fold_search_text,
     search_matches,
-    sql_fold_expression,
+    search_words,
+    sql_word_expression,
 )
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.offers.service import _authenticated_db
@@ -329,8 +329,8 @@ class MatchingService:
             else:
                 filters.append("created_at <= %(date_to)s::timestamptz")
         if search and search.strip():
-            params["search"] = search.strip().lower()
-            params["search_folded"] = _escape_like(fold_search_text(search.strip()))
+            params["search_ids"] = _escape_like(search.strip().lower())
+            params["search_folded"] = _escape_like(search_words(search.strip()))
             filters.append(queue_search_filter_sql())
 
         where_sql = " and ".join(filters)
@@ -2178,13 +2178,14 @@ def queue_search_filter_sql() -> str:
     The internal ``reason`` code is not searched; it is not text a buyer reads (P-152).
     """
     words = " or ".join(
-        f"(' ' || {sql_fold_expression(col)}) like '%% ' || %(search_folded)s || '%%'"
+        f"(' ' || {sql_word_expression(col)}) like '%% ' || %(search_folded)s || '%%'"
         for col in ("original_text", "supplier_name")
     )
     return (
         f"({words} "
-        "or quotation_id::text like '%%' || %(search)s || '%%' "
-        "or line_number::text like '%%' || %(search)s || '%%')"
+        "or quotation_id::text like '%%' || %(search_ids)s || '%%' "
+        "or ('#' || line_number::text) like '%%' || %(search_ids)s || '%%' "
+        "or line_number::text like '%%' || %(search_ids)s || '%%')"
     )
 
 
