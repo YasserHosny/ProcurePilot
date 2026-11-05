@@ -105,6 +105,7 @@ export class MatchResolutionComponent implements OnInit {
   readonly historyOpen = signal(false);
   readonly history = signal<readonly MatchDecision[] | null>(null);
   readonly historyFailed = signal(false);
+  private historyRequestId = 0;
   readonly landedCost = signal<LandedCost | null>(null);
 
   readonly baseUnits = signal<SelectableUnit[]>([]);
@@ -269,6 +270,7 @@ export class MatchResolutionComponent implements OnInit {
   }
 
   loadTask(id: string): void {
+    this.resetHistory();
     const requestId = ++this.latestLoadTaskId;
     this.latestLandedCostRequestId++;
     if (this.currentLoadedLineId !== id) {
@@ -324,8 +326,7 @@ export class MatchResolutionComponent implements OnInit {
 
     if (t.decision) {
       this.decision.set(t.decision);
-      this.history.set(null);
-      this.historyOpen.set(false);
+      this.resetHistory();
       this.selectedOutcome.set(t.decision.outcome);
       if (t.decision.selected_match_candidate_id) {
         this.selectedCandidateId.set(t.decision.selected_match_candidate_id);
@@ -373,17 +374,31 @@ export class MatchResolutionComponent implements OnInit {
 
   toggleHistory(): void {
     if (this.historyOpen()) {
-      this.historyOpen.set(false);
+      this.resetHistory();
       return;
     }
     const lineId = this.line()?.id;
     if (!lineId) return;
+    const requestId = ++this.historyRequestId;
     this.historyOpen.set(true);
     this.historyFailed.set(false);
     this.api.getDecisionHistory(lineId).subscribe({
-      next: (res) => this.history.set(res.items),
-      error: () => this.historyFailed.set(true),
+      // A late answer for an earlier request, or for another line, is ignored.
+      next: (res) => {
+        if (requestId === this.historyRequestId) this.history.set(res.items);
+      },
+      error: () => {
+        if (requestId === this.historyRequestId) this.historyFailed.set(true);
+      },
     });
+  }
+
+  /** Close the history and drop what it held; any answer still in flight is now stale. */
+  private resetHistory(): void {
+    this.historyRequestId++;
+    this.history.set(null);
+    this.historyOpen.set(false);
+    this.historyFailed.set(false);
   }
 
   /** A catalogue product the buyer picked was recorded as a candidate: list it and select it. */
@@ -593,8 +608,7 @@ export class MatchResolutionComponent implements OnInit {
         this.isSubmitting.set(false);
         this.resolutionKey = null;
         this.decision.set(decision);
-        this.history.set(null);
-        this.historyOpen.set(false);
+        this.resetHistory();
         if (resolveNext) {
           this.navigateToNextTask(l.id, decision);
           return;
@@ -773,8 +787,7 @@ export class MatchResolutionComponent implements OnInit {
 
         this.loadTask(lineId);
         this.decision.set(res.decision);
-        this.history.set(null);
-        this.historyOpen.set(false);
+        this.resetHistory();
 
         if (res.lines_matched_through_old_wording && res.lines_matched_through_old_wording.length > 0) {
           this.dependentLinesCount.set(res.lines_matched_through_old_wording.length);
