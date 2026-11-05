@@ -47,6 +47,7 @@ import type {
   Job,
   LandedCost,
   LimitCheck,
+  MatchCandidate,
   MatchDecision,
   MatchResolutionRequest,
   MatchCorrectionRequest,
@@ -721,6 +722,13 @@ export class ApiService {
       `${this.base}/quotation-lines/${lineId}/match`,
       body,
       { headers },
+    );
+  }
+
+  addManualCandidate(lineId: string, productId: string): Observable<MatchCandidate> {
+    return this.http.post<MatchCandidate>(
+      `${this.base}/quotation-lines/${lineId}/match-candidates/manual`,
+      { product_id: productId },
     );
   }
 

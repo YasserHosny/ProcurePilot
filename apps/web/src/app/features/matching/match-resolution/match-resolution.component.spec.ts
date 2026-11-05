@@ -10,6 +10,7 @@ import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import { ApiService } from '../../../core/api/api.service';
 import type {
+  MatchCandidate,
   LandedCost,
   MatchCorrectionRequest,
   MatchDecision,
@@ -251,6 +252,32 @@ describe('MatchResolutionComponent (T039)', () => {
     expect(component.candidates().length).toBe(2);
     expect(component.selectedCandidateId()).toBe('cand-1');
     expect(component.selectedOutcome()).toBe('same_product');
+  });
+
+  it('adds a catalogue product the buyer picked as the selected candidate (P-151)', () => {
+    expect(fixture.nativeElement.querySelector('app-product-picker')).not.toBeNull();
+    const picked: MatchCandidate = {
+    id: 'cand-manual',
+    quotation_line_id: 'line-1',
+    candidate_product: {
+      id: 'prod-manual',
+      tenant_name: 'Picked From Catalogue 5L',
+      canonical_name: 'Picked From Catalogue',
+      base_unit: 'litre',
+      status: 'active',
+    },
+    confidence: '0.0000',
+    reasons: { alias_hit: false, gtin_match: false, supplier_code_match: false, manual: true },
+    rank: 1,
+    scoring_version: 'manual-v1',
+    created_at: '2026-08-20T00:00:00Z',
+  };
+    component.onManualCandidate(picked);
+    expect(component.candidates().length).toBe(3);
+    expect(component.selectedCandidateId()).toBe('cand-manual');
+    expect(component.selectedOutcome()).toBe('same_product');
+    component.onManualCandidate(picked);
+    expect(component.candidates().length).toBe(3);
   });
 
   it('should require explicit candidate selection for close-candidate tasks', () => {
