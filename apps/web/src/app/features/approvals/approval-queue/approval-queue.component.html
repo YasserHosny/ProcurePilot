@@ -3,9 +3,11 @@
     <div>
       <h1 class="approval-queue-title">{{ 'approvals.title' | translate }}</h1>
       <p class="approval-queue-subtitle">{{ 'approvals.subtitle' | translate }}</p>
-      <p class="approval-queue-count" data-testid="approval-total-count">
-        {{ totalCountLabel() }}
-      </p>
+      @if (totalCount() !== null) {
+        <p class="approval-queue-count" data-testid="approval-total-count">
+          {{ totalCountLabel() }}
+        </p>
+      }
     </div>
   </div>
 
@@ -18,6 +20,17 @@
           <div class="error-trace">{{ traceId }}</div>
         }
       </div>
+      @if (pageLoadFailed()) {
+        <button
+          mat-stroked-button
+          type="button"
+          class="retry-load-btn"
+          data-testid="retry-load-btn"
+          (click)="retryLoad()"
+        >
+          {{ 'approvals.filter.retry' | translate }}
+        </button>
+      }
     </div>
   }
 
@@ -114,6 +127,8 @@
         <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
         <span>{{ 'common.loading' | translate }}</span>
       </div>
+    } @else if (pageLoadFailed()) {
+      <div class="load-failed-state" data-testid="load-failed-state"></div>
     } @else if (queueItems().length === 0) {
       @if (hasActiveFilters()) {
         <div class="empty-state" data-testid="empty-filtered">

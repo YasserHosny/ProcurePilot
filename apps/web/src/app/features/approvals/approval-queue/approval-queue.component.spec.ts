@@ -24,6 +24,9 @@ import {
   type GroupQueueItem,
 } from './approval-queue.component';
 
+const VALID_BRANCH_ID = '11111111-1111-4111-8111-111111111111';
+const UNKNOWN_BRANCH_ID = '22222222-2222-4222-8222-222222222222';
+
 const mockPendingRequests: PurchaseRequest[] = [
   {
     id: 'req-001',
@@ -185,6 +188,7 @@ describe('ApprovalQueueComponent', () => {
         items: [
           { id: 'branch-north', name: 'North Branch', is_active: true, created_at: '2026-01-01T00:00:00Z' },
           { id: 'branch-south', name: 'South Branch', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+          { id: VALID_BRANCH_ID, name: 'Filtered Branch', is_active: true, created_at: '2026-01-01T00:00:00Z' },
         ],
         next_cursor: null,
       }),
@@ -2182,15 +2186,15 @@ describe('ApprovalQueueComponent', () => {
         approvalsApi.listPendingApprovals.calls.reset();
         organisationApi.listBranches.calls.reset();
         routerSpy.navigate.calls.reset();
-        await configureQueue({ sort: 'required_by_asc', branch: 'branch-north' });
+        await configureQueue({ sort: 'required_by_asc', branch: VALID_BRANCH_ID });
       });
 
       it('restores a valid sort and branch from the URL and loads with them', () => {
         expect(component.sortOption()).toBe('required_by_asc');
-        expect(component.branchFilter()).toBe('branch-north');
+        expect(component.branchFilter()).toBe(VALID_BRANCH_ID);
         expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
           sort: 'required_by_asc',
-          branch_id: 'branch-north',
+          branch_id: VALID_BRANCH_ID,
           limit: 50,
         });
       });
@@ -2202,7 +2206,7 @@ describe('ApprovalQueueComponent', () => {
         approvalsApi.listPendingApprovals.calls.reset();
         organisationApi.listBranches.calls.reset();
         routerSpy.navigate.calls.reset();
-        await configureQueue({ sort: 'bogus', branch: 'branch-unknown' });
+        await configureQueue({ sort: 'bogus', branch: UNKNOWN_BRANCH_ID });
       });
 
       it('falls back to the default sort silently and drops an unknown branch', () => {
@@ -2355,13 +2359,13 @@ describe('ApprovalQueueComponent', () => {
       expect(fixture.nativeElement.querySelectorAll('.filter-chip').length).toBe(0);
     });
 
-    it('formats the pending decision count for singular, plural and zero in English', () => {
+    it('formats the pending request count for singular, plural and zero in English', () => {
       component.totalCount.set(1);
-      expect(component.totalCountLabel()).toBe('1 pending decision');
+      expect(component.totalCountLabel()).toBe('1 pending request');
       component.totalCount.set(12);
-      expect(component.totalCountLabel()).toBe('12 pending decisions');
+      expect(component.totalCountLabel()).toBe('12 pending requests');
       component.totalCount.set(0);
-      expect(component.totalCountLabel()).toBe('0 pending decisions');
+      expect(component.totalCountLabel()).toBe('0 pending requests');
     });
 
     it('uses the real Arabic catalogue and Latin digits for the count and sort labels', () => {
@@ -2369,15 +2373,15 @@ describe('ApprovalQueueComponent', () => {
       translate.use('ar');
 
       component.totalCount.set(1);
-      expect(component.totalCountLabel()).toBe('قرار معلق واحد');
+      expect(component.totalCountLabel()).toBe('طلب معلق واحد');
       component.totalCount.set(2);
-      expect(component.totalCountLabel()).toBe('قراران معلقان');
+      expect(component.totalCountLabel()).toBe('طلبان معلقان');
       component.totalCount.set(3);
-      expect(component.totalCountLabel()).toBe('3 قرارات معلقة');
+      expect(component.totalCountLabel()).toBe('3 طلبات معلقة');
       component.totalCount.set(12);
-      expect(component.totalCountLabel()).toBe('12 قرارًا معلقًا');
+      expect(component.totalCountLabel()).toBe('12 طلبًا معلقًا');
       component.totalCount.set(0);
-      expect(component.totalCountLabel()).toBe('لا توجد قرارات معلقة');
+      expect(component.totalCountLabel()).toBe('لا توجد طلبات معلقة');
       expect(component.sortOptionLabel('submitted_asc')).toBe('الأقدم أولاً');
     });
 
@@ -2387,7 +2391,7 @@ describe('ApprovalQueueComponent', () => {
       fixture.detectChanges();
 
       const count = fixture.nativeElement.querySelector('[data-testid="approval-total-count"]');
-      expect(count?.textContent?.trim()).toBe('120 pending decisions');
+      expect(count?.textContent?.trim()).toBe('120 pending requests');
       const status = fixture.nativeElement.querySelector('[data-testid="pagination-status"]');
       expect(status?.textContent).toContain('Showing 2 of 120');
     });
@@ -2406,7 +2410,7 @@ describe('ApprovalQueueComponent', () => {
       expect(fixture.nativeElement.querySelector('[data-testid="empty-default"]')).toBeNull();
       expect(
         fixture.nativeElement.querySelector('[data-testid="empty-filtered"]')?.textContent,
-      ).toContain('No pending decisions match these filters.');
+      ).toContain('No pending requests match these filters.');
       expect(fixture.nativeElement.querySelector('[data-testid="clear-filters-btn"]')).toBeTruthy();
     });
 
@@ -2419,11 +2423,11 @@ describe('ApprovalQueueComponent', () => {
         '[data-testid="queue-announcement"]',
       ) as HTMLElement;
       expect(live.getAttribute('aria-live')).toBe('polite');
-      expect(live.textContent).toContain('Sorted by Oldest first, 12 pending decisions');
+      expect(live.textContent).toContain('Sorted by Oldest first, 12 pending requests');
 
       TestBed.inject(TranslateService).use('ar');
       fixture.detectChanges();
-      expect(live.textContent).toContain('تم الترتيب حسب الأقدم أولاً، 12 قرارًا معلقًا');
+      expect(live.textContent).toContain('تم الترتيب حسب الأقدم أولاً، 12 طلبًا معلقًا');
     });
 
     it('reloads page 1 with the current sort and branch after a decision', () => {
@@ -2447,15 +2451,15 @@ describe('ApprovalQueueComponent', () => {
     it('updates controls and reloads when the URL changes (back/forward)', () => {
       approvalsApi.listPendingApprovals.calls.reset();
       queryParamMapSubject.next(
-        convertToParamMap({ sort: 'total_asc', branch: 'branch-south' }),
+        convertToParamMap({ sort: 'total_asc', branch: VALID_BRANCH_ID }),
       );
       fixture.detectChanges();
 
       expect(component.sortOption()).toBe('total_asc');
-      expect(component.branchFilter()).toBe('branch-south');
+      expect(component.branchFilter()).toBe(VALID_BRANCH_ID);
       expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({
         sort: 'total_asc',
-        branch_id: 'branch-south',
+        branch_id: VALID_BRANCH_ID,
         limit: 50,
       });
     });
@@ -2471,6 +2475,129 @@ describe('ApprovalQueueComponent', () => {
         queryParamsHandling: 'merge',
         replaceUrl: true,
       });
+    });
+
+    it('rejects a non-UUID branch from the URL before requesting approvals', async () => {
+      TestBed.resetTestingModule();
+      approvalsApi.listPendingApprovals.calls.reset();
+      routerSpy.navigate.calls.reset();
+
+      await configureQueue({ branch: 'abc' });
+
+      expect(component.branchFilter()).toBe('');
+      expect(approvalsApi.listPendingApprovals.calls.first().args[0]).toEqual({ limit: 50 });
+      expect(routerSpy.navigate).toHaveBeenCalledWith([], {
+        queryParams: { sort: null, branch: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    });
+
+    it('hides the total count while loading and after a failed list load', () => {
+      const pending = new Subject<PendingApprovalList>();
+      approvalsApi.listPendingApprovals.and.returnValue(pending);
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(component.totalCount()).toBeNull();
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="approval-total-count"]'),
+      ).toBeNull();
+
+      pending.next(list([], null, 5));
+      pending.complete();
+      fixture.detectChanges();
+      expect(
+        fixture.nativeElement
+          .querySelector('[data-testid="approval-total-count"]')
+          ?.textContent?.trim(),
+      ).toBe('5 pending requests');
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 500 })),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(component.totalCount()).toBeNull();
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="approval-total-count"]'),
+      ).toBeNull();
+    });
+
+    it('keeps the live region empty until a successful load supplies the count', () => {
+      const pending = new Subject<PendingApprovalList>();
+      approvalsApi.listPendingApprovals.and.returnValue(pending);
+      component.onSortChange('submitted_asc');
+      fixture.detectChanges();
+
+      const live = fixture.nativeElement.querySelector(
+        '[data-testid="queue-announcement"]',
+      ) as HTMLElement;
+      expect(live.textContent?.trim()).toBe('');
+
+      pending.next(list([], null, 5));
+      pending.complete();
+      fixture.detectChanges();
+      expect(live.textContent).toContain('Sorted by Oldest first, 5 pending requests');
+
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 500 })),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+      expect(live.textContent?.trim()).toBe('');
+    });
+
+    it('shows retry instead of an empty state when the page load fails and retries the current filters', () => {
+      component.onSortChange('submitted_asc');
+      fixture.detectChanges();
+      approvalsApi.listPendingApprovals.calls.reset();
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(
+          () => new HttpErrorResponse({ status: 500, error: { message: 'Boom' } }),
+        ),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(component.pageLoadFailed()).toBeTrue();
+      expect(fixture.nativeElement.querySelector('[data-testid="empty-default"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="empty-filtered"]')).toBeNull();
+      const retry = fixture.nativeElement.querySelector(
+        '[data-testid="retry-load-btn"]',
+      ) as HTMLButtonElement | null;
+      expect(retry).not.toBeNull();
+
+      approvalsApi.listPendingApprovals.and.returnValue(of(list([], null, 0)));
+      retry?.click();
+      fixture.detectChanges();
+
+      expect(component.pageLoadFailed()).toBeFalse();
+      expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
+        sort: 'submitted_asc',
+        limit: 50,
+      });
+      expect(fixture.nativeElement.querySelector('[data-testid="empty-filtered"]')).not.toBeNull();
+    });
+
+    it('keeps a valid branch filter and URL when the branch lookup fails', async () => {
+      TestBed.resetTestingModule();
+      approvalsApi.listPendingApprovals.calls.reset();
+      organisationApi.listBranches.calls.reset();
+      routerSpy.navigate.calls.reset();
+      organisationApi.listBranches.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 500 })),
+      );
+
+      await configureQueue({ branch: VALID_BRANCH_ID });
+
+      expect(component.branchFilter()).toBe(VALID_BRANCH_ID);
+      expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({
+        branch_id: VALID_BRANCH_ID,
+        limit: 50,
+      });
+      expect(routerSpy.navigate).not.toHaveBeenCalled();
     });
   });
 });

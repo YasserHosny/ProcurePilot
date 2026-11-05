@@ -32,7 +32,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import type { ParamMap } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
@@ -77,6 +77,11 @@ import { ApprovalsApiService } from '../approvals-api';
 
 const I18N = 'approvals';
 const DEFAULT_SORT: PendingApprovalSort = 'submitted_desc';
+interface BranchLookupResult {
+  readonly list: BranchList;
+  readonly succeeded: boolean;
+}
+
 const PENDING_APPROVAL_SORTS: readonly PendingApprovalSort[] = [
   'submitted_desc',
   'submitted_asc',
@@ -250,12 +255,13 @@ export class ApprovalQueueComponent implements OnInit {
   readonly costCentres = signal<CostCentre[]>([]);
   readonly products = signal<Product[]>([]);
   readonly errorMessage = signal<string | null>(null);
+  readonly pageLoadFailed = signal<boolean>(false);
   readonly errorTraceId = signal<string | null>(null);
   readonly expandedRequestIds = signal<ReadonlySet<string>>(new Set<string>());
   readonly processingRequestId = signal<string | null>(null);
   readonly sortOption = signal<PendingApprovalSort>(DEFAULT_SORT);
   readonly branchFilter = signal<string>('');
-  readonly totalCount = signal<number>(0);
+  readonly totalCount = signal<number | null>(null);
   readonly sortOptions = PENDING_APPROVAL_SORTS;
   readonly hasActiveFilters = computed(
     () => this.sortOption() !== DEFAULT_SORT || this.branchFilter() !== '',
@@ -391,8 +397,10 @@ export class ApprovalQueueComponent implements OnInit {
     const rawBranch = params.get('branch') ?? '';
     const branch = this.normalizeBranch(rawBranch);
     const invalidSort = !!rawSort && !this.isPendingApprovalSort(rawSort);
-    const unknownBranch = !!rawBranch && this.branchesLoaded && branch === '';
-    this.urlNeedsCleanup = invalidSort || unknownBranch;
+    const invalidBranch = !!rawBranch && !this.isUuid(rawBranch);
+    const unknownBranch =
+      !!rawBranch && !invalidBranch && this.branchesLoaded && branch === '';
+    this.urlNeedsCleanup = invalidSort || invalidBranch || unknownBranch;
 
     const changed = this.sortOption() !== sort || this.branchFilter() !== branch;
     this.sortOption.set(sort);
@@ -421,8 +429,12 @@ export class ApprovalQueueComponent implements OnInit {
     return value !== null && PENDING_APPROVAL_SORTS.includes(value as PendingApprovalSort);
   }
 
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  }
+
   private normalizeBranch(raw: string): string {
-    if (!raw) {
+    if (!raw || !this.isUuid(raw)) {
       return '';
     }
     if (!this.branchesLoaded) {
@@ -433,7 +445,7 @@ export class ApprovalQueueComponent implements OnInit {
 
   private resetAndReload(): void {
     this.pendingRequests.set([]);
-    this.totalCount.set(0);
+    this.totalCount.set(null);
     this.expandedRequestIds.set(new Set());
     this.loadPendingApprovals();
   }
@@ -509,14 +521,21 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   totalCountLabel(): string {
+    const total = this.totalCount();
+    if (total === null) {
+      return '';
+    }
     const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
-    const category = new Intl.PluralRules(locale).select(this.totalCount());
+    const category = new Intl.PluralRules(locale).select(total);
     return this.translate.instant(`approvals.total.${category}`, {
-      count: new Intl.NumberFormat('en-US').format(this.totalCount()),
+      count: this.formatService.formatNumber(total, { numberingSystem: 'latn' }),
     });
   }
 
   announcementText(): string {
+    if (this.isLoading() || this.totalCount() === null) {
+      return '';
+    }
     return this.translate.instant(`${I18N}.announce.sorted`, {
       sort: this.sortOptionLabel(this.sortOption()),
       count: this.totalCountLabel(),
@@ -532,7 +551,9 @@ export class ApprovalQueueComponent implements OnInit {
     this.isLoading.set(true);
     this.isLoadingMore.set(false);
     this.errorMessage.set(null);
+    this.pageLoadFailed.set(false);
     this.errorTraceId.set(null);
+    this.totalCount.set(null);
     this.nextCursor.set(null);
     this.groupSiblings.set(new Map());
     this.groupStatus.set(new Map());
@@ -549,13 +570,15 @@ export class ApprovalQueueComponent implements OnInit {
         }
         this.pendingRequests.set([...approvals.items]);
         this.nextCursor.set(approvals.next_cursor ?? null);
-        this.totalCount.set(approvals.total ?? 0);
-        this.branches.set([...branches.items]);
+        this.totalCount.set(approvals.total ?? null);
+        if (branches.succeeded) {
+          this.branches.set([...branches.list.items]);
+          this.branchesLoaded = true;
+        }
         this.costCentres.set([...costCentres.items]);
         this.products.set([...products.items]);
         this.isLoading.set(false);
-        this.branchesLoaded = true;
-        if (this.dropUnknownBranch(generation)) {
+        if (this.branchesLoaded && this.dropUnknownBranch(generation)) {
           return;
         }
         this.cleanupUrlAfterLookups();
@@ -566,9 +589,15 @@ export class ApprovalQueueComponent implements OnInit {
           return;
         }
         this.isLoading.set(false);
+        this.totalCount.set(null);
+        this.pageLoadFailed.set(true);
         this.handleError(err);
       },
     });
+  }
+
+  retryLoad(): void {
+    this.loadPendingApprovals();
   }
 
   private dropUnknownBranch(generation: number): boolean {
@@ -945,10 +974,11 @@ export class ApprovalQueueComponent implements OnInit {
 
   private loadBranches() {
     return this.organisationApi.listBranches({ limit: 100 }).pipe(
+      map((list): BranchLookupResult => ({ list, succeeded: true })),
       catchError(() =>
-        of<BranchList>({
-          items: [],
-          next_cursor: null,
+        of<BranchLookupResult>({
+          list: { items: [], next_cursor: null },
+          succeeded: false,
         }),
       ),
     );
@@ -1156,10 +1186,10 @@ export class ApprovalQueueComponent implements OnInit {
   paginationStatusText(): string {
     const count = this.pendingRequests().length;
     const total = this.totalCount();
-    if (total > count) {
+    if (total !== null && total > count) {
       return this.translate.instant('approvals.pagination.showingOf', {
-        loaded: new Intl.NumberFormat('en-US').format(count),
-        total: new Intl.NumberFormat('en-US').format(total),
+        loaded: this.formatService.formatNumber(count, { numberingSystem: 'latn' }),
+        total: this.formatService.formatNumber(total, { numberingSystem: 'latn' }),
       });
     }
     const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';

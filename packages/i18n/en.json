@@ -2582,20 +2582,21 @@
       "branch": "Branch",
       "allBranches": "All branches",
       "clear": "Clear filters",
-      "chipRemove": "Remove filter: {{filter}}"
+      "chipRemove": "Remove filter: {{filter}}",
+      "retry": "Retry"
     },
     "total": {
-      "zero": "{{count}} pending decisions",
-      "one": "{{count}} pending decision",
-      "two": "{{count}} pending decisions",
-      "few": "{{count}} pending decisions",
-      "many": "{{count}} pending decisions",
-      "other": "{{count}} pending decisions"
+      "zero": "{{count}} pending requests",
+      "one": "{{count}} pending request",
+      "two": "{{count}} pending requests",
+      "few": "{{count}} pending requests",
+      "many": "{{count}} pending requests",
+      "other": "{{count}} pending requests"
     },
     "announce": {
       "sorted": "Sorted by {{sort}}, {{count}}"
     },
-    "emptyFiltered": "No pending decisions match these filters.",
+    "emptyFiltered": "No pending requests match these filters.",
     "columns": {
       "requester": "Requester",
       "branch": "Branch",
