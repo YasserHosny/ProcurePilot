@@ -748,12 +748,7 @@ class RfqService:
                     replay_row = _fetch_reminder_recipient(
                         cur, rfq_id=rfq_id, recipient_id=recipient_id
                     )
-                    replay = _reminder_recipient_response(member, rfq_row, replay_row)
-                    if "can_remind" in target:
-                        replay.can_remind = bool(target["can_remind"])
-                    if "remind_blocked_reason" in target:
-                        replay.remind_blocked_reason = target["remind_blocked_reason"]
-                    return replay
+                    return _reminder_recipient_response(member, rfq_row, replay_row)
 
                 recipient = RfqRecipient(**recipient_row)
                 reason = _reminder_reason(
@@ -798,7 +793,7 @@ class RfqService:
 
                 cur.execute(
                     "update rfq_recipient "
-                    "set reminder_count = reminder_count + 1, last_reminder_at = now() "
+                    "set reminder_count = reminder_count + 1, last_reminder_at = clock_timestamp() "
                     "where id = %s and rfq_id = %s returning *",
                     (recipient_id, rfq_id),
                 )
