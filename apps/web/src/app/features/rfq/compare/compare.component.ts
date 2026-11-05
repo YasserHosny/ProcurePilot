@@ -13,8 +13,6 @@ import { MatTableModule } from '@angular/material/table';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -28,14 +26,12 @@ import type { ApiError, Branch } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { parseIsoDateLocal, toIsoDate } from '../../../core/format/iso-date';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
-import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
 // Money is compared in 1/10 000ths so totals like 4,830 − 4,770 come out exact.
 const MINOR_UNITS = 10_000;
 
 @Component({
-  providers: [provideAppDateAdapter()],
   selector: 'app-rfq-compare',
   standalone: true,
   imports: [
@@ -49,8 +45,6 @@ const MINOR_UNITS = 10_000;
     MatSnackBarModule,
     MatSelectModule,
     MatFormFieldModule,
-    MatInputModule,
-    MatDatepickerModule,
     MatProgressSpinnerModule,
     MatIconModule,
     TranslatePipe,
@@ -349,10 +343,78 @@ export class CompareComponent implements OnInit, OnChanges {
     return eligible;
   });
 
-  readonly lowestTotalResponseIds = computed<Set<string>>(() => {
+  private readonly rfqProductIds = computed(() =>
+    new Set((this.rfqDetail()?.lines ?? []).map((line) => line.workspace_product_id)),
+  );
+
+  landedTotal(response: RfqResponseComparison): { amount: number; currency: string } | null {
+    const products = this.rfqProductIds();
+    if (products.size === 0) return null;
+    const costs = new Map(
+      (response.rfq_landed_costs ?? [])
+        .filter((cost) => products.has(cost.workspace_product_id))
+        .map((cost) => [cost.workspace_product_id, cost]),
+    );
+    if (costs.size !== products.size) return null;
+    const currencies = new Set([...costs.values()].map((cost) => cost.total_currency));
+    if (currencies.size !== 1) return null;
+    let total = 0;
+    for (const cost of costs.values()) {
+      const amount = Number(cost.total_amount);
+      if (!Number.isFinite(amount)) return null;
+      total += Math.round(amount * MINOR_UNITS);
+    }
+    return { amount: total / MINOR_UNITS, currency: [...currencies][0] };
+  }
+
+  coverageLabel(response: RfqResponseComparison): string | null {
+    const products = this.rfqProductIds();
+    // A reply still being read, or with lines not matched yet, has unknown coverage, not a gap.
+    if (
+      response.quotation_status === 'refused' ||
+      products.size === 0 ||
+      response.lines.length === 0 ||
+      response.lines.some((line) => line.pending_match)
+    ) {
+      return null;
+    }
+    const covered = new Set(response.lines
+      .filter((line) => !line.pending_match && line.workspace_product_id && products.has(line.workspace_product_id))
+      .map((line) => line.workspace_product_id)).size;
+    return covered < products.size ? this.translate.instant('rfq.compare.coverage', {
+      covered: this.formatService.formatNumber(covered),
+      total: this.formatService.formatNumber(products.size),
+    }) : null;
+  }
+
+  /** Which replies are cheapest, and on which figure: landed totals, or the printed ones as a fallback. */
+  private readonly lowestTotal = computed<{ ids: Set<string>; basis: 'landed' | 'printed' | null }>(() => {
+    const replies = this.responses().filter(
+      (r) => r.quotation_status !== 'refused' && r.lines.length > 0 && r.lines.every((l) => !l.pending_match),
+    );
+    // A supplier's delivery fee or minimum order is not in a per-product total; only the split prices
+    // it (as splitSaving does), so no reply can be called the cheapest while such terms apply.
+    if (replies.some((reply) => reply.supplier_terms_apply)) {
+      return { ids: new Set<string>(), basis: null };
+    }
+    const landed = replies.map((reply) => ({ id: reply.id, total: this.landedTotal(reply) }));
+    if (landed.length >= 2 && landed.every((entry) => entry.total !== null)
+      && new Set(landed.map((entry) => entry.total?.currency)).size === 1) {
+      const minimum = Math.min(...landed.map((entry) => Math.round(entry.total!.amount * MINOR_UNITS)));
+      return {
+        ids: new Set(landed.filter((entry) => Math.round(entry.total!.amount * MINOR_UNITS) === minimum)
+          .map((entry) => entry.id)),
+        basis: 'landed',
+      };
+    }
+    // Some replies have landed costs and some do not: printed totals would mix VAT bases, so no chip.
+    if (replies.some((reply) => (reply.rfq_landed_costs ?? []).length > 0)) {
+      return { ids: new Set<string>(), basis: null };
+    }
+
     const eligible = this.comparableResponses();
     if (!eligible) {
-      return new Set<string>();
+      return { ids: new Set<string>(), basis: null };
     }
 
     const totals = eligible
@@ -362,7 +424,7 @@ export class CompareComponent implements OnInit, OnChanges {
       })
       .filter((t): t is { id: string; total: number } => t !== null);
     if (totals.length === 0) {
-      return new Set<string>();
+      return { ids: new Set<string>(), basis: null };
     }
     const minTotal = Math.min(...totals.map((t) => t.total));
     const ids = new Set<string>();
@@ -371,8 +433,11 @@ export class CompareComponent implements OnInit, OnChanges {
         ids.add(t.id);
       }
     }
-    return ids;
+    return { ids, basis: 'printed' };
   });
+
+  readonly lowestTotalResponseIds = computed<Set<string>>(() => this.lowestTotal().ids);
+  readonly lowestTotalBasis = computed<'landed' | 'printed' | null>(() => this.lowestTotal().basis);
 
   hasLowestTotal(response: RfqResponseComparison): boolean {
     return this.lowestTotalResponseIds().has(response.id);
@@ -794,11 +859,26 @@ export class CompareComponent implements OnInit, OnChanges {
     return responseId ? cur === responseId : Boolean(cur);
   }
 
+  /**
+   * A responded RFQ is not expired by the server, but its draft takes the RFQ's needed-by date and a past
+   * date is refused, so nothing can be prepared from it any more.
+   */
+  readonly isNeededByPast = computed<boolean>(() => {
+    const detail = this.rfqDetail();
+    if (detail?.rfq.status !== 'responded') return false;
+    const neededBy = parseIsoDateLocal(detail.rfq.needed_by_date);
+    if (!neededBy) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return neededBy.getTime() < today.getTime();
+  });
+
   canPrepare(response: RfqResponseComparison): boolean {
     return (
       !this.isConverted() &&
       !this.isExpired() &&
       !this.isCancelled() &&
+      !this.isNeededByPast() &&
       !this.branchesError() &&
       !this.rfqDetailError() &&
       this.isEligible(response) &&
@@ -810,7 +890,7 @@ export class CompareComponent implements OnInit, OnChanges {
   }
 
   prepareRequest(response: RfqResponseComparison): void {
-    if (this.isConverted() || this.isExpired() || this.isCancelled()) return;
+    if (this.isConverted() || this.isExpired() || this.isCancelled() || this.isNeededByPast()) return;
     if (response.quotation_status === 'refused') return;
     if (this.isPreparing(response.id)) return;
     if (!this.isEligible(response) || this.hasMixedCurrencies(response)) {
@@ -921,6 +1001,8 @@ export class CompareComponent implements OnInit, OnChanges {
           message = this.translate.instant('rfq.compare.prepareErrorQuotationRefused');
         } else if (reason === 'mixed_currencies') {
           message = this.translate.instant('rfq.compare.prepareErrorMixedCurrencies');
+        } else if (reason === 'required_by_in_the_past') {
+          message = this.translate.instant('requests.errors.required_by_in_the_past');
         }
 
         this.snackBar.open(

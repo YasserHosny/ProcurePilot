@@ -359,3 +359,30 @@
     inline-size: 48px;
   }
 }
+
+.landed-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-block-end: 16px;
+  font-weight: 600;
+}
+
+.coverage-badge {
+  display: inline-block;
+  margin-block-end: 8px;
+  color: var(--pp-text-muted);
+}
+
+.needed-by {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding-inline: 4px;
+
+  .needed-by-label {
+    font-size: 0.8125rem;
+    color: var(--pp-text-secondary, #5b6475);
+  }
+}

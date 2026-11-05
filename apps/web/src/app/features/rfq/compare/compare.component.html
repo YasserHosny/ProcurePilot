@@ -112,12 +112,13 @@
           </button>
         </div>
       }
-      <mat-form-field appearance="outline">
-        <mat-label>{{ 'rfq.compare.requiredByLabel' | translate }}</mat-label>
-        <input matInput [matDatepicker]="picker" [(ngModel)]="requiredByDate">
-        <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
-        <mat-datepicker #picker></mat-datepicker>
-      </mat-form-field>
+      <!-- The draft follows the RFQ's own needed-by date (the date the suppliers quoted for). -->
+      @if (rfqDetail()?.rfq?.needed_by_date; as neededBy) {
+        <div class="needed-by" data-testid="needed-by">
+          <span class="needed-by-label">{{ 'rfq.compare.neededByLabel' | translate }}</span>
+          <strong class="pp-figures">{{ neededBy | formatDate }}</strong>
+        </div>
+      }
     </div>
   }
 
@@ -209,6 +210,9 @@
             </mat-card-subtitle>
           </mat-card-header>
           <mat-card-content>
+            @if (coverageLabel(response); as coverage) {
+              <span class="coverage-badge" data-testid="coverage-badge">{{ coverage }}</span>
+            }
             @if (response.quotation_status === 'refused') {
               <div role="status">
                 <strong>{{ 'rfq.compare.refused' | translate }}</strong>
@@ -240,7 +244,7 @@
                   <td mat-footer-cell *matFooterCellDef class="total-label-cell">
                     <div class="total-cell-content">
                       <span class="total-label">{{ 'rfq.compare.total' | translate }}</span>
-                      @if (hasLowestTotal(response)) {
+                      @if (hasLowestTotal(response) && lowestTotalBasis() === 'printed') {
                         <mat-chip class="pp-chip-best lowest-total-chip">
                           {{ 'rfq.compare.lowestTotal' | translate }}
                         </mat-chip>
@@ -282,6 +286,17 @@
                 <tr mat-row *matRowDef="let row; columns: displayedColumns;" [class.best]="isLowestLinePrice(response, row)"></tr>
                 <tr mat-footer-row *matFooterRowDef="displayedColumns" class="total-row"></tr>
               </table>
+              @if (landedTotal(response); as total) {
+                <div class="landed-total" data-testid="landed-total">
+                  <span>{{ 'rfq.compare.landedTotal' | translate }}</span>
+                  <span class="pp-figures">{{ total | formatMoney }}</span>
+                  @if (hasLowestTotal(response) && lowestTotalBasis() === 'landed') {
+                    <mat-chip class="pp-chip-best lowest-total-chip">
+                      {{ 'rfq.compare.lowestTotal' | translate }}
+                    </mat-chip>
+                  }
+                </div>
+              }
             }
             @if (response.quotation_status !== 'refused' && unmatchedCount(response) > 0) {
               <div class="pending-warning">
@@ -352,7 +367,9 @@
                 } @else if (isExpired()) {
                   <span class="disabled-reason" data-testid="expired-reason">{{ 'rfq.compare.rfqExpired' | translate }}</span>
                 } @else if (isWriter()) {
-                  @if (branchesError()) {
+                  @if (isNeededByPast()) {
+                    <span class="disabled-reason" data-testid="needed-by-past-reason">{{ 'rfq.compare.neededByPast' | translate }}</span>
+                  } @else if (branchesError()) {
                     <span class="disabled-reason" data-testid="branches-error-reason">{{ 'rfq.compare.branchesLoadError' | translate }}</span>
                   } @else if (rfqDetailError()) {
                     <span class="disabled-reason" data-testid="rfq-detail-error-reason">{{ 'rfq.compare.rfqDetailLoadError' | translate }}</span>
