@@ -16,7 +16,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { Subject, catchError, debounceTime, distinctUntilChanged, of, switchMap, tap } from 'rxjs';
+import { Subject, catchError, debounceTime, of, switchMap, tap } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Product } from '../../../core/api/models';
@@ -81,7 +81,6 @@ export class CompareComponent implements OnInit {
     this.productSearchTerms
       .pipe(
         debounceTime(250),
-        distinctUntilChanged(),
         tap(() => this.productSearchFailed.set(false)),
         switchMap((term) =>
           this.api.products({ q: term || undefined, limit: 20, status: 'active' }).pipe(
@@ -260,9 +259,21 @@ export class CompareComponent implements OnInit {
   }
 
   onProductSearchClosed(): void {
-    // The list closed without a pick: show the current selection again.
+    // Material also closes the panel by itself when a search finds nothing; keep what the buyer
+    // typed then. Only a dismissed list with results goes back to showing the selection.
+    if (this.productSearchResults()?.length === 0) return;
+    this.resetProductSearch();
+  }
+
+  onProductSearchBlur(): void {
+    // No list to pick from (nothing found, or the search has not answered): show the selection.
+    if (!this.productSearchResults()?.length) this.resetProductSearch();
+  }
+
+  private resetProductSearch(): void {
     this.productSearchText.set(null);
     this.productSearchResults.set(null);
+    this.productSearchFailed.set(false);
   }
 
   onProductPicked(product: Product): void {

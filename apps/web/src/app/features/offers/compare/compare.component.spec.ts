@@ -230,6 +230,42 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
       expect(component.productSearchText()).toBeNull();
     }));
 
+    it('keeps the typed query when the search finds nothing (the empty panel closes by itself)', fakeAsync(() => {
+      apiService.products.and.returnValue(of({ items: [], next_cursor: null }));
+      type('oliv');
+      tick(400);
+      component.onProductSearchClosed();
+      expect(component.productSearchText()).toBe('oliv');
+      expect(component.productOptions()).toEqual([]);
+    }));
+
+    it('forgets the query when the list with results is dismissed, and retyping it searches again', fakeAsync(() => {
+      apiService.products.calls.reset();
+      apiService.products.and.returnValue(of({ items: [found], next_cursor: null }));
+      type('oliv');
+      tick(400);
+      component.onProductSearchClosed();
+      expect(component.productSearchText()).toBeNull();
+      type('oliv');
+      tick(400);
+      expect(apiService.products).toHaveBeenCalledTimes(2);
+      expect(component.productOptions().map((p) => p.id)).toEqual([found.id]);
+    }));
+
+    it('retrying the same failed query searches again', fakeAsync(() => {
+      apiService.products.calls.reset();
+      apiService.products.and.returnValue(throwError(() => new Error('boom')));
+      type('oliv');
+      tick(400);
+      expect(component.productSearchFailed()).toBeTrue();
+      apiService.products.and.returnValue(of({ items: [found], next_cursor: null }));
+      type('oliv');
+      tick(400);
+      expect(apiService.products).toHaveBeenCalledTimes(2);
+      expect(component.productSearchFailed()).toBeFalse();
+      expect(component.productOptions().map((p) => p.id)).toEqual([found.id]);
+    }));
+
     it('says so when the search fails, and keeps the current product', fakeAsync(() => {
       apiService.products.and.returnValue(throwError(() => new Error('boom')));
       type('oliv');

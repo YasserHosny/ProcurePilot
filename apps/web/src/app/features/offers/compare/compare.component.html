@@ -43,6 +43,7 @@
           [placeholder]="'compare.selectProductPrompt' | translate"
           [matAutocomplete]="productAuto"
           (input)="onProductSearch($any($event.target).value)"
+          (blur)="onProductSearchBlur()"
         />
         <mat-icon matSuffix aria-hidden="true">search</mat-icon>
         <mat-autocomplete
