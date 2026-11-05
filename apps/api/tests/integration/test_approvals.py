@@ -208,17 +208,14 @@ def test_approving_moves_request_and_step_to_approved(conn: object) -> None:
         request_id = _make_submitted_request(cur, owner, branch_id)
         step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
-        cur.execute(
-            "update purchase_request set status = 'approved' "
-            "where id = %s and status = 'submitted'",
-            (request_id,),
-        )
-        cur.execute(
-            "update approval_step set status = 'approved', comment = 'ok', "
-            "decided_by_membership_id = %s, decided_at = now() "
-            "where id = %s and status = 'pending'",
-            (approver.membership_id, step_id),
-        )
+        with conn.cursor(row_factory=psycopg.rows.dict_row) as decision_cur:
+            request, step = RequestsService()._apply_request_decision(
+                decision_cur, member=member_from_workspace(approver),
+                request_id=str(request_id), step_id=str(step_id), decision="approved",
+                request_status="approved", comment="ok", now="2026-11-05T00:00:00Z",
+            )
+        assert request["status"] == "approved"
+        assert step["status"] == "approved"
         cur.execute(
             "select pr.status, s.status, s.comment "
             "from purchase_request pr join approval_step s "

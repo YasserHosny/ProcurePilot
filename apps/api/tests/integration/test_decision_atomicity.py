@@ -47,6 +47,7 @@ def conn() -> psycopg.Connection:
 
 
 def _make_member(cur: psycopg.Cursor, tenant_id: UUID, label: str, role: str) -> Workspace:
+    label = f"{label}-{uuid4().hex[:12]}"
     user_id, membership_id = uuid4(), uuid4()
     cur.execute(
         "insert into auth.users (id,email) values (%s,%s)",
@@ -125,10 +126,7 @@ def test_a_real_decision_commits_all_three_writes_atomically(conn: psycopg.Conne
         now="2026-09-12T12:00:00Z",
     )
 
-    # The request itself lands on "ordered", not "approved" — there is no separate "place the
-    # order" human action this release (chunk R2.3, research.md R1); approval_step.status still
-    # records the human's actual decision unchanged.
-    assert decided_request["status"] == "ordered"
+    assert decided_request["status"] == "approved"
     assert decided_step["status"] == "approved"
     assert decided_step["comment"] == "Approved"
     assert str(decided_step["decided_by_membership_id"]) == str(approver.membership_id)
@@ -136,7 +134,7 @@ def test_a_real_decision_commits_all_three_writes_atomically(conn: psycopg.Conne
 
     with conn.cursor() as cur:
         cur.execute("select status from purchase_request where id = %s", (request_id,))
-        assert cur.fetchone() == ("ordered",)
+        assert cur.fetchone() == ("approved",)
         cur.execute(
             "select status, decided_by_membership_id from approval_step where id = %s",
             (step_id,),
@@ -316,7 +314,7 @@ def test_the_new_approver_can_decide_after_a_reassignment(conn: psycopg.Connecti
         comment="Approved by the new approver",
         now="2026-09-12T14:00:00Z",
     )
-    assert decided_request["status"] == "ordered"
+    assert decided_request["status"] == "approved"
     assert decided_step["status"] == "approved"
     assert str(decided_step["decided_by_membership_id"]) == str(new_approver.membership_id)
     assert notification_id is not None

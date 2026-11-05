@@ -1128,12 +1128,14 @@ R2.0 branch/cost-centre/budget pattern. Full contract:
 | `created_at` | timestamptz | Audit field |
 | `updated_at` | timestamptz | Audit field |
 
-State machine: `draft -> submitted -> (approved | rejected | withdrawn)`. As of chunk R2.3
-(`010-mobile-approvals-receipt`), an `approved` decision lands the request directly on `ordered`
-— there is no separate "place the order" human action this release, so `approved` itself is now a
-transient value the row never actually stops at (`RequestsService._decide_and_notify` maps
-`decision == "approved"` to `status = "ordered"` before writing; `approval_step.status` still
-records the human's real decision as `"approved"`, unchanged). From `ordered`, a delivery
+State machine: `draft -> submitted -> approved -> ordered -> delivered`, with rejection from
+`submitted` and withdrawal from `draft`, `submitted`, `approved`, or `ordered` when the withdrawal
+rules permit it. Approval leaves the request `approved` (ADR-025). A live purchase order
+(`source_request_id` references the request and `status <> 'cancelled'`) moves it to `ordered`.
+Cancelling or detaching the last live order returns an `ordered` request to `approved`; terminal
+request states are unchanged. These writes use the order transaction and request advisory locks.
+Legacy `ordered` requests without an order remain unchanged, orderable, and withdrawable.
+The approval step continues to record `approved`. From `ordered`, a delivery
 confirmation (`POST /requests/{id}/confirm-delivery`) moves it to `delivered`, the current
 terminal state. A `draft` may be hard-deleted by its own requester; once `submitted`, `withdraw`
 (FR-004) is the only requester-initiated retirement and there is no hard-delete path. No edits
@@ -1247,7 +1249,8 @@ lookup, owner or buyer only. There is no client update or delete: the group is i
 evidence, and its state is the state of its requests.
 
 Group state is derived from its requests: `draft -> submitted -> (approved | rejected |
-withdrawn)`. All requests of a group share one status; they are submitted, approved, rejected,
+withdrawn)`. Group approval decisions share one status; order creation can advance individual members to
+`ordered`. They are submitted, approved, rejected,
 and withdrawn only together, routed by the group's combined total. A single-request transition
 on a grouped request is refused with `409 part_of_split`.
 

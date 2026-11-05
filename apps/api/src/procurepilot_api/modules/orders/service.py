@@ -316,6 +316,8 @@ class OrdersService:
                     for line in payload.lines
                 ],
             )
+            if payload.source_request_id:
+                self._mark_request_ordered(cur, payload.source_request_id)
             order = self._load_order_cursor(cur, order_id)
             self._audit_cursor(cur, member, "orders.purchase_order_created", order_id)
         return order, True
@@ -491,6 +493,13 @@ class OrdersService:
                 ],
             )
 
+            if row.get("source_request_id") and (
+                str(row["source_request_id"]) != str(payload.source_request_id)
+            ):
+                self._release_request_without_orders(cur, UUID(str(row["source_request_id"])))
+            if payload.source_request_id:
+                self._mark_request_ordered(cur, payload.source_request_id)
+
             order = self._load_order_cursor(cur, order_id)
             self._audit_cursor(cur, member, "orders.purchase_order_edited", order_id)
 
@@ -542,6 +551,9 @@ class OrdersService:
                 "where tenant_id = %s and id = %s",
                 (idempotency_key, member.tenant_id, order_id),
             )
+
+            if row.get("source_request_id"):
+                self._release_request_without_orders(cur, UUID(str(row["source_request_id"])))
 
             order = self._load_order_cursor(cur, order_id)
             self._audit_cursor(cur, member, "orders.purchase_order_cancelled", order_id)
@@ -775,6 +787,28 @@ class OrdersService:
             raise NotFoundError(details={"resource": "purchase_request"})
         if request["status"] not in ("approved", "ordered"):
             raise ConflictError(details={"reason": "request_not_approved"})
+
+    @staticmethod
+    def _mark_request_ordered(cur: psycopg.Cursor, request_id: UUID) -> None:
+        """Caller holds the request advisory lock and has written the order and lines."""
+        cur.execute(
+            "update purchase_request set status = 'ordered', updated_at = now() "
+            "where id = %s and status = 'approved' and exists ("
+            "select 1 from purchase_order where source_request_id = %s "
+            "and status <> 'cancelled')",
+            (request_id, request_id),
+        )
+
+    @staticmethod
+    def _release_request_without_orders(cur: psycopg.Cursor, request_id: UUID) -> None:
+        """Caller holds the request advisory lock after cancelling or detaching an order."""
+        cur.execute(
+            "update purchase_request set status = 'approved', updated_at = now() "
+            "where id = %s and status = 'ordered' and not exists ("
+            "select 1 from purchase_order where source_request_id = %s "
+            "and status <> 'cancelled')",
+            (request_id, request_id),
+        )
 
     @staticmethod
     def _lock_requests(cur: psycopg.Cursor, tenant_id: UUID, request_ids: set[UUID]) -> None:

@@ -17,6 +17,10 @@ curl -sS -X POST "$API_URL/api/v1/requests/$REQUEST_ID/approve" \
 # expect: 200, status "approved" -- research.md R2: no new endpoint for this
 ```
 
+Before delivery confirmation, create a live purchase order from the approved request through
+`POST /api/v1/orders` (see the API specification). ADR-025 keeps it `approved` until that order
+exists; delivery confirmation before then returns `409 not_ordered`.
+
 ## 2. Confirm Delivery
 
 ```bash
