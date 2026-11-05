@@ -209,9 +209,9 @@
                 <input
                   matInput
                   [formControl]="lineGroup.controls.quantity"
-                  [type]="form.disabled ? 'text' : 'number'"
-                  min="0"
-                  step="any"
+                  type="text"
+                  inputmode="decimal"
+                  (input)="normaliseQuantity($event, lineGroup.controls.quantity)"
                 />
                 @if (!form.disabled) {
                   <span matSuffix>{{ 'requests.form.packsSuffix' | translate }}</span>
@@ -235,7 +235,13 @@
 
               <mat-form-field appearance="outline" class="line-note">
                 <mat-label>{{ 'requests.form.noteLabel' | translate }}</mat-label>
-                <input matInput [formControl]="lineGroup.controls.note" />
+                <input matInput [formControl]="lineGroup.controls.note" maxlength="500" />
+                <mat-hint>{{ 'requests.form.noteCounter' | translate: { count: lineGroup.controls.note.value.length } }}</mat-hint>
+                @if (lineGroup.controls.note.hasError('maxlength')) {
+                  <mat-error>{{ 'requests.form.noteTooLong' | translate }}</mat-error>
+                } @else if (lineGroup.controls.note.errors?.['server']; as serverError) {
+                  <mat-error>{{ serverError | translate }}</mat-error>
+                }
               </mat-form-field>
 
               @if (getLineEstimate(lineGroup); as estimate) {

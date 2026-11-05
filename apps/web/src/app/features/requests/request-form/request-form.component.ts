@@ -22,6 +22,7 @@ import { ApiService } from '../../../core/api/api.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatService } from '../../../core/format/format.service';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
+import { normaliseDigits } from '../../../core/format/money-input';
 import { trimDecimal } from '../../../core/format/trim-decimal';
 import type {
   ApiError,
@@ -46,6 +47,7 @@ import { AppDateAdapter, provideAppDateAdapter } from '../../../core/i18n/date-a
 const I18N = 'requests';
 
 const SERVER_ERROR_KEYS: Record<string, string> = {
+  note_too_long: 'requests.form.noteTooLong',
   quantity_not_positive: 'requests.errors.quantity_not_positive',
   required_by_in_the_past: 'requests.errors.required_by_in_the_past',
   duplicate_product: 'requests.errors.duplicate_product',
@@ -422,10 +424,17 @@ export class RequestFormComponent implements OnInit {
           nonNullable: true,
           validators: [Validators.required, Validators.pattern(/^(?!0(?:\.0+)?$)\d+(?:\.\d{1,6})?$/)],
         }),
-        note: new FormControl<string>('', { nonNullable: true }),
+        note: new FormControl<string>('', { nonNullable: true, validators: [Validators.maxLength(500)] }),
       }),
     );
     this.formChangeSignal.update((v) => v + 1);
+  }
+
+  normaliseQuantity(event: Event, control: FormControl<string>): void {
+    const input = event.target as HTMLInputElement;
+    const value = normaliseDigits(input.value).replace(/[\u066C\s]/g, '');
+    input.value = value;
+    control.setValue(value);
   }
 
   removeLine(index: number): void {
@@ -931,7 +940,7 @@ export class RequestFormComponent implements OnInit {
               nonNullable: true,
               validators: [Validators.required, Validators.pattern(/^(?!0(?:\.0+)?$)\d+(?:\.\d{1,6})?$/)],
             }),
-            note: new FormControl<string>(line.note ?? '', { nonNullable: true }),
+            note: new FormControl<string>(line.note ?? '', { nonNullable: true, validators: [Validators.maxLength(500)] }),
           });
           this.savedLineMeta.set(group, {
             pack_base_quantity: line.pack_base_quantity ?? null,

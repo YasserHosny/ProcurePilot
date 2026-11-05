@@ -2454,6 +2454,8 @@
       "draftSavedSubmitFailed": "Draft saved, but it could not be submitted. Review it and submit again.",
       "quantityRequired": "Quantity must be greater than zero.",
       "quantityPattern": "Quantity must be a number greater than zero.",
+      "noteTooLong": "Note must be 500 characters or fewer.",
+      "noteCounter": "{{count}} / 500",
       "noteLabel": "Note (optional)",
       "estimatedUnitPriceLabel": "Estimated Unit Price",
       "noEstimateAvailable": "No price history available for this product.",

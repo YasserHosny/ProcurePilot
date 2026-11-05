@@ -2454,6 +2454,8 @@
       "draftSavedSubmitFailed": "تم حفظ المسودة، لكن تعذّر إرسالها. راجعها وأرسلها مرة أخرى.",
       "quantityRequired": "يجب أن تكون الكمية أكبر من صفر.",
       "quantityPattern": "يجب أن تكون الكمية رقمًا أكبر من صفر.",
+      "noteTooLong": "يجب ألا تتجاوز الملاحظة 500 حرف.",
+      "noteCounter": "{{count}} / 500",
       "noteLabel": "ملاحظة (اختيارية)",
       "estimatedUnitPriceLabel": "سعر الوحدة المقدر",
       "noEstimateAvailable": "لا توجد بيانات أسعار سابقة لهذا المنتج.",

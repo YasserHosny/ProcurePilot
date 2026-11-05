@@ -207,3 +207,24 @@ def test_validate_cost_centre_not_found() -> None:
         "field": "cost_centre_id",
         "reason": "cost_centre_not_found",
     }
+
+
+@pytest.mark.parametrize("character", ["x", "م"])
+def test_note_length_rejects_501_characters(character: str) -> None:
+    lines = [
+        PurchaseRequestLineInput(workspace_product_id=uuid4(), quantity="1"),
+        PurchaseRequestLineInput(
+            workspace_product_id=uuid4(), quantity="1", note=f"  {character * 501}  "
+        ),
+    ]
+    with pytest.raises(UnprocessableEntityError) as exc:
+        RequestsService()._validate_request_lines(lines)
+    assert exc.value.status_code == 422
+    assert exc.value.details == {"field": "lines[1].note", "reason": "note_too_long"}
+
+
+@pytest.mark.parametrize("note", ["  " + "x" * 500 + "  ", "  " + "م" * 500 + "  ", " \t\n " * 200])
+def test_note_length_accepts_trimmed_boundary_and_blank(note: str) -> None:
+    line = PurchaseRequestLineInput(workspace_product_id=uuid4(), quantity="1", note=note)
+    RequestsService()._validate_request_lines([line])
+    assert line.note == (note.strip() or None)
