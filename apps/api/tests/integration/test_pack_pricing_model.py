@@ -18,6 +18,8 @@ import pytest
 
 from integration.test_rfq_service_e2e import _seed_tenant
 from procurepilot_api.config import get_settings
+from procurepilot_api.deps import CurrentMember
+from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.requests.service import RequestsService, _compute_totals
 from procurepilot_api.modules.requests.valuation import LineEstimate
 
@@ -189,6 +191,16 @@ def _total(
     return _compute_totals([str(line[3]) for line in LINES], estimates)
 
 
+def _member(tenant_id: UUID, user_id: UUID, membership_id: UUID) -> CurrentMember:
+    return CurrentMember(
+        membership_id=membership_id,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        email="packs@example.test",
+        role=MemberRole.owner,
+    )
+
+
 def test_estimate_follows_source_response_and_is_per_pack() -> None:
     with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
@@ -200,7 +212,9 @@ def test_estimate_follows_source_response_and_is_per_pack() -> None:
         conn.commit()
 
     service = RequestsService(settings=get_settings())
-    estimates = service._estimate_products(products, request_id=rid)
+    estimates = service._estimate_products(
+        products, member=_member(tenant_id, _user, membership_id), request_id=rid
+    )
 
     # Per-pack prices of the SOURCE response (النور), not الأمانة's, not per litre/kg.
     assert [e.unit_price_amount for e in estimates] == [
@@ -223,7 +237,9 @@ def test_estimate_without_source_response_is_still_per_pack() -> None:
             products, _ = _seed(cur, tenant_id, membership_id)
         conn.commit()
 
-    estimates = RequestsService(settings=get_settings())._estimate_products(products)
+    estimates = RequestsService(settings=get_settings())._estimate_products(
+        products, member=_member(tenant_id, _user, membership_id)
+    )
     # Latest landed cost (الأمانة, incl. delivery) priced per PACK: 1725, 925, 890, 575, 73.
     assert [e.unit_price_amount for e in estimates] == [
         Decimal(1725),
@@ -249,7 +265,7 @@ def test_source_estimate_includes_landed_charges() -> None:
         conn.commit()
 
     estimates = RequestsService(settings=get_settings())._estimate_products(
-        products, request_id=rid
+        products, member=_member(tenant_id, _user, membership_id), request_id=rid
     )
     assert [e.unit_price_amount for e in estimates] == [
         Decimal(1725),
