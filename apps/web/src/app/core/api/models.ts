@@ -1616,6 +1616,25 @@ export interface PendingApprovalList {
   readonly total: number;
 }
 
+export interface BulkApprovalDecisionInput {
+  readonly decision: 'approved' | 'rejected';
+  readonly comment: string | null;
+  readonly request_ids: readonly string[];
+}
+
+export interface BulkApprovalDecisionResult {
+  readonly request_id: string;
+  readonly outcome: 'decided' | 'failed';
+  readonly error_code: string | null;
+  readonly request: PurchaseRequest | null;
+}
+
+export interface BulkApprovalDecisionResponse {
+  readonly results: readonly BulkApprovalDecisionResult[];
+  readonly decided_count: number;
+  readonly failed_count: number;
+}
+
 export interface ApprovalDecisionInput {
   readonly comment?: string | null;
 }

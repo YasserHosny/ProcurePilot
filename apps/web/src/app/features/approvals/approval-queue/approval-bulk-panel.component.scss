@@ -1,0 +1,11 @@
+:host { display: block; }
+section { margin-block: var(--pp-space-4); margin-inline: var(--pp-space-4); padding-block: var(--pp-space-4); padding-inline: var(--pp-space-4); border: 1px solid var(--pp-border); border-radius: var(--pp-radius-card); background: var(--pp-surface-card); color: var(--pp-text); }
+h2 { font-size: var(--pp-size-18); color: var(--pp-text-strong); margin-block: 0 var(--pp-space-3); }
+p { margin-block: var(--pp-space-3); }
+.actions, .totals, .progress { display: flex; flex-wrap: wrap; gap: var(--pp-space-3); align-items: center; }
+.totals { list-style: none; padding-inline-start: 0; }
+ul { padding-inline-start: var(--pp-space-6); }
+li { overflow-wrap: anywhere; margin-block-end: var(--pp-space-2); }
+a { color: var(--pp-primary); text-underline-offset: 0.2em; }
+a:focus-visible { outline: 2px solid var(--pp-focus); outline-offset: 2px; }
+.error { margin-inline: var(--pp-space-4); padding-block: var(--pp-space-3); padding-inline: var(--pp-space-4); background: var(--pp-error-container); color: var(--pp-error); }

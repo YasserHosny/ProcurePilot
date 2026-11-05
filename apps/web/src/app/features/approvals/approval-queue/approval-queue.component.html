@@ -39,6 +39,7 @@
       <mat-form-field appearance="outline" class="sort-field" subscriptSizing="dynamic">
         <mat-label>{{ 'approvals.sort.label' | translate }}</mat-label>
         <mat-select
+          [disabled]="bulkBusy()"
           #sortSelect
           data-testid="sort-select"
           [value]="sortOption()"
@@ -53,6 +54,7 @@
       <mat-form-field appearance="outline" class="branch-field" subscriptSizing="dynamic">
         <mat-label>{{ 'approvals.filter.branch' | translate }}</mat-label>
         <mat-select
+          [disabled]="bulkBusy()"
           data-testid="branch-select"
           [value]="branchFilter()"
           (selectionChange)="onBranchChange($event.value)"
@@ -122,6 +124,13 @@
       {{ announcementText() }}
     </div>
 
+    <app-approval-bulk-panel [count]="selectedIds().size" [totals]="selectionTotals()"
+      [incomplete]="selectionIncomplete()" [busy]="bulkBusy()" [disabled]="bulkDisabled()"
+      [error]="bulkError()" [result]="bulkResult()" [failures]="bulkFailures()"
+      (approve)="openBulkDialog('approved')" (reject)="openBulkDialog('rejected')"
+      (clearSelection)="clearSelection()" />
+    @if (capReached()) { <p id="bulk-selection-cap" role="status">{{ 'approvals.bulk.capHint' | translate }}</p> }
+
     @if (isLoading()) {
       <div class="loading-state" aria-live="polite">
         <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
@@ -152,6 +161,23 @@
     } @else {
       <div class="table-responsive">
         <table mat-table [dataSource]="queueItems()" multiTemplateDataRows class="approvals-table">
+          <ng-container matColumnDef="selection">
+            <th mat-header-cell *matHeaderCellDef scope="col">
+              <mat-checkbox [aria-label]="'approvals.bulk.selectAll' | translate"
+                [checked]="allSelected()" [indeterminate]="someSelected()"
+                [disabled]="bulkDisabled() || eligibleSingles().length === 0"
+                (change)="toggleSelectAll()" />
+            </th>
+            <td mat-cell *matCellDef="let row">
+              @if (!isGroupRow(row)) {
+                <mat-checkbox [aria-label]="selectionLabel(row.request)"
+                  [checked]="selectedIds().has(row.id)" [disabled]="selectionDisabled(row)"
+                  [attr.aria-describedby]="capReached() && !selectedIds().has(row.id) ? 'bulk-selection-cap' : null"
+                  (change)="toggleSelection(row)" />
+              }
+            </td>
+          </ng-container>
+
           <ng-container matColumnDef="requiredByDate">
             <th mat-header-cell *matHeaderCellDef>
               {{ 'approvals.columns.requiredByDate' | translate }}

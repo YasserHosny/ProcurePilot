@@ -4,6 +4,8 @@ import { Observable } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import type {
   ApprovalDecisionInput,
+  BulkApprovalDecisionInput,
+  BulkApprovalDecisionResponse,
   ApprovalDelegation,
   ApprovalDelegationCreate,
   ApprovalDelegationList,
@@ -19,6 +21,8 @@ import type {
 
 export type {
   ApprovalDecisionInput,
+  BulkApprovalDecisionInput,
+  BulkApprovalDecisionResponse,
   ApprovalDelegation,
   ApprovalDelegationCreate,
   ApprovalDelegationList,
@@ -35,6 +39,10 @@ export type {
 @Injectable({ providedIn: 'root' })
 export class ApprovalsApiService {
   private readonly api = inject(ApiService);
+
+  bulkDecide(body: BulkApprovalDecisionInput, idempotencyKey: string): Observable<BulkApprovalDecisionResponse> {
+    return this.api.bulkDecide(body, idempotencyKey);
+  }
 
   listPendingApprovals(params?: {
     sort?: PendingApprovalSort;
