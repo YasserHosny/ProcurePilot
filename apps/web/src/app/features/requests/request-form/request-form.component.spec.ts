@@ -137,7 +137,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
       component.lines.at(0).patchValue({ workspace_product_id: 'wp1', quantity: '5' });
     }
 
-    for (const [raw, expected] of [['١٢٫٥', '12.5'], ['١٬٢٠٠', '1200'], ['1,5', '1.5'], [' ١ ٢٫٥ ', '12.5']]) {
+    for (const [raw, expected] of [['١٢٫٥', '12.5'], ['١٬٢٠٠', '1200'], ['۱۲٫۵', '12.5'], [' ١ ٢٫٥ ', '12.5']]) {
       it(`normalizes typed or pasted ${raw} to an ASCII string`, () => {
         const input: HTMLInputElement = fixture.nativeElement.querySelector('.line-quantity input');
         expect(input.type).toBe('text');
@@ -147,6 +147,19 @@ describe('RequestFormComponent — create mode (T017)', () => {
         expect(component.lines.at(0).controls.quantity.value).toBe(expected);
         expect(input.value).toBe(expected);
         expect(component.lines.at(0).controls.quantity.valid).toBeTrue();
+      });
+    }
+
+    for (const raw of ['1,000', '1,5']) {
+      it(`preserves ASCII commas in ${raw} and rejects the quantity with a pattern error`, () => {
+        const input: HTMLInputElement = fixture.nativeElement.querySelector('.line-quantity input');
+        input.value = raw;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        const control = component.lines.at(0).controls.quantity;
+        expect(input.value).toBe(raw);
+        expect(control.value).toBe(raw);
+        expect(control.invalid).toBeTrue();
+        expect(control.hasError('pattern')).toBeTrue();
       });
     }
 

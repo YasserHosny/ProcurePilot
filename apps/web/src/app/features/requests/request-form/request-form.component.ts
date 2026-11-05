@@ -432,10 +432,7 @@ export class RequestFormComponent implements OnInit {
 
   normaliseQuantity(event: Event, control: FormControl<string>): void {
     const input = event.target as HTMLInputElement;
-    let value = normaliseDigits(input.value).replace(/[\u066C\s]/g, '');
-    if (!value.includes('.') && value.indexOf(',') === value.lastIndexOf(',')) {
-      value = value.replace(',', '.');
-    }
+    const value = normaliseDigits(input.value).replace(/[\u066C\s]/g, '');
     input.value = value;
     control.setValue(value);
   }
