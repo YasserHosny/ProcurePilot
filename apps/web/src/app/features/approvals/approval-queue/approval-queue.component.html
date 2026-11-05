@@ -72,6 +72,7 @@
           type="button"
           class="clear-filters-btn"
           data-testid="clear-filters-btn"
+          [disabled]="bulkBusy()"
           (click)="clearFilters()"
         >
           {{ 'approvals.filter.clear' | translate }}
@@ -91,6 +92,7 @@
                 'approvals.filter.chipRemove'
                   | translate: { filter: sortOptionLabel(sortOption()) }
               "
+              [disabled]="bulkBusy()"
               (click)="removeSortFilter()"
             >
               <mat-icon aria-hidden="true">close</mat-icon>
@@ -106,6 +108,7 @@
               [attr.aria-label]="
                 'approvals.filter.chipRemove' | translate: { filter: branchFilterName() }
               "
+              [disabled]="bulkBusy()"
               (click)="removeBranchFilter()"
             >
               <mat-icon aria-hidden="true">close</mat-icon>
@@ -147,6 +150,7 @@
             mat-stroked-button
             type="button"
             class="clear-filters-btn"
+            [disabled]="bulkBusy()"
             (click)="clearFilters()"
           >
             {{ 'approvals.filter.clear' | translate }}

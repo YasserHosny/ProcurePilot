@@ -407,6 +407,207 @@ describe('ApprovalQueueComponent', () => {
         expect(getComputedStyle(panel).direction).toBe(locale === 'ar' ? 'rtl' : 'ltr');
       });
     }
+
+    function allDecidedResponse() {
+      return {results: [
+        {request_id: 'req-001', outcome: 'decided' as const, error_code: null, request: mockPendingRequests[0]},
+        {request_id: 'req-002', outcome: 'decided' as const, error_code: null, request: mockPendingRequests[1]},
+      ], decided_count: 2, failed_count: 0};
+    }
+    function query(selector: string): HTMLElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(selector);
+    }
+    function loadedIds(): string[] {
+      return component.pendingRequests().map(request => request.id);
+    }
+
+    describe('every loaded row decided while a next cursor exists', () => {
+      const nextPageRow: PurchaseRequest = {...mockPendingRequests[0], id: 'req-051'};
+
+      it('reloads page 1, keeps the results panel and never renders the empty state', () => {
+        component.nextCursor.set('cursor-2');
+        selectBoth();
+        const reloaded = new Subject<PendingApprovalList>();
+        approvalsApi.listPendingApprovals.calls.reset();
+        approvalsApi.listPendingApprovals.and.returnValue(reloaded);
+        approvalsApi.bulkDecide.and.returnValue(of(allDecidedResponse()));
+
+        component.submitBulk('approved', null); fixture.detectChanges();
+
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledOnceWith({limit: 50});
+        expect(query('.loading-state')).not.toBeNull();
+        expect(query('[data-testid="empty-default"]')).toBeNull();
+        expect(query('[data-testid="bulk-results"]')).not.toBeNull();
+
+        reloaded.next({items: [nextPageRow], next_cursor: 'cursor-3', total: 50}); reloaded.complete();
+        fixture.detectChanges();
+
+        expect(loadedIds()).toEqual(['req-051']);
+        expect(component.totalCount()).toBe(50);
+        expect(query('[data-testid="load-more-btn"]')).not.toBeNull();
+        expect(query('[data-testid="empty-default"]')).toBeNull();
+        expect(query('[data-testid="bulk-results"]')?.textContent).toContain('2 decided');
+      });
+
+      it('does not reload when no further page exists', () => {
+        selectBoth();
+        approvalsApi.listPendingApprovals.calls.reset();
+        approvalsApi.bulkDecide.and.returnValue(of(allDecidedResponse()));
+
+        component.submitBulk('approved', null); fixture.detectChanges();
+
+        expect(approvalsApi.listPendingApprovals).not.toHaveBeenCalled();
+        expect(query('[data-testid="empty-default"]')).not.toBeNull();
+        expect(query('[data-testid="bulk-results"]')).not.toBeNull();
+      });
+
+      it('does not reload when rows remain loaded', () => {
+        component.nextCursor.set('cursor-2');
+        selectBoth();
+        approvalsApi.listPendingApprovals.calls.reset();
+        approvalsApi.bulkDecide.and.returnValue(of(bulkResponse()));
+
+        component.submitBulk('approved', null); fixture.detectChanges();
+
+        expect(approvalsApi.listPendingApprovals).not.toHaveBeenCalled();
+        expect(query('[data-testid="load-more-btn"]')).not.toBeNull();
+      });
+
+      it('leaves an ordinary reload clearing the results panel', () => {
+        selectBoth();
+        approvalsApi.bulkDecide.and.returnValue(of(bulkResponse()));
+        component.submitBulk('approved', null); fixture.detectChanges();
+        expect(query('[data-testid="bulk-results"]')).not.toBeNull();
+
+        component.loadPendingApprovals(); fixture.detectChanges();
+
+        expect(component.bulkResult()).toBeNull();
+        expect(component.bulkFailures()).toEqual([]);
+        expect(query('[data-testid="bulk-results"]')).toBeNull();
+      });
+    });
+
+    describe('filter changes while a batch is in flight', () => {
+      function startBatch(): Subject<ReturnType<typeof bulkResponse>> {
+        selectBoth();
+        const batch = new Subject<ReturnType<typeof bulkResponse>>();
+        approvalsApi.bulkDecide.and.returnValue(batch);
+        component.submitBulk('approved', null); fixture.detectChanges();
+        return batch;
+      }
+
+      it('disables the clear button and chip removes until the batch returns', () => {
+        component.sortOption.set('total_desc');
+        component.branchFilter.set(VALID_BRANCH_ID);
+        const batch = startBatch();
+
+        const host = fixture.nativeElement as HTMLElement;
+        const clear = query('[data-testid="clear-filters-btn"]') as HTMLButtonElement;
+        const chips = Array.from(host.querySelectorAll<HTMLButtonElement>('.chip-remove'));
+        expect(chips.length).toBe(2);
+        expect(clear.disabled).toBeTrue();
+        for (const chip of chips) expect(chip.disabled).toBeTrue();
+
+        batch.next(bulkResponse()); batch.complete(); fixture.detectChanges();
+
+        expect(clear.disabled).toBeFalse();
+        for (const chip of chips) expect(chip.disabled).toBeFalse();
+      });
+
+      const guarded: readonly (readonly [string, () => void])[] = [
+        ['clearFilters', () => component.clearFilters()],
+        ['removeSortFilter', () => component.removeSortFilter()],
+        ['removeBranchFilter', () => component.removeBranchFilter()],
+      ];
+      for (const [name, act] of guarded) {
+        it(`${name} does nothing and the batch result is applied`, () => {
+          component.sortOption.set('total_desc');
+          component.branchFilter.set(VALID_BRANCH_ID);
+          const batch = startBatch();
+          approvalsApi.listPendingApprovals.calls.reset();
+          routerSpy.navigate.calls.reset();
+
+          act();
+
+          expect(component.sortOption()).toBe('total_desc');
+          expect(component.branchFilter()).toBe(VALID_BRANCH_ID);
+          expect(approvalsApi.listPendingApprovals).not.toHaveBeenCalled();
+          expect(routerSpy.navigate).not.toHaveBeenCalled();
+
+          batch.next(bulkResponse()); batch.complete(); fixture.detectChanges();
+
+          expect(loadedIds()).toEqual(['req-002']);
+          expect(component.totalCount()).toBe(1);
+          expect(query('[data-testid="bulk-results"]')).not.toBeNull();
+        });
+      }
+
+      it('disables the empty-state clear button when a URL change empties the list mid-batch', () => {
+        const batch = startBatch();
+        approvalsApi.listPendingApprovals.and.returnValue(of({items: [], next_cursor: null, total: 0}));
+
+        queryParamMapSubject.next(convertToParamMap({sort: 'total_desc'})); fixture.detectChanges();
+
+        expect((query('[data-testid="empty-filtered"] button') as HTMLButtonElement).disabled).toBeTrue();
+        batch.next(bulkResponse()); batch.complete();
+      });
+
+      it('publishes the results and reloads once when a URL change loaded the list before the response', () => {
+        const batch = startBatch();
+        const urlList = new Subject<PendingApprovalList>();
+        const reloaded = new Subject<PendingApprovalList>();
+        approvalsApi.listPendingApprovals.calls.reset();
+        approvalsApi.listPendingApprovals.and.returnValues(urlList, reloaded);
+
+        queryParamMapSubject.next(convertToParamMap({sort: 'total_desc'}));
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledOnceWith({sort: 'total_desc', limit: 50});
+        // This list GET ran before the items committed, so req-001 still reads as pending.
+        urlList.next({items: mockPendingRequests, next_cursor: null, total: 2}); urlList.complete();
+        expect(loadedIds()).toEqual(['req-001', 'req-002']);
+
+        batch.next(bulkResponse()); batch.complete(); fixture.detectChanges();
+
+        expect(component.bulkBusy()).toBeFalse();
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledTimes(2);
+        expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({sort: 'total_desc', limit: 50});
+        // The stale response's local removals stay off the new list; only the reload changes it.
+        expect(loadedIds()).toEqual(['req-001', 'req-002']);
+        const panel = query('[data-testid="bulk-results"]');
+        expect(panel?.textContent).toContain('1 decided');
+        expect(panel?.textContent).toContain('1 failed');
+        expect(panel?.textContent).toContain('mem-requ');
+        expect(panel?.textContent).toContain('req-002');
+        expect(panel?.textContent).not.toContain('self_decision_not_allowed');
+
+        reloaded.next({items: [mockPendingRequests[1]], next_cursor: null, total: 1}); reloaded.complete();
+        fixture.detectChanges();
+
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledTimes(2);
+        expect(loadedIds()).toEqual(['req-002']);
+        expect(component.totalCount()).toBe(1);
+        expect(query('[data-testid="bulk-results"]')).not.toBeNull();
+        expect(component.bulkFailures().map(failure => failure.requestId)).toEqual(['req-002']);
+      });
+
+      it('ignores the superseded list response when the batch returned first', () => {
+        const batch = startBatch();
+        const urlList = new Subject<PendingApprovalList>();
+        const reloaded = new Subject<PendingApprovalList>();
+        approvalsApi.listPendingApprovals.calls.reset();
+        approvalsApi.listPendingApprovals.and.returnValues(urlList, reloaded);
+
+        queryParamMapSubject.next(convertToParamMap({sort: 'total_desc'}));
+        batch.next(bulkResponse()); batch.complete();
+        reloaded.next({items: [mockPendingRequests[1]], next_cursor: null, total: 1}); reloaded.complete();
+        urlList.next({items: mockPendingRequests, next_cursor: null, total: 2}); urlList.complete();
+        fixture.detectChanges();
+
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledTimes(2);
+        expect(loadedIds()).toEqual(['req-002']);
+        expect(component.totalCount()).toBe(1);
+        expect(query('[data-testid="bulk-results"]')).not.toBeNull();
+      });
+    });
   });
 
   describe('PPS-167 self approval', () => {

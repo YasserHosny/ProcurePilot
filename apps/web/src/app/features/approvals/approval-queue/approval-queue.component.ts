@@ -502,22 +502,31 @@ export class ApprovalQueueComponent implements OnInit {
     this.approvalsApi.bulkDecide(body, key).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: response => {
         this.bulkBusy.set(false);
-        if (generation !== this.loadGeneration) return;
         const submitted = new Map(selected.map(request => [request.id, request]));
-        const decided = new Set(response.results.filter(result => result.outcome === 'decided' && submitted.has(result.request_id)).map(result => result.request_id));
         this.bulkFailures.set(response.results.filter(result => result.outcome === 'failed').map(result => ({
           requestId: result.request_id,
           label: this.translate.instant('approvals.bulk.requestLabel', {requester: submitted.has(result.request_id) ? this.getRequesterDisplay(submitted.get(result.request_id)!) : this.translate.instant('approvals.notAvailable'), id: result.request_id.slice(0, 8)}),
           reasonKey: bulkFailureKey(result.error_code),
         })));
+        this.bulkResult.set(response);
+        // A URL change replaced the list mid-batch, possibly with a GET that ran before the items
+        // committed. The removals below describe the old list, so refetch instead of applying them.
+        if (generation !== this.loadGeneration) {
+          this.loadPendingApprovals({keepBulkResults: true});
+          return;
+        }
+        const decided = new Set(response.results.filter(result => result.outcome === 'decided' && submitted.has(result.request_id)).map(result => result.request_id));
         this.pendingRequests.update(requests => requests.filter(request => !decided.has(request.id)));
         this.selection.set(new Set([...this.selection()].filter(id => !decided.has(id))));
         this.totalCount.update(total => total === null ? null : Math.max(0, total - decided.size));
-        this.bulkResult.set(response);
         // Keep the namespace for failed subsets: unavailable may mean the write committed
         // but its response failed, so their UUIDv5 item keys must replay the original audit.
         this.bulkAttempt = this.selectedIds().size > 0
           ? {key, signature: bulkAttemptSignature({...body, request_ids: [...this.selectedIds()]})} : null;
+        // No rows means no pagination footer, so a remaining page would be unreachable.
+        if (this.pendingRequests().length === 0 && this.nextCursor() !== null) {
+          this.loadPendingApprovals({keepBulkResults: true});
+        }
       },
       error: () => {
         this.bulkBusy.set(false);
@@ -653,11 +662,13 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   removeSortFilter(): void {
+    if (this.bulkBusy()) return;
     this.onSortChange(DEFAULT_SORT);
     this.focusAfterChipRemoval();
   }
 
   removeBranchFilter(): void {
+    if (this.bulkBusy()) return;
     this.onBranchChange('');
     this.focusAfterChipRemoval();
   }
@@ -678,6 +689,7 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   clearFilters(): void {
+    if (this.bulkBusy()) return;
     const changed = this.hasActiveFilters();
     this.sortOption.set(DEFAULT_SORT);
     this.branchFilter.set('');
@@ -715,14 +727,16 @@ export class ApprovalQueueComponent implements OnInit {
     });
   }
 
-  loadPendingApprovals(): void {
+  loadPendingApprovals({keepBulkResults = false}: {readonly keepBulkResults?: boolean} = {}): void {
     // When reloading (e.g. after a decision), reload from the first page and reset cursor.
     // Why: Reloading from cursor=null fetches fresh page 1 from the server. If accumulated
     // extra pages were kept, items could be duplicated or stale across pages, and the server
     // cursor would be out-of-sync with the spliced client list.
     const generation = ++this.loadGeneration;
     this.selection.set(new Set()); this.bulkAttempt = null; this.bulkError.set(false);
-    this.bulkResult.set(null); this.bulkFailures.set([]);
+    if (!keepBulkResults) {
+      this.bulkResult.set(null); this.bulkFailures.set([]);
+    }
     this.loadOwnerEligibility(generation);
     this.isLoading.set(true);
     this.isLoadingMore.set(false);
