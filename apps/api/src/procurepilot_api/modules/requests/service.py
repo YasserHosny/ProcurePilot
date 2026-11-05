@@ -1822,7 +1822,16 @@ class RequestsService:
                 ]
             return spend_cache[budget.id]
 
-        summaries = _request_group_summaries([{**row, "request_group": group} for row in rows])
+        summaries = _request_group_summaries(
+            [
+                {
+                    **row,
+                    "request_group": group,
+                    "supplier_name": contacts_by_id[str(row["id"])]["supplier_name"],
+                }
+                for row in rows
+            ]
+        )
         steps_by_request = {str(step["purchase_request_id"]): step for step in steps}
         result = []
         for row in rows:
