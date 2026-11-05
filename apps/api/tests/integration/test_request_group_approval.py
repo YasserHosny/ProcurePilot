@@ -14,6 +14,7 @@ from httpx import Response
 from psycopg import sql
 
 from integration.catalogue_helpers import TEST_DATABASE_URL, Workspace, make_workspace, reset_role
+from integration.quotation_helpers import make_quotation, make_supplier
 from integration.test_confirm_delivery import _add_line, _payload
 from integration.test_purchase_requests import _current_member, _make_member
 from integration.test_request_group_read import api_as as read_api_as
@@ -123,6 +124,56 @@ def submit(conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, data: Spli
             assert request["approval_step"]["assigned_membership_id"] == str(data.b.membership_id)
             assert request["approval_step"]["source"] == "group_threshold_match"
     assert_state(conn, data, "submitted")
+
+
+@pytest.mark.parametrize("action", ["submit", "withdraw"])
+def test_group_action_returns_sibling_supplier_names_and_positions(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    data = seed(conn)
+    with conn.cursor() as cur:
+        reset_role(cur)
+        cur.execute("select rfq_id from purchase_request_group where id=%s", (data.group,))
+        rfq = cur.fetchone()[0]
+        for position, request_id in enumerate(data.requests, 1):
+            supplier = make_supplier(cur, data.owner, f"Action supplier {position}")
+            quotation = make_quotation(cur, data.owner, supplier_id=supplier)
+            reset_role(cur)
+            recipient, response_id = uuid4(), uuid4()
+            cur.execute(
+                "insert into rfq_recipient (id,tenant_id,rfq_id,supplier_id,status) "
+                "values (%s,%s,%s,%s,'sent')",
+                (recipient, data.owner.tenant_id, rfq, supplier),
+            )
+            cur.execute(
+                "insert into rfq_response (id,tenant_id,rfq_recipient_id,quotation_id) "
+                "values (%s,%s,%s,%s)",
+                (response_id, data.owner.tenant_id, recipient, quotation),
+            )
+            cur.execute(
+                "update purchase_request set source_rfq_response_id=%s, "
+                "created_at='2026-10-01'::timestamptz + %s * interval '1 second' where id=%s",
+                (response_id, position, request_id),
+            )
+    conn.commit()
+
+    with api_as(conn, monkeypatch, data.requester) as (client, _service, _queries):
+        response = post(client, data, action)
+        assert response.status_code == 200, response.text
+        requests = response.json()
+        assert {request["id"] for request in requests} == {str(id_) for id_ in data.requests}
+        for request in requests:
+            position = data.requests.index(UUID(request["id"])) + 1
+            assert request["source"]["supplier_name"] == f"Action supplier {position}"
+            assert request["request_group"]["siblings"] == [
+                {
+                    "id": str(request_id),
+                    "position": position,
+                    "supplier_name": f"Action supplier {position}",
+                }
+                for position, request_id in enumerate(data.requests, 1)
+                if str(request_id) != request["id"]
+            ]
 
 
 def test_submit_and_approve_as_one_and_each_can_become_a_po(
