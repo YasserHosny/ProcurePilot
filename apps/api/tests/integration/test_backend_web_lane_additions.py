@@ -444,6 +444,8 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
                         response_id,
                     ),
                 )
+                # a client session cannot insert a decided step; the fixture writes it as owner
+                cur.execute("reset role")
                 cur.execute(
                     "insert into approval_step (tenant_id,purchase_request_id,"
                     "assigned_membership_id,"
@@ -456,6 +458,7 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
                         context.workspace.membership_id,
                     ),
                 )
+                cur.execute("set local role authenticated")
                 cur.execute(
                     "insert into purchase_request (id,tenant_id,branch_id,"
                     "requested_by_membership_id,"
@@ -479,6 +482,8 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
                         context.workspace.membership_id,
                     ),
                 )
+                # a client session cannot insert a decided step; the fixture writes it as owner
+                cur.execute("reset role")
                 cur.execute(
                     "insert into approval_step (tenant_id,purchase_request_id,"
                     "assigned_membership_id,"
@@ -491,6 +496,7 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
                         context.workspace.membership_id,
                     ),
                 )
+                cur.execute("set local role authenticated")
                 cur.execute(
                     "insert into purchase_order (tenant_id,order_number,supplier_id,status,order_date,total_amount,total_currency,tax_amount,tax_currency,source_kind,source_reference,created_by,create_idempotency_key) values (%s,'PO-000009',%s,'draft',current_date,1,'GBP',0,'GBP','manual','fixture',%s,%s)",  # noqa: E501
                     (
