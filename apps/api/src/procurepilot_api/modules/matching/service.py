@@ -49,6 +49,12 @@ from procurepilot_api.modules.matching.schemas import (
 )
 from procurepilot_api.modules.matching.scoring import SCORING_VERSION, decimal_string
 from procurepilot_api.modules.matching.search import build_similarity_candidates
+from procurepilot_api.modules.matching.search_text import (
+    SQL_ARTICLE,
+    search_matches,
+    search_words,
+    sql_word_expression,
+)
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.modules.quotations.schemas import Money, Pack
@@ -208,36 +214,12 @@ class MatchingService:
             line_ids = list({str(row["quotation_line_id"]) for row in rows})
             context_by_line = _prefetch_search_context(client, line_ids) if line_ids else {}
 
-            filtered_rows: list[dict[str, object]] = []
-            for row in rows:
-                if clean_search in str(row.get("reason", "")).lower():
-                    filtered_rows.append(row)
-                    continue
-
-                line_ctx = context_by_line.get(str(row["quotation_line_id"]))
-                if not line_ctx:
-                    continue
-
-                if clean_search in str(line_ctx.get("original_text", "")).lower():
-                    filtered_rows.append(row)
-                    continue
-
-                if clean_search in f"#{line_ctx.get('line_number')}":
-                    filtered_rows.append(row)
-                    continue
-
-                if clean_search in str(line_ctx.get("line_number")):
-                    filtered_rows.append(row)
-                    continue
-
-                if clean_search in str(line_ctx.get("quotation_id", "")).lower():
-                    filtered_rows.append(row)
-                    continue
-
-                if clean_search in str(line_ctx.get("supplier_name", "")).lower():
-                    filtered_rows.append(row)
-                    continue
-
+            filtered_rows: list[dict[str, object]] = [
+                row
+                for row in rows
+                if (line_ctx := context_by_line.get(str(row["quotation_line_id"])))
+                and _line_context_matches(clean_search, line_ctx)
+            ]
             rows = filtered_rows
 
         # The auto/decided filter also retains corrected heads, reported as resolved/corrected.
@@ -348,12 +330,13 @@ class MatchingService:
             else:
                 filters.append("created_at <= %(date_to)s::timestamptz")
         if search and search.strip():
+            params["search_ids"] = _escape_like(search.strip().lower())
+            params["search_folded"] = _escape_like(search_words(search.strip()))
             filters.append(
-                "(lower(original_text) like '%%' || lower(%(search)s) || '%%' "
-                "or lower(reason) like '%%' || lower(%(search)s) || '%%' "
-                "or lower(supplier_name) like '%%' || lower(%(search)s) || '%%' "
-                "or quotation_id::text like '%%' || lower(%(search)s) || '%%' "
-                "or line_number::text like '%%' || lower(%(search)s) || '%%')"
+                queue_search_filter_sql(
+                    has_words=bool(params["search_folded"]),
+                    has_ids=bool(search.strip().lstrip("#").strip()),
+                )
             )
 
         where_sql = " and ".join(filters)
@@ -1278,26 +1261,12 @@ class MatchingService:
         if clean_search:
             line_ids = list({str(row["quotation_line_id"]) for row in decision_rows})
             context_by_line = _prefetch_search_context(client, line_ids) if line_ids else {}
-            filtered: list[dict[str, object]] = []
-            for row in decision_rows:
-                line_ctx = context_by_line.get(str(row["quotation_line_id"]))
-                if not line_ctx:
-                    continue
-                if clean_search in str(line_ctx.get("original_text", "")).lower():
-                    filtered.append(row)
-                    continue
-                if clean_search in f"#{line_ctx.get('line_number')}":
-                    filtered.append(row)
-                    continue
-                if clean_search in str(line_ctx.get("line_number")):
-                    filtered.append(row)
-                    continue
-                if clean_search in str(line_ctx.get("quotation_id", "")).lower():
-                    filtered.append(row)
-                    continue
-                if clean_search in str(line_ctx.get("supplier_name", "")).lower():
-                    filtered.append(row)
-                    continue
+            filtered: list[dict[str, object]] = [
+                row
+                for row in decision_rows
+                if (line_ctx := context_by_line.get(str(row["quotation_line_id"])))
+                and _line_context_matches(clean_search, line_ctx)
+            ]
             decision_rows = filtered
 
         auto_tasks: list[MatchTask] = []
@@ -2203,6 +2172,48 @@ def _decode_cursor(cursor: str | None) -> int:
         return int(base64.urlsafe_b64decode(cursor.encode()).decode())
     except (ValueError, UnicodeDecodeError) as exc:
         raise NotFoundError(details={"cursor": "invalid"}) from exc
+
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def queue_search_filter_sql(*, has_words: bool = True, has_ids: bool = True) -> str:
+    """The queue search predicate: word-prefix on names, substring on ids, folded Arabic/Persian.
+
+    The internal ``reason`` code is not searched; it is not text a buyer reads (P-152). A term
+    with no word in it (only separators or tashkeel) searches the ids alone.
+    """
+    id_arms = (
+        "quotation_id::text like '%%' || %(search_ids)s || '%%' "
+        "or ('#' || line_number::text) like '%%' || %(search_ids)s || '%%' "
+        "or line_number::text like '%%' || %(search_ids)s || '%%'"
+    )
+    if not has_words:
+        return f"({id_arms})" if has_ids else "false"
+    words = " or ".join(
+        f"(' ' || {sql_word_expression(col)}) like '%% ' || %(search_folded)s || '%%' "
+        f"or (' ' || {sql_word_expression(col)}) like "
+        f"'%% {SQL_ARTICLE}' || %(search_folded)s || '%%'"
+        for col in ("original_text", "supplier_name")
+    )
+    return f"({words} or {id_arms})" if has_ids else f"({words})"
+
+
+def _line_context_matches(term: str, line_ctx: dict[str, object]) -> bool:
+    """Match a queue-search term against a line's names (word prefix) and ids (substring)."""
+    if search_words(term) and search_matches(
+        term, [line_ctx.get("original_text"), line_ctx.get("supplier_name")]
+    ):
+        return True
+    lowered = term.strip().lower()
+    if not lowered.lstrip("#").strip():
+        return False
+    return (
+        lowered in f"#{line_ctx.get('line_number')}"
+        or lowered in str(line_ctx.get("line_number"))
+        or lowered in str(line_ctx.get("quotation_id", "")).lower()
+    )
 
 
 def _prefetch_search_context(client: object, line_ids: list[str]) -> dict[str, dict[str, object]]:

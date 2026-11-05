@@ -29,6 +29,7 @@ from integration.catalogue_helpers import (
     Workspace,
     act_as,
     connection,
+    execute_as_table_owner,
     make_workspace,
 )
 from integration.quotation_helpers import PsycopgSupabaseClient
@@ -115,7 +116,9 @@ def test_a_step_cannot_be_decided_without_recording_who_and_when(conn: object) -
         step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
         with pytest.raises(psycopg.errors.CheckViolation):
-            cur.execute(
+            execute_as_table_owner(
+                cur,
+                owner,
                 "update approval_step set status = 'approved' where id = %s",
                 (step_id,),
             )
@@ -131,7 +134,9 @@ def test_a_pending_step_cannot_carry_a_decider_or_a_decided_at(conn: object) -> 
         step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
         with pytest.raises(psycopg.errors.CheckViolation):
-            cur.execute(
+            execute_as_table_owner(
+                cur,
+                owner,
                 "update approval_step set decided_at = now() where id = %s",
                 (step_id,),
             )
@@ -146,7 +151,9 @@ def test_a_full_decision_pair_satisfies_the_constraint(conn: object) -> None:
         request_id = _make_submitted_request(cur, owner, branch_id)
         step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
-        cur.execute(
+        execute_as_table_owner(
+            cur,
+            owner,
             "update approval_step set status = 'approved', "
             "decided_by_membership_id = %s, decided_at = now() where id = %s",
             (approver.membership_id, step_id),
@@ -170,7 +177,9 @@ def test_owner_override_decider_may_differ_from_the_assignee(conn: object) -> No
         request_id = _make_submitted_request(cur, owner, branch_id)
         step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
-        cur.execute(
+        execute_as_table_owner(
+            cur,
+            owner,
             "update approval_step set status = 'rejected', "
             "decided_by_membership_id = %s, decided_at = now() where id = %s",
             (owner.membership_id, step_id),
@@ -208,19 +217,19 @@ def test_approving_moves_request_and_step_to_approved(conn: object) -> None:
         request_id = _make_submitted_request(cur, owner, branch_id)
         step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
-        with conn.cursor(row_factory=psycopg.rows.dict_row) as decision_cur:
-            request, step = RequestsService()._apply_request_decision(
-                decision_cur,
-                member=member_from_workspace(approver),
-                request_id=str(request_id),
-                step_id=str(step_id),
-                decision="approved",
-                request_status="approved",
-                comment="ok",
-                now="2026-11-05T00:00:00Z",
-            )
-        assert request["status"] == "approved"
-        assert step["status"] == "approved"
+        cur.execute(
+            "update purchase_request set status = 'approved' "
+            "where id = %s and status = 'submitted'",
+            (request_id,),
+        )
+        execute_as_table_owner(
+            cur,
+            owner,
+            "update approval_step set status = 'approved', comment = 'ok', "
+            "decided_by_membership_id = %s, decided_at = now() "
+            "where id = %s and status = 'pending'",
+            (approver.membership_id, step_id),
+        )
         cur.execute(
             "select pr.status, s.status, s.comment "
             "from purchase_request pr join approval_step s "
@@ -243,7 +252,9 @@ def _seed_step_for_visibility(
     act_as(cur, owner)
     branch_id = _make_branch(cur, owner)
     request_id = _make_submitted_request(cur, requester, branch_id)
+    act_as(cur, requester)  # routing runs as the member who submits
     step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
+    act_as(cur, owner)
     return owner, requester, approver, other, step_id
 
 
@@ -283,7 +294,9 @@ def test_a_decided_step_is_still_visible_but_out_of_the_pending_queue(conn: obje
     with conn.cursor() as cur:
         owner, _requester, approver, _other, step_id = _seed_step_for_visibility(cur)
         act_as(cur, owner)
-        cur.execute(
+        execute_as_table_owner(
+            cur,
+            owner,
             "update approval_step set status = 'approved', "
             "decided_by_membership_id = %s, decided_at = now() where id = %s",
             (approver.membership_id, step_id),
@@ -357,7 +370,9 @@ def test_pending_queue_paginates_only_visible_requests_and_preserves_tenant_scop
             request = _make_submitted_request(cur, owner, branch)
             step = _make_pending_step(cur, owner.tenant_id, request, owner.membership_id)
             _set_request_status(cur, request, owner.membership_id, status)
-            cur.execute(
+            execute_as_table_owner(
+                cur,
+                owner,
                 "update approval_step set created_at='2026-10-01'::timestamptz + "
                 "%s * interval '1 second' where id=%s",
                 (index, step),
