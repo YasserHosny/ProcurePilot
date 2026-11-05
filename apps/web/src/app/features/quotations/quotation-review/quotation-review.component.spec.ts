@@ -3519,6 +3519,93 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       });
     });
 
+    describe('Retry and Archive use the app confirm dialog (PPS-216 / P-192)', () => {
+      const ofDialog = (result: boolean) =>
+        ({ afterClosed: () => of(result) }) as MatDialogRef<CatalogueConfirmDialogComponent, boolean>;
+
+      it('Retry Extraction asks through the modal dialog, never window.confirm, and does nothing when cancelled', () => {
+        const nativeConfirm = spyOn(window, 'confirm');
+        dialogSpy.open.calls.reset();
+        apiService.retryExtraction.calls.reset();
+        dialogSpy.open.and.returnValue(ofDialog(false));
+
+        component.retryExtraction();
+
+        expect(nativeConfirm).not.toHaveBeenCalled();
+        expect(dialogSpy.open).toHaveBeenCalledWith(
+          CatalogueConfirmDialogComponent,
+          jasmine.objectContaining({
+            data: jasmine.objectContaining({
+              titleKey: 'quotations.review.retryDialog.title',
+              messageKey: 'quotations.review.retryDialog.message',
+              confirmKey: 'quotations.review.retryDialog.confirm',
+              cancelKey: 'quotations.review.retryDialog.cancel',
+            }),
+          }),
+        );
+        expect(apiService.retryExtraction).not.toHaveBeenCalled();
+        expect(component.isRetryingExtraction()).toBeFalse();
+      });
+
+      it('Retry Extraction runs once the dialog is confirmed', () => {
+        spyOn(window, 'confirm');
+        dialogSpy.open.calls.reset();
+        apiService.retryExtraction.calls.reset();
+        dialogSpy.open.and.returnValue(ofDialog(true));
+        apiService.retryExtraction.and.returnValue(of(mockQuotationDetail));
+
+        component.retryExtraction();
+
+        expect(apiService.retryExtraction).toHaveBeenCalledTimes(1);
+      });
+
+      it('Archive asks through the modal dialog, never window.confirm, and does nothing when cancelled', () => {
+        const nativeConfirm = spyOn(window, 'confirm');
+        component.quotation.set(mockQuotationDetail);
+        fixture.detectChanges();
+        dialogSpy.open.calls.reset();
+        apiService.archiveQuotation.calls.reset();
+        dialogSpy.open.and.returnValue(ofDialog(false));
+
+        component.archiveQuotation();
+
+        expect(nativeConfirm).not.toHaveBeenCalled();
+        expect(dialogSpy.open).toHaveBeenCalledWith(
+          CatalogueConfirmDialogComponent,
+          jasmine.objectContaining({
+            data: jasmine.objectContaining({
+              titleKey: 'quotations.review.archiveDialog.title',
+              messageKey: 'quotations.review.archiveDialog.message',
+              confirmKey: 'quotations.review.archiveDialog.confirm',
+              cancelKey: 'quotations.review.archiveDialog.cancel',
+            }),
+          }),
+        );
+        expect(apiService.archiveQuotation).not.toHaveBeenCalled();
+        expect(component.isArchiving()).toBeFalse();
+      });
+
+      it('Archive runs once the dialog is confirmed', () => {
+        spyOn(window, 'confirm');
+        component.quotation.set(mockQuotationDetail);
+        fixture.detectChanges();
+        dialogSpy.open.calls.reset();
+        apiService.archiveQuotation.calls.reset();
+        dialogSpy.open.and.returnValue(ofDialog(true));
+        apiService.archiveQuotation.and.returnValue(of(mockQuotationDetail));
+        spyOn(TestBed.inject(Router), 'navigate');
+
+        component.archiveQuotation();
+
+        expect(apiService.archiveQuotation).toHaveBeenCalledWith(mockQuotationDetail.id);
+      });
+
+      it('a refused quotation cannot be retried (refusal cannot be undone)', () => {
+        expect(component.canRetryExtraction({ ...mockQuotationDetail, status: 'refused' })).toBeFalse();
+        expect(component.canRetryExtraction({ ...mockQuotationDetail, status: 'in_review' })).toBeTrue();
+      });
+    });
+
     describe('Finding 3: Refused quotation controls', () => {
       it('hides or disables editing controls, lines editing, Save and Confirm on refused quotation', () => {
         const refusedQuote: QuotationDetail = {

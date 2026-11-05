@@ -1254,6 +1254,18 @@
         "delivery_fee": "Delivery fee",
         "suggested_currency": "Suggested currency",
         "pack_details": "Pack details"
+      },
+      "retryDialog": {
+        "title": "Re-run extraction?",
+        "message": "Existing extracted data will be replaced.",
+        "confirm": "Re-run extraction",
+        "cancel": "Cancel"
+      },
+      "archiveDialog": {
+        "title": "Archive this quotation?",
+        "message": "It leaves the inbox and can be restored later.",
+        "confirm": "Archive",
+        "cancel": "Cancel"
       }
     },
     "audit": {
