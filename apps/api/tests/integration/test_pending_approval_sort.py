@@ -6,7 +6,13 @@ from uuid import uuid4
 import psycopg
 import pytest
 
-from integration.catalogue_helpers import TEST_DATABASE_URL, act_as, make_workspace, reset_role
+from integration.catalogue_helpers import (
+    TEST_DATABASE_URL,
+    act_as,
+    execute_as_table_owner,
+    make_workspace,
+    reset_role,
+)
 from integration.smart_compare_helpers import member_from_workspace
 from integration.test_approval_queue_paging import conn as conn
 from integration.test_approvals import (
@@ -41,7 +47,9 @@ def test_all_sorts_traverse_with_changes(
             sid = _make_pending_step(cur, owner.tenant_id, rid, owner.membership_id)
             stamp = datetime(2026, 10, 1, microsecond=index // 2, tzinfo=UTC)
             required = date(2026, 10, 1 + index // 2)
-            cur.execute("update approval_step set created_at=%s where id=%s", (stamp, sid))
+            execute_as_table_owner(
+                cur, owner, "update approval_step set created_at=%s where id=%s", (stamp, sid)
+            )
             cur.execute(
                 "update purchase_request set required_by_date=%s, estimated_total_amount=%s, "
                 "estimated_total_currency=%s where id=%s",
@@ -73,7 +81,9 @@ def test_all_sorts_traverse_with_changes(
         assert [item.id for item in default.items] == expected[:2]
     with conn.cursor() as cur:
         if mutation == "decision":
-            cur.execute(
+            execute_as_table_owner(
+                cur,
+                owner,
                 "update approval_step set status='approved', decided_at=now(), "
                 "decided_by_membership_id=%s where purchase_request_id=%s",
                 (owner.membership_id, first.items[0].id),
@@ -82,7 +92,9 @@ def test_all_sorts_traverse_with_changes(
         else:
             new = _make_submitted_request(cur, owner, branch)
             sid = _make_pending_step(cur, owner.tenant_id, new, owner.membership_id)
-            cur.execute(
+            execute_as_table_owner(
+                cur,
+                owner,
                 "update approval_step set created_at=%s where id=%s",
                 ("2030-01-01" if sort == "submitted_desc" else "2020-01-01", sid),
             )

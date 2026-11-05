@@ -20,6 +20,7 @@ from integration.catalogue_helpers import (
     Workspace,
     act_as,
     connection,
+    execute_as_table_owner,
     make_workspace,
     make_workspace_product,
     reset_role,
@@ -304,7 +305,9 @@ def test_approval_step_decision_fields_paired_rejects_approved_without_decided(
         branch_id = _make_branch(cur, ws)
         request_id = _make_request(cur, ws, branch_id, status="submitted")
         with pytest.raises(psycopg.errors.CheckViolation):
-            cur.execute(
+            execute_as_table_owner(
+                cur,
+                ws,
                 "insert into approval_step "
                 "(id,tenant_id,purchase_request_id,"
                 "assigned_membership_id,source,status) "
@@ -327,7 +330,9 @@ def test_approval_step_accepts_approved_with_decided(
         branch_id = _make_branch(cur, ws)
         request_id = _make_request(cur, ws, branch_id, status="submitted")
         step_id = uuid4()
-        cur.execute(
+        execute_as_table_owner(
+            cur,
+            ws,
             "insert into approval_step "
             "(id,tenant_id,purchase_request_id,"
             "assigned_membership_id,source,status,"
