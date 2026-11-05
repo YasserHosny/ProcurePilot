@@ -33,6 +33,7 @@ import type {
 } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { formatExactQuantity, percentSign } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { computeBaseQuantity } from '../../catalogue/normalisation';
 
@@ -703,7 +704,10 @@ export class MatchResolutionComponent implements OnInit {
     const resultFraction = shiftedFraction.replace(/0+$/, '');
     const sign = isNegative ? '-' : '';
     const result = resultFraction ? `${resultWhole}.${resultFraction}` : resultWhole;
-    return `${sign}${result}%`;
+    // The decimal shift above keeps the value exact; only the digits and the percent sign follow
+    // the interface language (`14.5%` / `١٤٫٥٪`).
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    return `${sign}${formatExactQuantity(result, locale)}${percentSign(locale)}`;
   }
 
   isDiscountNonZero(discount?: { amount: string | number } | null): boolean {

@@ -862,6 +862,18 @@ describe('MatchResolutionComponent (T039)', () => {
       expect(el.querySelector('.line-card')?.textContent).toContain('14.5%');
     });
 
+    it('shows the VAT rate with Arabic-Indic digits in Arabic and stays exact (P-159)', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog);
+      translate.use('ar');
+      const el = loadDecided({ vat_rate: '0.145' });
+      const text = el.querySelector('.line-card')?.textContent ?? '';
+      expect(text).toMatch(/١٤[.٫]٥\s?٪/);
+      expect(text).not.toContain('14.5%');
+      const whole = loadDecided({ vat_rate: '0.15' });
+      expect(whole.querySelector('.line-card')?.textContent).toMatch(/١٥\s?٪/);
+    });
+
     it('gives every region on the page an accessible name', () => {
       const el = loadDecided();
       const regions = Array.from(el.querySelectorAll('[role="region"]'));

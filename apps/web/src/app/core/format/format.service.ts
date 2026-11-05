@@ -66,6 +66,15 @@ export function formatLocaleNumber(
   return new Intl.NumberFormat(locale, buildNumberFormatOptions(locale, options)).format(num);
 }
 
+/** The locale's percent sign (`%` / `٪`), for a number formatted separately to keep it exact. */
+export function percentSign(locale = 'en'): string {
+  const parts = new Intl.NumberFormat(locale, {
+    style: 'percent',
+    ...(isArabicLocale(locale) ? { numberingSystem: 'arab' } : {}),
+  }).formatToParts(0.5);
+  return parts.find((part) => part.type === 'percentSign')?.value ?? '%';
+}
+
 /**
  * A match score already expressed as a whole percent (`85`) with locale digits and percent sign
  * (`85%` / `٨٥٪`). The score is a rank, not a probability; this only formats it.
