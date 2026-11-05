@@ -52,13 +52,13 @@
           <iframe
             class="pdf-preview-frame"
             [src]="safePreviewUrl"
-            title="Source document preview"
+            [attr.title]="'quotations.review.sourcePreviewTitle' | translate"
             [attr.data-preview-loaded]="previewLoaded ? 'true' : null"
             (load)="onPreviewLoad()"
           ></iframe>
         } @else {
           <div class="doc-preview-loading">
-            <mat-spinner diameter="32"></mat-spinner>
+            <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="32"></mat-spinner>
             <span>{{ 'common.loading' | translate }}</span>
           </div>
         }
@@ -85,6 +85,7 @@
             @if (technicalDetails(fe); as details) {
               <mat-icon
                 class="prov-details-icon"
+                aria-hidden="false"
                 tabindex="0"
                 [matTooltip]="details"
                 [attr.aria-label]="('quotations.review.provenance.technicalDetails' | translate) + ': ' + details"

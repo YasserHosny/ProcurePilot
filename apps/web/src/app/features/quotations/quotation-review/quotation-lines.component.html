@@ -81,32 +81,8 @@
                 @if (lineTotals[line.id]; as total) {
                   <span class="line-summary-total">{{ { amount: total, currency: line.unit_price?.currency || effectiveCurrency } | formatMoney }}</span>
                 }
-                @if (isWriter && quotation.status !== 'reviewed' && quotation.status !== 'refused' && !pendingRemoveLineIds.has(line.id)) {
-                  <button
-                    mat-icon-button
-                    type="button"
-                    (click)="lineMarkedForRemoval.emit(line.id); $event.stopPropagation()"
-                    [matTooltip]="'quotations.review.lines.removeLine' | translate"
-                    [attr.aria-label]="'quotations.review.lines.removeLine' | translate"
-                    [disabled]="isConfirming"
-                    class="remove-line-btn"
-                  >
-                    <mat-icon aria-hidden="true">delete_outline</mat-icon>
-                  </button>
-                }
                 @if (pendingRemoveLineIds.has(line.id)) {
                   <span class="removal-badge">{{ 'quotations.review.lines.markedForRemoval' | translate }}</span>
-                  <button
-                    mat-icon-button
-                    type="button"
-                    (click)="lineUnmarkedForRemoval.emit(line.id); $event.stopPropagation()"
-                    [matTooltip]="'quotations.review.lines.undoRemove' | translate"
-                    [attr.aria-label]="'quotations.review.lines.undoRemove' | translate"
-                    [disabled]="isConfirming"
-                    class="undo-remove-btn"
-                  >
-                    <mat-icon aria-hidden="true">undo</mat-icon>
-                  </button>
                 }
                 @if (getFieldExtraction('quotation_line', line.id, 'unit_price'); as fe) {
                   <span
@@ -119,6 +95,38 @@
                 }
               </mat-panel-description>
             </mat-expansion-panel-header>
+
+            <!-- Line actions stay outside the header: it is itself a button, and buttons cannot nest (axe nested-interactive) -->
+            @if (isWriter && quotation.status !== 'reviewed' && quotation.status !== 'refused' && !pendingRemoveLineIds.has(line.id)) {
+              <div class="line-actions-row">
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="lineMarkedForRemoval.emit(line.id); $event.stopPropagation()"
+                  [matTooltip]="'quotations.review.lines.removeLine' | translate"
+                  [attr.aria-label]="'quotations.review.lines.removeLine' | translate"
+                  [disabled]="isConfirming"
+                  class="remove-line-btn"
+                >
+                  <mat-icon aria-hidden="true">delete_outline</mat-icon>
+                </button>
+              </div>
+            }
+            @if (pendingRemoveLineIds.has(line.id)) {
+              <div class="line-actions-row">
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="lineUnmarkedForRemoval.emit(line.id); $event.stopPropagation()"
+                  [matTooltip]="'quotations.review.lines.undoRemove' | translate"
+                  [attr.aria-label]="'quotations.review.lines.undoRemove' | translate"
+                  [disabled]="isConfirming"
+                  class="undo-remove-btn"
+                >
+                  <mat-icon aria-hidden="true">undo</mat-icon>
+                </button>
+              </div>
+            }
 
             <!-- Line Fields Grid (expanded content) -->
             <div class="line-fields-grid">
@@ -164,6 +172,7 @@
                     type="button"
                     (click)="confirmLineTextAsIs(line)"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
@@ -213,6 +222,7 @@
                     type="button"
                     (click)="fieldConfirmedAsIs.emit({ entityType: 'quotation_line', entityId: line.id, fieldName: 'quantity' })"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
@@ -260,6 +270,7 @@
                     type="button"
                     (click)="confirmPackAsIs(line)"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
@@ -310,6 +321,7 @@
                     type="button"
                     (click)="fieldConfirmedAsIs.emit({ entityType: 'quotation_line', entityId: line.id, fieldName: 'unit_price' })"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
@@ -362,6 +374,7 @@
                     type="button"
                     (click)="fieldConfirmedAsIs.emit({ entityType: 'quotation_line', entityId: line.id, fieldName: 'delivery_fee' })"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
@@ -414,6 +427,7 @@
                     type="button"
                     (click)="fieldConfirmedAsIs.emit({ entityType: 'quotation_line', entityId: line.id, fieldName: 'discount' })"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
@@ -464,6 +478,7 @@
                     type="button"
                     (click)="fieldConfirmedAsIs.emit({ entityType: 'quotation_line', entityId: line.id, fieldName: 'vat_rate' })"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>

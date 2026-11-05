@@ -272,6 +272,37 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.pendingCorrections().get(unitPrice.id)).toEqual(unitPrice.extracted_value);
   });
 
+  it('gives every header confirm-as-is button the accessible name of its tooltip (PPS-162)', () => {
+    const extractions = [
+      { field_name: 'currency', extracted_value: 'GBP' },
+      { field_name: 'issue_date', extracted_value: '2026-08-20' },
+      { field_name: 'expiry_date', extracted_value: '2026-09-20' },
+      { field_name: 'stated_total', extracted_value: { amount: '250.00', currency: 'GBP' } },
+      { field_name: 'prices_include_vat', extracted_value: true },
+      { field_name: 'vat_rate', extracted_value: '0.15' },
+    ].map((field): FieldExtraction => ({
+      ...field,
+      id: `fe-${field.field_name}`,
+      quotation_id: mockQuotationDetail.id,
+      entity_type: 'quotation',
+      entity_id: mockQuotationDetail.id,
+      confidence: '0.5000',
+      extraction_method: 'bedrock',
+      model_version: 'v1',
+      corrected_value: null,
+      corrected_by: null,
+      corrected_at: null,
+    }));
+    component.quotation.set({ ...mockQuotationDetail, prices_include_vat: true, vat_rate: '0.15', field_extractions: extractions });
+    fixture.detectChanges();
+
+    const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.confirm-as-is-btn'));
+    expect(buttons.length).toBe(6);
+    for (const button of buttons) {
+      expect(button.getAttribute('aria-label')).toBe(enCatalog.quotations.review.corrections.confirmAsIsTooltip);
+    }
+  });
+
   it('requests inline preview URLs and attachment URLs from the download button', () => {
     expect(apiService.getDocumentDownloadUrl).toHaveBeenCalledWith('doc-1');
 
