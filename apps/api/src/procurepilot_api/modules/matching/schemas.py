@@ -124,6 +124,10 @@ class MatchDecision(BaseModel):
     outcome: MatchOutcome
     is_automatic: bool
     decided_by: UUID | None = None
+    decided_by_email: str | None = Field(
+        default=None,
+        description="The member who decided, for human decisions on a task or history read.",
+    )
     decided_at: datetime
     confidence: str = Field(
         description=(
@@ -138,6 +142,12 @@ class MatchDecision(BaseModel):
     learned_from_decision_id: UUID | None = Field(
         default=None,
         description="The human decision whose learned wording made this one (spec 023 FR-011).",
+    )
+
+
+class MatchDecisionHistory(BaseModel):
+    items: list[MatchDecision] = Field(
+        description="Every decision on the line, oldest first (the correction chain, ADR-022)."
     )
 
 

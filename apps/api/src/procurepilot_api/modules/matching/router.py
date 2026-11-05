@@ -21,6 +21,7 @@ from procurepilot_api.modules.matching.schemas import (
     MatchCorrectionRequest,
     MatchCorrectionResponse,
     MatchDecision,
+    MatchDecisionHistory,
     MatchQueueList,
     MatchResolutionRequest,
     MatchTask,
@@ -119,6 +120,16 @@ def list_match_tasks(
         sort_by=sort_by,
         sort_order=sort_order,
     )
+
+
+@router.get("/quotation-lines/{line_id}/match/history", response_model=MatchDecisionHistory)
+def match_decision_history(
+    line_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    _member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[MatchingService, Depends(get_matching_service)],
+) -> MatchDecisionHistory:
+    return service.decision_history(bearer_token=token, line_id=line_id)
 
 
 @router.post("/quotation-lines/{line_id}/match", response_model=MatchDecision)
