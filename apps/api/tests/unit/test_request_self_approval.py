@@ -43,7 +43,7 @@ def test_self_decision_is_refused_before_any_write(decision: str, role: MemberRo
             request_id=str(rid),
             step_id=str(step["id"]),
             decision=decision,
-            request_status="ordered",
+            request_status="approved",
             comment="Reason",
             now="2026-11-03",
         )
@@ -89,7 +89,7 @@ def test_only_active_owner_or_another_requester_allows_writes(self_decision: boo
         request_id=str(rid),
         step_id=str(step["id"]),
         decision="approved",
-        request_status="ordered",
+        request_status="approved",
         comment=None,
         now="2026-11-03",
     )
@@ -109,7 +109,7 @@ def test_stale_authorization_precedes_self_decision_rule() -> None:
             request_id=str(rid),
             step_id=str(cur.step["id"]),
             decision="approved",
-            request_status="ordered",
+            request_status="approved",
             comment=None,
             now="2026-11-03",
         )

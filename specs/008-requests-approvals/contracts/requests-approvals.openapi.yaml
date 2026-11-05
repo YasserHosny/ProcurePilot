@@ -7,8 +7,10 @@ info:
     resolved server-side from the token, cursor pagination capped at 100, Idempotency-Key on
     mutations, and the {code, message, details, trace_id} error envelope.
 
-    A purchase request moves draft -> submitted -> (ordered | rejected), with withdrawal
-    available from draft/submitted/ordered while the withdrawal rules permit it. Submission
+    A purchase request moves draft -> submitted -> (approved | rejected), with withdrawal
+    available from draft/submitted/approved/ordered while the withdrawal rules permit it.
+    Under ADR-025, a live purchase order moves approved to ordered; cancelling or detaching
+    the last live order returns ordered to approved. Legacy ordered rows are not backfilled. Submission
     resolves an approver via threshold rules, active delegation, and an owner fallback
     (research.md R3), captures the request's estimated value from price history (research.md R2),
     and creates one approval_step. A same-tenant, different-branch reference for a branch-scoped
@@ -127,7 +129,7 @@ paths:
     post:
       summary: Withdraw a request before a live purchase order exists
       description: >
-        Requester or workspace owner. Accepts draft/submitted/ordered. An ordered request
+        Requester or workspace owner. Accepts draft/submitted/approved/ordered. An approved or ordered request
         referencing any purchase order whose status is not cancelled returns 409 with
         details.reason purchase_order_exists. Sets withdrawn_at, releases committed budget
         spend, and audits previous_status. Other terminal states return 409 with

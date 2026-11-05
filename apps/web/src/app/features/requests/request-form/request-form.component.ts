@@ -286,7 +286,7 @@ export class RequestFormComponent implements OnInit {
 
   readonly canWithdraw = computed<boolean>(() => {
     const req = this.existingRequest();
-    return req !== null && (req.status === 'draft' || req.status === 'submitted');
+    return req !== null && ['draft', 'submitted', 'approved', 'ordered'].includes(req.status);
   });
 
   getGroupSubmitLabel(size: number): string {

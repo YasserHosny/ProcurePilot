@@ -656,6 +656,9 @@ def test_create_order_validates_request_linkage(monkeypatch: pytest.MonkeyPatch)
         bearer_token="token", member=_member(), payload=valid_payload, idempotency_key=UUID(int=10)
     )
 
+    status_writes = [stmt for stmt, _ in cursor.executed if "update purchase_request" in stmt]
+    assert any("'ordered'" in stmt and "'approved'" in stmt for stmt in status_writes)
+
     # 2. Exceeds allocation (ordered 6, remaining 5)
     payload_exceeds = PurchaseOrderCreate(
         order_number="PO-link",
@@ -1168,6 +1171,17 @@ def test_cancel_order(monkeypatch: pytest.MonkeyPatch) -> None:
         bearer_token="token", member=_member(), order_id=order_id, idempotency_key=idempotency_key
     )
     assert res.id == order_id
+    status_writes = [stmt for stmt, _ in cursor.executed if "update purchase_request" in stmt]
+    assert any("'approved'" in stmt and "not exists" in stmt for stmt in status_writes)
+    cancellation_index = next(
+        i
+        for i, (stmt, _) in enumerate(cursor.executed)
+        if "update purchase_order set status = 'cancelled'" in stmt
+    )
+    status_index = next(
+        i for i, (stmt, _) in enumerate(cursor.executed) if "update purchase_request" in stmt
+    )
+    assert cancellation_index < status_index
 
     # Check lock invocation
     expected_lock_id = (tenant_id.int ^ req_id.int) & 0x7FFFFFFFFFFFFFFF

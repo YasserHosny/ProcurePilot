@@ -25,7 +25,8 @@ paths:
     post:
       summary: Confirm delivery of an ordered request
       description: >
-        Requires the request's status to be `ordered` (data-model.md). Records the quantity
+        Requires the request's status to be `ordered` (data-model.md). Under ADR-025 approval
+        alone leaves it `approved`; a live purchase order advances it to `ordered`. Records the quantity
         actually received per line and derives has_delivery_discrepancy. Requires the caller to
         be the requester or hold branch-scoped write access for the request's branch, the same
         authorization shape 008-requests-approvals already uses for other requester-initiated

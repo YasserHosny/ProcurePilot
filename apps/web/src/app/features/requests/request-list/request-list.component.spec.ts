@@ -422,8 +422,8 @@ describe('RequestListComponent (T017)', () => {
     });
   });
 
-  it('hides Withdraw on ordered and terminal requests and shows it on draft and submitted (PPS-188)', () => {
-    for (const status of ['ordered', 'withdrawn', 'rejected', 'approved'] as const) {
+  it('offers withdrawal for approved and legacy ordered requests; server checks live orders', () => {
+    for (const status of ['withdrawn', 'rejected', 'delivered'] as const) {
       component.requests.set([{ ...mockRequests[0], status }]);
       fixture.detectChanges();
       const element = fixture.nativeElement as HTMLElement;
@@ -431,7 +431,7 @@ describe('RequestListComponent (T017)', () => {
       expect(component.canWithdraw(component.requests()[0])).toBeFalse();
     }
 
-    for (const status of ['draft', 'submitted'] as const) {
+    for (const status of ['draft', 'submitted', 'approved', 'ordered'] as const) {
       component.requests.set([{ ...mockRequests[0], status }]);
       fixture.detectChanges();
       const element = fixture.nativeElement as HTMLElement;
@@ -469,7 +469,7 @@ describe('RequestListComponent (T017)', () => {
     { label: 'owner', memberId: 'm2', role: 'owner' },
     { label: 'another buyer', memberId: 'm2', role: 'buyer' },
   ] as const) {
-    it(`never shows ordered Withdraw regardless of role (PPS-188): ${scenario.label}`, () => {
+    it(`offers ordered withdrawal subject to server authorization: ${scenario.label}`, () => {
       currentMember.set({ id: 'user-1', membership_id: scenario.memberId });
       role.set(scenario.role);
       component.requests.set([{ ...mockRequests[0], status: 'ordered' }]);
@@ -478,8 +478,8 @@ describe('RequestListComponent (T017)', () => {
       const button = (fixture.nativeElement as HTMLElement).querySelector(
         'button[aria-label="Withdraw request"]',
       );
-      expect(button).toBeNull();
-      expect(component.canWithdraw(component.requests()[0])).toBeFalse();
+      expect(button).not.toBeNull();
+      expect(component.canWithdraw(component.requests()[0])).toBeTrue();
     });
   }
 

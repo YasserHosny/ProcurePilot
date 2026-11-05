@@ -1517,6 +1517,16 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       expect(retryKey).toBe(firstKey);
     });
 
+    for (const status of ['approved', 'ordered'] as const) {
+      it(`offers withdrawal for ${status} requests subject to the live-order check`, () => {
+        requestsApi.getRequest.and.returnValue(of({ ...groupedRequest, status }));
+        const hostFixture = TestBed.createComponent(RequestFormComponent);
+        hostFixture.detectChanges();
+        expect(hostFixture.componentInstance.canWithdraw()).toBeTrue();
+        expect(hostFixture.nativeElement.querySelector('.withdraw-request-btn')).toBeTruthy();
+      });
+    }
+
     it('opens confirm dialog on withdraw click and does not withdraw if cancelled (PPS-188)', () => {
       requestsApi.withdrawRequest.calls.reset();
       dialogSpy.open.calls.reset();
