@@ -139,9 +139,9 @@ DELEGATION_COLUMNS = (
     "id,delegator_membership_id,delegate_membership_id,starts_on,ends_on,created_at"
 )
 BUDGET_COLUMNS = "id,amount,currency,period,period_start,scope,branch_id,cost_centre_id"
-# Statuses whose estimate counts against a budget. An approved request moves straight to
-# "ordered" (spec 010) and later "delivered", so both stay committed spend; draft, rejected
-# and withdrawn requests never count.
+# Statuses whose estimate counts against a budget. An approved request stays "approved" until a
+# live purchase order moves it to "ordered" (ADR-025), later "delivered"; approved, ordered and
+# delivered all count as committed spend (draft, rejected and withdrawn do not).
 COMMITTED_SPEND_STATUSES = ("submitted", "approved", "ordered", "delivered")
 # Matches the Data API max_rows (supabase/config.toml); a full page means "fetch the next".
 COMMITTED_SPEND_PAGE_SIZE = 1000
