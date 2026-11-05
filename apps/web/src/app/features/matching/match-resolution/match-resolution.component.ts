@@ -100,6 +100,11 @@ export class MatchResolutionComponent implements OnInit {
   readonly line = signal<QuotationLineSummary | null>(null);
   readonly candidates = signal<MatchCandidate[]>([]);
   readonly decision = signal<MatchDecision | null>(null);
+
+  // Correction chain (P-154): loaded when the buyer opens it, so it is always current.
+  readonly historyOpen = signal(false);
+  readonly history = signal<readonly MatchDecision[] | null>(null);
+  readonly historyFailed = signal(false);
   readonly landedCost = signal<LandedCost | null>(null);
 
   readonly baseUnits = signal<SelectableUnit[]>([]);
@@ -319,6 +324,8 @@ export class MatchResolutionComponent implements OnInit {
 
     if (t.decision) {
       this.decision.set(t.decision);
+      this.history.set(null);
+      this.historyOpen.set(false);
       this.selectedOutcome.set(t.decision.outcome);
       if (t.decision.selected_match_candidate_id) {
         this.selectedCandidateId.set(t.decision.selected_match_candidate_id);
@@ -361,6 +368,21 @@ export class MatchResolutionComponent implements OnInit {
         if (costRequestId !== this.latestLandedCostRequestId) return;
         this.isLoading.set(false);
       },
+    });
+  }
+
+  toggleHistory(): void {
+    if (this.historyOpen()) {
+      this.historyOpen.set(false);
+      return;
+    }
+    const lineId = this.line()?.id;
+    if (!lineId) return;
+    this.historyOpen.set(true);
+    this.historyFailed.set(false);
+    this.api.getDecisionHistory(lineId).subscribe({
+      next: (res) => this.history.set(res.items),
+      error: () => this.historyFailed.set(true),
     });
   }
 
@@ -571,6 +593,8 @@ export class MatchResolutionComponent implements OnInit {
         this.isSubmitting.set(false);
         this.resolutionKey = null;
         this.decision.set(decision);
+        this.history.set(null);
+        this.historyOpen.set(false);
         if (resolveNext) {
           this.navigateToNextTask(l.id, decision);
           return;
@@ -749,6 +773,8 @@ export class MatchResolutionComponent implements OnInit {
 
         this.loadTask(lineId);
         this.decision.set(res.decision);
+        this.history.set(null);
+        this.historyOpen.set(false);
 
         if (res.lines_matched_through_old_wording && res.lines_matched_through_old_wording.length > 0) {
           this.dependentLinesCount.set(res.lines_matched_through_old_wording.length);

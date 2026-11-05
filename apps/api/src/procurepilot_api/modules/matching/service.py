@@ -33,6 +33,7 @@ from procurepilot_api.modules.matching.rfq_fit import RfqFit, fit_against_rfq
 from procurepilot_api.modules.matching.schemas import (
     MatchCandidate,
     MatchDecision,
+    MatchDecisionHistory,
     MatchQueueCandidateSummary,
     MatchQueueItem,
     MatchQueueList,
@@ -531,6 +532,27 @@ class MatchingService:
                 return self._task(client, _synthetic_decided_task(decision), line_row=line)
             raise NotFoundError(details={"resource": "match_task"})
         return self._task(client, task, line_row=line)
+
+    def decision_history(self, *, bearer_token: str, line_id: UUID) -> MatchDecisionHistory:
+        """Every decision on a line, oldest first: the correction chain ADR-022 keeps."""
+        client = authenticated_client(self._settings, bearer_token)
+        _line_row(client, line_id)
+        try:
+            response = (
+                client.table("match_decision")
+                .select(DECISION_COLUMNS)
+                .eq("quotation_line_id", str(line_id))
+                .order("decided_at")
+                .order("id")
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        emails: dict[str, str | None] = {}
+        items = [
+            _decision_with_actor(client, row, emails) for row in _chain_order(_rows(response.data))
+        ]
+        return MatchDecisionHistory(items=items)
 
     def _ensure_pipeline(
         self,
@@ -1317,7 +1339,7 @@ class MatchingService:
                 _candidate(client, candidate)
                 for candidate in _candidate_rows(client, UUID(str(line_row["id"])))
             ],
-            decision=_decision(client, decision_row) if decision_row else None,
+            decision=_decision_with_actor(client, decision_row) if decision_row else None,
         )
 
     def _backfill_missing_embeddings(self, client: object) -> None:
@@ -1999,6 +2021,37 @@ def _candidate_from(row: dict[str, object], products: dict[str, ProductSummary])
         embedding_model=str(row["embedding_model"]) if row.get("embedding_model") else None,
         created_at=row["created_at"],
     )
+
+
+def _chain_order(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Oldest first by supersession depth: decisions made in one transaction share a timestamp."""
+    by_id = {str(row["id"]): row for row in rows}
+
+    def depth(row: dict[str, object]) -> int:
+        seen: set[str] = set()
+        count = 0
+        parent = row.get("supersedes_decision_id")
+        while parent is not None and str(parent) in by_id and str(parent) not in seen:
+            seen.add(str(parent))
+            count += 1
+            parent = by_id[str(parent)].get("supersedes_decision_id")
+        return count
+
+    return sorted(rows, key=lambda row: (depth(row), str(row["decided_at"]), str(row["id"])))
+
+
+def _decision_with_actor(
+    client: object, row: dict[str, object], emails: dict[str, str | None] | None = None
+) -> MatchDecision:
+    """`_decision` plus the deciding member's email, read once per member."""
+    decision = _decision(client, row)
+    if decision.decided_by is not None:
+        key = str(decision.decided_by)
+        cache = emails if emails is not None else {}
+        if key not in cache:
+            cache[key] = _membership_email(client, decision.decided_by)
+        decision.decided_by_email = cache[key]
+    return decision
 
 
 def _decision(client: object, row: dict[str, object]) -> MatchDecision:

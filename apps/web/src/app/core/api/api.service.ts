@@ -49,6 +49,7 @@ import type {
   LimitCheck,
   MatchCandidate,
   MatchDecision,
+  MatchDecisionHistory,
   MatchResolutionRequest,
   MatchCorrectionRequest,
   MatchCorrectionResponse,
@@ -723,6 +724,10 @@ export class ApiService {
       body,
       { headers },
     );
+  }
+
+  getDecisionHistory(lineId: string): Observable<MatchDecisionHistory> {
+    return this.http.get<MatchDecisionHistory>(`${this.base}/quotation-lines/${lineId}/match/history`);
   }
 
   addManualCandidate(lineId: string, productId: string): Observable<MatchCandidate> {

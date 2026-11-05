@@ -1590,7 +1590,15 @@
         "automatic": "Automatic Match",
         "human": "Human Resolution",
         "confidence": "Match Score:",
-        "fromRfqLine": "From your RFQ line {{position}}"
+        "fromRfqLine": "From your RFQ line {{position}}",
+        "history": {
+          "show": "Show decision history",
+          "hide": "Hide decision history",
+          "title": "Decision history",
+          "loading": "Loading the history…",
+          "failed": "The history could not be loaded. Try again.",
+          "current": "Current"
+        }
       },
       "actions": {
         "confirm": "Confirm Match Decision",

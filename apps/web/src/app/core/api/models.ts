@@ -552,6 +552,11 @@ export interface MatchCandidate {
   readonly created_at: string;
 }
 
+export interface MatchDecisionHistory {
+  /** Every decision on the line, oldest first (the correction chain). */
+  readonly items: readonly MatchDecision[];
+}
+
 export interface MatchDecision {
   readonly id: string;
   readonly quotation_line_id: string;
@@ -560,6 +565,8 @@ export interface MatchDecision {
   readonly outcome: MatchOutcome;
   readonly is_automatic: boolean;
   readonly decided_by?: string | null;
+  /** The deciding member, set on a task's decision and on history reads. */
+  readonly decided_by_email?: string | null;
   readonly decided_at: string;
   readonly confidence: string;
   readonly alias_id?: string | null;

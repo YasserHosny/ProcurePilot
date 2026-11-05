@@ -283,3 +283,33 @@ kbd {
   font-weight: 600;
   .btn-content { display: inline-flex; align-items: center; gap: 0.35rem; }
 }
+
+.history-toggle {
+  margin-block-start: 8px;
+}
+
+.history-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.history-when,
+.history-who {
+  color: var(--mat-sys-on-surface-variant, #5f6368);
+}
+
+.history-error {
+  margin: 8px 0 0;
+  color: var(--mat-sys-error, #b3261e);
+}
