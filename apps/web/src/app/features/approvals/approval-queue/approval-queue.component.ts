@@ -279,6 +279,7 @@ export class ApprovalQueueComponent implements OnInit {
   readonly branchFilter = signal<string>('');
   readonly totalCount = signal<number | null>(null);
   readonly sortOptions = PENDING_APPROVAL_SORTS;
+  readonly hasActiveBranchFilter = computed(() => this.branchFilter() !== '');
   readonly hasActiveFilters = computed(
     () => this.sortOption() !== DEFAULT_SORT || this.branchFilter() !== '',
   );

@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import psycopg
 import pytest
+from psycopg.rows import dict_row
 
 from integration.catalogue_helpers import (
     TEST_DATABASE_URL,
@@ -22,6 +23,7 @@ from integration.test_approvals import (
     _make_submitted_request,
     _queue_service,
 )
+from procurepilot_api.modules.requests.schemas import RequestGroupSummary
 
 pytestmark = pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL not set")
 SORTS = ["submitted_desc", "submitted_asc", "required_by_asc", "total_desc", "total_asc"]
@@ -193,3 +195,69 @@ def test_visibility_filters_and_count(
             assert own not in seen and terminal not in seen
     with conn.cursor() as cur:
         reset_role(cur)
+
+
+@pytest.mark.parametrize("sort", ["total_desc", "total_asc"])
+@pytest.mark.parametrize("limit", [1, 2])
+def test_split_group_combined_total_traversal(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, sort: str, limit: int
+) -> None:
+    from integration.test_request_group_schema import _insert_group, _setup
+
+    with conn.cursor() as cur:
+        owner, branch, rfq, job = _setup(cur, f"group-sort-{uuid4().hex}")
+        group = _insert_group(cur, owner, branch, rfq, job)
+        act_as(cur, owner)
+        members = []
+        ordinary = []
+        # The immutable group total is 4063 SAR; member estimates deliberately differ.
+        for amount, grouped in [(1, True), (2, True), (50, False), (100, False)]:
+            rid = _make_submitted_request(cur, owner, branch)
+            sid = _make_pending_step(cur, owner.tenant_id, rid, owner.membership_id)
+            cur.execute(
+                "update purchase_request set estimated_total_amount=%s, "
+                "estimated_total_currency='SAR', request_group_id=%s where id=%s",
+                (amount, group if grouped else None, rid),
+            )
+            (members if grouped else ordinary).append((rid, sid))
+    group_ids = [rid for rid, _ in sorted(members, key=lambda row: row[1])]
+    expected = (
+        group_ids + [rid for rid, _ in reversed(ordinary)]
+        if sort == "total_desc"
+        else [rid for rid, _ in ordinary] + group_ids
+    )
+    service = _queue_service(conn, monkeypatch, owner)
+    member = member_from_workspace(owner)
+
+    # The shared adapter cannot embed PostgREST relations. Use the equivalent real-RLS
+    # SQL enrichment so page-edge assertions include every sibling outside the page.
+    def fetch_groups(
+        _client: object, rows: list[dict[str, object]]
+    ) -> dict[str, RequestGroupSummary]:
+        previous_row_factory = conn.row_factory
+        try:
+            conn.row_factory = dict_row
+            return service._fetch_request_groups_sql(conn, member=member, request_rows=rows)
+        finally:
+            conn.row_factory = previous_row_factory
+
+    monkeypatch.setattr(service, "_fetch_request_groups_batch", fetch_groups)
+    seen = []
+    cursor = None
+    while True:
+        page = service.list_pending_approvals(
+            bearer_token="test", member=member, sort=sort, limit=limit, cursor=cursor
+        )
+        assert page.total == 4
+        seen.extend(item.id for item in page.items)
+        assert seen == expected[: len(seen)]
+        assert len(seen) <= 4
+        for item in page.items:
+            if item.id in group_ids:
+                assert item.request_group is not None
+                assert item.request_group.size == 2
+                assert set(item.request_group.sibling_request_ids) == set(group_ids) - {item.id}
+        cursor = page.next_cursor
+        if cursor is None:
+            break
+    assert seen == expected

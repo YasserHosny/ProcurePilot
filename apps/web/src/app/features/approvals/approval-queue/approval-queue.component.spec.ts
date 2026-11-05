@@ -546,7 +546,7 @@ describe('ApprovalQueueComponent', () => {
         const batch = startBatch();
         approvalsApi.listPendingApprovals.and.returnValue(of({items: [], next_cursor: null, total: 0}));
 
-        queryParamMapSubject.next(convertToParamMap({sort: 'total_desc'})); fixture.detectChanges();
+        queryParamMapSubject.next(convertToParamMap({sort: 'total_desc', branch: VALID_BRANCH_ID})); fixture.detectChanges();
 
         expect((query('[data-testid="empty-filtered"] button') as HTMLButtonElement).disabled).toBeTrue();
         batch.next(bulkResponse()); batch.complete();
@@ -2833,13 +2833,13 @@ describe('ApprovalQueueComponent', () => {
       expect(fixture.nativeElement.querySelector('[data-testid="empty-default"]')).toBeTruthy();
       expect(fixture.nativeElement.querySelector('[data-testid="empty-filtered"]')).toBeNull();
 
-      component.onSortChange('submitted_asc');
+      component.onBranchChange(VALID_BRANCH_ID);
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('[data-testid="empty-default"]')).toBeNull();
       expect(
         fixture.nativeElement.querySelector('[data-testid="empty-filtered"]')?.textContent,
-      ).toContain('No pending requests match these filters.');
+      ).toContain('No pending requests in this branch.');
       expect(fixture.nativeElement.querySelector('[data-testid="clear-filters-btn"]')).toBeTruthy();
     });
 
@@ -2858,6 +2858,35 @@ describe('ApprovalQueueComponent', () => {
       fixture.detectChanges();
       expect(live.textContent).toContain('تم الترتيب حسب الأقدم أولاً، 12 طلبًا معلقًا');
     });
+
+    for (const scenario of [
+      { sort: 'total_asc' as const, branch: '', filtered: false },
+      { sort: 'submitted_desc' as const, branch: VALID_BRANCH_ID, filtered: true },
+      { sort: 'total_asc' as const, branch: VALID_BRANCH_ID, filtered: true },
+    ]) {
+      it(`uses the correct empty state for sort ${scenario.sort} and branch ${scenario.branch}`, () => {
+        component.sortOption.set(scenario.sort);
+        component.branchFilter.set(scenario.branch);
+        component.pendingRequests.set([]);
+        component.isLoading.set(false);
+        fixture.detectChanges();
+
+        const root: HTMLElement = fixture.nativeElement;
+        const filtered = root.querySelector('[data-testid="empty-filtered"]');
+        const plain = root.querySelector('[data-testid="empty-default"]');
+        expect(filtered !== null).toBe(scenario.filtered);
+        expect(plain !== null).toBe(!scenario.filtered);
+        expect(root.querySelector('.empty-state button') !== null).toBe(scenario.filtered);
+        expect(component.hasActiveFilters()).toBe(true);
+        expect(root.querySelector('[data-testid="clear-filters-btn"]')).not.toBeNull();
+        if (scenario.filtered) {
+          expect(filtered?.textContent).toContain('No pending requests in this branch.');
+          TestBed.inject(TranslateService).use('ar');
+          fixture.detectChanges();
+          expect(filtered?.textContent).toContain('لا توجد طلبات معلقة في هذا الفرع.');
+        }
+      });
+    }
 
     it('reloads page 1 with the current sort and branch after a decision', () => {
       component.sortOption.set('total_asc');
@@ -3007,6 +3036,40 @@ describe('ApprovalQueueComponent', () => {
         sort: 'submitted_asc',
         limit: 50,
       });
+      expect(fixture.nativeElement.querySelector('[data-testid="empty-default"]')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="empty-filtered"]')).toBeNull();
+    });
+
+    it('shows the filtered empty state after retrying a failed branch-filtered load', () => {
+      component.onBranchChange(VALID_BRANCH_ID);
+      fixture.detectChanges();
+      approvalsApi.listPendingApprovals.calls.reset();
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(
+          () => new HttpErrorResponse({ status: 500, error: { message: 'Boom' } }),
+        ),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(component.pageLoadFailed()).toBeTrue();
+      expect(fixture.nativeElement.querySelector('[data-testid="empty-default"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="empty-filtered"]')).toBeNull();
+      const retry = fixture.nativeElement.querySelector(
+        '[data-testid="retry-load-btn"]',
+      ) as HTMLButtonElement | null;
+      expect(retry).not.toBeNull();
+
+      approvalsApi.listPendingApprovals.and.returnValue(of(list([], null, 0)));
+      retry?.click();
+      fixture.detectChanges();
+
+      expect(component.pageLoadFailed()).toBeFalse();
+      expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
+        branch_id: VALID_BRANCH_ID,
+        limit: 50,
+      });
+      expect(fixture.nativeElement.querySelector('[data-testid="empty-default"]')).toBeNull();
       expect(fixture.nativeElement.querySelector('[data-testid="empty-filtered"]')).not.toBeNull();
     });
 

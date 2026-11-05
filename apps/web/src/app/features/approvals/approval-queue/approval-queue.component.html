@@ -142,7 +142,7 @@
     } @else if (pageLoadFailed()) {
       <div class="load-failed-state" data-testid="load-failed-state"></div>
     } @else if (queueItems().length === 0) {
-      @if (hasActiveFilters()) {
+      @if (hasActiveBranchFilter()) {
         <div class="empty-state" data-testid="empty-filtered">
           <mat-icon class="empty-icon" aria-hidden="true">filter_alt_off</mat-icon>
           <p class="empty-message">{{ 'approvals.emptyFiltered' | translate }}</p>

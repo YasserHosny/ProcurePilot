@@ -4452,8 +4452,8 @@ _APPROVAL_SORT_COLUMNS = {
     "submitted_desc": ("ast.created_at", "desc"),
     "submitted_asc": ("ast.created_at", "asc"),
     "required_by_asc": ("pr.required_by_date", "asc"),
-    "total_desc": ("pr.estimated_total_amount", "desc"),
-    "total_asc": ("pr.estimated_total_amount", "asc"),
+    "total_desc": ("coalesce(prg.combined_total_amount, pr.estimated_total_amount)", "desc"),
+    "total_asc": ("coalesce(prg.combined_total_amount, pr.estimated_total_amount)", "asc"),
 }
 
 
@@ -4498,6 +4498,8 @@ def _pending_approval_query(
     query = (
         f"select {projection} from approval_step ast "
         "join purchase_request pr on pr.id = ast.purchase_request_id "
+        "left join purchase_request_group prg "
+        "on prg.tenant_id = pr.tenant_id and prg.id = pr.request_group_id "
         "where " + " and ".join(predicates)
     )
     if not count:
@@ -4562,7 +4564,7 @@ def _decode_approval_cursor(
         elif value is not None:
             if sort == "required_by_asc":
                 value = date.fromisoformat(value).isoformat()
-            # purchase_request.estimated_total_amount is numeric(18, 4).
+            # Both member estimates and immutable group totals are numeric(18, 4).
             elif (
                 not value.isascii()
                 or re.fullmatch(r"[+-]?[0-9]{1,14}(?:\.[0-9]{1,4})?", value) is None

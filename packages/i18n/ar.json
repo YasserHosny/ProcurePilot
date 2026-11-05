@@ -2640,7 +2640,7 @@
     "announce": {
       "sorted": "تم الترتيب حسب {{sort}}، {{count}}"
     },
-    "emptyFiltered": "لا توجد طلبات معلقة تطابق عوامل التصفية هذه.",
+    "emptyFiltered": "لا توجد طلبات معلقة في هذا الفرع.",
     "columns": {
       "requester": "مقدم الطلب",
       "branch": "الفرع",
