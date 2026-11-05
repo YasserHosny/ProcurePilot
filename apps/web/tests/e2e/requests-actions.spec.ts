@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect, type Page } from '@playwright/test';
 import { authFile } from '../../playwright.config';
-import { apiAsUser, createTestProduct, signInOwner } from './support/api';
+import { apiAsUser, createTestProduct, setOwnerLocale, signInOwner } from './support/api';
 import { openAsyncSelect } from './support/select';
 
 test.use({ storageState: authFile });
@@ -57,8 +57,10 @@ test.describe('Purchase request actions and URL state', () => {
     await page.goto('/home');
     await expect(page.getByRole('button', { name: /account options|خيارات الحساب/i })).toBeVisible();
     if ((await page.locator('html').getAttribute('dir')) === 'rtl') {
-      await page.getByRole('button', { name: /account options|خيارات الحساب/i }).click();
-      await page.getByRole('menuitem', { name: 'English', exact: true }).click();
+      // The shared owner's language is stored on the server and earlier specs may leave it
+      // Arabic. Reset it there instead of clicking a menu item whose accessible name varies.
+      await setOwnerLocale('en', token);
+      await page.reload();
     }
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
   });
