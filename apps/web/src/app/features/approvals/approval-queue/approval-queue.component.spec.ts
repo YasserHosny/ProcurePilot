@@ -168,6 +168,7 @@ describe('ApprovalQueueComponent', () => {
     };
     approvalsApi = jasmine.createSpyObj('ApprovalsApiService', [
       'listPendingApprovals',
+      'bulkDecide',
       'approveGroup',
       'rejectGroup',
     ]);
@@ -181,7 +182,8 @@ describe('ApprovalQueueComponent', () => {
       'listBranches',
       'listCostCentres',
     ]);
-    api = jasmine.createSpyObj('ApiService', ['products']);
+    api = jasmine.createSpyObj('ApiService', ['products', 'members']);
+    api.members.and.returnValue(of({items: [], next_cursor: null}));
     dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
     routerSpy = jasmine.createSpyObj('Router', ['navigate', 'createUrlTree', 'serializeUrl', 'navigateByUrl'], {
@@ -250,6 +252,362 @@ describe('ApprovalQueueComponent', () => {
     );
 
     await configureQueue();
+  });
+
+  describe('bulk decisions', () => {
+    beforeEach(() => {
+      sessionSpy.currentMember.and.returnValue({membership_id: 'another-member'});
+      component.pendingRequests.set([...component.pendingRequests()]);
+      fixture.detectChanges();
+    });
+    function row(id = 'req-001') {
+      return component.queueItems().find(item => item.id === id)!;
+    }
+    function selectBoth(): void {
+      component.toggleSelection(row());
+      component.toggleSelection(row('req-002'));
+      fixture.detectChanges();
+    }
+    it('selects singles only and names the header and row checkboxes', () => {
+      component.toggleSelection(row()); fixture.detectChanges();
+      expect(component.selectedIds().has('req-001')).toBeTrue();
+      const inputs = fixture.nativeElement.querySelectorAll('.mat-column-selection input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
+      expect(inputs.length).toBe(3);
+      for (const input of inputs) expect(input.getAttribute('aria-label')).toBeTruthy();
+      component.pendingRequests.set([{...mockPendingRequests[0], request_group: {id: 'split', rfq_id: 'rfq', position: 1, size: 1, sibling_request_ids: [], combined_total: {amount: '1', currency: 'SAR'}}}]);
+      component.toggleSelection(row('split')); fixture.detectChanges();
+      expect(component.selectedIds().size).toBe(0);
+      expect(fixture.nativeElement.querySelectorAll('td.mat-column-selection input').length).toBe(0);
+    });
+    it('selects all loaded singles, stops at 25, disables the rest and explains the cap', () => {
+      component.pendingRequests.set(Array.from({length: 27}, (_, i) => ({...mockPendingRequests[0], id: `bulk-${i}`})));
+      component.toggleSelectAll(); fixture.detectChanges();
+      expect(component.selectedIds().size).toBe(25);
+      expect(component.selectionDisabled(row('bulk-26'))).toBeTrue();
+      expect(component.selectionDisabled(row('bulk-0'))).toBeFalse();
+      expect(fixture.nativeElement.textContent).toContain('25');
+      expect(fixture.nativeElement.querySelector('#bulk-selection-cap')).not.toBeNull();
+      component.toggleSelectAll(); expect(component.selectedIds().size).toBe(0);
+    });
+    it('disables own requests unless the actor is the sole owner', () => {
+      sessionSpy.currentMember.and.returnValue({membership_id: 'mem-requester-1'});
+      expect(component.selectionDisabled(row())).toBeTrue();
+      component.toggleSelection(row()); expect(component.selectedIds().size).toBe(0);
+      role.set('owner'); component.soleOwner.set(true);
+      expect(component.selectionDisabled(row())).toBeFalse();
+      component.toggleSelection(row()); expect(component.selectedIds().size).toBe(1);
+    });
+    it('checks every active-owner page before allowing an owner to select their own request', () => {
+      role.set('owner'); sessionSpy.currentMember.and.returnValue({membership_id: 'mem-requester-1'});
+      api.members.and.returnValues(
+        of({items: [{id: 'mem-requester-1', role: 'owner', status: 'active', email: 'owner@example.test', mfa_enabled: false, created_at: '2026-01-01'}], next_cursor: 'page2'}),
+        of({items: [{id: 'other-owner', role: 'owner', status: 'active', email: 'other@example.test', mfa_enabled: false, created_at: '2026-01-01'}], next_cursor: null}),
+      );
+      component.loadPendingApprovals(); fixture.detectChanges();
+      expect(api.members).toHaveBeenCalledWith('page2');
+      expect(component.selectionDisabled(row())).toBeTrue();
+    });
+    for (const action of ['sort', 'branch', 'reload', 'clear'] as const) {
+      it(`clears selection on ${action}`, () => {
+        selectBoth();
+        if (action === 'sort') component.onSortChange('total_desc');
+        if (action === 'branch') component.onBranchChange(VALID_BRANCH_ID);
+        if (action === 'reload') component.loadPendingApprovals();
+        if (action === 'clear') component.clearSelection();
+        expect(component.selectedIds().size).toBe(0);
+      });
+    }
+    it('drops selected requests that disappear from loaded items', () => {
+      selectBoth(); component.pendingRequests.set([mockPendingRequests[1]]); fixture.detectChanges();
+      expect([...component.selectedIds()]).toEqual(['req-002']);
+      component.pendingRequests.set(mockPendingRequests); fixture.detectChanges();
+      expect(component.selectedIds().has('req-001')).toBeFalse();
+    });
+    it('groups totals by currency and identifies missing estimates', () => {
+      component.pendingRequests.set([mockPendingRequests[0], {...mockPendingRequests[1], estimated_total: {amount: '2', currency: 'EGP'}}]);
+      selectBoth();
+      expect(component.selectionTotals()).toEqual([{amount: '2', currency: 'EGP'}, {amount: '1250', currency: 'SAR'}]);
+      expect(fixture.nativeElement.textContent).toContain('EGP 2');
+      expect(fixture.nativeElement.textContent).toContain('SAR 1,250');
+      expect(fixture.nativeElement.textContent).toContain('incomplete');
+    });
+    it('opens a focus-restoring modal and submits the confirmed approval with one key', () => {
+      selectBoth();
+      dialogSpy.open.and.returnValue({afterClosed: () => of({confirmed: true, comment: null})} as MatDialogRef<ApprovalDecisionDialogComponent>);
+      approvalsApi.bulkDecide.and.returnValue(of({results: [], decided_count: 0, failed_count: 0}));
+      component.openBulkDialog('approved');
+      expect(dialogSpy.open.calls.mostRecent().args[1]).toEqual(jasmine.objectContaining({restoreFocus: true, ariaModal: true, autoFocus: 'first-tabbable'}));
+      expect(approvalsApi.bulkDecide).toHaveBeenCalledWith({decision: 'approved', comment: null, request_ids: ['req-001', 'req-002']}, jasmine.any(String));
+    });
+    it('does not submit a rejection with missing, blank or overlong comment', () => {
+      selectBoth();
+      for (const comment of [null, '  ', 'x'.repeat(2001)]) component.submitBulk('rejected', comment);
+      expect(approvalsApi.bulkDecide).not.toHaveBeenCalled();
+    });
+    it('disables controls and announces progress while a batch is in flight', () => {
+      selectBoth(); const response = new Subject<ReturnType<typeof bulkResponse>>();
+      approvalsApi.bulkDecide.and.returnValue(response);
+      component.submitBulk('approved', null); fixture.detectChanges();
+      expect(component.bulkBusy()).toBeTrue();
+      expect(fixture.nativeElement.querySelector('[data-testid="bulk-bar"]').getAttribute('aria-busy')).toBe('true');
+      expect(fixture.nativeElement.querySelector('[data-testid="bulk-approve"]').disabled).toBeTrue();
+      component.submitBulk('approved', null); expect(approvalsApi.bulkDecide).toHaveBeenCalledTimes(1);
+      response.next(bulkResponse()); response.complete();
+    });
+    function bulkResponse() {
+      return {results: [
+        {request_id: 'req-001', outcome: 'decided' as const, error_code: null, request: mockPendingRequests[0]},
+        {request_id: 'req-002', outcome: 'failed' as const, error_code: 'self_decision_not_allowed', request: null},
+      ], decided_count: 1, failed_count: 1};
+    }
+    it('removes decided rows, adjusts total and retains failures with translated reasons', () => {
+      selectBoth(); approvalsApi.bulkDecide.and.returnValue(of(bulkResponse()));
+      component.submitBulk('approved', null); fixture.detectChanges();
+      expect(component.pendingRequests().map(req => req.id)).toEqual(['req-002']);
+      expect(component.totalCount()).toBe(1);
+      expect([...component.selectedIds()]).toEqual(['req-002']);
+      expect(fixture.nativeElement.textContent).toContain('1 decided');
+      expect(fixture.nativeElement.textContent).toContain('1 failed');
+      expect(fixture.nativeElement.textContent).not.toContain('self_decision_not_allowed');
+      expect(fixture.nativeElement.querySelector('[data-testid="bulk-results"]')).not.toBeNull();
+    });
+    it('keeps the original key when retrying an unavailable item after partial success', () => {
+      selectBoth(); const response = bulkResponse(); response.results[1].error_code = 'unavailable';
+      approvalsApi.bulkDecide.and.returnValue(of(response)); component.submitBulk('approved', null);
+      const key = approvalsApi.bulkDecide.calls.mostRecent().args[1];
+      component.submitBulk('approved', null);
+      expect(approvalsApi.bulkDecide.calls.mostRecent().args).toEqual([{decision: 'approved', comment: null, request_ids: ['req-002']}, key]);
+    });
+    for (const status of [0, 422, 503]) {
+      it(`keeps selection and the key after whole-batch error ${status}`, () => {
+        selectBoth(); approvalsApi.bulkDecide.and.returnValue(throwError(() => new HttpErrorResponse({status, error: {message: 'raw failure'}})));
+        component.submitBulk('approved', null); const key = approvalsApi.bulkDecide.calls.mostRecent().args[1];
+        component.submitBulk('approved', null); fixture.detectChanges();
+        expect(approvalsApi.bulkDecide.calls.mostRecent().args[1]).toBe(key);
+        expect(component.selectedIds().size).toBe(2);
+        expect(fixture.nativeElement.querySelector('[data-testid="bulk-error"]')).not.toBeNull();
+        expect(fixture.nativeElement.textContent).not.toContain('raw failure');
+        approvalsApi.bulkDecide.and.returnValue(of(bulkResponse())); component.submitBulk('rejected', 'Reason');
+        expect(approvalsApi.bulkDecide.calls.mostRecent().args[1]).not.toBe(key);
+      });
+    }
+    for (const locale of ['en', 'ar']) {
+      it(`uses localized unknown-error text, Latin counts and a mirrored layout in ${locale}`, () => {
+        TestBed.inject(TranslateService).use(locale); fixture.nativeElement.setAttribute('dir', locale === 'ar' ? 'rtl' : 'ltr');
+        selectBoth();
+        const buttons = fixture.nativeElement.querySelectorAll('[data-testid="bulk-bar"] button') as NodeListOf<HTMLButtonElement>;
+        const first = buttons[0].getBoundingClientRect(), second = buttons[1].getBoundingClientRect();
+        if (locale === 'ar') expect(first.x).toBeGreaterThan(second.x); else expect(first.x).toBeLessThan(second.x);
+        const response = bulkResponse(); response.results[1].error_code = 'unknown-private-code';
+        approvalsApi.bulkDecide.and.returnValue(of(response)); component.submitBulk('approved', null); fixture.detectChanges();
+        const panel = fixture.nativeElement.querySelector('[data-testid="bulk-results"]') as HTMLElement;
+        expect(panel.textContent).toContain(locale === 'ar' ? arCatalog.approvals.bulk.reasons.generic : enCatalog.approvals.bulk.reasons.generic);
+        expect(panel.textContent).not.toContain('unknown-private-code');
+        expect(panel.textContent).not.toMatch(/[٠-٩]/);
+        expect(getComputedStyle(panel).direction).toBe(locale === 'ar' ? 'rtl' : 'ltr');
+      });
+    }
+
+    function allDecidedResponse() {
+      return {results: [
+        {request_id: 'req-001', outcome: 'decided' as const, error_code: null, request: mockPendingRequests[0]},
+        {request_id: 'req-002', outcome: 'decided' as const, error_code: null, request: mockPendingRequests[1]},
+      ], decided_count: 2, failed_count: 0};
+    }
+    function query(selector: string): HTMLElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(selector);
+    }
+    function loadedIds(): string[] {
+      return component.pendingRequests().map(request => request.id);
+    }
+
+    describe('every loaded row decided while a next cursor exists', () => {
+      const nextPageRow: PurchaseRequest = {...mockPendingRequests[0], id: 'req-051'};
+
+      it('reloads page 1, keeps the results panel and never renders the empty state', () => {
+        component.nextCursor.set('cursor-2');
+        selectBoth();
+        const reloaded = new Subject<PendingApprovalList>();
+        approvalsApi.listPendingApprovals.calls.reset();
+        approvalsApi.listPendingApprovals.and.returnValue(reloaded);
+        approvalsApi.bulkDecide.and.returnValue(of(allDecidedResponse()));
+
+        component.submitBulk('approved', null); fixture.detectChanges();
+
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledOnceWith({limit: 50});
+        expect(query('.loading-state')).not.toBeNull();
+        expect(query('[data-testid="empty-default"]')).toBeNull();
+        expect(query('[data-testid="bulk-results"]')).not.toBeNull();
+
+        reloaded.next({items: [nextPageRow], next_cursor: 'cursor-3', total: 50}); reloaded.complete();
+        fixture.detectChanges();
+
+        expect(loadedIds()).toEqual(['req-051']);
+        expect(component.totalCount()).toBe(50);
+        expect(query('[data-testid="load-more-btn"]')).not.toBeNull();
+        expect(query('[data-testid="empty-default"]')).toBeNull();
+        expect(query('[data-testid="bulk-results"]')?.textContent).toContain('2 decided');
+      });
+
+      it('does not reload when no further page exists', () => {
+        selectBoth();
+        approvalsApi.listPendingApprovals.calls.reset();
+        approvalsApi.bulkDecide.and.returnValue(of(allDecidedResponse()));
+
+        component.submitBulk('approved', null); fixture.detectChanges();
+
+        expect(approvalsApi.listPendingApprovals).not.toHaveBeenCalled();
+        expect(query('[data-testid="empty-default"]')).not.toBeNull();
+        expect(query('[data-testid="bulk-results"]')).not.toBeNull();
+      });
+
+      it('does not reload when rows remain loaded', () => {
+        component.nextCursor.set('cursor-2');
+        selectBoth();
+        approvalsApi.listPendingApprovals.calls.reset();
+        approvalsApi.bulkDecide.and.returnValue(of(bulkResponse()));
+
+        component.submitBulk('approved', null); fixture.detectChanges();
+
+        expect(approvalsApi.listPendingApprovals).not.toHaveBeenCalled();
+        expect(query('[data-testid="load-more-btn"]')).not.toBeNull();
+      });
+
+      it('leaves an ordinary reload clearing the results panel', () => {
+        selectBoth();
+        approvalsApi.bulkDecide.and.returnValue(of(bulkResponse()));
+        component.submitBulk('approved', null); fixture.detectChanges();
+        expect(query('[data-testid="bulk-results"]')).not.toBeNull();
+
+        component.loadPendingApprovals(); fixture.detectChanges();
+
+        expect(component.bulkResult()).toBeNull();
+        expect(component.bulkFailures()).toEqual([]);
+        expect(query('[data-testid="bulk-results"]')).toBeNull();
+      });
+    });
+
+    describe('filter changes while a batch is in flight', () => {
+      function startBatch(): Subject<ReturnType<typeof bulkResponse>> {
+        selectBoth();
+        const batch = new Subject<ReturnType<typeof bulkResponse>>();
+        approvalsApi.bulkDecide.and.returnValue(batch);
+        component.submitBulk('approved', null); fixture.detectChanges();
+        return batch;
+      }
+
+      it('disables the clear button and chip removes until the batch returns', () => {
+        component.sortOption.set('total_desc');
+        component.branchFilter.set(VALID_BRANCH_ID);
+        const batch = startBatch();
+
+        const host = fixture.nativeElement as HTMLElement;
+        const clear = query('[data-testid="clear-filters-btn"]') as HTMLButtonElement;
+        const chips = Array.from(host.querySelectorAll<HTMLButtonElement>('.chip-remove'));
+        expect(chips.length).toBe(2);
+        expect(clear.disabled).toBeTrue();
+        for (const chip of chips) expect(chip.disabled).toBeTrue();
+
+        batch.next(bulkResponse()); batch.complete(); fixture.detectChanges();
+
+        expect(clear.disabled).toBeFalse();
+        for (const chip of chips) expect(chip.disabled).toBeFalse();
+      });
+
+      const guarded: readonly (readonly [string, () => void])[] = [
+        ['clearFilters', () => component.clearFilters()],
+        ['removeSortFilter', () => component.removeSortFilter()],
+        ['removeBranchFilter', () => component.removeBranchFilter()],
+      ];
+      for (const [name, act] of guarded) {
+        it(`${name} does nothing and the batch result is applied`, () => {
+          component.sortOption.set('total_desc');
+          component.branchFilter.set(VALID_BRANCH_ID);
+          const batch = startBatch();
+          approvalsApi.listPendingApprovals.calls.reset();
+          routerSpy.navigate.calls.reset();
+
+          act();
+
+          expect(component.sortOption()).toBe('total_desc');
+          expect(component.branchFilter()).toBe(VALID_BRANCH_ID);
+          expect(approvalsApi.listPendingApprovals).not.toHaveBeenCalled();
+          expect(routerSpy.navigate).not.toHaveBeenCalled();
+
+          batch.next(bulkResponse()); batch.complete(); fixture.detectChanges();
+
+          expect(loadedIds()).toEqual(['req-002']);
+          expect(component.totalCount()).toBe(1);
+          expect(query('[data-testid="bulk-results"]')).not.toBeNull();
+        });
+      }
+
+      it('disables the empty-state clear button when a URL change empties the list mid-batch', () => {
+        const batch = startBatch();
+        approvalsApi.listPendingApprovals.and.returnValue(of({items: [], next_cursor: null, total: 0}));
+
+        queryParamMapSubject.next(convertToParamMap({sort: 'total_desc'})); fixture.detectChanges();
+
+        expect((query('[data-testid="empty-filtered"] button') as HTMLButtonElement).disabled).toBeTrue();
+        batch.next(bulkResponse()); batch.complete();
+      });
+
+      it('publishes the results and reloads once when a URL change loaded the list before the response', () => {
+        const batch = startBatch();
+        const urlList = new Subject<PendingApprovalList>();
+        const reloaded = new Subject<PendingApprovalList>();
+        approvalsApi.listPendingApprovals.calls.reset();
+        approvalsApi.listPendingApprovals.and.returnValues(urlList, reloaded);
+
+        queryParamMapSubject.next(convertToParamMap({sort: 'total_desc'}));
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledOnceWith({sort: 'total_desc', limit: 50});
+        // This list GET ran before the items committed, so req-001 still reads as pending.
+        urlList.next({items: mockPendingRequests, next_cursor: null, total: 2}); urlList.complete();
+        expect(loadedIds()).toEqual(['req-001', 'req-002']);
+
+        batch.next(bulkResponse()); batch.complete(); fixture.detectChanges();
+
+        expect(component.bulkBusy()).toBeFalse();
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledTimes(2);
+        expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({sort: 'total_desc', limit: 50});
+        // The stale response's local removals stay off the new list; only the reload changes it.
+        expect(loadedIds()).toEqual(['req-001', 'req-002']);
+        const panel = query('[data-testid="bulk-results"]');
+        expect(panel?.textContent).toContain('1 decided');
+        expect(panel?.textContent).toContain('1 failed');
+        expect(panel?.textContent).toContain('mem-requ');
+        expect(panel?.textContent).toContain('req-002');
+        expect(panel?.textContent).not.toContain('self_decision_not_allowed');
+
+        reloaded.next({items: [mockPendingRequests[1]], next_cursor: null, total: 1}); reloaded.complete();
+        fixture.detectChanges();
+
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledTimes(2);
+        expect(loadedIds()).toEqual(['req-002']);
+        expect(component.totalCount()).toBe(1);
+        expect(query('[data-testid="bulk-results"]')).not.toBeNull();
+        expect(component.bulkFailures().map(failure => failure.requestId)).toEqual(['req-002']);
+      });
+
+      it('ignores the superseded list response when the batch returned first', () => {
+        const batch = startBatch();
+        const urlList = new Subject<PendingApprovalList>();
+        const reloaded = new Subject<PendingApprovalList>();
+        approvalsApi.listPendingApprovals.calls.reset();
+        approvalsApi.listPendingApprovals.and.returnValues(urlList, reloaded);
+
+        queryParamMapSubject.next(convertToParamMap({sort: 'total_desc'}));
+        batch.next(bulkResponse()); batch.complete();
+        reloaded.next({items: [mockPendingRequests[1]], next_cursor: null, total: 1}); reloaded.complete();
+        urlList.next({items: mockPendingRequests, next_cursor: null, total: 2}); urlList.complete();
+        fixture.detectChanges();
+
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledTimes(2);
+        expect(loadedIds()).toEqual(['req-002']);
+        expect(component.totalCount()).toBe(1);
+        expect(query('[data-testid="bulk-results"]')).not.toBeNull();
+      });
+    });
   });
 
   describe('PPS-167 self approval', () => {

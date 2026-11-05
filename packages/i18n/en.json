@@ -2874,6 +2874,74 @@
         "delegate": "delegated",
         "owner_fallback": "to the owner"
       }
+    },
+    "bulk": {
+      "title": "Bulk decisions",
+      "totals": "Selected totals by currency",
+      "incomplete": "The selected estimates are incomplete.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "clear": "Clear selection",
+      "cancel": "Cancel",
+      "progress": "Submitting decisions…",
+      "batchError": "The batch could not be completed. Retry with the same selection and decision.",
+      "resultsTitle": "Decision results",
+      "resultsSummary": "{{decided}}; {{failed}}",
+      "selectAll": "Select or clear up to 25 requests on the loaded pages",
+      "selectRequest": "Select request {{id}} from {{requester}}",
+      "requestLabel": "{{requester}} · Request {{id}}",
+      "capHint": "A maximum of 25 requests can be selected. Clear a selection to select another request.",
+      "comment": "Rejection reason",
+      "commentHint": "Required for all selected requests; up to 2000 characters.",
+      "reasons": {
+        "group": "This request belongs to a split. Use the group decision.",
+        "self": "Another owner must decide your request.",
+        "notFound": "This request was not found.",
+        "unavailable": "The result is unavailable. Retry the same decision.",
+        "notPending": "This request is no longer pending.",
+        "notAllowed": "You cannot decide this request.",
+        "generic": "This request could not be decided."
+      },
+      "selected": {
+        "zero": "{{count}} selected",
+        "one": "{{count}} selected",
+        "two": "{{count}} selected",
+        "few": "{{count}} selected",
+        "many": "{{count}} selected",
+        "other": "{{count}} selected"
+      },
+      "decided": {
+        "zero": "{{count}} decided",
+        "one": "{{count}} decided",
+        "two": "{{count}} decided",
+        "few": "{{count}} decided",
+        "many": "{{count}} decided",
+        "other": "{{count}} decided"
+      },
+      "failed": {
+        "zero": "{{count}} failed",
+        "one": "{{count}} failed",
+        "two": "{{count}} failed",
+        "few": "{{count}} failed",
+        "many": "{{count}} failed",
+        "other": "{{count}} failed"
+      },
+      "approveTitle": {
+        "zero": "Approve {{count}} requests?",
+        "one": "Approve {{count}} request?",
+        "two": "Approve {{count}} requests?",
+        "few": "Approve {{count}} requests?",
+        "many": "Approve {{count}} requests?",
+        "other": "Approve {{count}} requests?"
+      },
+      "rejectTitle": {
+        "zero": "Reject {{count}} requests?",
+        "one": "Reject {{count}} request?",
+        "two": "Reject {{count}} requests?",
+        "few": "Reject {{count}} requests?",
+        "many": "Reject {{count}} requests?",
+        "other": "Reject {{count}} requests?"
+      }
     }
   },
   "devices": {},

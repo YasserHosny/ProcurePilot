@@ -3222,3 +3222,35 @@ contract: `specs/024-rfq-basket-split/contracts/rfq-split.openapi.yaml`.
 Approval steps include nullable `decided_name` and `decided_email`, resolved from the recorded
 decider membership in the same contact batch as the requester and assignee. Pending steps
 return null for both. Request visibility and cross-tenant not-found behavior are unchanged.
+
+
+### Bulk single-request approval decisions (P-177 stage 3)
+
+`POST /api/v1/approvals/bulk-decisions` uses the same verified bearer-token and current-member
+dependencies as the single approve/reject endpoints. `Idempotency-Key: UUID` is required.
+The body is `{decision: "approved" | "rejected", comment?: string | null, request_ids: UUID[]}`.
+There must be 1–25 distinct ids. Rejection requires a non-blank comment; any comment is at most
+2000 characters and is preserved verbatim. Invalid bodies, duplicate ids or invalid/missing keys
+return 422 before processing any item.
+
+Each item calls the existing single-request decision path with `uuid5(batch_key, str(request_id))`.
+There is no batch transaction: each decision independently commits its request/step updates,
+append-only audit event and push outbox entry, or rolls them back together. Existing assignment,
+owner, ADR-024 self-decision and RLS checks remain authoritative. The batch neither purchases
+anything nor combines monetary amounts or currencies.
+
+A valid batch returns 200 with `{results: [{request_id, outcome: "decided" | "failed",
+error_code: string | null, request: PurchaseRequest | null}], decided_count, failed_count}`.
+Results retain input order. Successful items carry the existing enriched request response and
+null error_code; failures carry null request. Error codes are `not_found` for invisible/foreign
+requests, `group_request_use_group_decision` for split members (use the group decision endpoint),
+`self_decision_not_allowed` for ADR-024 refusals, and `unavailable` for infrastructure or unexpected
+item failures. Other errors retain the single path's top-level code, including `conflict` and
+`auth.permission_denied`; no raw exception text or group identifiers are returned.
+
+Replaying the same key uses the existing actor/tenant/action/request-scoped audit lookup and
+returns the current recorded result without another decision audit or push entry. Changing the
+batch decision uses the single path's normal conflict behavior. A response-enrichment failure
+can produce unavailable after that item's decision committed; replaying the same batch key
+recovers the response without repeating the write. Failed items are retried against current
+state; no new batch ledger or table is introduced.

@@ -194,6 +194,43 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /approvals/bulk-decisions:
+    post:
+      summary: Decide up to 25 single purchase requests with per-item results
+      description: >
+        A human chooses one approved or rejected decision for distinct request ids. The
+        authenticated single-request decision path runs separately for each item, with its
+        own transaction, audit and push outbox. Item keys are uuid5(batch key, str(request_id));
+        replay uses the existing actor/tenant/action-scoped single-request mechanism.
+        Results preserve input order. Split members fail with group_request_use_group_decision;
+        self-decision refusals fail with self_decision_not_allowed; invisible or other-tenant
+        ids fail with not_found. Other application errors retain their top-level single-path
+        code (for example conflict or auth.permission_denied); infrastructure failures use
+        unavailable. No monetary values are aggregated. Every valid batch returns 200,
+        including batches where every item fails. Invalid bodies or batch keys return 422
+        before any item runs. Rejection requires a non-blank comment; any comment is at most
+        2000 characters. A response-read failure can report unavailable after a decision has
+        committed; retrying with the same batch key recovers it without another decision.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BulkApprovalDecisionInput' }
+      responses:
+        '200':
+          description: Ordered per-item decision results
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkApprovalDecisionResponse' }
+        '401':
+          description: Authentication required
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
   /approvals/pending:
     get:
       summary: List requests awaiting the signed-in approver's decision
@@ -598,6 +635,58 @@ components:
           items: { $ref: '#/components/schemas/PurchaseRequest' }
         next_cursor: { type: string, nullable: true }
         total: { type: integer, minimum: 0 }
+
+    BulkApprovalDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [decision, request_ids]
+      properties:
+        decision: { type: string, enum: [approved, rejected] }
+        comment:
+          type: string
+          nullable: true
+          maxLength: 2000
+          description: Required and non-blank when decision is rejected; preserved verbatim.
+        request_ids:
+          type: array
+          minItems: 1
+          maxItems: 25
+          uniqueItems: true
+          items: { type: string, format: uuid }
+      allOf:
+        - if:
+            properties:
+              decision: { const: rejected }
+          then:
+            required: [comment]
+            properties:
+              comment: { type: string, minLength: 1, maxLength: 2000, pattern: '\S' }
+
+    BulkApprovalDecisionResult:
+      type: object
+      required: [request_id, outcome]
+      properties:
+        request_id: { type: string, format: uuid }
+        outcome: { type: string, enum: [decided, failed] }
+        error_code: { type: string, nullable: true, default: null }
+        request:
+          anyOf:
+            - { $ref: '#/components/schemas/PurchaseRequest' }
+            - { type: 'null' }
+          default: null
+      description: Decided items carry request and null error_code; failed items carry error_code and null request.
+
+    BulkApprovalDecisionResponse:
+      type: object
+      required: [results, decided_count, failed_count]
+      properties:
+        results:
+          type: array
+          minItems: 1
+          maxItems: 25
+          items: { $ref: '#/components/schemas/BulkApprovalDecisionResult' }
+        decided_count: { type: integer, minimum: 0, maximum: 25 }
+        failed_count: { type: integer, minimum: 0, maximum: 25 }
 
     ApprovalDecisionInput:
       type: object

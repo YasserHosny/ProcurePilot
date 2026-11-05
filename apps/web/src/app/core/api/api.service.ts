@@ -10,6 +10,8 @@ import type {
   AlertKind,
   Alias,
   ApprovalDecisionInput,
+  BulkApprovalDecisionInput,
+  BulkApprovalDecisionResponse,
   ApprovalDelegation,
   ApprovalDelegationCreate,
   ApprovalDelegationList,
@@ -1161,6 +1163,12 @@ export class ApiService {
       null,
       { headers },
     );
+  }
+
+  bulkDecide(body: BulkApprovalDecisionInput, idempotencyKey: string): Observable<BulkApprovalDecisionResponse> {
+    return this.http.post<BulkApprovalDecisionResponse>(`${this.base}/approvals/bulk-decisions`, body, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
   }
 
   listPendingApprovals(params?: {
