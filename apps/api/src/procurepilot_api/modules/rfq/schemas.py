@@ -57,7 +57,19 @@ class RfqRecipient(BaseModel):
     failure_reason: Literal["delivery_error", "missing_contact_email"] | None = None
     send_attempts: int = 0
     last_attempt_at: datetime | None = None
+    reminder_count: int = 0
+    last_reminder_at: datetime | None = None
+    can_remind: bool = False
+    remind_blocked_reason: str | None = None
     created_at: datetime
+
+
+class RfqReminderPreview(BaseModel):
+    subject: str
+    body_text: str
+    locale: str
+    allowed: bool
+    blocked_reason: str | None = None
 
 
 class RfqResponse(BaseModel):

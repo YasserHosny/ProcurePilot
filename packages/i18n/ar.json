@@ -4735,7 +4735,18 @@
         "11": "نوفمبر",
         "12": "ديسمبر"
       },
-      "unknownProduct": "منتج غير معروف"
+      "unknownProduct": "منتج غير معروف",
+      "reminderSubject": "تذكير: طلب عرض سعر — {{tenant}} — مطلوب قبل {{date}}",
+      "reminderGreeting": "مرحباً،",
+      "reminderIntro": "تذكير بطلب عرض سعر من {{tenant}}.",
+      "reminderReference": "المرجع",
+      "reminderSentDate": "تاريخ الإرسال",
+      "reminderItemsHeading": "العناصر المطلوبة",
+      "reminderNeededBy": "مطلوب قبل",
+      "reminderIgnore": "إذا كنت قد قمت بالرد بالفعل، فيرجى تجاهل هذا التذكير.",
+      "reminderReplyInstructions": "يرجى الرد مباشرة على هذا البريد أو إرسال عرض السعر إلى:",
+      "reminderThanks": "شكراً لكم.",
+      "reminderEnglishSummary": "This is a reminder of a request for quotation from {{tenant}}."
     },
     "autoPreparedEmail": {
       "subject": "مسودة طلب جاهزة للمراجعة — {{supplier}}",
