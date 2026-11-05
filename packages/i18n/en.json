@@ -980,6 +980,7 @@
       "subtitle": "Inspect extracted fields side by side with the source document. Verify supplier and resolve any discrepancies.",
       "backToQueue": "Back to Review Queue",
       "downloadOriginal": "Download original document",
+      "sourcePreviewTitle": "Source document preview",
       "readOnlyNotice": "Read-only mode. You can view extraction evidence, but editing and confirmation require Owner or Buyer permissions.",
       "uploadedBy": "Uploaded by:",
       "uploadedAt": "Uploaded at:",
