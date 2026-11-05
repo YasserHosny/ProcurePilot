@@ -486,6 +486,14 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 - `decision` carries `supersedes_decision_id` and `learned_from_decision_id` (nullable uuid). The
   decision returned is the current one (head of the chain, ADR-022).
 
+### `GET /quotation-lines/{line_id}/match/history`
+
+- Requires bearer auth; any member of the workspace.
+- Returns every decision on the line, oldest first: the correction chain ADR-022 keeps. Each item is a
+  decision with `supersedes_decision_id` and, for a human decision, `decided_by_email`. The last item
+  is the current decision. A line of another tenant returns `404`.
+- The decision on a match task also carries `decided_by_email` for a human decision.
+
 ### `POST /quotation-lines/{line_id}/match-candidates/manual`
 
 - Requires bearer auth and owner or buyer role. Body: `{ "product_id": uuid }`.

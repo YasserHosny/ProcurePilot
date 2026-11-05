@@ -181,6 +181,7 @@ describe('MatchResolutionComponent (T039)', () => {
       'resolveMatch',
       'correctMatch',
       'getLandedCost',
+      'getDecisionHistory',
     ]);
     apiService.getMatchTasks.and.returnValue(of({ items: [mockTask], next_cursor: null }));
     apiService.getMatchTaskForLine.and.returnValue(of(mockTask));
@@ -293,6 +294,54 @@ describe('MatchResolutionComponent (T039)', () => {
     expect(
       component.localizedUnitLabel({ code: 'x', label_en: 'Server', label_ar: 'خادم', dimension: 'count' }),
     ).toBe('خادم');
+  });
+
+  describe('who decided and the decision history (P-154)', () => {
+    const human = { ...mockDecision, decided_by: 'm-1', decided_by_email: 'buyer@example.test' };
+    const auto = {
+      ...mockDecision,
+      id: 'dec-0',
+      is_automatic: true,
+      decided_by: null,
+      decided_by_email: null,
+      decided_at: '2026-08-20T01:00:00Z',
+    };
+
+    it('shows who made a human decision, and nothing invented for an automatic one', () => {
+      component.decision.set(human);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain('buyer@example.test');
+      component.decision.set(auto);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).not.toContain('Decided By:');
+    });
+
+    it('loads the correction chain when the history is opened, oldest first, current marked', () => {
+      apiService.getDecisionHistory.and.returnValue(of({ items: [auto, { ...human, supersedes_decision_id: 'dec-0' }] }));
+      component.decision.set(human);
+      fixture.detectChanges();
+      const toggle = fixture.nativeElement.querySelector('[data-testid="history-toggle"]') as HTMLButtonElement;
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      toggle.click();
+      fixture.detectChanges();
+      expect(apiService.getDecisionHistory).toHaveBeenCalledOnceWith('line-99');
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      const rows = fixture.nativeElement.querySelectorAll('[data-testid="history-row"]');
+      expect(rows.length).toBe(2);
+      expect(rows[0].textContent).toContain('Automatic');
+      expect(rows[1].textContent).toContain('buyer@example.test');
+      expect(rows[1].textContent).toContain('Current');
+      expect(rows[0].textContent).not.toContain('Current');
+    });
+
+    it('says so when the history cannot be loaded', () => {
+      apiService.getDecisionHistory.and.returnValue(throwError(() => new Error('boom')));
+      component.decision.set(human);
+      fixture.detectChanges();
+      (fixture.nativeElement.querySelector('[data-testid="history-toggle"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-testid="history-error"]')).not.toBeNull();
+    });
   });
 
   it('should require explicit candidate selection for close-candidate tasks', () => {
