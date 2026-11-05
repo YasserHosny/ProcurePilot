@@ -334,6 +334,43 @@ describe('MatchResolutionComponent (T039)', () => {
       expect(rows[0].textContent).not.toContain('Current');
     });
 
+    it('ignores a history answer that arrives after the buyer moved to another line', () => {
+      const late = new Subject<{ items: readonly MatchDecision[] }>();
+      apiService.getDecisionHistory.and.returnValue(late.asObservable());
+      component.decision.set(human);
+      fixture.detectChanges();
+      (fixture.nativeElement.querySelector('[data-testid="history-toggle"]') as HTMLButtonElement).click();
+      component.loadTask('line-99'); // the page loads another line while the history is in flight
+      late.next({ items: [auto, human] });
+      expect(component.history()).toBeNull();
+      expect(component.historyOpen()).toBeFalse();
+    });
+
+    it('ignores a history failure that arrives after the buyer moved on', () => {
+      const late = new Subject<{ items: readonly MatchDecision[] }>();
+      apiService.getDecisionHistory.and.returnValue(late.asObservable());
+      component.decision.set(human);
+      fixture.detectChanges();
+      (fixture.nativeElement.querySelector('[data-testid="history-toggle"]') as HTMLButtonElement).click();
+      component.loadTask('line-99');
+      late.error(new Error('boom'));
+      expect(component.historyFailed()).toBeFalse();
+    });
+
+    it('lets the newest request win when the history is closed and reopened', () => {
+      const first = new Subject<{ items: readonly MatchDecision[] }>();
+      const second = new Subject<{ items: readonly MatchDecision[] }>();
+      apiService.getDecisionHistory.and.returnValues(first.asObservable(), second.asObservable());
+      component.decision.set(human);
+      fixture.detectChanges();
+      component.toggleHistory(); // open: first request
+      component.toggleHistory(); // close
+      component.toggleHistory(); // reopen: second request
+      second.next({ items: [human] });
+      first.next({ items: [auto] }); // late answer of the first request
+      expect(component.history()?.map((d) => d.id)).toEqual([human.id]);
+    });
+
     it('says so when the history cannot be loaded', () => {
       apiService.getDecisionHistory.and.returnValue(throwError(() => new Error('boom')));
       component.decision.set(human);
