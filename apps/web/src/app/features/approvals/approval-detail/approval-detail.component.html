@@ -1,0 +1,92 @@
+<article class="approval-detail" [attr.aria-busy]="loading()">
+  <a routerLink="/approvals">{{ 'approvals.detail.back' | translate }}</a>
+  <header>
+    <h1>{{ 'approvals.detail.title' | translate: { id: request()?.id?.slice(0, 8) ?? '' } }}</h1>
+    @if (request(); as req) {
+      <span class="status" [attr.data-status]="req.status">{{ ('requests.status.' + req.status) | translate }}</span>
+    }
+  </header>
+  <div aria-live="polite" role="status">
+    @if (loading()) {
+      <mat-spinner diameter="32" />
+      <p>{{ 'approvals.detail.loading' | translate }}</p>
+    }
+  </div>
+  @if (error(); as message) {
+    <p role="alert">{{ ('approvals.detail.' + message) | translate }}</p>
+    @if (message === 'error') { <button type="button" (click)="retry()">{{ 'approvals.detail.retry' | translate }}</button> }
+  }
+  @if (request(); as req) {
+    <section aria-labelledby="summary-heading">
+      <h2 id="summary-heading">{{ 'approvals.detail.summary' | translate }}</h2>
+      <dl>
+        <div><dt>{{ 'approvals.detail.requester' | translate }}</dt><dd dir="auto">{{ requester(req) }} @if (req.requester_email) { <span>{{ req.requester_email }}</span> }</dd></div>
+        <div><dt>{{ 'approvals.detail.branch' | translate }}</dt><dd>{{ branch(req.branch_id) }}</dd></div>
+        <div><dt>{{ 'approvals.detail.costCentre' | translate }}</dt><dd>{{ costCentre(req.cost_centre_id) }}</dd></div>
+        <div><dt>{{ 'approvals.detail.requiredBy' | translate }}</dt><dd><time [attr.datetime]="req.required_by_date">{{ date(req.required_by_date) }}</time></dd></div>
+        <div><dt>{{ 'approvals.detail.total' | translate }}</dt><dd class="pp-figures">{{ money(req.estimated_total) }} @if (req.has_incomplete_estimate) { <span class="badge">{{ 'approvals.detail.incomplete' | translate }}</span> }</dd></div>
+        <div><dt>{{ 'approvals.detail.budget' | translate }}</dt><dd>{{ budget(req) }}</dd></div>
+        @if (req.source; as source) {
+          <div><dt>{{ 'approvals.detail.source' | translate }}</dt><dd><span dir="auto">{{ source.supplier_name ?? unavailable() }}</span> · {{ 'approvals.detail.sourceReference' | translate: {id: source.rfq_id.slice(0, 8)} }}</dd></div>
+        }
+      </dl>
+      @if (req.request_group; as group) {
+        <nav class="split" [attr.aria-label]="'approvals.detail.split' | translate">
+          <strong>{{ 'approvals.detail.split' | translate }}</strong>
+          @for (id of group.sibling_request_ids; track id) {
+            @if (id !== req.id) { <a [routerLink]="['/approvals', id]">{{ 'approvals.detail.sibling' | translate: {id: id.slice(0, 8)} }}</a> }
+          }
+        </nav>
+      }
+    </section>
+    <section aria-labelledby="lines-heading">
+      <h2 id="lines-heading">{{ 'approvals.detail.lines' | translate }}</h2>
+      <div class="table-scroll" tabindex="0" role="region" [attr.aria-label]="'approvals.detail.lines' | translate">
+        <table>
+          <thead><tr>
+            <th scope="col">{{ 'approvals.detail.product' | translate }}</th>
+            <th scope="col">{{ 'approvals.detail.quantity' | translate }}</th>
+            <th scope="col">{{ 'approvals.detail.unitPrice' | translate }}</th>
+            <th scope="col">{{ 'approvals.detail.note' | translate }}</th>
+          </tr></thead>
+          <tbody>
+            @for (line of req.lines; track line.id) {
+              <tr><td dir="auto">{{ product(line) }}</td><td class="pp-figures">{{ number(line.quantity) }}
+                @if (line.pack_base_quantity && line.base_unit) { <small>{{ 'approvals.detail.pack' | translate: {quantity: number(line.pack_base_quantity), unit: line.base_unit} }}</small> }
+              </td><td class="pp-figures">{{ money(line.estimated_unit_price) }}</td><td dir="auto">{{ line.note ?? unavailable() }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section aria-labelledby="decision-heading">
+      <h2 id="decision-heading">{{ 'approvals.detail.decision' | translate }}</h2>
+      @if (req.approval_step; as step) {
+        @if (step.status === 'pending' && req.status === 'submitted') {
+          <p>{{ 'approvals.detail.assigned' | translate: {name: assignee(req)} }}</p>
+          <p>{{ 'approvals.detail.pendingHint' | translate }} <a routerLink="/approvals">{{ 'approvals.detail.queue' | translate }}</a></p>
+        } @else if (step.status !== 'pending') {
+          <p>{{ 'approvals.detail.decided' | translate: {status: ('requests.status.' + step.status) | translate, name: decider(req)} }}</p>
+          @if (step.decided_email) { <p dir="auto">{{ step.decided_email }}</p> }
+          @if (step.decided_at) { <time [attr.datetime]="step.decided_at">{{ date(step.decided_at) }}</time> }
+          @if (step.comment) { <p class="comment" dir="auto">{{ step.comment }}</p> }
+        } @else { <p>{{ 'approvals.detail.noDecision' | translate }}</p> }
+        @if (step.self_approval) { <p class="badge">{{ selfMark(req) | translate }}</p> }
+      } @else { <p>{{ 'approvals.detail.noDecision' | translate }}</p> }
+    </section>
+    <section aria-labelledby="timeline-heading">
+      <h2 id="timeline-heading">{{ 'approvals.detail.timeline' | translate }}</h2>
+      <ol>
+        @for (event of timeline(); track event.key) {
+          <li>
+            <p>{{ ('approvals.detail.' + event.key) | translate: {name: event.name} }}</p>
+            @if (event.reason) { <p>{{ ('approvals.detail.routing.' + event.reason) | translate }}</p> }
+            @if (event.at) { <time [attr.datetime]="event.at">{{ date(event.at) }}</time> }
+            @if (event.comment) { <p class="comment" dir="auto">{{ event.comment }}</p> }
+            @if (event.selfMark) { <p class="badge">{{ event.selfMark | translate }}</p> }
+          </li>
+        }
+      </ol>
+    </section>
+  }
+</article>

@@ -76,6 +76,8 @@ class ApprovalStep(BaseModel):
     assigned_membership_id: UUID
     assigned_name: str | None = None
     assigned_email: str | None = None
+    decided_name: str | None = None
+    decided_email: str | None = None
     source: ApprovalStepSource
     status: ApprovalStepStatus
     comment: str | None = None

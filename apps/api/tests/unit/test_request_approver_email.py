@@ -118,3 +118,61 @@ def test_member_contact_batch_skips_missing_approval_step() -> None:
     )
     assert client.queries == 1
     assert emails == {requester_id: MemberContact("requester@example.test", None)}
+
+
+@pytest.mark.parametrize("decided", [True, False])
+def test_decider_contact_is_loaded_in_the_same_batch(
+    monkeypatch: pytest.MonkeyPatch, decided: bool
+) -> None:
+    requester, assignee, decider = str(uuid4()), str(uuid4()), str(uuid4())
+
+    class Client:
+        queries = 0
+
+        def table(self, name: str) -> Client:
+            assert name == "membership"
+            self.queries += 1
+            return self
+
+        def select(self, columns: str) -> Client:
+            return self
+
+        def in_(self, column: str, values: list[str]) -> Client:
+            assert set(values) == {requester, assignee, *([decider] if decided else [])}
+            return self
+
+        def execute(self) -> SimpleNamespace:
+            return SimpleNamespace(
+                data=[{"id": decider, "display_name": "ليلى", "email": "decider@example.test"}]
+            )
+
+    service = RequestsService()
+    monkeypatch.setattr(service, "_budget_status_for", lambda *_: None)
+    monkeypatch.setattr(service, "_quoted_prices_for", lambda *_: {})
+    client = Client()
+    result = service._purchase_request_with_budget_status(
+        client,
+        {
+            "id": uuid4(),
+            "branch_id": uuid4(),
+            "requested_by_membership_id": requester,
+            "required_by_date": "2026-11-10",
+            "status": "approved" if decided else "submitted",
+            "created_at": datetime.now(UTC),
+        },
+        [],
+        {
+            "id": uuid4(),
+            "assigned_membership_id": assignee,
+            "source": "owner_fallback",
+            "status": "approved" if decided else "pending",
+            "decided_by_membership_id": decider if decided else None,
+        },
+        auto_prepared_lookup=False,
+        source_lookup=False,
+        request_group_lookup=False,
+    )
+    assert client.queries == 1
+    assert result.approval_step is not None
+    assert result.approval_step.decided_name == ("ليلى" if decided else None)
+    assert result.approval_step.decided_email == ("decider@example.test" if decided else None)

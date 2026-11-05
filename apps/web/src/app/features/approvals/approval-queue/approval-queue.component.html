@@ -270,6 +270,11 @@
               {{ 'approvals.columns.actions' | translate }}
             </th>
             <td mat-cell *matCellDef="let row" class="actions-cell">
+              @if (row.kind === 'single') {
+                <a [routerLink]="['/approvals', row.request.id]"
+                  [attr.aria-label]="'approvals.detail.viewDetailsLabel' | translate: { requester: getRequesterDisplay(row.request), total: formatMoney(row.request) }"
+                  (click)="$event.stopPropagation()">{{ 'approvals.detail.viewDetails' | translate }}</a>
+              }
               <div class="cell-inline">
                 <button
                   mat-flat-button
@@ -325,6 +330,9 @@
                     @for (req of row.requests; track req.id) {
                       <div class="group-request-section">
                         <div class="group-request-header">
+                          <a [routerLink]="['/approvals', req.id]"
+                            [attr.aria-label]="'approvals.detail.viewDetailsLabel' | translate: { requester: getRequesterDisplay(req), total: formatMoney(req) }"
+                            (click)="$event.stopPropagation()">{{ 'approvals.detail.viewDetails' | translate }}</a>
                           @if (req.source?.supplier_name; as supplier) {
                             <span class="group-request-supplier" dir="auto">{{ supplier }}</span>
                           }
