@@ -3,7 +3,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   Component,
   DestroyRef,
+  ElementRef,
+  Injector,
   OnInit,
+  afterNextRender,
   computed,
   inject,
   signal,
@@ -31,8 +34,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
 import type { ParamMap } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { forkJoin, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { EMPTY, Observable, defer, forkJoin, of } from 'rxjs';
+import { catchError, expand, map, reduce } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
@@ -243,6 +246,8 @@ export class ApprovalQueueComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
+  private readonly host = inject(ElementRef<HTMLElement>);
   private readonly sortSelect = viewChild<MatSelect>('sortSelect');
 
   readonly isLoading = signal<boolean>(true);
@@ -498,10 +503,27 @@ export class ApprovalQueueComponent implements OnInit {
 
   removeSortFilter(): void {
     this.onSortChange(DEFAULT_SORT);
+    this.focusAfterChipRemoval();
   }
 
   removeBranchFilter(): void {
     this.onBranchChange('');
+    this.focusAfterChipRemoval();
+  }
+
+  private focusAfterChipRemoval(): void {
+    afterNextRender(
+      () => {
+        const host = this.host.nativeElement as HTMLElement;
+        const buttons = host.querySelectorAll<HTMLButtonElement>('.chip-remove');
+        if (buttons.length > 0) {
+          buttons[0].focus();
+          return;
+        }
+        this.sortSelect()?.focus();
+      },
+      { injector: this.injector },
+    );
   }
 
   clearFilters(): void {
@@ -591,7 +613,7 @@ export class ApprovalQueueComponent implements OnInit {
         this.isLoading.set(false);
         this.totalCount.set(null);
         this.pageLoadFailed.set(true);
-        this.handleError(err);
+        this.handleError(err, 'approvals.pagination.pageLoadError');
       },
     });
   }
@@ -972,16 +994,35 @@ export class ApprovalQueueComponent implements OnInit {
     return this.productNameById().get(productId) ?? productId;
   }
 
-  private loadBranches() {
-    return this.organisationApi.listBranches({ limit: 100 }).pipe(
-      map((list): BranchLookupResult => ({ list, succeeded: true })),
-      catchError(() =>
-        of<BranchLookupResult>({
-          list: { items: [], next_cursor: null },
-          succeeded: false,
+  private loadBranches(): Observable<BranchLookupResult> {
+    return defer(() => {
+      const HARD_CAP = 50;
+      let pageCount = 0;
+
+      return this.organisationApi.listBranches({ limit: 100 }).pipe(
+        expand((res) => {
+          pageCount++;
+          if (res.next_cursor && pageCount < HARD_CAP) {
+            return this.organisationApi.listBranches({ limit: 100, cursor: res.next_cursor });
+          }
+          return EMPTY;
         }),
-      ),
-    );
+        reduce(
+          (acc: BranchList, res: BranchList) => ({
+            items: [...acc.items, ...res.items],
+            next_cursor: res.next_cursor,
+          }),
+          { items: [], next_cursor: null } as BranchList,
+        ),
+        map((list): BranchLookupResult => ({ list, succeeded: list.next_cursor === null })),
+        catchError(() =>
+          of<BranchLookupResult>({
+            list: { items: [], next_cursor: null },
+            succeeded: false,
+          }),
+        ),
+      );
+    });
   }
 
   private loadCostCentres() {
@@ -1198,7 +1239,7 @@ export class ApprovalQueueComponent implements OnInit {
       ? `approvals.pagination.showingMore.${category}`
       : `approvals.pagination.showing.${category}`;
     return this.translate.instant(key, {
-      count: this.formatService.formatNumber(count),
+      count: this.formatService.formatNumber(count, { numberingSystem: 'latn' }),
     });
   }
 
@@ -1217,7 +1258,10 @@ export class ApprovalQueueComponent implements OnInit {
       }
       this.errorTraceId.set(apiError?.trace_id ?? null);
 
-      if (defaultMessageKey === 'approvals.pagination.loadError') {
+      const isListError =
+        defaultMessageKey === 'approvals.pagination.loadError' ||
+        defaultMessageKey === 'approvals.pagination.pageLoadError';
+      if (isListError) {
         const raw = err.error as unknown;
         const isEnvelope =
           typeof raw === 'object' &&

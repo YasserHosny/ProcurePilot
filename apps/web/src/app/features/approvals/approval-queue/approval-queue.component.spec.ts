@@ -2359,6 +2359,36 @@ describe('ApprovalQueueComponent', () => {
       expect(fixture.nativeElement.querySelectorAll('.filter-chip').length).toBe(0);
     });
 
+    it('moves focus to the remaining chip remove button, then to the sort select', async () => {
+      component.onSortChange('required_by_asc');
+      component.onBranchChange('branch-north');
+      fixture.detectChanges();
+
+      const chips = Array.from(
+        fixture.nativeElement.querySelectorAll('.filter-chip'),
+      ) as HTMLElement[];
+      const branchRemove = chips[1].querySelector('.chip-remove') as HTMLButtonElement;
+      branchRemove.focus();
+      branchRemove.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const remainingRemove = fixture.nativeElement.querySelector(
+        '.chip-remove',
+      ) as HTMLButtonElement;
+      expect(document.activeElement).toBe(remainingRemove);
+
+      remainingRemove.focus();
+      remainingRemove.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const sortSelect = fixture.nativeElement.querySelector(
+        '[data-testid="sort-select"]',
+      ) as HTMLElement;
+      expect(document.activeElement).toBe(sortSelect);
+    });
+
     it('formats the pending request count for singular, plural and zero in English', () => {
       component.totalCount.set(1);
       expect(component.totalCountLabel()).toBe('1 pending request');
@@ -2394,6 +2424,28 @@ describe('ApprovalQueueComponent', () => {
       expect(count?.textContent?.trim()).toBe('120 pending requests');
       const status = fixture.nativeElement.querySelector('[data-testid="pagination-status"]');
       expect(status?.textContent).toContain('Showing 2 of 120');
+    });
+
+    it('uses Latin digits in the Arabic header and fully loaded pagination status', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.use('ar');
+      const many = Array.from({ length: 12 }, (_, index) => ({
+        ...mockPendingRequests[0],
+        id: `req-many-${index}`,
+      }));
+      approvalsApi.listPendingApprovals.and.returnValue(of(list(many, null, many.length)));
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      const count = fixture.nativeElement.querySelector('[data-testid="approval-total-count"]');
+      expect(count?.textContent).toContain('12');
+      expect(count?.textContent).not.toContain('١٢');
+      const status = fixture.nativeElement.querySelector('[data-testid="pagination-status"]');
+      expect(status?.textContent).toContain('12');
+      expect(status?.textContent).not.toContain('١٢');
+
+      translate.use('en');
+      fixture.detectChanges();
     });
 
     it('shows the default empty state with no filters and the filtered empty state with Clear when a filter is active', () => {
@@ -2581,6 +2633,35 @@ describe('ApprovalQueueComponent', () => {
       expect(fixture.nativeElement.querySelector('[data-testid="empty-filtered"]')).not.toBeNull();
     });
 
+    it('shows a localized page-load message for non-envelope HTTP failures', () => {
+      for (const error of [
+        new HttpErrorResponse({ status: 0, error: 'Unknown Error' }),
+        new HttpErrorResponse({ status: 502, error: '<html>Bad Gateway</html>' }),
+      ]) {
+        approvalsApi.listPendingApprovals.and.returnValue(throwError(() => error));
+        component.loadPendingApprovals();
+        fixture.detectChanges();
+
+        expect(component.errorMessage()).toBe('Unable to load pending requests. Please try again.');
+      }
+    });
+
+    it('shows the ProcurePilot envelope message for page-load failures', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 502,
+              error: { code: 'bad_gateway', message: 'Gateway exploded' },
+            }),
+        ),
+      );
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBe('Gateway exploded');
+    });
+
     it('keeps a valid branch filter and URL when the branch lookup fails', async () => {
       TestBed.resetTestingModule();
       approvalsApi.listPendingApprovals.calls.reset();
@@ -2589,6 +2670,84 @@ describe('ApprovalQueueComponent', () => {
       organisationApi.listBranches.and.returnValue(
         throwError(() => new HttpErrorResponse({ status: 500 })),
       );
+
+      await configureQueue({ branch: VALID_BRANCH_ID });
+
+      expect(component.branchFilter()).toBe(VALID_BRANCH_ID);
+      expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({
+        branch_id: VALID_BRANCH_ID,
+        limit: 50,
+      });
+      expect(routerSpy.navigate).not.toHaveBeenCalled();
+    });
+
+    it('pages through branches and keeps a filter found on a later page', async () => {
+      TestBed.resetTestingModule();
+      approvalsApi.listPendingApprovals.calls.reset();
+      organisationApi.listBranches.calls.reset();
+      routerSpy.navigate.calls.reset();
+      organisationApi.listBranches.and.callFake((params) => {
+        if (!params?.cursor) {
+          return of({
+            items: [
+              {
+                id: 'branch-north',
+                name: 'North Branch',
+                is_active: true,
+                created_at: '2026-01-01T00:00:00Z',
+              },
+            ],
+            next_cursor: 'branch-page-2',
+          });
+        }
+        return of({
+          items: [
+            {
+              id: VALID_BRANCH_ID,
+              name: 'Filtered Branch',
+              is_active: true,
+              created_at: '2026-01-01T00:00:00Z',
+            },
+          ],
+          next_cursor: null,
+        });
+      });
+
+      await configureQueue({ branch: VALID_BRANCH_ID });
+
+      expect(organisationApi.listBranches).toHaveBeenCalledWith({
+        limit: 100,
+        cursor: 'branch-page-2',
+      });
+      expect(component.branchFilter()).toBe(VALID_BRANCH_ID);
+      expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({
+        branch_id: VALID_BRANCH_ID,
+        limit: 50,
+      });
+      expect(routerSpy.navigate).not.toHaveBeenCalled();
+    });
+
+    it('keeps the branch filter when a later branch page fails', async () => {
+      TestBed.resetTestingModule();
+      approvalsApi.listPendingApprovals.calls.reset();
+      organisationApi.listBranches.calls.reset();
+      routerSpy.navigate.calls.reset();
+      organisationApi.listBranches.and.callFake((params) => {
+        if (!params?.cursor) {
+          return of({
+            items: [
+              {
+                id: 'branch-north',
+                name: 'North Branch',
+                is_active: true,
+                created_at: '2026-01-01T00:00:00Z',
+              },
+            ],
+            next_cursor: 'branch-page-2',
+          });
+        }
+        return throwError(() => new HttpErrorResponse({ status: 500 }));
+      });
 
       await configureQueue({ branch: VALID_BRANCH_ID });
 

@@ -2655,7 +2655,8 @@
         "many": "Showing {{count}} requests, more available",
         "other": "Showing {{count}} requests, more available"
       },
-      "loadError": "Unable to load more requests. Please try again."
+      "loadError": "Unable to load more requests. Please try again.",
+      "pageLoadError": "Unable to load pending requests. Please try again."
     },
     "requestCount": {
       "zero": "{{count}} requests",
