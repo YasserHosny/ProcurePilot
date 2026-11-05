@@ -486,6 +486,14 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 - `decision` carries `supersedes_decision_id` and `learned_from_decision_id` (nullable uuid). The
   decision returned is the current one (head of the chain, ADR-022).
 
+### `POST /quotation-lines/{line_id}/match-candidates/manual`
+
+- Requires bearer auth and owner or buyer role. Body: `{ "product_id": uuid }`.
+- Records an active catalogue product the buyer picked as a candidate for the line, so a decision can
+  point at it. The row has scoring version `manual-v1`, confidence `0.0000`, no signal and
+  `reasons.manual = true`. Picking the same product again returns the existing candidate.
+- A product that is archived returns `409`; a product or line of another tenant returns `404`.
+
 ### `POST /quotation-lines/{line_id}/match/corrections`
 
 - Requires bearer auth and owner or buyer role; requires an `Idempotency-Key` (uuid) header.
