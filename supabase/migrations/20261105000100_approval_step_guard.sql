@@ -39,6 +39,11 @@ begin
   is_owner := coalesce(current_membership_role() = 'owner', false);
   acting_membership := current_membership_id();
 
+  if acting_membership is null then
+    raise exception 'no active membership for this session'
+      using errcode = '42501';
+  end if;
+
   if tg_op = 'INSERT' then
     if new.status <> 'pending' then
       raise exception 'an approval step is created pending'
@@ -141,6 +146,9 @@ begin
         using errcode = '42501';
     end if;
   end if;
+
+  -- The decision time is the database's, not whatever the session wrote.
+  new.decided_at := now();
 
   return new;
 end;

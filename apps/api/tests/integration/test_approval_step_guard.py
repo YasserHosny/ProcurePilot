@@ -498,3 +498,35 @@ def test_an_approval_cannot_be_recorded_on_a_rejected_request(fx: Fixture) -> No
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         _decide(cur, step_id, "approved", fx.approver.membership_id)
     _denied(fx.conn)
+
+
+# ---- review round 2 ----------------------------------------------------------------------
+
+
+def test_a_removed_member_with_an_unexpired_owner_token_cannot_write(fx: Fixture) -> None:
+    step_id = fx.step()
+    fx.settle(step_id, "approved")
+    with fx.conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute(
+            "update membership set status='removed' where id=%s", (fx.owner2.membership_id,)
+        )
+    cur = fx.act_as(fx.owner2)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _decide(cur, step_id, "approved", fx.owner2.membership_id)
+    _denied(fx.conn)
+
+
+def test_the_decision_time_is_the_databases_not_the_sessions(fx: Fixture) -> None:
+    step_id = fx.step()
+    fx.settle(step_id, "approved")
+    cur = fx.act_as(fx.approver)
+    cur.execute(
+        "update approval_step set status='approved', decided_by_membership_id=%s, "
+        "decided_at='2001-01-01' where id=%s",
+        (fx.approver.membership_id, step_id),
+    )
+    cur.execute(
+        "select decided_at > now() - interval '1 minute' from approval_step where id=%s", (step_id,)
+    )
+    assert cur.fetchone() == (True,)
