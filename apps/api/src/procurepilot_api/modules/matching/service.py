@@ -549,7 +549,9 @@ class MatchingService:
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         emails: dict[str, str | None] = {}
-        items = [_decision_with_actor(client, row, emails) for row in _rows(response.data)]
+        items = [
+            _decision_with_actor(client, row, emails) for row in _chain_order(_rows(response.data))
+        ]
         return MatchDecisionHistory(items=items)
 
     def _ensure_pipeline(
@@ -2019,6 +2021,23 @@ def _candidate_from(row: dict[str, object], products: dict[str, ProductSummary])
         embedding_model=str(row["embedding_model"]) if row.get("embedding_model") else None,
         created_at=row["created_at"],
     )
+
+
+def _chain_order(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Oldest first by supersession depth: decisions made in one transaction share a timestamp."""
+    by_id = {str(row["id"]): row for row in rows}
+
+    def depth(row: dict[str, object]) -> int:
+        seen: set[str] = set()
+        count = 0
+        parent = row.get("supersedes_decision_id")
+        while parent is not None and str(parent) in by_id and str(parent) not in seen:
+            seen.add(str(parent))
+            count += 1
+            parent = by_id[str(parent)].get("supersedes_decision_id")
+        return count
+
+    return sorted(rows, key=lambda row: (depth(row), str(row["decided_at"]), str(row["id"])))
 
 
 def _decision_with_actor(

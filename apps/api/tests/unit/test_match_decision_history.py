@@ -110,3 +110,15 @@ def test_the_decision_on_a_task_carries_who_decided(monkeypatch: pytest.MonkeyPa
         MagicMock(), _row(minutes=0, decided_by=None, automatic=True)
     )
     assert automatic.decided_by_email is None
+
+
+def test_history_follows_the_supersession_chain_when_timestamps_tie(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first = _row(minutes=0, decided_by=None, automatic=True)
+    second = _row(minutes=0, decided_by=uuid4(), automatic=False, supersedes=UUID(str(first["id"])))
+    third = _row(minutes=0, decided_by=uuid4(), automatic=False, supersedes=UUID(str(second["id"])))
+    # The database hands them back in an arbitrary order; the chain decides.
+    service = _service(monkeypatch, [third, first, second])
+    result = service.decision_history(bearer_token="t", line_id=LINE)
+    assert [str(d.id) for d in result.items] == [first["id"], second["id"], third["id"]]
