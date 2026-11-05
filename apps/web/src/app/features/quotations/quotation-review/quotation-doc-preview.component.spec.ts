@@ -60,6 +60,15 @@ describe('QuotationDocPreviewComponent provenance', () => {
     expect(icon.getAttribute('aria-label')).toContain('bedrock · test-model');
   });
 
+  it('names the loading spinner while the preview URL is pending (PPS-162)', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.use('en');
+    fixture.detectChanges();
+    const spinner = fixture.nativeElement.querySelector('.doc-preview-loading mat-spinner') as HTMLElement;
+    expect(spinner.getAttribute('aria-label')).toBe(enCatalog.common.loading);
+  });
+
   it('exposes the focusable technical-details icon to assistive tech (PPS-162)', () => {
     const icon = fixture.nativeElement.querySelector('.prov-details-icon') as HTMLElement;
     expect(icon.getAttribute('tabindex')).toBe('0');

@@ -58,7 +58,7 @@
           ></iframe>
         } @else {
           <div class="doc-preview-loading">
-            <mat-spinner diameter="32"></mat-spinner>
+            <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="32"></mat-spinner>
             <span>{{ 'common.loading' | translate }}</span>
           </div>
         }
