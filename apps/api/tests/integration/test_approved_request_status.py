@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 import psycopg
 import pytest
 
-from integration.catalogue_helpers import TEST_DATABASE_URL, make_workspace
+from integration.catalogue_helpers import TEST_DATABASE_URL, make_workspace, reset_role
 from integration.quotation_helpers import PsycopgSupabaseClient
 from integration.smart_compare_helpers import (
     committed_smart_context,
@@ -15,6 +15,7 @@ from integration.smart_compare_helpers import (
     settings_for_test_db,
 )
 from integration.test_confirm_delivery import _payload as delivery_payload
+from integration.test_mobile_audit import _PsycopgAuditWriter
 from integration.test_order_tracking import _base_order_payload, _setup_approved_request
 from procurepilot_api import db
 from procurepilot_api.deps import CurrentMember
@@ -22,7 +23,7 @@ from procurepilot_api.errors import ConflictError, NotFoundError
 from procurepilot_api.modules.orders.schemas import PurchaseOrderCreate, PurchaseOrderDraftUpdate
 from procurepilot_api.modules.orders.service import OrdersService
 from procurepilot_api.modules.requests import service as requests_module
-from procurepilot_api.modules.requests.schemas import ApprovalDecisionInput
+from procurepilot_api.modules.requests.schemas import ApprovalDecisionInput, PurchaseRequest
 from procurepilot_api.modules.requests.service import RequestsService
 
 pytestmark = pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL not set")
@@ -32,6 +33,7 @@ pytestmark = pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL
 class Lifecycle:
     conn: psycopg.Connection
     member: CurrentMember
+    claims: str
     requests: RequestsService
     orders: OrdersService
     request_id: UUID
@@ -80,15 +82,22 @@ def lifecycle(monkeypatch: pytest.MonkeyPatch) -> Iterator[Lifecycle]:
         with db.connect(TEST_DATABASE_URL or "") as conn:
             rid, lid = _setup_approved_request(conn, context.workspace, context.product_id)
             member = member_from_workspace(context.workspace)
+            claims = context.workspace.claims()
+
+            def client_factory(_settings: object, token: str) -> PsycopgSupabaseClient:
+                return PsycopgSupabaseClient(
+                    conn, claims=token if token and token.startswith("{") else claims
+                )
+
+            monkeypatch.setattr(requests_module, "authenticated_client", client_factory)
             monkeypatch.setattr(
-                requests_module,
-                "authenticated_client",
-                lambda *_: PsycopgSupabaseClient(conn, claims=context.workspace.claims()),
+                requests_module, "get_audit_writer", lambda: _PsycopgAuditWriter(conn)
             )
             monkeypatch.setattr(requests_module, "enqueue_push_job", lambda *_: None)
             result = Lifecycle(
                 conn,
                 member,
+                claims,
                 RequestsService(settings),
                 OrdersService(settings),
                 rid,
@@ -120,7 +129,7 @@ def test_approval_and_keyed_replay_return_current_state(lifecycle: Lifecycle, ke
     case.conn.commit()
     key = uuid4() if keyed else None
 
-    def approve():
+    def approve() -> PurchaseRequest:
         return case.requests.approve_request(
             bearer_token="test",
             member=case.member,
@@ -138,6 +147,7 @@ def test_approval_and_keyed_replay_return_current_state(lifecycle: Lifecycle, ke
         case.create()
         assert approve().status == "ordered"
         with case.conn.cursor() as cur:
+            reset_role(cur)
             cur.execute(
                 "select count(*) from push_notification where purchase_request_id=%s",
                 (case.request_id,),
@@ -191,7 +201,7 @@ def test_legacy_ordered_request_can_create_order(lifecycle: Lifecycle) -> None:
 def test_delivery_requires_order(lifecycle: Lifecycle) -> None:
     case = lifecycle
     args = dict(
-        bearer_token="test",
+        bearer_token=case.claims,
         member=case.member,
         request_id=case.request_id,
         payload=delivery_payload([(case.line_id, "10")]),
@@ -209,7 +219,7 @@ def test_cancellation_preserves_terminal_request(lifecycle: Lifecycle, status: s
     order = case.create()
     if status == "delivered":
         case.requests.confirm_delivery(
-            bearer_token="test",
+            bearer_token=case.claims,
             member=case.member,
             request_id=case.request_id,
             payload=delivery_payload([(case.line_id, "10")]),

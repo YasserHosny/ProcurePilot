@@ -210,9 +210,14 @@ def test_approving_moves_request_and_step_to_approved(conn: object) -> None:
 
         with conn.cursor(row_factory=psycopg.rows.dict_row) as decision_cur:
             request, step = RequestsService()._apply_request_decision(
-                decision_cur, member=member_from_workspace(approver),
-                request_id=str(request_id), step_id=str(step_id), decision="approved",
-                request_status="approved", comment="ok", now="2026-11-05T00:00:00Z",
+                decision_cur,
+                member=member_from_workspace(approver),
+                request_id=str(request_id),
+                step_id=str(step_id),
+                decision="approved",
+                request_status="approved",
+                comment="ok",
+                now="2026-11-05T00:00:00Z",
             )
         assert request["status"] == "approved"
         assert step["status"] == "approved"

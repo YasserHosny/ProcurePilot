@@ -237,9 +237,7 @@ def test_a_step_reassigned_after_the_precheck_refuses_the_stale_approver(
     with conn.cursor() as cur:
         owner = make_workspace(cur, "t037-reassign")
         requester = _make_member(cur, owner.tenant_id, "t037-reassign-requester", "branch_manager")
-        original_approver = _make_member(
-            cur, owner.tenant_id, "t037-reassign-original", "approver"
-        )
+        original_approver = _make_member(cur, owner.tenant_id, "t037-reassign-original", "approver")
         new_approver = _make_member(cur, owner.tenant_id, "t037-reassign-new", "approver")
         branch_id = _make_branch(cur, owner)
         request_id = _make_submitted_request(cur, owner, branch_id, requester)

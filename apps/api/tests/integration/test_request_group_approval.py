@@ -652,8 +652,10 @@ def test_budget_status_sees_both_just_submitted_requests_and_does_not_block_appr
 @pytest.mark.parametrize("statuses", [("approved", "approved"), ("approved", "ordered")])
 @pytest.mark.parametrize("live_order", [False, True])
 def test_approved_split_withdrawal_checks_live_orders(
-    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch,
-    statuses: tuple[str, str], live_order: bool,
+    conn: psycopg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+    statuses: tuple[str, str],
+    live_order: bool,
 ) -> None:
     from integration.quotation_helpers import make_supplier
 
@@ -675,8 +677,14 @@ def test_approved_split_withdrawal_checks_live_orders(
                 "total_amount,total_currency,tax_amount,tax_currency,source_kind,source_reference,"
                 "source_request_id,created_by,create_idempotency_key) "
                 "values (%s,%s,%s,'draft',current_date,1,'SAR',0,'SAR','manual','test',%s,%s,%s)",
-                (data.owner.tenant_id, f"PO-{uuid4().hex[:12]}", supplier, data.requests[0],
-                 data.owner.membership_id, uuid4()),
+                (
+                    data.owner.tenant_id,
+                    f"PO-{uuid4().hex[:12]}",
+                    supplier,
+                    data.requests[0],
+                    data.owner.membership_id,
+                    uuid4(),
+                ),
             )
     conn.commit()
     with api_as(conn, monkeypatch, data.requester) as (client, _service, _queries):

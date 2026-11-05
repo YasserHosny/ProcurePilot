@@ -445,8 +445,9 @@ class SpendClient:
 def test_ordered_and_delivered_requests_reduce_remaining_budget_for_another_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Regression: an approved request moves straight to "ordered" (spec 010), so committed
-    # spend filtered on submitted/approved only silently dropped every approved request.
+    # Regression: an approved request stays "approved" until a live purchase order exists, while
+    # an "ordered" request also consumes committed spend (spec 010), so committed spend filtered
+    # on submitted/approved only silently dropped every approved request.
     tenant_id = uuid4()
     branch_id = uuid4()
     requester_id = uuid4()
