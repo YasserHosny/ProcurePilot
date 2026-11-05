@@ -30,8 +30,27 @@ left join lateral (
   limit 1
 ) lc on true
 where resp.id = %(rfq_response_id)s
-  and (%(tenant_id)s::uuid is null or (resp.tenant_id = %(tenant_id)s
-       and ql.tenant_id = %(tenant_id)s and md.tenant_id = %(tenant_id)s))
+  and md.matched_workspace_product_id = any(%(product_ids)s)
+  and ql.unit_price_amount is not null
+order by ql.line_number
+"""
+
+# The same lines, addressed by the quotation a request was prepared from (purchase_request
+# .source_quotation_id), so a caller reads them through the quotation tables' own policies rather
+# than through the RFQ tables, which a requester may no longer read after a role change.
+SOURCE_QUOTATION_LINES_SQL = """
+select ql.unit_price_amount, ql.unit_price_currency, md.matched_workspace_product_id,
+       lc.id as landed_cost_id, lc.total_amount, lc.total_currency, lc.quantity
+from quotation_line ql
+join current_match_decision md on md.quotation_line_id = ql.id
+left join lateral (
+  select id, total_amount, total_currency, quantity
+  from landed_cost
+  where match_decision_id = md.id
+  order by recorded_at desc, id desc
+  limit 1
+) lc on true
+where ql.quotation_id = %(quotation_id)s
   and md.matched_workspace_product_id = any(%(product_ids)s)
   and ql.unit_price_amount is not null
 order by ql.line_number
@@ -87,23 +106,37 @@ def estimate_from_source_response(
     *,
     rfq_response_id: UUID,
     product_ids: list[UUID],
-    tenant_id: UUID | None = None,
 ) -> dict[UUID, LineEstimate]:
     """Per-pack landed prices (falling back to the quoted price) of the RFQ response a request
     was prepared from. A request prepared from a response is valued at that response's prices,
     never at another supplier's (the estimate must not silently change between prepare and
-    submit). With `tenant_id` the read is confined to that workspace, for callers that run it
-    outside the caller's database role."""
+    submit)."""
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             SOURCE_RESPONSE_QUOTE_LINES_SQL,
-            {
-                "rfq_response_id": rfq_response_id,
-                "product_ids": product_ids,
-                "tenant_id": tenant_id,
-            },
+            {"rfq_response_id": rfq_response_id, "product_ids": product_ids},
         )
         rows = cur.fetchall()
+    return _source_estimates(rows)
+
+
+def estimate_from_source_quotation(
+    conn: psycopg.Connection,
+    *,
+    quotation_id: UUID,
+    product_ids: list[UUID],
+) -> dict[UUID, LineEstimate]:
+    """`estimate_from_source_response`, addressed by the response's quotation."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            SOURCE_QUOTATION_LINES_SQL,
+            {"quotation_id": quotation_id, "product_ids": product_ids},
+        )
+        rows = cur.fetchall()
+    return _source_estimates(rows)
+
+
+def _source_estimates(rows: list[dict[str, object]]) -> dict[UUID, LineEstimate]:
     estimates: dict[UUID, LineEstimate] = {}
     for row in rows:
         landed_quantity = row["quantity"]

@@ -80,6 +80,7 @@ from procurepilot_api.modules.requests.schemas import (
 from procurepilot_api.modules.requests.valuation import (
     LineEstimate,
     QuotedPrice,
+    estimate_from_source_quotation,
     estimate_from_source_response,
     estimate_line_value,
     quoted_prices_from_source_response,
@@ -2710,32 +2711,29 @@ class RequestsService:
         with db.connect(db_url) as conn:
             conn.execute("set local role authenticated")
             conn.execute("select set_config('request.jwt.claims', %s, true)", (json.dumps(claims),))
-            source_response_id = None
+            source_quotation_id = None
             if request_id is not None:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "select source_rfq_response_id from purchase_request where id = %s",
+                        "select source_quotation_id from purchase_request where id = %s",
                         (request_id,),
                     )
                     row = cur.fetchone()
                 if row is not None:
-                    source_response_id = row[0]
-            latest = {
-                pid: estimate_line_value(conn, workspace_product_id=pid) for pid in product_ids
-            }
+                    source_quotation_id = row[0]
             sourced: dict[UUID, LineEstimate] = {}
-            if source_response_id is not None:
-                # A requester may no longer read RFQ tables (a role change after they prepared
-                # the request), but the request is still valued at its source response, so this
-                # read leaves the caller's role and is confined to the caller's workspace.
-                conn.execute("reset role")
-                sourced = estimate_from_source_response(
-                    conn,
-                    rfq_response_id=source_response_id,
-                    product_ids=product_ids,
-                    tenant_id=member.tenant_id,
+            if source_quotation_id is not None:
+                # The request's own snapshot of the quotation it was prepared from, read through
+                # the quotation tables, not the RFQ tables a requester may no longer read.
+                sourced = estimate_from_source_quotation(
+                    conn, quotation_id=source_quotation_id, product_ids=product_ids
                 )
-            return [sourced.get(pid, latest[pid]) for pid in product_ids]
+            return [
+                sourced[pid]
+                if pid in sourced
+                else estimate_line_value(conn, workspace_product_id=pid)
+                for pid in product_ids
+            ]
 
     def _insert_lines(
         self,
