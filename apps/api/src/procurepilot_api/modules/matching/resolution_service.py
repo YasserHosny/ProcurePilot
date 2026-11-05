@@ -26,6 +26,7 @@ from procurepilot_api.modules.matching.exact import is_exact_name_match
 from procurepilot_api.modules.matching.schemas import (
     BulkConfirmResult,
     ExactMatchSummary,
+    MatchCandidate,
     MatchCorrectionRequest,
     MatchCorrectionResponse,
     MatchDecision,
@@ -33,15 +34,18 @@ from procurepilot_api.modules.matching.schemas import (
 )
 from procurepilot_api.modules.matching.scoring import decimal_string
 from procurepilot_api.modules.matching.service import (
+    CANDIDATE_COLUMNS,
     CANONICAL_COLUMNS,
     DECISION_COLUMNS,
     LINE_COLUMNS,
     PRODUCT_COLUMNS,
     MatchingService,
     _candidate,
+    _candidate_from,
     _decision,
     _decision_for_line,
     _line_row,
+    _product_summary,
 )
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.offers.service import _authenticated_db
@@ -54,6 +58,7 @@ EXACT_CONFIRM_WORKERS = 12  # overlap hosted RTT; never more than twelve in-flig
 EXACT_CONFIRM_BATCH = 100  # exact pairs returned per call
 EXACT_SCAN_LIMIT = 1000  # open tasks examined while collecting them
 EXACT_LOOKUP_CHUNK = 100  # lines per batched read (keeps PostgREST URLs short)
+MANUAL_SCORING_VERSION = "manual-v1"  # candidates a buyer picked from the catalogue (P-151)
 CORRECTION_PRODUCT_NAMESPACE = UUID("c3db433e-668c-44be-9fc4-124f4e77b375")
 
 
@@ -63,6 +68,82 @@ class MatchResolutionService:
         self._catalogue = CatalogueService(self._settings)
         self._aliases = AliasLearningService()
         self._landed_cost = LandedCostService(self._settings)
+
+    def add_manual_candidate(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        line_id: UUID,
+        product_id: UUID,
+    ) -> MatchCandidate:
+        """Record a catalogue product the buyer picked as a candidate for this line.
+
+        A decision must point at a candidate row, so a product the matcher never proposed is
+        recorded as one before it can be chosen. The evidence is explicit: confidence 0, no
+        signal, ``manual`` true. Reads and the write run as the caller, so RLS scopes both.
+        """
+        client = authenticated_client(self._settings, bearer_token)
+        _line_row(client, line_id)
+        product = _product_summary(client, product_id)
+        if product.status != "active":
+            raise ConflictError(details={"reason": "product_archived"})
+        existing = self._line_candidates(client, line_id)
+        for row in existing:
+            if str(row["candidate_workspace_product_id"]) == str(product_id):
+                return _candidate_from(row, {str(product_id): product})
+        next_rank = (
+            max(
+                (
+                    int(row["rank"])
+                    for row in existing
+                    if row["scoring_version"] == MANUAL_SCORING_VERSION
+                ),
+                default=0,
+            )
+            + 1
+        )
+        try:
+            response = (
+                client.table("match_candidate")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "quotation_line_id": str(line_id),
+                        "candidate_workspace_product_id": str(product_id),
+                        "confidence": "0.0000",
+                        "reasons": {
+                            "alias_hit": False,
+                            "gtin_match": False,
+                            "supplier_code_match": False,
+                            "manual": True,
+                        },
+                        "rank": next_rank,
+                        "scoring_version": MANUAL_SCORING_VERSION,
+                    }
+                )
+                .execute()
+            )
+        except APIError as exc:
+            if exc.code == "23505":  # a concurrent pick of the same product won the insert
+                for row in self._line_candidates(client, line_id):
+                    if str(row["candidate_workspace_product_id"]) == str(product_id):
+                        return _candidate_from(row, {str(product_id): product})
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        return _candidate_from(response.data[0], {str(product_id): product})
+
+    @staticmethod
+    def _line_candidates(client: object, line_id: UUID) -> list[dict[str, object]]:
+        try:
+            return list(
+                client.table("match_candidate")
+                .select(CANDIDATE_COLUMNS)
+                .eq("quotation_line_id", str(line_id))
+                .execute()
+                .data
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def resolve(
         self,
