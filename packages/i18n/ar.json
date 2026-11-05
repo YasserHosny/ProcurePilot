@@ -1728,7 +1728,9 @@
       "viewScorecard": "عرض بطاقة الأداء",
       "backToCatalogue": "العودة إلى الكتالوج",
       "recordPurchase": "تسجيل الشراء"
-    }
+    },
+    "offersTruncated": "يظهر هنا أحدث العروض فقط. لهذا المنتج عروض أكثر مما تتسع له القائمة، فقد يكون عرض أرخص غير ظاهر.",
+    "productSearchFailed": "فشل البحث عن المنتج. حاول مرة أخرى."
   },
   "productIntelligence": {
     "title": "ذكاء أسعار المنتج",

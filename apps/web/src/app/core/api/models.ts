@@ -805,6 +805,8 @@ export interface OfferComparison {
   readonly product: ProductRef;
   readonly requested_quantity: string;
   readonly offers: readonly Offer[];
+  /** True when more offers exist than this response carries (the cap is enforced server-side). */
+  readonly offers_truncated?: boolean;
   readonly recommendation: Recommendation | null;
 }
 
