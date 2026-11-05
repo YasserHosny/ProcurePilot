@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator, model_validator
 
 type PurchaseRequestStatus = Literal[
     "draft", "submitted", "approved", "rejected", "withdrawn", "ordered", "delivered"
@@ -185,6 +185,38 @@ class PendingApprovalList(BaseModel):
 
 class ApprovalDecisionInput(StrictApiModel):
     comment: str | None = None
+
+
+class BulkApprovalDecisionInput(StrictApiModel):
+    decision: Literal["approved", "rejected"]
+    comment: str | None = Field(default=None, max_length=2000)
+    request_ids: list[UUID] = Field(min_length=1, max_length=25)
+
+    @field_validator("request_ids")
+    @classmethod
+    def unique_request_ids(cls, value: list[UUID]) -> list[UUID]:
+        if len(value) != len(set(value)):
+            raise ValueError("Request ids must be unique.")
+        return value
+
+    @model_validator(mode="after")
+    def rejection_requires_comment(self) -> BulkApprovalDecisionInput:
+        if self.decision == "rejected" and (self.comment is None or not self.comment.strip()):
+            raise ValueError("A rejection comment is required.")
+        return self
+
+
+class BulkApprovalDecisionResult(BaseModel):
+    request_id: UUID
+    outcome: Literal["decided", "failed"]
+    error_code: str | None = None
+    request: PurchaseRequest | None = None
+
+
+class BulkApprovalDecisionResponse(BaseModel):
+    results: list[BulkApprovalDecisionResult] = Field(min_length=1, max_length=25)
+    decided_count: int = Field(ge=0, le=25)
+    failed_count: int = Field(ge=0, le=25)
 
 
 class DeliveryConfirmationLineInput(StrictApiModel):

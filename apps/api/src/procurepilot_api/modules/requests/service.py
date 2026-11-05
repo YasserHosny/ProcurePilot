@@ -8,7 +8,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import NamedTuple
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
 import psycopg
 from postgrest.exceptions import APIError
@@ -21,6 +21,7 @@ from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (
+    AppError,
     ConflictError,
     NotFoundError,
     PermissionDeniedError,
@@ -51,6 +52,9 @@ from procurepilot_api.modules.requests.schemas import (
     ApprovalStep,
     AutoPreparedProvenance,
     BudgetStatus,
+    BulkApprovalDecisionInput,
+    BulkApprovalDecisionResponse,
+    BulkApprovalDecisionResult,
     DeliveryConfirmationCreate,
     LowStockReport,
     LowStockReportCreate,
@@ -2459,6 +2463,68 @@ class RequestsService:
             target={"delivery_quality_issue_photo_id": str(row["id"])},
         )
         return _quality_issue_photo(row, url=url)
+
+    def bulk_decisions(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        payload: BulkApprovalDecisionInput,
+        idempotency_key: UUID,
+    ) -> BulkApprovalDecisionResponse:
+        results: list[BulkApprovalDecisionResult] = []
+        for request_id in payload.request_ids:
+            try:
+                # Each call owns its transaction, audit and outbox through the existing
+                # single-request path. Never wrap the batch in a shared transaction.
+                request = self._decide_request(
+                    bearer_token=bearer_token,
+                    member=member,
+                    request_id=request_id,
+                    payload=ApprovalDecisionInput(comment=payload.comment),
+                    decision=payload.decision,
+                    idempotency_key=uuid5(idempotency_key, str(request_id)),
+                )
+                results.append(
+                    BulkApprovalDecisionResult(
+                        request_id=request_id,
+                        outcome="decided",
+                        request=request,
+                    )
+                )
+            except AppError as exc:
+                reason = (exc.details or {}).get("reason")
+                error_code = (
+                    "group_request_use_group_decision"
+                    if reason == "part_of_split"
+                    else "self_decision_not_allowed"
+                    if reason == "self_decision_not_allowed"
+                    else "unavailable"
+                    if exc.status_code >= 500
+                    else exc.code
+                )
+                results.append(
+                    BulkApprovalDecisionResult(
+                        request_id=request_id,
+                        outcome="failed",
+                        error_code=error_code,
+                    )
+                )
+            except Exception:
+                logger.exception("Bulk approval item failed", extra={"request_id": str(request_id)})
+                results.append(
+                    BulkApprovalDecisionResult(
+                        request_id=request_id,
+                        outcome="failed",
+                        error_code="unavailable",
+                    )
+                )
+        decided_count = sum(item.outcome == "decided" for item in results)
+        return BulkApprovalDecisionResponse(
+            results=results,
+            decided_count=decided_count,
+            failed_count=len(results) - decided_count,
+        )
 
     def approve_request(
         self,

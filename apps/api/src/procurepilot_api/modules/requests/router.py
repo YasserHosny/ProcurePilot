@@ -14,6 +14,8 @@ from procurepilot_api.modules.requests.schemas import (
     ApprovalDelegation,
     ApprovalDelegationCreate,
     ApprovalDelegationList,
+    BulkApprovalDecisionInput,
+    BulkApprovalDecisionResponse,
     DeliveryConfirmationCreate,
     LowStockReport,
     LowStockReportCreate,
@@ -416,6 +418,22 @@ def reject_request(
         bearer_token=token,
         member=member,
         request_id=request_id,
+        payload=payload,
+        idempotency_key=idempotency_key,
+    )
+
+
+@router.post("/approvals/bulk-decisions", response_model=BulkApprovalDecisionResponse)
+def bulk_decisions(
+    payload: Annotated[BulkApprovalDecisionInput, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+) -> BulkApprovalDecisionResponse:
+    return service.bulk_decisions(
+        bearer_token=token,
+        member=member,
         payload=payload,
         idempotency_key=idempotency_key,
     )
