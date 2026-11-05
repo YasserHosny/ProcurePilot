@@ -1276,10 +1276,12 @@ ProcurePilot only; no provider-send/write/cancel method exists.
 | `edit_idempotency_key` | uuid | Nullable unique per tenant |
 | `cancel_idempotency_key` | uuid | Nullable unique per tenant |
 | `close_idempotency_key` | uuid | Nullable unique per tenant |
+| `withdraw_idempotency_key` | uuid | Nullable unique per tenant |
 | `created_at` / `updated_at` | timestamptz | Audit fields |
 
 State transitions for US4: create yields `draft`; `PUT /orders/{id}` may edit only `draft`;
-`POST /orders/{id}/submit` moves `draft -> submitted`; `POST /orders/{id}/cancel` moves a
+`POST /orders/{id}/submit` moves `draft -> submitted`; `POST /orders/{id}/withdraw` moves
+`submitted -> draft` while no confirmation, receipt or purchase outcome exists; `POST /orders/{id}/cancel` moves a
 cancellable order (anything but `received` or `closed`) to `cancelled`. Cancellation is internal
 and preserves receipt/confirmation evidence. `POST /orders/{id}/close` moves a `received` order to
 `closed`, which is final.

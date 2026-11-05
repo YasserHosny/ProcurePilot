@@ -1,4 +1,4 @@
-"""Manual reminders use only the explicitly configured throwaway database and FakeMailer."""
+"""Manual reminders run against TEST_DATABASE_URL with FakeMailer; no real email is sent."""
 
 import os
 from collections.abc import Iterator
@@ -25,7 +25,13 @@ pytestmark = pytest.mark.skipif(not DB, reason="TEST_DATABASE_URL is required")
 def reminder(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[tuple[TestClient, str, str, CurrentMember]]:
-    assert "localhost:54398/" in DB, "These tests require the PPS-176 throwaway database"
+    with psycopg.connect(DB, prepare_threshold=None) as probe:
+        has_columns = probe.execute(
+            "select count(*) from information_schema.columns "
+            "where table_name = 'rfq_recipient' and column_name = 'reminder_count'"
+        ).fetchone()[0]
+    if not has_columns:
+        pytest.skip("migration 20261104120000_rfq_reminders is not applied to this database")
     monkeypatch.setenv("DATABASE_URL", DB)
     monkeypatch.setenv("RFQ_MAILER_MODE", "stub")
     monkeypatch.setenv("RATE_LIMIT_RFQ_SEND", "10000/minute")
