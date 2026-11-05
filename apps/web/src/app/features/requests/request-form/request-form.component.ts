@@ -145,6 +145,7 @@ export class RequestFormComponent implements OnInit {
   readonly isLoading = signal<boolean>(false);
   readonly isSaving = signal<boolean>(false);
   readonly isSubmitting = signal<boolean>(false);
+  /** Translation key; the template resolves it in the active language. */
   readonly errorMessage = signal<string | null>(null);
   readonly branches = signal<Branch[]>([]);
   readonly allCostCentres = signal<CostCentre[]>([]);
@@ -820,23 +821,23 @@ export class RequestFormComponent implements OnInit {
 
   private getValidationErrorMessage(): string {
     if (this.form.controls.branch_id.invalid) {
-      return this.translate.instant(`${I18N}.form.branchRequired`);
+      return `${I18N}.form.branchRequired`;
     }
     if (this.form.controls.required_by_date.invalid) {
-      return this.translate.instant(`${I18N}.form.requiredByDateRequired`);
+      return `${I18N}.form.requiredByDateRequired`;
     }
     if (this.lines.length === 0) {
-      return this.translate.instant(`${I18N}.form.atLeastOneLineRequired`);
+      return `${I18N}.form.atLeastOneLineRequired`;
     }
     for (const group of this.lines.controls) {
       if (group.controls.workspace_product_id.invalid) {
-        return this.translate.instant(`${I18N}.form.productRequired`);
+        return `${I18N}.form.productRequired`;
       }
       if (group.controls.quantity.invalid) {
-        return this.translate.instant(`${I18N}.form.quantityRequired`);
+        return `${I18N}.form.quantityRequired`;
       }
     }
-    return this.translate.instant(`${I18N}.genericError`);
+    return `${I18N}.genericError`;
   }
 
   private buildRequestPayload() {
@@ -909,7 +910,7 @@ export class RequestFormComponent implements OnInit {
       }),
       catchError(() => {
         this.resetState();
-        this.errorMessage.set(this.translate.instant('requests.genericError'));
+        this.errorMessage.set('requests.genericError');
         this.focusErrorBanner();
         return of(null);
       }),
@@ -1064,7 +1065,7 @@ export class RequestFormComponent implements OnInit {
       }
 
       if (err.status === 409 && details?.reason === 'part_of_split') {
-        this.errorMessage.set(this.translate.instant(`${I18N}.partOfSplitError`));
+        this.errorMessage.set(`${I18N}.partOfSplitError`);
         this.focusErrorBanner();
         return;
       }
@@ -1085,19 +1086,19 @@ export class RequestFormComponent implements OnInit {
           }
         }
         if (isQuantityField) {
-          this.errorMessage.set(this.translate.instant(`${I18N}.genericError`));
+          this.errorMessage.set(`${I18N}.genericError`);
         } else {
-          this.errorMessage.set(this.translate.instant(key));
+          this.errorMessage.set(key);
         }
         this.focusErrorBanner();
         return;
       }
 
-      this.errorMessage.set(this.translate.instant(`${I18N}.genericError`));
+      this.errorMessage.set(`${I18N}.genericError`);
       this.focusErrorBanner();
       return;
     }
-    this.errorMessage.set(this.translate.instant(`${I18N}.genericError`));
+    this.errorMessage.set(`${I18N}.genericError`);
     this.focusErrorBanner();
   }
 }

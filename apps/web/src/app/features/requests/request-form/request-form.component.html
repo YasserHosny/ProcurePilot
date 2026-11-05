@@ -115,10 +115,10 @@
     </div>
   }
 
-  @if (errorMessage()) {
+  @if (errorMessage(); as errorKey) {
     <div class="error-banner" role="alert" tabindex="-1">
       <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
-      <span>{{ errorMessage() }}</span>
+      <span>{{ errorKey | translate }}</span>
     </div>
   }
 

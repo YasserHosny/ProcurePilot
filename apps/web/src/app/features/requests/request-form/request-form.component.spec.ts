@@ -131,6 +131,27 @@ describe('RequestFormComponent — create mode (T017)', () => {
     fixture.detectChanges();
   });
 
+  it('updates the validation banner when the language changes without resubmitting', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('ar', arCatalog);
+    translate.use('en');
+    component.saveAndSubmit();
+    fixture.detectChanges();
+
+    const banner = fixture.nativeElement.querySelector('.error-banner') as HTMLElement;
+    expect(banner.textContent).toContain(enCatalog.requests.form.branchRequired);
+    expect(banner.getAttribute('role')).toBe('alert');
+    expect(banner.getAttribute('tabindex')).toBe('-1');
+
+    translate.use('ar');
+    fixture.detectChanges();
+
+    expect(banner.textContent).toContain(arCatalog.requests.form.branchRequired);
+    expect(banner.textContent).not.toContain(enCatalog.requests.form.branchRequired);
+    expect(requestsApi.createRequest).not.toHaveBeenCalled();
+    expect(requestsApi.submitRequest).not.toHaveBeenCalled();
+  });
+
   describe('PPS-186 note limits and localized quantities', () => {
     function fillForm(): void {
       component.form.patchValue({ branch_id: 'b1', required_by_date: '2099-01-01' });
@@ -791,7 +812,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
 
     component.saveDraft();
 
-    expect(component.errorMessage()).toBe('Unable to save the purchase request. Please try again.');
+    expect(component.errorMessage()).toBe('requests.genericError');
     expect(component.isSaving()).toBeFalse();
   });
 
@@ -1066,7 +1087,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
 
     expect(requestsApi.updateRequest).toHaveBeenCalledTimes(1);
     expect(requestsApi.submitRequest).not.toHaveBeenCalled();
-    expect(component.errorMessage()).toBe('Unable to save the purchase request. Please try again.');
+    expect(component.errorMessage()).toBe('requests.genericError');
     expect(component.isSubmitting()).toBeFalse();
   });
 
@@ -2333,7 +2354,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
         'Quantity can have at most 6 decimals.',
       );
       // Banner displays the generic error
-      expect(component.errorMessage()).toBe('Unable to save the purchase request. Please try again.');
+      expect(component.errorMessage()).toBe('requests.genericError');
     });
 
     it('object-shaped details still work with field-level server error and translated banner', () => {
@@ -2360,7 +2381,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       expect(component.form.controls.required_by_date.errors?.['server']).toBe(
         'requests.errors.required_by_in_the_past',
       );
-      expect(component.errorMessage()).toBe('The required-by date cannot be in the past.');
+      expect(component.errorMessage()).toBe('requests.errors.required_by_in_the_past');
     });
   });
 
@@ -2932,7 +2953,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       expect(requestsApi.createRequest).not.toHaveBeenCalled();
       expect(requestsApi.updateRequest).not.toHaveBeenCalled();
       expect(component.form.controls.branch_id.touched).toBeTrue();
-      expect(component.errorMessage()).toBe('Branch is required.');
+      expect(component.errorMessage()).toBe('requests.form.branchRequired');
     });
   });
 
@@ -2967,7 +2988,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       expect(dateField?.querySelector('mat-error')?.textContent?.trim()).toBe(
         'The required-by date cannot be in the past.',
       );
-      expect(component.errorMessage()).toBe('The required-by date cannot be in the past.');
+      expect(component.errorMessage()).toBe('requests.errors.required_by_in_the_past');
     });
 
     it('falls back to requests.genericError on unknown error reason and never displays raw English apiError.message', () => {
@@ -2991,7 +3012,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       component.saveDraft();
       fixture.detectChanges();
 
-      expect(component.errorMessage()).toBe('Unable to save the purchase request. Please try again.');
+      expect(component.errorMessage()).toBe('requests.genericError');
       expect(component.errorMessage()).not.toContain('Raw database constraint failure');
     });
   });
@@ -3163,7 +3184,7 @@ describe('RequestFormComponent — PPS-190 draft actions', () => {
     confirmation.next(true);
     const key = requestsApi.withdrawRequest.calls.mostRecent().args[1];
     expect(key).toEqual(jasmine.any(String));
-    expect(component.errorMessage()).toBe(enCatalog.requests.genericError);
+    expect(component.errorMessage()).toBe('requests.genericError');
     expect(router.navigate).not.toHaveBeenCalled();
     requestsApi.withdrawRequest.and.returnValue(of({ ...mockRequest, status: 'withdrawn' }));
     confirmation.next(true);
@@ -3231,7 +3252,7 @@ describe('RequestFormComponent — PPS-190 draft actions', () => {
       expect(component.existingRequest()).toBeNull();
       expect(component.form.getRawValue()).toEqual({ branch_id: '', cost_centre_id: '', required_by_date: null,
         lines: [{ workspace_product_id: '', quantity: '', note: '' }] });
-      expect(component.errorMessage()).toBe(enCatalog.requests.genericError);
+      expect(component.errorMessage()).toBe('requests.genericError');
       expect(fixture.nativeElement.querySelector('.duplicate-banner')).toBeNull();
     });
   }
