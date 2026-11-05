@@ -3,7 +3,7 @@ import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { FormatService } from '../../../core/format/format.service';
-import type { QuotationDetail, QuotationLine } from '../../../core/api/models';
+import type { FieldExtraction, QuotationDetail, QuotationLine } from '../../../core/api/models';
 import { QuotationLinesComponent } from './quotation-lines.component';
 
 describe('QuotationLinesComponent', () => {
@@ -773,6 +773,75 @@ describe('QuotationLinesComponent', () => {
       const badge = fixture.nativeElement.querySelector('.removal-badge') as HTMLElement;
       expect(badge).toBeTruthy();
       expect(badge.textContent?.toLowerCase()).toContain('evidence');
+    });
+  });
+
+  describe('PPS-162 accessibility of the line controls', () => {
+    const lowConfidence = (field_name: string, extracted_value: unknown): FieldExtraction => ({
+      id: `fe-${field_name}`,
+      quotation_id: 'q-1',
+      entity_type: 'quotation_line',
+      entity_id: 'line-1',
+      field_name,
+      extracted_value,
+      confidence: '0.50',
+      extraction_method: 'structured_parse',
+      model_version: 'v1',
+      corrected_value: null,
+      corrected_by: null,
+      corrected_at: null,
+    });
+
+    beforeEach(() => {
+      component.isWriter = true;
+    });
+
+    it('gives every confirm-as-is button the accessible name of its tooltip', () => {
+      component.quotation = {
+        ...mockQuotation,
+        field_extractions: [
+          lowConfidence('original_text', 'Test item'),
+          lowConfidence('quantity', '2'),
+          lowConfidence('pack_count', 6),
+          lowConfidence('unit_price', { amount: '10.00', currency: 'GBP' }),
+          lowConfidence('delivery_fee', { amount: '5.00', currency: 'GBP' }),
+          lowConfidence('discount', { amount: '2.00', currency: 'GBP' }),
+          lowConfidence('vat_rate', '0.15'),
+        ],
+      };
+      fixture.detectChanges();
+
+      const buttons = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('.confirm-as-is-btn'),
+      );
+      expect(buttons.length).toBe(7);
+      for (const button of buttons) {
+        expect(button.getAttribute('aria-label')).toBe(enCatalog.quotations.review.corrections.confirmAsIsTooltip);
+      }
+    });
+
+    it('keeps remove and undo out of the panel header, leaving the removal badge in it', () => {
+      const host = fixture.nativeElement as HTMLElement;
+      spyOn(component.lineMarkedForRemoval, 'emit');
+      spyOn(component.lineUnmarkedForRemoval, 'emit');
+      fixture.detectChanges();
+
+      const removeButton = host.querySelector<HTMLButtonElement>('.remove-line-btn');
+      expect(removeButton).toBeTruthy();
+      expect(removeButton?.closest('mat-expansion-panel-header')).toBeNull();
+      removeButton?.click();
+      expect(component.lineMarkedForRemoval.emit).toHaveBeenCalledWith('line-1');
+
+      component.pendingRemoveLineIds = new Set(['line-1']);
+      fixture.detectChanges();
+
+      expect(host.querySelector('.remove-line-btn')).toBeNull();
+      const undoButton = host.querySelector<HTMLButtonElement>('.undo-remove-btn');
+      expect(undoButton).toBeTruthy();
+      expect(undoButton?.closest('mat-expansion-panel-header')).toBeNull();
+      expect(host.querySelector('mat-expansion-panel-header .removal-badge')).toBeTruthy();
+      undoButton?.click();
+      expect(component.lineUnmarkedForRemoval.emit).toHaveBeenCalledWith('line-1');
     });
   });
 });

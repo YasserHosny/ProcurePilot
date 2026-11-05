@@ -113,6 +113,12 @@
   }
 }
 
+.line-actions-row {
+  display: flex;
+  justify-content: flex-end; // Follows writing direction: inline end in LTR and RTL.
+  margin-block-end: 0.25rem;
+}
+
 .line-fields-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));

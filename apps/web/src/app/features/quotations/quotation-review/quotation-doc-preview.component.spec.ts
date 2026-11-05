@@ -60,6 +60,12 @@ describe('QuotationDocPreviewComponent provenance', () => {
     expect(icon.getAttribute('aria-label')).toContain('bedrock · test-model');
   });
 
+  it('exposes the focusable technical-details icon to assistive tech (PPS-162)', () => {
+    const icon = fixture.nativeElement.querySelector('.prov-details-icon') as HTMLElement;
+    expect(icon.getAttribute('tabindex')).toBe('0');
+    expect(icon.getAttribute('aria-hidden')).not.toBe('true');
+  });
+
   it('renders a money-shaped value in provenance original value via FormatService.formatMoney in en and ar without .mono class', () => {
     const formatService = TestBed.inject(FormatService);
     const translate = TestBed.inject(TranslateService);
@@ -171,6 +177,22 @@ describe('QuotationDocPreviewComponent focus guard (PPS-57)', () => {
   afterEach(() => {
     externalInput.remove();
     fixture.nativeElement.remove();
+  });
+
+  it('names the source-document frame from the catalogue in English and Arabic (PPS-162)', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.setTranslation('ar', arCatalog);
+    const iframe = fixture.nativeElement.querySelector('iframe.pdf-preview-frame') as HTMLIFrameElement;
+
+    translate.use('en');
+    fixture.detectChanges();
+    expect(iframe.title).toBe(enCatalog.quotations.review.sourcePreviewTitle);
+
+    translate.use('ar');
+    fixture.detectChanges();
+    expect(iframe.title).toBe(arCatalog.quotations.review.sourcePreviewTitle);
+    expect(iframe.title).not.toBe(enCatalog.quotations.review.sourcePreviewTitle);
   });
 
   it('refocuses the input and restores selection when iframe steals focus during the guard window', fakeAsync(() => {
