@@ -2568,6 +2568,35 @@
     "selfDecisionNotAllowed": "You can't decide a request you submitted. Another owner or approver needs to decide it.",
     "title": "Approval Queue",
     "subtitle": "Requests awaiting your decision.",
+    "sort": {
+      "label": "Sort by",
+      "options": {
+        "submitted_desc": "Newest first",
+        "submitted_asc": "Oldest first",
+        "required_by_asc": "Required by (soonest)",
+        "total_desc": "Highest total",
+        "total_asc": "Lowest total"
+      }
+    },
+    "filter": {
+      "branch": "Branch",
+      "allBranches": "All branches",
+      "clear": "Clear filters",
+      "chipRemove": "Remove filter: {{filter}}",
+      "retry": "Retry"
+    },
+    "total": {
+      "zero": "{{count}} pending requests",
+      "one": "{{count}} pending request",
+      "two": "{{count}} pending requests",
+      "few": "{{count}} pending requests",
+      "many": "{{count}} pending requests",
+      "other": "{{count}} pending requests"
+    },
+    "announce": {
+      "sorted": "Sorted by {{sort}}, {{count}}"
+    },
+    "emptyFiltered": "No pending requests match these filters.",
     "columns": {
       "requester": "Requester",
       "branch": "Branch",
@@ -2609,6 +2638,7 @@
     "pagination": {
       "loadMore": "Load more",
       "loading": "Loading...",
+      "showingOf": "Showing {{loaded}} of {{total}}",
       "showing": {
         "zero": "Showing 0 requests",
         "one": "Showing 1 request",
@@ -2625,7 +2655,8 @@
         "many": "Showing {{count}} requests, more available",
         "other": "Showing {{count}} requests, more available"
       },
-      "loadError": "Unable to load more requests. Please try again."
+      "loadError": "Unable to load more requests. Please try again.",
+      "pageLoadError": "Unable to load pending requests. Please try again."
     },
     "requestCount": {
       "zero": "{{count}} requests",

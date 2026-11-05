@@ -7,8 +7,9 @@ import type {
   ApprovalDelegation,
   ApprovalDelegationCreate,
   ApprovalDelegationList,
+  PendingApprovalList,
+  PendingApprovalSort,
   PurchaseRequest,
-  PurchaseRequestList,
   RequestGroupSummary,
   ThresholdRule,
   ThresholdRuleCreate,
@@ -21,6 +22,8 @@ export type {
   ApprovalDelegation,
   ApprovalDelegationCreate,
   ApprovalDelegationList,
+  PendingApprovalList,
+  PendingApprovalSort,
   PurchaseRequest,
   RequestGroupSummary,
   ThresholdRule,
@@ -34,9 +37,11 @@ export class ApprovalsApiService {
   private readonly api = inject(ApiService);
 
   listPendingApprovals(params?: {
+    sort?: PendingApprovalSort;
+    branch_id?: string;
     cursor?: string;
     limit?: number;
-  }): Observable<PurchaseRequestList> {
+  }): Observable<PendingApprovalList> {
     return this.api.listPendingApprovals(params);
   }
 

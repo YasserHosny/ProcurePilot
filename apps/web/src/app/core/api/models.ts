@@ -1593,6 +1593,19 @@ export interface PurchaseRequestList {
   readonly next_cursor: string | null;
 }
 
+export type PendingApprovalSort =
+  | 'submitted_desc'
+  | 'submitted_asc'
+  | 'required_by_asc'
+  | 'total_desc'
+  | 'total_asc';
+
+export interface PendingApprovalList {
+  readonly items: readonly PurchaseRequest[];
+  readonly next_cursor: string | null;
+  readonly total: number;
+}
+
 export interface ApprovalDecisionInput {
   readonly comment?: string | null;
 }

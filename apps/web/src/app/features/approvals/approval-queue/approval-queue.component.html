@@ -3,6 +3,11 @@
     <div>
       <h1 class="approval-queue-title">{{ 'approvals.title' | translate }}</h1>
       <p class="approval-queue-subtitle">{{ 'approvals.subtitle' | translate }}</p>
+      @if (totalCount() !== null) {
+        <p class="approval-queue-count" data-testid="approval-total-count">
+          {{ totalCountLabel() }}
+        </p>
+      }
     </div>
   </div>
 
@@ -15,20 +20,135 @@
           <div class="error-trace">{{ traceId }}</div>
         }
       </div>
+      @if (pageLoadFailed()) {
+        <button
+          mat-stroked-button
+          type="button"
+          class="retry-load-btn"
+          data-testid="retry-load-btn"
+          (click)="retryLoad()"
+        >
+          {{ 'approvals.filter.retry' | translate }}
+        </button>
+      }
     </div>
   }
 
   <mat-card class="approval-queue-card">
+    <div class="queue-controls">
+      <mat-form-field appearance="outline" class="sort-field" subscriptSizing="dynamic">
+        <mat-label>{{ 'approvals.sort.label' | translate }}</mat-label>
+        <mat-select
+          #sortSelect
+          data-testid="sort-select"
+          [value]="sortOption()"
+          (selectionChange)="onSortChange($event.value)"
+        >
+          @for (option of sortOptions; track option) {
+            <mat-option [value]="option">{{ sortOptionLabel(option) }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="branch-field" subscriptSizing="dynamic">
+        <mat-label>{{ 'approvals.filter.branch' | translate }}</mat-label>
+        <mat-select
+          data-testid="branch-select"
+          [value]="branchFilter()"
+          (selectionChange)="onBranchChange($event.value)"
+        >
+          <mat-option value="">{{ 'approvals.filter.allBranches' | translate }}</mat-option>
+          @for (branch of branches(); track branch.id) {
+            <mat-option [value]="branch.id">{{ branch.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      @if (hasActiveFilters()) {
+        <button
+          mat-stroked-button
+          type="button"
+          class="clear-filters-btn"
+          data-testid="clear-filters-btn"
+          (click)="clearFilters()"
+        >
+          {{ 'approvals.filter.clear' | translate }}
+        </button>
+      }
+    </div>
+
+    @if (hasActiveFilters()) {
+      <div class="filter-chips" data-testid="filter-chips">
+        @if (sortOption() !== 'submitted_desc') {
+          <span class="filter-chip">
+            <span class="chip-label">{{ sortOptionLabel(sortOption()) }}</span>
+            <button
+              type="button"
+              class="chip-remove"
+              [attr.aria-label]="
+                'approvals.filter.chipRemove'
+                  | translate: { filter: sortOptionLabel(sortOption()) }
+              "
+              (click)="removeSortFilter()"
+            >
+              <mat-icon aria-hidden="true">close</mat-icon>
+            </button>
+          </span>
+        }
+        @if (branchFilter()) {
+          <span class="filter-chip">
+            <span class="chip-label">{{ branchFilterName() }}</span>
+            <button
+              type="button"
+              class="chip-remove"
+              [attr.aria-label]="
+                'approvals.filter.chipRemove' | translate: { filter: branchFilterName() }
+              "
+              (click)="removeBranchFilter()"
+            >
+              <mat-icon aria-hidden="true">close</mat-icon>
+            </button>
+          </span>
+        }
+      </div>
+    }
+
+    <div
+      class="visually-hidden"
+      aria-live="polite"
+      aria-atomic="true"
+      data-testid="queue-announcement"
+    >
+      {{ announcementText() }}
+    </div>
+
     @if (isLoading()) {
       <div class="loading-state" aria-live="polite">
         <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
         <span>{{ 'common.loading' | translate }}</span>
       </div>
+    } @else if (pageLoadFailed()) {
+      <div class="load-failed-state" data-testid="load-failed-state"></div>
     } @else if (queueItems().length === 0) {
-      <div class="empty-state">
-        <mat-icon class="empty-icon" aria-hidden="true">inbox</mat-icon>
-        <p class="empty-message">{{ 'approvals.empty' | translate }}</p>
-      </div>
+      @if (hasActiveFilters()) {
+        <div class="empty-state" data-testid="empty-filtered">
+          <mat-icon class="empty-icon" aria-hidden="true">filter_alt_off</mat-icon>
+          <p class="empty-message">{{ 'approvals.emptyFiltered' | translate }}</p>
+          <button
+            mat-stroked-button
+            type="button"
+            class="clear-filters-btn"
+            (click)="clearFilters()"
+          >
+            {{ 'approvals.filter.clear' | translate }}
+          </button>
+        </div>
+      } @else {
+        <div class="empty-state" data-testid="empty-default">
+          <mat-icon class="empty-icon" aria-hidden="true">inbox</mat-icon>
+          <p class="empty-message">{{ 'approvals.empty' | translate }}</p>
+        </div>
+      }
     } @else {
       <div class="table-responsive">
         <table mat-table [dataSource]="queueItems()" multiTemplateDataRows class="approvals-table">
