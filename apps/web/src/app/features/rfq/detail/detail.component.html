@@ -300,6 +300,26 @@
       <!-- Tab 2: Recipients (n) -->
       <mat-tab [label]="'rfq.detail.tabRecipients' | translate: { count: detail.recipients.length }">
         <div class="tab-content">
+          @if (neededInDays() !== null) {
+            <div class="needed-hint" role="status" data-testid="rfq-detail-needed-hint">
+              <mat-icon aria-hidden="true">schedule</mat-icon>
+              <span>{{ neededHintText() }}</span>
+            </div>
+          }
+          @if (hasRemindableRecipients()) {
+            <div class="reminder-actions">
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                [disabled]="remindingAll()"
+                (click)="onRemindAll()"
+                data-testid="rfq-detail-remind-all-button"
+              >
+                {{ 'rfq.detail.remindAllAwaiting' | translate }}
+              </button>
+            </div>
+          }
           <mat-card class="table-card">
             <div class="table-container">
               <table mat-table [dataSource]="detail.recipients" class="recipients-table">
@@ -382,6 +402,38 @@
                     } @else {
                       <span class="text-muted">—</span>
                     }
+                  </td>
+                </ng-container>
+
+                <!-- Reminders Column -->
+                <ng-container matColumnDef="reminders">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'rfq.detail.reminders' | translate }}</th>
+                  <td mat-cell *matCellDef="let recipient">
+                    <div class="recipient-reminders-cell">
+                      @if ((recipient.reminder_count ?? 0) > 0) {
+                        <span class="reminder-history" [attr.data-testid]="'recipient-reminders-' + recipient.id">
+                          {{ reminderHistoryText(recipient) }}
+                        </span>
+                      }
+                      @if (reminderBlockedText(recipient); as blockedText) {
+                        <span
+                          class="reminder-blocked text-muted"
+                          [attr.data-testid]="'recipient-reminder-blocked-' + recipient.id"
+                        >{{ blockedText }}</span>
+                      }
+                      @if (canRemindRecipient(recipient)) {
+                        <button
+                          mat-stroked-button
+                          type="button"
+                          class="remind-button"
+                          (click)="onRemindRecipient(recipient)"
+                          [attr.data-testid]="'recipient-remind-' + recipient.id"
+                        >
+                          <mat-icon aria-hidden="true">notifications_active</mat-icon>
+                          {{ 'rfq.detail.sendReminder' | translate }}
+                        </button>
+                      }
+                    </div>
                   </td>
                 </ng-container>
 

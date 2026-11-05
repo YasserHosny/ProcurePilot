@@ -7,7 +7,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, of, Subject, throwError } from 'rxjs';
 
 import { DetailComponent } from './detail.component';
 import { RfqActionKeys, RfqApi, RfqDetail, RfqRecipient, RfqResponseComparisonList, RfqSendResponse } from '../rfq-api';
@@ -18,10 +18,37 @@ import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 
+interface ReminderRecipient extends RfqRecipient {
+  reminder_count?: number;
+  last_reminder_at?: string | null;
+  can_remind?: boolean;
+  remind_blocked_reason?: string | null;
+}
+
+interface ReminderPreviewFixture {
+  subject: string;
+  body_text: string;
+  locale: string;
+  allowed: boolean;
+  blocked_reason: string | null;
+}
+
+interface ReminderApiSpy {
+  previewReminder: jasmine.Spy<(rfqId: string, recipientId: string) => Observable<ReminderPreviewFixture>>;
+  sendReminder: jasmine.Spy<(rfqId: string, recipientId: string, key?: string) => Observable<ReminderRecipient>>;
+}
+
+function catalogString(catalog: unknown, path: string): string {
+  return path.split('.').reduce<unknown>(
+    (acc, part) => (acc as Record<string, unknown> | undefined)?.[part], catalog,
+  ) as string;
+}
+
 describe('DetailComponent (RFQ Details)', () => {
   let component: DetailComponent;
   let fixture: ComponentFixture<DetailComponent>;
   let rfqApiSpy: jasmine.SpyObj<RfqApi>;
+  let reminderApi: ReminderApiSpy;
   let apiSpy: jasmine.SpyObj<ApiService>;
   let router: Router;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
@@ -193,6 +220,9 @@ describe('DetailComponent (RFQ Details)', () => {
     queryParamMapSubject = new BehaviorSubject(convertToParamMap({}));
 
     rfqApiSpy = jasmine.createSpyObj('RfqApi', ['getRfq', 'listResponses', 'sendRfq', 'cancelRfq', 'listGuardrails']);
+    reminderApi = rfqApiSpy as unknown as ReminderApiSpy;
+    reminderApi.previewReminder = jasmine.createSpy<(rfqId: string, recipientId: string) => Observable<ReminderPreviewFixture>>('previewReminder');
+    reminderApi.sendReminder = jasmine.createSpy<(rfqId: string, recipientId: string, key?: string) => Observable<ReminderRecipient>>('sendReminder');
     rfqApiSpy.getRfq.and.returnValue(of(mockSentDetail));
     rfqApiSpy.listResponses.and.returnValue(of(mockResponses));
     rfqApiSpy.listGuardrails.and.returnValue(of([]));
@@ -1436,6 +1466,346 @@ describe('DetailComponent (RFQ Details)', () => {
       expect(rfqApiSpy.sendRfq.calls.mostRecent().args[1]).not.toBe(rejected);
     });
   }
+
+  describe('PPS-176: manual supplier reminders', () => {
+    function recipient(overrides: Partial<ReminderRecipient> = {}): ReminderRecipient {
+      return {
+        id: 'rec-r1',
+        tenant_id: 't-1',
+        rfq_id: 'rfq-sent-1',
+        supplier_id: 'sup-1',
+        status: 'sent',
+        outbound_message_id: 'msg-1',
+        sent_at: '2026-10-28T14:14:00Z',
+        created_at: '2026-10-20T10:00:00Z',
+        supplier_name: 'Al-Madina Foods',
+        supplier_contact_email: 'contact@almadina.test',
+        response_count: 0,
+        reminder_count: 0,
+        last_reminder_at: null,
+        can_remind: true,
+        remind_blocked_reason: null,
+        ...overrides,
+      };
+    }
+
+    function setRecipients(
+      recipients: ReminderRecipient[],
+      rfqOverrides: Partial<RfqDetail['rfq']> = {},
+    ): void {
+      component.rfqId.set('rfq-sent-1');
+      component.currentMembershipId.set('m-creator');
+      component.rfqDetail.set({
+        ...mockSentDetail,
+        rfq: { ...mockSentDetail.rfq, ...rfqOverrides },
+        recipients,
+      });
+      component.selectedTabIndex.set(2);
+      fixture.detectChanges();
+    }
+
+    function page(): HTMLElement {
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    function query<T extends HTMLElement = HTMLElement>(testId: string): T | null {
+      return page().querySelector<T>(`[data-testid="${testId}"]`);
+    }
+
+    function isoDateIn(days: number): string {
+      const date = new Date();
+      date.setDate(date.getDate() + days);
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${date.getFullYear()}-${month}-${day}`;
+    }
+
+    function confirmDialog(confirmed: boolean): MatDialogRef<CatalogueConfirmDialogComponent, boolean> {
+      return { afterClosed: () => of(confirmed) } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>;
+    }
+
+    const preview = (overrides: Partial<ReminderPreviewFixture> = {}): ReminderPreviewFixture => ({
+      subject: 'Reminder: RFQ-000001',
+      body_text: 'Hello supplier',
+      locale: 'en',
+      allowed: true,
+      blocked_reason: null,
+      ...overrides,
+    });
+
+    it('shows Send reminder only when the recipient can be reminded', () => {
+      setRecipients([
+        recipient({ id: 'r1', can_remind: true }),
+        recipient({ id: 'r2', can_remind: false, remind_blocked_reason: 'replied' }),
+      ]);
+
+      expect(query('recipient-remind-r1')).not.toBeNull();
+      expect(query('recipient-remind-r2')).toBeNull();
+    });
+
+    it('shows a short blocked reason only for too early, cooldown and limit reached', () => {
+      const reasons = ['too_early', 'cooldown', 'limit_reached', 'replied', 'rfq_not_open', 'not_delivered', 'not_permitted'];
+      setRecipients(reasons.map((reason, index) => recipient({
+        id: `r${index}`, can_remind: false, remind_blocked_reason: reason,
+      })));
+
+      for (const index of [0, 1, 2]) {
+        expect(query(`recipient-reminder-blocked-r${index}`)?.textContent?.trim()).toBeTruthy();
+      }
+      for (const index of [3, 4, 5, 6]) {
+        expect(query(`recipient-reminder-blocked-r${index}`)).toBeNull();
+      }
+    });
+
+    it('shows reminders sent and the last reminder time', () => {
+      const lastReminderAt = '2026-11-01T09:30:00Z';
+      setRecipients([recipient({
+        id: 'r1', reminder_count: 2, last_reminder_at: lastReminderAt,
+        can_remind: false, remind_blocked_reason: 'limit_reached',
+      })]);
+
+      const text = query('recipient-reminders-r1')?.textContent ?? '';
+      expect(text).toContain(catalogString(enCatalog, 'rfq.detail.remindersSent').replace('{{count}}', '2'));
+      expect(text).toContain(component.formatDate(lastReminderAt));
+      expect(text).toContain(component.formatTime(lastReminderAt));
+    });
+
+    it('opens the preview dialog and sends the reminder from the response', () => {
+      setRecipients([recipient({ id: 'r1' })]);
+      reminderApi.previewReminder.and.returnValue(of(preview({
+        subject: 'Reminder: RFQ-000001', body_text: 'Hello supplier', locale: 'ar',
+      })));
+      reminderApi.sendReminder.and.returnValue(of(recipient({
+        id: 'r1', reminder_count: 1, last_reminder_at: '2026-11-05T10:00:00Z',
+        can_remind: false, remind_blocked_reason: 'cooldown',
+      })));
+      dialogSpy.open.and.returnValue(confirmDialog(true));
+
+      query<HTMLButtonElement>('recipient-remind-r1')?.click();
+      fixture.detectChanges();
+
+      expect(reminderApi.previewReminder).toHaveBeenCalledWith('rfq-sent-1', 'r1');
+      expect(dialogSpy.open).toHaveBeenCalledWith(CatalogueConfirmDialogComponent, jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          titleKey: 'rfq.detail.reminderPreviewTitle',
+          previewSubject: 'Reminder: RFQ-000001',
+          previewBody: 'Hello supplier',
+          previewLocale: 'ar',
+          confirmKey: 'rfq.detail.reminderSend',
+          cancelKey: 'rfq.detail.reminderCancel',
+          showConfirm: true,
+        }),
+      }));
+      expect(reminderApi.sendReminder).toHaveBeenCalledWith('rfq-sent-1', 'r1', jasmine.any(String));
+      expect(query('recipient-remind-r1')).toBeNull();
+      expect(query('recipient-reminders-r1')?.textContent)
+        .toContain(catalogString(enCatalog, 'rfq.detail.remindersSent').replace('{{count}}', '1'));
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        catalogString(enCatalog, 'rfq.detail.reminderSent'),
+        jasmine.any(String),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+    });
+
+    it('shows the blocked reason and no Send button when the preview is not allowed', () => {
+      setRecipients([recipient({ id: 'r1' })]);
+      reminderApi.previewReminder.and.returnValue(of(preview({
+        allowed: false, blocked_reason: 'too_early',
+      })));
+      dialogSpy.open.and.returnValue(confirmDialog(false));
+
+      query<HTMLButtonElement>('recipient-remind-r1')?.click();
+      fixture.detectChanges();
+
+      expect(dialogSpy.open).toHaveBeenCalledWith(CatalogueConfirmDialogComponent, jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          showConfirm: false,
+          warningKey: 'rfq.detail.reminderBlockedTooEarly',
+        }),
+      }));
+      expect(reminderApi.sendReminder).not.toHaveBeenCalled();
+    });
+
+    it('shows the translated blocked reason when sending is rejected with 422', () => {
+      setRecipients([recipient({ id: 'r1' })]);
+      reminderApi.previewReminder.and.returnValue(of(preview()));
+      reminderApi.sendReminder.and.returnValue(throwError(() => new HttpErrorResponse({
+        status: 422, error: { details: { reason: 'cooldown' } },
+      })));
+      dialogSpy.open.and.returnValue(confirmDialog(true));
+
+      query<HTMLButtonElement>('recipient-remind-r1')?.click();
+      fixture.detectChanges();
+
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        catalogString(enCatalog, 'rfq.detail.reminderBlockedCooldown'),
+        jasmine.any(String),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+    });
+
+    it('shows the delivery-failed message when the reminder returns 503', () => {
+      setRecipients([recipient({ id: 'r1' })]);
+      reminderApi.previewReminder.and.returnValue(of(preview()));
+      reminderApi.sendReminder.and.returnValue(throwError(() => new HttpErrorResponse({
+        status: 503, error: { code: 'reminder_delivery_failed' },
+      })));
+      dialogSpy.open.and.returnValue(confirmDialog(true));
+
+      query<HTMLButtonElement>('recipient-remind-r1')?.click();
+      fixture.detectChanges();
+
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        catalogString(enCatalog, 'rfq.detail.reminderDeliveryFailed'),
+        jasmine.any(String),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+    });
+
+    it('shows Remind all awaiting when at least one recipient can be reminded', () => {
+      setRecipients([
+        recipient({ id: 'r1', can_remind: true }),
+        recipient({ id: 'r2', can_remind: false, remind_blocked_reason: 'replied' }),
+      ]);
+
+      expect(query('rfq-detail-remind-all-button')).not.toBeNull();
+    });
+
+    it('hides Remind all awaiting when no recipient can be reminded', () => {
+      setRecipients([recipient({ id: 'r1', can_remind: false, remind_blocked_reason: 'replied' })]);
+
+      expect(query('rfq-detail-remind-all-button')).toBeNull();
+    });
+
+    it('hides all reminder actions from a buyer who is not the creator', () => {
+      spyOn(TestBed.inject(SessionService), 'hasRole').and.callFake((role) => role === 'buyer');
+      setRecipients([recipient({ id: 'r1', can_remind: true })]);
+      component.currentMembershipId.set('m-other');
+      fixture.detectChanges();
+
+      expect(query('rfq-detail-remind-all-button')).toBeNull();
+      expect(query('recipient-remind-r1')).toBeNull();
+    });
+
+    it('reminds each awaiting recipient sequentially with its own key and reports the result', () => {
+      const r1 = recipient({ id: 'r1', supplier_name: 'Alpha' });
+      const r2 = recipient({ id: 'r2', supplier_name: 'Beta' });
+      const r3 = recipient({ id: 'r3', supplier_name: 'Gamma', can_remind: false, remind_blocked_reason: 'replied' });
+      setRecipients([r1, r2, r3]);
+
+      const calls: string[] = [];
+      reminderApi.sendReminder.and.callFake((_rfqId: string, recipientId: string) => {
+        calls.push(recipientId);
+        return of(recipient({ id: recipientId, reminder_count: 1, can_remind: false }));
+      });
+      dialogSpy.open.and.returnValue(confirmDialog(true));
+      const initialLoads = rfqApiSpy.getRfq.calls.count();
+
+      query<HTMLButtonElement>('rfq-detail-remind-all-button')?.click();
+      fixture.detectChanges();
+
+      expect(dialogSpy.open).toHaveBeenCalledWith(CatalogueConfirmDialogComponent, jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          titleKey: 'rfq.detail.remindAllConfirmTitle',
+          messageParams: jasmine.objectContaining({ count: 2 }),
+          listItems: ['Alpha', 'Beta'],
+        }),
+      }));
+      expect(calls).toEqual(['r1', 'r2']);
+      const keys = reminderApi.sendReminder.calls.allArgs().map((args) => args[2]);
+      expect(new Set(keys).size).toBe(2);
+      expect(rfqApiSpy.getRfq.calls.count()).toBe(initialLoads + 1);
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        TestBed.inject(TranslateService).instant('rfq.detail.remindAllResult', { sent: 2, failed: 0 }),
+        jasmine.any(String),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+    });
+
+    it('continues after a failed reminder and reports sent and failed counts', () => {
+      setRecipients([
+        recipient({ id: 'r1', supplier_name: 'Alpha' }),
+        recipient({ id: 'r2', supplier_name: 'Beta' }),
+      ]);
+      reminderApi.sendReminder.and.callFake((_rfqId: string, recipientId: string) => recipientId === 'r2'
+        ? throwError(() => new HttpErrorResponse({ status: 503, error: { code: 'reminder_delivery_failed' } }))
+        : of(recipient({ id: recipientId, reminder_count: 1, can_remind: false })));
+      dialogSpy.open.and.returnValue(confirmDialog(true));
+
+      query<HTMLButtonElement>('rfq-detail-remind-all-button')?.click();
+      fixture.detectChanges();
+
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        TestBed.inject(TranslateService).instant('rfq.detail.remindAllResult', { sent: 1, failed: 1 }),
+        jasmine.any(String),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+    });
+
+    it('shows the needed-in hint for an open RFQ due within two days with an unreplied supplier', () => {
+      setRecipients([recipient({ id: 'r1', response_count: 0 })], {
+        status: 'sent', needed_by_date: isoDateIn(1),
+      });
+
+      const hint = query('rfq-detail-needed-hint');
+      expect(hint).not.toBeNull();
+      expect(hint?.textContent).toContain('Needed in 1 day and some suppliers have not replied');
+    });
+
+    it('hides the needed-in hint when all suppliers replied, the RFQ is closed, or the date is beyond two days', () => {
+      setRecipients([recipient({ id: 'r1', response_count: 1 })], {
+        status: 'sent', needed_by_date: isoDateIn(1),
+      });
+      expect(query('rfq-detail-needed-hint')).toBeNull();
+
+      setRecipients([recipient({ id: 'r1', response_count: 0 })], {
+        status: 'expired', needed_by_date: isoDateIn(1),
+      });
+      expect(query('rfq-detail-needed-hint')).toBeNull();
+
+      setRecipients([recipient({ id: 'r1', response_count: 0 })], {
+        status: 'sent', needed_by_date: isoDateIn(3),
+      });
+      expect(query('rfq-detail-needed-hint')).toBeNull();
+    });
+
+    it('uses Arabic plural forms for the needed-in hint', () => {
+      TestBed.inject(TranslateService).use('ar');
+      setRecipients([recipient({ id: 'r1', response_count: 0 })], {
+        status: 'sent', needed_by_date: isoDateIn(2),
+      });
+
+      expect(query('rfq-detail-needed-hint')?.textContent)
+        .toContain('مطلوب خلال يومين ولم يرد بعض الموردين');
+    });
+
+    it('provides English and Arabic strings for every reminder key', () => {
+      const keys = [
+        'remindersSent', 'lastReminderAt', 'sendReminder', 'remindAllAwaiting', 'reminders',
+        'reminderPreviewTitle', 'reminderPreviewMessage', 'reminderSend', 'reminderCancel',
+        'reminderSent', 'reminderSendError', 'reminderDeliveryFailed', 'reminderPreviewError',
+        'remindAllConfirmTitle', 'remindAllConfirmMessage', 'remindAllConfirmButton', 'remindAllResult',
+        'reminderBlockedRfqNotOpen', 'reminderBlockedNotDelivered', 'reminderBlockedReplied',
+        'reminderBlockedTooEarly', 'reminderBlockedCooldown', 'reminderBlockedLimitReached',
+        'reminderBlockedNotPermitted', 'neededInDaysTitle',
+      ];
+
+      for (const key of keys) {
+        const en = catalogString(enCatalog, `rfq.detail.${key}`);
+        const ar = catalogString(arCatalog, `rfq.detail.${key}`);
+        expect(typeof en).withContext(`EN ${key}`).toBe('string');
+        expect(typeof ar).withContext(`AR ${key}`).toBe('string');
+        expect((en ?? '').trim()).withContext(`EN empty ${key}`).not.toBe('');
+        expect((ar ?? '').trim()).withContext(`AR empty ${key}`).not.toBe('');
+      }
+      for (const category of ['zero', 'one', 'two', 'few', 'many', 'other']) {
+        expect(typeof catalogString(enCatalog, `rfq.detail.neededInDays.${category}`))
+          .withContext(`EN neededInDays.${category}`).toBe('string');
+        expect(typeof catalogString(arCatalog, `rfq.detail.neededInDays.${category}`))
+          .withContext(`AR neededInDays.${category}`).toBe('string');
+      }
+    });
+  });
 
 });
 
