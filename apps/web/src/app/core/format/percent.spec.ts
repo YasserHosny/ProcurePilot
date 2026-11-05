@@ -1,4 +1,4 @@
-import { formatScorePercent } from './format.service';
+import { formatScorePercent, percentSign } from './format.service';
 
 // P-159: match scores were raw `85%` in Latin digits while quantities and totals use Arabic-Indic digits.
 describe('formatScorePercent', () => {
@@ -15,5 +15,12 @@ describe('formatScorePercent', () => {
     expect(formatScorePercent(84.6, 'en')).toBe('85%');
     expect(formatScorePercent(null, 'en')).toBe('—');
     expect(formatScorePercent(undefined, 'ar')).toBe('—');
+  });
+});
+
+describe('percentSign', () => {
+  it('is the locale percent sign', () => {
+    expect(percentSign('en')).toBe('%');
+    expect(percentSign('ar')).toMatch(/^٪/);
   });
 });
