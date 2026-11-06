@@ -33,7 +33,7 @@ import type {
 } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
-import { formatExactQuantity, percentSign } from '../../../core/format/format.service';
+import { formatExactQuantity, localizeDigits, percentSign } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { computeBaseQuantity } from '../../catalogue/normalisation';
 
@@ -674,6 +674,12 @@ export class MatchResolutionComponent implements OnInit {
     if (score === undefined || score === null) return 0;
     const num = typeof score === 'string' ? parseFloat(score) : score;
     return Math.round(num * 100);
+  }
+
+  /** `1 × 2.0` as printed, with the interface language's digits. */
+  packText(pack: { pack_count: number | string; unit_size: number | string }): string {
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    return localizeDigits(`${pack.pack_count} × ${pack.unit_size}`, locale);
   }
 
   formatVatRate(rate: string | number | null | undefined): string {

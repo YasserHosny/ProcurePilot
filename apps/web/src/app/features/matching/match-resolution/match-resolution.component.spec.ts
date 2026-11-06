@@ -874,6 +874,17 @@ describe('MatchResolutionComponent (T039)', () => {
       expect(whole.querySelector('.line-card')?.textContent).toMatch(/١٥\s?٪/);
     });
 
+    it('shows the supplier pack with Arabic-Indic digits in Arabic and unchanged in English (P-159)', () => {
+      const pack = { pack_count: 1, unit_size: '2.0', unit: 'litre' };
+      const english = loadDecided({ pack });
+      expect(english.querySelector('.line-card')?.textContent).toContain('1 × 2.0');
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog);
+      translate.use('ar');
+      const arabic = loadDecided({ pack });
+      expect(arabic.querySelector('.line-card')?.textContent).toContain('١ × ٢٫٠');
+    });
+
     it('gives every region on the page an accessible name', () => {
       const el = loadDecided();
       const regions = Array.from(el.querySelectorAll('[role="region"]'));

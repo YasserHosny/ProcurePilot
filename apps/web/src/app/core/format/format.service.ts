@@ -66,6 +66,20 @@ export function formatLocaleNumber(
   return new Intl.NumberFormat(locale, buildNumberFormatOptions(locale, options)).format(num);
 }
 
+const ARABIC_INDIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+
+/**
+ * Re-spell the digits of an already built string for the locale, leaving everything else as is:
+ * in Arabic `1 × 2.0` becomes `١ × ٢٫٠` (digits and the decimal point between digits); in other
+ * locales the text is returned unchanged. For values that must keep their exact printed form.
+ */
+export function localizeDigits(text: string, locale = 'en'): string {
+  if (!isArabicLocale(locale)) return text;
+  return text
+    .replace(/(?<=\d)\.(?=\d)/g, '٫')
+    .replace(/\d/g, (digit) => ARABIC_INDIC_DIGITS[Number(digit)]);
+}
+
 /** The locale's percent sign (`%` / `٪`), for a number formatted separately to keep it exact. */
 export function percentSign(locale = 'en'): string {
   const parts = new Intl.NumberFormat(locale, {
