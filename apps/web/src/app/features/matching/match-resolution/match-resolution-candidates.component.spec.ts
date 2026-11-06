@@ -61,6 +61,23 @@ describe('MatchResolutionCandidatesComponent', () => {
     expect(score).not.toMatch(/[0-9]/);
   });
 
+  it('shows the rank with Arabic-Indic digits in Arabic, but keeps the key hint a Latin digit (P-159)', () => {
+    component.candidates = [baseCandidate];
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.cand-rank-badge').textContent).toContain('#1');
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('ar', arCatalog);
+    translate.use('ar');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.cand-rank-badge').textContent).toContain('#١');
+    // The hint names the key to press; the key is a Latin digit.
+    expect(fixture.nativeElement.querySelector('.cand-key-hint kbd').textContent.trim()).toBe('1');
+    const label = fixture.nativeElement.querySelector('input[type="radio"]').getAttribute('aria-label') as string;
+    // The rank in the screen-reader label follows the language; the product name is data.
+    expect(label).toContain('رقم ١:');
+  });
+
   it('displays "Your RFQ line {n}" when candidate has rfq_line_id and pack_check is not conflict', () => {
     component.candidates = [
       {
