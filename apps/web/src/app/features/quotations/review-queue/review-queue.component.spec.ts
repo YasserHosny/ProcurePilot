@@ -106,6 +106,54 @@ describe('ReviewQueueComponent (T052)', () => {
     fixture.detectChanges();
   });
 
+  describe('supplier pagination', () => {
+    const zulu = { id: 'supplier-z', name: 'Zulu', status: 'active' as const, created_at: '2026-01-01T00:00:00Z' };
+    const alpha = { id: 'supplier-a', name: 'Alpha', status: 'active' as const, created_at: '2026-01-01T00:00:00Z' };
+
+    beforeEach(() => apiService.suppliers.calls.reset());
+
+    it('follows next_cursor and sorts supplier options from both pages by name', () => {
+      apiService.suppliers.and.returnValues(
+        of({ items: [zulu], next_cursor: 'suppliers-page-2' }),
+        of({ items: [alpha], next_cursor: null }),
+      );
+
+      component.ngOnInit();
+
+      expect(apiService.suppliers.calls.count()).toBe(2);
+      expect(apiService.suppliers.calls.argsFor(1)).toEqual([
+        { limit: 100, status: 'all', cursor: 'suppliers-page-2' },
+      ]);
+      expect(component.suppliers()).toEqual([alpha, zulu]);
+    });
+
+    it('keeps loaded supplier options without an error banner when a later page fails', () => {
+      apiService.suppliers.and.returnValues(
+        of({ items: [zulu], next_cursor: 'suppliers-page-2' }),
+        throwError(() => new Error('Supplier page failed')),
+      );
+      const handleError = spyOn(component as unknown as { handleError: (error: unknown) => void }, 'handleError');
+
+      component.ngOnInit();
+      fixture.detectChanges();
+
+      expect(apiService.suppliers.calls.count()).toBe(2);
+      expect(component.suppliers()).toEqual([zulu]);
+      expect(handleError).not.toHaveBeenCalled();
+      expect(component.errorMessage()).toBeNull();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.error-banner')).toBeNull();
+    });
+
+    it('stops after 20 supplier pages when every response has a cursor', () => {
+      apiService.suppliers.and.returnValue(of({ items: [zulu], next_cursor: 'more-suppliers' }));
+
+      component.ngOnInit();
+
+      expect(apiService.suppliers.calls.count()).toBe(20);
+      expect(component.suppliers().length).toBe(20);
+    });
+  });
+
   it('should load open tasks on init', () => {
     expect(apiService.getReviewTasks).toHaveBeenCalledWith({
       status: 'open',
@@ -764,7 +812,7 @@ describe('ReviewQueueComponent (T052)', () => {
         ], next_cursor: null }));
         const nextFixture = TestBed.createComponent(ReviewQueueComponent);
         nextFixture.detectChanges();
-        expect(apiService.suppliers).toHaveBeenCalledWith({ limit: 100, status: 'all' });
+        expect(apiService.suppliers).toHaveBeenCalledWith({ limit: 100, status: 'all', cursor: undefined });
         const loader = TestbedHarnessEnvironment.loader(nextFixture);
         for (const [name, label] of [
           ['supplier', 'Acme'], ['reason', enCatalog.quotations.queue.reason.read_failure],

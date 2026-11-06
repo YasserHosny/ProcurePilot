@@ -166,13 +166,7 @@ export class ReviewQueueComponent implements OnInit {
   );
 
   ngOnInit(): void {
-    // The supplier endpoint has no name sort: show its first 100 suppliers, sorted by name here.
-    this.api.suppliers({ limit: 100, status: 'all' })
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (response) => this.suppliers.set([...response.items].sort((a, b) => a.name.localeCompare(b.name))),
-        error: (error: unknown) => this.handleError(error),
-      });
+    this.loadSuppliers();
     this.queryParamSub?.unsubscribe();
     const queryParamMap$ =
       this.route.queryParamMap ?? of(this.route.snapshot?.queryParamMap ?? convertToParamMap({}));
@@ -180,6 +174,22 @@ export class ReviewQueueComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((params) => {
         this.handleQueryParamChange(params);
+      });
+  }
+
+  // The supplier endpoint has no name sort: load up to 20 pages and sort by name here.
+  private loadSuppliers(cursor?: string, loaded: Supplier[] = [], page = 1): void {
+    this.api.suppliers({ limit: 100, status: 'all', cursor })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (response) => {
+          const all = [...loaded, ...response.items];
+          this.suppliers.set(all.sort((a, b) => a.name.localeCompare(b.name)));
+          if (response.next_cursor && page < 20) this.loadSuppliers(response.next_cursor, all, page + 1);
+        },
+        error: (error: unknown) => {
+          if (page === 1) this.handleError(error);
+        },
       });
   }
 
