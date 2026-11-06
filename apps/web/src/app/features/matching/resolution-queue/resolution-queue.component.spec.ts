@@ -5,6 +5,7 @@ import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Subject, firstValueFrom, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
 import type { CatalogueRefreshReview, MatchQueueItem, MatchTask, MatchTaskReason, Role } from '../../../core/api/models';
@@ -668,6 +669,20 @@ describe('ResolutionQueueComponent', () => {
       expect(apiService.getMatchTasks).toHaveBeenCalledWith(
         jasmine.objectContaining({ sort_by: 'priority', sort_order: 'desc' }),
       );
+    });
+
+    it('shows each line number with Arabic-Indic digits in Arabic (P-159)', () => {
+      const badges = Array.from(el().querySelectorAll('.line-number-badge'));
+      expect(badges.length).toBeGreaterThan(0);
+      expect(badges[0].textContent).toMatch(/#[0-9]/);
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog);
+      translate.use('ar');
+      fixture.detectChanges();
+      for (const badge of Array.from(el().querySelectorAll('.line-number-badge'))) {
+        expect(badge.textContent).toMatch(/#[٠-٩]/);
+        expect(badge.textContent).not.toMatch(/[0-9]/);
+      }
     });
 
     it('shows how many lines and quotations are listed, and that more can be loaded', () => {

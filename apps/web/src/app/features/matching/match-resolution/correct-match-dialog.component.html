@@ -9,7 +9,7 @@
 
     <!-- Line being corrected -->
     <div class="line-summary-banner">
-      <span class="line-badge">#{{ data.line.line_number }}</span>
+      <span class="line-badge">#{{ data.line.line_number | formatQuantity }}</span>
       <span class="line-text">{{ data.line.original_text }}</span>
     </div>
 

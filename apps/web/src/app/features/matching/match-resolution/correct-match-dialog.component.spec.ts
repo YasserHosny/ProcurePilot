@@ -3,6 +3,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { ApiService } from '../../../core/api/api.service';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import type { MatchCandidate, QuotationLineSummary } from '../../../core/api/models';
 import { CorrectMatchDialogComponent, type CorrectMatchDialogData } from './correct-match-dialog.component';
@@ -204,6 +205,15 @@ describe('CorrectMatchDialogComponent', () => {
     // Picking the same product again does not add a second row.
     component.onManualCandidate(manualCandidate);
     expect(component.allCandidates().filter((c) => c.id === 'cand-manual').length).toBe(1);
+  });
+
+  it('shows the line number with Arabic-Indic digits in Arabic (P-159)', () => {
+    expect(fixture.nativeElement.querySelector('.line-badge').textContent).toContain('#1');
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('ar', arCatalog);
+    translate.use('ar');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.line-badge').textContent).toContain('#١');
   });
 
   it('renders line text and candidates list with RFQ badges', () => {
