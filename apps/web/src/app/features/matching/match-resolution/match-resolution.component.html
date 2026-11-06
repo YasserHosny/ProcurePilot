@@ -90,7 +90,7 @@
       <mat-card class="line-card">
         <mat-card-header>
           <mat-card-title class="card-title-row">
-            <span class="line-badge">{{ 'matching.resolution.lineDetails.lineNumber' | translate: { line: l.line_number } }}</span>
+            <span class="line-badge">{{ 'matching.resolution.lineDetails.lineNumber' | translate: { line: (l.line_number | formatQuantity) } }}</span>
             <span class="original-wording">{{ l.original_text }}</span>
           </mat-card-title>
         </mat-card-header>

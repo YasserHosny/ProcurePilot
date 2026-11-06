@@ -344,7 +344,7 @@
                 @for (task of group.tasks; track task.id) {
                   <article class="match-line">
                     <div class="line-identity">
-                      <span class="line-number-badge">#{{ task.quotation_line.line_number }}</span>
+                      <span class="line-number-badge">#{{ task.quotation_line.line_number | formatQuantity }}</span>
                       <div>
                         <h3>{{ task.quotation_line.original_text }}</h3>
                         <span class="timestamp" [matTooltip]="task.created_at"><mat-icon class="age-icon" aria-hidden="true">schedule</mat-icon> {{ ageLabel(task.created_at) }}</span>

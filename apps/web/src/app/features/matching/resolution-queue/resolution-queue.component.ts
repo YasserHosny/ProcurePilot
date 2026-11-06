@@ -32,6 +32,7 @@ import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { FormatPercentPipe } from '../../../core/format/percent.pipe';
+import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
@@ -71,6 +72,7 @@ export interface QuotationTaskGroup {
     FormatDatePipe,
     FormatMoneyPipe,
     FormatPercentPipe,
+    FormatQuantityPipe,
   ],
   templateUrl: './resolution-queue.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,

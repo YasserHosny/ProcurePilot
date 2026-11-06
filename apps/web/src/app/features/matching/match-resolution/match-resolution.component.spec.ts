@@ -885,6 +885,17 @@ describe('MatchResolutionComponent (T039)', () => {
       expect(arabic.querySelector('.line-card')?.textContent).toContain('١ × ٢٫٠');
     });
 
+    it('shows the line number with Arabic-Indic digits in Arabic and Latin digits in English (P-159)', () => {
+      const english = loadDecided();
+      expect(english.querySelector('.line-badge')?.textContent).toContain('Line #1');
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog);
+      translate.use('ar');
+      const arabic = loadDecided();
+      expect(arabic.querySelector('.line-badge')?.textContent).toContain('١');
+      expect(arabic.querySelector('.line-badge')?.textContent).not.toMatch(/[0-9]/);
+    });
+
     it('gives every region on the page an accessible name', () => {
       const el = loadDecided();
       const regions = Array.from(el.querySelectorAll('[role="region"]'));
