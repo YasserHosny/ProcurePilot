@@ -34,7 +34,7 @@
             <div class="cand-row-content">
               <div class="cand-row-header">
                 @if (!cand.reasons.manual) {
-                  <span class="cand-rank">#{{ cand.rank }}</span>
+                  <span class="cand-rank">#{{ cand.rank | formatQuantity }}</span>
                 }
                 <strong class="cand-name">{{ cand.candidate_product.tenant_name }}</strong>
                 @if (cand.reasons.manual) {

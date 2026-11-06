@@ -216,6 +216,18 @@ describe('CorrectMatchDialogComponent', () => {
     expect(fixture.nativeElement.querySelector('.line-badge').textContent).toContain('#١');
   });
 
+  it('shows each candidate rank with Arabic-Indic digits in Arabic (P-159)', () => {
+    expect(fixture.nativeElement.querySelector('.cand-rank').textContent).toContain('#1');
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('ar', arCatalog);
+    translate.use('ar');
+    fixture.detectChanges();
+    for (const rank of Array.from(fixture.nativeElement.querySelectorAll('.cand-rank')) as HTMLElement[]) {
+      expect(rank.textContent).toMatch(/#[٠-٩]/);
+      expect(rank.textContent).not.toMatch(/[0-9]/);
+    }
+  });
+
   it('renders line text and candidates list with RFQ badges', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Organic Milk 2L');
