@@ -113,13 +113,31 @@ class RequestsApiClient {
   }
 
   /// Approves a pending purchase request using the existing 008 endpoint.
-  Future<PurchaseRequest> approveRequest(String requestId, {String? comment}) {
-    return _decideRequest(requestId, action: 'approve', comment: comment);
+  Future<PurchaseRequest> approveRequest(
+    String requestId, {
+    String? comment,
+    String? idempotencyKey,
+  }) {
+    return _decideRequest(
+      requestId,
+      action: 'approve',
+      comment: comment,
+      idempotencyKey: idempotencyKey,
+    );
   }
 
   /// Rejects a pending purchase request using the existing 008 endpoint.
-  Future<PurchaseRequest> rejectRequest(String requestId, {String? comment}) {
-    return _decideRequest(requestId, action: 'reject', comment: comment);
+  Future<PurchaseRequest> rejectRequest(
+    String requestId, {
+    String? comment,
+    String? idempotencyKey,
+  }) {
+    return _decideRequest(
+      requestId,
+      action: 'reject',
+      comment: comment,
+      idempotencyKey: idempotencyKey,
+    );
   }
 
   /// Confirms delivery of an ordered purchase request.
@@ -189,12 +207,16 @@ class RequestsApiClient {
     String requestId, {
     required String action,
     String? comment,
+    String? idempotencyKey,
   }) async {
     final uri = Uri.parse('$apiBaseUrl/requests/$requestId/$action');
     final trimmedComment = comment?.trim();
     final response = await _httpClient.post(
       uri,
-      headers: _headers(),
+      headers: {
+        ..._headers(),
+        if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey,
+      },
       body: jsonEncode({
         if (trimmedComment != null && trimmedComment.isNotEmpty)
           'comment': trimmedComment,

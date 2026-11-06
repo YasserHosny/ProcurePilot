@@ -7,14 +7,60 @@ import 'package:http/testing.dart';
 import 'package:procurepilot_mobile/core/api/models.dart';
 import 'package:procurepilot_mobile/core/api/requests_api_client.dart';
 
+import '../../features/approvals/split_approval_fixtures.dart';
+
 void main() {
   const apiBaseUrl = 'https://api.procurepilot.test/api/v1';
+
+  for (final action in ['approve', 'reject']) {
+    for (final withKey in [true, false]) {
+      test(
+        '$action sends Idempotency-Key only when supplied ($withKey)',
+        () async {
+          const key = '11111111-1111-4111-8111-111111111111';
+          final client = RequestsApiClient(
+            apiBaseUrl: apiBaseUrl,
+            httpClient: MockClient((request) async {
+              expect(request.method, 'POST');
+              expect(request.url.path, '/api/v1/requests/req-1/$action');
+              expect(
+                request.headers['Idempotency-Key'],
+                withKey ? key : isNull,
+              );
+              expect(jsonDecode(request.body), {'comment': 'Reason'});
+              return http.Response.bytes(
+                utf8.encode(jsonEncode(splitApprovalRequests().first.toJson())),
+                200,
+                headers: {'content-type': 'application/json; charset=utf-8'},
+              );
+            }),
+          );
+          if (action == 'approve') {
+            await client.approveRequest(
+              'req-1',
+              comment: 'Reason',
+              idempotencyKey: withKey ? key : null,
+            );
+          } else {
+            await client.rejectRequest(
+              'req-1',
+              comment: 'Reason',
+              idempotencyKey: withKey ? key : null,
+            );
+          }
+        },
+      );
+    }
+  }
 
   group('RequestsApiClient - Quality Issues', () {
     test('reportQualityIssue POSTs to /requests/{id}/quality-issues and parses QualityIssue', () async {
       final client = MockClient((request) async {
         expect(request.method, 'POST');
-        expect(request.url.toString(), '$apiBaseUrl/requests/req-123/quality-issues');
+        expect(
+          request.url.toString(),
+          '$apiBaseUrl/requests/req-123/quality-issues',
+        );
         expect(request.headers['Content-Type'], 'application/json');
         expect(request.headers['Authorization'], 'Bearer test-token');
         final body = jsonDecode(request.body) as Map<String, dynamic>;
@@ -33,10 +79,15 @@ void main() {
         );
       });
 
-      final apiClient = RequestsApiClient(apiBaseUrl: apiBaseUrl, httpClient: client)
-        ..accessToken = 'test-token';
+      final apiClient = RequestsApiClient(
+        apiBaseUrl: apiBaseUrl,
+        httpClient: client,
+      )..accessToken = 'test-token';
 
-      final issue = await apiClient.reportQualityIssue('req-123', 'Damaged packaging');
+      final issue = await apiClient.reportQualityIssue(
+        'req-123',
+        'Damaged packaging',
+      );
 
       expect(issue.id, 'qi-uuid-1');
       expect(issue.purchaseRequestId, 'req-123');
@@ -46,30 +97,36 @@ void main() {
       expect(issue.createdAt, DateTime.parse('2026-09-13T12:00:00Z'));
     });
 
-    test('reportQualityIssue throws ApiException on 409 not_delivered', () async {
-      final client = MockClient((request) async {
-        return http.Response(
-          jsonEncode({
-            'code': 'conflict',
-            'message': 'Request is not delivered',
-            'details': {'reason': 'not_delivered'},
-            'trace_id': 'trace-123',
-          }),
-          409,
+    test(
+      'reportQualityIssue throws ApiException on 409 not_delivered',
+      () async {
+        final client = MockClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'code': 'conflict',
+              'message': 'Request is not delivered',
+              'details': {'reason': 'not_delivered'},
+              'trace_id': 'trace-123',
+            }),
+            409,
+          );
+        });
+
+        final apiClient = RequestsApiClient(
+          apiBaseUrl: apiBaseUrl,
+          httpClient: client,
         );
-      });
 
-      final apiClient = RequestsApiClient(apiBaseUrl: apiBaseUrl, httpClient: client);
-
-      expect(
-        () => apiClient.reportQualityIssue('req-not-delivered', 'Broken'),
-        throwsA(
-          isA<ApiException>()
-              .having((e) => e.statusCode, 'statusCode', 409)
-              .having((e) => e.details?['reason'], 'reason', 'not_delivered'),
-        ),
-      );
-    });
+        expect(
+          () => apiClient.reportQualityIssue('req-not-delivered', 'Broken'),
+          throwsA(
+            isA<ApiException>()
+                .having((e) => e.statusCode, 'statusCode', 409)
+                .having((e) => e.details?['reason'], 'reason', 'not_delivered'),
+          ),
+        );
+      },
+    );
 
     test('uploadQualityIssuePhoto sends multipart POST to /quality-issues/{id}/photos', () async {
       final tempDir = await Directory.systemTemp.createTemp('upload_test');
@@ -79,7 +136,10 @@ void main() {
       try {
         final client = MockClient((request) async {
           expect(request.method, 'POST');
-          expect(request.url.toString(), '$apiBaseUrl/quality-issues/issue-456/photos');
+          expect(
+            request.url.toString(),
+            '$apiBaseUrl/quality-issues/issue-456/photos',
+          );
           expect(request.headers['Authorization'], 'Bearer upload-token');
           expect(
             request.headers['content-type']?.startsWith('multipart/form-data'),
@@ -97,10 +157,15 @@ void main() {
           );
         });
 
-        final apiClient = RequestsApiClient(apiBaseUrl: apiBaseUrl, httpClient: client)
-          ..accessToken = 'upload-token';
+        final apiClient = RequestsApiClient(
+          apiBaseUrl: apiBaseUrl,
+          httpClient: client,
+        )..accessToken = 'upload-token';
 
-        final photo = await apiClient.uploadQualityIssuePhoto('issue-456', testFile.path);
+        final photo = await apiClient.uploadQualityIssuePhoto(
+          'issue-456',
+          testFile.path,
+        );
 
         expect(photo.id, 'photo-uuid-1');
         expect(photo.deliveryQualityIssueId, 'issue-456');
@@ -114,7 +179,10 @@ void main() {
     test('listQualityIssues GETs /requests/{id}/quality-issues and parses QualityIssueList', () async {
       final client = MockClient((request) async {
         expect(request.method, 'GET');
-        expect(request.url.toString(), '$apiBaseUrl/requests/req-789/quality-issues');
+        expect(
+          request.url.toString(),
+          '$apiBaseUrl/requests/req-789/quality-issues',
+        );
         return http.Response(
           jsonEncode({
             'items': [
@@ -129,17 +197,20 @@ void main() {
                     'delivery_quality_issue_id': 'qi-1',
                     'url': 'https://url/p1.jpg',
                     'created_at': '2026-09-13T12:00:00Z',
-                  }
+                  },
                 ],
                 'created_at': '2026-09-13T12:00:00Z',
-              }
+              },
             ],
           }),
           200,
         );
       });
 
-      final apiClient = RequestsApiClient(apiBaseUrl: apiBaseUrl, httpClient: client);
+      final apiClient = RequestsApiClient(
+        apiBaseUrl: apiBaseUrl,
+        httpClient: client,
+      );
       final list = await apiClient.listQualityIssues('req-789');
 
       expect(list.items, hasLength(1));

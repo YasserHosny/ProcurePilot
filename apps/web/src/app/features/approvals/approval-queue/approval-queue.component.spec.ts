@@ -1078,6 +1078,43 @@ describe('ApprovalQueueComponent', () => {
     expect(compiled.textContent).toContain('prod-gloves');
   });
 
+  describe('single decision idempotency', () => {
+    for (const action of ['approve', 'reject'] as const) {
+      it(`${action} sends a UUID and reuses it after an error`, () => {
+        const spy = action === 'approve' ? requestsApi.approveRequest : requestsApi.rejectRequest;
+        spy.and.returnValue(throwError(() => new Error('lost response')));
+        component.submitDecision('req-001', action, 'Reason');
+        const key = spy.calls.mostRecent().args[2];
+        expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+        component.submitDecision('req-001', action, 'Reason');
+        expect(spy.calls.mostRecent().args[2]).toBe(key);
+      });
+    }
+
+    it('starts a new key for a different request, action or comment', () => {
+      requestsApi.approveRequest.and.returnValue(throwError(() => new Error('lost response')));
+      requestsApi.rejectRequest.and.returnValue(throwError(() => new Error('lost response')));
+      const keys: (string | undefined)[] = [];
+      for (const [id, action, comment] of [
+        ['req-001', 'approve', 'Reason'], ['req-002', 'approve', 'Reason'],
+        ['req-002', 'reject', 'Reason'], ['req-002', 'reject', 'Changed'],
+      ] as const) {
+        component.submitDecision(id, action, comment);
+        const spy = action === 'approve' ? requestsApi.approveRequest : requestsApi.rejectRequest;
+        keys.push(spy.calls.mostRecent().args[2]);
+      }
+      expect(new Set(keys).size).toBe(4);
+    });
+
+    it('drops the key after success', () => {
+      requestsApi.approveRequest.and.returnValue(of(mockPendingRequests[0]));
+      component.submitDecision('req-001', 'approve', 'Reason');
+      const key = requestsApi.approveRequest.calls.mostRecent().args[2];
+      component.submitDecision('req-001', 'approve', 'Reason');
+      expect(requestsApi.approveRequest.calls.mostRecent().args[2]).not.toBe(key);
+    });
+  });
+
   it('should open decision dialog for approve and call approveRequest on confirm', () => {
     dialogSpy.open.and.returnValue({
       afterClosed: () => of({ confirmed: true, comment: 'Budget approved' }),
@@ -1092,7 +1129,7 @@ describe('ApprovalQueueComponent', () => {
     expect(dialogSpy.open).toHaveBeenCalledTimes(1);
     expect(requestsApi.approveRequest).toHaveBeenCalledWith('req-001', {
       comment: 'Budget approved',
-    });
+    }, jasmine.any(String));
     expect(approvalsApi.listPendingApprovals).toHaveBeenCalledTimes(2);
     expect(snackBarSpy.open).toHaveBeenCalledWith(
       'Request approved.',
@@ -1115,7 +1152,7 @@ describe('ApprovalQueueComponent', () => {
     expect(dialogSpy.open).toHaveBeenCalledTimes(1);
     expect(requestsApi.rejectRequest).toHaveBeenCalledWith('req-001', {
       comment: 'Too expensive',
-    });
+    }, jasmine.any(String));
     expect(approvalsApi.listPendingApprovals).toHaveBeenCalledTimes(2);
     expect(snackBarSpy.open).toHaveBeenCalledWith('Request rejected.', undefined, {
       duration: 3500,

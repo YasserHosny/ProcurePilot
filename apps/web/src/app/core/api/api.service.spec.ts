@@ -21,6 +21,22 @@ describe('ApiService - Member display names (PPS-125)', () => {
 
   afterEach(() => http.verify());
 
+  for (const action of ['approve', 'reject'] as const) {
+    for (const withKey of [true, false]) {
+      it(`${action} sends Idempotency-Key only when supplied (${withKey})`, () => {
+        const key = '11111111-1111-4111-8111-111111111111';
+        service[action === 'approve' ? 'approveRequest' : 'rejectRequest'](
+          'req-1', { comment: 'Reason' }, withKey ? key : undefined,
+        ).subscribe();
+        const req = http.expectOne(`/api/v1/requests/req-1/${action}`);
+        expect(req.request.method).toBe('POST');
+        expect(req.request.body).toEqual({ comment: 'Reason' });
+        expect(req.request.headers.get('Idempotency-Key')).toBe(withKey ? key : null);
+        req.flush({});
+      });
+    }
+  }
+
   it('serializes review queue filters together with existing search and paging', () => {
     const supplierId = '11111111-1111-1111-1111-111111111111';
     service.getReviewTasks({
