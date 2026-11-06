@@ -25,3 +25,6 @@ desktop.ini
 
 # Generated mirrors of product repos (recreated by npm run sources:sync); large video cuts never committed
 */product-repo/video-cuts-latest/
+
+# WhatsApp kit: holds private prices and large videos; the repo is public (MD-07)
+whatsapp/
