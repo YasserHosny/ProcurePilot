@@ -133,6 +133,32 @@ void main() {
     });
 
     group('ApprovalStep', () {
+      test('self approval accepts only true and round-trips', () {
+        final json = <String, dynamic>{
+          'id': 'step-1',
+          'assigned_membership_id': 'mem-1',
+          'source': 'owner',
+          'status': 'pending',
+        };
+        for (final value in [true, false, null, 'true', 1, {}, []]) {
+          final step = ApprovalStep.fromJson({...json, 'self_approval': value});
+          expect(step.selfApproval, value == true, reason: '$value');
+          expect(step.toJson()['self_approval'], value == true);
+          expect(
+            ApprovalStep.fromJson(step.toJson()).selfApproval,
+            value == true,
+          );
+        }
+        expect(ApprovalStep.fromJson(json).selfApproval, isFalse);
+        const step = ApprovalStep(
+          id: 's',
+          assignedMembershipId: 'm',
+          source: 'owner',
+          status: 'pending',
+        );
+        expect(step.selfApproval, isFalse);
+      });
+
       test('parses assigned_name and assigned_email from json and round-trips to json', () {
         final json = {
           'id': 'step-1',

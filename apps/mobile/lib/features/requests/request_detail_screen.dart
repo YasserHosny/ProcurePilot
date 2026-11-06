@@ -215,6 +215,9 @@ class RequestApprovalStepSection extends StatelessWidget {
           key: Key('approvalStepStatus_${step.status}'),
           label: Text(i18n.t('requests.status.${step.status}')),
         ),
+        if (step.selfApproval &&
+            const ['pending', 'approved', 'rejected'].contains(step.status))
+          _SelfApprovalMark(step: step),
         RequestInfoRow(
           label: i18n.t('requests.approval.assignedTo'),
           value: step.assignedDisplayName(i18n),
@@ -237,6 +240,52 @@ class RequestApprovalStepSection extends StatelessWidget {
             child: Text(i18n.t('requests.approval.pending')),
           ),
       ],
+    );
+  }
+}
+
+class _SelfApprovalMark extends StatelessWidget {
+  const _SelfApprovalMark({required this.step});
+
+  final ApprovalStep step;
+
+  @override
+  Widget build(BuildContext context) {
+    final i18n = ServiceProvider.of(context).i18n;
+    final markKey = switch (step.status) {
+      'pending' => 'selfApprovalPending',
+      'approved' => 'selfApproved',
+      _ => 'selfRejected',
+    };
+    final mark = i18n.t('requests.approval.$markKey');
+    final hint = step.status == 'pending'
+        ? null
+        : i18n.t('requests.approval.selfApprovedHint');
+    return Semantics(
+      key: const Key('selfApprovalMark'),
+      container: true,
+      excludeSemantics: true,
+      label: hint == null ? mark : '$mark. $hint',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const ExcludeSemantics(child: Icon(Icons.person_outline, size: 18)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(mark, style: Theme.of(context).textTheme.bodySmall),
+                  if (hint != null)
+                    Text(hint, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
