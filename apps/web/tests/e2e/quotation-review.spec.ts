@@ -121,6 +121,30 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     await confirmQuotation(page);
   });
 
+  test('archives a quotation and Undo brings it back to the review queue', async ({ page }) => {
+    const quotationId = await uploadQuotationAndOpenReview(page, 'quote_archive_undo.pdf');
+
+    await page.locator('.header-actions').getByRole('button', { name: 'Archive', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Archive this quotation?' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Archive', exact: true }).click();
+    await page.waitForURL('**/quotations');
+
+    const snackbar = page.locator('.mat-mdc-snack-bar-container');
+    await expect(snackbar).toContainText('Quotation archived');
+    await snackbar.getByRole('button', { name: 'Undo' }).click();
+
+    // Restored: back on its review page (an archived quotation would not load), and its own open
+    // review task is in the queue again.
+    await page.waitForURL(`**/quotations/${quotationId}/review`, { timeout: 30000 });
+    await expect(page.locator('.status-pill')).toBeVisible();
+    await page.goto(`/quotations?status=open&search=${quotationId.slice(0, 8)}`);
+    const row = page.locator('tr.clickable-row');
+    await expect(row).toHaveCount(1, { timeout: 30000 });
+    await row.click();
+    await expect(page).toHaveURL(new RegExp(`/quotations/${quotationId}/review`));
+  });
+
   test('blocks low-confidence line price until confirmed as extracted', async ({ page }) => {
     const quotationId = await uploadQuotationAndOpenReview(page, 'quote_line_price_gate.pdf');
     seedQuotationReviewCase(buyer.email, quotationId, 'unit_price');

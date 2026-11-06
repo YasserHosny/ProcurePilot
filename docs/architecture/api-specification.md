@@ -393,6 +393,24 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 - Returns `409` when the quotation is not editable in its current state.
 - Returns `422` when validation fails.
 
+### `POST /quotations/{quotation_id}/archive`
+
+- Owner or buyer only; tenant scope comes from the verified JWT. Other tenants' quotations return `404`.
+- Sets `deleted_at` and `archive_idempotency_key`, and resolves open/in-progress review tasks
+  with `resolved_at` equal to the archive timestamp. Returns the quotation (`200`).
+- The quotation review page's archive confirmation offers Undo for eight seconds through the restore endpoint (archiving from the queue offers none).
+
+### `POST /quotations/{quotation_id}/restore`
+
+- Same authenticated client and write-role requirement as archive. Other tenants' quotations return `404`.
+- Clears `deleted_at` and `archive_idempotency_key`. Reopens only resolved review tasks whose
+  `resolved_at` equals the quotation's previous `deleted_at`. Formerly in-progress tasks return
+  as open; tasks resolved by review at a different timestamp remain resolved.
+- Records `quotation.restored` and enqueues guardrail evaluation only when the guarded update
+  restores the quotation. Restoring a non-archived quotation, including a concurrent restore
+  that loses the update race, returns the current quotation unchanged (`200`) without side effects.
+- Response model remains `Quotation`. No migration is required.
+
 ### `POST /quotations/{quotation_id}/extract`
 
 - Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
