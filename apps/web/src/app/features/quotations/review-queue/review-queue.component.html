@@ -87,6 +87,39 @@
         </mat-select>
       </mat-form-field>
 
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>{{ 'quotations.queue.filters.supplier' | translate }}</mat-label>
+        <mat-select [canSelectNullableOptions]="true" [value]="supplierFilter()" (selectionChange)="onSupplierChange($event.value)"
+          [aria-label]="'quotations.queue.filters.supplier' | translate" data-testid="filter-supplier">
+          <mat-option [value]="null">{{ 'quotations.queue.filters.allSuppliers' | translate }}</mat-option>
+          @for (supplier of suppliers(); track supplier.id) {
+            <mat-option [value]="supplier.id">{{ supplier.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>{{ 'quotations.queue.filters.reason' | translate }}</mat-label>
+        <mat-select [value]="reasonFilter()" (selectionChange)="onReasonChange($event.value)"
+          [aria-label]="'quotations.queue.filters.reason' | translate" data-testid="filter-reason">
+          <mat-option value="all">{{ 'quotations.queue.filters.allReasons' | translate }}</mat-option>
+          @for (value of reasons; track value) {
+            <mat-option [value]="value">{{ 'quotations.queue.reason.' + value | translate }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>{{ 'quotations.queue.filters.lifecycle' | translate }}</mat-label>
+        <mat-select [value]="lifecycleFilter()" (selectionChange)="onLifecycleChange($event.value)"
+          [aria-label]="'quotations.queue.filters.lifecycle' | translate" data-testid="filter-lifecycle">
+          <mat-option value="all">{{ 'quotations.queue.filters.allLifecycles' | translate }}</mat-option>
+          @for (value of lifecycles; track value) {
+            <mat-option [value]="value">{{ 'quotations.review.status.' + value | translate }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
       <mat-form-field appearance="outline" class="filter-field date-field">
         <mat-label>{{ 'quotations.queue.filters.dateFrom' | translate }}</mat-label>
         <input
@@ -112,6 +145,11 @@
         <mat-datepicker-toggle matIconSuffix [for]="dateToPicker"></mat-datepicker-toggle>
         <mat-datepicker #dateToPicker></mat-datepicker>
       </mat-form-field>
+      @if (dateRangeInvalid()) {
+        <p class="date-range-error" role="alert" data-testid="date-range-error">
+          {{ 'quotations.queue.filters.dateRangeInvalid' | translate }}
+        </p>
+      }
 
       <button
         mat-stroked-button
@@ -168,6 +206,39 @@
                 [attr.aria-label]="'quotations.queue.filterChips.removePriority' | translate"
                 data-testid="remove-priority-chip"
               >
+                <mat-icon aria-hidden="true">cancel</mat-icon>
+              </button>
+            </mat-chip>
+          }
+
+          @if (supplierFilter() !== null) {
+            <mat-chip class="active-filter-chip" data-testid="chip-supplier">
+              <span>{{ 'quotations.queue.filters.supplier' | translate }}: {{ supplierLabel() }}</span>
+              <button matChipRemove type="button" (click)="onSupplierChange(null)"
+                [attr.aria-label]="'quotations.queue.filterChips.removeSupplier' | translate"
+                data-testid="remove-supplier-chip">
+                <mat-icon aria-hidden="true">cancel</mat-icon>
+              </button>
+            </mat-chip>
+          }
+
+          @if (reasonFilter() !== 'all') {
+            <mat-chip class="active-filter-chip" data-testid="chip-reason">
+              <span>{{ 'quotations.queue.filters.reason' | translate }}: {{ 'quotations.queue.reason.' + reasonFilter() | translate }}</span>
+              <button matChipRemove type="button" (click)="onReasonChange('all')"
+                [attr.aria-label]="'quotations.queue.filterChips.removeReason' | translate"
+                data-testid="remove-reason-chip">
+                <mat-icon aria-hidden="true">cancel</mat-icon>
+              </button>
+            </mat-chip>
+          }
+
+          @if (lifecycleFilter() !== 'all') {
+            <mat-chip class="active-filter-chip" data-testid="chip-lifecycle">
+              <span>{{ 'quotations.queue.filters.lifecycle' | translate }}: {{ 'quotations.review.status.' + lifecycleFilter() | translate }}</span>
+              <button matChipRemove type="button" (click)="onLifecycleChange('all')"
+                [attr.aria-label]="'quotations.queue.filterChips.removeLifecycle' | translate"
+                data-testid="remove-lifecycle-chip">
                 <mat-icon aria-hidden="true">cancel</mat-icon>
               </button>
             </mat-chip>

@@ -16,9 +16,12 @@ from procurepilot_api.modules.matching.resolution_service import (
 from procurepilot_api.modules.matching.schemas import (
     BulkConfirmResult,
     ExactMatchSummary,
+    ManualCandidateRequest,
+    MatchCandidate,
     MatchCorrectionRequest,
     MatchCorrectionResponse,
     MatchDecision,
+    MatchDecisionHistory,
     MatchQueueList,
     MatchResolutionRequest,
     MatchTask,
@@ -119,6 +122,16 @@ def list_match_tasks(
     )
 
 
+@router.get("/quotation-lines/{line_id}/match/history", response_model=MatchDecisionHistory)
+def match_decision_history(
+    line_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    _member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[MatchingService, Depends(get_matching_service)],
+) -> MatchDecisionHistory:
+    return service.decision_history(bearer_token=token, line_id=line_id)
+
+
 @router.post("/quotation-lines/{line_id}/match", response_model=MatchDecision)
 def resolve_match(
     line_id: UUID,
@@ -134,6 +147,22 @@ def resolve_match(
         line_id=line_id,
         payload=payload,
         idempotency_key=_idempotency_key,
+    )
+
+
+@router.post(
+    "/quotation-lines/{line_id}/match-candidates/manual",
+    response_model=MatchCandidate,
+)
+def add_manual_candidate(
+    line_id: UUID,
+    payload: Annotated[ManualCandidateRequest, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[MatchResolutionService, Depends(get_match_resolution_service)],
+) -> MatchCandidate:
+    return service.add_manual_candidate(
+        bearer_token=token, member=member, line_id=line_id, product_id=payload.product_id
     )
 
 

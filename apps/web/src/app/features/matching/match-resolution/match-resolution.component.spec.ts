@@ -6,10 +6,11 @@ import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Subject, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
-import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
+import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
 import type {
+  MatchCandidate,
   LandedCost,
   MatchCorrectionRequest,
   MatchDecision,
@@ -17,6 +18,7 @@ import type {
   Role,
 } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
+import { FALLBACK_BASE_UNITS } from './correct-match-dialog.component';
 import { MatchResolutionComponent } from './match-resolution.component';
 
 @Component({ standalone: true, template: '<p>dialog</p>' })
@@ -179,6 +181,7 @@ describe('MatchResolutionComponent (T039)', () => {
       'resolveMatch',
       'correctMatch',
       'getLandedCost',
+      'getDecisionHistory',
     ]);
     apiService.getMatchTasks.and.returnValue(of({ items: [mockTask], next_cursor: null }));
     apiService.getMatchTaskForLine.and.returnValue(of(mockTask));
@@ -251,6 +254,131 @@ describe('MatchResolutionComponent (T039)', () => {
     expect(component.candidates().length).toBe(2);
     expect(component.selectedCandidateId()).toBe('cand-1');
     expect(component.selectedOutcome()).toBe('same_product');
+  });
+
+  it('adds a catalogue product the buyer picked as the selected candidate (P-151)', () => {
+    expect(fixture.nativeElement.querySelector('app-product-picker')).not.toBeNull();
+    const picked: MatchCandidate = {
+    id: 'cand-manual',
+    quotation_line_id: 'line-1',
+    candidate_product: {
+      id: 'prod-manual',
+      tenant_name: 'Picked From Catalogue 5L',
+      canonical_name: 'Picked From Catalogue',
+      base_unit: 'litre',
+      status: 'active',
+    },
+    confidence: '0.0000',
+    reasons: { alias_hit: false, gtin_match: false, supplier_code_match: false, manual: true },
+    rank: 1,
+    scoring_version: 'manual-v1',
+    created_at: '2026-08-20T00:00:00Z',
+  };
+    component.onManualCandidate(picked);
+    expect(component.candidates().length).toBe(3);
+    expect(component.selectedCandidateId()).toBe('cand-manual');
+    expect(component.selectedOutcome()).toBe('same_product');
+    component.onManualCandidate(picked);
+    expect(component.candidates().length).toBe(3);
+  });
+
+  it('labels the built-in fallback units from the i18n catalogue, not hardcoded strings (P-159)', () => {
+    expect(FALLBACK_BASE_UNITS.every((u) => !('label_en' in u) && !('label_ar' in u))).toBeTrue();
+    const litre = FALLBACK_BASE_UNITS.find((u) => u.code === 'litre')!;
+    expect(component.localizedUnitLabel(litre)).toBe('Litre (L)');
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('ar', arCatalog);
+    translate.use('ar');
+    expect(component.localizedUnitLabel(litre)).toBe(arCatalog.matching.resolution.unitNames.litre);
+    // A unit from the API keeps the server's label (here in Arabic).
+    expect(
+      component.localizedUnitLabel({ code: 'x', label_en: 'Server', label_ar: 'خادم', dimension: 'count' }),
+    ).toBe('خادم');
+  });
+
+  describe('who decided and the decision history (P-154)', () => {
+    const human = { ...mockDecision, decided_by: 'm-1', decided_by_email: 'buyer@example.test' };
+    const auto = {
+      ...mockDecision,
+      id: 'dec-0',
+      is_automatic: true,
+      decided_by: null,
+      decided_by_email: null,
+      decided_at: '2026-08-20T01:00:00Z',
+    };
+
+    it('shows who made a human decision, and nothing invented for an automatic one', () => {
+      component.decision.set(human);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain('buyer@example.test');
+      component.decision.set(auto);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).not.toContain('Decided By:');
+    });
+
+    it('loads the correction chain when the history is opened, oldest first, current marked', () => {
+      apiService.getDecisionHistory.and.returnValue(of({ items: [auto, { ...human, supersedes_decision_id: 'dec-0' }] }));
+      component.decision.set(human);
+      fixture.detectChanges();
+      const toggle = fixture.nativeElement.querySelector('[data-testid="history-toggle"]') as HTMLButtonElement;
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      toggle.click();
+      fixture.detectChanges();
+      expect(apiService.getDecisionHistory).toHaveBeenCalledOnceWith('line-99');
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      const rows = fixture.nativeElement.querySelectorAll('[data-testid="history-row"]');
+      expect(rows.length).toBe(2);
+      expect(rows[0].textContent).toContain('Automatic');
+      expect(rows[1].textContent).toContain('buyer@example.test');
+      expect(rows[1].textContent).toContain('Current');
+      expect(rows[0].textContent).not.toContain('Current');
+    });
+
+    it('ignores a history answer that arrives after the buyer moved to another line', () => {
+      const late = new Subject<{ items: readonly MatchDecision[] }>();
+      apiService.getDecisionHistory.and.returnValue(late.asObservable());
+      component.decision.set(human);
+      fixture.detectChanges();
+      (fixture.nativeElement.querySelector('[data-testid="history-toggle"]') as HTMLButtonElement).click();
+      component.loadTask('line-99'); // the page loads another line while the history is in flight
+      late.next({ items: [auto, human] });
+      expect(component.history()).toBeNull();
+      expect(component.historyOpen()).toBeFalse();
+    });
+
+    it('ignores a history failure that arrives after the buyer moved on', () => {
+      const late = new Subject<{ items: readonly MatchDecision[] }>();
+      apiService.getDecisionHistory.and.returnValue(late.asObservable());
+      component.decision.set(human);
+      fixture.detectChanges();
+      (fixture.nativeElement.querySelector('[data-testid="history-toggle"]') as HTMLButtonElement).click();
+      component.loadTask('line-99');
+      late.error(new Error('boom'));
+      expect(component.historyFailed()).toBeFalse();
+    });
+
+    it('lets the newest request win when the history is closed and reopened', () => {
+      const first = new Subject<{ items: readonly MatchDecision[] }>();
+      const second = new Subject<{ items: readonly MatchDecision[] }>();
+      apiService.getDecisionHistory.and.returnValues(first.asObservable(), second.asObservable());
+      component.decision.set(human);
+      fixture.detectChanges();
+      component.toggleHistory(); // open: first request
+      component.toggleHistory(); // close
+      component.toggleHistory(); // reopen: second request
+      second.next({ items: [human] });
+      first.next({ items: [auto] }); // late answer of the first request
+      expect(component.history()?.map((d) => d.id)).toEqual([human.id]);
+    });
+
+    it('says so when the history cannot be loaded', () => {
+      apiService.getDecisionHistory.and.returnValue(throwError(() => new Error('boom')));
+      component.decision.set(human);
+      fixture.detectChanges();
+      (fixture.nativeElement.querySelector('[data-testid="history-toggle"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-testid="history-error"]')).not.toBeNull();
+    });
   });
 
   it('should require explicit candidate selection for close-candidate tasks', () => {
@@ -734,6 +862,40 @@ describe('MatchResolutionComponent (T039)', () => {
       expect(el.querySelector('.line-card')?.textContent).toContain('14.5%');
     });
 
+    it('shows the VAT rate with Arabic-Indic digits in Arabic and stays exact (P-159)', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog);
+      translate.use('ar');
+      const el = loadDecided({ vat_rate: '0.145' });
+      const text = el.querySelector('.line-card')?.textContent ?? '';
+      expect(text).toMatch(/١٤[.٫]٥\s?٪/);
+      expect(text).not.toContain('14.5%');
+      const whole = loadDecided({ vat_rate: '0.15' });
+      expect(whole.querySelector('.line-card')?.textContent).toMatch(/١٥\s?٪/);
+    });
+
+    it('shows the supplier pack with Arabic-Indic digits in Arabic and unchanged in English (P-159)', () => {
+      const pack = { pack_count: 1, unit_size: '2.0', unit: 'litre' };
+      const english = loadDecided({ pack });
+      expect(english.querySelector('.line-card')?.textContent).toContain('1 × 2.0');
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog);
+      translate.use('ar');
+      const arabic = loadDecided({ pack });
+      expect(arabic.querySelector('.line-card')?.textContent).toContain('١ × ٢٫٠');
+    });
+
+    it('shows the line number with Arabic-Indic digits in Arabic and Latin digits in English (P-159)', () => {
+      const english = loadDecided();
+      expect(english.querySelector('.line-badge')?.textContent).toContain('Line #1');
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog);
+      translate.use('ar');
+      const arabic = loadDecided();
+      expect(arabic.querySelector('.line-badge')?.textContent).toContain('١');
+      expect(arabic.querySelector('.line-badge')?.textContent).not.toMatch(/[0-9]/);
+    });
+
     it('gives every region on the page an accessible name', () => {
       const el = loadDecided();
       const regions = Array.from(el.querySelectorAll('[role="region"]'));
@@ -773,6 +935,17 @@ describe('MatchResolutionComponent (T039)', () => {
     beforeEach(() => {
       component.decision.set(mockDecision);
       spyOn((component as unknown as { dialog: { open: () => unknown } }).dialog, 'open');
+    });
+
+    it('opens the Correct-match dialog with the built-in units while the unit list has not arrived', () => {
+      component.baseUnits.set([]);
+      const dialog = (component as unknown as { dialog: { open: jasmine.Spy } }).dialog;
+      (dialog.open as jasmine.Spy).and.returnValue({ afterClosed: () => of(null) });
+
+      component.openCorrectMatchDialog();
+
+      const data = (dialog.open as jasmine.Spy).calls.mostRecent().args[1].data;
+      expect(data.baseUnits.length).withContext('units offered').toBeGreaterThan(0);
     });
 
     it('replays the same Idempotency-Key when the same correction is retried after a failure', () => {

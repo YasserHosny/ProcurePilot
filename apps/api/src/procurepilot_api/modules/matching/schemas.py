@@ -70,6 +70,7 @@ class MatchReason(BaseModel):
     feature_score: FeatureScore | None = None
     rfq: RfqMatchReason | None = None
     measured: dict[str, str] | None = None
+    manual: bool = False
 
 
 class ProductSummary(BaseModel):
@@ -123,6 +124,10 @@ class MatchDecision(BaseModel):
     outcome: MatchOutcome
     is_automatic: bool
     decided_by: UUID | None = None
+    decided_by_email: str | None = Field(
+        default=None,
+        description="The member who decided, for human decisions on a task or history read.",
+    )
     decided_at: datetime
     confidence: str = Field(
         description=(
@@ -137,6 +142,12 @@ class MatchDecision(BaseModel):
     learned_from_decision_id: UUID | None = Field(
         default=None,
         description="The human decision whose learned wording made this one (spec 023 FR-011).",
+    )
+
+
+class MatchDecisionHistory(BaseModel):
+    items: list[MatchDecision] = Field(
+        description="Every decision on the line, oldest first (the correction chain, ADR-022)."
     )
 
 
@@ -169,6 +180,10 @@ class MatchTask(BaseModel):
     created_at: datetime
     resolved_at: datetime | None = None
     supplier_name: str | None = None
+
+
+class ManualCandidateRequest(StrictApiModel):
+    product_id: UUID
 
 
 class MatchResolutionRequest(StrictApiModel):
@@ -255,6 +270,7 @@ class MatchQueueItem(BaseModel):
 class MatchQueueList(BaseModel):
     items: list[MatchQueueItem]
     next_cursor: str | None = None
+    rfq_id: UUID | None = None
 
 
 class QuotationLineMatchState(BaseModel):

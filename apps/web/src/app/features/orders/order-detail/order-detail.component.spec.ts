@@ -28,7 +28,7 @@ describe('OrderDetailComponent', () => {
     requests = jasmine.createSpyObj<RequestsApiService>('RequestsApiService', ['getRequest']);
     requests.getRequest.and.returnValue(throwError(() => new Error('no request')));
     api = jasmine.createSpyObj<OrdersApiService>('OrdersApiService', [
-      'getOrder', 'submitOrder', 'cancelOrder', 'recordConfirmation', 'recordReceipt',
+      'getOrder', 'submitOrder', 'cancelOrder', 'closeOrder', 'withdrawOrder', 'recordConfirmation', 'recordReceipt',
     ]);
     api.getOrder.and.returnValue(of({
       order: {
@@ -67,7 +67,7 @@ describe('OrderDetailComponent', () => {
         status: { submitted: 'Submitted' }, evidence: { pending: 'Pending' },
         detail: {
           receivedQuantityFor: '{{product}} · Received quantity ({{unit}}, ordered {{ordered}})', confirmedQuantityFor: '{{product}} · Confirmed quantity ({{unit}}, ordered {{ordered}})', receiptSaved: 'Delivery receipt saved.', submitted: 'Order submitted.', dateFormatHintDayFirst: 'dd/mm/yyyy', dateFormatHintMonthFirst: 'mm/dd/yyyy',
-          errors: { order_not_open_for_evidence: 'This order cannot take delivery or confirmation evidence.' },
+          errors: { order_not_open_for_evidence: 'This order cannot take delivery or confirmation evidence.', order_has_evidence: 'It already has a supplier confirmation or a delivery receipt.' }, withdrawn: 'Order is a draft again.', closed: 'Order closed.',
           eyebrow: 'Purchase order', createdAt: 'Created {{date}}', orderDate: 'Order date', expectedDelivery: 'Expected',
           total: 'Total', confirmation: 'Confirmation', receipt: 'Receipt', linesTitle: 'Lines', linesSubtitle: 'Evidence',
           ordered: 'Ordered', confirmed: 'Confirmed', received: 'Received', remaining: 'Remaining', fromRequest: 'From request', actionsTitle: 'Actions',
@@ -663,5 +663,230 @@ describe('OrderDetailComponent', () => {
       },
     });
     expect(component.receivedPercent()).toBe(100);
+  });
+
+  // PPS-212: say why a delivery was short, or what arrived damaged, on the line itself.
+  it('sends the note typed against a line with the receipt and leaves blank notes out', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.receiptOpen.set(true);
+    component.receiptReference.set('GRN-9');
+    component.receiptDate.set('2026-10-25');
+    component.setQuantity('receipt', 'line-1', '4');
+    component.setReceiptNote('line-1', '  two cartons crushed ');
+    api.recordReceipt.and.returnValue(of(component.evidence()!));
+
+    component.recordReceipt();
+
+    const sent = api.recordReceipt.calls.mostRecent().args[1];
+    expect(sent.lines[0].note).toBe('two cartons crushed');
+
+    component.setReceiptNote('line-1', '   ');
+    component.recordReceipt();
+    expect(api.recordReceipt.calls.mostRecent().args[1].lines[0].note).toBeUndefined();
+  });
+
+  it('offers a note field on every receipt line and shows a recorded note with its receipt', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.receiptOpen.set(true);
+    fixture.detectChanges();
+    expect(byTestId('receipt-note-line-1')).toBeTruthy();
+
+    const current = component.evidence()!;
+    component.evidence.set({
+      ...current,
+      receipts: [{
+        id: 'r1', tenant_id: 't', purchase_order_id: current.order.id, receipt_reference: 'GRN-1',
+        receipt_date: '2026-10-20', received_by: 'm', source_kind: 'manual', source_reference: 'GRN-1',
+        created_at: '2026-10-20T10:00:00Z',
+        lines: [{ id: 'rl1', purchase_order_line_id: 'line-1', received_quantity: '4', note: 'Short: supplier ran out' }],
+      }] as never,
+    });
+    fixture.detectChanges();
+
+    expect(byTestId('receipt-note')?.textContent).toContain('Short: supplier ran out');
+  });
+
+  // PPS-212: a back link from the order to the basket split that produced its request.
+  it('links back to the basket split the order came from, and only then', () => {
+    fixture.detectChanges();
+    expect(byTestId('source-split-link')).toBeNull();
+
+    const component = fixture.componentInstance;
+    component.evidence.set({ ...component.evidence()!, source_split_job_id: 'job-7' });
+    fixture.detectChanges();
+
+    expect(byTestId('source-split-link')?.getAttribute('href')).toBe('/offers/basket-split/job-7');
+  });
+
+  it('does not carry a saved receipt note into the next receipt', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.receiptOpen.set(true);
+    component.receiptReference.set('GRN-10');
+    component.receiptDate.set('2026-10-25');
+    component.setQuantity('receipt', 'line-1', '4');
+    component.setReceiptNote('line-1', 'two cartons crushed');
+    api.recordReceipt.and.returnValue(of(component.evidence()!));
+
+    component.recordReceipt();
+
+    expect(component.receiptNotes()).toEqual({});
+  });
+
+  it('names the order line a recorded receipt note belongs to', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const current = component.evidence()!;
+    component.evidence.set({
+      ...current,
+      receipts: [{
+        id: 'r1', tenant_id: 't', purchase_order_id: current.order.id, receipt_reference: 'GRN-1',
+        receipt_date: '2026-10-20', received_by: 'm', source_kind: 'manual', source_reference: 'GRN-1',
+        created_at: '2026-10-20T10:00:00Z',
+        lines: [{ id: 'rl1', purchase_order_line_id: 'line-1', received_quantity: '4', note: 'Short: supplier ran out' }],
+      }] as never,
+    });
+    fixture.detectChanges();
+
+    const text = byTestId('receipt-note')?.textContent ?? '';
+    expect(text).toContain(component.lineDescription(current.order.lines[0]));
+    expect(text).toContain('Short: supplier ran out');
+  });
+
+  // PPS-205: `closed` can be set, from received only, behind a confirmation.
+  it('offers Close only on received orders and asks first', fakeAsync(() => {
+    const offered: Record<string, boolean> = {};
+    for (const status of ['draft', 'submitted', 'confirmed', 'partially_received', 'received', 'closed', 'cancelled']) {
+      fixture = TestBed.createComponent(OrderDetailComponent);
+      showOrderAs(status);
+      fixture.detectChanges();
+      offered[status] = byTestId('close-order') !== null;
+    }
+    expect(offered).toEqual({
+      draft: false, submitted: false, confirmed: false, partially_received: false,
+      received: true, closed: false, cancelled: false,
+    });
+
+    fixture = TestBed.createComponent(OrderDetailComponent);
+    showOrderAs('received');
+    fixture.detectChanges();
+    byTestId('close-order')!.click();
+    fixture.detectChanges();
+    tick();
+    expect(api.closeOrder).not.toHaveBeenCalled();
+    expect(byTestId('close-confirm-panel')?.contains(document.activeElement)).toBeTrue();
+  }));
+
+  it('closes the order after confirmation, reloads it and announces it', fakeAsync(() => {
+    showOrderAs('received');
+    fixture.detectChanges();
+    api.closeOrder.and.returnValue(of({} as unknown as import('../orders-api').PurchaseOrder));
+    byTestId('close-order')!.click();
+    fixture.detectChanges();
+
+    byTestId('confirm-close')!.click();
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    expect(api.closeOrder).toHaveBeenCalledTimes(1);
+    expect(byTestId('close-confirm-panel')).toBeNull();
+    expect(byTestId('action-status')?.textContent).toContain('closed');
+  }));
+
+  it('keeps the order on screen and says why when closing fails', () => {
+    showOrderAs('received');
+    fixture.detectChanges();
+    api.closeOrder.and.returnValue(throwError(() => ({
+      status: 409, error: { code: 'conflict', details: { reason: 'order_not_closable' } },
+    })));
+    fixture.componentInstance.closeOrder();
+    fixture.componentInstance.confirmClose();
+    fixture.detectChanges();
+
+    expect(byTestId('order-lines')).toBeTruthy();
+    expect(byTestId('action-error')?.getAttribute('role')).toBe('alert');
+  });
+
+  // PPS-205: the timeline said nothing of how an order ended.
+  it('puts a cancelled or closed order\'s ending in the timeline', () => {
+    showOrderAs('cancelled');
+    fixture.detectChanges();
+    expect(byTestId('timeline-cancelled')).toBeTruthy();
+
+    fixture = TestBed.createComponent(OrderDetailComponent);
+    showOrderAs('closed');
+    fixture.detectChanges();
+    expect(byTestId('timeline-closed')).toBeTruthy();
+
+    fixture = TestBed.createComponent(OrderDetailComponent);
+    showOrderAs('submitted');
+    fixture.detectChanges();
+    expect(byTestId('timeline-cancelled')).toBeNull();
+    expect(byTestId('timeline-closed')).toBeNull();
+  });
+
+  // PPS-205: undo a submit while nothing has been confirmed or received.
+  it('offers Withdraw only on a submitted order that has no confirmation or receipt', () => {
+    const offered: Record<string, boolean> = {};
+    for (const status of ['draft', 'submitted', 'confirmed', 'partially_received', 'received', 'closed', 'cancelled']) {
+      fixture = TestBed.createComponent(OrderDetailComponent);
+      showOrderAs(status);
+      fixture.detectChanges();
+      offered[status] = byTestId('withdraw-order') !== null;
+    }
+    expect(offered).toEqual({
+      draft: false, submitted: true, confirmed: false, partially_received: false,
+      received: false, closed: false, cancelled: false,
+    });
+
+    fixture = TestBed.createComponent(OrderDetailComponent);
+    showOrderAs('submitted');
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.evidence.set({
+      ...component.evidence()!,
+      receipts: [{ id: 'r1', lines: [] }] as never,
+    });
+    fixture.detectChanges();
+    expect(byTestId('withdraw-order')).toBeNull();
+  });
+
+  it('asks before taking a submitted order back to a draft, then reloads it and says so', fakeAsync(() => {
+    showOrderAs('submitted');
+    fixture.detectChanges();
+    api.withdrawOrder.and.returnValue(of({} as unknown as import('../orders-api').PurchaseOrder));
+
+    byTestId('withdraw-order')!.click();
+    fixture.detectChanges();
+    tick();
+    expect(api.withdrawOrder).not.toHaveBeenCalled();
+    expect(byTestId('withdraw-confirm-panel')?.contains(document.activeElement)).toBeTrue();
+
+    byTestId('confirm-withdraw')!.click();
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    expect(api.withdrawOrder).toHaveBeenCalledTimes(1);
+    expect(byTestId('withdraw-confirm-panel')).toBeNull();
+    expect(byTestId('action-status')?.textContent).toContain('draft');
+  }));
+
+  it('keeps the order on screen and says why when withdrawing fails', () => {
+    showOrderAs('submitted');
+    fixture.detectChanges();
+    api.withdrawOrder.and.returnValue(throwError(() => ({
+      status: 409, error: { code: 'conflict', details: { reason: 'order_has_evidence' } },
+    })));
+    fixture.componentInstance.withdrawOrder();
+    fixture.componentInstance.confirmWithdraw();
+    fixture.detectChanges();
+
+    expect(byTestId('order-lines')).toBeTruthy();
+    expect(byTestId('action-error')?.getAttribute('role')).toBe('alert');
+    expect(byTestId('action-error')?.textContent).toContain('already has a supplier confirmation');
   });
 });

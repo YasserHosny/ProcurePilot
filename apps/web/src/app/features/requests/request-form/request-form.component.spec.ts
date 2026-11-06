@@ -10,6 +10,7 @@ import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
+import { FormatService } from '../../../core/format/format.service';
 import { ApiService } from '../../../core/api/api.service';
 import type { BranchList, CostCentre, Member, Product, PurchaseRequest } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
@@ -130,6 +131,265 @@ describe('RequestFormComponent — create mode (T017)', () => {
     fixture.detectChanges();
   });
 
+  it('updates the validation banner when the language changes without resubmitting', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('ar', arCatalog);
+    translate.use('en');
+    component.saveAndSubmit();
+    fixture.detectChanges();
+
+    const banner = fixture.nativeElement.querySelector('.error-banner') as HTMLElement;
+    expect(banner.textContent).toContain(enCatalog.requests.form.branchRequired);
+    expect(banner.getAttribute('role')).toBe('alert');
+    expect(banner.getAttribute('tabindex')).toBe('-1');
+
+    translate.use('ar');
+    fixture.detectChanges();
+
+    expect(banner.textContent).toContain(arCatalog.requests.form.branchRequired);
+    expect(banner.textContent).not.toContain(enCatalog.requests.form.branchRequired);
+    expect(requestsApi.createRequest).not.toHaveBeenCalled();
+    expect(requestsApi.submitRequest).not.toHaveBeenCalled();
+  });
+
+  describe('PPS-186 note limits and localized quantities', () => {
+    function fillForm(): void {
+      component.form.patchValue({ branch_id: 'b1', required_by_date: '2099-01-01' });
+      component.lines.at(0).patchValue({ workspace_product_id: 'wp1', quantity: '5' });
+    }
+
+    for (const [raw, expected] of [['١٢٫٥', '12.5'], ['١٬٢٠٠', '1200'], ['۱۲٫۵', '12.5'], [' ١ ٢٫٥ ', '12.5']]) {
+      it(`normalizes typed or pasted ${raw} to an ASCII string`, () => {
+        const input: HTMLInputElement = fixture.nativeElement.querySelector('.line-quantity input');
+        expect(input.type).toBe('text');
+        expect(input.inputMode).toBe('decimal');
+        input.value = raw;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        expect(component.lines.at(0).controls.quantity.value).toBe(expected);
+        expect(input.value).toBe(expected);
+        expect(component.lines.at(0).controls.quantity.valid).toBeTrue();
+      });
+    }
+
+    for (const raw of ['1,000', '1,5']) {
+      it(`preserves ASCII commas in ${raw} and rejects the quantity with a pattern error`, () => {
+        const input: HTMLInputElement = fixture.nativeElement.querySelector('.line-quantity input');
+        input.value = raw;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        const control = component.lines.at(0).controls.quantity;
+        expect(input.value).toBe(raw);
+        expect(control.value).toBe(raw);
+        expect(control.invalid).toBeTrue();
+        expect(control.hasError('pattern')).toBeTrue();
+      });
+    }
+
+    it('keeps letters, zero and excess decimals invalid after input normalization', () => {
+      const input: HTMLInputElement = fixture.nativeElement.querySelector('.line-quantity input');
+      for (const raw of ['abc', '١abc', '٠', '١٫١٢٣٤٥٦٧']) {
+        input.value = raw;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        expect(component.lines.at(0).controls.quantity.hasError('pattern')).withContext(raw).toBeTrue();
+      }
+    });
+
+    for (const lang of ['en', 'ar']) {
+      it(`counts Arabic note characters and rejects 501 with inline error and blocked Save (${lang})`, () => {
+        const translate = TestBed.inject(TranslateService);
+        translate.setTranslation('ar', arCatalog);
+        translate.use(lang);
+        fillForm();
+        const note = component.lines.at(0).controls.note;
+        note.setValue('م'.repeat(500));
+        fixture.detectChanges();
+        expect(note.valid).toBeTrue();
+        expect(fixture.nativeElement.querySelector('.line-note input').maxLength).toBe(500);
+        expect(fixture.nativeElement.querySelector('.line-note mat-hint')?.textContent).toContain('500 / 500');
+        note.setValue('م'.repeat(501));
+        note.markAsTouched();
+        fixture.detectChanges();
+        expect(note.hasError('maxlength')).toBeTrue();
+        expect(fixture.nativeElement.querySelector('.line-note mat-error')?.textContent)
+          .toContain(translate.instant('requests.form.noteTooLong'));
+        component.saveDraft();
+        expect(requestsApi.createRequest).not.toHaveBeenCalled();
+      });
+    }
+
+    it('validates notes loaded into an existing draft', () => {
+      requestsApi.getRequest.and.returnValue(of({ ...mockRequest,
+        lines: [{ ...mockRequest.lines[0], note: 'م'.repeat(501) }] }));
+      routeParams.next(convertToParamMap({ id: 'r1' }));
+      expect(component.lines.at(0).controls.note.hasError('maxlength')).toBeTrue();
+    });
+
+    it('maps array-shaped note_too_long server details to the inline note message', () => {
+      fillForm();
+      requestsApi.createRequest.and.returnValue(throwError(() => new HttpErrorResponse({
+        status: 422, error: { details: [{ field: 'lines[0].note', reason: 'note_too_long' }] },
+      })));
+      component.saveDraft();
+      fixture.detectChanges();
+      expect(component.lines.at(0).controls.note.errors?.['server']).toBe('requests.form.noteTooLong');
+      expect(fixture.nativeElement.querySelector('.line-note mat-error')?.textContent)
+        .toContain(TestBed.inject(TranslateService).instant('requests.form.noteTooLong'));
+    });
+  });
+
+  describe('PPS-193 view leftovers', () => {
+    function show(request: PurchaseRequest): HTMLElement {
+      requestsApi.getRequest.and.returnValue(of(request));
+      routeParams.next(convertToParamMap({ id: `${request.id}-${request.status}-${request.requester_name}-${request.requester_email}-${TestBed.inject(TranslateService).getCurrentLang()}` }));
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('renders details in drafts and read-only requests with name, email and missing requester fallbacks', () => {
+      for (const status of ['draft', 'submitted'] as const) {
+        for (const [name, email, expected] of [
+          ['Mona', 'mona@example.com', 'Mona'],
+          ['', 'mona@example.com', 'mona@example.com'],
+          ['', '', '—'],
+        ]) {
+          const root = show({ ...mockRequest, status, requester_name: name, requester_email: email,
+            submitted_at: status === 'submitted' ? '2026-08-24T12:00:00Z' : null });
+          const details = root.querySelector('.request-details');
+          expect(details?.textContent).toContain('Details');
+          expect(details?.querySelector('[dir="auto"]')?.textContent?.trim()).toBe(expected);
+          expect(details?.textContent).toContain('Requested by');
+          expect(details?.textContent).toContain('Created');
+          expect(details?.querySelector('time')?.getAttribute('datetime')).toBe(mockRequest.created_at);
+          expect(details?.querySelectorAll('time').length).toBe(status === 'submitted' ? 2 : 1);
+          expect(details?.textContent).toContain(TestBed.inject(FormatService).formatDate(mockRequest.created_at));
+        }
+      }
+    });
+
+    it('renders only timestamped history in chronological order with approval comment and decider in en and ar', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog);
+      for (const locale of ['en', 'ar']) {
+        translate.use(locale);
+        const root = show({ ...mockRequest, status: 'ordered', requester_name: 'Mona',
+          submitted_at: '2026-08-24T12:00:00Z', withdrawn_at: '2026-08-26T12:00:00Z',
+          delivered_at: '2026-08-25T12:00:00Z',
+          approval_step: { id: 'a', assigned_membership_id: 'm2', source: 'owner_fallback',
+            status: 'approved', decided_by_membership_id: 'm2', decided_at: '2026-08-24T13:00:00Z',
+            assigned_name: 'Ali', assigned_email: 'ali@example.com', comment: 'Within budget' } });
+        const history = root.querySelector('ol.request-history');
+        expect(history?.getAttribute('aria-label')).toBe(locale === 'en' ? 'History' : 'السجل');
+        const rows = Array.from(history?.querySelectorAll('li') ?? []);
+        expect(rows.length).toBe(5);
+        expect(rows[0]?.textContent).toContain(locale === 'en' ? 'Created' : 'تم الإنشاء');
+        expect(rows[0]?.textContent).toContain('Mona');
+        expect(rows[2]?.textContent).toContain(locale === 'en' ? 'Approval approved' : 'تمت الموافقة');
+        expect(rows[2]?.textContent).toContain('Ali');
+        expect(rows[2]?.textContent).toContain('Within budget');
+        expect(rows.map(row => row.querySelector('time')?.getAttribute('datetime'))).toEqual([
+          mockRequest.created_at, '2026-08-24T12:00:00Z', '2026-08-24T13:00:00Z',
+          '2026-08-25T12:00:00Z', '2026-08-26T12:00:00Z',
+        ]);
+      }
+    });
+
+    for (const status of ['approved', 'rejected'] as const) {
+      for (const [scenario, decider] of [
+        ['assigned approver', 'm2'],
+        ['delegate', 'm3'],
+        ['missing decider', undefined],
+      ] as const) {
+        for (const name of ['Ali', '']) {
+          it(`shows the correct history actor for ${status}, ${scenario}, name="${name}"`, () => {
+            const timestamp = '2026-08-24T13:00:00Z';
+            const root = show({ ...mockRequest, status, approval_step: {
+              id: 'a', assigned_membership_id: 'm2', source: 'owner_fallback', status,
+              decided_by_membership_id: decider, decided_at: timestamp,
+              assigned_name: name, assigned_email: 'ali@example.com', comment: 'Decision comment',
+            } });
+            const row = root.querySelectorAll('.request-history li')[1];
+            expect(row).toBeDefined();
+            const actor = row?.querySelector('span[dir="auto"]');
+            if (decider === 'm2') {
+              expect(actor?.textContent?.trim()).toBe(name || 'ali@example.com');
+            } else {
+              expect(actor).toBeNull();
+            }
+            expect(row?.querySelector('p')?.textContent).toBe('Decision comment');
+            expect(row?.querySelector('time')?.getAttribute('datetime')).toBe(timestamp);
+            expect(row?.querySelector('time')?.textContent).toContain(
+              TestBed.inject(FormatService).formatDate(timestamp),
+            );
+          });
+        }
+      }
+    }
+
+    it('omits absent events and clears details and history when navigating to a new request', () => {
+      const root = show({ ...mockRequest, status: 'ordered', approval_step: {
+        id: 'a', assigned_membership_id: 'm2', source: 'owner_fallback', status: 'approved',
+      } });
+      expect(root.querySelectorAll('.request-history li').length).toBe(1);
+      component.existingRequest.set({ ...mockRequest, status: 'rejected', approval_step: {
+        id: 'a', assigned_membership_id: 'm2', source: 'owner_fallback', status: 'rejected',
+        decided_by_membership_id: 'm2', decided_at: '2026-08-24T12:00:00Z', assigned_email: 'ali@example.com',
+      } });
+      fixture.detectChanges();
+      expect(root.querySelectorAll('.request-history li').length).toBe(2);
+      expect(root.querySelector('.request-history')?.textContent).toContain('Approval rejected');
+      expect(root.querySelector('.request-history')?.textContent).toContain('ali@example.com');
+      routeParams.next(convertToParamMap({}));
+      fixture.detectChanges();
+      expect(root.querySelector('.request-details')).toBeNull();
+      expect(root.querySelector('.request-history')).toBeNull();
+    });
+  });
+
+  describe('PPS-167 self approval marker', () => {
+    for (const locale of ['en', 'ar']) {
+      for (const status of ['pending', 'approved', 'rejected'] as const) {
+        for (const flag of [true, false, undefined]) {
+          it(`renders the marker for ${locale}, ${status}, self_approval=${flag}`, () => {
+            const translate = TestBed.inject(TranslateService);
+            translate.setTranslation('ar', arCatalog);
+            translate.use(locale);
+            const step = {
+              id: 'step-own', assigned_membership_id: 'm1',
+              source: 'owner_fallback' as const, status,
+              ...(flag === undefined ? {} : { self_approval: flag }),
+            };
+            requestsApi.getRequest.and.returnValue(of({
+              ...mockRequest, status: 'submitted', approval_step: step,
+            }));
+            routeParams.next(convertToParamMap({ id: 'r1' }));
+            fixture.detectChanges();
+            const marker = (fixture.nativeElement as HTMLElement).querySelector('.self-approval');
+            if (flag !== true) {
+              expect(marker).toBeNull();
+              return;
+            }
+            expect(marker).not.toBeNull();
+            expect(marker?.querySelector('mat-icon')?.getAttribute('aria-hidden')).toBe('true');
+            if (status === 'pending') {
+              expect(marker?.textContent).toContain(locale === 'ar'
+                ? 'مُسند إلى مقدّم الطلب'
+                : 'Assigned to the requester');
+              expect(marker?.textContent).not.toContain(locale === 'ar' ? 'المالك الوحيد' : 'the only owner');
+              expect(marker?.textContent).not.toContain('Decided by the person');
+            } else {
+              const approvedLabel = locale === 'ar' ? 'اعتماد ذاتي' : 'Self-approved';
+              const rejectedLabel = locale === 'ar' ? 'رفض ذاتي' : 'Self-rejected';
+              expect(marker?.textContent).toContain(status === 'approved' ? approvedLabel : rejectedLabel);
+              expect(marker?.textContent).not.toContain(status === 'approved' ? rejectedLabel : approvedLabel);
+              expect(marker?.textContent).toContain(locale === 'ar'
+                ? 'اتخذ القرار الشخص الذي قدّم الطلب'
+                : 'Decided by the person who submitted it');
+              expect(marker?.textContent).not.toContain('Assigned to the requester');
+            }
+          });
+        }
+      }
+    }
+  });
   describe('PPS-193 pack hints and Save and submit', () => {
     const product: Product = {
       id: 'wp1', tenant_name: 'Flour', canonical_name: 'Flour', base_unit: 'kg',
@@ -552,7 +812,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
 
     component.saveDraft();
 
-    expect(component.errorMessage()).toBe('Unable to save the purchase request. Please try again.');
+    expect(component.errorMessage()).toBe('requests.genericError');
     expect(component.isSaving()).toBeFalse();
   });
 
@@ -827,7 +1087,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
 
     expect(requestsApi.updateRequest).toHaveBeenCalledTimes(1);
     expect(requestsApi.submitRequest).not.toHaveBeenCalled();
-    expect(component.errorMessage()).toBe('Unable to save the purchase request. Please try again.');
+    expect(component.errorMessage()).toBe('requests.genericError');
     expect(component.isSubmitting()).toBeFalse();
   });
 
@@ -1181,6 +1441,40 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       expect(siblingLinks.length).toBe(1);
     });
 
+    for (const lang of ['en', 'ar']) {
+      for (const supplier of ['Sibling supplier', null]) {
+        it(`PPS-189 labels sibling with position and supplier ${supplier} (${lang})`, () => {
+          const translate = TestBed.inject(TranslateService);
+          translate.setTranslation('ar', arCatalog);
+          translate.use(lang);
+          const request = {
+            ...groupedRequest,
+            request_group: {
+              ...groupedRequest.request_group!,
+              siblings: [{ id: 'r2', position: 2, supplier_name: supplier }],
+            },
+          };
+          requestsApi.getRequest.and.returnValue(of(request));
+          const hostFixture = TestBed.createComponent(RequestFormComponent);
+          hostFixture.detectChanges();
+          const link = (hostFixture.nativeElement as HTMLElement).querySelector('a.sibling-link');
+          const position = lang === 'ar' ? '2 من 2' : '2 of 2';
+          expect(link?.textContent?.trim()).toBe(supplier ? `${position} · Sibling supplier` : position);
+          const directive = hostFixture.debugElement.query(By.css('a.sibling-link')).injector.get(RouterLink);
+          const input = (directive as unknown as Record<string, () => unknown>)['routerLinkInput']();
+          expect(input).toEqual(['/requests', 'r2']);
+        });
+      }
+    }
+
+    it('PPS-189 keeps legacy labels when siblings are missing', () => {
+      requestsApi.getRequest.and.returnValue(of(groupedRequest));
+      const hostFixture = TestBed.createComponent(RequestFormComponent);
+      hostFixture.detectChanges();
+      const link = (hostFixture.nativeElement as HTMLElement).querySelector('a.sibling-link');
+      expect(link?.textContent?.trim()).toBe('Request r2');
+    });
+
     it('a grouped draft renders read-only with no Save and explains why', () => {
       requestsApi.getRequest.and.returnValue(of(groupedRequest));
       const hostFixture = TestBed.createComponent(RequestFormComponent);
@@ -1277,6 +1571,16 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       const retryKey = requestsApi.withdrawGroup.calls.mostRecent().args[1];
       expect(retryKey).toBe(firstKey);
     });
+
+    for (const status of ['approved', 'ordered'] as const) {
+      it(`offers withdrawal for ${status} requests subject to the live-order check`, () => {
+        requestsApi.getRequest.and.returnValue(of({ ...groupedRequest, status }));
+        const hostFixture = TestBed.createComponent(RequestFormComponent);
+        hostFixture.detectChanges();
+        expect(hostFixture.componentInstance.canWithdraw()).toBeTrue();
+        expect(hostFixture.nativeElement.querySelector('.withdraw-request-btn')).toBeTruthy();
+      });
+    }
 
     it('opens confirm dialog on withdraw click and does not withdraw if cancelled (PPS-188)', () => {
       requestsApi.withdrawRequest.calls.reset();
@@ -2050,7 +2354,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
         'Quantity can have at most 6 decimals.',
       );
       // Banner displays the generic error
-      expect(component.errorMessage()).toBe('Unable to save the purchase request. Please try again.');
+      expect(component.errorMessage()).toBe('requests.genericError');
     });
 
     it('object-shaped details still work with field-level server error and translated banner', () => {
@@ -2077,7 +2381,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       expect(component.form.controls.required_by_date.errors?.['server']).toBe(
         'requests.errors.required_by_in_the_past',
       );
-      expect(component.errorMessage()).toBe('The required-by date cannot be in the past.');
+      expect(component.errorMessage()).toBe('requests.errors.required_by_in_the_past');
     });
   });
 
@@ -2649,7 +2953,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       expect(requestsApi.createRequest).not.toHaveBeenCalled();
       expect(requestsApi.updateRequest).not.toHaveBeenCalled();
       expect(component.form.controls.branch_id.touched).toBeTrue();
-      expect(component.errorMessage()).toBe('Branch is required.');
+      expect(component.errorMessage()).toBe('requests.form.branchRequired');
     });
   });
 
@@ -2684,7 +2988,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       expect(dateField?.querySelector('mat-error')?.textContent?.trim()).toBe(
         'The required-by date cannot be in the past.',
       );
-      expect(component.errorMessage()).toBe('The required-by date cannot be in the past.');
+      expect(component.errorMessage()).toBe('requests.errors.required_by_in_the_past');
     });
 
     it('falls back to requests.genericError on unknown error reason and never displays raw English apiError.message', () => {
@@ -2708,7 +3012,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       component.saveDraft();
       fixture.detectChanges();
 
-      expect(component.errorMessage()).toBe('Unable to save the purchase request. Please try again.');
+      expect(component.errorMessage()).toBe('requests.genericError');
       expect(component.errorMessage()).not.toContain('Raw database constraint failure');
     });
   });
@@ -2880,7 +3184,7 @@ describe('RequestFormComponent — PPS-190 draft actions', () => {
     confirmation.next(true);
     const key = requestsApi.withdrawRequest.calls.mostRecent().args[1];
     expect(key).toEqual(jasmine.any(String));
-    expect(component.errorMessage()).toBe(enCatalog.requests.genericError);
+    expect(component.errorMessage()).toBe('requests.genericError');
     expect(router.navigate).not.toHaveBeenCalled();
     requestsApi.withdrawRequest.and.returnValue(of({ ...mockRequest, status: 'withdrawn' }));
     confirmation.next(true);
@@ -2948,7 +3252,7 @@ describe('RequestFormComponent — PPS-190 draft actions', () => {
       expect(component.existingRequest()).toBeNull();
       expect(component.form.getRawValue()).toEqual({ branch_id: '', cost_centre_id: '', required_by_date: null,
         lines: [{ workspace_product_id: '', quantity: '', note: '' }] });
-      expect(component.errorMessage()).toBe(enCatalog.requests.genericError);
+      expect(component.errorMessage()).toBe('requests.genericError');
       expect(fixture.nativeElement.querySelector('.duplicate-banner')).toBeNull();
     });
   }

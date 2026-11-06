@@ -8,13 +8,21 @@ import type {
   PurchaseRequestLine,
   PurchaseRequestCreate,
   PurchaseRequestList,
-  PurchaseRequestStatus as BasePurchaseRequestStatus,
+  PurchaseRequestStatus,
   PurchaseRequestUpdate,
   RequestGroupSummary,
   RequestSource,
 } from '../../core/api/models';
 
-export type PurchaseRequestStatus = BasePurchaseRequestStatus | 'delivered';
+export type { PurchaseRequestStatus };
+
+export type PurchaseRequestSort =
+  | 'created_desc'
+  | 'created_asc'
+  | 'required_by_asc'
+  | 'required_by_desc'
+  | 'total_desc'
+  | 'total_asc';
 
 export type {
   ApprovalDecisionInput,
@@ -37,8 +45,11 @@ export class RequestsApiService {
     cursor?: string;
     limit?: number;
     eligible_for_order?: boolean;
+    q?: string;
+    sort?: PurchaseRequestSort;
+    mine?: boolean;
   }): Observable<PurchaseRequestList> {
-    return this.api.listRequests(params as Parameters<ApiService['listRequests']>[0]);
+    return this.api.listRequests(params);
   }
 
   getRequest(requestId: string): Observable<PurchaseRequest> {
@@ -64,12 +75,12 @@ export class RequestsApiService {
     return this.api.withdrawRequest(requestId, idempotencyKey);
   }
 
-  approveRequest(requestId: string, body: ApprovalDecisionInput): Observable<PurchaseRequest> {
-    return this.api.approveRequest(requestId, body);
+  approveRequest(requestId: string, body: ApprovalDecisionInput, idempotencyKey?: string): Observable<PurchaseRequest> {
+    return this.api.approveRequest(requestId, body, idempotencyKey);
   }
 
-  rejectRequest(requestId: string, body: ApprovalDecisionInput): Observable<PurchaseRequest> {
-    return this.api.rejectRequest(requestId, body);
+  rejectRequest(requestId: string, body: ApprovalDecisionInput, idempotencyKey?: string): Observable<PurchaseRequest> {
+    return this.api.rejectRequest(requestId, body, idempotencyKey);
   }
 
   submitGroup(groupId: string, idempotencyKey?: string): Observable<PurchaseRequest[]> {

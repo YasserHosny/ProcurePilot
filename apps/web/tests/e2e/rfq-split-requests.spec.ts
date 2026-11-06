@@ -59,7 +59,7 @@ async function switchToArabic(page: Page): Promise<void> {
  *    Wait for job via API polling helper. Assert split total, baselines, and saving.
  * 3. "Prepare 2 requests" → fill branch and required-by → submit → summary shows 2 requests.
  * 4. Open one request → "Part of a split · N of 2" → Submit (group submit).
- * 5. Sign in as approver/owner → queue shows ONE row for split → Approve → both requests are ordered.
+ * 5. Sign in as approver/owner → queue shows ONE row for split → Approve → both requests are approved.
  * 6. Arabic RTL pass on approval queue & basket split RFQ mode with zero axe violations @a11y.
  */
 test.describe.serial('RFQ basket split & group approval flow (024, T033)', () => {
@@ -391,7 +391,7 @@ test.describe.serial('RFQ basket split & group approval flow (024, T033)', () =>
     await decisionDialog.locator('.confirm-btn').click();
     await groupApprovePromise;
 
-    // Both requests are ordered (check via the API helper)
+    // Both requests are approved (check via the API helper)
     const req1 = await apiAsUser<{ status: string }>(
       ownerToken,
       'GET',
@@ -402,8 +402,8 @@ test.describe.serial('RFQ basket split & group approval flow (024, T033)', () =>
       'GET',
       `/requests/${createdRequestIds[1]}`,
     );
-    expect(req1.status).toBe('ordered');
-    expect(req2.status).toBe('ordered');
+    expect(req1.status).toBe('approved');
+    expect(req2.status).toBe('approved');
   });
 
   test('renders approval queue and basket split in Arabic (RTL) with zero WCAG 2.1 AA violations @a11y', async ({

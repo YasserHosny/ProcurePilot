@@ -68,6 +68,8 @@ export class OrderDetailComponent implements OnInit {
   readonly confirmationOpen = signal(false);
   readonly receiptOpen = signal(false);
   readonly cancelOpen = signal(false);
+  readonly closeOpen = signal(false);
+  readonly withdrawOpen = signal(false);
   readonly submitOpen = signal(false);
   readonly actionError = signal<string | null>(null);
   /** Polite announcement of the last successful action, for screen readers. */
@@ -81,6 +83,7 @@ export class OrderDetailComponent implements OnInit {
   readonly receiptDateModel = computed(() => parseIsoDateLocal(this.receiptDate()));
   readonly confirmationQuantities = signal<Record<string, string>>({});
   readonly receiptQuantities = signal<Record<string, string>>({});
+  readonly receiptNotes = signal<Record<string, string>>({});
 
   onConfirmationDateChange(date: Date | null): void {
     this.confirmationDate.set(toIsoDateOrNull(date) ?? '');
@@ -203,6 +206,16 @@ export class OrderDetailComponent implements OnInit {
     target.set({ ...target(), [lineId]: value });
   }
 
+  setReceiptNote(lineId: string, value: string): void {
+    this.receiptNotes.set({ ...this.receiptNotes(), [lineId]: value });
+  }
+
+  /** What a recorded receipt line was for, so its note reads on its own. */
+  receiptLineName(lineId: string): string {
+    const line = this.evidence()?.order.lines.find((candidate) => candidate.id === lineId);
+    return line ? lineDescription(line) : '';
+  }
+
   readonly isOverdue = isOrderOverdue;
 
   /** Hands the browser a file to save; separate so tests do not need a real download. */
@@ -317,6 +330,56 @@ export class OrderDetailComponent implements OnInit {
     });
   }
 
+  /** A submit can be undone until a supplier confirmation or a receipt is on record. */
+  canWithdraw(status: string, evidence: OrderEvidenceProjection): boolean {
+    return status === 'submitted' && !evidence.confirmation && evidence.receipts.length === 0;
+  }
+
+  withdrawOrder(): void {
+    this.actionError.set(null);
+    this.withdrawOpen.set(true);
+    this.focusPanel('withdraw-confirm-panel');
+  }
+
+  confirmWithdraw(): void {
+    this.isSaving.set(true);
+    this.actionError.set(null);
+    this.ordersApi.withdrawOrder(this.orderId).subscribe({
+      next: () => {
+        this.loadOrder();
+        this.withdrawOpen.set(false);
+        this.isSaving.set(false);
+        this.announce('orders.detail.withdrawn');
+      },
+      error: (err: unknown) => this.failWith(err),
+    });
+  }
+
+  /** Closing is for an order whose goods have all arrived; it ends the order for good. */
+  canClose(status: string): boolean {
+    return status === 'received';
+  }
+
+  closeOrder(): void {
+    this.actionError.set(null);
+    this.closeOpen.set(true);
+    this.focusPanel('close-confirm-panel');
+  }
+
+  confirmClose(): void {
+    this.isSaving.set(true);
+    this.actionError.set(null);
+    this.ordersApi.closeOrder(this.orderId).subscribe({
+      next: () => {
+        this.loadOrder();
+        this.closeOpen.set(false);
+        this.isSaving.set(false);
+        this.announce('orders.detail.closed');
+      },
+      error: (err: unknown) => this.failWith(err),
+    });
+  }
+
   recordConfirmation(): void {
     const current = this.evidence();
     if (!current || !this.confirmationReference().trim() || !this.confirmationDate()) return;
@@ -355,12 +418,16 @@ export class OrderDetailComponent implements OnInit {
       receipt_date: this.receiptDate(),
       source_kind: 'manual',
       source_reference: this.receiptReference().trim(),
-      lines: current.order.lines.map((line) => ({
-        purchase_order_line_id: line.id,
-        received_quantity: this.quantityValue(this.receiptQuantities(), line) || '0',
-      })),
+      lines: current.order.lines.map((line) => {
+        const note = (this.receiptNotes()[line.id] ?? '').trim();
+        return {
+          purchase_order_line_id: line.id,
+          received_quantity: this.quantityValue(this.receiptQuantities(), line) || '0',
+          ...(note ? { note } : {}),
+        };
+      }),
     }).subscribe({
-      next: (value) => { this.evidence.set(value); this.receiptOpen.set(false); this.isSaving.set(false); this.announce('orders.detail.receiptSaved'); },
+      next: (value) => { this.evidence.set(value); this.receiptOpen.set(false); this.receiptNotes.set({}); this.isSaving.set(false); this.announce('orders.detail.receiptSaved'); },
       error: (err: unknown) => this.failWith(err),
     });
   }

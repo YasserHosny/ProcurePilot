@@ -46,6 +46,16 @@
     </mat-card>
   }
 
+  @if (isCancelled()) {
+    <mat-card class="draft-notice-card expired-notice-card" data-testid="rfq-compare-cancelled-notice" role="status">
+      <div class="draft-notice-content">
+        <div class="draft-notice-text">
+          <p>{{ 'rfq.compare.rfqCancelled' | translate }}</p>
+        </div>
+      </div>
+    </mat-card>
+  }
+
   @if (isExpired()) {
     <mat-card class="draft-notice-card expired-notice-card" data-testid="rfq-compare-expired-notice">
       <div class="draft-notice-content">
@@ -102,12 +112,13 @@
           </button>
         </div>
       }
-      <mat-form-field appearance="outline">
-        <mat-label>{{ 'rfq.compare.requiredByLabel' | translate }}</mat-label>
-        <input matInput [matDatepicker]="picker" [(ngModel)]="requiredByDate">
-        <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
-        <mat-datepicker #picker></mat-datepicker>
-      </mat-form-field>
+      <!-- The draft follows the RFQ's own needed-by date (the date the suppliers quoted for). -->
+      @if (rfqDetail()?.rfq?.needed_by_date; as neededBy) {
+        <div class="needed-by" data-testid="needed-by">
+          <span class="needed-by-label">{{ 'rfq.compare.neededByLabel' | translate }}</span>
+          <strong class="pp-figures">{{ neededBy | formatDate }}</strong>
+        </div>
+      }
     </div>
   }
 
@@ -141,11 +152,11 @@
   }
 
   @if (!isLoading() && responses().length > 0) {
-    @if (splitSaving()) {
+    @if (splitSaving() && splitSavingMode(); as savingMode) {
       <aside class="split-saving-hint" data-testid="split-saving-hint">
         <mat-icon class="split-saving-icon" aria-hidden="true">savings</mat-icon>
         <span class="split-saving-text">
-          {{ 'rfq.compare.splitSavingHint' | translate: { money: splitSavingMoney() } }}
+          {{ (savingMode === 'missed' ? 'rfq.compare.splitSavingHintConverted' : 'rfq.compare.splitSavingHint') | translate: { money: splitSavingMoney() } }}
         </span>
       </aside>
     }
@@ -166,7 +177,9 @@
         </button>
         @if (!splitEligibility().canSplit) {
           <div class="split-disabled-reason" data-testid="split-disabled-reason">
-            @if (splitEligibility().reason === 'rfq_expired') {
+            @if (splitEligibility().reason === 'rfq_cancelled') {
+              <span>{{ 'rfq.compare.rfqCancelled' | translate }}</span>
+            } @else if (splitEligibility().reason === 'rfq_expired') {
               <span>{{ 'rfq.compare.rfqExpired' | translate }}</span>
             } @else if (splitEligibility().reason === 'needs_two_matched') {
               <span>{{ 'rfq.compare.needsTwoMatched' | translate }}</span>
@@ -197,6 +210,9 @@
             </mat-card-subtitle>
           </mat-card-header>
           <mat-card-content>
+            @if (coverageLabel(response); as coverage) {
+              <span class="coverage-badge" data-testid="coverage-badge">{{ coverage }}</span>
+            }
             @if (response.quotation_status === 'refused') {
               <div role="status">
                 <strong>{{ 'rfq.compare.refused' | translate }}</strong>
@@ -228,7 +244,7 @@
                   <td mat-footer-cell *matFooterCellDef class="total-label-cell">
                     <div class="total-cell-content">
                       <span class="total-label">{{ 'rfq.compare.total' | translate }}</span>
-                      @if (hasLowestTotal(response)) {
+                      @if (hasLowestTotal(response) && lowestTotalBasis() === 'printed') {
                         <mat-chip class="pp-chip-best lowest-total-chip">
                           {{ 'rfq.compare.lowestTotal' | translate }}
                         </mat-chip>
@@ -270,6 +286,17 @@
                 <tr mat-row *matRowDef="let row; columns: displayedColumns;" [class.best]="isLowestLinePrice(response, row)"></tr>
                 <tr mat-footer-row *matFooterRowDef="displayedColumns" class="total-row"></tr>
               </table>
+              @if (landedTotal(response); as total) {
+                <div class="landed-total" data-testid="landed-total">
+                  <span>{{ 'rfq.compare.landedTotal' | translate }}</span>
+                  <span class="pp-figures">{{ total | formatMoney }}</span>
+                  @if (hasLowestTotal(response) && lowestTotalBasis() === 'landed') {
+                    <mat-chip class="pp-chip-best lowest-total-chip">
+                      {{ 'rfq.compare.lowestTotal' | translate }}
+                    </mat-chip>
+                  }
+                </div>
+              }
             }
             @if (response.quotation_status !== 'refused' && unmatchedCount(response) > 0) {
               <div class="pending-warning">
@@ -328,17 +355,21 @@
                   </a>
                 } @else if (isWriter()) {
                   <button mat-flat-button color="primary"
-                    [disabled]="!canPrepare(response) || isConverted() || isExpired()"
+                    [disabled]="!canPrepare(response) || isConverted() || isExpired() || isCancelled()"
                     (click)="prepareRequest(response)">
                     {{ 'rfq.compare.prepareRequest' | translate }}
                   </button>
                 }
               </div>
               @if (!isConverted()) {
-                @if (isExpired()) {
+                @if (isCancelled()) {
+                  <span class="disabled-reason" data-testid="cancelled-reason">{{ 'rfq.compare.rfqCancelled' | translate }}</span>
+                } @else if (isExpired()) {
                   <span class="disabled-reason" data-testid="expired-reason">{{ 'rfq.compare.rfqExpired' | translate }}</span>
                 } @else if (isWriter()) {
-                  @if (branchesError()) {
+                  @if (isNeededByPast()) {
+                    <span class="disabled-reason" data-testid="needed-by-past-reason">{{ 'rfq.compare.neededByPast' | translate }}</span>
+                  } @else if (branchesError()) {
                     <span class="disabled-reason" data-testid="branches-error-reason">{{ 'rfq.compare.branchesLoadError' | translate }}</span>
                   } @else if (rfqDetailError()) {
                     <span class="disabled-reason" data-testid="rfq-detail-error-reason">{{ 'rfq.compare.rfqDetailLoadError' | translate }}</span>

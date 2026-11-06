@@ -74,6 +74,23 @@
         </div>
       }
 
+      <!-- Standalone split: an estimate from stored prices, so the next step is fresh quotes -->
+      @if (!isRfqMode && isWriter && currentJob?.id) {
+        <div class="standalone-next-step" data-testid="standalone-next-step">
+          <p class="standalone-note">{{ 'basketSplit.result.standaloneNote' | translate }}</p>
+          <a
+            mat-flat-button
+            color="primary"
+            [routerLink]="['/rfq/create']"
+            [queryParams]="{ from_split: currentJob?.id }"
+            data-testid="start-rfq-from-split"
+          >
+            <mat-icon aria-hidden="true">forward_to_inbox</mat-icon>
+            {{ 'basketSplit.result.startRfq' | translate }}
+          </a>
+        </div>
+      }
+
       <!-- Single-Supplier Baseline Comparison (FR-008, US3 Scenario 2) -->
       @if (!isRfqMode && singleSupplierSavings; as baselineInfo) {
         @if (baselineInfo.type !== 'neither_feasible') {

@@ -239,6 +239,9 @@ def build_service(
         lambda _client: removed_membership_ids or set(),
     )
     monkeypatch.setattr(service, "_fetch_owner_membership_id", lambda _client: owner.membership_id)
+    monkeypatch.setattr(
+        service, "_fetch_owner_membership_ids", lambda _client: [owner.membership_id]
+    )
     monkeypatch.setattr(service, "_budget_status_for", lambda _client, _row: None)
     monkeypatch.setattr(
         "procurepilot_api.modules.requests.service.get_audit_writer",

@@ -3,6 +3,11 @@
     <div>
       <h1 class="approval-queue-title">{{ 'approvals.title' | translate }}</h1>
       <p class="approval-queue-subtitle">{{ 'approvals.subtitle' | translate }}</p>
+      @if (totalCount() !== null) {
+        <p class="approval-queue-count" data-testid="approval-total-count">
+          {{ totalCountLabel() }}
+        </p>
+      }
     </div>
   </div>
 
@@ -15,23 +20,161 @@
           <div class="error-trace">{{ traceId }}</div>
         }
       </div>
+      @if (pageLoadFailed()) {
+        <button
+          mat-stroked-button
+          type="button"
+          class="retry-load-btn"
+          data-testid="retry-load-btn"
+          (click)="retryLoad()"
+        >
+          {{ 'approvals.filter.retry' | translate }}
+        </button>
+      }
     </div>
   }
 
   <mat-card class="approval-queue-card">
+    <div class="queue-controls">
+      <mat-form-field appearance="outline" class="sort-field" subscriptSizing="dynamic">
+        <mat-label>{{ 'approvals.sort.label' | translate }}</mat-label>
+        <mat-select
+          [disabled]="bulkBusy()"
+          #sortSelect
+          data-testid="sort-select"
+          [value]="sortOption()"
+          (selectionChange)="onSortChange($event.value)"
+        >
+          @for (option of sortOptions; track option) {
+            <mat-option [value]="option">{{ sortOptionLabel(option) }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="branch-field" subscriptSizing="dynamic">
+        <mat-label>{{ 'approvals.filter.branch' | translate }}</mat-label>
+        <mat-select
+          [disabled]="bulkBusy()"
+          data-testid="branch-select"
+          [value]="branchFilter()"
+          (selectionChange)="onBranchChange($event.value)"
+        >
+          <mat-option value="">{{ 'approvals.filter.allBranches' | translate }}</mat-option>
+          @for (branch of branches(); track branch.id) {
+            <mat-option [value]="branch.id">{{ branch.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      @if (hasActiveFilters()) {
+        <button
+          mat-stroked-button
+          type="button"
+          class="clear-filters-btn"
+          data-testid="clear-filters-btn"
+          [disabled]="bulkBusy()"
+          (click)="clearFilters()"
+        >
+          {{ 'approvals.filter.clear' | translate }}
+        </button>
+      }
+    </div>
+
+    @if (hasActiveFilters()) {
+      <div class="filter-chips" data-testid="filter-chips">
+        @if (sortOption() !== 'submitted_desc') {
+          <span class="filter-chip">
+            <span class="chip-label">{{ sortOptionLabel(sortOption()) }}</span>
+            <button
+              type="button"
+              class="chip-remove"
+              [attr.aria-label]="
+                'approvals.filter.chipRemove'
+                  | translate: { filter: sortOptionLabel(sortOption()) }
+              "
+              [disabled]="bulkBusy()"
+              (click)="removeSortFilter()"
+            >
+              <mat-icon aria-hidden="true">close</mat-icon>
+            </button>
+          </span>
+        }
+        @if (branchFilter()) {
+          <span class="filter-chip">
+            <span class="chip-label">{{ branchFilterName() }}</span>
+            <button
+              type="button"
+              class="chip-remove"
+              [attr.aria-label]="
+                'approvals.filter.chipRemove' | translate: { filter: branchFilterName() }
+              "
+              [disabled]="bulkBusy()"
+              (click)="removeBranchFilter()"
+            >
+              <mat-icon aria-hidden="true">close</mat-icon>
+            </button>
+          </span>
+        }
+      </div>
+    }
+
+    <div
+      class="visually-hidden"
+      aria-live="polite"
+      aria-atomic="true"
+      data-testid="queue-announcement"
+    >
+      {{ announcementText() }}
+    </div>
+
     @if (isLoading()) {
       <div class="loading-state" aria-live="polite">
         <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
         <span>{{ 'common.loading' | translate }}</span>
       </div>
+    } @else if (pageLoadFailed()) {
+      <div class="load-failed-state" data-testid="load-failed-state"></div>
     } @else if (queueItems().length === 0) {
-      <div class="empty-state">
-        <mat-icon class="empty-icon" aria-hidden="true">inbox</mat-icon>
-        <p class="empty-message">{{ 'approvals.empty' | translate }}</p>
-      </div>
+      @if (hasActiveBranchFilter()) {
+        <div class="empty-state" data-testid="empty-filtered">
+          <mat-icon class="empty-icon" aria-hidden="true">filter_alt_off</mat-icon>
+          <p class="empty-message">{{ 'approvals.emptyFiltered' | translate }}</p>
+          <button
+            mat-stroked-button
+            type="button"
+            class="clear-filters-btn"
+            [disabled]="bulkBusy()"
+            (click)="clearFilters()"
+          >
+            {{ 'approvals.filter.clear' | translate }}
+          </button>
+        </div>
+      } @else {
+        <div class="empty-state" data-testid="empty-default">
+          <mat-icon class="empty-icon" aria-hidden="true">inbox</mat-icon>
+          <p class="empty-message">{{ 'approvals.empty' | translate }}</p>
+        </div>
+      }
     } @else {
       <div class="table-responsive">
         <table mat-table [dataSource]="queueItems()" multiTemplateDataRows class="approvals-table">
+          <ng-container matColumnDef="selection">
+            <th mat-header-cell *matHeaderCellDef scope="col">
+              <mat-checkbox [aria-label]="'approvals.bulk.selectAll' | translate"
+                [checked]="allSelected()" [indeterminate]="someSelected()"
+                [disabled]="bulkDisabled() || eligibleSingles().length === 0"
+                (change)="toggleSelectAll()" />
+            </th>
+            <td mat-cell *matCellDef="let row">
+              @if (!isGroupRow(row)) {
+                <mat-checkbox [aria-label]="selectionLabel(row.request)"
+                  [checked]="selectedIds().has(row.id)" [disabled]="selectionDisabled(row)"
+                  [attr.aria-describedby]="capReached() && !selectedIds().has(row.id) ? 'bulk-selection-cap' : null"
+                  (change)="toggleSelection(row)" />
+              }
+            </td>
+          </ng-container>
+
           <ng-container matColumnDef="requiredByDate">
             <th mat-header-cell *matHeaderCellDef>
               {{ 'approvals.columns.requiredByDate' | translate }}
@@ -56,6 +199,9 @@
                 >{{ reqInfo.text }}</span>
               } @else {
                 {{ reqInfo.text }}
+              }
+              @if (isOwnRequest(row)) {
+                <span class="own-request-badge">{{ 'approvals.ownRequestBadge' | translate }}</span>
               }
             </td>
           </ng-container>
@@ -147,6 +293,11 @@
               {{ 'approvals.columns.actions' | translate }}
             </th>
             <td mat-cell *matCellDef="let row" class="actions-cell">
+              @if (row.kind === 'single') {
+                <a [routerLink]="['/approvals', row.request.id]"
+                  [attr.aria-label]="'approvals.detail.viewDetailsLabel' | translate: { requester: getRequesterDisplay(row.request), total: formatMoney(row.request) }"
+                  (click)="$event.stopPropagation()">{{ 'approvals.detail.viewDetails' | translate }}</a>
+              }
               <div class="cell-inline">
                 <button
                   mat-flat-button
@@ -202,6 +353,9 @@
                     @for (req of row.requests; track req.id) {
                       <div class="group-request-section">
                         <div class="group-request-header">
+                          <a [routerLink]="['/approvals', req.id]"
+                            [attr.aria-label]="'approvals.detail.viewDetailsLabel' | translate: { requester: getRequesterDisplay(req), total: formatMoney(req) }"
+                            (click)="$event.stopPropagation()">{{ 'approvals.detail.viewDetails' | translate }}</a>
                           @if (req.source?.supplier_name; as supplier) {
                             <span class="group-request-supplier" dir="auto">{{ supplier }}</span>
                           }
@@ -314,6 +468,13 @@
         }
       </div>
     }
+    <app-approval-bulk-panel [count]="selectedIds().size" [totals]="selectionTotals()"
+      [incomplete]="selectionIncomplete()" [busy]="bulkBusy()" [disabled]="bulkDisabled()"
+      [error]="bulkError()" [result]="bulkResult()" [failures]="bulkFailures()"
+      (approve)="openBulkDialog('approved')" (reject)="openBulkDialog('rejected')"
+      (clearSelection)="clearSelection()" />
+    @if (capReached()) { <p id="bulk-selection-cap" role="status">{{ 'approvals.bulk.capHint' | translate }}</p> }
+
   </mat-card>
 
   <ng-template #budgetBadgeTmpl let-req>

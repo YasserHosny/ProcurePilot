@@ -6,15 +6,17 @@ import type { QuotationStatus, BasketSplitJob } from '../../core/api/models';
 import { environment } from '../../../environments/environment';
 
 export interface Rfq {
+  reference_number?: number;
   id: string;
   tenant_id: string;
   created_by_membership_id: string;
-  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted';
+  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted' | 'cancelled';
   needed_by_date: string;
   tenant_terms: string | null;
   idempotency_key: string;
   created_at: string;
   sent_at?: string | null;
+  cancelled_at?: string | null;
 }
 
 export interface RfqLine {
@@ -30,6 +32,9 @@ export interface RfqLine {
 }
 
 export interface RfqRecipient {
+  failure_reason?: 'delivery_error' | 'missing_contact_email' | null;
+  send_attempts?: number;
+  last_attempt_at?: string | null;
   id: string;
   tenant_id: string;
   rfq_id: string;
@@ -41,6 +46,18 @@ export interface RfqRecipient {
   supplier_name?: string | null;
   supplier_contact_email?: string | null;
   response_count?: number;
+  reminder_count?: number;
+  last_reminder_at?: string | null;
+  can_remind?: boolean;
+  remind_blocked_reason?: string | null;
+}
+
+export interface RfqReminderPreview {
+  subject: string;
+  body_text: string;
+  locale: string;
+  allowed: boolean;
+  blocked_reason: string | null;
 }
 
 export interface RfqDetail {
@@ -144,12 +161,14 @@ export interface RfqResponseComparisonList {
 }
 
 export interface RfqSummary {
+  reference_number?: number;
   id: string;
   created_by_membership_id: string;
-  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted';
+  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted' | 'cancelled';
   needed_by_date: string;
   created_at: string;
   sent_at: string | null;
+  cancelled_at?: string | null;
   recipient_count: number;
   response_count: number;
   converted_purchase_request_id: string | null;
@@ -180,6 +199,13 @@ export class RfqApi {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiBaseUrl}/rfq`;
 
+  cancelRfq(rfqId: string, idempotencyKey?: string): Observable<Rfq> {
+    const headers = new HttpHeaders({
+      'Idempotency-Key': idempotencyKey ?? crypto.randomUUID(),
+    });
+    return this.http.post<Rfq>(`${this.baseUrl}/${rfqId}/cancel`, null, { headers });
+  }
+
   createRfq(payload: RfqCreatePayload, idempotencyKey?: string): Observable<RfqCreateResponse> {
     const headers = new HttpHeaders({
       'Idempotency-Key': idempotencyKey ?? crypto.randomUUID(),
@@ -209,6 +235,21 @@ export class RfqApi {
     return this.http.get<RfqResponseComparisonList>(`${this.baseUrl}/${rfqId}/responses`);
   }
 
+  previewReminder(rfqId: string, recipientId: string): Observable<RfqReminderPreview> {
+    return this.http.get<RfqReminderPreview>(
+      `${this.baseUrl}/${rfqId}/recipients/${recipientId}/reminder-preview`,
+    );
+  }
+
+  sendReminder(rfqId: string, recipientId: string, idempotencyKey?: string): Observable<RfqRecipient> {
+    const headers = new HttpHeaders({
+      'Idempotency-Key': idempotencyKey ?? crypto.randomUUID(),
+    });
+    return this.http.post<RfqRecipient>(
+      `${this.baseUrl}/${rfqId}/recipients/${recipientId}/reminder`, null, { headers },
+    );
+  }
+
   prepareRequest(rfqId: string, payload: PrepareRequestPayload, idempotencyKey?: string): Observable<PrepareRequestResponse> {
     const headers = new HttpHeaders({ 'Idempotency-Key': idempotencyKey ?? crypto.randomUUID() });
     return this.http.post<PrepareRequestResponse>(
@@ -223,8 +264,10 @@ export class RfqApi {
     return this.http.post<BasketSplitJob>(`${this.baseUrl}/${rfqId}/split`, {}, { headers });
   }
 
-  listRfqs(status?: string, cursor?: string, limit?: number): Observable<RfqList> {
+  listRfqs(status?: string, cursor?: string, limit?: number, q?: string, sort?: string): Observable<RfqList> {
     let params = new HttpParams();
+    if (q?.trim()) params = params.set('q', q.trim());
+    if (sort && sort !== 'created_desc') params = params.set('sort', sort);
     if (status) params = params.set('status', status);
     if (cursor) params = params.set('cursor', cursor);
     if (limit) params = params.set('limit', limit.toString());
@@ -245,16 +288,23 @@ export class RfqApi {
   }
 }
 
-/** Component-local keys survive ambiguous failures until the logical action resolves. */
+/**
+ * Component-local keys survive ambiguous failures until the logical action resolves.
+ *
+ * A key is only reused for the payload it was created for: the server answers a repeated key with
+ * the result it stored the first time and ignores a changed body, so an edited payload must start a
+ * new operation. Pass a fingerprint of the request body (e.g. its JSON) for actions that have one.
+ */
 export class RfqActionKeys {
-  private readonly keys = new Map<string, string>();
+  private readonly keys = new Map<string, { key: string; fingerprint: string | undefined }>();
 
-  get(action: string): string {
-    let key = this.keys.get(action);
-    if (!key) {
-      key = crypto.randomUUID();
-      this.keys.set(action, key);
+  get(action: string, fingerprint?: string): string {
+    const current = this.keys.get(action);
+    if (current && (fingerprint === undefined || current.fingerprint === fingerprint)) {
+      return current.key;
     }
+    const key = crypto.randomUUID();
+    this.keys.set(action, { key, fingerprint });
     return key;
   }
 
@@ -267,4 +317,9 @@ export class RfqActionKeys {
       this.clear(action);
     }
   }
+}
+
+/** Stable display identifier; older API deployments may omit the number. */
+export function formatRfqReference(n: number | null | undefined): string {
+  return n == null ? '' : `RFQ-${String(n).padStart(6, '0')}`;
 }

@@ -152,7 +152,7 @@ def test_decision_records_one_audit_and_retry_conflicts(
         assert retry.json()["details"] == {"reason": "not_submitted"}
     statuses, audits, notifications = state(conn, rid)
     decision = "approved" if action == "approve" else "rejected"
-    assert statuses == ("ordered" if action == "approve" else "rejected", decision, comment)
+    assert statuses == ("approved" if action == "approve" else "rejected", decision, comment)
     assert audits == [
         (
             f"requests.approval_step_{decision}",
@@ -161,6 +161,7 @@ def test_decision_records_one_audit_and_retry_conflicts(
                 "approval_step_id": str(sid),
                 "decided_by_membership_id": str(ws.membership_id),
                 "comment": comment,
+                "self_approved": True,
             },
         )
     ]
@@ -218,6 +219,6 @@ def test_response_read_failure_leaves_committed_decision_audited(
         response = client.post(f"/api/v1/requests/{rid}/approve", json={})
         assert response.status_code == 500, response.text
     statuses, audits, notifications = state(conn, rid)
-    assert statuses == ("ordered", "approved", None)
+    assert statuses == ("approved", "approved", None)
     assert len(audits) == len(notifications) == 1
     assert "comment" not in audits[0][1]

@@ -80,6 +80,7 @@ export interface DeliveryReceiptLine {
   id: string;
   purchase_order_line_id: string;
   received_quantity: string;
+  note?: string | null;
 }
 
 export interface DeliveryReceipt {
@@ -124,6 +125,8 @@ export interface OrderEvidenceProjection {
   confirmation: SupplierConfirmation | null;
   receipts: DeliveryReceipt[];
   lifecycle: LifecycleSummary;
+  /** The basket split the order's request was prepared from, when it came from one. */
+  source_split_job_id?: string | null;
 }
 
 export interface PurchaseOrderList {
@@ -163,6 +166,7 @@ export interface DeliveryReceiptCreate {
   lines: {
     purchase_order_line_id: string;
     received_quantity: string;
+    note?: string;
   }[];
 }
 
@@ -300,6 +304,20 @@ export class OrdersApiService {
       ? new HttpHeaders({ 'Idempotency-Key': idempotencyKey })
       : this.idempotencyHeaders();
     return this.http.put<PurchaseOrder>(`${this.base}/orders/${encodeURIComponent(orderId)}`, payload, { headers });
+  }
+
+  withdrawOrder(orderId: string, idempotencyKey?: string): Observable<PurchaseOrder> {
+    const headers = idempotencyKey
+      ? new HttpHeaders({ 'Idempotency-Key': idempotencyKey })
+      : this.idempotencyHeaders();
+    return this.http.post<PurchaseOrder>(`${this.base}/orders/${encodeURIComponent(orderId)}/withdraw`, {}, { headers });
+  }
+
+  closeOrder(orderId: string, idempotencyKey?: string): Observable<PurchaseOrder> {
+    const headers = idempotencyKey
+      ? new HttpHeaders({ 'Idempotency-Key': idempotencyKey })
+      : this.idempotencyHeaders();
+    return this.http.post<PurchaseOrder>(`${this.base}/orders/${encodeURIComponent(orderId)}/close`, {}, { headers });
   }
 
   cancelOrder(orderId: string, idempotencyKey?: string): Observable<PurchaseOrder> {

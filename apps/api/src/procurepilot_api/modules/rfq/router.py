@@ -26,6 +26,7 @@ from procurepilot_api.modules.rfq.schemas import (
     RfqPrepareRequestInput,
     RfqPrepareRequestResponse,
     RfqRecipient,
+    RfqReminderPreview,
     RfqResponseComparisonList,
 )
 from procurepilot_api.modules.rfq.service import RfqService, get_rfq_service
@@ -81,12 +82,16 @@ def list_rfqs(
     status: str | None = None,
     cursor: str | None = None,
     limit: int = 50,
+    q: str | None = None,
+    sort: str = "created_desc",
 ) -> RfqList:
     return service.list_rfqs(
         member=member,
         status=status,
         cursor=cursor,
         limit=limit,
+        q=q,
+        sort=sort,
     )
 
 
@@ -219,6 +224,51 @@ def send_rfq(
         idempotency_key=idempotency_key,
     )
     return RfqSendResponse(rfq=rfq, recipients=recipients)
+
+
+@router.get(
+    "/{rfq_id}/recipients/{recipient_id}/reminder-preview",
+    status_code=status.HTTP_200_OK,
+    response_model=RfqReminderPreview,
+    operation_id="getRfqReminderPreview",
+)
+def get_reminder_preview(
+    rfq_id: uuid.UUID,
+    recipient_id: uuid.UUID,
+    member: Annotated[CurrentMember, Depends(require_role(*RFQ_WRITE_ROLES))],
+    service: Annotated[RfqService, Depends(get_rfq_service)],
+) -> RfqReminderPreview:
+    return service.get_reminder_preview(
+        member=member,
+        rfq_id=rfq_id,
+        recipient_id=recipient_id,
+    )
+
+
+@router.post(
+    "/{rfq_id}/recipients/{recipient_id}/reminder",
+    status_code=status.HTTP_200_OK,
+    response_model=RfqRecipient,
+    operation_id="sendRfqReminder",
+)
+@mutation_limiter.limit(_rfq_send_limit)
+def send_reminder(
+    request: Request,
+    rfq_id: uuid.UUID,
+    recipient_id: uuid.UUID,
+    member: Annotated[CurrentMember, Depends(require_role(*RFQ_WRITE_ROLES))],
+    service: Annotated[RfqService, Depends(get_rfq_service)],
+    idempotency_key: Annotated[uuid.UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> RfqRecipient:
+    if idempotency_key is None:
+        raise UnprocessableEntityError(details={"header": "Idempotency-Key is required"})
+
+    return service.send_reminder(
+        member=member,
+        rfq_id=rfq_id,
+        recipient_id=recipient_id,
+        idempotency_key=idempotency_key,
+    )
 
 
 @router.get(

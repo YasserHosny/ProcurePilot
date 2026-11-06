@@ -181,7 +181,7 @@ def _seed_orders(context: object, product_ids: list) -> None:
                           (id, tenant_id, order_number, supplier_id, status, order_date,
                            expected_delivery_date, total_amount, total_currency, tax_amount,
                            tax_currency, source_reference, created_by)
-                        values (%s, %s, %s, %s, 'received', %s, %s, 10, 'GBP', 0,
+                        values (%s, %s, %s, %s, 'draft', %s, %s, 10, 'GBP', 0,
                                 'GBP', %s, %s)
                         """,
                         (
@@ -211,6 +211,13 @@ def _seed_orders(context: object, product_ids: list) -> None:
                             order_id,
                             product_ids[order_index % len(product_ids)],
                         ),
+                    )
+                    # Lines are only written while the order is a draft; move it on afterwards.
+                    cur.execute(
+                        "update purchase_order set status = 'submitted' where id = %s", (order_id,)
+                    )
+                    cur.execute(
+                        "update purchase_order set status = 'received' where id = %s", (order_id,)
                     )
         conn.commit()
 
@@ -315,10 +322,15 @@ def _seed_service_risk_rows(context: object) -> None:
                     context.workspace.membership_id,
                 ),
             )
+            # A received order's header is frozen; link the request with the guard off.
+            cur.execute("reset role")
+            cur.execute("alter table purchase_order disable trigger purchase_order_lifecycle_guard")
             cur.execute(
                 "update purchase_order set source_request_id = %s where id = %s",
                 (request_id, order_ids[3]),
             )
+            cur.execute("alter table purchase_order enable trigger purchase_order_lifecycle_guard")
+            act_as(cur, context.workspace)
             cur.execute(
                 """
                 insert into delivery_quality_issue

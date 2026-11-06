@@ -10,6 +10,8 @@ import type {
   AlertKind,
   Alias,
   ApprovalDecisionInput,
+  BulkApprovalDecisionInput,
+  BulkApprovalDecisionResponse,
   ApprovalDelegation,
   ApprovalDelegationCreate,
   ApprovalDelegationList,
@@ -17,6 +19,7 @@ import type {
   BaseUnit,
   BasketOptimiseRequest,
   BasketSplitJob,
+  BasketSplitJobList,
   BillingAccount,
   Branch,
   BranchCreate,
@@ -46,7 +49,9 @@ import type {
   Job,
   LandedCost,
   LimitCheck,
+  MatchCandidate,
   MatchDecision,
+  MatchDecisionHistory,
   MatchResolutionRequest,
   MatchCorrectionRequest,
   MatchCorrectionResponse,
@@ -59,6 +64,8 @@ import type {
   Member,
   Offer,
   OfferComparison,
+  PendingApprovalList,
+  PendingApprovalSort,
   PresignRequest,
   PresignResponse,
   PriceHistoryResponse,
@@ -82,8 +89,8 @@ import type {
   QuotationMatches,
   QuotationReviewPatch,
   ReviewTask,
+  ReviewTaskFilters,
   ReviewTaskPriority,
-  ReviewTaskStatus,
   Role,
   SavingEvidence,
   SavingList,
@@ -578,22 +585,17 @@ export class ApiService {
     return this.http.get<Job>(`${this.base}/jobs/${jobId}`);
   }
 
-  getReviewTasks(params?: {
-    cursor?: string;
-    limit?: number;
-    status?: ReviewTaskStatus | 'all';
-    priority?: ReviewTaskPriority;
-    search?: string;
-    date_from?: string;
-    date_to?: string;
-    sort_by?: 'created_at' | 'stated_total' | 'priority' | 'status';
-    sort_order?: 'asc' | 'desc';
-  }): Observable<{ items: ReviewTask[]; next_cursor: string | null }> {
+  getReviewTasks(
+    params?: ReviewTaskFilters,
+  ): Observable<{ items: ReviewTask[]; next_cursor: string | null }> {
     const query = new URLSearchParams();
     if (params?.cursor) query.set('cursor', params.cursor);
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.status) query.set('status', params.status);
     if (params?.priority) query.set('priority', params.priority);
+    if (params?.supplier_id) query.set('supplier_id', params.supplier_id);
+    if (params?.reason) query.set('reason', params.reason);
+    if (params?.quotation_status) query.set('quotation_status', params.quotation_status);
     if (params?.search) query.set('search', params.search);
     if (params?.date_from) query.set('date_from', params.date_from);
     if (params?.date_to) query.set('date_to', params.date_to);
@@ -627,7 +629,7 @@ export class ApiService {
     date_to?: string;
     sort_by?: 'created_at' | 'priority' | 'status';
     sort_order?: 'asc' | 'desc';
-  }): Observable<{ items: MatchQueueItem[]; next_cursor: string | null }> {
+  }): Observable<{ items: MatchQueueItem[]; next_cursor: string | null; rfq_id?: string | null }> {
     const query = new URLSearchParams();
     if (params?.cursor) query.set('cursor', params.cursor);
     if (params?.limit) query.set('limit', String(params.limit));
@@ -641,7 +643,7 @@ export class ApiService {
     if (params?.sort_by) query.set('sort_by', params.sort_by);
     if (params?.sort_order) query.set('sort_order', params.sort_order);
     const qs = query.toString() ? `?${query.toString()}` : '';
-    return this.http.get<{ items: MatchQueueItem[]; next_cursor: string | null }>(
+    return this.http.get<{ items: MatchQueueItem[]; next_cursor: string | null; rfq_id?: string | null }>(
       `${this.base}/match-tasks${qs}`,
     );
   }
@@ -718,6 +720,17 @@ export class ApiService {
       `${this.base}/quotation-lines/${lineId}/match`,
       body,
       { headers },
+    );
+  }
+
+  getDecisionHistory(lineId: string): Observable<MatchDecisionHistory> {
+    return this.http.get<MatchDecisionHistory>(`${this.base}/quotation-lines/${lineId}/match/history`);
+  }
+
+  addManualCandidate(lineId: string, productId: string): Observable<MatchCandidate> {
+    return this.http.post<MatchCandidate>(
+      `${this.base}/quotation-lines/${lineId}/match-candidates/manual`,
+      { product_id: productId },
     );
   }
 
@@ -800,6 +813,14 @@ export class ApiService {
   ): Observable<BasketSplitJob> {
     const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
     return this.http.post<BasketSplitJob>(`${this.base}/baskets/optimise`, body, { headers });
+  }
+
+  listBasketSplitJobs(params?: { cursor?: string; limit?: number }): Observable<BasketSplitJobList> {
+    const query = new URLSearchParams();
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit) query.set('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<BasketSplitJobList>(`${this.base}/baskets${qs}`);
   }
 
   getBasketSplitJob(id: string): Observable<BasketSplitJob> {
@@ -1030,6 +1051,9 @@ export class ApiService {
     cursor?: string;
     limit?: number;
     eligible_for_order?: boolean;
+    q?: string;
+    sort?: import('../../features/requests/requests-api').PurchaseRequestSort;
+    mine?: boolean;
   }): Observable<PurchaseRequestList> {
     const query = new URLSearchParams();
     if (params?.status) query.set('status', params.status);
@@ -1037,6 +1061,9 @@ export class ApiService {
     if (params?.cursor) query.set('cursor', params.cursor);
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
     if (params?.eligible_for_order) query.set('eligible_for_order', 'true');
+    if (params?.q?.trim()) query.set('q', params.q.trim());
+    if (params?.sort && params.sort !== 'created_desc') query.set('sort', params.sort);
+    if (params?.mine) query.set('mine', 'true');
     const qs = query.toString() ? `?${query.toString()}` : '';
     return this.http.get<PurchaseRequestList>(`${this.base}/requests${qs}`);
   }
@@ -1078,15 +1105,19 @@ export class ApiService {
   approveRequest(
     requestId: string,
     body: ApprovalDecisionInput,
+    idempotencyKey?: string,
   ): Observable<PurchaseRequest> {
-    return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/approve`, body);
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/approve`, body, { headers });
   }
 
   rejectRequest(
     requestId: string,
     body: ApprovalDecisionInput,
+    idempotencyKey?: string,
   ): Observable<PurchaseRequest> {
-    return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/reject`, body);
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/reject`, body, { headers });
   }
 
   submitGroup(groupId: string, idempotencyKey?: string): Observable<PurchaseRequest[]> {
@@ -1133,15 +1164,25 @@ export class ApiService {
     );
   }
 
+  bulkDecide(body: BulkApprovalDecisionInput, idempotencyKey: string): Observable<BulkApprovalDecisionResponse> {
+    return this.http.post<BulkApprovalDecisionResponse>(`${this.base}/approvals/bulk-decisions`, body, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+  }
+
   listPendingApprovals(params?: {
+    sort?: PendingApprovalSort;
+    branch_id?: string;
     cursor?: string;
     limit?: number;
-  }): Observable<PurchaseRequestList> {
+  }): Observable<PendingApprovalList> {
     const query = new URLSearchParams();
+    if (params?.sort) query.set('sort', params.sort);
+    if (params?.branch_id) query.set('branch_id', params.branch_id);
     if (params?.cursor) query.set('cursor', params.cursor);
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
     const qs = query.toString() ? `?${query.toString()}` : '';
-    return this.http.get<PurchaseRequestList>(`${this.base}/approvals/pending${qs}`);
+    return this.http.get<PendingApprovalList>(`${this.base}/approvals/pending${qs}`);
   }
 
   listThresholdRules(params?: {

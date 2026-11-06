@@ -3,9 +3,10 @@
 ## R1 — Delivery lifecycle lives on `purchase_request` itself, not a new disconnected entity
 
 **Decision**: Extend `purchase_request.status` with two new terminal-adjacent states —
-`ordered` and `delivered` — reached only from `approved` (an approved request is implicitly
-"ordered" the moment a human decided to fulfil it; there is no separate "place the order" action in
-this feature's scope, matching spec.md's explicit exclusion of any new purchasing action). Add
+`ordered` and `delivered` — reached only from `approved`. **ADR-025 supersedes the original
+implicit-ordering decision**: approval now leaves the request `approved`; the first live purchase
+order moves it to `ordered`, and cancelling or detaching the last live order returns it to
+`approved`. Existing `ordered` rows are not backfilled. Add
 delivery-fact columns directly to `purchase_request` (or a 1:1 `purchase_request_delivery` table if
 the column count grows large enough to warrant it during implementation — a call left to
 data-model.md, not pre-decided here) rather than reusing or extending the existing, unrelated

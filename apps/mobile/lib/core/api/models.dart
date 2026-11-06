@@ -285,8 +285,10 @@ class ApprovalStep {
     this.comment,
     this.decidedByMembershipId,
     this.decidedAt,
+    this.selfApproval = false,
   });
 
+  final bool selfApproval;
   final String id;
   final String assignedMembershipId;
   final String? assignedName;
@@ -309,6 +311,7 @@ class ApprovalStep {
 
   factory ApprovalStep.fromJson(Map<String, dynamic> json) {
     return ApprovalStep(
+      selfApproval: json['self_approval'] == true,
       id: json['id'] as String,
       assignedMembershipId: json['assigned_membership_id'] as String,
       assignedName: json['assigned_name'] as String?,
@@ -324,6 +327,7 @@ class ApprovalStep {
   }
 
   Map<String, dynamic> toJson() => {
+        'self_approval': selfApproval,
         'id': id,
         'assigned_membership_id': assignedMembershipId,
         if (assignedName != null) 'assigned_name': assignedName,

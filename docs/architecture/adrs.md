@@ -422,3 +422,130 @@
 - **Consequences:** An enabled guardrail prepares a single request as soon as every reply is matched
   and converts the RFQ, so the split cannot be prepared on that RFQ. That is by design in 024's edge
   cases and is tracked as a product decision (W2, PPS-148).
+
+## ADR-024 — The Requester Does Not Approve Their Own Request, Except a Sole Owner, Who Is Marked
+
+- **Status:** Accepted (2026-11-03, owner decision on P-173 / PPS-167)
+- **Context:** Routing (`resolve_approver`) picks the approver from the threshold rules, then the
+  active delegation, then the owner. It never looks at who submitted the request, and
+  `_require_assigned_approver_or_owner` lets an owner decide any step. A requester who is the
+  matching approver, the delegate or the owner could therefore decide their own request, and
+  nothing in the queue or the audit trail said so.
+- **Options considered:**
+  1. Leave routing alone and rely on policy. Rejected: nothing enforces it and nothing shows it.
+  2. Change routing only. Rejected: the owner override would still let a requester decide their
+     own request.
+  3. Routing plus a decision-time rule, with a visible mark for the one case that cannot be avoided
+     (a workspace with a single active owner). Chosen.
+- **Decision:**
+  - **Routing.** After the threshold rule and the delegation are resolved, a step is not assigned
+    to the requester when someone else is eligible. A requester who is the matching approver is
+    replaced by an active owner other than the requester (source `owner_fallback`). A delegate who
+    is the requester is skipped and the step stays with the delegator. An owner who is the
+    requester is replaced by another active owner. The same rule applies to a split, which is
+    routed once for the group.
+  - **Decision.** A member cannot approve or reject a request they submitted, through either the
+    assigned-approver path or the owner override, unless they are the only active owner of the
+    workspace (`403 self_decision_not_allowed`). The rule covers a split decision too.
+  - **Mark.** A decision made by the requester is «self-approved». The mark is delivered in two
+    steps: this change ships the audit mark (`self_approved: true`) and the derived `self_approval`
+    flag in API responses (the requester is the assignee, or the decider); the queue and
+    request-page display (and a dedicated message for the 403 reason in the clients) ship in the
+    next web change tracked as P-173 part 2. No stored column is added: the flag is derived from the
+    step and the request, so there is no migration, and row-level security is unchanged.
+  - **Existing steps.** Pending steps created before this change keep their assignee. The
+    decision rule applies to them, so a requester-assigned step is decided by another owner or
+    approver unless the requester is the sole owner.
+- **Acceptance:**
+  - Submitting as the matching approver, as a delegate or as an owner assigns someone else when
+    one exists, for a single request and for a split.
+  - A sole owner's request is assigned to that owner, can be decided by them, and is marked.
+  - A requester with another eligible approver gets `403 self_decision_not_allowed` on approve,
+    reject and the split decisions; the other approver or owner can decide.
+  - The audit event carries `self_approved: true` and API responses carry `self_approval: true`
+    (the queue and request-page display, and dedicated client messaging for `self_decision_not_allowed`,
+    ship in part 2); a decision by someone else carries no mark.
+- **Consequences:** In a workspace with two owners, an owner's own requests go to the other owner.
+  In a one-owner workspace nothing changes except the mark. The owner override still exists for
+  requests the owner did not submit. The rule is application-layer routing and decision logic, so it
+  is tested at the service and API level, not in the database; it makes no change to tenant
+  isolation.
+
+## ADR-025 — An Approved Request Stays «Approved» Until a Purchase Order Exists
+
+- **Status:** Accepted (2026-11-04, owner decision on P-174 / PPS-168, confirmed 2026-11-03)
+- **Context:** Approving a request sets `purchase_request.status` to `ordered` (chunk R2.3, spec 010
+  R1), although no purchase order exists yet; creating a purchase order never touches the request.
+  The request page therefore shows «Ordered» next to «Approved» and still offers «Create purchase
+  order», the list shows «Ordered» for requests that have no order, and in Arabic the label reads as
+  «requested». The `approved` value already exists in `purchase_request_status`, and the order code
+  already accepts both `approved` and `ordered` as orderable.
+- **Options considered:**
+  1. Relabel «Ordered» in the clients while no order exists. Rejected: each client would derive the
+     meaning separately and filters, the phone and exports would still disagree.
+  2. Add a new status value. Rejected: `approved` is already in the enum.
+  3. Use `approved` for approved requests and move to `ordered` when an order exists. Chosen.
+- **Decision:**
+  - A single, keyed or split approval sets the request to `approved`. The approval step still
+    records `approved`; the request status now says the same.
+  - A request becomes `ordered` when its first live purchase order (any status except cancelled)
+    takes quantity from it, in the same transaction as the order change and under the existing
+    request advisory locks. It returns to `approved` when its last live order is cancelled.
+  - Unchanged: the orderable statuses (`approved`, `ordered`), delivery confirmation requiring
+    `ordered`, committed-spend statuses, the approval step, notifications.
+  - Withdrawal is allowed from `draft`, `submitted` and `approved`, and from `ordered` under the
+    rules it has today. A rejected request stays terminal.
+  - Clients show the request status as it is. «Create purchase order» is offered while the request is
+    `approved`, and for a legacy `ordered` request that has no live order.
+  - The Arabic label for `ordered` is reworded so it reads as «order placed», not «requested».
+- **Legacy data:** No migration and no backfill. Requests already `ordered` without an order keep
+  their status and still offer «Create purchase order» (the clients above). Moving them to `approved`
+  is a one-off data change that touches existing rows of every tenant, including demo tenants, so it
+  is left to an explicit operator decision and is not part of this change.
+- **Consequences:** The status says what is true at every step. Order creation and cancellation now
+  write the request status, so they must keep the request lock order they already use. Exports and
+  reports that group by status will show `approved` for newly approved requests until an order exists.
+  There is no schema change and nothing to apply to the hosted database.
+
+## ADR-026 — RFQ Lifecycle: Expiry Is Derived, Cancel Is Terminal, Reminders Are Manual
+
+- **Status:** Accepted (2026-11-02 audit P-142 / PPS-176; owner decisions 2026-11-03 to 2026-11-06)
+- **Context:** An RFQ had a status `expired` that nothing set, no way to withdraw one, and no
+  per-supplier reply state, so a sent RFQ whose needed-by date had passed still read «Sent» and a
+  supplier that had not answered looked the same as one that had.
+- **Options considered:**
+  1. A scheduled job that writes `expired`. Rejected: a second writer of the status, a lag between
+     the date passing and the row changing, and nothing to run it on demand in tests.
+  2. «Close» as a soft state that can be reopened. Rejected by the owner: «Cancel» says what happens
+     (nothing more is sent or prepared) and a reopen path would need its own rules.
+  3. Scheduled or automatic reminders. Rejected by the owner: a message to a supplier is always a
+     person's click (constitution: no autonomous purchasing, automation prepares and a human acts).
+- **Decision:**
+  - **Expiry is derived at read time.** The stored status stays `sent`; readers use the one SQL
+    fragment `_EFFECTIVE_STATUS_SQL` (`sent` with `needed_by_date < current_date` reads as `expired`).
+    `lock_rfq_for_preparation` returns the effective status, so prepare, split and the guardrail
+    path refuse an expired RFQ. Nothing writes `expired`.
+  - **Cancel is terminal.** `cancel_rfq(uuid)` (SECURITY DEFINER, pinned search path) sets `cancelled`
+    and `cancelled_at` for a draft, sent or responded RFQ, by an active owner or by the creating
+    buyer. It emails nobody; lines, recipients and received replies stay. Nothing can be sent, split
+    or prepared from a cancelled RFQ. A converted or already cancelled RFQ cannot be cancelled.
+  - **Owner can act.** An owner may send, retry and cancel a buyer's RFQ (`rfq_update` and
+    `rfq_recipient_update` admit the owner); a buyer acts on RFQs they created.
+  - **Per-supplier reply state.** Each recipient shows awaiting, replied or no reply; the list shows
+    the count of replies.
+  - **Reminders are manual, per supplier, and bounded.** An owner, or a buyer on their own RFQ, may
+    remind a supplier only while the RFQ is open (effective status `sent` or `responded`, needed-by
+    date not passed), the send succeeded, there is no reply, at least 24 hours have passed since
+    the RFQ was sent, 24 hours since the last reminder, and fewer than two reminders were sent. The
+    first failing rule is reported, in that order: `rfq_not_open`, `not_delivered`, `replied`,
+    `too_early`, `cooldown`, `limit_reached`. The person sees the exact email first; the send writes
+    an `rfq.reminder_sent` audit event and updates `reminder_count` / `last_reminder_at` in one
+    transaction; the subject is «Re: » plus the RFQ email's subject so mail clients group it, and
+    the message carries `In-Reply-To` / `References` of the original.
+  - **Send-then-commit is accepted.** The reminder email is sent before its counters commit. A crash
+    in that gap can allow one duplicate reminder; the owner chose to keep this (option A, 2026-11-06)
+    over record-then-send with compensation.
+- **Consequences:** The status a reader sees depends on the date, so every reader must use the shared
+  fragment and a stored `sent` is not by itself «open». `rfq.status` has one more value
+  (`cancelled`) that exports and reports must handle. Reminders add two columns to `rfq_recipient`
+  and one audit action; the rules above are enforced in the API, not by the database.

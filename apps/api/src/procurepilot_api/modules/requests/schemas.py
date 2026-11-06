@@ -4,11 +4,16 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator, model_validator
 
 type PurchaseRequestStatus = Literal[
     "draft", "submitted", "approved", "rejected", "withdrawn", "ordered", "delivered"
 ]
+type PurchaseRequestSort = Literal[
+    "created_desc", "created_asc", "required_by_asc", "required_by_desc", "total_desc", "total_asc"
+]
+
+
 # Terminal request states have no pending approval work; approved/ordered still progress.
 TERMINAL_REQUEST_STATUSES = ("withdrawn", "rejected", "delivered")
 
@@ -59,12 +64,20 @@ class PurchaseRequestLineInput(StrictApiModel):
     quantity: StrictStr = Field(pattern=r"^\d+(\.\d{1,6})?$")
     note: str | None = None
 
+    @field_validator("note")
+    @classmethod
+    def trim_note(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
+
 
 class ApprovalStep(BaseModel):
+    self_approval: bool = False
     id: UUID
     assigned_membership_id: UUID
     assigned_name: str | None = None
     assigned_email: str | None = None
+    decided_name: str | None = None
+    decided_email: str | None = None
     source: ApprovalStepSource
     status: ApprovalStepStatus
     comment: str | None = None
@@ -94,6 +107,12 @@ class RequestSource(BaseModel):
     supplier_name: str | None = None
 
 
+class RequestGroupSibling(BaseModel):
+    id: UUID
+    position: int
+    supplier_name: str | None = None
+
+
 class RequestGroupSummary(BaseModel):
     id: UUID
     rfq_id: UUID
@@ -103,6 +122,7 @@ class RequestGroupSummary(BaseModel):
     best_single_total: Money | None
     saving: Money | None
     sibling_request_ids: list[UUID]
+    siblings: list[RequestGroupSibling] = Field(default_factory=list)
 
 
 class PurchaseRequest(BaseModel):
@@ -152,8 +172,51 @@ class PurchaseRequestList(BaseModel):
     next_cursor: str | None = None
 
 
+PendingApprovalSort = Literal[
+    "submitted_desc", "submitted_asc", "required_by_asc", "total_desc", "total_asc"
+]
+
+
+class PendingApprovalList(BaseModel):
+    items: list[PurchaseRequest]
+    next_cursor: str | None = None
+    total: int = Field(ge=0)
+
+
 class ApprovalDecisionInput(StrictApiModel):
     comment: str | None = None
+
+
+class BulkApprovalDecisionInput(StrictApiModel):
+    decision: Literal["approved", "rejected"]
+    comment: str | None = Field(default=None, max_length=2000)
+    request_ids: list[UUID] = Field(min_length=1, max_length=25)
+
+    @field_validator("request_ids")
+    @classmethod
+    def unique_request_ids(cls, value: list[UUID]) -> list[UUID]:
+        if len(value) != len(set(value)):
+            raise ValueError("Request ids must be unique.")
+        return value
+
+    @model_validator(mode="after")
+    def rejection_requires_comment(self) -> BulkApprovalDecisionInput:
+        if self.decision == "rejected" and (self.comment is None or not self.comment.strip()):
+            raise ValueError("A rejection comment is required.")
+        return self
+
+
+class BulkApprovalDecisionResult(BaseModel):
+    request_id: UUID
+    outcome: Literal["decided", "failed"]
+    error_code: str | None = None
+    request: PurchaseRequest | None = None
+
+
+class BulkApprovalDecisionResponse(BaseModel):
+    results: list[BulkApprovalDecisionResult] = Field(min_length=1, max_length=25)
+    decided_count: int = Field(ge=0, le=25)
+    failed_count: int = Field(ge=0, le=25)
 
 
 class DeliveryConfirmationLineInput(StrictApiModel):

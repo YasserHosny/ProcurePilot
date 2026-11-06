@@ -1,10 +1,9 @@
-import { RfqActionKeys } from '../rfq-api';
 import { Component, OnInit, DestroyRef, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, forkJoin, of, catchError, tap, switchMap } from 'rxjs';
+import { Subject, forkJoin, of, catchError, tap, switchMap, finalize, take, from, concatMap, map, toArray } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
@@ -15,11 +14,11 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { RfqApi, RfqDetail, RfqRecipient } from '../rfq-api';
+import { formatRfqReference, RfqActionKeys, RfqApi, RfqDetail, RfqRecipient, RfqReminderPreview } from '../rfq-api';
 import { FormatService } from '../../../core/format/format.service';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
-import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
+import { CatalogueConfirmDialogComponent, ConfirmDialogData } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { CompareComponent } from '../compare/compare.component';
 import { isDateInPast } from '../history/history.component';
 
@@ -69,6 +68,7 @@ const TAB_NAMES = ['details', 'items', 'recipients', 'responses'] as const;
   styleUrl: './detail.component.scss',
 })
 export class DetailComponent implements OnInit {
+  readonly formatRfqReference = formatRfqReference;
   private readonly actionKeys = new RfqActionKeys();
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -90,10 +90,13 @@ export class DetailComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly selectedTabIndex = signal<number>(0);
   readonly currentMembershipId = signal<string | null>(null);
+  readonly cancelling = signal(false);
+
   readonly retrying = signal<boolean>(false);
+  readonly remindingAll = signal<boolean>(false);
 
   readonly displayedItemColumns = ['product', 'quantity'];
-  readonly displayedRecipientColumns = ['supplier', 'contactEmail', 'status', 'reply', 'sentAt'];
+  readonly displayedRecipientColumns = ['supplier', 'contactEmail', 'status', 'reply', 'sentAt', 'reminders'];
 
   constructor() {
     this.loadTrigger$.pipe(
@@ -142,11 +145,27 @@ export class DetailComponent implements OnInit {
     });
   }
 
-  ngOnInit(): void {
-    this.api.members().subscribe(({ items }) => {
-      const email = this.session.currentMember()?.email;
-      this.currentMembershipId.set(items.find((m) => m.email === email)?.id ?? null);
+  /**
+   * The viewer's own membership id comes from the session. The members list is owner-only (a buyer
+   * gets 403), so it is only a fallback for a session without the id.
+   */
+  private resolveMembershipId(): void {
+    const sessionMembershipId = this.session.currentMember()?.membership_id;
+    if (sessionMembershipId) {
+      this.currentMembershipId.set(sessionMembershipId);
+      return;
+    }
+    this.api.members().subscribe({
+      next: ({ items }) => {
+        const email = this.session.currentMember()?.email;
+        this.currentMembershipId.set(items.find((m) => m.email === email)?.id ?? null);
+      },
+      error: () => this.currentMembershipId.set(null),
     });
+  }
+
+  ngOnInit(): void {
+    this.resolveMembershipId();
 
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id');
@@ -244,6 +263,9 @@ export class DetailComponent implements OnInit {
       const timePart = this.formatTime(sentAt);
       return this.translate.instant('rfq.detail.breadcrumbRfqSent', { date: datePart, time: timePart });
     }
+    if (detail.rfq.status === 'cancelled') {
+      return this.translate.instant('rfq.detail.breadcrumbRfqCancelled');
+    }
     return this.translate.instant('rfq.detail.breadcrumbRfqDraft');
   }
 
@@ -259,6 +281,66 @@ export class DetailComponent implements OnInit {
     return this.formatService.formatDate(value, { timeStyle: 'short' });
   }
 
+  /** Any owner or buyer can start a new RFQ from this one, whatever its status. */
+  canDuplicate(): boolean {
+    return this.session.hasRole('owner', 'buyer');
+  }
+
+  canCancel(): boolean {
+    const rfq = this.rfqDetail()?.rfq;
+    return Boolean(rfq && ['draft', 'sent', 'responded', 'expired'].includes(rfq.status) &&
+      (this.session.hasRole('owner') || (this.session.hasRole('buyer') && this.isCreator())));
+  }
+
+  onCancelRfq(): void {
+    const id = this.rfqId();
+    if (!id || !this.canCancel() || this.cancelling()) return;
+    this.cancelling.set(true);
+    const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
+      width: '440px',
+      data: {
+        titleKey: 'rfq.cancel.title',
+        messageKey: 'rfq.cancel.message',
+        confirmKey: 'rfq.cancel.confirm',
+        cancelKey: 'rfq.cancel.keep',
+        isDestructive: true,
+      },
+    });
+    dialogRef.afterClosed().pipe(take(1), takeUntilDestroyed(this.destroyRef)).subscribe((confirmed: boolean | undefined) => {
+      if (!confirmed) {
+        this.cancelling.set(false);
+        return;
+      }
+      this.rfqApi.cancelRfq(id, this.actionKeys.get(`cancel:${id}`)).pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => { this.cancelling.set(false); }),
+      ).subscribe({
+        next: () => {
+          this.actionKeys.clear(`cancel:${id}`);
+          this.showCancelMessage('rfq.cancel.success');
+          this.loadRfq(id);
+        },
+        error: (err: unknown) => {
+          this.actionKeys.onError(`cancel:${id}`, err);
+          let key = 'rfq.cancel.error';
+          if (err instanceof HttpErrorResponse) {
+            if (err.status === 403 && err.error?.details?.reason === 'not_creator') {
+              key = 'rfq.cancel.notCreator';
+            } else if (err.status === 409) {
+              key = 'rfq.cancel.notCancellable';
+              this.loadRfq(id);
+            }
+          }
+          this.showCancelMessage(key);
+        },
+      });
+    });
+  }
+
+  private showCancelMessage(key: string): void {
+    this.snackBar.open(this.translate.instant(key), this.translate.instant('rfq.history.dismiss'), { duration: 5000 });
+  }
+
   getStatusClass(status: string): string {
     switch (status) {
       case 'draft': return 'status-draft';
@@ -266,6 +348,7 @@ export class DetailComponent implements OnInit {
       case 'responded': return 'status-responded';
       case 'expired': return 'status-expired';
       case 'converted': return 'status-converted';
+      case 'cancelled': return 'status-cancelled';
       default: return '';
     }
   }
@@ -303,7 +386,7 @@ export class DetailComponent implements OnInit {
       };
     }
 
-    if (recipient.status === 'sent' && (rfqStatus === 'expired' || rfqStatus === 'converted')) {
+    if (recipient.status === 'sent' && (rfqStatus === 'expired' || rfqStatus === 'converted' || rfqStatus === 'cancelled')) {
       return {
         status: 'no_reply',
         icon: 'close',
@@ -390,6 +473,240 @@ export class DetailComponent implements OnInit {
     return `${repliedPart} · ${overduePart}`;
   }
 
+  canSend(): boolean {
+    return this.isCreator() || this.session.hasRole('owner');
+  }
+
+  canRemindRecipient(recipient: RfqRecipient): boolean {
+    return this.canSend() && recipient.can_remind === true;
+  }
+
+  hasRemindableRecipients(): boolean {
+    return this.canSend() && (this.rfqDetail()?.recipients ?? []).some((r) => r.can_remind === true);
+  }
+
+  reminderBlockedText(recipient: RfqRecipient): string | null {
+    const reason = recipient.remind_blocked_reason;
+    if (reason !== 'too_early' && reason !== 'cooldown' && reason !== 'limit_reached') {
+      return null;
+    }
+    return this.translate.instant(this.reminderBlockedKeyFor(reason));
+  }
+
+  reminderHistoryText(recipient: RfqRecipient): string {
+    const count = recipient.reminder_count ?? 0;
+    const sent = this.translate.instant('rfq.detail.remindersSent', {
+      count: this.formatService.formatNumber(count),
+    });
+    if (!recipient.last_reminder_at) {
+      return sent;
+    }
+    return `${sent} · ${this.translate.instant('rfq.detail.lastReminderAt')} ` +
+      `${this.formatDate(recipient.last_reminder_at)} · ${this.formatTime(recipient.last_reminder_at)}`;
+  }
+
+  onRemindRecipient(recipient: RfqRecipient): void {
+    const id = this.rfqId();
+    if (!id || !this.canRemindRecipient(recipient)) return;
+
+    this.rfqApi.previewReminder(id, recipient.id).pipe(
+      take(1),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (preview) => this.openReminderPreview(id, recipient, preview),
+      error: () => this.showReminderMessage('rfq.detail.reminderPreviewError'),
+    });
+  }
+
+  private openReminderPreview(id: string, recipient: RfqRecipient, preview: RfqReminderPreview): void {
+    const blockedKey = this.reminderBlockedKeyFor(preview.blocked_reason);
+    const data: ConfirmDialogData = {
+      titleKey: 'rfq.detail.reminderPreviewTitle',
+      messageKey: 'rfq.detail.reminderPreviewMessage',
+      previewSubject: preview.subject,
+      previewBody: preview.body_text,
+      previewLocale: preview.locale,
+      showConfirm: preview.allowed,
+      confirmKey: 'rfq.detail.reminderSend',
+      cancelKey: 'rfq.detail.reminderCancel',
+      warningKey: preview.allowed ? undefined : (blockedKey ?? 'rfq.detail.reminderBlockedNotPermitted'),
+      isDestructive: false,
+    };
+
+    const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, { width: '560px', data });
+    dialogRef.afterClosed().pipe(take(1), takeUntilDestroyed(this.destroyRef)).subscribe((confirmed: boolean | undefined) => {
+      if (!confirmed || !preview.allowed) return;
+      this.sendReminder(id, recipient);
+    });
+  }
+
+  private sendReminder(id: string, recipient: RfqRecipient): void {
+    const action = `remind:${id}:${recipient.id}`;
+    this.rfqApi.sendReminder(id, recipient.id, this.actionKeys.get(action)).pipe(
+      take(1),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (updated) => {
+        this.actionKeys.clear(action);
+        this.applyRecipientUpdate(updated);
+        this.showReminderMessage('rfq.detail.reminderSent');
+      },
+      error: (err: unknown) => {
+        this.actionKeys.onError(action, err);
+        this.showReminderMessage(this.reminderErrorKey(err));
+      },
+    });
+  }
+
+  private applyRecipientUpdate(updated: RfqRecipient): void {
+    const detail = this.rfqDetail();
+    if (!detail) return;
+    this.rfqDetail.set({
+      ...detail,
+      recipients: detail.recipients.map((recipient) => (
+        recipient.id === updated.id ? { ...recipient, ...updated } : recipient
+      )),
+    });
+  }
+
+  onRemindAll(): void {
+    if (this.remindingAll() || !this.canSend()) return;
+    const id = this.rfqId();
+    const recipients = (this.rfqDetail()?.recipients ?? []).filter((r) => r.can_remind === true);
+    if (!id || recipients.length === 0) return;
+
+    const names = recipients.map((recipient) => (
+      recipient.supplier_name || this.translate.instant('rfq.detail.unknownSupplier')
+    ));
+    const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
+      width: '520px',
+      data: {
+        titleKey: 'rfq.detail.remindAllConfirmTitle',
+        messageKey: 'rfq.detail.remindAllConfirmMessage',
+        messageParams: { count: recipients.length },
+        count: recipients.length,
+        listItems: names,
+        confirmKey: 'rfq.detail.remindAllConfirmButton',
+        cancelKey: 'rfq.detail.reminderCancel',
+        isDestructive: false,
+      } satisfies ConfirmDialogData,
+    });
+
+    dialogRef.afterClosed().pipe(take(1), takeUntilDestroyed(this.destroyRef)).subscribe((confirmed: boolean | undefined) => {
+      if (!confirmed) return;
+      this.remindingAll.set(true);
+
+      const sendOne = (recipient: RfqRecipient) => {
+        const action = `remind:${id}:${recipient.id}`;
+        return this.rfqApi.sendReminder(id, recipient.id, this.actionKeys.get(action)).pipe(
+          tap(() => this.actionKeys.clear(action)),
+          map(() => true),
+          catchError((error: unknown) => {
+            this.actionKeys.onError(action, error);
+            return of(false);
+          }),
+        );
+      };
+
+      from(recipients).pipe(
+        concatMap(sendOne),
+        toArray(),
+        finalize(() => this.remindingAll.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      ).subscribe((results) => {
+        const sent = results.filter((ok) => ok).length;
+        const failed = results.length - sent;
+        this.showReminderMessage('rfq.detail.remindAllResult', { sent, failed });
+        this.loadRfq(id);
+      });
+    });
+  }
+
+  neededInDays(): number | null {
+    const detail = this.rfqDetail();
+    if (!detail) return null;
+    const { status, needed_by_date } = detail.rfq;
+    if (status !== 'sent' && status !== 'responded') return null;
+    const days = this.calendarDaysUntil(needed_by_date);
+    if (days === null || days < 0 || days > 2) return null;
+    const recipients = detail.recipients ?? [];
+    if (!recipients.some((recipient) => (recipient.response_count ?? 0) === 0)) return null;
+    return days;
+  }
+
+  neededHintText(): string {
+    const days = this.neededInDays();
+    if (days === null) return '';
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(days);
+    const params = { count: this.formatService.formatNumber(days) };
+    const key = `rfq.detail.neededInDays.${category}`;
+    const translated = this.translate.instant(key, params);
+    if (translated && translated !== key) {
+      return translated;
+    }
+    return this.translate.instant('rfq.detail.neededInDaysTitle', params);
+  }
+
+  private calendarDaysUntil(value: string | null | undefined): number | null {
+    if (!value) return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    const target = match
+      ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+      : new Date(value);
+    if (Number.isNaN(target.getTime())) return null;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+  }
+
+  private reminderBlockedKeyFor(reason: string | null | undefined): string {
+    switch (reason) {
+      case 'rfq_not_open': return 'rfq.detail.reminderBlockedRfqNotOpen';
+      case 'not_delivered': return 'rfq.detail.reminderBlockedNotDelivered';
+      case 'replied': return 'rfq.detail.reminderBlockedReplied';
+      case 'too_early': return 'rfq.detail.reminderBlockedTooEarly';
+      case 'cooldown': return 'rfq.detail.reminderBlockedCooldown';
+      case 'limit_reached': return 'rfq.detail.reminderBlockedLimitReached';
+      case 'not_permitted': return 'rfq.detail.reminderBlockedNotPermitted';
+      default: return 'rfq.detail.reminderSendError';
+    }
+  }
+
+  private reminderErrorKey(error: unknown): string {
+    if (error instanceof HttpErrorResponse) {
+      if (error.status === 503) {
+        return 'rfq.detail.reminderDeliveryFailed';
+      }
+      if (error.status === 422) {
+        const envelope = error.error as { details?: { reason?: string }; reason?: string } | null;
+        const reason = envelope?.details?.reason ?? envelope?.reason;
+        return this.reminderBlockedKeyFor(reason);
+      }
+      if (error.status === 403) {
+        return 'rfq.detail.reminderBlockedNotPermitted';
+      }
+    }
+    return 'rfq.detail.reminderSendError';
+  }
+
+  private showReminderMessage(key: string, params?: Record<string, unknown>): void {
+    this.snackBar.open(
+      this.translate.instant(key, params),
+      this.translate.instant('rfq.history.dismiss'),
+      { duration: 5000 },
+    );
+  }
+
+  sendAttemptsText(recipient: RfqRecipient): string {
+    const count = recipient.send_attempts ?? 0;
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    return this.translate.instant(`rfq.detail.sendAttempts.${category}`, {
+      count: this.formatService.formatNumber(count),
+    });
+  }
+
   isCreator(): boolean {
     return this.rfqDetail()?.rfq.created_by_membership_id === this.currentMembershipId();
   }
@@ -401,7 +718,7 @@ export class DetailComponent implements OnInit {
 
   showRetryNotice(): boolean {
     const status = this.rfqDetail()?.rfq.status;
-    return (status === 'sent' || status === 'responded') && this.isCreator() && this.unsentRecipients().length > 0;
+    return (status === 'sent' || status === 'responded') && this.canSend() && this.unsentRecipients().length > 0;
   }
 
   unsentRecipientsTitle(): string {
@@ -418,7 +735,7 @@ export class DetailComponent implements OnInit {
   }
 
   onRetryUnsent(): void {
-    if (this.retrying() || !this.isCreator()) return;
+    if (this.retrying() || !this.canSend()) return;
     const detail = this.rfqDetail();
     const id = this.rfqId();
     if (!id || !detail) return;
@@ -491,7 +808,7 @@ export class DetailComponent implements OnInit {
 
   onSendDraft(): void {
     if (this.retrying()) return;
-    if (!this.isCreator()) return;
+    if (!this.canSend()) return;
     const detail = this.rfqDetail();
     const id = this.rfqId();
     if (!id) return;

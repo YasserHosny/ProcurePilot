@@ -1,0 +1,18 @@
+<h2 mat-dialog-title>{{ data.title }}</h2>
+<mat-dialog-content>
+  <ul [attr.aria-label]="'approvals.bulk.totals' | translate">
+    @for (total of data.totals; track total.currency) { <li class="pp-figures">{{ money(total) }}</li> }
+  </ul>
+  @if (data.incomplete) { <p>{{ 'approvals.bulk.incomplete' | translate }}</p> }
+  @if (data.decision === 'rejected') {
+    <mat-form-field appearance="outline">
+      <mat-label>{{ 'approvals.bulk.comment' | translate }}</mat-label>
+      <textarea matInput required maxlength="2000" rows="3" [ngModel]="comment()" (ngModelChange)="comment.set($event)" (keydown.control.enter)="confirm()" (keydown.meta.enter)="confirm()"></textarea>
+      <mat-hint>{{ 'approvals.bulk.commentHint' | translate }}</mat-hint>
+    </mat-form-field>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()">{{ 'approvals.bulk.cancel' | translate }}</button>
+  <button mat-flat-button type="button" [disabled]="invalid()" (click)="confirm()">{{ (data.decision === 'approved' ? 'approvals.bulk.approve' : 'approvals.bulk.reject') | translate }}</button>
+</mat-dialog-actions>

@@ -9,7 +9,7 @@
 
     <!-- Line being corrected -->
     <div class="line-summary-banner">
-      <span class="line-badge">#{{ data.line.line_number }}</span>
+      <span class="line-badge">#{{ data.line.line_number | formatQuantity }}</span>
       <span class="line-text">{{ data.line.original_text }}</span>
     </div>
 
@@ -18,7 +18,7 @@
       <h3 class="section-title" id="candidates-title">{{ 'matching.resolution.correction.candidatesTitle' | translate }}</h3>
 
       <div class="candidates-list" role="radiogroup" aria-labelledby="candidates-title">
-        @for (cand of data.candidates; track cand.id) {
+        @for (cand of allCandidates(); track cand.id) {
           <label
             class="dialog-candidate-item"
             [class.selected]="selectedOutcome() === 'same_product' && selectedCandidateId() === cand.id"
@@ -33,17 +33,23 @@
             />
             <div class="cand-row-content">
               <div class="cand-row-header">
-                <span class="cand-rank">#{{ cand.rank }}</span>
+                @if (!cand.reasons.manual) {
+                  <span class="cand-rank">#{{ cand.rank | formatQuantity }}</span>
+                }
                 <strong class="cand-name">{{ cand.candidate_product.tenant_name }}</strong>
-                <div
-                  class="cand-score-badge"
-                  [class.high]="formatScore(cand.confidence) >= 90"
-                  [class.medium]="(formatScore(cand.confidence) >= 70 && formatScore(cand.confidence) < 90) || isRfqCandidate(cand)"
-                  [class.low]="formatScore(cand.confidence) < 70 && !isRfqCandidate(cand)"
-                  [class.rfq-info]="isRfqCandidate(cand)"
-                >
-                  {{ formatScore(cand.confidence) }}%
-                </div>
+                @if (cand.reasons.manual) {
+                  <div class="cand-score-badge medium">{{ 'matching.resolution.picker.manualBadge' | translate }}</div>
+                } @else {
+                  <div
+                    class="cand-score-badge"
+                    [class.high]="formatScore(cand.confidence) >= 90"
+                    [class.medium]="(formatScore(cand.confidence) >= 70 && formatScore(cand.confidence) < 90) || isRfqCandidate(cand)"
+                    [class.low]="formatScore(cand.confidence) < 70 && !isRfqCandidate(cand)"
+                    [class.rfq-info]="isRfqCandidate(cand)"
+                  >
+                    {{ formatScore(cand.confidence) | formatPercent }}
+                  </div>
+                }
               </div>
 
               <!-- RFQ Badges -->
@@ -102,6 +108,7 @@
           </div>
         </label>
       </div>
+      <app-product-picker [lineId]="data.line.id" (picked)="onManualCandidate($event)" />
     </section>
 
     <!-- New product form when selected -->
@@ -110,6 +117,12 @@
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>{{ 'matching.resolution.newProduct.tenantNameLabel' | translate }}</mat-label>
           <input matInput formControlName="tenant_name" required />
+          @if (productForm.get('tenant_name')?.hasError('required') && productForm.get('tenant_name')?.touched) {
+            <mat-error>{{ 'matching.resolution.newProduct.tenantNameRequired' | translate }}</mat-error>
+          }
+          @if (productForm.get('tenant_name')?.hasError('maxlength')) {
+            <mat-error>{{ 'matching.resolution.newProduct.tenantNameMaxLength' | translate }}</mat-error>
+          }
         </mat-form-field>
 
         <div class="form-row">
@@ -132,16 +145,31 @@
                 <mat-option [value]="unit.code">{{ unit.code | unitLabel }}</mat-option>
               }
             </mat-select>
+            @if (productForm.get('base_unit')?.hasError('required') && productForm.get('base_unit')?.touched) {
+              <mat-error>{{ 'matching.resolution.newProduct.baseUnitRequired' | translate }}</mat-error>
+            }
           </mat-form-field>
 
           <mat-form-field appearance="outline">
             <mat-label>{{ 'matching.resolution.newProduct.packCountLabel' | translate }}</mat-label>
             <input matInput type="number" formControlName="pack_count" min="1" required />
+            @if (productForm.get('pack_count')?.hasError('required') && productForm.get('pack_count')?.touched) {
+              <mat-error>{{ 'matching.resolution.newProduct.packCountRequired' | translate }}</mat-error>
+            }
+            @if (productForm.get('pack_count')?.hasError('min')) {
+              <mat-error>{{ 'matching.resolution.newProduct.packCountMin' | translate }}</mat-error>
+            }
           </mat-form-field>
 
           <mat-form-field appearance="outline">
             <mat-label>{{ 'matching.resolution.newProduct.unitSizeLabel' | translate }}</mat-label>
             <input matInput formControlName="unit_size" required />
+            @if (productForm.get('unit_size')?.hasError('required') && productForm.get('unit_size')?.touched) {
+              <mat-error>{{ 'matching.resolution.newProduct.unitSizeRequired' | translate }}</mat-error>
+            }
+            @if (productForm.get('unit_size')?.hasError('pattern') && productForm.get('unit_size')?.touched) {
+              <mat-error>{{ 'matching.resolution.newProduct.unitSizePositive' | translate }}</mat-error>
+            }
           </mat-form-field>
         </div>
       </form>
@@ -172,7 +200,7 @@
       type="button"
       class="confirm-correction-btn"
       (click)="onConfirm()"
-      [disabled]="selectedOutcome() === 'same_product' && !selectedCandidateId()"
+      [disabled]="!canSave()"
     >
       {{ 'matching.resolution.correction.submit' | translate }}
     </button>

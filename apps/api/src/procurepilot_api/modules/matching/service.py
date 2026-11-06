@@ -33,6 +33,7 @@ from procurepilot_api.modules.matching.rfq_fit import RfqFit, fit_against_rfq
 from procurepilot_api.modules.matching.schemas import (
     MatchCandidate,
     MatchDecision,
+    MatchDecisionHistory,
     MatchQueueCandidateSummary,
     MatchQueueItem,
     MatchQueueList,
@@ -49,11 +50,21 @@ from procurepilot_api.modules.matching.schemas import (
 )
 from procurepilot_api.modules.matching.scoring import SCORING_VERSION, decimal_string
 from procurepilot_api.modules.matching.search import build_similarity_candidates
+from procurepilot_api.modules.matching.search_text import (
+    SQL_ARTICLE,
+    search_matches,
+    search_words,
+    sql_word_expression,
+)
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.modules.quotations.schemas import Money, Pack
 from procurepilot_api.modules.quotations.schemas import decimal_string as quantity_string
-from procurepilot_api.modules.rfq.read_api import RfqContext, rfq_lines_for_quotation
+from procurepilot_api.modules.rfq.read_api import (
+    RfqContext,
+    rfq_id_for_quotation_with_conn,
+    rfq_lines_for_quotation,
+)
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 from procurepilot_api.shared.postgrest_pages import all_rows
@@ -204,36 +215,12 @@ class MatchingService:
             line_ids = list({str(row["quotation_line_id"]) for row in rows})
             context_by_line = _prefetch_search_context(client, line_ids) if line_ids else {}
 
-            filtered_rows: list[dict[str, object]] = []
-            for row in rows:
-                if clean_search in str(row.get("reason", "")).lower():
-                    filtered_rows.append(row)
-                    continue
-
-                line_ctx = context_by_line.get(str(row["quotation_line_id"]))
-                if not line_ctx:
-                    continue
-
-                if clean_search in str(line_ctx.get("original_text", "")).lower():
-                    filtered_rows.append(row)
-                    continue
-
-                if clean_search in f"#{line_ctx.get('line_number')}":
-                    filtered_rows.append(row)
-                    continue
-
-                if clean_search in str(line_ctx.get("line_number")):
-                    filtered_rows.append(row)
-                    continue
-
-                if clean_search in str(line_ctx.get("quotation_id", "")).lower():
-                    filtered_rows.append(row)
-                    continue
-
-                if clean_search in str(line_ctx.get("supplier_name", "")).lower():
-                    filtered_rows.append(row)
-                    continue
-
+            filtered_rows: list[dict[str, object]] = [
+                row
+                for row in rows
+                if (line_ctx := context_by_line.get(str(row["quotation_line_id"])))
+                and _line_context_matches(clean_search, line_ctx)
+            ]
             rows = filtered_rows
 
         # The auto/decided filter also retains corrected heads, reported as resolved/corrected.
@@ -344,12 +331,13 @@ class MatchingService:
             else:
                 filters.append("created_at <= %(date_to)s::timestamptz")
         if search and search.strip():
+            params["search_ids"] = _escape_like(search.strip().lower())
+            params["search_folded"] = _escape_like(search_words(search.strip()))
             filters.append(
-                "(lower(original_text) like '%%' || lower(%(search)s) || '%%' "
-                "or lower(reason) like '%%' || lower(%(search)s) || '%%' "
-                "or lower(supplier_name) like '%%' || lower(%(search)s) || '%%' "
-                "or quotation_id::text like '%%' || lower(%(search)s) || '%%' "
-                "or line_number::text like '%%' || lower(%(search)s) || '%%')"
+                queue_search_filter_sql(
+                    has_words=bool(params["search_folded"]),
+                    has_ids=bool(search.strip().lstrip("#").strip()),
+                )
             )
 
         where_sql = " and ".join(filters)
@@ -515,11 +503,14 @@ class MatchingService:
             offset %(offset)s limit %(limit)s
         """
 
+        rfq_id: UUID | None = None
         try:
             with _authenticated_db(self._settings, member) as conn:
                 with conn.cursor(row_factory=dict_row) as cur:
                     cur.execute(query, params)
                     rows = [dict(row) for row in cur.fetchall()]
+                if quotation_id is not None:
+                    rfq_id = rfq_id_for_quotation_with_conn(conn, quotation_id)
         except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -528,6 +519,7 @@ class MatchingService:
         return MatchQueueList(
             items=[_queue_item(row) for row in page_rows],
             next_cursor=_encode_cursor(offset + fetch_limit - 1) if has_more else None,
+            rfq_id=rfq_id,
         )
 
     def match_task_for_line(self, *, bearer_token: str, line_id: UUID) -> MatchTask:
@@ -540,6 +532,27 @@ class MatchingService:
                 return self._task(client, _synthetic_decided_task(decision), line_row=line)
             raise NotFoundError(details={"resource": "match_task"})
         return self._task(client, task, line_row=line)
+
+    def decision_history(self, *, bearer_token: str, line_id: UUID) -> MatchDecisionHistory:
+        """Every decision on a line, oldest first: the correction chain ADR-022 keeps."""
+        client = authenticated_client(self._settings, bearer_token)
+        _line_row(client, line_id)
+        try:
+            response = (
+                client.table("match_decision")
+                .select(DECISION_COLUMNS)
+                .eq("quotation_line_id", str(line_id))
+                .order("decided_at")
+                .order("id")
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        emails: dict[str, str | None] = {}
+        items = [
+            _decision_with_actor(client, row, emails) for row in _chain_order(_rows(response.data))
+        ]
+        return MatchDecisionHistory(items=items)
 
     def _ensure_pipeline(
         self,
@@ -1270,26 +1283,12 @@ class MatchingService:
         if clean_search:
             line_ids = list({str(row["quotation_line_id"]) for row in decision_rows})
             context_by_line = _prefetch_search_context(client, line_ids) if line_ids else {}
-            filtered: list[dict[str, object]] = []
-            for row in decision_rows:
-                line_ctx = context_by_line.get(str(row["quotation_line_id"]))
-                if not line_ctx:
-                    continue
-                if clean_search in str(line_ctx.get("original_text", "")).lower():
-                    filtered.append(row)
-                    continue
-                if clean_search in f"#{line_ctx.get('line_number')}":
-                    filtered.append(row)
-                    continue
-                if clean_search in str(line_ctx.get("line_number")):
-                    filtered.append(row)
-                    continue
-                if clean_search in str(line_ctx.get("quotation_id", "")).lower():
-                    filtered.append(row)
-                    continue
-                if clean_search in str(line_ctx.get("supplier_name", "")).lower():
-                    filtered.append(row)
-                    continue
+            filtered: list[dict[str, object]] = [
+                row
+                for row in decision_rows
+                if (line_ctx := context_by_line.get(str(row["quotation_line_id"])))
+                and _line_context_matches(clean_search, line_ctx)
+            ]
             decision_rows = filtered
 
         auto_tasks: list[MatchTask] = []
@@ -1340,7 +1339,7 @@ class MatchingService:
                 _candidate(client, candidate)
                 for candidate in _candidate_rows(client, UUID(str(line_row["id"])))
             ],
-            decision=_decision(client, decision_row) if decision_row else None,
+            decision=_decision_with_actor(client, decision_row) if decision_row else None,
         )
 
     def _backfill_missing_embeddings(self, client: object) -> None:
@@ -2024,6 +2023,37 @@ def _candidate_from(row: dict[str, object], products: dict[str, ProductSummary])
     )
 
 
+def _chain_order(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Oldest first by supersession depth: decisions made in one transaction share a timestamp."""
+    by_id = {str(row["id"]): row for row in rows}
+
+    def depth(row: dict[str, object]) -> int:
+        seen: set[str] = set()
+        count = 0
+        parent = row.get("supersedes_decision_id")
+        while parent is not None and str(parent) in by_id and str(parent) not in seen:
+            seen.add(str(parent))
+            count += 1
+            parent = by_id[str(parent)].get("supersedes_decision_id")
+        return count
+
+    return sorted(rows, key=lambda row: (depth(row), str(row["decided_at"]), str(row["id"])))
+
+
+def _decision_with_actor(
+    client: object, row: dict[str, object], emails: dict[str, str | None] | None = None
+) -> MatchDecision:
+    """`_decision` plus the deciding member's email, read once per member."""
+    decision = _decision(client, row)
+    if decision.decided_by is not None:
+        key = str(decision.decided_by)
+        cache = emails if emails is not None else {}
+        if key not in cache:
+            cache[key] = _membership_email(client, decision.decided_by)
+        decision.decided_by_email = cache[key]
+    return decision
+
+
 def _decision(client: object, row: dict[str, object]) -> MatchDecision:
     product_id = str(row["matched_workspace_product_id"])
     return _decision_from(row, {product_id: _product_summary(client, UUID(product_id))})
@@ -2195,6 +2225,48 @@ def _decode_cursor(cursor: str | None) -> int:
         return int(base64.urlsafe_b64decode(cursor.encode()).decode())
     except (ValueError, UnicodeDecodeError) as exc:
         raise NotFoundError(details={"cursor": "invalid"}) from exc
+
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def queue_search_filter_sql(*, has_words: bool = True, has_ids: bool = True) -> str:
+    """The queue search predicate: word-prefix on names, substring on ids, folded Arabic/Persian.
+
+    The internal ``reason`` code is not searched; it is not text a buyer reads (P-152). A term
+    with no word in it (only separators or tashkeel) searches the ids alone.
+    """
+    id_arms = (
+        "quotation_id::text like '%%' || %(search_ids)s || '%%' "
+        "or ('#' || line_number::text) like '%%' || %(search_ids)s || '%%' "
+        "or line_number::text like '%%' || %(search_ids)s || '%%'"
+    )
+    if not has_words:
+        return f"({id_arms})" if has_ids else "false"
+    words = " or ".join(
+        f"(' ' || {sql_word_expression(col)}) like '%% ' || %(search_folded)s || '%%' "
+        f"or (' ' || {sql_word_expression(col)}) like "
+        f"'%% {SQL_ARTICLE}' || %(search_folded)s || '%%'"
+        for col in ("original_text", "supplier_name")
+    )
+    return f"({words} or {id_arms})" if has_ids else f"({words})"
+
+
+def _line_context_matches(term: str, line_ctx: dict[str, object]) -> bool:
+    """Match a queue-search term against a line's names (word prefix) and ids (substring)."""
+    if search_words(term) and search_matches(
+        term, [line_ctx.get("original_text"), line_ctx.get("supplier_name")]
+    ):
+        return True
+    lowered = term.strip().lower()
+    if not lowered.lstrip("#").strip():
+        return False
+    return (
+        lowered in f"#{line_ctx.get('line_number')}"
+        or lowered in str(line_ctx.get("line_number"))
+        or lowered in str(line_ctx.get("quotation_id", "")).lower()
+    )
 
 
 def _prefetch_search_context(client: object, line_ids: list[str]) -> dict[str, dict[str, object]]:

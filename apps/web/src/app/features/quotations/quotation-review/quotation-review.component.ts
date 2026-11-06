@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, HostListener, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ElementRef, Injector, afterNextRender, viewChild, DestroyRef, HostListener, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Observable, Subject, Subscription, map, of, switchMap, takeUntil, timer } from 'rxjs';
+import { Observable, Subject, Subscription, map, of, switchMap, take, takeUntil, timer } from 'rxjs';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -43,7 +43,7 @@ import { CurrencySymbolPipe } from '../../../core/format/currency-symbol.pipe';
 import { FormatExtractionPipe } from '../../../core/format/extraction-value.pipe';
 import { parseMoneyInput } from '../../../core/format/money-input';
 import { QuotationReviewBannersComponent } from './quotation-review-banners.component';
-import { QuotationDocPreviewComponent } from './quotation-doc-preview.component';
+import { QuotationDocPreviewComponent, isDocumentPreviewable } from './quotation-doc-preview.component';
 import { QuotationLinesComponent } from './quotation-lines.component';
 import { QuotationAuditTrailComponent } from './quotation-audit-trail.component';
 import { sameReviewedValue } from './reviewed-value';
@@ -152,6 +152,9 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   private readonly sanitizer = inject(DomSanitizer);
   private readonly destroyRef = inject(DestroyRef);
   private readonly dialog = inject(MatDialog);
+  private readonly injector = inject(Injector);
+  private readonly nextStepCard = viewChild<unknown, ElementRef<HTMLElement>>('nextStepCard', { read: ElementRef });
+  private readonly nextStepMatchLines = viewChild<unknown, ElementRef<HTMLButtonElement>>('nextStepMatchLines', { read: ElementRef });
   private readonly cancelLoads$ = new Subject<void>();
   private priorQuotationsSub: Subscription | null = null;
   private extractionPollSub: Subscription | null = null;
@@ -228,9 +231,20 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   readonly activeExtraction = signal<FieldExtraction | null>(null);
 
   // PDF preview URL (signed)
+  readonly documentPreviewError = signal(false);
   readonly documentPreviewUrl = signal<string | null>(null);
-  readonly safePreviewUrl = computed<SafeResourceUrl | null>(() => {
+  private previewDocumentId: string | null = null;
+  readonly previewUrl = computed<string | null>(() => {
     const url = this.documentPreviewUrl();
+    if (!url) return null;
+    const base = url.split('#')[0];
+    const page = this.activeExtraction()?.source_page;
+    const fragment = this.quotation()?.document.mime_type === 'application/pdf' && page && page >= 1
+      ? `#page=${page}` : '';
+    return base + fragment;
+  });
+  readonly safePreviewUrl = computed<SafeResourceUrl | null>(() => {
+    const url = this.previewUrl();
     return url ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : null;
   });
 
@@ -240,7 +254,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
   readonly confirmBlockedReason = signal<string | null>(null);
-  readonly matchingSetupStatus = signal<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  readonly matchingSetupStatus = signal<'idle' | 'loading' | 'error'>('idle');
   readonly matchingSetupError = signal<string | null>(null);
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
@@ -515,7 +529,9 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
     this.isCreatingSupplierFromExtraction.set(false);
 
     this.activeExtraction.set(null);
+    this.previewDocumentId = null;
     this.documentPreviewUrl.set(null);
+    this.documentPreviewError.set(false);
     this.currentFlaggedIndex.set(0);
 
     this.auditTrail.set([]);
@@ -656,16 +672,25 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
     });
   }
 
-  private loadDocumentPreview(documentId: string): void {
+  loadDocumentPreview(documentId: string): void {
+    this.documentPreviewError.set(false);
+    if (this.previewDocumentId !== documentId) {
+      this.previewDocumentId = documentId;
+      this.documentPreviewUrl.set(null);
+    }
+    if (!isDocumentPreviewable(this.quotation()?.document.mime_type ?? '')) return;
     this.api
       .getDocumentDownloadUrl(documentId)
       .pipe(takeUntil(this.cancelLoads$))
       .subscribe({
       next: ({ download_url }) => {
+        if (this.previewDocumentId !== documentId) return;
+        this.documentPreviewError.set(false);
         this.documentPreviewUrl.set(download_url);
       },
       error: () => {
-        // Non-fatal — falls back to text simulation
+        if (this.previewDocumentId !== documentId) return;
+        this.documentPreviewError.set(!this.documentPreviewUrl());
       },
     });
   }
@@ -1552,10 +1577,13 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   }
 
   private proceedWithArchive(q: QuotationDetail): void {
-    if (!window.confirm(this.translate.instant('quotations.review.archiveConfirm'))) {
-      return;
-    }
+    this.confirmWithDialog('quotations.review.archiveDialog').subscribe((confirmed) => {
+      if (!confirmed) return;
+      this.executeArchive(q);
+    });
+  }
 
+  private executeArchive(q: QuotationDetail): void {
     this.isArchiving.set(true);
     this.errorMessage.set(null);
 
@@ -1566,8 +1594,25 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
         next: () => {
           this.isArchiving.set(false);
           this.leavingAfterArchive = true;
-          this.snackBar.open(this.translate.instant('quotations.review.archived'), undefined, {
-            duration: 3000,
+          // Undo belongs to the snackbar and must survive navigation destroying this component.
+          this.snackBar.open(
+            this.translate.instant('quotations.review.archived'),
+            this.translate.instant('quotations.review.undo'),
+            { duration: 8000 },
+          ).onAction().pipe(take(1)).subscribe(() => {
+            this.api.restoreQuotation(q.id).subscribe({
+              next: () => {
+                this.router.navigate(['/quotations', q.id, 'review']);
+                this.snackBar.open(this.translate.instant('quotations.review.restored'), undefined, {
+                  duration: 3000,
+                });
+              },
+              error: () => {
+                this.snackBar.open(this.translate.instant('quotations.review.restoreFailed'), undefined, {
+                  duration: 3000,
+                });
+              },
+            });
           });
           this.router.navigate(['/quotations']);
         },
@@ -1582,10 +1627,27 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   retryExtraction(): void {
     const q = this.quotation();
     if (!q) return;
-    if (!window.confirm(this.translate.instant('quotations.review.retryConfirm'))) {
-      return;
-    }
+    this.confirmWithDialog('quotations.review.retryDialog').subscribe((confirmed) => {
+      if (!confirmed) return;
+      this.executeRetryExtraction(q);
+    });
+  }
 
+  private confirmWithDialog(keyPrefix: string): Observable<boolean> {
+    return this.dialog
+      .open(CatalogueConfirmDialogComponent, {
+        width: '440px',
+        data: {
+          titleKey: `${keyPrefix}.title`,
+          messageKey: `${keyPrefix}.message`,
+          confirmKey: `${keyPrefix}.confirm`,
+          cancelKey: `${keyPrefix}.cancel`,
+        },
+      })
+      .afterClosed();
+  }
+
+  private executeRetryExtraction(q: QuotationDetail): void {
     this.isRetryingExtraction.set(true);
     this.errorMessage.set(null);
 
@@ -1696,7 +1758,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   }
 
   canRetryExtraction(q: QuotationDetail): boolean {
-    return q.status === 'extracted' || q.status === 'in_review' || q.status === 'refused';
+    return q.status === 'extracted' || q.status === 'in_review';
   }
 
   computeLineTotal(line: QuotationDetail['lines'][number]): string | null {
@@ -1815,6 +1877,13 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
         next: (confirmed) => {
           this.isConfirming.set(false);
           this.showNextStep.set(true);
+          afterNextRender(() => {
+            this.nextStepCard()?.nativeElement.scrollIntoView?.({
+              block: 'center',
+              behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+            });
+            this.nextStepMatchLines()?.nativeElement.focus({ preventScroll: true });
+          }, { injector: this.injector });
           this.quotation.update((current) =>
             current
               ? {
@@ -1826,12 +1895,14 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
               : null,
           );
           this.loadQuotation(confirmed.id, { silent: true });
+          this.api.getQuotationMatches(confirmed.id)
+            .pipe(takeUntil(this.cancelLoads$))
+            .subscribe({ error: (err: unknown) => this.setMatchingSetupError(err) });
           this.snackBar.open(
             this.translate.instant('quotations.review.actions.confirmSuccess'),
             undefined,
             { duration: 4000 },
           );
-          this.initializeMatching(confirmed.id);
         },
         error: (err: unknown) => {
           this.isConfirming.set(false);
@@ -1855,22 +1926,29 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   }
 
   initializeMatching(quotationId = this.quotationId()): void {
-    if (!quotationId) return;
+    if (!quotationId || this.matchingSetupStatus() === 'loading') return;
     this.matchingSetupStatus.set('loading');
     this.matchingSetupError.set(null);
     this.api
       .getQuotationMatches(quotationId)
       .pipe(takeUntil(this.cancelLoads$))
       .subscribe({
-      next: () => this.matchingSetupStatus.set('ready'),
+      next: () => {
+        this.matchingSetupStatus.set('idle');
+        void this.router.navigate(['/matching'], { queryParams: { quotation_id: quotationId } });
+      },
       error: (err: unknown) => {
-        this.matchingSetupStatus.set('error');
-        const apiError = err instanceof HttpErrorResponse ? (err.error as ApiError | undefined) : null;
-        this.matchingSetupError.set(
-          apiError?.message ?? this.translate.instant('quotations.review.matchingSetup.error'),
-        );
+        this.setMatchingSetupError(err);
       },
     });
+  }
+
+  private setMatchingSetupError(err: unknown): void {
+    this.matchingSetupStatus.set('error');
+    const apiError = err instanceof HttpErrorResponse ? (err.error as ApiError | undefined) : null;
+    this.matchingSetupError.set(
+      apiError?.message ?? this.translate.instant('quotations.review.matchingSetup.error'),
+    );
   }
 
   showAddLineForm(): void {
@@ -1958,7 +2036,11 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
             this.loadQuotation(q.id, { silent: true });
             return;
           }
+          const previousDocumentId = this.quotation()?.document.id;
           this.quotation.set(q);
+          if (q.document.id !== previousDocumentId) {
+            this.loadDocumentPreview(q.document.id);
+          }
           this.scheduleNextPoll(quotationId);
         },
         error: (err: unknown) => {

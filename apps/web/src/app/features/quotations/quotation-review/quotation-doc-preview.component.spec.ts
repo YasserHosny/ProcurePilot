@@ -37,6 +37,42 @@ describe('QuotationDocPreviewComponent provenance', () => {
     fixture.detectChanges();
   });
 
+  it('shows an error alert with retry and download instead of loading', () => {
+    fixture.componentRef.setInput('documentPreviewError', true);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('[role="alert"]')).not.toBeNull();
+    expect(root.querySelector('iframe, mat-spinner')).toBeNull();
+    const retry = spyOn(fixture.componentInstance.retry, 'emit');
+    const download = spyOn(fixture.componentInstance.download, 'emit');
+    root.querySelector<HTMLButtonElement>('.preview-retry')!.click();
+    root.querySelector<HTMLButtonElement>('.preview-download')!.click();
+    expect(retry).toHaveBeenCalled();
+    expect(download).toHaveBeenCalled();
+    expect(root.querySelector('.preview-fallback')?.textContent).toContain('quote.pdf');
+  });
+
+  for (const mime of ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/tiff']) {
+    it(`shows a download-only status for ${mime}`, () => {
+      fixture.componentRef.setInput('quotation', { document: { mime_type: mime } } as QuotationDetail);
+      fixture.componentRef.setInput('safePreviewUrl', TestBed.inject(DomSanitizer).bypassSecurityTrustResourceUrl('about:blank'));
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelector('[role="status"]')).not.toBeNull();
+      expect(root.querySelector('iframe, mat-spinner, .preview-retry, [role="alert"]')).toBeNull();
+      expect(root.querySelector('.preview-download')).not.toBeNull();
+    });
+  }
+
+  for (const mime of ['application/pdf', 'image/png', 'image/jpeg', 'text/plain']) {
+    it(`renders an iframe for ${mime}`, () => {
+      fixture.componentRef.setInput('quotation', { document: { mime_type: mime } } as QuotationDetail);
+      fixture.componentRef.setInput('safePreviewUrl', TestBed.inject(DomSanitizer).bypassSecurityTrustResourceUrl('about:blank'));
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('iframe')).not.toBeNull();
+    });
+  }
+
   it('renders Arabic string provenance as plain auto-direction text without JSON quotes', () => {
     const values = Array.from(fixture.nativeElement.querySelectorAll('.prov-val[dir="auto"]')) as HTMLElement[];
     expect(values.length).toBe(2);
@@ -58,6 +94,21 @@ describe('QuotationDocPreviewComponent provenance', () => {
     expect(fixture.nativeElement.querySelector('.extraction-field-label').textContent.trim()).toBe('اسم المورد');
     const icon = fixture.nativeElement.querySelector('.prov-details-icon') as HTMLElement;
     expect(icon.getAttribute('aria-label')).toContain('bedrock · test-model');
+  });
+
+  it('names the loading spinner while the preview URL is pending (PPS-162)', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.use('en');
+    fixture.detectChanges();
+    const spinner = fixture.nativeElement.querySelector('.doc-preview-loading mat-spinner') as HTMLElement;
+    expect(spinner.getAttribute('aria-label')).toBe(enCatalog.common.loading);
+  });
+
+  it('exposes the focusable technical-details icon to assistive tech (PPS-162)', () => {
+    const icon = fixture.nativeElement.querySelector('.prov-details-icon') as HTMLElement;
+    expect(icon.getAttribute('tabindex')).toBe('0');
+    expect(icon.getAttribute('aria-hidden')).not.toBe('true');
   });
 
   it('renders a money-shaped value in provenance original value via FormatService.formatMoney in en and ar without .mono class', () => {
@@ -173,6 +224,22 @@ describe('QuotationDocPreviewComponent focus guard (PPS-57)', () => {
     fixture.nativeElement.remove();
   });
 
+  it('names the source-document frame from the catalogue in English and Arabic (PPS-162)', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.setTranslation('ar', arCatalog);
+    const iframe = fixture.nativeElement.querySelector('iframe.pdf-preview-frame') as HTMLIFrameElement;
+
+    translate.use('en');
+    fixture.detectChanges();
+    expect(iframe.title).toBe(enCatalog.quotations.review.sourcePreviewTitle);
+
+    translate.use('ar');
+    fixture.detectChanges();
+    expect(iframe.title).toBe(arCatalog.quotations.review.sourcePreviewTitle);
+    expect(iframe.title).not.toBe(enCatalog.quotations.review.sourcePreviewTitle);
+  });
+
   it('refocuses the input and restores selection when iframe steals focus during the guard window', fakeAsync(() => {
     const iframe = fixture.nativeElement.querySelector('iframe.pdf-preview-frame') as HTMLIFrameElement;
     expect(iframe).toBeTruthy();
@@ -254,4 +321,17 @@ describe('QuotationDocPreviewComponent focus guard (PPS-57)', () => {
     iframe = fixture.nativeElement.querySelector('iframe.pdf-preview-frame') as HTMLIFrameElement;
     expect(iframe.getAttribute('data-preview-loaded')).toBeNull();
   });
+  it('keeps data-preview-loaded on a fragment-only page jump', () => {
+    const sanitizer = TestBed.inject(DomSanitizer);
+    fixture.componentRef.setInput('safePreviewUrl', sanitizer.bypassSecurityTrustResourceUrl('about:blank#page=1'));
+    fixture.detectChanges();
+    const iframe = fixture.nativeElement.querySelector('iframe.pdf-preview-frame') as HTMLIFrameElement;
+    iframe.dispatchEvent(new Event('load'));
+    fixture.detectChanges();
+    expect(iframe.getAttribute('data-preview-loaded')).toBe('true');
+    fixture.componentRef.setInput('safePreviewUrl', sanitizer.bypassSecurityTrustResourceUrl('about:blank#page=2'));
+    fixture.detectChanges();
+    expect(iframe.getAttribute('data-preview-loaded')).toBe('true');
+  });
+
 });

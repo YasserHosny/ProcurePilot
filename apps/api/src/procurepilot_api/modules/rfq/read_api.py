@@ -53,6 +53,14 @@ where resp.quotation_id = %s
 order by rl.position, rl.created_at, rl.id
 """
 
+RFQ_ID_FOR_QUOTATION_SQL = """
+select distinct rec.rfq_id
+from rfq_response resp
+join rfq_recipient rec
+  on rec.tenant_id = resp.tenant_id and rec.id = resp.rfq_recipient_id
+where resp.quotation_id = %s
+"""
+
 
 @dataclass(frozen=True)
 class RfqLineContext:
@@ -105,6 +113,20 @@ def rfq_lines_for_quotation_with_conn(
             for row in rows
         ),
     )
+
+
+def rfq_id_for_quotation_with_conn(conn: psycopg.Connection, quotation_id: UUID) -> UUID | None:
+    """The one RFQ a quotation answered, read on a connection already scoped to the member."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(RFQ_ID_FOR_QUOTATION_SQL, (quotation_id,))
+        rows = cur.fetchall()
+    if not rows:
+        return None
+    rfq_ids = {row["rfq_id"] for row in rows}
+    if len(rfq_ids) != 1:
+        # A quotation answers at most one RFQ recipient today; refuse to guess if that changes.
+        return None
+    return rows[0]["rfq_id"]
 
 
 def rfq_lines_for_quotation(

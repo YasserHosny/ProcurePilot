@@ -120,3 +120,77 @@ def render_rfq_email(
     return RenderedRfqEmail(
         subject=subject, text=text_body, html=html_body, from_name=from_name, locale=lang
     )
+
+
+def render_reminder_email(
+    *,
+    tenant_name: str,
+    locale: str,
+    reference_number: int,
+    sent_date: date,
+    needed_by: date,
+    lines: list[RfqEmailLine],
+    reply_to: str | None,
+) -> RenderedRfqEmail:
+    lang = "ar" if locale == "ar" else "en"
+    direction = "rtl" if lang == "ar" else "ltr"
+    reference = f"RFQ-{reference_number:06d}"
+    sent_label = _date(sent_date, lang)
+    date_label = _date(needed_by, lang)
+    # "Re:" plus the RFQ email's own subject, so mail clients group the reminder under it.
+    subject = "Re: " + t("rfq.email.subject", lang, tenant=tenant_name, date=date_label)
+    from_name = t("rfq.email.fromName", lang, tenant=tenant_name)
+    greeting = t("rfq.email.reminderGreeting", lang)
+    intro = t("rfq.email.reminderIntro", lang, tenant=tenant_name)
+    reference_label = t("rfq.email.reminderReference", lang)
+    sent_date_label = t("rfq.email.reminderSentDate", lang)
+    item_title = t("rfq.email.reminderItemsHeading", lang)
+    needed_label = t("rfq.email.reminderNeededBy", lang)
+    ignore = t("rfq.email.reminderIgnore", lang)
+    reply_text = t("rfq.email.reminderReplyInstructions", lang)
+    thanks = t("rfq.email.reminderThanks", lang)
+    courtesy = (
+        t("rfq.email.reminderEnglishSummary", "en", tenant=tenant_name) if lang == "ar" else ""
+    )
+    quantity_lines: list[str] = []
+    item_html: list[str] = []
+    for item in lines:
+        amount = _line_amount(item, lang)
+        quantity_lines.append(f"- {item.product_name}: {amount}")
+        item_html.append(f"<li>{html.escape(item.product_name)}: {html.escape(amount)}</li>")
+    text_lines = [
+        greeting,
+        intro,
+        "",
+        f"{reference_label}: {reference}",
+        f"{sent_date_label}: {sent_label}",
+        "",
+        item_title,
+        *quantity_lines,
+        "",
+        f"{needed_label}: {date_label}",
+        "",
+        ignore,
+    ]
+    if reply_to:
+        text_lines.extend(["", reply_text, reply_to])
+    text_lines.extend(["", thanks])
+    if courtesy:
+        text_lines.extend(["", courtesy])
+    text_body = "\n".join(text_lines)
+    reply_html = f"<p>{html.escape(reply_text)}<br>{html.escape(reply_to)}</p>" if reply_to else ""
+    courtesy_html = f'<p lang="en" dir="ltr">{html.escape(courtesy)}</p>' if courtesy else ""
+    html_body = (
+        f'<!doctype html><html lang="{lang}" dir="{direction}"><head><meta charset="utf-8">'
+        f"<title>{html.escape(subject)}</title></head><body><p>{html.escape(greeting)}</p>"
+        f"<p>{html.escape(intro)}</p>"
+        f"<p>{html.escape(reference_label)}: {html.escape(reference)}<br>"
+        f"{html.escape(sent_date_label)}: {html.escape(sent_label)}</p>"
+        f"<h2>{html.escape(item_title)}</h2><ul>{''.join(item_html)}</ul>"
+        f"<p>{html.escape(needed_label)}: {html.escape(date_label)}</p>"
+        f"<p>{html.escape(ignore)}</p>{reply_html}<p>{html.escape(thanks)}</p>"
+        f"{courtesy_html}</body></html>"
+    )
+    return RenderedRfqEmail(
+        subject=subject, text=text_body, html=html_body, from_name=from_name, locale=lang
+    )

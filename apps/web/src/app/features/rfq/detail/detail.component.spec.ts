@@ -3,14 +3,14 @@ import { signal } from '@angular/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter, Router, ActivatedRoute, convertToParamMap } from '@angular/router';
 import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, of, Subject, throwError } from 'rxjs';
 
 import { DetailComponent } from './detail.component';
-import { RfqApi, RfqDetail, RfqRecipient, RfqResponseComparisonList, RfqSendResponse } from '../rfq-api';
+import { RfqActionKeys, RfqApi, RfqDetail, RfqRecipient, RfqResponseComparisonList, RfqSendResponse } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatService } from '../../../core/format/format.service';
@@ -18,10 +18,37 @@ import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 
+interface ReminderRecipient extends RfqRecipient {
+  reminder_count?: number;
+  last_reminder_at?: string | null;
+  can_remind?: boolean;
+  remind_blocked_reason?: string | null;
+}
+
+interface ReminderPreviewFixture {
+  subject: string;
+  body_text: string;
+  locale: string;
+  allowed: boolean;
+  blocked_reason: string | null;
+}
+
+interface ReminderApiSpy {
+  previewReminder: jasmine.Spy<(rfqId: string, recipientId: string) => Observable<ReminderPreviewFixture>>;
+  sendReminder: jasmine.Spy<(rfqId: string, recipientId: string, key?: string) => Observable<ReminderRecipient>>;
+}
+
+function catalogString(catalog: unknown, path: string): string {
+  return path.split('.').reduce<unknown>(
+    (acc, part) => (acc as Record<string, unknown> | undefined)?.[part], catalog,
+  ) as string;
+}
+
 describe('DetailComponent (RFQ Details)', () => {
   let component: DetailComponent;
   let fixture: ComponentFixture<DetailComponent>;
   let rfqApiSpy: jasmine.SpyObj<RfqApi>;
+  let reminderApi: ReminderApiSpy;
   let apiSpy: jasmine.SpyObj<ApiService>;
   let router: Router;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
@@ -135,11 +162,67 @@ describe('DetailComponent (RFQ Details)', () => {
     ],
   };
 
+
+  it('shows an isolated reference below the unchanged heading, and omits absent references', () => {
+    component.rfqDetail.set({ ...mockSentDetail, rfq: { ...mockSentDetail.rfq, reference_number: 123 } });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('h1').textContent).toContain('RFQ Details');
+    expect(fixture.nativeElement.querySelector('[data-testid="rfq-reference"] bdi').textContent).toBe('RFQ-000123');
+    component.rfqDetail.set(mockSentDetail);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="rfq-reference"]')).toBeNull();
+  });
+
+  for (const owner of [true, false]) {
+    for (const draft of [true, false]) {
+      it('non-creator sending permission owner=' + owner + ', draft=' + draft, async () => {
+        spyOn(TestBed.inject(SessionService), 'hasRole').and.callFake(role => role === (owner ? 'owner' : 'buyer'));
+        component.currentMembershipId.set('other');
+        component.rfqDetail.set(draft ? mockDraftDetail : mockSentDetail);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(!!fixture.nativeElement.querySelector(draft ? '[data-testid="rfq-detail-send-button"]' : '[data-testid="rfq-detail-retry-button"]')).toBe(owner);
+        expect(fixture.nativeElement.querySelector('[data-testid="rfq-detail-edit-button"]')).toBeNull();
+      });
+    }
+  }
+
+  for (const locale of ['en', 'ar']) {
+    for (const status of ['sent', 'responded', 'expired', 'draft'] as const) {
+      it('renders send records using real ' + locale + ' catalogue on ' + status, async () => {
+        TestBed.inject(TranslateService).use(locale);
+        component.rfqDetail.set({
+          ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status },
+          recipients: [
+            { ...mockSentDetail.recipients[1], failure_reason: 'delivery_error', send_attempts: 2, last_attempt_at: '2026-10-31T12:30:00Z' },
+            { ...mockSentDetail.recipients[0], status: 'draft', failure_reason: 'missing_contact_email' },
+          ],
+        });
+        component.selectedTabIndex.set(2);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const records = fixture.nativeElement.querySelectorAll('.send-record');
+        expect(records.length).toBe(status === 'draft' ? 0 : 2);
+        if (status !== 'draft') {
+          expect(records[0].textContent).toContain(locale === 'en' ? 'Delivery failed' : 'فشل التسليم');
+          expect(records[1].textContent).toContain(locale === 'en' ? 'No contact email' : 'لا يوجد بريد إلكتروني للتواصل');
+          expect(records[0].textContent).toContain(locale === 'en' ? '2 attempts' : 'محاولتان');
+          expect(records[0].textContent).toContain(component.formatTime('2026-10-31T12:30:00Z'));
+          expect(records[1].querySelector('.send-attempts')).toBeNull();
+        }
+      });
+    }
+  }
   beforeEach(async () => {
     paramMapSubject = new BehaviorSubject(convertToParamMap({ id: 'rfq-sent-1' }));
     queryParamMapSubject = new BehaviorSubject(convertToParamMap({}));
 
-    rfqApiSpy = jasmine.createSpyObj('RfqApi', ['getRfq', 'listResponses', 'sendRfq', 'listGuardrails']);
+    rfqApiSpy = jasmine.createSpyObj('RfqApi', ['getRfq', 'listResponses', 'sendRfq', 'cancelRfq', 'listGuardrails']);
+    reminderApi = rfqApiSpy as unknown as ReminderApiSpy;
+    reminderApi.previewReminder = jasmine.createSpy<(rfqId: string, recipientId: string) => Observable<ReminderPreviewFixture>>('previewReminder');
+    reminderApi.sendReminder = jasmine.createSpy<(rfqId: string, recipientId: string, key?: string) => Observable<ReminderRecipient>>('sendReminder');
     rfqApiSpy.getRfq.and.returnValue(of(mockSentDetail));
     rfqApiSpy.listResponses.and.returnValue(of(mockResponses));
     rfqApiSpy.listGuardrails.and.returnValue(of([]));
@@ -222,6 +305,222 @@ describe('DetailComponent (RFQ Details)', () => {
     router = TestBed.inject(Router);
     spyOn(router, 'navigate');
     fixture.detectChanges();
+  });
+
+  describe('creator membership id (buyers cannot call the members API)', () => {
+    function createWithSession(sessionMember: object | null): DetailComponent {
+      spyOn(TestBed.inject(SessionService), 'currentMember').and.returnValue(sessionMember as never);
+      apiSpy.members.calls.reset();
+      const created = TestBed.createComponent(DetailComponent);
+      created.detectChanges();
+      return created.componentInstance;
+    }
+
+    it('reads the membership id from the session and does not call members()', () => {
+      const detail = createWithSession({ email: 'buyer@test.com', membership_id: 'm-buyer' });
+      expect(detail.currentMembershipId()).toBe('m-buyer');
+      expect(apiSpy.members).not.toHaveBeenCalled();
+    });
+
+    it('lets a buyer act as creator of their own RFQ even though members() is forbidden', () => {
+      apiSpy.members.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+      const detail = createWithSession({ email: 'buyer@test.com', membership_id: 'm-buyer' });
+      detail.rfqDetail.set({
+        ...mockSentDetail,
+        rfq: { ...mockSentDetail.rfq, created_by_membership_id: 'm-buyer' },
+      });
+      expect(detail.isCreator()).toBeTrue();
+    });
+
+    it('falls back to members() when the session has no membership id', () => {
+      const detail = createWithSession({ email: 'creator@test.com' });
+      expect(apiSpy.members).toHaveBeenCalled();
+      expect(detail.currentMembershipId()).toBe('m-creator');
+    });
+
+    it('stays without an id, and without an unhandled error, when members() is forbidden', () => {
+      apiSpy.members.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+      const detail = createWithSession({ email: 'buyer@test.com' });
+      expect(detail.currentMembershipId()).toBeNull();
+    });
+  });
+
+  describe('breadcrumb', () => {
+    it('says cancelled, not draft, for an RFQ cancelled before it was ever sent', () => {
+      component.rfqDetail.set({
+        ...mockSentDetail,
+        rfq: { ...mockSentDetail.rfq, status: 'cancelled' },
+        recipients: mockSentDetail.recipients.map((recipient) => ({ ...recipient, status: 'draft', sent_at: null })),
+      });
+      expect(component.breadcrumbText()).toBe('RFQ · Cancelled');
+    });
+
+    it('keeps the sent date for an RFQ that was sent and then cancelled', () => {
+      component.rfqDetail.set({ ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status: 'cancelled' } });
+      expect(component.breadcrumbText()).toContain('RFQ · Sent');
+    });
+
+    it('has an Arabic translation for the cancelled breadcrumb', () => {
+      expect((arCatalog as unknown as { rfq: { detail: Record<string, string> } }).rfq.detail['breadcrumbRfqCancelled']).toBeTruthy();
+    });
+  });
+
+  describe('duplicate', () => {
+    function query(testId: string): HTMLElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector(`[data-testid="${testId}"]`);
+    }
+
+    it('shows Duplicate to owners and buyers for any RFQ, and not to other roles', () => {
+      const role = spyOn(TestBed.inject(SessionService), 'hasRole');
+      component.rfqId.set(mockSentDetail.rfq.id);
+      component.rfqDetail.set({ ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status: 'converted' } });
+      role.and.callFake((...roles) => roles.includes('owner'));
+      fixture.detectChanges();
+      expect(query('rfq-detail-duplicate-button')).not.toBeNull();
+      role.and.callFake((...roles) => roles.includes('buyer'));
+      fixture.detectChanges();
+      expect(query('rfq-detail-duplicate-button')).not.toBeNull();
+      role.and.callFake((...roles) => roles.includes('viewer'));
+      fixture.detectChanges();
+      expect(query('rfq-detail-duplicate-button')).toBeNull();
+    });
+
+    it('links to the create page with this RFQ as the source', () => {
+      component.rfqId.set(mockSentDetail.rfq.id);
+      component.rfqDetail.set(mockSentDetail);
+      fixture.detectChanges();
+      const link = query('rfq-detail-duplicate-button') as HTMLAnchorElement;
+      expect(link.getAttribute('href')).toBe(`/rfq/create?from=${mockSentDetail.rfq.id}`);
+      expect(link.textContent?.trim()).toBe('Duplicate');
+    });
+  });
+
+  describe('cancellation', () => {
+    for (const status of [0, 503, 408, 429]) {
+      it(`retains the cancel key after ${status} and rotates after success or definitive rejection`, () => {
+        component.rfqId.set(mockSentDetail.rfq.id);
+        component.rfqDetail.set(mockSentDetail);
+        dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>);
+        rfqApiSpy.cancelRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status })));
+        component.onCancelRfq();
+        const first = rfqApiSpy.cancelRfq.calls.mostRecent().args[1];
+        expect(first).toEqual(jasmine.any(String));
+        const pending = new Subject<RfqDetail['rfq']>();
+        rfqApiSpy.cancelRfq.and.returnValue(pending);
+        component.onCancelRfq();
+        component.onCancelRfq();
+        expect(rfqApiSpy.cancelRfq).toHaveBeenCalledTimes(2);
+        expect(rfqApiSpy.cancelRfq.calls.mostRecent().args[1]).toBe(first);
+        pending.next(mockSentDetail.rfq);
+        pending.complete();
+        rfqApiSpy.cancelRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status: 422 })));
+        component.onCancelRfq();
+        const rejected = rfqApiSpy.cancelRfq.calls.mostRecent().args[1];
+        expect(rejected).not.toBe(first);
+        component.onCancelRfq();
+        expect(rfqApiSpy.cancelRfq.calls.mostRecent().args[1]).not.toBe(rejected);
+      });
+    }
+
+    it('shows Cancel for an owner on another buyer’s RFQ, and buyers only on their own', () => {
+      const role = spyOn(TestBed.inject(SessionService), 'hasRole');
+      role.and.callFake((...roles) => roles.includes('owner'));
+      component.currentMembershipId.set('another-member');
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-detail-cancel-button"]')).not.toBeNull();
+      role.and.callFake((...roles) => roles.includes('buyer'));
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-detail-cancel-button"]')).toBeNull();
+      component.currentMembershipId.set('m-creator');
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-detail-cancel-button"]')).not.toBeNull();
+      role.and.returnValue(false);
+      expect(component.canCancel()).toBeFalse();
+    });
+
+    for (const status of ['draft', 'sent', 'responded', 'expired'] as const) {
+      it(`allows cancellation of ${status}`, () => {
+        component.rfqDetail.set({ ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status } });
+        expect(component.canCancel()).toBeTrue();
+      });
+    }
+
+    for (const status of ['converted', 'cancelled'] as const) {
+      it(`hides Cancel for ${status}`, () => {
+        component.rfqDetail.set({ ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status } });
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-detail-cancel-button"]')).toBeNull();
+        component.onCancelRfq();
+        expect(dialogSpy.open).not.toHaveBeenCalled();
+      });
+    }
+
+    it('confirms a destructive action and calls cancel once despite repeated clicks or confirmation emissions', () => {
+      const confirmation = new Subject<boolean>();
+      const result = new Subject<RfqDetail['rfq']>();
+      dialogSpy.open.and.returnValue({ afterClosed: () => confirmation } as unknown as MatDialogRef<CatalogueConfirmDialogComponent>);
+      rfqApiSpy.cancelRfq.and.returnValue(result);
+      const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid="rfq-detail-cancel-button"]')!;
+      button.click();
+      button.click();
+      expect(dialogSpy.open).toHaveBeenCalledOnceWith(CatalogueConfirmDialogComponent, jasmine.objectContaining({
+        data: jasmine.objectContaining({ isDestructive: true, confirmKey: 'rfq.cancel.confirm', cancelKey: 'rfq.cancel.keep' }),
+      }));
+      expect(rfqApiSpy.cancelRfq).not.toHaveBeenCalled();
+      confirmation.next(true);
+      confirmation.next(true);
+      fixture.detectChanges();
+      expect(button.disabled).toBeTrue();
+      component.onCancelRfq();
+      expect(rfqApiSpy.cancelRfq).toHaveBeenCalledOnceWith('rfq-sent-1', jasmine.any(String));
+      const cancelled: RfqDetail = { ...mockSentDetail, rfq: { ...mockSentDetail.rfq, status: 'cancelled', cancelled_at: '2026-11-03T10:00:00Z' } };
+      rfqApiSpy.getRfq.and.returnValue(of(cancelled));
+      rfqApiSpy.getRfq.calls.reset();
+      result.next(cancelled.rfq);
+      result.complete();
+      fixture.detectChanges();
+      expect(rfqApiSpy.getRfq).toHaveBeenCalledWith('rfq-sent-1');
+      expect(snackBarSpy.open).toHaveBeenCalledWith(enCatalog.rfq.cancel.success, jasmine.any(String), jasmine.any(Object));
+      const page = fixture.nativeElement as HTMLElement;
+      for (const action of ['cancel', 'edit', 'send', 'retry']) {
+        expect(page.querySelector(`[data-testid="rfq-detail-${action}-button"]`)).toBeNull();
+      }
+      expect(page.querySelector('.status-badge')?.textContent).toContain('Cancelled');
+      expect(page.querySelector('[data-testid="rfq-detail-cancelled-at"]')?.textContent).toContain(component.formatDate(cancelled.rfq.cancelled_at));
+      expect(component.getRecipientReplyState(cancelled.recipients[0]).status).toBe('no_reply');
+      expect(component.getRecipientReplyState({ ...cancelled.recipients[0], response_count: 1 }).status).toBe('replied');
+    });
+
+    it('keeps the RFQ when confirmation is declined', () => {
+      dialogSpy.open.and.returnValue({ afterClosed: () => of(false) } as MatDialogRef<CatalogueConfirmDialogComponent>);
+      component.onCancelRfq();
+      expect(rfqApiSpy.cancelRfq).not.toHaveBeenCalled();
+      expect(component.cancelling()).toBeFalse();
+    });
+
+    for (const [status, reason, key] of [
+      [403, 'not_creator', 'notCreator'], [409, 'not_cancellable', 'notCancellable'], [500, '', 'error'],
+    ] as const) {
+      it(`handles cancellation error ${status}`, () => {
+        dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as MatDialogRef<CatalogueConfirmDialogComponent>);
+        rfqApiSpy.cancelRfq.and.returnValue(throwError(() => new HttpErrorResponse({ status, error: { details: { reason } } })));
+        rfqApiSpy.getRfq.calls.reset();
+        component.onCancelRfq();
+        expect(snackBarSpy.open).toHaveBeenCalledWith(enCatalog.rfq.cancel[key], jasmine.any(String), jasmine.any(Object));
+        expect(component.cancelling()).toBeFalse();
+        expect(rfqApiSpy.getRfq.calls.count()).toBe(status === 409 ? 1 : 0);
+      });
+    }
+
+    it('provides cancellation copy and status in English and Arabic', () => {
+      for (const catalog of [enCatalog, arCatalog]) {
+        expect(catalog.rfq.history.status_cancelled).toBeTruthy();
+        expect(catalog.rfq.detail.cancelledAtLabel).toBeTruthy();
+        expect(catalog.rfq.compare.rfqCancelled).toBeTruthy();
+        for (const value of Object.values(catalog.rfq.cancel)) expect(value.trim()).toBeTruthy();
+      }
+      expect(arCatalog.rfq.history.status_cancelled).toMatch(/[\u0600-\u06ff]/);
+    });
   });
 
   it('loads RFQ detail and responses on init', () => {
@@ -564,7 +863,8 @@ describe('DetailComponent (RFQ Details)', () => {
     expect(compiled.querySelector('[data-testid="rfq-detail-retry-notice"]')).toBeNull();
   });
 
-  it('hides retry notice card when viewer is not creator', async () => {
+  it('hides retry notice card when viewer is a non-creator buyer', async () => {
+    spyOn(TestBed.inject(SessionService), 'hasRole').and.callFake(role => role === 'buyer');
     component.currentMembershipId.set('m-other-user');
     fixture.detectChanges();
     await fixture.whenStable();
@@ -1167,4 +1467,376 @@ describe('DetailComponent (RFQ Details)', () => {
     });
   }
 
+  describe('PPS-176: manual supplier reminders', () => {
+    function recipient(overrides: Partial<ReminderRecipient> = {}): ReminderRecipient {
+      return {
+        id: 'rec-r1',
+        tenant_id: 't-1',
+        rfq_id: 'rfq-sent-1',
+        supplier_id: 'sup-1',
+        status: 'sent',
+        outbound_message_id: 'msg-1',
+        sent_at: '2026-10-28T14:14:00Z',
+        created_at: '2026-10-20T10:00:00Z',
+        supplier_name: 'Al-Madina Foods',
+        supplier_contact_email: 'contact@almadina.test',
+        response_count: 0,
+        reminder_count: 0,
+        last_reminder_at: null,
+        can_remind: true,
+        remind_blocked_reason: null,
+        ...overrides,
+      };
+    }
+
+    function setRecipients(
+      recipients: ReminderRecipient[],
+      rfqOverrides: Partial<RfqDetail['rfq']> = {},
+    ): void {
+      component.rfqId.set('rfq-sent-1');
+      component.currentMembershipId.set('m-creator');
+      component.rfqDetail.set({
+        ...mockSentDetail,
+        rfq: { ...mockSentDetail.rfq, ...rfqOverrides },
+        recipients,
+      });
+      component.selectedTabIndex.set(2);
+      fixture.detectChanges();
+    }
+
+    function page(): HTMLElement {
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    function query<T extends HTMLElement = HTMLElement>(testId: string): T | null {
+      return page().querySelector<T>(`[data-testid="${testId}"]`);
+    }
+
+    function isoDateIn(days: number): string {
+      const date = new Date();
+      date.setDate(date.getDate() + days);
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${date.getFullYear()}-${month}-${day}`;
+    }
+
+    function confirmDialog(confirmed: boolean): MatDialogRef<CatalogueConfirmDialogComponent, boolean> {
+      return { afterClosed: () => of(confirmed) } as MatDialogRef<CatalogueConfirmDialogComponent, boolean>;
+    }
+
+    const preview = (overrides: Partial<ReminderPreviewFixture> = {}): ReminderPreviewFixture => ({
+      subject: 'Reminder: RFQ-000001',
+      body_text: 'Hello supplier',
+      locale: 'en',
+      allowed: true,
+      blocked_reason: null,
+      ...overrides,
+    });
+
+    it('shows Send reminder only when the recipient can be reminded', () => {
+      setRecipients([
+        recipient({ id: 'r1', can_remind: true }),
+        recipient({ id: 'r2', can_remind: false, remind_blocked_reason: 'replied' }),
+      ]);
+
+      expect(query('recipient-remind-r1')).not.toBeNull();
+      expect(query('recipient-remind-r2')).toBeNull();
+    });
+
+    it('shows a short blocked reason only for too early, cooldown and limit reached', () => {
+      const reasons = ['too_early', 'cooldown', 'limit_reached', 'replied', 'rfq_not_open', 'not_delivered', 'not_permitted'];
+      setRecipients(reasons.map((reason, index) => recipient({
+        id: `r${index}`, can_remind: false, remind_blocked_reason: reason,
+      })));
+
+      for (const index of [0, 1, 2]) {
+        expect(query(`recipient-reminder-blocked-r${index}`)?.textContent?.trim()).toBeTruthy();
+      }
+      for (const index of [3, 4, 5, 6]) {
+        expect(query(`recipient-reminder-blocked-r${index}`)).toBeNull();
+      }
+    });
+
+    it('shows reminders sent and the last reminder time', () => {
+      const lastReminderAt = '2026-11-01T09:30:00Z';
+      setRecipients([recipient({
+        id: 'r1', reminder_count: 2, last_reminder_at: lastReminderAt,
+        can_remind: false, remind_blocked_reason: 'limit_reached',
+      })]);
+
+      const text = query('recipient-reminders-r1')?.textContent ?? '';
+      expect(text).toContain(catalogString(enCatalog, 'rfq.detail.remindersSent').replace('{{count}}', '2'));
+      expect(text).toContain(component.formatDate(lastReminderAt));
+      expect(text).toContain(component.formatTime(lastReminderAt));
+    });
+
+    it('opens the preview dialog and sends the reminder from the response', () => {
+      setRecipients([recipient({ id: 'r1' })]);
+      reminderApi.previewReminder.and.returnValue(of(preview({
+        subject: 'Reminder: RFQ-000001', body_text: 'Hello supplier', locale: 'ar',
+      })));
+      reminderApi.sendReminder.and.returnValue(of(recipient({
+        id: 'r1', reminder_count: 1, last_reminder_at: '2026-11-05T10:00:00Z',
+        can_remind: false, remind_blocked_reason: 'cooldown',
+      })));
+      dialogSpy.open.and.returnValue(confirmDialog(true));
+
+      query<HTMLButtonElement>('recipient-remind-r1')?.click();
+      fixture.detectChanges();
+
+      expect(reminderApi.previewReminder).toHaveBeenCalledWith('rfq-sent-1', 'r1');
+      expect(dialogSpy.open).toHaveBeenCalledWith(CatalogueConfirmDialogComponent, jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          titleKey: 'rfq.detail.reminderPreviewTitle',
+          previewSubject: 'Reminder: RFQ-000001',
+          previewBody: 'Hello supplier',
+          previewLocale: 'ar',
+          confirmKey: 'rfq.detail.reminderSend',
+          cancelKey: 'rfq.detail.reminderCancel',
+          showConfirm: true,
+        }),
+      }));
+      expect(reminderApi.sendReminder).toHaveBeenCalledWith('rfq-sent-1', 'r1', jasmine.any(String));
+      expect(query('recipient-remind-r1')).toBeNull();
+      expect(query('recipient-reminders-r1')?.textContent)
+        .toContain(catalogString(enCatalog, 'rfq.detail.remindersSent').replace('{{count}}', '1'));
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        catalogString(enCatalog, 'rfq.detail.reminderSent'),
+        jasmine.any(String),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+    });
+
+    it('shows the blocked reason and no Send button when the preview is not allowed', () => {
+      setRecipients([recipient({ id: 'r1' })]);
+      reminderApi.previewReminder.and.returnValue(of(preview({
+        allowed: false, blocked_reason: 'too_early',
+      })));
+      dialogSpy.open.and.returnValue(confirmDialog(false));
+
+      query<HTMLButtonElement>('recipient-remind-r1')?.click();
+      fixture.detectChanges();
+
+      expect(dialogSpy.open).toHaveBeenCalledWith(CatalogueConfirmDialogComponent, jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          showConfirm: false,
+          warningKey: 'rfq.detail.reminderBlockedTooEarly',
+        }),
+      }));
+      expect(reminderApi.sendReminder).not.toHaveBeenCalled();
+    });
+
+    it('shows the translated blocked reason when sending is rejected with 422', () => {
+      setRecipients([recipient({ id: 'r1' })]);
+      reminderApi.previewReminder.and.returnValue(of(preview()));
+      reminderApi.sendReminder.and.returnValue(throwError(() => new HttpErrorResponse({
+        status: 422, error: { details: { reason: 'cooldown' } },
+      })));
+      dialogSpy.open.and.returnValue(confirmDialog(true));
+
+      query<HTMLButtonElement>('recipient-remind-r1')?.click();
+      fixture.detectChanges();
+
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        catalogString(enCatalog, 'rfq.detail.reminderBlockedCooldown'),
+        jasmine.any(String),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+    });
+
+    it('shows the delivery-failed message when the reminder returns 503', () => {
+      setRecipients([recipient({ id: 'r1' })]);
+      reminderApi.previewReminder.and.returnValue(of(preview()));
+      reminderApi.sendReminder.and.returnValue(throwError(() => new HttpErrorResponse({
+        status: 503, error: { code: 'reminder_delivery_failed' },
+      })));
+      dialogSpy.open.and.returnValue(confirmDialog(true));
+
+      query<HTMLButtonElement>('recipient-remind-r1')?.click();
+      fixture.detectChanges();
+
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        catalogString(enCatalog, 'rfq.detail.reminderDeliveryFailed'),
+        jasmine.any(String),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+    });
+
+    it('shows Remind all awaiting when at least one recipient can be reminded', () => {
+      setRecipients([
+        recipient({ id: 'r1', can_remind: true }),
+        recipient({ id: 'r2', can_remind: false, remind_blocked_reason: 'replied' }),
+      ]);
+
+      expect(query('rfq-detail-remind-all-button')).not.toBeNull();
+    });
+
+    it('hides Remind all awaiting when no recipient can be reminded', () => {
+      setRecipients([recipient({ id: 'r1', can_remind: false, remind_blocked_reason: 'replied' })]);
+
+      expect(query('rfq-detail-remind-all-button')).toBeNull();
+    });
+
+    it('hides all reminder actions from a buyer who is not the creator', () => {
+      spyOn(TestBed.inject(SessionService), 'hasRole').and.callFake((role) => role === 'buyer');
+      setRecipients([recipient({ id: 'r1', can_remind: true })]);
+      component.currentMembershipId.set('m-other');
+      fixture.detectChanges();
+
+      expect(query('rfq-detail-remind-all-button')).toBeNull();
+      expect(query('recipient-remind-r1')).toBeNull();
+    });
+
+    it('reminds each awaiting recipient sequentially with its own key and reports the result', () => {
+      const r1 = recipient({ id: 'r1', supplier_name: 'Alpha' });
+      const r2 = recipient({ id: 'r2', supplier_name: 'Beta' });
+      const r3 = recipient({ id: 'r3', supplier_name: 'Gamma', can_remind: false, remind_blocked_reason: 'replied' });
+      setRecipients([r1, r2, r3]);
+
+      const calls: string[] = [];
+      reminderApi.sendReminder.and.callFake((_rfqId: string, recipientId: string) => {
+        calls.push(recipientId);
+        return of(recipient({ id: recipientId, reminder_count: 1, can_remind: false }));
+      });
+      dialogSpy.open.and.returnValue(confirmDialog(true));
+      const initialLoads = rfqApiSpy.getRfq.calls.count();
+
+      query<HTMLButtonElement>('rfq-detail-remind-all-button')?.click();
+      fixture.detectChanges();
+
+      expect(dialogSpy.open).toHaveBeenCalledWith(CatalogueConfirmDialogComponent, jasmine.objectContaining({
+        data: jasmine.objectContaining({
+          titleKey: 'rfq.detail.remindAllConfirmTitle',
+          messageParams: jasmine.objectContaining({ count: 2 }),
+          listItems: ['Alpha', 'Beta'],
+        }),
+      }));
+      expect(calls).toEqual(['r1', 'r2']);
+      const keys = reminderApi.sendReminder.calls.allArgs().map((args) => args[2]);
+      expect(new Set(keys).size).toBe(2);
+      expect(rfqApiSpy.getRfq.calls.count()).toBe(initialLoads + 1);
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        TestBed.inject(TranslateService).instant('rfq.detail.remindAllResult', { sent: 2, failed: 0 }),
+        jasmine.any(String),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+    });
+
+    it('continues after a failed reminder and reports sent and failed counts', () => {
+      setRecipients([
+        recipient({ id: 'r1', supplier_name: 'Alpha' }),
+        recipient({ id: 'r2', supplier_name: 'Beta' }),
+      ]);
+      reminderApi.sendReminder.and.callFake((_rfqId: string, recipientId: string) => recipientId === 'r2'
+        ? throwError(() => new HttpErrorResponse({ status: 503, error: { code: 'reminder_delivery_failed' } }))
+        : of(recipient({ id: recipientId, reminder_count: 1, can_remind: false })));
+      dialogSpy.open.and.returnValue(confirmDialog(true));
+
+      query<HTMLButtonElement>('rfq-detail-remind-all-button')?.click();
+      fixture.detectChanges();
+
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        TestBed.inject(TranslateService).instant('rfq.detail.remindAllResult', { sent: 1, failed: 1 }),
+        jasmine.any(String),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+    });
+
+    it('shows the needed-in hint for an open RFQ due within two days with an unreplied supplier', () => {
+      setRecipients([recipient({ id: 'r1', response_count: 0 })], {
+        status: 'sent', needed_by_date: isoDateIn(1),
+      });
+
+      const hint = query('rfq-detail-needed-hint');
+      expect(hint).not.toBeNull();
+      expect(hint?.textContent).toContain('Needed in 1 day and some suppliers have not replied');
+    });
+
+    it('hides the needed-in hint when all suppliers replied, the RFQ is closed, or the date is beyond two days', () => {
+      setRecipients([recipient({ id: 'r1', response_count: 1 })], {
+        status: 'sent', needed_by_date: isoDateIn(1),
+      });
+      expect(query('rfq-detail-needed-hint')).toBeNull();
+
+      setRecipients([recipient({ id: 'r1', response_count: 0 })], {
+        status: 'expired', needed_by_date: isoDateIn(1),
+      });
+      expect(query('rfq-detail-needed-hint')).toBeNull();
+
+      setRecipients([recipient({ id: 'r1', response_count: 0 })], {
+        status: 'sent', needed_by_date: isoDateIn(3),
+      });
+      expect(query('rfq-detail-needed-hint')).toBeNull();
+    });
+
+    it('uses Arabic plural forms for the needed-in hint', () => {
+      TestBed.inject(TranslateService).use('ar');
+      setRecipients([recipient({ id: 'r1', response_count: 0 })], {
+        status: 'sent', needed_by_date: isoDateIn(2),
+      });
+
+      expect(query('rfq-detail-needed-hint')?.textContent)
+        .toContain('مطلوب خلال يومين ولم يرد بعض الموردين');
+    });
+
+    it('provides English and Arabic strings for every reminder key', () => {
+      const keys = [
+        'remindersSent', 'lastReminderAt', 'sendReminder', 'remindAllAwaiting', 'reminders',
+        'reminderPreviewTitle', 'reminderPreviewMessage', 'reminderSend', 'reminderCancel',
+        'reminderSent', 'reminderSendError', 'reminderDeliveryFailed', 'reminderPreviewError',
+        'remindAllConfirmTitle', 'remindAllConfirmMessage', 'remindAllConfirmButton', 'remindAllResult',
+        'reminderBlockedRfqNotOpen', 'reminderBlockedNotDelivered', 'reminderBlockedReplied',
+        'reminderBlockedTooEarly', 'reminderBlockedCooldown', 'reminderBlockedLimitReached',
+        'reminderBlockedNotPermitted', 'neededInDaysTitle',
+      ];
+
+      for (const key of keys) {
+        const en = catalogString(enCatalog, `rfq.detail.${key}`);
+        const ar = catalogString(arCatalog, `rfq.detail.${key}`);
+        expect(typeof en).withContext(`EN ${key}`).toBe('string');
+        expect(typeof ar).withContext(`AR ${key}`).toBe('string');
+        expect((en ?? '').trim()).withContext(`EN empty ${key}`).not.toBe('');
+        expect((ar ?? '').trim()).withContext(`AR empty ${key}`).not.toBe('');
+      }
+      for (const category of ['zero', 'one', 'two', 'few', 'many', 'other']) {
+        expect(typeof catalogString(enCatalog, `rfq.detail.neededInDays.${category}`))
+          .withContext(`EN neededInDays.${category}`).toBe('string');
+        expect(typeof catalogString(arCatalog, `rfq.detail.neededInDays.${category}`))
+          .withContext(`AR neededInDays.${category}`).toBe('string');
+      }
+    });
+  });
+
+});
+
+// Exercise the real HTTP boundary here alongside the cancellation UI regression suite.
+describe('RfqApi cancellation idempotency', () => {
+  let api: RfqApi;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(withXhr()), provideHttpClientTesting()] });
+    api = TestBed.inject(RfqApi);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  it('posts no body with the caller-supplied action key', () => {
+    const keys = new RfqActionKeys();
+    const key = keys.get('cancel:rfq-1');
+    api.cancelRfq('rfq-1', key).subscribe();
+    const request = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toBeNull();
+    expect(request.request.headers.get('Idempotency-Key')).toBe(key);
+    request.flush({ status: 'cancelled' });
+  });
+
+  it('generates a fallback key when the caller does not supply one', () => {
+    api.cancelRfq('rfq-1').subscribe();
+    const request = http.expectOne((req) => req.url.endsWith('/rfq/rfq-1/cancel'));
+    expect(request.request.headers.get('Idempotency-Key')).toEqual(jasmine.any(String));
+    request.flush({ status: 'cancelled' });
+  });
 });

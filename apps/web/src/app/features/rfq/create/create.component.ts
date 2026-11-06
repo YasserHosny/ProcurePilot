@@ -1,4 +1,3 @@
-import { RfqActionKeys } from '../rfq-api';
 import { Component, OnInit, inject, signal, ChangeDetectionStrategy, ElementRef, viewChildren } from '@angular/core';
 
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -19,7 +18,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { EMPTY, Observable, expand, forkJoin, map, reduce } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
-import { Rfq, RfqApi, RfqDetail } from '../rfq-api';
+import { RfqActionKeys, Rfq, RfqApi, RfqDetail } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { Product, Supplier } from '../../../core/api/models';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
@@ -256,6 +255,12 @@ export class RfqCreateComponent implements OnInit {
       return;
     }
 
+    const fromSplitId = this.route?.snapshot?.queryParamMap?.get('from_split') ?? null;
+    if (fromSplitId) {
+      this.loadSplitData(fromSplitId);
+      return;
+    }
+
     const fromId = this.route?.snapshot?.queryParamMap?.get('from') ?? null;
     if (fromId) {
       this.loadDuplicateData(fromId);
@@ -306,6 +311,63 @@ export class RfqCreateComponent implements OnInit {
       ),
       reduce((acc, res) => acc.concat(res.items), [] as Product[]),
     );
+  }
+
+  /**
+   * Starts an RFQ from a basket split: the split's suppliers and quantities, so fresh quotes can
+   * confirm what the split only estimated. The needed-by date and terms are left for the buyer.
+   */
+  private loadSplitData(jobId: string): void {
+    this.isLoadingRfq.set(true);
+    this.errorMessage.set(null);
+    this.initialLoadError.set(null);
+
+    forkJoin({
+      products: this.loadAllActiveProducts(),
+      suppliers: this.loadAllActiveSuppliers(),
+      job: this.apiService.getBasketSplitJob(jobId),
+    }).subscribe({
+      next: ({ products, suppliers, job }) => {
+        this.products.set(products);
+        this.allLoadedSuppliers.set(suppliers);
+        this.excludedSupplierCount.set(suppliers.filter((s) => !s.contact_email).length);
+        const withEmail = suppliers.filter((s) => !!s.contact_email);
+        this.suppliers.set(withEmail);
+
+        this.linesFormArray.clear();
+        for (const item of job.items) {
+          const product = products.find((p) => p.id === item.workspace_product_id);
+          const saved = parseFloat(job.pack_snapshot?.[item.workspace_product_id]?.base_quantity ?? '');
+          // The pack saved on the job, else the product's (a product without pack data is sold
+          // loose); with neither, the pack is unknown and the buyer enters the quantity.
+          const packBase =
+            saved > 0 ? saved : product ? parseFloat(product.pack?.base_quantity ?? '') || 1 : null;
+          const packs = packBase ? Math.round((parseFloat(item.quantity) / packBase) * 1e6) / 1e6 : null;
+          const lineGroup = this.fb.nonNullable.group({
+            workspace_product_id: [item.workspace_product_id, [Validators.required, this.productValidator]],
+            quantity: [packs === null ? '' : String(packs), [Validators.required, Validators.min(0.01)]],
+          });
+          if (!product) lineGroup.get('workspace_product_id')?.markAsTouched();
+          this.linesFormArray.push(lineGroup);
+        }
+        if (this.linesFormArray.length === 0) this.addLine();
+
+        const sendable = new Set(withEmail.map((s) => s.id));
+        // Suppliers the buyer excluded from the split are not asked for a quote.
+        const excluded = new Set(job.request_settings?.excluded_supplier_ids ?? []);
+        this.form.patchValue({
+          supplierIds: job.supplier_ids.filter((id) => sendable.has(id) && !excluded.has(id)),
+        });
+        this.isDataLoaded.set(true);
+        this.isLoadingRfq.set(false);
+      },
+      error: () => {
+        // The split is only a starting point: an empty RFQ form is still useful.
+        this.isLoadingRfq.set(false);
+        this.errorMessage.set(this.translate.instant('rfq.create.splitLoadError'));
+        this.loadCreateModeData();
+      },
+    });
   }
 
   private loadDuplicateData(fromId: string): void {
@@ -523,9 +585,10 @@ export class RfqCreateComponent implements OnInit {
     const payload = this.buildSavePayload();
     const existingId = this.rfqId();
     const action = existingId ? `update:${existingId}` : 'create:new';
+    const key = this.actionKeys.get(action, JSON.stringify(payload));
     const request$ = existingId
-      ? this.rfqApi.updateRfq(existingId, payload, this.actionKeys.get(action))
-      : this.rfqApi.createRfq(payload, this.actionKeys.get(action));
+      ? this.rfqApi.updateRfq(existingId, payload, key)
+      : this.rfqApi.createRfq(payload, key);
 
     request$.subscribe({
       next: (res) => {
@@ -627,7 +690,7 @@ export class RfqCreateComponent implements OnInit {
     this.rejectedSuppliers.set([]);
 
     const payload = this.buildSavePayload();
-    this.rfqApi.updateRfq(id, payload, this.actionKeys.get(action)).subscribe({
+    this.rfqApi.updateRfq(id, payload, this.actionKeys.get(action, JSON.stringify(payload))).subscribe({
       next: (res) => {
         this.actionKeys.clear(action);
         this.isSaving.set(false);

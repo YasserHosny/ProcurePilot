@@ -20,7 +20,6 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ApiService } from '../../../core/api/api.service';
 import type {
   ApiError,
-  BaseUnit,
   LandedCost,
   MatchCandidate,
   MatchCorrectionRequest,
@@ -34,11 +33,18 @@ import type {
 } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { formatExactQuantity, localizeDigits, percentSign } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { computeBaseQuantity } from '../../catalogue/normalisation';
 
 import { MatchResolutionCandidatesComponent } from './match-resolution-candidates.component';
-import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS } from './correct-match-dialog.component';
+import { ProductPickerComponent } from './product-picker.component';
+import {
+  CorrectMatchDialogComponent,
+  FALLBACK_BASE_UNITS,
+  type SelectableUnit,
+} from './correct-match-dialog.component';
+import { FormatPercentPipe } from '../../../core/format/percent.pipe';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 import { formatSweptLinesMessage, appendSweptMessage, CorrectionKeyManager } from '../matching-api';
@@ -64,11 +70,13 @@ import { formatSweptLinesMessage, appendSweptMessage, CorrectionKeyManager } fro
     MatDialogModule,
     MatTooltipModule,
     TranslatePipe,
+    FormatPercentPipe,
     FormatQuantityPipe,
     UnitLabelPipe,
     FormatDatePipe,
     FormatMoneyPipe,
     MatchResolutionCandidatesComponent,
+    ProductPickerComponent,
   ],
   templateUrl: './match-resolution.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -93,9 +101,15 @@ export class MatchResolutionComponent implements OnInit {
   readonly line = signal<QuotationLineSummary | null>(null);
   readonly candidates = signal<MatchCandidate[]>([]);
   readonly decision = signal<MatchDecision | null>(null);
+
+  // Correction chain (P-154): loaded when the buyer opens it, so it is always current.
+  readonly historyOpen = signal(false);
+  readonly history = signal<readonly MatchDecision[] | null>(null);
+  readonly historyFailed = signal(false);
+  private historyRequestId = 0;
   readonly landedCost = signal<LandedCost | null>(null);
 
-  readonly baseUnits = signal<BaseUnit[]>([]);
+  readonly baseUnits = signal<SelectableUnit[]>([]);
   readonly suppliers = signal<Supplier[]>([]);
 
   // Selected candidate and outcome
@@ -257,6 +271,7 @@ export class MatchResolutionComponent implements OnInit {
   }
 
   loadTask(id: string): void {
+    this.resetHistory();
     const requestId = ++this.latestLoadTaskId;
     this.latestLandedCostRequestId++;
     if (this.currentLoadedLineId !== id) {
@@ -312,6 +327,7 @@ export class MatchResolutionComponent implements OnInit {
 
     if (t.decision) {
       this.decision.set(t.decision);
+      this.resetHistory();
       this.selectedOutcome.set(t.decision.outcome);
       if (t.decision.selected_match_candidate_id) {
         this.selectedCandidateId.set(t.decision.selected_match_candidate_id);
@@ -355,6 +371,44 @@ export class MatchResolutionComponent implements OnInit {
         this.isLoading.set(false);
       },
     });
+  }
+
+  toggleHistory(): void {
+    if (this.historyOpen()) {
+      this.resetHistory();
+      return;
+    }
+    const lineId = this.line()?.id;
+    if (!lineId) return;
+    const requestId = ++this.historyRequestId;
+    this.historyOpen.set(true);
+    this.historyFailed.set(false);
+    this.api.getDecisionHistory(lineId).subscribe({
+      // A late answer for an earlier request, or for another line, is ignored.
+      next: (res) => {
+        if (requestId === this.historyRequestId) this.history.set(res.items);
+      },
+      error: () => {
+        if (requestId === this.historyRequestId) this.historyFailed.set(true);
+      },
+    });
+  }
+
+  /** Close the history and drop what it held; any answer still in flight is now stale. */
+  private resetHistory(): void {
+    this.historyRequestId++;
+    this.history.set(null);
+    this.historyOpen.set(false);
+    this.historyFailed.set(false);
+  }
+
+  /** A catalogue product the buyer picked was recorded as a candidate: list it and select it. */
+  onManualCandidate(candidate: MatchCandidate): void {
+    if (!this.candidates().some((c) => c.id === candidate.id)) {
+      this.candidates.update((list) => [...list, candidate]);
+    }
+    this.selectCandidate(candidate.id);
+    this.selectedOutcome.set('same_product');
   }
 
   selectCandidate(candidateId: string): void {
@@ -555,6 +609,7 @@ export class MatchResolutionComponent implements OnInit {
         this.isSubmitting.set(false);
         this.resolutionKey = null;
         this.decision.set(decision);
+        this.resetHistory();
         if (resolveNext) {
           this.navigateToNextTask(l.id, decision);
           return;
@@ -621,6 +676,12 @@ export class MatchResolutionComponent implements OnInit {
     return Math.round(num * 100);
   }
 
+  /** `1 × 2.0` as printed, with the interface language's digits. */
+  packText(pack: { pack_count: number | string; unit_size: number | string }): string {
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    return localizeDigits(`${pack.pack_count} × ${pack.unit_size}`, locale);
+  }
+
   formatVatRate(rate: string | number | null | undefined): string {
     if (rate == null || rate === '') return '';
     let str = String(rate).trim();
@@ -649,7 +710,10 @@ export class MatchResolutionComponent implements OnInit {
     const resultFraction = shiftedFraction.replace(/0+$/, '');
     const sign = isNegative ? '-' : '';
     const result = resultFraction ? `${resultWhole}.${resultFraction}` : resultWhole;
-    return `${sign}${result}%`;
+    // The decimal shift above keeps the value exact; only the digits and the percent sign follow
+    // the interface language (`14.5%` / `١٤٫٥٪`).
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    return `${sign}${formatExactQuantity(result, locale)}${percentSign(locale)}`;
   }
 
   isDiscountNonZero(discount?: { amount: string | number } | null): boolean {
@@ -662,8 +726,9 @@ export class MatchResolutionComponent implements OnInit {
     return candidate.embedding_model !== 'stub-hash-v1';
   }
 
-  localizedUnitLabel(unit: BaseUnit): string {
-    return this.translate.getCurrentLang() === 'ar' ? unit.label_ar : unit.label_en;
+  localizedUnitLabel(unit: SelectableUnit): string {
+    const label = this.translate.getCurrentLang() === 'ar' ? unit.label_ar : unit.label_en;
+    return label || this.translate.instant(`matching.resolution.unitNames.${unit.code}`);
   }
 
   openCorrectMatchDialog(): void {
@@ -678,7 +743,8 @@ export class MatchResolutionComponent implements OnInit {
         candidates: this.candidates(),
         expectedCurrentDecisionId: dec.id,
         currentCandidateId: dec.selected_match_candidate_id ?? null,
-        baseUnits: this.baseUnits(),
+        // The unit list loads in parallel: until it arrives (or if it is empty) offer the built-in units.
+        baseUnits: this.baseUnits().length > 0 ? this.baseUnits() : FALLBACK_BASE_UNITS,
         quotationSupplierId: this.task()?.quotation?.supplier_id ?? null,
       },
     });
@@ -731,6 +797,7 @@ export class MatchResolutionComponent implements OnInit {
 
         this.loadTask(lineId);
         this.decision.set(res.decision);
+        this.resetHistory();
 
         if (res.lines_matched_through_old_wording && res.lines_matched_through_old_wording.length > 0) {
           this.dependentLinesCount.set(res.lines_matched_through_old_wording.length);

@@ -3,11 +3,12 @@ from __future__ import annotations
 import base64
 import json
 import logging
-from collections.abc import Sequence
+import re
+from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import NamedTuple
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
 import psycopg
 from postgrest.exceptions import APIError
@@ -20,6 +21,7 @@ from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (
+    AppError,
     ConflictError,
     NotFoundError,
     PermissionDeniedError,
@@ -50,22 +52,29 @@ from procurepilot_api.modules.requests.schemas import (
     ApprovalStep,
     AutoPreparedProvenance,
     BudgetStatus,
+    BulkApprovalDecisionInput,
+    BulkApprovalDecisionResponse,
+    BulkApprovalDecisionResult,
     DeliveryConfirmationCreate,
     LowStockReport,
     LowStockReportCreate,
     LowStockReportList,
     Money,
+    PendingApprovalList,
+    PendingApprovalSort,
     PurchaseRequest,
     PurchaseRequestCreate,
     PurchaseRequestLine,
     PurchaseRequestLineInput,
     PurchaseRequestList,
+    PurchaseRequestSort,
     PurchaseRequestStatus,
     PurchaseRequestUpdate,
     QualityIssue,
     QualityIssueCreate,
     QualityIssueList,
     QualityIssuePhoto,
+    RequestGroupSibling,
     RequestGroupSummary,
     RequestSource,
     ThresholdRule,
@@ -76,6 +85,7 @@ from procurepilot_api.modules.requests.schemas import (
 from procurepilot_api.modules.requests.valuation import (
     LineEstimate,
     QuotedPrice,
+    estimate_from_source_quotation,
     estimate_from_source_response,
     estimate_line_value,
     quoted_prices_from_source_response,
@@ -135,9 +145,9 @@ DELEGATION_COLUMNS = (
     "id,delegator_membership_id,delegate_membership_id,starts_on,ends_on,created_at"
 )
 BUDGET_COLUMNS = "id,amount,currency,period,period_start,scope,branch_id,cost_centre_id"
-# Statuses whose estimate counts against a budget. An approved request moves straight to
-# "ordered" (spec 010) and later "delivered", so both stay committed spend; draft, rejected
-# and withdrawn requests never count.
+# Statuses whose estimate counts against a budget. An approved request stays "approved" until a
+# live purchase order moves it to "ordered" (ADR-025), later "delivered"; approved, ordered and
+# delivered all count as committed spend (draft, rejected and withdrawn do not).
 COMMITTED_SPEND_STATUSES = ("submitted", "approved", "ordered", "delivered")
 # Matches the Data API max_rows (supabase/config.toml); a full page means "fetch the next".
 COMMITTED_SPEND_PAGE_SIZE = 1000
@@ -163,6 +173,10 @@ class RequestsService:
     def _validate_request_lines(self, lines: Sequence[PurchaseRequestLineInput]) -> None:
         seen: set[UUID] = set()
         for i, line in enumerate(lines):
+            if line.note is not None and len(line.note.strip()) > 500:
+                raise UnprocessableEntityError(
+                    details={"field": f"lines[{i}].note", "reason": "note_too_long"}
+                )
             try:
                 qty = Decimal(str(line.quantity))
             except Exception:
@@ -301,7 +315,7 @@ class RequestsService:
 
         # 2. Estimates & Totals
         product_ids = [line.workspace_product_id for line in payload.lines]
-        estimates = self._estimate_products(product_ids)
+        estimates = self._estimate_products(product_ids, member=member)
         quantities = [line.quantity for line in payload.lines]
         total_amount, total_currency, has_incomplete = _compute_totals(quantities, estimates)
         pack_quantities = self._fetch_pack_quantities_batch(
@@ -596,6 +610,8 @@ class RequestsService:
                         contact_ids = [request_row["requested_by_membership_id"]]
                         if step_row:
                             contact_ids.append(step_row["assigned_membership_id"])
+                            if step_row.get("decided_by_membership_id"):
+                                contact_ids.append(step_row["decided_by_membership_id"])
                         contacts = {
                             str(row["id"]): _member_contact(row)
                             for row in conn.execute(
@@ -641,12 +657,14 @@ class RequestsService:
 
         requester = contacts.get(str(request_row["requested_by_membership_id"]))
         assignee = contacts.get(str(step_row["assigned_membership_id"])) if step_row else None
+        decider = contacts.get(str(step_row.get("decided_by_membership_id"))) if step_row else None
         return _purchase_request(
             request_row,
             line_rows,
             step_row,
             requester=requester,
             assignee=assignee,
+            decider=decider,
             auto_prepared=(
                 AutoPreparedProvenance.model_validate(auto_prepared_row)
                 if auto_prepared_row
@@ -666,8 +684,12 @@ class RequestsService:
         cursor: str | None = None,
         limit: int = 50,
         eligible_for_order: bool = False,
+        sort: PurchaseRequestSort = "created_desc",
+        q: str | None = None,
+        mine: bool = False,
     ) -> PurchaseRequestList:
-        if eligible_for_order:
+        filtered_sql = q is not None or mine or sort != "created_desc"
+        if eligible_for_order and not filtered_sql and status is None and branch_id is None:
             if member is None:
                 raise UnprocessableEntityError(details={"reason": "member_required"})
             return self.list_requests_eligible_for_order(member=member, cursor=cursor, limit=limit)
@@ -675,27 +697,55 @@ class RequestsService:
         capped = _cap_limit(limit)
         offset = _decode_cursor(cursor)
 
-        try:
-            query = client.table("purchase_request").select(REQUEST_COLUMNS)
-            if status is not None:
-                query = query.eq("status", status)
-            if branch_id is not None:
-                query = query.eq("branch_id", str(branch_id))
-            response = (
-                query.order("created_at", desc=True)
-                .order("id")
-                .range(offset, offset + capped)
-                .execute()
+        if filtered_sql or eligible_for_order:
+            if member is None:
+                raise UnprocessableEntityError(details={"reason": "member_required"})
+            rows = self._list_request_rows_sql(
+                member=member,
+                status=status,
+                branch_id=branch_id,
+                q=q,
+                mine=mine,
+                sort=sort,
+                offset=offset,
+                limit=capped + 1,
+                eligible_for_order=eligible_for_order,
             )
-        except APIError as exc:
-            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        else:
+            try:
+                query = client.table("purchase_request").select(REQUEST_COLUMNS)
+                if status is not None:
+                    query = query.eq("status", status)
+                if branch_id is not None:
+                    query = query.eq("branch_id", str(branch_id))
+                response = (
+                    query.order("created_at", desc=True)
+                    .order("id")
+                    .range(offset, offset + capped)
+                    .execute()
+                )
+            except APIError as exc:
+                raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
-        rows = _rows(response.data)
+            rows = _rows(response.data)
+
         visible = rows[:capped]
         next_cursor = _encode_cursor(offset + capped) if len(rows) > capped else None
 
         if not visible:
             return PurchaseRequestList(items=[], next_cursor=next_cursor)
+
+        if eligible_for_order:
+            assert member is not None
+            # Reuse the legacy eligible helper's per-row construction, skipping normal
+            # list enrichment so filters cannot change item content. Keep the bare path intact.
+            return PurchaseRequestList(
+                items=[
+                    self._get_request_for_member(member=member, request_id=UUID(str(row["id"])))
+                    for row in visible
+                ],
+                next_cursor=next_cursor,
+            )
 
         request_ids = [str(r["id"]) for r in visible]
         lines_by_request = self._fetch_lines_batch(client, request_ids)
@@ -706,6 +756,17 @@ class RequestsService:
         auto_prepared = self._fetch_auto_prepared_batch(client, visible)
         sources = self._fetch_sources_batch(client, visible)
         request_groups = self._fetch_request_groups_batch(client, visible)
+
+        budgets = self._fetch_budget_rows(client)
+        spend_cache: dict[UUID, list[SpendRow]] = {}
+
+        def committed_spend(budget: BudgetRow) -> list[SpendRow]:
+            if budget.id not in spend_cache:
+                spend_cache[budget.id] = self._fetch_committed_spend_rows(client, budget)
+            return spend_cache[budget.id]
+
+        def budget_status_for(row: dict[str, object]) -> BudgetStatus | None:
+            return _compute_request_budget_status(row, budgets, committed_spend)
 
         items = []
         for row in visible:
@@ -722,6 +783,9 @@ class RequestsService:
                         if step is not None
                         else None
                     ),
+                    decider=member_contacts.get(str(step.get("decided_by_membership_id")))
+                    if step
+                    else None,
                     requester_lookup=False,
                     auto_prepared=auto_prepared.get(str(row["id"])),
                     auto_prepared_lookup=False,
@@ -729,6 +793,7 @@ class RequestsService:
                     source_lookup=False,
                     request_group=request_groups.get(str(row["id"])),
                     request_group_lookup=False,
+                    budget_status_for=budget_status_for,
                 )
             )
         if member is not None:
@@ -747,6 +812,92 @@ class RequestsService:
             for item in orderable:
                 item.has_quantity_to_order = item.id in remaining
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
+
+    def _list_request_rows_sql(
+        self,
+        *,
+        member: CurrentMember,
+        status: PurchaseRequestStatus | None,
+        branch_id: UUID | None,
+        q: str | None,
+        mine: bool,
+        sort: PurchaseRequestSort,
+        offset: int,
+        limit: int,
+        eligible_for_order: bool,
+    ) -> list[dict[str, object]]:
+        # Run the full filtered page in SQL: no matching-ID cap (including >2000 matches),
+        # no oversized PostgREST URL, and only limit+1 rows are materialised.
+        predicates = [sql.SQL("true")]
+        params: list[object] = []
+        for column, value in (
+            ("status", status),
+            ("branch_id", branch_id),
+            ("requested_by_membership_id", member.membership_id if mine else None),
+        ):
+            if value is not None:
+                predicates.append(sql.SQL("pr.{} = %s").format(sql.Identifier(column)))
+                params.append(value)
+        if q is not None:
+            # Escape LIKE syntax before adding our own substring wildcards. Parameters
+            # keep both Arabic/Latin text and SQL metacharacters as literal user input.
+            pattern = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+            predicates.append(
+                sql.SQL(
+                    "(exists (select 1 from supplier s where s.tenant_id=pr.tenant_id "
+                    "and s.id=pr.source_supplier_id and s.name ilike %s) "
+                    "or exists (select 1 from purchase_request_line l "
+                    "left join workspace_product p on p.tenant_id=l.tenant_id "
+                    "and p.id=l.workspace_product_id "
+                    "where l.tenant_id=pr.tenant_id and l.purchase_request_id=pr.id "
+                    "and (p.tenant_name ilike %s or l.note ilike %s)))"
+                )
+            )
+            params.extend([pattern] * 3)
+        if eligible_for_order:
+            predicates.append(
+                sql.SQL(
+                    f"{orderable_request_predicate('pr')} and exists (select 1 "
+                    "from approval_step ast where ast.tenant_id=pr.tenant_id "
+                    f"and ast.purchase_request_id=pr.id and {approved_step_predicate('ast')}) "
+                    "and not exists (select 1 from purchase_order po "
+                    "where po.tenant_id=pr.tenant_id and po.source_request_id=pr.id)"
+                )
+            )
+        orders = {
+            "created_desc": "pr.created_at desc, pr.id",
+            "created_asc": "pr.created_at asc, pr.id",
+            "required_by_asc": "pr.required_by_date asc, pr.id",
+            "required_by_desc": "pr.required_by_date desc, pr.id",
+            # Raw amounts across currencies are ordered numerically; cross-currency
+            # totals are not comparable. Unknown totals always follow known totals.
+            "total_desc": "pr.estimated_total_amount desc nulls last, pr.id",
+            "total_asc": "pr.estimated_total_amount asc nulls last, pr.id",
+        }
+        # The id tie-break makes a quiet table's offset pages stable. Concurrent inserts
+        # can still shift offsets; the web de-duplicates. Retain the existing cursor.
+        query = sql.SQL(
+            "select pr.* from purchase_request pr where {} order by {} limit %s offset %s"
+        ).format(sql.SQL(" and ").join(predicates), sql.SQL(orders[sort]))
+        params.extend([limit, offset])
+        claims = json.dumps(
+            {
+                "sub": str(member.user_id),
+                "tenant_id": str(member.tenant_id),
+                "role": "authenticated",
+                "member_role": member.role.value,
+            }
+        )
+        try:
+            with db.connect(
+                self._settings.database_url.get_secret_value(), row_factory=dict_row
+            ) as conn:
+                # member is resolved from the verified JWT; all joined tables retain RLS.
+                conn.execute("set local role authenticated")
+                conn.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
+                return conn.execute(query, params).fetchall()
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def list_requests_eligible_for_order(
         self, *, member: CurrentMember, cursor: str | None = None, limit: int = 50
@@ -804,54 +955,45 @@ class RequestsService:
         member: CurrentMember,
         cursor: str | None = None,
         limit: int = 50,
-    ) -> PurchaseRequestList:
+        sort: PendingApprovalSort = "submitted_desc",
+        branch_id: UUID | None = None,
+    ) -> PendingApprovalList:
+        boundary = _decode_approval_cursor(cursor, sort=sort, branch_id=branch_id)
         client = authenticated_client(self._settings, bearer_token)
         capped = _cap_limit(limit)
-        boundary = _decode_approval_cursor(cursor)
-
-        try:
-            query = (
-                client.table("approval_step")
-                .select(f"{STEP_COLUMNS},created_at,purchase_request!inner(status)")
-                .eq("status", "pending")
-            )
-            for status in TERMINAL_REQUEST_STATUSES:
-                query = query.neq("purchase_request.status", status)
-            if member.role is not MemberRole.owner:
-                query = query.eq("assigned_membership_id", str(member.membership_id))
-            if boundary is not None:
-                created_at, step_id = boundary
-                query = query.or_(
-                    f"created_at.lt.{created_at},and(created_at.eq.{created_at},id.gt.{step_id})"
-                )
-            response = query.order("created_at", desc=True).order("id").range(0, capped).execute()
-        except APIError as exc:
-            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-
-        step_rows = _rows(response.data)
+        step_rows, total = self._pending_approval_page(
+            member=member, sort=sort, branch_id=branch_id, boundary=boundary, limit=capped
+        )
         visible_steps = step_rows[:capped]
         next_cursor = (
             _encode_approval_cursor(
-                str(visible_steps[-1]["created_at"]), UUID(str(visible_steps[-1]["id"]))
+                None
+                if visible_steps[-1]["sort_value"] is None
+                else str(visible_steps[-1]["sort_value"]),
+                UUID(str(visible_steps[-1]["id"])),
+                sort=sort,
+                branch_id=branch_id,
             )
             if len(step_rows) > capped
             else None
         )
         if not visible_steps:
-            return PurchaseRequestList(items=[], next_cursor=next_cursor)
+            return PendingApprovalList(items=[], next_cursor=next_cursor, total=total)
 
         request_ids = [str(step["purchase_request_id"]) for step in visible_steps]
         request_rows = self._fetch_requests_batch(client, request_ids)
         lines_by_request = self._fetch_lines_batch(client, request_ids)
-        steps_by_request = {str(step["purchase_request_id"]): step for step in visible_steps}
         member_contacts = self._fetch_member_contacts_batch(client, request_rows, visible_steps)
         auto_prepared = self._fetch_auto_prepared_batch(client, request_rows)
         sources = self._fetch_sources_batch(client, request_rows)
         request_groups = self._fetch_request_groups_batch(client, request_rows)
 
         items = []
-        for row in request_rows:
-            step = steps_by_request.get(str(row["id"]))
+        rows_by_id = {str(row["id"]): row for row in request_rows}
+        for step in visible_steps:
+            row = rows_by_id.get(str(step["purchase_request_id"]))
+            if row is None:
+                continue
             items.append(
                 self._purchase_request_with_budget_status(
                     client,
@@ -864,6 +1006,9 @@ class RequestsService:
                         if step is not None
                         else None
                     ),
+                    decider=member_contacts.get(str(step.get("decided_by_membership_id")))
+                    if step
+                    else None,
                     requester_lookup=False,
                     auto_prepared=auto_prepared.get(str(row["id"])),
                     auto_prepared_lookup=False,
@@ -873,7 +1018,52 @@ class RequestsService:
                     request_group_lookup=False,
                 )
             )
-        return PurchaseRequestList(items=items, next_cursor=next_cursor)
+        return PendingApprovalList(items=items, next_cursor=next_cursor, total=total)
+
+    def _pending_approval_page(
+        self,
+        *,
+        member: CurrentMember,
+        sort: PendingApprovalSort,
+        branch_id: UUID | None,
+        boundary: tuple[str | None, UUID] | None,
+        limit: int,
+    ) -> tuple[list[dict[str, object]], int]:
+        claims = json.dumps(
+            {
+                "sub": str(member.user_id),
+                "tenant_id": str(member.tenant_id),
+                "role": "authenticated",
+                "member_role": member.role.value,
+            }
+        )
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    # Both reads use the verified member's RLS context.
+                    cur.execute("set local role authenticated")
+                    cur.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
+                    cur.execute(
+                        "select id from membership where role = 'owner' and status = 'active'"
+                    )
+                    owners = {UUID(str(row["id"])) for row in cur.fetchall()}
+                    options = dict(
+                        sort=sort,
+                        branch_id=branch_id,
+                        membership_id=member.membership_id,
+                        is_owner=member.role is MemberRole.owner,
+                        is_sole_owner=member.role is MemberRole.owner
+                        and owners == {member.membership_id},
+                        limit=limit,
+                    )
+                    query, params = _pending_approval_query(**options, boundary=None, count=True)
+                    cur.execute(query, params)
+                    total = int(cur.fetchone()["total"])
+                    query, params = _pending_approval_query(**options, boundary=boundary)
+                    cur.execute(query, params)
+                    return cur.fetchall(), total
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def create_low_stock_report(
         self,
@@ -1099,7 +1289,9 @@ class RequestsService:
                     new_line_rows: list[dict[str, object]] | None = None
                     if patch.lines is not None:
                         product_ids = [ln.workspace_product_id for ln in patch.lines]
-                        estimates = self._estimate_products(product_ids, request_id=request_id)
+                        estimates = self._estimate_products(
+                            product_ids, member=member, request_id=request_id
+                        )
                         quantities = [ln.quantity for ln in patch.lines]
                         total_amount, total_currency, has_incomplete = _compute_totals(
                             quantities, estimates
@@ -1319,10 +1511,7 @@ class RequestsService:
                     replay = cur.fetchone()
                     cur.execute("set local role authenticated")
                     if replay is not None:
-                        return [
-                            PurchaseRequest.model_validate(item)
-                            for item in replay["target"]["response"]
-                        ]
+                        return _replay_group_response(replay["target"]["response"])
 
                     cur.execute(
                         "select id from purchase_request where request_group_id=%s order by id",
@@ -1347,7 +1536,11 @@ class RequestsService:
                     if action != "withdrawn" and statuses != {expected}:
                         raise ConflictError(details={"reason": f"not_{expected}"})
                     if action == "withdrawn" and (
-                        len(statuses) != 1 or not statuses <= {"draft", "submitted", "ordered"}
+                        not statuses
+                        or not (
+                            statuses <= {"approved", "ordered"}
+                            or statuses in ({"draft"}, {"submitted"})
+                        )
                     ):
                         raise ConflictError(details={"reason": "already_decided_or_withdrawn"})
                     if (
@@ -1413,6 +1606,12 @@ class RequestsService:
                                 row["id"] for row in members if row["status"] != "active"
                             },
                             owner_membership_id=owner,
+                            owner_membership_ids=[
+                                row["id"]
+                                for row in members
+                                if row["role"] == "owner" and row["status"] == "active"
+                            ],
+                            requester_membership_id=rows[0]["requested_by_membership_id"],
                             as_of=as_of,
                             is_group=True,
                         )
@@ -1489,7 +1688,7 @@ class RequestsService:
                                     request_id=str(row["id"]),
                                     step_id=str(step_by_request[str(row["id"])]["id"]),
                                     decision=action,
-                                    request_status="ordered" if action == "approved" else action,
+                                    request_status=action,
                                     comment=comment,
                                     now=now,
                                 )
@@ -1498,7 +1697,7 @@ class RequestsService:
                             rows = [request for request, _ in decided]
                             steps = [step for _, step in decided]
                         else:
-                            if statuses == {"ordered"}:
+                            if statuses & {"approved", "ordered"}:
                                 cur.execute(
                                     "select 1 from purchase_order where "
                                     "source_request_id=any(%s::uuid[]) and status<>'cancelled' "
@@ -1526,6 +1725,10 @@ class RequestsService:
                         "idempotency_key": str(idempotency_key),
                         "response": [item.model_dump(mode="json") for item in result],
                     }
+                    if action in ("approved", "rejected") and str(
+                        rows[0]["requested_by_membership_id"]
+                    ) == str(member.membership_id):
+                        target["self_approved"] = True
                     cur.execute(
                         "select record_audit_event(%s,'success',%s,%s,%s,%s,%s)",
                         (
@@ -1585,7 +1788,7 @@ class RequestsService:
         contacts = conn.execute(
             "select pr.id, m.email as requester_email, m.display_name as requester_name, "
             "a.email as assigned_email, a.display_name as assigned_name, s.name as "
-            "supplier_name, "
+            "supplier_name, d.email as decided_email, d.display_name as decided_name, "
             "row_to_json(e) as auto_prepared from purchase_request pr "
             "left join membership m on m.id=pr.requested_by_membership_id and "
             "m.tenant_id=pr.tenant_id "
@@ -1593,6 +1796,8 @@ class RequestsService:
             "ast.tenant_id=pr.tenant_id "
             "left join membership a on a.id=ast.assigned_membership_id and "
             "a.tenant_id=pr.tenant_id "
+            "left join membership d on d.id=ast.decided_by_membership_id and "
+            "d.tenant_id=pr.tenant_id "
             "left join supplier s on s.id=pr.source_supplier_id and s.tenant_id=pr.tenant_id "
             "left join auto_preparation_event e on e.purchase_request_id=pr.id and "
             "e.tenant_id=pr.tenant_id "
@@ -1633,7 +1838,16 @@ class RequestsService:
                 ]
             return spend_cache[budget.id]
 
-        summaries = _request_group_summaries([{**row, "request_group": group} for row in rows])
+        summaries = _request_group_summaries(
+            [
+                {
+                    **row,
+                    "request_group": group,
+                    "supplier_name": contacts_by_id[str(row["id"])]["supplier_name"],
+                }
+                for row in rows
+            ]
+        )
         steps_by_request = {str(step["purchase_request_id"]): step for step in steps}
         result = []
         for row in rows:
@@ -1662,6 +1876,7 @@ class RequestsService:
                     request_group=summaries[rid],
                     requester=MemberContact(contact["requester_email"], contact["requester_name"]),
                     assignee=MemberContact(contact["assigned_email"], contact["assigned_name"]),
+                    decider=MemberContact(contact["decided_email"], contact["decided_name"]),
                     source=source,
                     auto_prepared=AutoPreparedProvenance.model_validate(auto) if auto else None,
                     quoted_prices=self._quoted_prices_for(row, request_lines),
@@ -1768,7 +1983,9 @@ class RequestsService:
                             raise UnprocessableEntityError(details={"reason": "no_lines"})
 
                         product_ids = [UUID(str(lr["workspace_product_id"])) for lr in line_rows]
-                        estimates = self._estimate_products(product_ids, request_id=request_id)
+                        estimates = self._estimate_products(
+                            product_ids, member=member, request_id=request_id
+                        )
 
                         now = _now_iso()
                         for lr, est in zip(line_rows, estimates, strict=True):
@@ -1847,6 +2064,10 @@ class RequestsService:
                             delegations=self._fetch_active_delegations(client, as_of=as_of),
                             removed_membership_ids=self._fetch_removed_membership_ids(client),
                             owner_membership_id=self._fetch_owner_membership_id(client),
+                            owner_membership_ids=self._fetch_owner_membership_ids(client),
+                            requester_membership_id=UUID(
+                                str(request_row["requested_by_membership_id"])
+                            ),
                             as_of=as_of,
                         )
 
@@ -1988,9 +2209,9 @@ class RequestsService:
                         return existing, None, True
 
                     previous_status = str(existing["status"])
-                    if previous_status not in ("draft", "submitted", "ordered"):
+                    if previous_status not in ("draft", "submitted", "approved", "ordered"):
                         raise ConflictError(details={"reason": "already_decided_or_withdrawn"})
-                    if previous_status == "ordered":
+                    if previous_status in ("approved", "ordered"):
                         cur.execute(
                             "select 1 from purchase_order where source_request_id = %s "
                             "and status <> 'cancelled' limit 1",
@@ -2242,6 +2463,68 @@ class RequestsService:
             target={"delivery_quality_issue_photo_id": str(row["id"])},
         )
         return _quality_issue_photo(row, url=url)
+
+    def bulk_decisions(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        payload: BulkApprovalDecisionInput,
+        idempotency_key: UUID,
+    ) -> BulkApprovalDecisionResponse:
+        results: list[BulkApprovalDecisionResult] = []
+        for request_id in payload.request_ids:
+            try:
+                # Each call owns its transaction, audit and outbox through the existing
+                # single-request path. Never wrap the batch in a shared transaction.
+                request = self._decide_request(
+                    bearer_token=bearer_token,
+                    member=member,
+                    request_id=request_id,
+                    payload=ApprovalDecisionInput(comment=payload.comment),
+                    decision=payload.decision,
+                    idempotency_key=uuid5(idempotency_key, str(request_id)),
+                )
+                results.append(
+                    BulkApprovalDecisionResult(
+                        request_id=request_id,
+                        outcome="decided",
+                        request=request,
+                    )
+                )
+            except AppError as exc:
+                reason = (exc.details or {}).get("reason")
+                error_code = (
+                    "group_request_use_group_decision"
+                    if reason == "part_of_split"
+                    else "self_decision_not_allowed"
+                    if reason == "self_decision_not_allowed"
+                    else "unavailable"
+                    if exc.status_code >= 500
+                    else exc.code
+                )
+                results.append(
+                    BulkApprovalDecisionResult(
+                        request_id=request_id,
+                        outcome="failed",
+                        error_code=error_code,
+                    )
+                )
+            except Exception:
+                logger.exception("Bulk approval item failed", extra={"request_id": str(request_id)})
+                results.append(
+                    BulkApprovalDecisionResult(
+                        request_id=request_id,
+                        outcome="failed",
+                        error_code="unavailable",
+                    )
+                )
+        decided_count = sum(item.outcome == "decided" for item in results)
+        return BulkApprovalDecisionResponse(
+            results=results,
+            decided_count=decided_count,
+            failed_count=len(results) - decided_count,
+        )
 
     def approve_request(
         self,
@@ -2499,25 +2782,41 @@ class RequestsService:
     # ── internal helpers ──────────────────────────────────────────────
 
     def _estimate_products(
-        self, product_ids: list[UUID], *, request_id: UUID | None = None
+        self, product_ids: list[UUID], *, member: CurrentMember, request_id: UUID | None = None
     ) -> list[LineEstimate]:
         """Per-pack estimates. A request prepared from an RFQ response is valued at that
         response's quoted prices; any product not on it (or any other request) falls back to
-        the latest landed cost per pack."""
+        the latest landed cost per pack.
+
+        Read inside the caller's own database role and claims, so a product, request or quote
+        of another workspace has no estimate (PPS-185)."""
         db_url = self._settings.database_url.get_secret_value()
+        claims = {
+            "sub": str(member.user_id),
+            "tenant_id": str(member.tenant_id),
+            "role": "authenticated",
+            "member_role": member.role.value,
+        }
         with db.connect(db_url) as conn:
-            sourced: dict[UUID, LineEstimate] = {}
+            conn.execute("set local role authenticated")
+            conn.execute("select set_config('request.jwt.claims', %s, true)", (json.dumps(claims),))
+            source_quotation_id = None
             if request_id is not None:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "select source_rfq_response_id from purchase_request where id = %s",
+                        "select source_quotation_id from purchase_request where id = %s",
                         (request_id,),
                     )
                     row = cur.fetchone()
-                if row is not None and row[0] is not None:
-                    sourced = estimate_from_source_response(
-                        conn, rfq_response_id=row[0], product_ids=product_ids
-                    )
+                if row is not None:
+                    source_quotation_id = row[0]
+            sourced: dict[UUID, LineEstimate] = {}
+            if source_quotation_id is not None:
+                # The request's own snapshot of the quotation it was prepared from, read through
+                # the quotation tables, not the RFQ tables a requester may no longer read.
+                sourced = estimate_from_source_quotation(
+                    conn, quotation_id=source_quotation_id, product_ids=product_ids
+                )
             return [
                 sourced[pid]
                 if pid in sourced
@@ -2790,6 +3089,28 @@ class RequestsService:
         row = _one_row(response.data, reason="owner_membership_not_found")
         return UUID(str(row["id"]))
 
+    def _fetch_owner_membership_ids(self, client: Client) -> list[UUID]:
+        owners: list[UUID] = []
+        page_size = 1000
+        try:
+            while True:
+                offset = len(owners)
+                response = (
+                    client.table("membership")
+                    .select("id")
+                    .eq("role", "owner")
+                    .eq("status", "active")
+                    .order("id")
+                    .range(offset, offset + page_size - 1)
+                    .execute()
+                )
+                page = _rows(response.data)
+                owners.extend(UUID(str(row["id"])) for row in page)
+                if len(page) < page_size:
+                    return owners
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
     def _fetch_removed_membership_ids(self, client: Client) -> set[UUID]:
         try:
             response = client.table("membership").select("id").neq("status", "active").execute()
@@ -2941,6 +3262,8 @@ class RequestsService:
             delegations=self._fetch_active_delegations(client, as_of=as_of),
             removed_membership_ids=self._fetch_removed_membership_ids(client),
             owner_membership_id=self._fetch_owner_membership_id(client),
+            owner_membership_ids=self._fetch_owner_membership_ids(client),
+            requester_membership_id=UUID(str(request_row["requested_by_membership_id"])),
             as_of=as_of,
         )
         try:
@@ -3113,6 +3436,23 @@ class RequestsService:
         now: str,
     ) -> tuple[dict[str, object], dict[str, object]]:
         """Shared guarded writes; the caller owns the transaction and outbox."""
+        cur.execute("select * from purchase_request where id=%s for update", (request_id,))
+        request_row = cur.fetchone()
+        if request_row is None or str(request_row["status"]) != "submitted":
+            raise ConflictError(details={"reason": "not_submitted"})
+        cur.execute("select * from approval_step where id=%s for update", (step_id,))
+        step_row = cur.fetchone()
+        # Preserve the guarded-write conflict for a stale unkeyed authorization pre-check.
+        if (
+            step_row is None
+            or str(step_row["status"]) != "pending"
+            or (
+                member.role is not MemberRole.owner
+                and str(step_row["assigned_membership_id"]) != str(member.membership_id)
+            )
+        ):
+            raise ConflictError(details={"reason": "no_pending_approval"})
+        _require_self_decision_allowed(cur, request_row, member)
         cur.execute(
             """
             update purchase_request
@@ -3254,20 +3594,14 @@ class RequestsService:
                     # rows and we raise before touching the step or writing a notification, leaving
                     # the step `pending` rather than stranding a `decided` step on a non-submitted
                     # request.
-                    #
-                    # An approved request lands directly on `ordered`, not `approved` (chunk R2.3,
-                    # specs/010-mobile-approvals-receipt/research.md R1) — there is no separate
-                    # "place the order" human action this release, so the same decision that
-                    # approves a request is also what marks it ordered. `approval_step.status` and
-                    # the audit action below still record the human's actual decision ("approved"),
-                    # unchanged; only `purchase_request.status` itself takes the new terminal value.
+                    # Approval remains approved until a live purchase order exists (ADR-025).
                     decided_request, decided_step = self._apply_request_decision(
                         cur,
                         member=member,
                         request_id=request_id,
                         step_id=step_id,
                         decision=decision,
-                        request_status="ordered" if decision == "approved" else decision,
+                        request_status=decision,
                         comment=comment,
                         now=now,
                     )
@@ -3277,6 +3611,10 @@ class RequestsService:
                         "approval_step_id": str(decided_step["id"]),
                         "decided_by_membership_id": str(member.membership_id),
                     }
+                    if str(decided_request["requested_by_membership_id"]) == str(
+                        member.membership_id
+                    ):
+                        target["self_approved"] = True
                     if idempotency_key is not None:
                         target["idempotency_key"] = str(idempotency_key)
                     if comment is not None:
@@ -3327,6 +3665,7 @@ class RequestsService:
         *,
         requester: MemberContact | None = None,
         assignee: MemberContact | None = None,
+        decider: MemberContact | None = None,
         requester_lookup: bool = True,
         auto_prepared: AutoPreparedProvenance | None = None,
         auto_prepared_lookup: bool = True,
@@ -3334,6 +3673,7 @@ class RequestsService:
         source_lookup: bool = True,
         request_group: RequestGroupSummary | None = None,
         request_group_lookup: bool = True,
+        budget_status_for: Callable[[dict[str, object]], BudgetStatus | None] | None = None,
     ) -> PurchaseRequest:
         if requester_lookup:
             member_contacts = self._fetch_member_contacts_batch(
@@ -3342,6 +3682,11 @@ class RequestsService:
             requester = member_contacts.get(str(request_row["requested_by_membership_id"]))
             assignee = (
                 member_contacts.get(str(step_row["assigned_membership_id"])) if step_row else None
+            )
+            decider = (
+                member_contacts.get(str(step_row.get("decided_by_membership_id")))
+                if step_row
+                else None
             )
         if auto_prepared_lookup:
             auto_prepared = self._fetch_auto_prepared_batch(client, [request_row]).get(
@@ -3357,10 +3702,15 @@ class RequestsService:
             request_row,
             line_rows,
             step_row,
-            budget_status=self._budget_status_for(client, request_row),
+            budget_status=(
+                budget_status_for(request_row)
+                if budget_status_for is not None
+                else self._budget_status_for(client, request_row)
+            ),
             quoted_prices=self._quoted_prices_for(request_row, line_rows),
             requester=requester,
             assignee=assignee,
+            decider=decider,
             auto_prepared=auto_prepared,
             source=source,
             request_group=request_group,
@@ -3384,7 +3734,8 @@ class RequestsService:
             rows = _rows(
                 client.table("purchase_request")
                 .select(
-                    "id,request_group_id,created_at,"
+                    "id,request_group_id,created_at,source_rfq_id,source_rfq_response_id,"
+                    "source_quotation_id,source_supplier_id,"
                     "request_group:purchase_request_group!purchase_request_request_group_fkey("
                     f"id,{GROUP_TOTAL_COLUMNS})"
                 )
@@ -3395,7 +3746,18 @@ class RequestsService:
             )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        return _request_group_summaries(rows)
+        sources = self._fetch_sources_batch(client, rows)
+        return _request_group_summaries(
+            [
+                {
+                    **row,
+                    "supplier_name": sources[str(row["id"])].supplier_name
+                    if str(row["id"]) in sources
+                    else None,
+                }
+                for row in rows
+            ]
+        )
 
     def _fetch_request_groups_sql(
         self,
@@ -3412,9 +3774,10 @@ class RequestsService:
             return {}
         columns = ", ".join(f"g.{c}" for c in GROUP_TOTAL_COLUMNS.split(","))
         rows = conn.execute(
-            f"select pr.id, pr.request_group_id, pr.created_at, {columns} "
+            f"select pr.id, pr.request_group_id, pr.created_at, s.name as supplier_name, {columns} "
             "from purchase_request pr join purchase_request_group g "
             "on g.tenant_id = pr.tenant_id and g.id = pr.request_group_id "
+            "left join supplier s on s.tenant_id = pr.tenant_id and s.id = pr.source_supplier_id "
             "where pr.tenant_id = %s and pr.request_group_id = any(%s::uuid[])",
             (member.tenant_id, group_ids),
         ).fetchall()
@@ -3518,6 +3881,11 @@ class RequestsService:
         membership_ids.update(
             str(row["assigned_membership_id"]) for row in step_rows if row is not None
         )
+        membership_ids.update(
+            str(row["decided_by_membership_id"])
+            for row in step_rows
+            if row is not None and row.get("decided_by_membership_id")
+        )
         if not membership_ids:
             return {}
         try:
@@ -3553,27 +3921,10 @@ class RequestsService:
         client: Client,
         request_row: dict[str, object],
     ) -> BudgetStatus | None:
-        return compute_budget_status(
-            request_id=UUID(str(request_row["id"])),
-            request_amount=(
-                Decimal(str(request_row["estimated_total_amount"]))
-                if request_row.get("estimated_total_amount") is not None
-                else None
-            ),
-            request_currency=(
-                str(request_row["estimated_total_currency"])
-                if request_row.get("estimated_total_currency") is not None
-                else None
-            ),
-            branch_id=UUID(str(request_row["branch_id"])),
-            cost_centre_id=(
-                UUID(str(request_row["cost_centre_id"]))
-                if request_row.get("cost_centre_id")
-                else None
-            ),
-            required_by=_parse_date(request_row["required_by_date"]),
-            budgets=self._fetch_budget_rows(client),
-            committed_spend=lambda budget: self._fetch_committed_spend_rows(client, budget),
+        return _compute_request_budget_status(
+            request_row,
+            self._fetch_budget_rows(client),
+            lambda budget: self._fetch_committed_spend_rows(client, budget),
         )
 
     def _create_quality_issue_photo_url(self, client: Client, storage_path: str) -> str:
@@ -3584,6 +3935,33 @@ class RequestsService:
         except Exception as exc:
             raise ServiceUnavailableError(details={"dependency": "supabase_storage"}) from exc
         return _signed_url(result)
+
+
+def _compute_request_budget_status(
+    request_row: dict[str, object],
+    budgets: list[BudgetRow],
+    committed_spend: Callable[[BudgetRow], list[SpendRow]],
+) -> BudgetStatus | None:
+    return compute_budget_status(
+        request_id=UUID(str(request_row["id"])),
+        request_amount=(
+            Decimal(str(request_row["estimated_total_amount"]))
+            if request_row.get("estimated_total_amount") is not None
+            else None
+        ),
+        request_currency=(
+            str(request_row["estimated_total_currency"])
+            if request_row.get("estimated_total_currency") is not None
+            else None
+        ),
+        branch_id=UUID(str(request_row["branch_id"])),
+        cost_centre_id=(
+            UUID(str(request_row["cost_centre_id"])) if request_row.get("cost_centre_id") else None
+        ),
+        required_by=_parse_date(request_row["required_by_date"]),
+        budgets=budgets,
+        committed_spend=committed_spend,
+    )
 
 
 def get_requests_service() -> RequestsService:
@@ -3606,6 +3984,18 @@ def _require_ungrouped(request_row: dict[str, object]) -> None:
 def _require_requester(request_row: dict[str, object], member: CurrentMember) -> None:
     if str(request_row["requested_by_membership_id"]) != str(member.membership_id):
         raise PermissionDeniedError(details={"reason": "not_requester"})
+
+
+def _require_self_decision_allowed(
+    cur: psycopg.Cursor, request_row: dict[str, object], member: CurrentMember
+) -> None:
+    """Check current active owners inside the decision transaction (ADR-024)."""
+    if str(request_row["requested_by_membership_id"]) != str(member.membership_id):
+        return
+    cur.execute("select id from membership where role='owner' and status='active'")
+    owners = {str(row["id"]) for row in cur.fetchall()}
+    if owners != {str(member.membership_id)}:
+        raise PermissionDeniedError(details={"reason": "self_decision_not_allowed"})
 
 
 def _require_assigned_approver_or_owner(step_row: dict[str, object], member: CurrentMember) -> None:
@@ -3651,6 +4041,15 @@ def _request_group_summaries(
                 ),
                 saving=_money(group["saving_amount"], group["saving_currency"]),
                 sibling_request_ids=[UUID(str(s["id"])) for s in siblings if s is not row],
+                siblings=[
+                    RequestGroupSibling(
+                        id=UUID(str(s["id"])),
+                        position=index,
+                        supplier_name=s.get("supplier_name"),
+                    )
+                    for index, s in enumerate(siblings, 1)
+                    if s is not row
+                ],
             )
     return summaries
 
@@ -3664,6 +4063,7 @@ def _purchase_request(
     quoted_prices: dict[UUID, QuotedPrice] | None = None,
     requester: MemberContact | None = None,
     assignee: MemberContact | None = None,
+    decider: MemberContact | None = None,
     auto_prepared: AutoPreparedProvenance | None = None,
     source: RequestSource | None = None,
     request_group: RequestGroupSummary | None = None,
@@ -3693,7 +4093,16 @@ def _purchase_request(
         ),
         has_incomplete_estimate=bool(row.get("has_incomplete_estimate", False)),
         budget_status=budget_status,
-        approval_step=(_approval_step(step_row, assignee=assignee) if step_row else None),
+        approval_step=(
+            _approval_step(
+                step_row,
+                requester_membership_id=UUID(str(row["requested_by_membership_id"])),
+                assignee=assignee,
+                decider=decider,
+            )
+            if step_row
+            else None
+        ),
         submitted_at=row.get("submitted_at"),
         withdrawn_at=row.get("withdrawn_at"),
         delivered_at=row.get("delivered_at"),
@@ -3759,14 +4168,40 @@ def _member_contact(row: dict[str, object]) -> MemberContact:
     return MemberContact(str(email) if email else None, str(name) if name else None)
 
 
+def _replay_group_response(rows: list[dict[str, object]]) -> list[PurchaseRequest]:
+    responses = [PurchaseRequest.model_validate(row) for row in rows]
+    for request in responses:
+        step = request.approval_step
+        if step is not None:
+            # Older audit snapshots do not carry the derived flag.
+            step.self_approval = (
+                step.assigned_membership_id
+                if step.status == "pending"
+                else step.decided_by_membership_id
+            ) == request.requested_by_membership_id
+    return responses
+
+
 def _approval_step(
-    row: dict[str, object], *, assignee: MemberContact | None = None
+    row: dict[str, object],
+    *,
+    requester_membership_id: UUID,
+    assignee: MemberContact | None = None,
+    decider: MemberContact | None = None,
 ) -> ApprovalStep:
     return ApprovalStep(
+        self_approval=str(
+            row["assigned_membership_id"]
+            if str(row["status"]) == "pending"
+            else row.get("decided_by_membership_id")
+        )
+        == str(requester_membership_id),
         id=UUID(str(row["id"])),
         assigned_membership_id=UUID(str(row["assigned_membership_id"])),
         assigned_name=assignee.name if assignee else None,
         assigned_email=assignee.email if assignee else None,
+        decided_name=decider.name if decider and row.get("decided_by_membership_id") else None,
+        decided_email=decider.email if decider and row.get("decided_by_membership_id") else None,
         source=str(row["source"]),
         status=str(row["status"]),
         comment=row.get("comment"),
@@ -4013,12 +4448,90 @@ def _encode_cursor(offset: int) -> str:
     return base64.urlsafe_b64encode(raw).decode("ascii")
 
 
-def _encode_approval_cursor(created_at: str, step_id: UUID) -> str:
-    raw = json.dumps({"created_at": created_at, "id": str(step_id)}).encode("utf-8")
+_APPROVAL_SORT_COLUMNS = {
+    "submitted_desc": ("ast.created_at", "desc"),
+    "submitted_asc": ("ast.created_at", "asc"),
+    "required_by_asc": ("pr.required_by_date", "asc"),
+    "total_desc": ("coalesce(prg.combined_total_amount, pr.estimated_total_amount)", "desc"),
+    "total_asc": ("coalesce(prg.combined_total_amount, pr.estimated_total_amount)", "asc"),
+}
+
+
+def _pending_approval_query(
+    *,
+    sort: PendingApprovalSort,
+    branch_id: UUID | None,
+    membership_id: UUID,
+    is_owner: bool,
+    is_sole_owner: bool,
+    boundary: tuple[str | None, UUID] | None,
+    limit: int,
+    count: bool = False,
+) -> tuple[str, list[object]]:
+    column, direction = _APPROVAL_SORT_COLUMNS[sort]
+    predicates = ["ast.status = 'pending'"]
+    params: list[object] = []
+    for status in sorted(TERMINAL_REQUEST_STATUSES):
+        predicates.append("pr.status <> %s")
+        params.append(status)
+    if not is_owner:
+        predicates.append("ast.assigned_membership_id = %s")
+        params.append(membership_id)
+    if not is_sole_owner:
+        predicates.append("pr.requested_by_membership_id <> %s")
+        params.append(membership_id)
+    if branch_id is not None:
+        predicates.append("pr.branch_id = %s")
+        params.append(branch_id)
+    if boundary is not None and not count:
+        value, step_id = boundary
+        if value is None:
+            predicates.append(f"({column} is null and ast.id > %s)")
+            params.append(step_id)
+        else:
+            operator = "<" if direction == "desc" else ">"
+            predicates.append(
+                f"({column} {operator} %s or ({column} = %s and ast.id > %s) or {column} is null)"
+            )
+            params.extend([value, value, step_id])
+    projection = "count(*) as total" if count else f"ast.*, {column} as sort_value"
+    query = (
+        f"select {projection} from approval_step ast "
+        "join purchase_request pr on pr.id = ast.purchase_request_id "
+        "left join purchase_request_group prg "
+        "on prg.tenant_id = pr.tenant_id and prg.id = pr.request_group_id "
+        "where " + " and ".join(predicates)
+    )
+    if not count:
+        query += f" order by {column} {direction} nulls last, ast.id asc limit %s"
+        params.append(limit + 1)
+    return query, params
+
+
+def _encode_approval_cursor(
+    value: str | None,
+    step_id: UUID,
+    *,
+    sort: PendingApprovalSort = "submitted_desc",
+    branch_id: UUID | None = None,
+) -> str:
+    raw = json.dumps(
+        {
+            "sort": sort,
+            "value": value,
+            "id": str(step_id),
+            "branch_id": str(branch_id) if branch_id else None,
+        }
+    ).encode("utf-8")
     return base64.urlsafe_b64encode(raw).decode("ascii")
 
 
-def _decode_approval_cursor(cursor: str | None) -> tuple[str, UUID] | None:
+def _decode_approval_cursor(
+    cursor: str | None,
+    *,
+    sort: PendingApprovalSort = "submitted_desc",
+    branch_id: UUID | None = None,
+) -> tuple[str | None, UUID] | None:
     if cursor is None:
         return None
     try:
@@ -4026,18 +4539,39 @@ def _decode_approval_cursor(cursor: str | None) -> tuple[str, UUID] | None:
         payload = json.loads(raw.decode("utf-8"))
         if not isinstance(payload, dict):
             raise ValueError("invalid cursor payload")
-        created_at, step_id = payload["created_at"], payload["id"]
-        if not isinstance(created_at, str) or not isinstance(step_id, str):
+        # Existing unfiltered default-sort cursors remain valid across deployment.
+        if "sort" not in payload and "created_at" in payload:
+            payload = {
+                **payload,
+                "sort": "submitted_desc",
+                "branch_id": None,
+                "value": payload["created_at"],
+            }
+        if payload["sort"] != sort or payload["branch_id"] != (
+            str(branch_id) if branch_id else None
+        ):
+            raise ValueError("cursor filter mismatch")
+        value, step_id = payload["value"], payload["id"]
+        if not isinstance(step_id, str) or (value is not None and not isinstance(value, str)):
             raise ValueError("invalid cursor fields")
-        timestamp = datetime.fromisoformat(created_at)
-        if timestamp.tzinfo is None:
-            raise ValueError("cursor timestamp requires a timezone")
-        # UTC Z avoids '+' being interpreted as a space by filter/URL parsers.
-        normalized = (
-            timestamp.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
-        )
-        return normalized, UUID(step_id)
-    except (KeyError, ValueError, TypeError, OverflowError) as exc:
+        if sort.startswith("submitted"):
+            timestamp = datetime.fromisoformat(value)
+            if timestamp.tzinfo is None:
+                raise ValueError("cursor timestamp requires a timezone")
+            value = (
+                timestamp.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+            )
+        elif value is not None:
+            if sort == "required_by_asc":
+                value = date.fromisoformat(value).isoformat()
+            # Both member estimates and immutable group totals are numeric(18, 4).
+            elif (
+                not value.isascii()
+                or re.fullmatch(r"[+-]?[0-9]{1,14}(?:\.[0-9]{1,4})?", value) is None
+            ):
+                raise ValueError("invalid cursor amount")
+        return value, UUID(step_id)
+    except (KeyError, ValueError, TypeError, OverflowError, ArithmeticError) as exc:
         raise UnprocessableEntityError(details={"cursor": "invalid"}) from exc
 
 

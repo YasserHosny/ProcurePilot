@@ -330,3 +330,32 @@ td.mat-mdc-cell:last-of-type {
     }
   }
 }
+
+.status-badge.status-cancelled {
+  background: var(--pp-error-container);
+  color: var(--pp-error);
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-end: 16px;
+
+  .filter-btn.active {
+    background: var(--mat-sys-secondary-container);
+    color: var(--mat-sys-on-secondary-container);
+    font-weight: 600;
+  }
+}
+
+.search-sort-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pp-space-3, 12px);
+
+  mat-form-field {
+    flex: 1 1 240px;
+    min-inline-size: 0;
+  }
+}

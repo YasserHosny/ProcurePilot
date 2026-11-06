@@ -90,7 +90,7 @@
       <mat-card class="line-card">
         <mat-card-header>
           <mat-card-title class="card-title-row">
-            <span class="line-badge">{{ 'matching.resolution.lineDetails.lineNumber' | translate: { line: l.line_number } }}</span>
+            <span class="line-badge">{{ 'matching.resolution.lineDetails.lineNumber' | translate: { line: (l.line_number | formatQuantity) } }}</span>
             <span class="original-wording">{{ l.original_text }}</span>
           </mat-card-title>
         </mat-card-header>
@@ -102,7 +102,7 @@
           @if (l.pack) {
             <div class="metric-item">
               <span class="metric-label">{{ 'matching.resolution.lineDetails.pack' | translate }}</span>
-              <span class="metric-value">{{ l.pack.pack_count }} × {{ l.pack.unit_size }} {{ l.pack.unit | unitLabel }}</span>
+              <span class="metric-value">{{ packText(l.pack) }} {{ l.pack.unit | unitLabel }}</span>
             </div>
           }
           @if (l.unit_price) {
@@ -180,14 +180,56 @@
             </div>
             <div>
               <strong>{{ 'matching.resolution.decision.confidence' | translate }}</strong>
-              <span>{{ formatScore(dec.confidence) }}%</span>
+              <span>{{ formatScore(dec.confidence) | formatPercent }}</span>
             </div>
+            @if (!dec.is_automatic && dec.decided_by_email) {
+              <div>
+                <strong>{{ 'matching.resolution.decision.decidedBy' | translate }}</strong>
+                <span>{{ dec.decided_by_email }}</span>
+              </div>
+            }
             <div>
               <strong>{{ 'matching.resolution.decision.decidedAt' | translate }}</strong>
               <span>{{ dec.decided_at | formatDate }}</span>
             </div>
           }
         </div>
+        @if (decision()) {
+          <button
+            mat-button
+            type="button"
+            class="history-toggle"
+            data-testid="history-toggle"
+            [attr.aria-expanded]="historyOpen()"
+            aria-controls="decision-history"
+            (click)="toggleHistory()"
+          >
+            <mat-icon aria-hidden="true">history</mat-icon>
+            <span>{{ (historyOpen() ? 'matching.resolution.decision.history.hide' : 'matching.resolution.decision.history.show') | translate }}</span>
+          </button>
+          <div id="decision-history" class="decision-history" role="region" [attr.aria-label]="'matching.resolution.decision.history.title' | translate">
+            @if (historyOpen()) {
+              @if (historyFailed()) {
+                <p class="history-error" data-testid="history-error" role="alert">{{ 'matching.resolution.decision.history.failed' | translate }}</p>
+              } @else if (history(); as chain) {
+                <ol class="history-list">
+                  @for (item of chain; track item.id; let last = $last) {
+                    <li class="history-row" data-testid="history-row">
+                      <span class="history-when">{{ item.decided_at | formatDate }}</span>
+                      <span class="history-what">{{ item.matched_product.tenant_name }} — {{ 'matching.resolution.outcomes.' + item.outcome + '.label' | translate }}</span>
+                      <span class="history-who">{{ item.is_automatic ? ('matching.resolution.decision.automatic' | translate) : (item.decided_by_email ?? '') }}</span>
+                      @if (last) {
+                        <span class="decision-tag human-tag">{{ 'matching.resolution.decision.history.current' | translate }}</span>
+                      }
+                    </li>
+                  }
+                </ol>
+              } @else {
+                <p class="history-loading" role="status">{{ 'matching.resolution.decision.history.loading' | translate }}</p>
+              }
+            }
+          </div>
+        }
       </div>
     }
 
@@ -264,6 +306,10 @@
       [hasDecision]="decision() !== null || !!task()?.matched_product"
       (candidateSelected)="selectCandidate($event)"
     ></app-match-resolution-candidates>
+
+    @if (isWriter() && !decision() && !task()?.matched_product && line(); as pickerLine) {
+      <app-product-picker [lineId]="pickerLine.id" (picked)="onManualCandidate($event)" />
+    }
 
     <!-- Outcomes Selection Section -->
     @if (isWriter() && !decision() && !task()?.matched_product) {

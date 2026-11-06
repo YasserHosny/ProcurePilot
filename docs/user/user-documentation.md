@@ -360,7 +360,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 12 | **Reviewer Notes** | A free-text field for recording why a correction was made or leaving context for whoever authorizes the quotation. Saved together with corrections. |
 | 13 | **Audit Trail** | An expandable panel at the bottom logging every action taken on this quotation — upload, extraction, field corrections, status changes, matching setup, automatic match acceptance, and reviewer match decisions — with actor and timestamp. |
 | 14 | **Save Corrections** | Persist manual edits without changing the quotation's status — you can return later. |
-| 15 | **Confirm & Authorize Quotation** | Marks the quotation as reviewed. Matching setup then shows loading, ready, or a retryable error; when ready, **Continue to Product Matching** opens only this quotation's matching group. A confirmation dialog states plainly that authorization **cannot be undone**. |
+| 15 | **Confirm & Authorize Quotation** | Marks the quotation as reviewed. **Match lines** in the **Next step** card prepares matching and opens only this quotation's matching group; retry from the same button if setup fails. A confirmation dialog states plainly that authorization **cannot be undone**. |
 
 **If authorization is blocked:** the page shows **Select a supplier before authorizing this quotation.** when no supplier is selected, **Resolve or acknowledge the arithmetic mismatch before confirming.** when a discrepancy is unacknowledged, **Review or confirm the flagged extraction fields before confirming.** while flagged fields remain unresolved (the first blocking field is highlighted and scrolled into view), **Set the quotation currency before confirming.** when currency is missing, and **This quotation is not in a state that can be confirmed.** when the quotation has already been actioned.
 
@@ -377,7 +377,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 2. Check the arithmetic status banner — if it flags a discrepancy, compare stated total against the line sum.
 3. Walk through attention-required fields, correcting any extraction errors inline — the totals and mismatch banner update as you go.
 4. Confirm or add the supplier, using the auto-match banner if one appears.
-5. Click **Save Corrections** to persist your edits, or go straight to **Confirm & Authorize Quotation** once satisfied. Wait for matching setup to report ready, then use **Continue to Product Matching**; retry setup if the page reports a failure.
+5. Click **Save Corrections** to persist your edits, or go straight to **Confirm & Authorize Quotation** once satisfied. Use **Match lines** in the **Next step** card to open product matching; retry from the same button if setup fails.
 
 **Business value:** quotation review turns AI output into trusted commercial data. A wrong supplier, date, quantity, or total can create a false recommendation and a false saving; this page makes the reviewer's corrections auditable before the data affects matching, comparison, or reporting.
 

@@ -21,18 +21,43 @@
       <span>{{ data.itemName }}</span>
     </div>
   }
+  @if (data.previewSubject || data.previewBody) {
+    <div
+      class="dialog-preview"
+      [attr.dir]="data.previewLocale === 'ar' ? 'rtl' : 'ltr'"
+      [attr.lang]="data.previewLocale || null"
+      data-testid="confirm-dialog-preview"
+    >
+      @if (data.previewSubject) {
+        <p class="preview-subject" data-testid="confirm-dialog-preview-subject">{{ data.previewSubject }}</p>
+      }
+      @if (data.previewBody) {
+        <pre class="preview-body" data-testid="confirm-dialog-preview-body">{{ data.previewBody }}</pre>
+      }
+    </div>
+  }
+  @if (data.listItems?.length) {
+    <ul class="dialog-list" data-testid="confirm-dialog-list">
+      @for (item of data.listItems; track $index) {
+        <li>{{ item }}</li>
+      }
+    </ul>
+  }
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
   <button mat-button type="button" (click)="onCancel()">
     {{ (data.cancelKey || 'catalogue.products.form.cancel') | translate }}
   </button>
-  <button
-    mat-flat-button
-    [color]="data.isDestructive ? 'warn' : 'primary'"
-    type="button"
-    (click)="onConfirm()"
-  >
-    {{ data.confirmKey | translate: data.confirmParams }}
-  </button>
+  @if (data.showConfirm !== false) {
+    <button
+      mat-flat-button
+      [color]="data.isDestructive ? 'warn' : 'primary'"
+      type="button"
+      data-testid="confirm-dialog-confirm"
+      (click)="onConfirm()"
+    >
+      {{ data.confirmKey | translate: data.confirmParams }}
+    </button>
+  }
 </mat-dialog-actions>

@@ -30,10 +30,12 @@ from procurepilot_api.modules.quotations.schemas import (
     QuotationCreate,
     QuotationDetail,
     QuotationLine,
+    QuotationStatus,
     QuotationVersionReference,
     ReviewTask,
     ReviewTaskList,
     ReviewTaskPriority,
+    ReviewTaskReason,
     ReviewTaskStatus,
     decimal_string,
 )
@@ -180,6 +182,9 @@ class QuotationService:
         limit: int = 50,
         status: ReviewTaskStatus | str = "open",
         priority: ReviewTaskPriority | None = None,
+        supplier_id: UUID | None = None,
+        reason: ReviewTaskReason | None = None,
+        quotation_status: QuotationStatus | None = None,
         search: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
@@ -228,6 +233,12 @@ class QuotationService:
                 query = query.in_("quotation.supplier_id", supplier_ids)
             elif id_bounds is not None:
                 query = query.gte("quotation_id", id_bounds[0]).lte("quotation_id", id_bounds[1])
+            if supplier_id is not None:
+                query = query.eq("quotation.supplier_id", str(supplier_id))
+            if reason is not None:
+                query = query.eq("reason", reason)
+            if quotation_status is not None:
+                query = query.eq("quotation.status", quotation_status)
             if status != "all":
                 query = query.eq("status", status)
             if priority is not None:
@@ -423,18 +434,42 @@ class QuotationService:
         quotation_id: UUID,
     ) -> Quotation:
         client = authenticated_client(self._settings, bearer_token)
-        _quotation_row(client, quotation_id)
+        quote = _quotation_row(client, quotation_id)
+        archived_at = quote["deleted_at"]
+        if archived_at is None:
+            # A restore interrupted after the state change (the audit write failed) leaves the
+            # quotation active with "archived" as its last archive event: finish the job once.
+            if _last_archive_event(client, quotation_id) == "quotation.archived":
+                self._finish_restore(
+                    bearer_token=bearer_token, member=member, quotation_id=quotation_id
+                )
+            return _quotation(quote)
         try:
-            row = _one_row(
+            # Tasks first: while the quotation is still archived they are hidden from the queue, and
+            # a failure between the two writes can be repaired by retrying the restore.
+            # Archive loses the previous task state; in-progress tasks reopen as open.
+            client.table("review_task").update({"status": "open", "resolved_at": None}).eq(
+                "quotation_id", str(quotation_id)
+            ).eq("status", "resolved").eq("resolved_at", archived_at).execute()
+            response = (
                 client.table("quotation")
-                .update({"deleted_at": None})
+                .update({"deleted_at": None, "archive_idempotency_key": None})
                 .eq("id", str(quotation_id))
+                .eq("deleted_at", archived_at)
                 .execute()
-                .data,
-                resource="quotation",
             )
+            # Matching the previous archive timestamp also guards concurrent restores.
+            if not response.data:
+                return _quotation(_quotation_row(client, quotation_id))
+            row = _one_row(response.data, resource="quotation")
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        self._finish_restore(bearer_token=bearer_token, member=member, quotation_id=quotation_id)
+        return _quotation(row)
+
+    def _finish_restore(
+        self, *, bearer_token: str, member: CurrentMember, quotation_id: UUID
+    ) -> None:
         self._record(
             bearer_token=bearer_token,
             member=member,
@@ -446,7 +481,6 @@ class QuotationService:
         enqueue_guardrail_evaluation(
             self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
         )
-        return _quotation(row)
 
     def retry_extraction(
         self,
@@ -802,6 +836,24 @@ def _archive_key_was_recorded(client: object, quotation_id: UUID, idempotency_ke
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
     return bool(response.data)
+
+
+def _last_archive_event(client: object, quotation_id: UUID) -> str | None:
+    """The latest archive or restore audit action on a quotation, or None if it has none."""
+    try:
+        response = (
+            client.table("audit_event")
+            .select("action")
+            .in_("action", ["quotation.archived", "quotation.restored"])
+            .eq("target->>quotation_id", str(quotation_id))
+            .order("id", desc=True)
+            .limit(1)
+            .execute()
+        )
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    rows = _rows(response.data)
+    return str(rows[0]["action"]) if rows else None
 
 
 def _archive_key_matches(quote: dict[str, object], idempotency_key: UUID) -> bool:

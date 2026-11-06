@@ -5,6 +5,7 @@ import {
   ElementRef,
   EventEmitter,
   Input,
+  SecurityContext,
   Output,
   inject,
   ChangeDetectionStrategy,
@@ -14,12 +15,16 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import type { SafeResourceUrl } from '@angular/platform-browser';
+import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import type { FieldExtraction, QuotationDetail } from '../../../core/api/models';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatExtractionPipe, isExtractionJsonFallback } from '../../../core/format/extraction-value.pipe';
+
+export function isDocumentPreviewable(mimeType: string): boolean {
+  return ['application/pdf', 'image/png', 'image/jpeg', 'text/plain'].includes(mimeType);
+}
 
 @Component({
   selector: 'app-quotation-doc-preview',
@@ -39,6 +44,10 @@ import { FormatExtractionPipe, isExtractionJsonFallback } from '../../../core/fo
   styleUrl: './quotation-doc-preview.component.scss',
 })
 export class QuotationDocPreviewComponent {
+  readonly isPreviewable = isDocumentPreviewable;
+  @Input() documentPreviewError = false;
+  @Output() readonly retry = new EventEmitter<void>();
+
   readonly isExtractionJson = isExtractionJsonFallback;
   previewLoaded = false;
   private _safePreviewUrl: SafeResourceUrl | null = null;
@@ -49,8 +58,12 @@ export class QuotationDocPreviewComponent {
     return this._safePreviewUrl;
   }
   set safePreviewUrl(value: SafeResourceUrl | null) {
+    const base = (url: SafeResourceUrl | null): string | null =>
+      this.sanitizer.sanitize(SecurityContext.RESOURCE_URL, url)?.split('#')[0] ?? null;
+    if (base(value) !== base(this._safePreviewUrl)) {
+      this.previewLoaded = false;
+    }
     this._safePreviewUrl = value;
-    this.previewLoaded = false;
   }
   @Input({ required: true }) documentFileName = '';
   @Input({ required: true }) activeExtraction: FieldExtraction | null = null;
@@ -60,6 +73,7 @@ export class QuotationDocPreviewComponent {
   @Output() readonly replaceDocumentSelected = new EventEmitter<Event>();
   @Output() readonly download = new EventEmitter<void>();
 
+  private readonly sanitizer = inject(DomSanitizer);
   private readonly translate = inject(TranslateService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly elementRef = inject<ElementRef<HTMLElement>>(ElementRef);

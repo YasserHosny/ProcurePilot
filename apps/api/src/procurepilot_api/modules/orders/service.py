@@ -83,7 +83,7 @@ RECEIPT_COLUMNS = (
     "id,tenant_id,purchase_order_id,receipt_reference,receipt_date,received_by,source_kind,"
     "source_reference,source_hash,created_at"
 )
-RECEIPT_LINE_COLUMNS = "id,purchase_order_line_id,received_quantity"
+RECEIPT_LINE_COLUMNS = "id,purchase_order_line_id,received_quantity,note"
 WRITE_ROLES = {MemberRole.owner, MemberRole.buyer}
 
 
@@ -316,6 +316,8 @@ class OrdersService:
                     for line in payload.lines
                 ],
             )
+            if payload.source_request_id:
+                self._mark_request_ordered(cur, payload.source_request_id)
             order = self._load_order_cursor(cur, order_id)
             self._audit_cursor(cur, member, "orders.purchase_order_created", order_id)
         return order, True
@@ -491,6 +493,13 @@ class OrdersService:
                 ],
             )
 
+            if row.get("source_request_id") and (
+                str(row["source_request_id"]) != str(payload.source_request_id)
+            ):
+                self._release_request_without_orders(cur, UUID(str(row["source_request_id"])))
+            if payload.source_request_id:
+                self._mark_request_ordered(cur, payload.source_request_id)
+
             order = self._load_order_cursor(cur, order_id)
             self._audit_cursor(cur, member, "orders.purchase_order_edited", order_id)
 
@@ -543,8 +552,121 @@ class OrdersService:
                 (idempotency_key, member.tenant_id, order_id),
             )
 
+            if row.get("source_request_id"):
+                self._release_request_without_orders(cur, UUID(str(row["source_request_id"])))
+
             order = self._load_order_cursor(cur, order_id)
             self._audit_cursor(cur, member, "orders.purchase_order_cancelled", order_id)
+
+        return order
+
+    def withdraw_order(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        order_id: UUID,
+        idempotency_key: UUID | None,
+    ) -> PurchaseOrder:
+        """Take a submitted order back to a draft while it has no recorded evidence."""
+        self._require_write(member, idempotency_key)
+
+        with self._transaction(member) as cur:
+            cur.execute(
+                f"select {ORDER_HEADER_COLUMNS},withdraw_idempotency_key from purchase_order "
+                "where tenant_id = %s and id = %s for update",
+                (member.tenant_id, order_id),
+            )
+            row = cur.fetchone()
+            if row is None:
+                raise NotFoundError(details={"resource": "purchase_order"})
+            if str(row.get("withdraw_idempotency_key")) == str(idempotency_key):
+                return self._load_order_cursor(cur, order_id)
+            if row["status"] != "submitted":
+                raise ConflictError(details={"reason": "order_not_submitted"})
+
+            cur.execute(
+                "select exists (select 1 from supplier_confirmation "
+                "where tenant_id = %s and purchase_order_id = %s) or exists "
+                "(select 1 from delivery_receipt where tenant_id = %s and purchase_order_id = %s)"
+                " or exists (select 1 from purchase_record pr "
+                "join purchase_order_line pol on pol.tenant_id = pr.tenant_id "
+                "and pol.id = pr.purchase_order_line_id "
+                "where pol.tenant_id = %s and pol.purchase_order_id = %s) as has_evidence",
+                (
+                    member.tenant_id,
+                    order_id,
+                    member.tenant_id,
+                    order_id,
+                    member.tenant_id,
+                    order_id,
+                ),
+            )
+            if cur.fetchone()["has_evidence"]:
+                raise ConflictError(details={"reason": "order_has_evidence"})
+
+            cur.execute(
+                "select 1 from purchase_order where tenant_id = %s "
+                "and withdraw_idempotency_key = %s and id != %s",
+                (member.tenant_id, idempotency_key, order_id),
+            )
+            if cur.fetchone() is not None:
+                raise ConflictError(details={"reason": "order_number_or_idempotency_exists"})
+
+            cur.execute(
+                "update purchase_order set status = 'draft', withdraw_idempotency_key = %s, "
+                "updated_at = now() where tenant_id = %s and id = %s",
+                (idempotency_key, member.tenant_id, order_id),
+            )
+            order = self._load_order_cursor(cur, order_id)
+            self._audit_cursor(cur, member, "orders.purchase_order_withdrawn", order_id)
+
+        return order
+
+    def close_order(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        order_id: UUID,
+        idempotency_key: UUID | None,
+    ) -> PurchaseOrder:
+        """Close an order whose goods have all been received; closed is final."""
+        self._require_write(member, idempotency_key)
+
+        with self._transaction(member) as cur:
+            cur.execute(
+                f"select {ORDER_HEADER_COLUMNS},close_idempotency_key from purchase_order "
+                "where tenant_id = %s and id = %s for update",
+                (member.tenant_id, order_id),
+            )
+            row = cur.fetchone()
+            if row is None:
+                raise NotFoundError(details={"resource": "purchase_order"})
+            if row["status"] == "closed":
+                if row.get("close_idempotency_key") and str(row["close_idempotency_key"]) == str(
+                    idempotency_key
+                ):
+                    return self._load_order_cursor(cur, order_id)
+                raise ConflictError(details={"reason": "order_already_closed"})
+            if row["status"] != "received":
+                raise ConflictError(details={"reason": "order_not_closable"})
+
+            cur.execute(
+                "select 1 from purchase_order where tenant_id = %s "
+                "and close_idempotency_key = %s and id != %s",
+                (member.tenant_id, idempotency_key, order_id),
+            )
+            if cur.fetchone() is not None:
+                raise ConflictError(details={"reason": "order_number_or_idempotency_exists"})
+
+            cur.execute(
+                "update purchase_order set status = 'closed', close_idempotency_key = %s, "
+                "updated_at = now() where tenant_id = %s and id = %s",
+                (idempotency_key, member.tenant_id, order_id),
+            )
+            order = self._load_order_cursor(cur, order_id)
+            self._audit_cursor(cur, member, "orders.purchase_order_closed", order_id)
 
         return order
 
@@ -665,6 +787,28 @@ class OrdersService:
             raise NotFoundError(details={"resource": "purchase_request"})
         if request["status"] not in ("approved", "ordered"):
             raise ConflictError(details={"reason": "request_not_approved"})
+
+    @staticmethod
+    def _mark_request_ordered(cur: psycopg.Cursor, request_id: UUID) -> None:
+        """Caller holds the request advisory lock and has written the order and lines."""
+        cur.execute(
+            "update purchase_request set status = 'ordered', updated_at = now() "
+            "where id = %s and status = 'approved' and exists ("
+            "select 1 from purchase_order where source_request_id = %s "
+            "and status <> 'cancelled')",
+            (request_id, request_id),
+        )
+
+    @staticmethod
+    def _release_request_without_orders(cur: psycopg.Cursor, request_id: UUID) -> None:
+        """Caller holds the request advisory lock after cancelling or detaching an order."""
+        cur.execute(
+            "update purchase_request set status = 'approved', updated_at = now() "
+            "where id = %s and status = 'ordered' and not exists ("
+            "select 1 from purchase_order where source_request_id = %s "
+            "and status <> 'cancelled')",
+            (request_id, request_id),
+        )
 
     @staticmethod
     def _lock_requests(cur: psycopg.Cursor, tenant_id: UUID, request_ids: set[UUID]) -> None:
@@ -1048,7 +1192,7 @@ class OrdersService:
                 cur.executemany(
                     "insert into delivery_receipt_line (tenant_id,delivery_receipt_id,"
                     "purchase_order_id,"
-                    "purchase_order_line_id,received_quantity) values (%s,%s,%s,%s,%s)",
+                    "purchase_order_line_id,received_quantity,note) values (%s,%s,%s,%s,%s,%s)",
                     [
                         (
                             member.tenant_id,
@@ -1056,6 +1200,7 @@ class OrdersService:
                             order_id,
                             line.purchase_order_line_id,
                             line.received_quantity,
+                            line.note,
                         )
                         for line in payload.lines
                     ],
@@ -1078,7 +1223,34 @@ class OrdersService:
             confirmation=latest_confirmation,
             receipts=receipts,
             lifecycle=lifecycle,
+            source_split_job_id=self._source_split_job_id(client, order),
         )
+
+    @staticmethod
+    def _source_split_job_id(client: Client, order: PurchaseOrder) -> UUID | None:
+        """The basket split behind the order's request, when the request came from one."""
+        if order.source_request_id is None:
+            return None
+        request = _rows(
+            client.table("purchase_request")
+            .select("request_group_id")
+            .eq("id", str(order.source_request_id))
+            .limit(1)
+            .execute()
+            .data
+        )
+        group_id = request[0]["request_group_id"] if request else None
+        if group_id is None:
+            return None
+        group = _rows(
+            client.table("purchase_request_group")
+            .select("basket_split_job_id")
+            .eq("id", str(group_id))
+            .limit(1)
+            .execute()
+            .data
+        )
+        return UUID(str(group[0]["basket_split_job_id"])) if group else None
 
     @contextmanager
     def _transaction(self, member: CurrentMember) -> Iterator[psycopg.Cursor]:
@@ -1508,6 +1680,7 @@ def _receipt_line_model(row: dict[str, object]) -> DeliveryReceiptLine:
             "id": row["id"],
             "purchase_order_line_id": row["purchase_order_line_id"],
             "received_quantity": row["received_quantity"],
+            "note": row.get("note"),
         },
     )
 

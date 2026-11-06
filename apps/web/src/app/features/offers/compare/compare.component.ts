@@ -1,6 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -10,11 +12,11 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { Subject, catchError, debounceTime, of, switchMap, tap } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Product } from '../../../core/api/models';
@@ -42,7 +44,7 @@ import { CompareTableComponent } from './compare-table.component';
     MatDividerModule,
     MatFormFieldModule,
     MatInputModule,
-    MatSelectModule,
+    MatAutocompleteModule,
     MatCheckboxModule,
     MatTableModule,
     MatProgressSpinnerModule,
@@ -76,10 +78,42 @@ export class CompareComponent implements OnInit {
     this.destroyRef.onDestroy(() => {
       this.cancelRefreshTimer();
     });
+    this.productSearchTerms
+      .pipe(
+        debounceTime(250),
+        tap(() => this.productSearchFailed.set(false)),
+        switchMap((term) =>
+          this.api.products({ q: term || undefined, limit: 20, status: 'active' }).pipe(
+            catchError(() => {
+              this.productSearchFailed.set(true);
+              return of(null);
+            }),
+          ),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((page) => {
+        if (page) this.productSearchResults.set(page.items);
+      });
   }
 
   readonly isLoading = signal<boolean>(false);
   readonly products = signal<Product[]>([]);
+
+  // Product search (P-157): the list above is only the first page of the catalogue; typing asks
+  // the server, so a product beyond it can still be chosen. `null` text means "not editing".
+  readonly productSearchText = signal<string | null>(null);
+  readonly productSearchResults = signal<Product[] | null>(null);
+  readonly productSearchFailed = signal(false);
+  private readonly productSearchTerms = new Subject<string>();
+  readonly productOptions = computed<Product[]>(() => this.productSearchResults() ?? this.products());
+  readonly productInputText = computed<string>(() => {
+    const typed = this.productSearchText();
+    if (typed !== null) return typed;
+    const selected = this.selectedProduct();
+    if (!selected) return '';
+    return selected.variant ? `${selected.tenant_name} (${selected.variant})` : selected.tenant_name;
+  });
   readonly selectedProductId = signal<string>('');
   // The comparison request is in base units, which needs the selected product's pack size, so it
   // must not be sent before the product list has loaded (otherwise 10 tins go out as 10 litres).
@@ -216,6 +250,41 @@ export class CompareComponent implements OnInit {
     if (this.refreshTimer !== null) {
       clearTimeout(this.refreshTimer);
       this.refreshTimer = null;
+    }
+  }
+
+  onProductSearch(text: string): void {
+    this.productSearchText.set(text);
+    this.productSearchTerms.next(text.trim());
+  }
+
+  onProductSearchClosed(): void {
+    // Material also closes the panel by itself when a search finds nothing; keep what the buyer
+    // typed then. Only a dismissed list with results goes back to showing the selection.
+    if (this.productSearchResults()?.length === 0) return;
+    this.resetProductSearch();
+  }
+
+  onProductSearchBlur(): void {
+    // No list to pick from (nothing found, or the search has not answered): show the selection.
+    if (!this.productSearchResults()?.length) this.resetProductSearch();
+  }
+
+  private resetProductSearch(): void {
+    this.productSearchText.set(null);
+    this.productSearchResults.set(null);
+    this.productSearchFailed.set(false);
+  }
+
+  onProductPicked(product: Product): void {
+    this.productSearchText.set(null);
+    this.productSearchResults.set(null);
+    this.productSearchFailed.set(false);
+    if (!this.products().some((p) => p.id === product.id)) {
+      this.products.update((list) => [...list, product]);
+    }
+    if (product.id !== this.selectedProductId()) {
+      this.onProductChange(product.id);
     }
   }
 

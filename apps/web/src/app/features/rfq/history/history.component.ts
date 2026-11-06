@@ -1,13 +1,16 @@
-import { RfqActionKeys } from '../rfq-api';
 import { Component, OnInit, inject, signal, computed, DestroyRef, ChangeDetectionStrategy } from '@angular/core';
 import { BidiModule } from '@angular/cdk/bidi';
 import { A11yModule } from '@angular/cdk/a11y';
 import { OverlayModule, ConnectedPosition } from '@angular/cdk/overlay';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { finalize, take, Subject, debounceTime, filter } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
@@ -19,7 +22,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { RfqApi, RfqRecipient, RfqSummary } from '../rfq-api';
+import { formatRfqReference, RfqActionKeys, RfqApi, RfqRecipient, RfqSummary } from '../rfq-api';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatService } from '../../../core/format/format.service';
 import { parseIsoDateLocal } from '../../../core/format/iso-date';
@@ -44,6 +47,29 @@ export interface RecipientsCacheEntry {
   recipients?: RfqRecipient[];
 }
 
+export const RFQ_STATUS_FILTERS = [
+  'draft',
+  'sent',
+  'responded',
+  'expired',
+  'converted',
+  'cancelled',
+] as const;
+
+/** The status in the address, or null when it is missing or not a known status. */
+export function parseStatusFilter(value: string | null | undefined): string | null {
+  return value && (RFQ_STATUS_FILTERS as readonly string[]).includes(value) ? value : null;
+}
+
+export const RFQ_SORTS = ['created_desc', 'created_asc', 'needed_asc', 'needed_desc', 'reference_desc', 'reference_asc'] as const;
+export type RfqSort = typeof RFQ_SORTS[number];
+export function parseSort(value: string | null | undefined): RfqSort {
+  return RFQ_SORTS.includes(value as RfqSort) ? value as RfqSort : 'created_desc';
+}
+export function parseSearch(value: string | null | undefined): string {
+  return (value ?? '').trim().slice(0, 100);
+}
+
 @Component({
   selector: 'app-rfq-history',
   standalone: true,
@@ -54,6 +80,9 @@ export interface RecipientsCacheEntry {
     OverlayModule,
     RouterModule,
     MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
     MatTableModule,
     MatProgressSpinnerModule,
     MatIconModule,
@@ -70,9 +99,11 @@ export interface RecipientsCacheEntry {
   styleUrl: './history.component.scss'
 })
 export class HistoryComponent implements OnInit {
+  readonly formatRfqReference = formatRfqReference;
   private readonly actionKeys = new RfqActionKeys();
   private readonly rfqApi = inject(RfqApi);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
@@ -83,18 +114,19 @@ export class HistoryComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly currentMembershipId = signal<string | null>(null);
+  readonly cancellingIds = signal<ReadonlySet<string>>(new Set());
 
   readonly isBelow1200 = signal(false);
   readonly isBelow768 = signal(false);
 
   readonly displayedColumns = computed(() => {
     if (this.isBelow768()) {
-      return ['status', 'neededBy', 'actions'];
+      return ['reference', 'status', 'neededBy', 'actions'];
     }
     if (this.isBelow1200()) {
-      return ['status', 'neededBy', 'sentAt', 'actions'];
+      return ['reference', 'status', 'neededBy', 'sentAt', 'actions'];
     }
-    return ['status', 'neededBy', 'sentAt', 'recipients', 'responses', 'actions'];
+    return ['reference', 'status', 'neededBy', 'sentAt', 'recipients', 'responses', 'actions'];
   });
 
   readonly showCountsInMenu = computed(() => this.isBelow1200());
@@ -103,9 +135,18 @@ export class HistoryComponent implements OnInit {
   readonly loadError = signal<boolean>(false);
   readonly loadingMore = signal<boolean>(false);
   readonly loadMoreError = signal<boolean>(false);
+  readonly statusFilters = RFQ_STATUS_FILTERS;
+  readonly statusFilter = signal<string | null>(null);
   readonly draftActionsUnavailable = signal<boolean>(false);
   readonly rfqs = signal<RfqSummary[]>([]);
   readonly nextCursor = signal<string | null>(null);
+  readonly searchText = signal('');
+  readonly sort = signal<RfqSort>('created_desc');
+  readonly sorts = RFQ_SORTS;
+  private appliedQuery = '';
+  private readonly searchChanges = new Subject<number>();
+  private searchRevision = 0;
+  readonly hasActiveFilters = computed(() => !!this.searchText().trim() || this.statusFilter() !== null);
   private listGeneration = 0;
   readonly recipientsCache = signal<Record<string, RecipientsCacheEntry>>({});
 
@@ -149,6 +190,28 @@ export class HistoryComponent implements OnInit {
 
   readonly timeFormatOptions: Intl.DateTimeFormatOptions = { timeStyle: 'short' };
 
+  /**
+   * The viewer's own membership id comes from the session. The members list is owner-only (a buyer
+   * gets 403), so it is only a fallback for a session without the id.
+   */
+  private resolveMembershipId(): void {
+    const sessionMembershipId = this.session.currentMember()?.membership_id;
+    if (sessionMembershipId) {
+      this.currentMembershipId.set(sessionMembershipId);
+      return;
+    }
+    this.api.members().subscribe({
+      next: ({ items }) => {
+        const email = this.session.currentMember()?.email;
+        this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
+      },
+      error: () => {
+        this.currentMembershipId.set(null);
+        this.draftActionsUnavailable.set(true);
+      },
+    });
+  }
+
   ngOnInit(): void {
     this.breakpoint
       .observe('(max-width: 1199.98px)')
@@ -164,20 +227,63 @@ export class HistoryComponent implements OnInit {
         this.isBelow768.set(res.matches);
       });
 
-    this.api.members().subscribe({
-      next: ({ items }) => {
-        const email = this.session.currentMember()?.email;
-        this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
+    this.statusFilter.set(parseStatusFilter(this.route.snapshot.queryParamMap.get('status')));
+    this.searchText.set(parseSearch(this.route.snapshot.queryParamMap.get('q')));
+    this.appliedQuery = this.searchText();
+    this.sort.set(parseSort(this.route.snapshot.queryParamMap.get('sort')));
+    this.searchChanges.pipe(
+      debounceTime(300),
+      filter(revision => revision === this.searchRevision),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(() => this.applyFilters());
+    this.resolveMembershipId();
+    this.loadRfqs();
+  }
+
+  /** Filter the list by status (null shows every RFQ) and keep the choice in the address. */
+  setStatusFilter(status: string | null): void {
+    if (this.statusFilter() === status) {
+      return;
+    }
+    this.statusFilter.set(status);
+    this.applyFilters();
+  }
+
+  onSearchInput(value: string): void {
+    this.searchText.set(value.slice(0, 100));
+    this.searchChanges.next(++this.searchRevision);
+  }
+
+  clearSearch(): void {
+    this.searchText.set('');
+    this.applyFilters();
+  }
+
+  setSort(value: string): void {
+    this.sort.set(parseSort(value));
+    this.applyFilters();
+  }
+
+  clearFilters(): void {
+    this.searchText.set('');
+    this.sort.set('created_desc');
+    this.statusFilter.set(null);
+    this.applyFilters();
+  }
+
+  applyFilters(): void {
+    ++this.searchRevision;
+    this.appliedQuery = parseSearch(this.searchText());
+    this.searchText.set(this.appliedQuery);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        status: this.statusFilter(),
+        q: this.appliedQuery || null,
+        sort: this.sort() === 'created_desc' ? null : this.sort(),
       },
-      error: () => {
-        const fallbackId = this.session.currentMember()?.membership_id;
-        if (fallbackId) {
-          this.currentMembershipId.set(fallbackId);
-        } else {
-          this.currentMembershipId.set(null);
-          this.draftActionsUnavailable.set(true);
-        }
-      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
     this.loadRfqs();
   }
@@ -189,7 +295,7 @@ export class HistoryComponent implements OnInit {
     this.loadError.set(false);
     this.loadMoreError.set(false);
     this.loadingMore.set(false);
-    this.rfqApi.listRfqs().subscribe({
+    this.rfqApi.listRfqs(this.statusFilter() ?? undefined, undefined, undefined, this.appliedQuery || undefined, this.sort()).subscribe({
       next: (response) => {
         if (generation !== this.listGeneration) {
           return;
@@ -210,14 +316,14 @@ export class HistoryComponent implements OnInit {
 
   loadMore(): void {
     const cursor = this.nextCursor();
-    if (this.loadingMore() || !cursor) {
+    if (this.loading() || this.loadingMore() || !cursor) {
       return;
     }
 
     const generation = this.listGeneration;
     this.loadingMore.set(true);
     this.loadMoreError.set(false);
-    this.rfqApi.listRfqs(undefined, cursor).subscribe({
+    this.rfqApi.listRfqs(this.statusFilter() ?? undefined, cursor, undefined, this.appliedQuery || undefined, this.sort()).subscribe({
       next: (response) => {
         if (generation !== this.listGeneration) {
           return;
@@ -313,6 +419,61 @@ export class HistoryComponent implements OnInit {
     });
   }
 
+  canCancel(rfq: RfqSummary): boolean {
+    return Boolean(rfq && ['draft', 'sent', 'responded', 'expired'].includes(rfq.status) &&
+      (this.session.hasRole('owner') || (this.session.hasRole('buyer') && this.isCreator(rfq))));
+  }
+
+  onCancelRfq(rfq: RfqSummary, event?: Event): void {
+    event?.stopPropagation();
+    const id = rfq.id;
+    if (!this.canCancel(rfq) || this.cancellingIds().has(id)) return;
+    this.cancellingIds.update((ids) => new Set([...ids, id]));
+    const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
+      width: '440px',
+      data: {
+        titleKey: 'rfq.cancel.title',
+        messageKey: 'rfq.cancel.message',
+        confirmKey: 'rfq.cancel.confirm',
+        cancelKey: 'rfq.cancel.keep',
+        isDestructive: true,
+      },
+    });
+    dialogRef.afterClosed().pipe(take(1), takeUntilDestroyed(this.destroyRef)).subscribe((confirmed: boolean | undefined) => {
+      if (!confirmed) {
+        this.cancellingIds.update((ids) => new Set([...ids].filter((value) => value !== id)));
+        return;
+      }
+      this.rfqApi.cancelRfq(id, this.actionKeys.get(`cancel:${id}`)).pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => { this.cancellingIds.update((ids) => new Set([...ids].filter((value) => value !== id))); }),
+      ).subscribe({
+        next: () => {
+          this.actionKeys.clear(`cancel:${id}`);
+          this.showCancelMessage('rfq.cancel.success');
+          this.loadRfqs();
+        },
+        error: (err: unknown) => {
+          this.actionKeys.onError(`cancel:${id}`, err);
+          let key = 'rfq.cancel.error';
+          if (err instanceof HttpErrorResponse) {
+            if (err.status === 403 && err.error?.details?.reason === 'not_creator') {
+              key = 'rfq.cancel.notCreator';
+            } else if (err.status === 409) {
+              key = 'rfq.cancel.notCancellable';
+              this.loadRfqs();
+            }
+          }
+          this.showCancelMessage(key);
+        },
+      });
+    });
+  }
+
+  private showCancelMessage(key: string): void {
+    this.snackBar.open(this.translate.instant(key), this.translate.instant('rfq.history.dismiss'), { duration: 5000 });
+  }
+
   getStatusClass(status: string): string {
     switch (status) {
       case 'draft': return 'status-draft';
@@ -320,6 +481,7 @@ export class HistoryComponent implements OnInit {
       case 'responded': return 'status-responded';
       case 'expired': return 'status-expired';
       case 'converted': return 'status-converted';
+      case 'cancelled': return 'status-cancelled';
       default: return '';
     }
   }
@@ -354,7 +516,7 @@ export class HistoryComponent implements OnInit {
 
   onSendDraft(rfq: RfqSummary, event?: Event): void {
     event?.stopPropagation();
-    if (!this.isCreator(rfq)) return;
+    if (!this.canSend(rfq)) return;
 
     if (isDateInPast(rfq.needed_by_date)) {
       const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
@@ -422,6 +584,8 @@ export class HistoryComponent implements OnInit {
       },
     });
   }
+
+  canSend(rfq: RfqSummary): boolean { return this.isCreator(rfq) || this.session.hasRole('owner'); }
 
   isCreator(rfq: RfqSummary): boolean { return rfq.created_by_membership_id === this.currentMembershipId(); }
 

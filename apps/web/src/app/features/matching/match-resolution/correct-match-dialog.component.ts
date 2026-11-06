@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, inject, signal } from '@angular/core';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -19,24 +19,32 @@ import type {
   ProductCreate,
   QuotationLineSummary,
 } from '../../../core/api/models';
+import { FormatPercentPipe } from '../../../core/format/percent.pipe';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
+import { ProductPickerComponent } from './product-picker.component';
 
 export interface CorrectMatchDialogData {
   readonly line: QuotationLineSummary;
   readonly candidates: readonly MatchCandidate[];
   readonly expectedCurrentDecisionId: string;
   readonly currentCandidateId?: string | null;
-  readonly baseUnits?: readonly BaseUnit[];
+  readonly baseUnits?: readonly SelectableUnit[];
   readonly quotationSupplierId?: string | null;
 }
 
-export const FALLBACK_BASE_UNITS: BaseUnit[] = [
-  { code: 'litre', label_en: 'Litre (L)', label_ar: 'لتر (L)', dimension: 'volume' },
-  { code: 'millilitre', label_en: 'Millilitre (ml)', label_ar: 'مليلتر (ml)', dimension: 'volume' },
-  { code: 'kilogram', label_en: 'Kilogram (kg)', label_ar: 'كيلوغرام (kg)', dimension: 'mass' },
-  { code: 'gram', label_en: 'Gram (g)', label_ar: 'غرام (g)', dimension: 'mass' },
-  { code: 'each', label_en: 'Each (item)', label_ar: 'حبة / قطعة', dimension: 'count' },
+/**
+ * A unit the pickers can offer. A unit from the API carries the server's labels; the built-in
+ * fallback carries only its code and takes its label from the i18n catalogue (`unitNames`).
+ */
+export type SelectableUnit = Pick<BaseUnit, 'code' | 'dimension'> & Partial<BaseUnit>;
+
+export const FALLBACK_BASE_UNITS: SelectableUnit[] = [
+  { code: 'litre', dimension: 'volume' },
+  { code: 'millilitre', dimension: 'volume' },
+  { code: 'kilogram', dimension: 'mass' },
+  { code: 'gram', dimension: 'mass' },
+  { code: 'each', dimension: 'count' },
 ];
 
 @Component({
@@ -56,7 +64,9 @@ export const FALLBACK_BASE_UNITS: BaseUnit[] = [
     MatSelectModule,
     TranslatePipe,
     UnitLabelPipe,
+    FormatPercentPipe,
     FormatQuantityPipe,
+    ProductPickerComponent,
   ],
   templateUrl: './correct-match-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -73,15 +83,31 @@ export class CorrectMatchDialogComponent {
   );
   readonly learnAlias = signal<boolean>(true);
 
+  /** Catalogue products the buyer picked in this dialog, recorded as manual candidates (P-151). */
+  private readonly pickedCandidates = signal<MatchCandidate[]>([]);
+  readonly allCandidates = computed<readonly MatchCandidate[]>(() => [
+    ...this.data.candidates,
+    ...this.pickedCandidates().filter((p) => !this.data.candidates.some((c) => c.id === p.id)),
+  ]);
+
+  onManualCandidate(candidate: MatchCandidate): void {
+    if (!this.pickedCandidates().some((c) => c.id === candidate.id)) {
+      this.pickedCandidates.update((list) => [...list, candidate]);
+    }
+    this.selectCandidate(candidate.id);
+  }
+
   readonly productForm: FormGroup = this.fb.group({
     tenant_name: [this.data.line.original_text, [Validators.required, Validators.maxLength(200)]],
     brand: [''],
     canonical_name: [''],
     variant: [''],
     gtin: ['', [Validators.pattern(/^(\d{8}|\d{12}|\d{13}|\d{14})?$/)]],
-    base_unit: [this.data.baseUnits?.[0]?.code ?? '', [Validators.required]],
+    // Left blank on purpose: a default would silently normalise a 10 kg pack as «pcs».
+    base_unit: ['', [Validators.required]],
     pack_count: [this.data.line.pack?.pack_count ?? 1, [Validators.required, Validators.min(1)]],
-    unit_size: [this.data.line.pack?.unit_size ?? '1.0', [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)]],
+    // Blank when the line has no pack: a made-up «1.0» would turn a 10 kg pack into a 1 kg one.
+    unit_size: [this.data.line.pack?.unit_size ?? '', [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)]],
     preferred_supplier_id: [this.data.quotationSupplierId ?? null],
   });
 
@@ -92,6 +118,10 @@ export class CorrectMatchDialogComponent {
 
   selectOutcome(outcome: MatchOutcome): void {
     this.selectedOutcome.set(outcome);
+    if (outcome === 'no_match_new_product') {
+      // Save stays disabled until the form is valid, so it cannot be clicked to reveal what is missing.
+      this.productForm.markAllAsTouched();
+    }
   }
 
   formatScore(score: string | number | undefined | null): number {
@@ -102,6 +132,15 @@ export class CorrectMatchDialogComponent {
 
   isRfqCandidate(cand: MatchCandidate): boolean {
     return Boolean(cand.reasons?.rfq && !cand.reasons.rfq.not_in_rfq && cand.reasons.rfq.rfq_line_id);
+  }
+
+  /** Save only changes something: a different match, or a valid new product. */
+  canSave(): boolean {
+    if (this.selectedOutcome() === 'no_match_new_product') {
+      return this.productForm.valid;
+    }
+    const chosen = this.selectedCandidateId();
+    return chosen !== null && chosen !== (this.data.currentCandidateId ?? null);
   }
 
   onConfirm(): void {

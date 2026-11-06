@@ -24,6 +24,7 @@ class Rfq(BaseModel):
     tenant_terms: str | None = None
     idempotency_key: UUID
     created_at: datetime
+    reference_number: int
 
 
 class RfqLine(BaseModel):
@@ -53,7 +54,22 @@ class RfqRecipient(BaseModel):
     status: RfqRecipientStatus
     outbound_message_id: str | None = None
     sent_at: datetime | None = None
+    failure_reason: Literal["delivery_error", "missing_contact_email"] | None = None
+    send_attempts: int = 0
+    last_attempt_at: datetime | None = None
+    reminder_count: int = 0
+    last_reminder_at: datetime | None = None
+    can_remind: bool = False
+    remind_blocked_reason: str | None = None
     created_at: datetime
+
+
+class RfqReminderPreview(BaseModel):
+    subject: str
+    body_text: str
+    locale: str
+    allowed: bool
+    blocked_reason: str | None = None
 
 
 class RfqResponse(BaseModel):
@@ -215,6 +231,7 @@ class RfqSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    reference_number: int
     status: RfqStatus
     cancelled_at: datetime | None = None
     needed_by_date: date

@@ -446,6 +446,21 @@ export type ReviewTaskReason =
   | 'line_count_mismatch'
   | 'total_unverified';
 
+export interface ReviewTaskFilters {
+  cursor?: string;
+  limit?: number;
+  status?: ReviewTaskStatus | 'all';
+  priority?: ReviewTaskPriority;
+  supplier_id?: string;
+  reason?: ReviewTaskReason;
+  quotation_status?: QuotationStatus;
+  search?: string;
+  date_from?: string;
+  date_to?: string;
+  sort_by?: 'created_at' | 'stated_total' | 'priority' | 'status';
+  sort_order?: 'asc' | 'desc';
+}
+
 export interface ReviewTask {
   readonly id: string;
   readonly quotation_id: string;
@@ -537,6 +552,7 @@ export interface MatchReason {
   readonly feature_score?: FeatureScore | null;
   readonly rfq?: RfqMatchReason | null;
   readonly measured?: Record<string, string> | null;
+  readonly manual?: boolean;
 }
 
 export interface MatchCandidate {
@@ -551,6 +567,11 @@ export interface MatchCandidate {
   readonly created_at: string;
 }
 
+export interface MatchDecisionHistory {
+  /** Every decision on the line, oldest first (the correction chain). */
+  readonly items: readonly MatchDecision[];
+}
+
 export interface MatchDecision {
   readonly id: string;
   readonly quotation_line_id: string;
@@ -559,6 +580,8 @@ export interface MatchDecision {
   readonly outcome: MatchOutcome;
   readonly is_automatic: boolean;
   readonly decided_by?: string | null;
+  /** The deciding member, set on a task's decision and on history reads. */
+  readonly decided_by_email?: string | null;
   readonly decided_at: string;
   readonly confidence: string;
   readonly alias_id?: string | null;
@@ -804,6 +827,8 @@ export interface OfferComparison {
   readonly product: ProductRef;
   readonly requested_quantity: string;
   readonly offers: readonly Offer[];
+  /** True when more offers exist than this response carries (the cap is enforced server-side). */
+  readonly offers_truncated?: boolean;
   readonly recommendation: Recommendation | null;
 }
 
@@ -950,6 +975,23 @@ export interface BasketRequestSettings {
   readonly urgency: 'normal' | 'urgent';
   readonly excluded_supplier_ids: readonly string[];
   readonly weights: OptimisationWeights;
+}
+
+export interface BasketSplitJobSummary {
+  readonly id: string;
+  readonly status: BasketSplitJobStatus;
+  readonly created_at: string;
+  readonly supplier_ids: readonly string[];
+  /** Supplier names aligned with supplier_ids; an entry is empty when the name is unknown. */
+  readonly supplier_names?: readonly string[];
+  readonly item_count: number;
+  readonly rfq_id?: string | null;
+  readonly total_landed_cost?: Money | null;
+}
+
+export interface BasketSplitJobList {
+  readonly items: readonly BasketSplitJobSummary[];
+  readonly next_cursor: string | null;
 }
 
 export interface BasketPackSnapshot {
@@ -1447,6 +1489,7 @@ export interface BranchRoleAssignmentCreate {
 // --- requests + approvals (008) ---------------------------------------------
 
 export type PurchaseRequestStatus =
+  | 'delivered'
   | 'draft'
   | 'submitted'
   | 'approved'
@@ -1454,7 +1497,7 @@ export type PurchaseRequestStatus =
   | 'rejected'
   | 'withdrawn';
 export type ApprovalStepStatus = 'pending' | 'approved' | 'rejected';
-export type ApprovalStepSource = 'threshold_match' | 'delegate' | 'owner_fallback';
+export type ApprovalStepSource = 'threshold_match' | 'group_threshold_match' | 'delegate' | 'owner_fallback';
 
 export type BudgetStatusValue = 'within' | 'near' | 'over' | 'no_budget';
 
@@ -1494,9 +1537,12 @@ export interface ApprovalStep {
   readonly assigned_membership_id: string;
   readonly assigned_name?: string | null;
   readonly assigned_email?: string | null;
+  readonly decided_name?: string | null;
+  readonly decided_email?: string | null;
   readonly source: ApprovalStepSource;
   readonly status: ApprovalStepStatus;
   readonly comment?: string | null;
+  readonly self_approval?: boolean;
   readonly decided_by_membership_id?: string | null;
   readonly decided_at?: string | null;
 }
@@ -1518,6 +1564,12 @@ export interface AutoPreparedProvenance {
   readonly created_at: string;
 }
 
+export interface RequestGroupSibling {
+  readonly id: string;
+  readonly position: number;
+  readonly supplier_name: string | null;
+}
+
 export interface RequestGroupSummary {
   readonly id: string;
   readonly rfq_id: string;
@@ -1527,6 +1579,7 @@ export interface RequestGroupSummary {
   readonly best_single_total?: Money | null;
   readonly saving?: Money | null;
   readonly sibling_request_ids: readonly string[];
+  readonly siblings?: readonly RequestGroupSibling[];
 }
 
 export interface PurchaseRequest {
@@ -1550,6 +1603,7 @@ export interface PurchaseRequest {
   readonly approval_step?: ApprovalStep | null;
   readonly submitted_at?: string | null;
   readonly withdrawn_at?: string | null;
+  readonly delivered_at?: string | null;
   readonly created_at: string;
   readonly updated_at?: string;
 }
@@ -1571,6 +1625,38 @@ export interface PurchaseRequestUpdate {
 export interface PurchaseRequestList {
   readonly items: readonly PurchaseRequest[];
   readonly next_cursor: string | null;
+}
+
+export type PendingApprovalSort =
+  | 'submitted_desc'
+  | 'submitted_asc'
+  | 'required_by_asc'
+  | 'total_desc'
+  | 'total_asc';
+
+export interface PendingApprovalList {
+  readonly items: readonly PurchaseRequest[];
+  readonly next_cursor: string | null;
+  readonly total: number;
+}
+
+export interface BulkApprovalDecisionInput {
+  readonly decision: 'approved' | 'rejected';
+  readonly comment: string | null;
+  readonly request_ids: readonly string[];
+}
+
+export interface BulkApprovalDecisionResult {
+  readonly request_id: string;
+  readonly outcome: 'decided' | 'failed';
+  readonly error_code: string | null;
+  readonly request: PurchaseRequest | null;
+}
+
+export interface BulkApprovalDecisionResponse {
+  readonly results: readonly BulkApprovalDecisionResult[];
+  readonly decided_count: number;
+  readonly failed_count: number;
 }
 
 export interface ApprovalDecisionInput {

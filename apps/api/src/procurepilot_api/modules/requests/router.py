@@ -4,6 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, Query, Request, Response, status
+from pydantic import StringConstraints
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
@@ -13,13 +14,18 @@ from procurepilot_api.modules.requests.schemas import (
     ApprovalDelegation,
     ApprovalDelegationCreate,
     ApprovalDelegationList,
+    BulkApprovalDecisionInput,
+    BulkApprovalDecisionResponse,
     DeliveryConfirmationCreate,
     LowStockReport,
     LowStockReportCreate,
     LowStockReportList,
+    PendingApprovalList,
+    PendingApprovalSort,
     PurchaseRequest,
     PurchaseRequestCreate,
     PurchaseRequestList,
+    PurchaseRequestSort,
     PurchaseRequestStatus,
     PurchaseRequestUpdate,
     QualityIssue,
@@ -71,7 +77,12 @@ def list_requests(
     status_filter: Annotated[PurchaseRequestStatus | None, Query(alias="status")] = None,
     branch_id: Annotated[UUID | None, Query()] = None,
     cursor: Annotated[str | None, Query()] = None,
-    limit: Annotated[int, Query(le=100)] = 50,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    sort: Annotated[PurchaseRequestSort, Query()] = "created_desc",
+    q: Annotated[
+        str | None, StringConstraints(strip_whitespace=True, min_length=1, max_length=100), Query()
+    ] = None,
+    mine: Annotated[bool, Query()] = False,
     eligible_for_order: Annotated[bool, Query()] = False,
 ) -> PurchaseRequestList:
     return service.list_requests(
@@ -82,20 +93,27 @@ def list_requests(
         cursor=cursor,
         limit=limit,
         eligible_for_order=eligible_for_order,
+        sort=sort,
+        q=q,
+        mine=mine,
     )
 
 
-@router.get("/approvals/pending", response_model=PurchaseRequestList)
+@router.get("/approvals/pending", response_model=PendingApprovalList)
 def list_pending_approvals(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
+    sort: Annotated[PendingApprovalSort, Query()] = "submitted_desc",
+    branch_id: Annotated[UUID | None, Query()] = None,
     cursor: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(le=100)] = 50,
-) -> PurchaseRequestList:
+) -> PendingApprovalList:
     return service.list_pending_approvals(
         bearer_token=token,
         member=member,
+        sort=sort,
+        branch_id=branch_id,
         cursor=cursor,
         limit=limit,
     )
@@ -400,6 +418,22 @@ def reject_request(
         bearer_token=token,
         member=member,
         request_id=request_id,
+        payload=payload,
+        idempotency_key=idempotency_key,
+    )
+
+
+@router.post("/approvals/bulk-decisions", response_model=BulkApprovalDecisionResponse)
+def bulk_decisions(
+    payload: Annotated[BulkApprovalDecisionInput, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+) -> BulkApprovalDecisionResponse:
+    return service.bulk_decisions(
+        bearer_token=token,
+        member=member,
         payload=payload,
         idempotency_key=idempotency_key,
     )

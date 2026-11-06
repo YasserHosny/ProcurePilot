@@ -7,8 +7,10 @@ info:
     resolved server-side from the token, cursor pagination capped at 100, Idempotency-Key on
     mutations, and the {code, message, details, trace_id} error envelope.
 
-    A purchase request moves draft -> submitted -> (ordered | rejected), with withdrawal
-    available from draft/submitted/ordered while the withdrawal rules permit it. Submission
+    A purchase request moves draft -> submitted -> (approved | rejected), with withdrawal
+    available from draft/submitted/approved/ordered while the withdrawal rules permit it.
+    Under ADR-025, a live purchase order moves approved to ordered; cancelling or detaching
+    the last live order returns ordered to approved. Legacy ordered rows are not backfilled. Submission
     resolves an approver via threshold rules, active delegation, and an owner fallback
     (research.md R3), captures the request's estimated value from price history (research.md R2),
     and creates one approval_step. A same-tenant, different-branch reference for a branch-scoped
@@ -127,7 +129,7 @@ paths:
     post:
       summary: Withdraw a request before a live purchase order exists
       description: >
-        Requester or workspace owner. Accepts draft/submitted/ordered. An ordered request
+        Requester or workspace owner. Accepts draft/submitted/approved/ordered. An approved or ordered request
         referencing any purchase order whose status is not cancelled returns 409 with
         details.reason purchase_order_exists. Sets withdrawn_at, releases committed budget
         spend, and audits previous_status. Other terminal states return 409 with
@@ -149,7 +151,9 @@ paths:
       description: >
         The request's currently-resolved approver, or an owner acting as standing override
         (FR-007), only. Requires a recorded human decision (FR-006) — there is no
-        system-originated approval path.
+        system-originated approval path. A requester receives 403 with
+        details.reason self_decision_not_allowed unless they are the only active owner
+        (ADR-024).
       parameters:
         - $ref: '#/components/parameters/RequestId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -170,7 +174,9 @@ paths:
   /requests/{request_id}/reject:
     post:
       summary: Reject a request
-      description: Same authorisation rule as approve (FR-007).
+      description: >
+        Same authorisation rule as approve (FR-007, ADR-024), including 403 with
+        details.reason self_decision_not_allowed unless the requester is the only active owner.
       parameters:
         - $ref: '#/components/parameters/RequestId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -188,14 +194,64 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /approvals/bulk-decisions:
+    post:
+      summary: Decide up to 25 single purchase requests with per-item results
+      description: >
+        A human chooses one approved or rejected decision for distinct request ids. The
+        authenticated single-request decision path runs separately for each item, with its
+        own transaction, audit and push outbox. Item keys are uuid5(batch key, str(request_id));
+        replay uses the existing actor/tenant/action-scoped single-request mechanism.
+        Results preserve input order. Split members fail with group_request_use_group_decision;
+        self-decision refusals fail with self_decision_not_allowed; invisible or other-tenant
+        ids fail with not_found. Other application errors retain their top-level single-path
+        code (for example conflict or auth.permission_denied); infrastructure failures use
+        unavailable. No monetary values are aggregated. Every valid batch returns 200,
+        including batches where every item fails. Invalid bodies or batch keys return 422
+        before any item runs. Rejection requires a non-blank comment; any comment is at most
+        2000 characters. A response-read failure can report unavailable after a decision has
+        committed; retrying with the same batch key recovers it without another decision.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BulkApprovalDecisionInput' }
+      responses:
+        '200':
+          description: Ordered per-item decision results
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkApprovalDecisionResponse' }
+        '401':
+          description: Authentication required
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
   /approvals/pending:
     get:
       summary: List requests awaiting the signed-in approver's decision
       description: >
         Every field an approver needs to decide (requester, branch, cost centre, lines,
         required-by date, budget status) is embedded directly in each item (FR-005) — no further
-        navigation required.
+        navigation required. Sorting uses approval-step creation time for submitted sorts,
+        request required-by date or estimated total amount for the other sorts, then step ID
+        ascending. Null values sort last. Branch filtering respects RLS; invisible and absent
+        branches return an empty list. Total counts matching pending decisions independently
+        of cursor and limit. Cursors are bound to sort and branch; mismatches return 422.
       parameters:
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [submitted_desc, submitted_asc, required_by_asc, total_desc, total_asc]
+            default: submitted_desc
+        - name: branch_id
+          in: query
+          schema: { type: string, format: uuid }
         - name: cursor
           in: query
           schema: { type: string }
@@ -207,7 +263,10 @@ paths:
           description: Pending approval queue
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/PurchaseRequestList' }
+              schema: { $ref: '#/components/schemas/PendingApprovalList' }
+
+        '422':
+          description: Invalid sort, branch UUID, or cursor (details.cursor is invalid for cursor errors)
 
   /approvals/threshold-rules:
     get:
@@ -472,8 +531,14 @@ components:
       type: object
       required: [id, assigned_membership_id, source, status]
       properties:
+        self_approval:
+          type: boolean
+          default: false
+          description: Derived; pending assignee or recorded decider is the requester (ADR-024).
         id: { type: string, format: uuid }
         assigned_membership_id: { type: string, format: uuid }
+        decided_name: { type: string, nullable: true }
+        decided_email: { type: string, format: email, nullable: true }
         assigned_name: { type: string, nullable: true }
         assigned_email: { type: string, format: email, nullable: true }
         source: { $ref: '#/components/schemas/ApprovalStepSource' }
@@ -560,6 +625,68 @@ components:
           type: array
           items: { $ref: '#/components/schemas/PurchaseRequest' }
         next_cursor: { type: string, nullable: true }
+
+    PendingApprovalList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/PurchaseRequest' }
+        next_cursor: { type: string, nullable: true }
+        total: { type: integer, minimum: 0 }
+
+    BulkApprovalDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [decision, request_ids]
+      properties:
+        decision: { type: string, enum: [approved, rejected] }
+        comment:
+          type: string
+          nullable: true
+          maxLength: 2000
+          description: Required and non-blank when decision is rejected; preserved verbatim.
+        request_ids:
+          type: array
+          minItems: 1
+          maxItems: 25
+          uniqueItems: true
+          items: { type: string, format: uuid }
+      allOf:
+        - if:
+            properties:
+              decision: { const: rejected }
+          then:
+            required: [comment]
+            properties:
+              comment: { type: string, minLength: 1, maxLength: 2000, pattern: '\S' }
+
+    BulkApprovalDecisionResult:
+      type: object
+      required: [request_id, outcome]
+      properties:
+        request_id: { type: string, format: uuid }
+        outcome: { type: string, enum: [decided, failed] }
+        error_code: { type: string, nullable: true, default: null }
+        request:
+          anyOf:
+            - { $ref: '#/components/schemas/PurchaseRequest' }
+            - { type: 'null' }
+          default: null
+      description: Decided items carry request and null error_code; failed items carry error_code and null request.
+
+    BulkApprovalDecisionResponse:
+      type: object
+      required: [results, decided_count, failed_count]
+      properties:
+        results:
+          type: array
+          minItems: 1
+          maxItems: 25
+          items: { $ref: '#/components/schemas/BulkApprovalDecisionResult' }
+        decided_count: { type: integer, minimum: 0, maximum: 25 }
+        failed_count: { type: integer, minimum: 0, maximum: 25 }
 
     ApprovalDecisionInput:
       type: object

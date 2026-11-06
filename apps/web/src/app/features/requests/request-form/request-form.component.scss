@@ -421,3 +421,55 @@
   font-weight: 500;
   margin-inline-start: 0.5rem;
 }
+
+.self-approval {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+
+  mat-icon { flex-shrink: 0; }
+  p { margin-block: 0.25rem 0; }
+}
+
+.request-details dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+}
+
+.request-details dd {
+  margin-inline: 0;
+  overflow-wrap: anywhere;
+}
+
+.request-details dt,
+.request-history time {
+  color: var(--pp-text-muted);
+}
+
+.request-history {
+  padding-inline-start: 1.5rem;
+  list-style-type: decimal;
+
+  li {
+    padding-inline-start: 0.5rem;
+    margin-block-end: 0.75rem;
+    overflow-wrap: anywhere;
+  }
+
+  li::marker {
+    color: var(--pp-text-strong);
+    font-weight: 600;
+  }
+
+  span + span, time {
+    margin-inline-start: 0.75rem;
+  }
+
+  p {
+    margin-block: 0.25rem 0;
+    white-space: pre-wrap;
+  }
+}

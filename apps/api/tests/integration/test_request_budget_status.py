@@ -33,8 +33,10 @@ class FakeQuery:
         self.client = client
         self.table = table
         self.excluded_request_statuses: list[str] = []
+        self.excluded_requester_ids: list[str] = []
         self.update_body: dict[str, object] | None = None
         self.filters: dict[str, object] = {}
+        self.range_window: tuple[int, int] | None = None
 
     def select(self, _columns: str) -> FakeQuery:
         return self
@@ -48,8 +50,12 @@ class FakeQuery:
         return self
 
     def neq(self, column: str, value: str) -> FakeQuery:
-        assert column == "purchase_request.status"
-        self.excluded_request_statuses.append(value)
+        if column == "purchase_request.status":
+            self.excluded_request_statuses.append(value)
+        elif column == "purchase_request.requested_by_membership_id":
+            self.excluded_requester_ids.append(value)
+        else:
+            raise AssertionError(f"unexpected neq column: {column}")
         return self
 
     def in_(self, column: str, value: object) -> FakeQuery:
@@ -59,10 +65,14 @@ class FakeQuery:
     def order(self, _column: str, *, desc: bool = False) -> FakeQuery:
         return self
 
-    def range(self, _start: int, _end: int) -> FakeQuery:
+    def range(self, start: int, end: int) -> FakeQuery:
+        self.range_window = (start, end)
         return self
 
     def limit(self, _count: int) -> FakeQuery:
+        return self
+
+    def or_(self, _condition: str) -> FakeQuery:
         return self
 
     def execute(self) -> Response:
@@ -70,7 +80,23 @@ class FakeQuery:
             if self.table == "approval_step":
                 if self.client.request_row["status"] in self.excluded_request_statuses:
                     return Response([])
+                if (
+                    str(self.client.request_row.get("requested_by_membership_id"))
+                    in self.excluded_requester_ids
+                ):
+                    return Response([])
+                if "assigned_membership_id" in self.filters:
+                    if str(self.client.step_row.get("assigned_membership_id")) != str(
+                        self.filters["assigned_membership_id"]
+                    ):
+                        return Response([])
                 return Response([self.client.step_row])
+            if self.table == "membership":
+                rows = [{"id": str(owner_id)} for owner_id in self.client.owner_membership_ids]
+                if self.range_window is not None:
+                    start, end = self.range_window
+                    rows = rows[start : end + 1]
+                return Response(rows)
             return Response([])
 
         if self.table == "purchase_request":
@@ -87,9 +113,16 @@ class FakeClient:
         self,
         request_row: dict[str, object],
         step_row: dict[str, object],
+        *,
+        owner_membership_ids: list[UUID] | None = None,
     ) -> None:
         self.request_row = request_row
         self.step_row = step_row
+        self.owner_membership_ids = (
+            list(owner_membership_ids)
+            if owner_membership_ids is not None
+            else [UUID(str(step_row["assigned_membership_id"])), uuid4()]
+        )
 
     def table(self, name: str) -> FakeQuery:
         return FakeQuery(self, name)
@@ -150,6 +183,7 @@ def step_row(*, request_id: UUID, assignee_id: UUID) -> dict[str, object]:
         "purchase_request_id": str(request_id),
         "assigned_membership_id": str(assignee_id),
         "source": "owner_fallback",
+        "created_at": "2026-09-11T09:00:00Z",
         "status": "pending",
         "comment": None,
         "decided_by_membership_id": None,
@@ -209,7 +243,8 @@ def service_with_budget_fixture(
         requester_id=requester_id,
     )
     step = step_row(request_id=request_id, assignee_id=approver_id)
-    client = FakeClient(req, step)
+    other_owner_id = uuid4()
+    client = FakeClient(req, step, owner_membership_ids=[approver_id, other_owner_id])
     service = RequestsService()
     member = owner_member(tenant_id=tenant_id, membership_id=approver_id)
 
@@ -247,6 +282,22 @@ def test_budget_status_is_attached_to_request_detail_and_pending_queue(
 ) -> None:
     service, _client, member, request_id = service_with_budget_fixture(monkeypatch)
 
+    def pending_page(
+        *, member: CurrentMember, **_kwargs: object
+    ) -> tuple[list[dict[str, object]], int]:
+        # This fixture has two owners; the requester's own request is excluded.
+        # SQL visibility is covered by the real-database queue tests.
+        rows = (
+            _client.table("approval_step")
+            .select("*")
+            .neq("purchase_request.requested_by_membership_id", str(member.membership_id))
+            .execute()
+            .data
+        )
+        return [{**row, "sort_value": row["created_at"]} for row in rows], len(rows)
+
+    monkeypatch.setattr(service, "_pending_approval_page", pending_page)
+
     detail = service.get_request(bearer_token="token", request_id=request_id)
     pending = service.list_pending_approvals(
         bearer_token="token",
@@ -258,12 +309,26 @@ def test_budget_status_is_attached_to_request_detail_and_pending_queue(
     assert detail.budget_status.remaining_amount.amount == "70.0000"
     assert detail.budget_status.remaining_amount.currency == "GBP"
 
+    assert pending.total == len(pending.items) == 1
     queued = pending.items[0]
+    assert queued.approval_step is not None
+    assert queued.approval_step.assigned_membership_id == member.membership_id
     assert queued.id == request_id
     assert queued.budget_status is not None
     assert queued.budget_status.exceeds is True
     assert queued.budget_status.remaining_amount.amount == "70.0000"
     assert queued.budget_status.remaining_amount.currency == "GBP"
+
+    requester_member = owner_member(
+        tenant_id=member.tenant_id,
+        membership_id=UUID(str(_client.request_row["requested_by_membership_id"])),
+    )
+    requester_pending = service.list_pending_approvals(
+        bearer_token="token",
+        member=requester_member,
+    )
+    assert requester_pending.items == []
+    assert requester_pending.total == 0
 
 
 def test_exceeding_budget_does_not_block_approval(
@@ -380,8 +445,9 @@ class SpendClient:
 def test_ordered_and_delivered_requests_reduce_remaining_budget_for_another_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Regression: an approved request moves straight to "ordered" (spec 010), so committed
-    # spend filtered on submitted/approved only silently dropped every approved request.
+    # Regression: an approved request stays "approved" until a live purchase order exists, while
+    # an "ordered" request also consumes committed spend (spec 010), so committed spend filtered
+    # on submitted/approved only silently dropped every approved request.
     tenant_id = uuid4()
     branch_id = uuid4()
     requester_id = uuid4()

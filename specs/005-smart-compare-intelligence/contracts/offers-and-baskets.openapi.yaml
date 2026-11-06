@@ -322,6 +322,9 @@ components:
         offers:
           type: array
           items: { $ref: '#/components/schemas/Offer' }
+        offers_truncated:
+          type: boolean
+          description: True when more offers exist than the response carries (capped at 101).
         recommendation:
           oneOf:
             - $ref: '#/components/schemas/Recommendation'

@@ -20,6 +20,7 @@ WRITE_ROLES = (MemberRole.owner, MemberRole.buyer)
 QUOTATION_GUARDS: dict[str, tuple[MemberRole, ...]] = {
     "presign-document-upload": WRITE_ROLES,
     "create-quotation": WRITE_ROLES,
+    "restore-quotation": WRITE_ROLES,
     "trigger-extraction": WRITE_ROLES,
     "correct-extracted-fields": WRITE_ROLES,
     "confirm-quotation": WRITE_ROLES,
@@ -55,3 +56,17 @@ def test_quotation_role_matrix_holds_in_both_directions(guard: str, role: Member
 
 def test_every_quotation_role_is_covered() -> None:
     assert set(ALL_ROLES) == set(MemberRole)
+
+
+@pytest.mark.parametrize("role", ALL_ROLES)
+def test_restore_route_uses_write_role_dependency(role: MemberRole) -> None:
+    from procurepilot_api.modules.quotations.router import router
+
+    route = next(route for route in router.routes if route.path.endswith("/restore"))
+    dependency = next(dep.call for dep in route.dependant.dependencies if dep.name == "member")
+    member = member_with_role(role)
+    if role in WRITE_ROLES:
+        assert dependency(member) == member
+    else:
+        with pytest.raises(PermissionDeniedError):
+            dependency(member)

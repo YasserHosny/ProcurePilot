@@ -1,8 +1,23 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  Injector,
+  OnInit,
+  afterNextRender,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+  ChangeDetectionStrategy,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatCardModule } from '@angular/material/card';
 import {
   MAT_DIALOG_DATA,
@@ -14,13 +29,15 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelect, MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import type { ParamMap } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { EMPTY, Observable, defer, forkJoin, of } from 'rxjs';
+import { catchError, expand, map, reduce } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
@@ -29,9 +46,13 @@ import type {
   ApprovalDecisionInput,
   Branch,
   BranchList,
+  BulkApprovalDecisionInput,
+  BulkApprovalDecisionResponse,
+  Member,
   BudgetStatusValue,
   CostCentre,
   CostCentreList,
+  PendingApprovalSort,
   Product,
   PurchaseRequest,
   PurchaseRequestLine,
@@ -61,8 +82,24 @@ import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { RequestsApiService } from '../../requests/requests-api';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { ApprovalsApiService } from '../approvals-api';
+import { ApprovalBulkPanelComponent, type BulkFailure } from './approval-bulk-panel.component';
+import { ApprovalBulkDialogComponent, type ApprovalBulkDialogData, type ApprovalBulkDialogResult } from './approval-bulk-dialog.component';
+import { BULK_SELECTION_LIMIT, bulkAttemptSignature, bulkFailureKey, selectionCurrencyTotals } from './bulk-selection';
 
 const I18N = 'approvals';
+const DEFAULT_SORT: PendingApprovalSort = 'submitted_desc';
+interface BranchLookupResult {
+  readonly list: BranchList;
+  readonly succeeded: boolean;
+}
+
+const PENDING_APPROVAL_SORTS: readonly PendingApprovalSort[] = [
+  'submitted_desc',
+  'submitted_asc',
+  'required_by_asc',
+  'total_desc',
+  'total_asc',
+];
 
 export interface ApprovalDecisionDialogData {
   readonly action: 'approve' | 'reject';
@@ -188,6 +225,9 @@ export class ApprovalDecisionDialogComponent {
   standalone: true,
   imports: [
     NgTemplateOutlet,
+    MatCheckboxModule,
+    ApprovalBulkPanelComponent,
+    RouterLink,
     MatCardModule,
     MatTableModule,
     MatButtonModule,
@@ -196,6 +236,7 @@ export class ApprovalDecisionDialogComponent {
     MatSnackBarModule,
     MatDialogModule,
     MatTooltipModule,
+    MatSelectModule,
     TranslatePipe,
     FormatQuantityPipe,
   ],
@@ -214,6 +255,11 @@ export class ApprovalQueueComponent implements OnInit {
   private readonly translate = inject(TranslateService);
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
+  private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly sortSelect = viewChild<MatSelect>('sortSelect');
 
   readonly isLoading = signal<boolean>(true);
   readonly pendingRequests = signal<PurchaseRequest[]>([]);
@@ -225,11 +271,38 @@ export class ApprovalQueueComponent implements OnInit {
   readonly costCentres = signal<CostCentre[]>([]);
   readonly products = signal<Product[]>([]);
   readonly errorMessage = signal<string | null>(null);
+  readonly pageLoadFailed = signal<boolean>(false);
   readonly errorTraceId = signal<string | null>(null);
   readonly expandedRequestIds = signal<ReadonlySet<string>>(new Set<string>());
   readonly processingRequestId = signal<string | null>(null);
+  readonly sortOption = signal<PendingApprovalSort>(DEFAULT_SORT);
+  readonly branchFilter = signal<string>('');
+  readonly totalCount = signal<number | null>(null);
+  readonly sortOptions = PENDING_APPROVAL_SORTS;
+  readonly hasActiveBranchFilter = computed(() => this.branchFilter() !== '');
+  readonly hasActiveFilters = computed(
+    () => this.sortOption() !== DEFAULT_SORT || this.branchFilter() !== '',
+  );
+
+  readonly soleOwner = signal(false);
+  private readonly selection = signal<ReadonlySet<string>>(new Set());
+  readonly bulkBusy = signal(false);
+  readonly bulkError = signal(false);
+  readonly bulkResult = signal<BulkApprovalDecisionResponse | null>(null);
+  readonly bulkFailures = signal<readonly BulkFailure[]>([]);
+  private bulkAttempt: {signature: string; key: string} | null = null;
+  readonly eligibleSingles = computed(() => this.pendingRequests().filter(request => !request.request_group && this.canSelectRequest(request)));
+  readonly selectedRequests = computed(() => this.eligibleSingles().filter(request => this.selection().has(request.id)));
+  readonly selectedIds = computed<ReadonlySet<string>>(() => new Set(this.selectedRequests().map(request => request.id)));
+  readonly selectionTotals = computed(() => selectionCurrencyTotals(this.selectedRequests()));
+  readonly selectionIncomplete = computed(() => this.selectedRequests().some(request => !request.estimated_total || request.has_incomplete_estimate));
+  readonly capReached = computed(() => this.selectedIds().size >= BULK_SELECTION_LIMIT);
+  readonly allSelected = computed(() => this.eligibleSingles().length > 0 && this.selectedIds().size === this.eligibleSingles().length);
+  readonly someSelected = computed(() => this.selectedIds().size > 0 && !this.allSelected());
+  readonly bulkDisabled = computed(() => this.bulkBusy() || this.isLoading() || this.processingRequestId() !== null);
 
   readonly displayedColumns: readonly string[] = [
+    'selection',
     'requiredByDate',
     'requester',
     'branch',
@@ -262,6 +335,11 @@ export class ApprovalQueueComponent implements OnInit {
       byId.set(product.id, product.tenant_name);
     }
     return byId;
+  });
+
+  readonly branchFilterName = computed(() => {
+    const branchId = this.branchFilter();
+    return branchId ? (this.branchNameById().get(branchId) ?? branchId) : '';
   });
 
   readonly queueItems = computed<QueueItem[]>(() => {
@@ -324,6 +402,9 @@ export class ApprovalQueueComponent implements OnInit {
 
   private readonly idempotencyKeys = new Map<string, string>();
   private loadGeneration = 0;
+  private branchesLoaded = false;
+  private initialized = false;
+  private urlNeedsCleanup = false;
 
   private getIdempotencyKey(action: string, targetId: string): string {
     const keyId = `${action}:${targetId}`;
@@ -339,26 +420,346 @@ export class ApprovalQueueComponent implements OnInit {
     this.idempotencyKeys.delete(`${action}:${targetId}`);
   }
 
+  constructor() {
+    effect(() => {
+      const eligible = new Set(this.eligibleSingles().map(request => request.id));
+      const current = this.selection();
+      const retained = new Set([...current].filter(id => eligible.has(id)));
+      if (retained.size !== current.size) this.selection.set(retained);
+    });
+  }
+
+  private canSelectRequest(request: PurchaseRequest): boolean {
+    const membershipId = this.session.currentMember()?.membership_id;
+    if (!membershipId || request.status !== 'submitted' || (request.approval_step && request.approval_step.status !== 'pending')) return false;
+    if (request.requested_by_membership_id === membershipId) return this.session.hasRole('owner') && this.soleOwner();
+    return this.session.hasRole('owner') || !request.approval_step || request.approval_step.assigned_membership_id === membershipId;
+  }
+
+  selectionDisabled(row: QueueItem): boolean {
+    return row.kind !== 'single' || !this.canSelectRequest(row.request) || this.bulkDisabled() || (this.capReached() && !this.selectedIds().has(row.id));
+  }
+
+  toggleSelection(row: QueueItem): void {
+    if (this.selectionDisabled(row)) return;
+    const selected = new Set(this.selectedIds());
+    if (selected.has(row.id)) selected.delete(row.id); else selected.add(row.id);
+    this.selection.set(selected);
+    this.clearBulkResults();
+    this.bulkError.set(false);
+  }
+
+  toggleSelectAll(): void {
+    if (this.bulkDisabled()) return;
+    if (this.allSelected() || this.capReached()) { this.clearSelection(); return; }
+    const selected = new Set(this.selectedIds());
+    for (const request of this.eligibleSingles()) {
+      if (selected.size >= BULK_SELECTION_LIMIT) break;
+      selected.add(request.id);
+    }
+    this.selection.set(selected);
+    this.clearBulkResults();
+    this.bulkError.set(false);
+  }
+
+  clearSelection(): void {
+    if (this.bulkBusy()) return;
+    this.selection.set(new Set());
+    this.clearBulkResults();
+    this.bulkAttempt = null;
+    this.bulkError.set(false);
+  }
+
+  private clearBulkResults(): void {
+    this.bulkResult.set(null);
+    this.bulkFailures.set([]);
+  }
+
+  selectionLabel(request: PurchaseRequest): string {
+    return this.translate.instant('approvals.bulk.selectRequest', {requester: this.getRequesterDisplay(request), id: request.id.slice(0, 8)});
+  }
+
+  openBulkDialog(decision: 'approved' | 'rejected'): void {
+    if (this.bulkDisabled() || this.selectedIds().size === 0) return;
+    this.clearBulkResults();
+    const signature = JSON.stringify([...this.selectedIds()].sort());
+    const count = this.selectedIds().size;
+    const category = new Intl.PluralRules(this.formatService.locale()).select(count);
+    const ref = this.dialog.open<ApprovalBulkDialogComponent, ApprovalBulkDialogData, ApprovalBulkDialogResult>(ApprovalBulkDialogComponent, {
+      width: '480px', restoreFocus: true, autoFocus: 'first-tabbable', ariaModal: true,
+      direction: this.formatService.locale().startsWith('ar') ? 'rtl' : 'ltr',
+      data: {
+        decision,
+        title: this.translate.instant(`approvals.bulk.${decision === 'approved' ? 'approveTitle' : 'rejectTitle'}.${category}`, {count: this.formatService.formatNumber(count, {numberingSystem: 'latn'})}),
+        totals: this.selectionTotals(), incomplete: this.selectionIncomplete(),
+      },
+    });
+    ref.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(result => {
+      if (result?.confirmed && signature === JSON.stringify([...this.selectedIds()].sort())) this.submitBulk(decision, result.comment);
+    });
+  }
+
+  submitBulk(decision: 'approved' | 'rejected', comment: string | null): void {
+    if (this.bulkDisabled() || this.selectedIds().size === 0 || (comment !== null && comment.length > 2000) || (decision === 'rejected' && !comment?.trim())) return;
+    const selected = this.selectedRequests();
+    const body: BulkApprovalDecisionInput = {decision, comment, request_ids: selected.map(request => request.id)};
+    const signature = bulkAttemptSignature(body);
+    if (this.bulkAttempt?.signature !== signature) this.bulkAttempt = {signature, key: crypto.randomUUID()};
+    const key = this.bulkAttempt.key;
+    const generation = this.loadGeneration;
+    this.bulkBusy.set(true); this.bulkError.set(false); this.bulkResult.set(null); this.bulkFailures.set([]);
+    this.errorMessage.set(null); this.errorTraceId.set(null);
+    this.approvalsApi.bulkDecide(body, key).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: response => {
+        this.bulkBusy.set(false);
+        const submitted = new Map(selected.map(request => [request.id, request]));
+        this.bulkFailures.set(response.results.filter(result => result.outcome === 'failed').map(result => ({
+          requestId: result.request_id,
+          label: this.translate.instant('approvals.bulk.requestLabel', {requester: submitted.has(result.request_id) ? this.getRequesterDisplay(submitted.get(result.request_id)!) : this.translate.instant('approvals.notAvailable'), id: result.request_id.slice(0, 8)}),
+          reasonKey: bulkFailureKey(result.error_code),
+        })));
+        this.bulkResult.set(response);
+        // A URL change replaced the list mid-batch, possibly with a GET that ran before the items
+        // committed. The removals below describe the old list, so refetch instead of applying them.
+        if (generation !== this.loadGeneration) {
+          this.loadPendingApprovals({keepBulkResults: true});
+          return;
+        }
+        const decided = new Set(response.results.filter(result => result.outcome === 'decided' && submitted.has(result.request_id)).map(result => result.request_id));
+        this.pendingRequests.update(requests => requests.filter(request => !decided.has(request.id)));
+        this.selection.set(new Set([...this.selection()].filter(id => !decided.has(id))));
+        this.totalCount.update(total => total === null ? null : Math.max(0, total - decided.size));
+        // Keep the namespace for failed subsets: unavailable may mean the write committed
+        // but its response failed, so their UUIDv5 item keys must replay the original audit.
+        this.bulkAttempt = this.selectedIds().size > 0
+          ? {key, signature: bulkAttemptSignature({...body, request_ids: [...this.selectedIds()]})} : null;
+        // No rows means no pagination footer, so a remaining page would be unreachable.
+        if (this.pendingRequests().length === 0 && this.nextCursor() !== null) {
+          this.loadPendingApprovals({keepBulkResults: true});
+        }
+      },
+      error: () => {
+        this.bulkBusy.set(false);
+        if (generation === this.loadGeneration) this.bulkError.set(true);
+      },
+    });
+  }
+
+  private loadOwnerEligibility(generation: number): void {
+    this.soleOwner.set(false);
+    if (!this.session.hasRole('owner')) return;
+    this.api.members().pipe(
+      expand(page => page.next_cursor ? this.api.members(page.next_cursor) : EMPTY),
+      reduce((members: Member[], page) => [...members, ...page.items], []),
+      catchError(() => of<Member[]>([])),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(members => {
+      if (generation !== this.loadGeneration) return;
+      const owners = members.filter(member => member.role === 'owner' && member.status === 'active');
+      this.soleOwner.set(owners.length === 1 && owners[0].id === this.session.currentMember()?.membership_id);
+    });
+  }
+
   ngOnInit(): void {
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => this.applyUrlState(params));
+  }
+
+  private applyUrlState(params: ParamMap): void {
+    const rawSort = params.get('sort');
+    const sort = this.isPendingApprovalSort(rawSort) ? rawSort : DEFAULT_SORT;
+    const rawBranch = params.get('branch') ?? '';
+    const branch = this.normalizeBranch(rawBranch);
+    const invalidSort = !!rawSort && !this.isPendingApprovalSort(rawSort);
+    const invalidBranch = !!rawBranch && !this.isUuid(rawBranch);
+    const unknownBranch =
+      !!rawBranch && !invalidBranch && this.branchesLoaded && branch === '';
+    this.urlNeedsCleanup = invalidSort || invalidBranch || unknownBranch;
+
+    const changed = this.sortOption() !== sort || this.branchFilter() !== branch;
+    this.sortOption.set(sort);
+    this.branchFilter.set(branch);
+
+    if (!this.initialized) {
+      this.initialized = true;
+      this.loadPendingApprovals();
+      return;
+    }
+
+    if (!changed) {
+      if (this.urlNeedsCleanup && this.branchesLoaded) {
+        this.writeUrl();
+      }
+      return;
+    }
+
+    this.resetAndReload();
+    if (this.urlNeedsCleanup && this.branchesLoaded) {
+      this.writeUrl();
+    }
+  }
+
+  private isPendingApprovalSort(value: string | null): value is PendingApprovalSort {
+    return value !== null && PENDING_APPROVAL_SORTS.includes(value as PendingApprovalSort);
+  }
+
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  }
+
+  private normalizeBranch(raw: string): string {
+    if (!raw || !this.isUuid(raw)) {
+      return '';
+    }
+    if (!this.branchesLoaded) {
+      return raw;
+    }
+    return this.branchNameById().has(raw) ? raw : '';
+  }
+
+  private resetAndReload(): void {
+    this.pendingRequests.set([]);
+    this.totalCount.set(null);
+    this.expandedRequestIds.set(new Set());
     this.loadPendingApprovals();
   }
 
-  loadPendingApprovals(): void {
+  private listParams(cursor?: string): {
+    sort?: PendingApprovalSort;
+    branch_id?: string;
+    cursor?: string;
+    limit: number;
+  } {
+    return {
+      ...(this.sortOption() !== DEFAULT_SORT ? { sort: this.sortOption() } : {}),
+      ...(this.branchFilter() ? { branch_id: this.branchFilter() } : {}),
+      ...(cursor ? { cursor } : {}),
+      limit: 50,
+    };
+  }
+
+  private writeUrl(): void {
+    void this.router.navigate([], {
+      queryParams: {
+        sort: this.sortOption() === DEFAULT_SORT ? null : this.sortOption(),
+        branch: this.branchFilter() || null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  onSortChange(sort: PendingApprovalSort): void {
+    if (!this.isPendingApprovalSort(sort) || this.sortOption() === sort) {
+      return;
+    }
+    this.sortOption.set(sort);
+    this.urlNeedsCleanup = false;
+    this.writeUrl();
+    this.resetAndReload();
+  }
+
+  onBranchChange(branchId: string): void {
+    const branch = branchId ?? '';
+    if (this.branchFilter() === branch) {
+      return;
+    }
+    this.branchFilter.set(branch);
+    this.urlNeedsCleanup = false;
+    this.writeUrl();
+    this.resetAndReload();
+  }
+
+  removeSortFilter(): void {
+    if (this.bulkBusy()) return;
+    this.onSortChange(DEFAULT_SORT);
+    this.focusAfterChipRemoval();
+  }
+
+  removeBranchFilter(): void {
+    if (this.bulkBusy()) return;
+    this.onBranchChange('');
+    this.focusAfterChipRemoval();
+  }
+
+  private focusAfterChipRemoval(): void {
+    afterNextRender(
+      () => {
+        const host = this.host.nativeElement as HTMLElement;
+        const buttons = host.querySelectorAll<HTMLButtonElement>('.chip-remove');
+        if (buttons.length > 0) {
+          buttons[0].focus();
+          return;
+        }
+        this.sortSelect()?.focus();
+      },
+      { injector: this.injector },
+    );
+  }
+
+  clearFilters(): void {
+    if (this.bulkBusy()) return;
+    const changed = this.hasActiveFilters();
+    this.sortOption.set(DEFAULT_SORT);
+    this.branchFilter.set('');
+    this.urlNeedsCleanup = false;
+    this.writeUrl();
+    if (changed) {
+      this.resetAndReload();
+    }
+    this.sortSelect()?.focus();
+  }
+
+  sortOptionLabel(sort: PendingApprovalSort): string {
+    return this.translate.instant(`${I18N}.sort.options.${sort}`);
+  }
+
+  totalCountLabel(): string {
+    const total = this.totalCount();
+    if (total === null) {
+      return '';
+    }
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(total);
+    return this.translate.instant(`approvals.total.${category}`, {
+      count: this.formatService.formatNumber(total, { numberingSystem: 'latn' }),
+    });
+  }
+
+  announcementText(): string {
+    if (this.isLoading() || this.totalCount() === null) {
+      return '';
+    }
+    return this.translate.instant(`${I18N}.announce.sorted`, {
+      sort: this.sortOptionLabel(this.sortOption()),
+      count: this.totalCountLabel(),
+    });
+  }
+
+  loadPendingApprovals({keepBulkResults = false}: {readonly keepBulkResults?: boolean} = {}): void {
     // When reloading (e.g. after a decision), reload from the first page and reset cursor.
     // Why: Reloading from cursor=null fetches fresh page 1 from the server. If accumulated
     // extra pages were kept, items could be duplicated or stale across pages, and the server
     // cursor would be out-of-sync with the spliced client list.
     const generation = ++this.loadGeneration;
+    this.selection.set(new Set()); this.bulkAttempt = null; this.bulkError.set(false);
+    if (!keepBulkResults) {
+      this.bulkResult.set(null); this.bulkFailures.set([]);
+    }
+    this.loadOwnerEligibility(generation);
     this.isLoading.set(true);
     this.isLoadingMore.set(false);
     this.errorMessage.set(null);
+    this.pageLoadFailed.set(false);
     this.errorTraceId.set(null);
+    this.totalCount.set(null);
     this.nextCursor.set(null);
     this.groupSiblings.set(new Map());
     this.groupStatus.set(new Map());
 
     forkJoin({
-      approvals: this.approvalsApi.listPendingApprovals({ limit: 50 }),
+      approvals: this.approvalsApi.listPendingApprovals(this.listParams()),
       branches: this.loadBranches(),
       costCentres: this.loadCostCentres(),
       products: this.loadProducts(),
@@ -369,10 +770,18 @@ export class ApprovalQueueComponent implements OnInit {
         }
         this.pendingRequests.set([...approvals.items]);
         this.nextCursor.set(approvals.next_cursor ?? null);
-        this.branches.set([...branches.items]);
+        this.totalCount.set(approvals.total ?? null);
+        if (branches.succeeded) {
+          this.branches.set([...branches.list.items]);
+          this.branchesLoaded = true;
+        }
         this.costCentres.set([...costCentres.items]);
         this.products.set([...products.items]);
         this.isLoading.set(false);
+        if (this.branchesLoaded && this.dropUnknownBranch(generation)) {
+          return;
+        }
+        this.cleanupUrlAfterLookups();
         this.checkAndFetchMissingGroupSiblings(generation);
       },
       error: (err: unknown) => {
@@ -380,9 +789,37 @@ export class ApprovalQueueComponent implements OnInit {
           return;
         }
         this.isLoading.set(false);
-        this.handleError(err);
+        this.totalCount.set(null);
+        this.pageLoadFailed.set(true);
+        this.handleError(err, 'approvals.pagination.pageLoadError');
       },
     });
+  }
+
+  retryLoad(): void {
+    this.loadPendingApprovals();
+  }
+
+  private dropUnknownBranch(generation: number): boolean {
+    const branch = this.branchFilter();
+    if (!branch || this.branchNameById().has(branch)) {
+      return false;
+    }
+    this.branchFilter.set('');
+    this.urlNeedsCleanup = false;
+    this.writeUrl();
+    if (generation === this.loadGeneration) {
+      this.resetAndReload();
+    }
+    return true;
+  }
+
+  private cleanupUrlAfterLookups(): void {
+    if (!this.urlNeedsCleanup) {
+      return;
+    }
+    this.urlNeedsCleanup = false;
+    this.writeUrl();
   }
 
   loadMore(): void {
@@ -395,7 +832,7 @@ export class ApprovalQueueComponent implements OnInit {
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
 
-    this.approvalsApi.listPendingApprovals({ cursor, limit: 50 }).subscribe({
+    this.approvalsApi.listPendingApprovals(this.listParams(cursor)).subscribe({
       next: (res) => {
         if (generation !== this.loadGeneration) {
           return;
@@ -405,6 +842,7 @@ export class ApprovalQueueComponent implements OnInit {
         const additions = res.items.filter((r) => !seenIds.has(r.id));
         this.pendingRequests.set([...current, ...additions]);
         this.nextCursor.set(res.next_cursor ?? null);
+        this.totalCount.set(res.total ?? this.totalCount());
         this.isLoadingMore.set(false);
         this.checkAndFetchMissingGroupSiblings(generation);
       },
@@ -465,6 +903,8 @@ export class ApprovalQueueComponent implements OnInit {
     });
   }
 
+  private singleDecision: { signature: string; key: string } | null = null;
+
   submitDecision(requestId: string, action: 'approve' | 'reject', comment?: string): void {
     this.processingRequestId.set(requestId);
     this.errorMessage.set(null);
@@ -474,13 +914,19 @@ export class ApprovalQueueComponent implements OnInit {
       comment: comment?.trim() || undefined,
     };
 
+    const signature = JSON.stringify([requestId, action, body.comment]);
+    if (this.singleDecision?.signature !== signature) {
+      this.singleDecision = { signature, key: crypto.randomUUID() };
+    }
+    const key = this.singleDecision.key;
     const action$ =
       action === 'approve'
-        ? this.requestsApi.approveRequest(requestId, body)
-        : this.requestsApi.rejectRequest(requestId, body);
+        ? this.requestsApi.approveRequest(requestId, body, key)
+        : this.requestsApi.rejectRequest(requestId, body, key);
 
     action$.subscribe({
       next: () => {
+        if (this.singleDecision?.key === key) this.singleDecision = null;
         this.processingRequestId.set(null);
         this.loadPendingApprovals();
         if (action === 'approve') {
@@ -576,6 +1022,17 @@ export class ApprovalQueueComponent implements OnInit {
         this.handleError(err);
       },
     });
+  }
+
+  isOwnRequest(item: QueueItem): boolean {
+    const membershipId = this.session.currentMember()?.membership_id;
+    if (!membershipId) return false;
+    const isOwn = (request: PurchaseRequest): boolean =>
+      request.approval_step?.self_approval === true &&
+      request.requested_by_membership_id === membershipId;
+    return item.kind === 'group'
+      ? item.requests.some(isOwn)
+      : isOwn(item.request);
   }
 
   isGroupRow(item: QueueItem): item is GroupQueueItem {
@@ -723,15 +1180,35 @@ export class ApprovalQueueComponent implements OnInit {
     return this.productNameById().get(productId) ?? productId;
   }
 
-  private loadBranches() {
-    return this.organisationApi.listBranches({ limit: 100 }).pipe(
-      catchError(() =>
-        of<BranchList>({
-          items: [],
-          next_cursor: null,
+  private loadBranches(): Observable<BranchLookupResult> {
+    return defer(() => {
+      const HARD_CAP = 50;
+      let pageCount = 0;
+
+      return this.organisationApi.listBranches({ limit: 100 }).pipe(
+        expand((res) => {
+          pageCount++;
+          if (res.next_cursor && pageCount < HARD_CAP) {
+            return this.organisationApi.listBranches({ limit: 100, cursor: res.next_cursor });
+          }
+          return EMPTY;
         }),
-      ),
-    );
+        reduce(
+          (acc: BranchList, res: BranchList) => ({
+            items: [...acc.items, ...res.items],
+            next_cursor: res.next_cursor,
+          }),
+          { items: [], next_cursor: null } as BranchList,
+        ),
+        map((list): BranchLookupResult => ({ list, succeeded: list.next_cursor === null })),
+        catchError(() =>
+          of<BranchLookupResult>({
+            list: { items: [], next_cursor: null },
+            succeeded: false,
+          }),
+        ),
+      );
+    });
   }
 
   private loadCostCentres() {
@@ -783,6 +1260,7 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   isDecisionDisabled(row: QueueItem): boolean {
+    if (this.bulkBusy()) return true;
     if (this.isProcessing(row.id)) {
       return true;
     }
@@ -935,13 +1413,20 @@ export class ApprovalQueueComponent implements OnInit {
 
   paginationStatusText(): string {
     const count = this.pendingRequests().length;
+    const total = this.totalCount();
+    if (total !== null && total > count) {
+      return this.translate.instant('approvals.pagination.showingOf', {
+        loaded: this.formatService.formatNumber(count, { numberingSystem: 'latn' }),
+        total: this.formatService.formatNumber(total, { numberingSystem: 'latn' }),
+      });
+    }
     const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
     const category = new Intl.PluralRules(locale).select(count);
     const key = this.nextCursor()
       ? `approvals.pagination.showingMore.${category}`
       : `approvals.pagination.showing.${category}`;
     return this.translate.instant(key, {
-      count: this.formatService.formatNumber(count),
+      count: this.formatService.formatNumber(count, { numberingSystem: 'latn' }),
     });
   }
 
@@ -949,13 +1434,21 @@ export class ApprovalQueueComponent implements OnInit {
     if (err instanceof HttpErrorResponse) {
       const apiError = err.error as ApiError | undefined;
       const details = apiError?.details as { reason?: string } | undefined;
+      if (err.status === 403 && details?.reason === 'self_decision_not_allowed') {
+        this.loadPendingApprovals();
+        this.errorMessage.set(this.translate.instant('approvals.selfDecisionNotAllowed'));
+        return;
+      }
       if (err.status === 409 && details?.reason === 'part_of_split') {
         this.errorMessage.set(this.translate.instant(`${I18N}.partOfSplitError`));
         return;
       }
       this.errorTraceId.set(apiError?.trace_id ?? null);
 
-      if (defaultMessageKey === 'approvals.pagination.loadError') {
+      const isListError =
+        defaultMessageKey === 'approvals.pagination.loadError' ||
+        defaultMessageKey === 'approvals.pagination.pageLoadError';
+      if (isListError) {
         const raw = err.error as unknown;
         const isEnvelope =
           typeof raw === 'object' &&

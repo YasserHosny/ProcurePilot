@@ -157,7 +157,8 @@ either way.
   before a decision is made? The request keeps its original assignment and remains decidable — a
   branch closing down does not retroactively invalidate requests already in flight.
 - What happens when a requester wants to change their mind after submitting? They can withdraw a
-  request that has not yet been decided, moving it to a "withdrawn" status; they cannot edit a
+  draft, submitted, approved, or legacy ordered request without a live purchase order (ADR-025),
+  moving it to a "withdrawn" status; they cannot edit a
   submitted request in place, since an approver may already be reviewing what they saw.
 - What happens when a request is rejected and the requester wants to try again? They create a new
   request (optionally copying the rejected one's details); a rejected request is never reopened or
@@ -190,8 +191,9 @@ either way.
 - **FR-002**: System MUST allow a requester to submit a draft request, moving it from "draft" to
   "submitted" and making it visible to whichever approver(s) it routes to.
 - **FR-003**: System MUST reject submission of a request with zero lines.
-- **FR-004**: System MUST allow a requester to withdraw their own request at any point before a
-  decision is recorded, and MUST NOT allow editing a request once it has been submitted.
+- **FR-004**: System MUST allow a requester or workspace owner to withdraw a draft, submitted,
+  approved, or ordered request. Approved and ordered requests MUST have no live purchase order
+  (ADR-025). System MUST NOT allow editing a request once it has been submitted.
 - **FR-005**: System MUST provide an approval queue showing every request currently awaiting the
   signed-in approver's decision, each with requester, branch, cost centre, lines, required-by
   date, and budget status (when applicable) visible without further navigation.

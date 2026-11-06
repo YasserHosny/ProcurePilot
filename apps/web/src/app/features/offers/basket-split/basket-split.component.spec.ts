@@ -9,7 +9,7 @@ import { MatSelect } from '@angular/material/select';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import en from '../../../../../../../packages/i18n/en.json';
 import ar from '../../../../../../../packages/i18n/ar.json';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import { RfqApi } from '../../rfq/rfq-api';
@@ -125,7 +125,13 @@ describe('BasketSplitComponent (US3, T045)', () => {
       'products',
       'optimiseBasket',
       'getBasketSplitJob',
+      'product',
+      'listBasketSplitJobs',
     ]);
+
+    // Looking up a product the page has not loaded fails by default; the label stays the id.
+    apiService.product.and.returnValue(throwError(() => new Error('unknown product')));
+    apiService.listBasketSplitJobs.and.returnValue(of({ items: [], next_cursor: null }));
 
     mockRfqApi = jasmine.createSpyObj<RfqApi>('RfqApi', ['getRfq']);
     mockRfqApi.getRfq.and.returnValue(
@@ -1199,6 +1205,145 @@ describe('BasketSplitComponent (US3, T045)', () => {
         }),
       );
       expect(component.rerunNotice()).toBeFalse();
+    });
+
+    // PPS-209: only the first 100 products and suppliers could be picked.
+    it('follows the supplier cursors so every supplier can be chosen', () => {
+      apiService.suppliers.and.callFake(((params?: { status?: string; cursor?: string }) => {
+        if (params?.status === 'preferred') return of({ items: [], next_cursor: null });
+        return params?.cursor === 'p2'
+          ? of({ items: [{ id: 'supp-3', name: 'Supplier Gamma', status: 'active', created_at: '' }], next_cursor: null })
+          : of({ items: [{ id: 'supp-1', name: 'Supplier Alpha', status: 'active', created_at: '' }], next_cursor: 'p2' });
+      }) as never);
+
+      component.loadSuppliersAndProducts();
+
+      expect(component.suppliers().map((x) => x.id)).toEqual(['supp-1', 'supp-3']);
+    });
+
+    it('loads further pages of products on request and does not duplicate any', () => {
+      const prod = (id: string) => ({ id, tenant_name: id, canonical_name: id, base_unit: 'EA', pack: { pack_count: 1, unit_size: '1' }, status: 'active', created_at: '' });
+      apiService.products.and.returnValues(
+        of({ items: [prod('prod-1')], next_cursor: 'c2' }) as never,
+        of({ items: [prod('prod-1'), prod('prod-2')], next_cursor: null }) as never,
+      );
+      component.loadSuppliersAndProducts();
+      expect(component.hasMoreProducts()).toBeTrue();
+
+      component.loadMoreProducts();
+
+      expect(apiService.products).toHaveBeenCalledWith(jasmine.objectContaining({ cursor: 'c2' }));
+      expect(component.products().map((x) => x.id)).toEqual(['prod-1', 'prod-2']);
+      expect(component.hasMoreProducts()).toBeFalse();
+    });
+
+    // Review: Enter in the search box submitted the whole basket form.
+    it('does not submit the basket when Enter is pressed in the product search', () => {
+      fixture.detectChanges();
+      const input = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="product-search"]') as HTMLInputElement;
+      const event = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true });
+      input.dispatchEvent(event);
+      expect(event.defaultPrevented).toBeTrue();
+    });
+
+    // Review: a product found by search is not in the first 100 the job page loads.
+    it('resolves the name of a job item whose product is not in the loaded list', () => {
+      component.products.set([]);
+      apiService.product.and.returnValue(
+        of({ id: 'prod-9', tenant_name: 'Basmati rice', canonical_name: 'rice', base_unit: 'EA', pack: { pack_count: 1, unit_size: '1' }, status: 'active', created_at: '' } as unknown as import('../../../core/api/models').Product),
+      );
+      apiService.getBasketSplitJob.and.returnValue(
+        of({ ...mockFeasibleJob, items: [{ workspace_product_id: 'prod-9', quantity: '3.000000' }] }),
+      );
+
+      component.fetchJob('job-1');
+
+      expect(apiService.product).toHaveBeenCalledWith('prod-9');
+      expect(component.getProductName('prod-9')).toBe('Basmati rice');
+    });
+
+    // Review: a failed rerun must be visible on the results view, not only in the form.
+    it('shows an error from a failed rerun above the results', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
+      component.currentJob.set(mockFeasibleJob);
+      component.errorMessage.set('The rerun failed.');
+      fixture.detectChanges();
+      const alert = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="job-error"]');
+      expect(alert?.getAttribute('role')).toBe('alert');
+      expect(alert?.textContent).toContain('The rerun failed.');
+    });
+
+    // Review: a slow answer to an older search must not replace the newer list.
+    it('ignores an older product search answer that arrives after a newer one', fakeAsync(() => {
+      const prod = (id: string) => ({ id, tenant_name: id, canonical_name: id, base_unit: 'EA', pack: { pack_count: 1, unit_size: '1' }, status: 'active', created_at: '' });
+      const first = new Subject<{ items: never[]; next_cursor: string | null }>();
+      const second = new Subject<{ items: never[]; next_cursor: string | null }>();
+      apiService.products.and.returnValues(first as never, second as never);
+      component.products.set([]);
+
+      component.onProductSearch('a');
+      tick(300);
+      component.onProductSearch('ab');
+      tick(300);
+      second.next({ items: [prod('newer') as never], next_cursor: null });
+      first.next({ items: [prod('older') as never], next_cursor: 'stale' });
+
+      expect(component.products().map((x) => x.id)).toEqual(['newer']);
+      expect(component.productsCursor()).toBeNull();
+    }));
+
+    it('searches products by name and keeps the products already chosen', fakeAsync(() => {
+      const prod = (id: string, name: string) => ({ id, tenant_name: name, canonical_name: name, base_unit: 'EA', pack: { pack_count: 1, unit_size: '1' }, status: 'active', created_at: '' });
+      component.products.set([prod('prod-1', 'Product 1') as never]);
+      component.items.set([{ workspace_product_id: 'prod-1', quantity: '1' }]);
+      apiService.products.and.returnValue(of({ items: [prod('prod-9', 'Basmati rice') as never], next_cursor: null }));
+
+      component.onProductSearch('rice');
+      tick(300);
+
+      expect(apiService.products).toHaveBeenCalledWith(jasmine.objectContaining({ q: 'rice' }));
+      expect(component.products().map((x) => x.id).sort()).toEqual(['prod-1', 'prod-9']);
+    }));
+
+    // PPS-209: earlier splits could only be found through their URL.
+    it('lists recent splits with a link to each and loads further pages', () => {
+      const summary = (id: string) => ({
+        id, status: 'completed' as const, created_at: '2026-11-03T10:00:00Z',
+        supplier_ids: ['supp-1', 'supp-2'], supplier_names: ['Al Dhahabi', 'Al Wafra'], item_count: 3,
+        total_landed_cost: { amount: '255.0000', currency: 'SAR' },
+      });
+      apiService.listBasketSplitJobs.and.returnValues(
+        of({ items: [summary('job-a')], next_cursor: 'c2' }),
+        of({ items: [summary('job-b')], next_cursor: null }),
+      );
+      component.loadHistory();
+      fixture.detectChanges();
+
+      const rows = () => Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="split-history-row"]'));
+      expect(rows().length).toBe(1);
+      expect(rows()[0].getAttribute('href')).toBe('/offers/basket-split/job-a');
+      expect(rows()[0].textContent).toContain('Al Dhahabi, Al Wafra');
+      // The stored amount is shown like every other amount, not as «255.0000».
+      expect(rows()[0].textContent).not.toContain('255.0000');
+      expect(rows()[0].textContent).toContain('255');
+      expect(component.hasMoreHistory()).toBeTrue();
+
+      component.loadMoreHistory();
+      fixture.detectChanges();
+
+      expect(apiService.listBasketSplitJobs).toHaveBeenCalledWith(jasmine.objectContaining({ cursor: 'c2' }));
+      expect(rows().map((r) => r.getAttribute('href'))).toEqual(['/offers/basket-split/job-a', '/offers/basket-split/job-b']);
+      expect(component.hasMoreHistory()).toBeFalse();
+    });
+
+    it('says nothing when there is no history, and keeps the form usable when it cannot be loaded', () => {
+      apiService.listBasketSplitJobs.and.returnValue(throwError(() => new Error('down')));
+      component.loadHistory();
+      fixture.detectChanges();
+      expect(component.history()).toEqual([]);
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="split-history"]')).toBeNull();
     });
 
     it('offers preferred suppliers as well as active ones, without duplicates', () => {

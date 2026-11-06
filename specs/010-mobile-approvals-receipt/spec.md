@@ -86,7 +86,7 @@ quantity, confirming the shortage is recorded and visible against that specific 
 2. **Given** the same scenario, **When** the branch member instead records a lower quantity
    received for one or more lines, **Then** the request is marked delivered with the specific
    shortage recorded against those lines, not just a generic "problem" flag.
-3. **Given** a request that has not yet been approved, **When** a branch member attempts to
+3. **Given** a request that is not yet ordered (including approved without a purchase order), **When** a branch member attempts to
    confirm its delivery, **Then** the app refuses — there is nothing to receive against a request
    that was never ordered.
 4. **Given** a request already confirmed as delivered, **When** anyone views its status, **Then**
@@ -179,11 +179,11 @@ against that specific request afterward.
   uninformed decision.
 - **FR-004**: The mobile app MUST tell an approver plainly, not silently fail or double-record,
   when they attempt to decide on a request that has already been decided by someone else.
-- **FR-005**: The mobile app MUST let a branch member confirm delivery of an approved request,
+- **FR-005**: The mobile app MUST let a branch member confirm delivery of an ordered request (approval plus a live purchase order, ADR-025),
   recording the quantity actually received for each line and flagging any shortfall against what
   was ordered.
 - **FR-006**: The mobile app MUST refuse delivery confirmation for a request that has not been
-  approved, and MUST refuse a quality-issue report for a request that has not been confirmed
+  ordered, and MUST refuse a quality-issue report for a request that has not been confirmed
   delivered.
 - **FR-007**: The mobile app MUST let a branch member report a delivery quality issue against a
   delivered request, with a written description and zero or more photos captured through the

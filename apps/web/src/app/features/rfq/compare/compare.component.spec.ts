@@ -1,4 +1,4 @@
-import { signal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed, fakeAsync } from '@angular/core/testing';
 import { CompareComponent } from './compare.component';
 import { formatExactQuantity, formatLocaleNumber, FormatService } from '../../../core/format/format.service';
@@ -318,6 +318,29 @@ describe('CompareComponent (RFQ)', () => {
     } catch {
       // ignore
     }
+  });
+
+  describe('creator membership id (buyers cannot call the members API)', () => {
+    function createWithSession(sessionMember: { email: string; membership_id?: string } | null): CompareComponent {
+      (mockSession.currentMember as unknown as WritableSignal<object | null>).set(sessionMember);
+      mockApiService.members.calls.reset();
+      const created = TestBed.createComponent(CompareComponent);
+      created.detectChanges();
+      return created.componentInstance;
+    }
+
+    it('reads the membership id from the session and does not call members()', () => {
+      const compare = createWithSession({ email: 'buyer@test.com', membership_id: 'm-buyer' });
+      expect(compare.currentMembershipId()).toBe('m-buyer');
+      expect(mockApiService.members).not.toHaveBeenCalled();
+    });
+
+    it('stays without an id, and without an unhandled error, when members() is forbidden', () => {
+      mockApiService.members.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+      const compare = createWithSession({ email: 'buyer@test.com' });
+      expect(mockApiService.members).toHaveBeenCalledTimes(1);
+      expect(compare.currentMembershipId()).toBeNull();
+    });
   });
 
   it('shows draft notice card only when RFQ status is draft', () => {
@@ -1464,6 +1487,43 @@ describe('CompareComponent (RFQ)', () => {
       expect(compiled.querySelectorAll('[data-testid="lowest-line-price"]').length).toBe(0);
     });
 
+    // Review: the saving is only a missed one when no split was taken and none is possible now.
+    it('words the split saving by what the RFQ can still do', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      const { respDahabi, respWafra, rfqLines } = createD8f7fb0cFixtures();
+      applyD8f7fb0cDetail(rfqLines, 'responded');
+      component.responses.set([respDahabi, respWafra]);
+      const compiled = fixture.nativeElement as HTMLElement;
+      const hintText = () => compiled.querySelector('[data-testid="split-saving-hint"]')?.textContent ?? null;
+      const withStatus = (status: string, extra: object = {}) => {
+        component.rfqDetail.set({
+          ...sentDetail,
+          rfq: { ...sentDetail.rfq, status } as RfqDetail['rfq'],
+          lines: rfqLines,
+          ...extra,
+        });
+        fixture.detectChanges();
+      };
+
+      withStatus('responded');
+      expect(hintText()).toContain('could save');
+
+      for (const status of ['cancelled', 'expired']) {
+        withStatus(status);
+        expect(hintText()).toContain('would have saved');
+        expect(hintText()).not.toContain('could save');
+      }
+
+      withStatus('converted', { converted_purchase_request_ids: ['pr-single'] }); // one supplier took it all
+      expect(hintText()).toContain('would have saved');
+
+      // The split itself converted this RFQ: the saving was taken, so it is not shown as missed.
+      withStatus('converted', { request_group_id: 'group-1', converted_purchase_request_ids: ['a', 'b'] });
+      expect(hintText()).toBeNull();
+    });
+
     it('split hint: shows SAR 60, sits right above the one Split action (splitRfq) on an open RFQ, keeps the text when converted, and has no bare route link', () => {
       const translate = TestBed.inject(TranslateService);
       translate.setTranslation('en', enCatalog, true);
@@ -1478,6 +1538,7 @@ describe('CompareComponent (RFQ)', () => {
       const hint = compiled.querySelector('[data-testid="split-saving-hint"]');
       expect(hint).not.toBeNull();
       expect(hint?.textContent).toContain('60');
+      expect(hint?.textContent).toContain('could save'); // still open: an offer worth taking
 
       // (a) open RFQ, writer, eligible -> the hint has no Split button of its own; the RFQ's one Split
       // action follows it directly and calls rfqApi.splitRfq with the RFQ id
@@ -1506,6 +1567,9 @@ describe('CompareComponent (RFQ)', () => {
       const convertedHint = compiled.querySelector('[data-testid="split-saving-hint"]');
       expect(convertedHint).not.toBeNull();
       expect(convertedHint?.textContent).toContain('60');
+      // PPS-208: on a converted RFQ it is a record of what was left on the table, not an offer.
+      expect(convertedHint?.textContent).toContain('would have saved');
+      expect(convertedHint?.textContent).not.toContain('could save');
       expect(convertedHint?.querySelector('button')).toBeNull();
       expect(compiled.querySelector('[data-testid="rfq-compare-split-button"]')).toBeNull();
 
@@ -1755,7 +1819,8 @@ describe('CompareComponent (RFQ)', () => {
       const { respDahabi, respWafra } = createD8f7fb0cFixtures();
       component.rfqDetail.set({
         ...sentDetail,
-        rfq: { ...sentDetail.rfq, status: 'responded' },
+        // Still ahead, so the date does not date this test (a past date disables Prepare).
+        rfq: { ...sentDetail.rfq, status: 'responded', needed_by_date: '2099-12-31' },
       });
       component.responses.set([respDahabi, respWafra]);
       component.selectedBranchId.set('branch-1');
@@ -1811,6 +1876,223 @@ describe('CompareComponent (RFQ)', () => {
         { duration: 5000 },
       );
       expect(component.loadData).toHaveBeenCalledWith('rfq-1');
+    });
+  });
+
+  describe('landed totals, coverage and the converted hint (P-155, PPS-199)', () => {
+    const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+    const rfqLine = (product: string) => ({
+      id: `line-${product}`,
+      tenant_id: 'tenant-1',
+      rfq_id: 'rfq-1',
+      workspace_product_id: product,
+      quantity: '10',
+      created_at: '2026-09-25T09:00:00Z',
+    });
+    const reply = (id: string, supplier: string, products: string[], price: string, landed: string) => ({
+      id,
+      rfq_id: 'rfq-1',
+      supplier_id: supplier,
+      quotation_id: `quote-${id}`,
+      quotation_status: 'reviewed' as const,
+      submitted_at: '2026-09-25T10:00:00Z',
+      lines: products.map((product) => ({
+        workspace_product_id: product,
+        original_text: product,
+        quoted_quantity: '10',
+        quoted_unit_price_amount: price,
+        quoted_unit_price_currency: 'SAR',
+        pending_match: false,
+      })),
+      rfq_landed_costs: products.map((product) => ({
+        workspace_product_id: product,
+        total_amount: landed,
+        total_currency: 'SAR',
+      })),
+    });
+    const load = (replies: ReturnType<typeof reply>[], products: string[], status = 'sent'): void => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      mockRfqApi.getRfq.and.returnValue(
+        of({
+          ...sentDetail,
+          rfq: { ...sentDetail.rfq, status: status as RfqDetail['rfq']['status'] },
+          lines: products.map(rfqLine),
+        } as RfqDetail),
+      );
+      mockRfqApi.listResponses.and.returnValue(of({ items: replies }));
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+    };
+
+    it('marks «Lowest total» on landed totals, not on printed prices, and shows both', () => {
+      // A prints cheaper (2,000 vs 2,100) but its quote excludes VAT: landed 2,300 vs 2,100.
+      load(
+        [
+          reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1150'),
+          reply('b', 'supp-b', ['p1', 'p2'], '105.00', '1050'),
+        ],
+        ['p1', 'p2'],
+      );
+
+      const cards = Array.from(el().querySelectorAll('.response-card')) as HTMLElement[];
+      expect(cards.length).toBe(2);
+      expect(cards[0].querySelector('.lowest-total-chip')).withContext('A is not the lowest').toBeNull();
+      expect(cards[1].querySelector('.lowest-total-chip')).withContext('B is the lowest').toBeTruthy();
+      expect(cards[0].querySelector('[data-testid="landed-total"]')?.textContent).toContain('2,300');
+      expect(cards[1].querySelector('[data-testid="landed-total"]')?.textContent).toContain('2,100');
+      // The chip sits next to the landed figure that earned it, not next to the printed total.
+      expect(cards[1].querySelector('[data-testid="landed-total"] .lowest-total-chip')).toBeTruthy();
+      expect(cards[1].querySelector('tr.total-row .lowest-total-chip')).toBeNull();
+    });
+
+    it('says how many of the RFQ products a reply covers when it misses some', () => {
+      load(
+        [
+          reply('partial', 'supp-a', ['p1', 'p2'], '100.00', '1000'),
+          reply('full', 'supp-b', ['p1', 'p2', 'p3'], '100.00', '1000'),
+        ],
+        ['p1', 'p2', 'p3'],
+      );
+
+      const cards = Array.from(el().querySelectorAll('.response-card')) as HTMLElement[];
+      expect(cards[0].querySelector('[data-testid="coverage-badge"]')?.textContent).toContain('Covers 2 of 3');
+      expect(cards[1].querySelector('[data-testid="coverage-badge"]')).toBeNull();
+    });
+
+    it('awards no «Lowest total» when a reply has incomplete landed costs, even if printed totals point one way', () => {
+      // A prints cheaper (2,000 vs 2,100) and has full landed costs; B is missing p2's landed cost.
+      const incomplete = reply('b', 'supp-b', ['p1', 'p2'], '105.00', '1050');
+      incomplete.rfq_landed_costs = incomplete.rfq_landed_costs.slice(0, 1);
+      load([reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1150'), incomplete], ['p1', 'p2']);
+
+      expect(el().querySelector('.lowest-total-chip')).toBeNull();
+    });
+
+    it('keeps ranking on printed totals when no reply has any landed cost at all', () => {
+      const noCosts = (id: string, supplier: string, price: string) => ({
+        ...reply(id, supplier, ['p1', 'p2'], price, '0'),
+        rfq_landed_costs: [],
+      });
+      load([noCosts('a', 'supp-a', '100.00'), noCosts('b', 'supp-b', '105.00')], ['p1', 'p2']);
+
+      const cards = Array.from(el().querySelectorAll('.response-card')) as HTMLElement[];
+      expect(cards[0].querySelector('.lowest-total-chip')).toBeTruthy();
+      expect(cards[1].querySelector('.lowest-total-chip')).toBeNull();
+    });
+
+    it('awards no «Lowest total» when a supplier has delivery or minimum-order terms the totals cannot price', () => {
+      const withTerms = { ...reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000'), supplier_terms_apply: true };
+      load([withTerms, reply('b', 'supp-b', ['p1', 'p2'], '105.00', '1050')], ['p1', 'p2']);
+
+      expect(el().querySelector('.lowest-total-chip')).toBeNull();
+    });
+
+    it('disables Prepare with a reason when a responded RFQ\'s needed-by date has passed', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      mockRfqApi.getRfq.and.returnValue(
+        of({
+          ...sentDetail,
+          rfq: { ...sentDetail.rfq, status: 'responded', needed_by_date: '2020-01-01' },
+          lines: ['p1', 'p2'].map(rfqLine),
+        } as RfqDetail),
+      );
+      mockRfqApi.listResponses.and.returnValue(of({ items: [reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000')] }));
+      component.loadData('rfq-1');
+      component.selectedBranchId.set('branch-1');
+      fixture.detectChanges();
+
+      const button = el().querySelector('.prepare-buttons-row button') as HTMLButtonElement;
+      expect(button.disabled).toBeTrue();
+      expect(el().querySelector('[data-testid="needed-by-past-reason"]')?.textContent).toContain(
+        enCatalog.rfq.compare.neededByPast,
+      );
+    });
+
+    it('keeps Prepare available when a responded RFQ\'s needed-by date is still ahead', () => {
+      mockRfqApi.getRfq.and.returnValue(
+        of({
+          ...sentDetail,
+          rfq: { ...sentDetail.rfq, status: 'responded', needed_by_date: '2099-12-31' },
+          lines: ['p1', 'p2'].map(rfqLine),
+        } as RfqDetail),
+      );
+      mockRfqApi.listResponses.and.returnValue(of({ items: [reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000')] }));
+      component.loadData('rfq-1');
+      component.selectedBranchId.set('branch-1');
+      fixture.detectChanges();
+
+      const button = el().querySelector('.prepare-buttons-row button') as HTMLButtonElement;
+      expect(button.disabled).toBeFalse();
+      expect(el().querySelector('[data-testid="needed-by-past-reason"]')).toBeNull();
+    });
+
+    it('shows no coverage badge for a reply that is still being read or not matched yet', () => {
+      const reading = { ...reply('read', 'supp-a', [], '0', '0'), rfq_landed_costs: [] };
+      const unmatched = reply('un', 'supp-b', ['p1', 'p2'], '100.00', '1000');
+      unmatched.lines[1] = { ...unmatched.lines[1], workspace_product_id: null as never, pending_match: true };
+      load([reading, unmatched], ['p1', 'p2']);
+
+      expect(el().querySelector('[data-testid="coverage-badge"]')).toBeNull();
+    });
+
+    it('tells the buyer when the RFQ date is already in the past instead of blaming unmatched lines', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      load([reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000')], ['p1', 'p2']);
+      mockRfqApi.prepareRequest.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 422,
+              error: { code: 'unprocessable', details: { reason: 'required_by_in_the_past' } },
+            }),
+        ),
+      );
+      component.selectedBranchId.set('branch-1');
+      mockSnackBar.open.calls.reset();
+
+      component.prepareRequest(component.responses()[0]);
+
+      expect(mockSnackBar.open.calls.mostRecent().args[0]).toBe(enCatalog.requests.errors.required_by_in_the_past);
+    });
+
+    it('shows the RFQ\'s needed-by date read-only: the draft follows it, so there is nothing to edit', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+      load([reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000')], ['p1', 'p2']);
+
+      const neededBy = el().querySelector('[data-testid="needed-by"]');
+      expect(neededBy).withContext('needed-by block').toBeTruthy();
+      expect(neededBy?.textContent).toContain(enCatalog.rfq.compare.neededByLabel);
+      expect(neededBy?.textContent).toContain('2026');
+      expect(el().querySelector('input.mat-datepicker-input')).withContext('no editable date').toBeNull();
+    });
+
+    it('words the saving hint on a converted RFQ as a missed saving and names its basis', () => {
+      load(
+        [
+          { ...reply('a', 'supp-a', ['p1', 'p2'], '100.00', '1000'), rfq_landed_costs: [
+              { workspace_product_id: 'p1', total_amount: '1000', total_currency: 'SAR' },
+              { workspace_product_id: 'p2', total_amount: '1200', total_currency: 'SAR' },
+            ] },
+          { ...reply('b', 'supp-b', ['p1', 'p2'], '100.00', '1100'), rfq_landed_costs: [
+              { workspace_product_id: 'p1', total_amount: '1100', total_currency: 'SAR' },
+              { workspace_product_id: 'p2', total_amount: '1000', total_currency: 'SAR' },
+            ] },
+        ],
+        ['p1', 'p2'],
+        'converted',
+      );
+
+      const hint = el().querySelector('[data-testid="split-saving-hint"]');
+      expect(hint?.textContent).toContain('would have saved');
+      expect(hint?.textContent).toContain('landed cost');
     });
   });
 
@@ -2431,6 +2713,76 @@ describe('CompareComponent (RFQ)', () => {
         jasmine.objectContaining({ duration: 5000 }),
       );
     }));
+    it('cancelled RFQ shows the notice and disables Prepare and Split', fakeAsync(() => {
+      const cancelledDetail: RfqDetail = {
+        ...sentDetail,
+        rfq: {
+          ...sentDetail.rfq,
+          status: 'cancelled',
+        },
+      };
+      mockRfqApi.getRfq.and.returnValue(of(cancelledDetail));
+      component.loadData('rfq-1');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const cancelledNotice = compiled.querySelector('[data-testid="rfq-compare-cancelled-notice"]');
+      expect(cancelledNotice).not.toBeNull();
+      expect(cancelledNotice?.textContent).toContain('This RFQ was cancelled — requests can no longer be prepared from it');
+
+      // Prepare is disabled
+      expect(component.canPrepare(dummyResponses.items[0])).toBeFalse();
+      const prepareBtn = compiled.querySelector<HTMLButtonElement>('.prepare-buttons-row button');
+      expect(prepareBtn?.disabled).toBeTrue();
+      const cancelledReason = compiled.querySelector('[data-testid="cancelled-reason"]');
+      expect(cancelledReason).not.toBeNull();
+      expect(cancelledReason?.textContent).toContain('This RFQ was cancelled');
+
+      // Split is disabled
+      expect(component.splitEligibility().canSplit).toBeFalse();
+      const splitBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-compare-split-button"]');
+      expect(splitBtn?.disabled).toBeTrue();
+      component.prepareRequest(dummyResponses.items[0]);
+      component.splitRfq();
+      expect(mockRfqApi.prepareRequest).not.toHaveBeenCalled();
+      expect(mockRfqApi.splitRfq).not.toHaveBeenCalled();
+    }));
+
+    it('API reason rfq_cancelled shows the translated message for prepare and split', fakeAsync(() => {
+      const cancelledHttpError = new HttpErrorResponse({
+        status: 422,
+        error: { details: { reason: 'rfq_cancelled' } },
+      });
+
+      mockRfqApi.prepareRequest.and.returnValue(throwError(() => cancelledHttpError));
+      component.prepareRequest(dummyResponses.items[0]);
+
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog, true);
+      translate.use('en');
+
+      expect(mockSnackBar.open).toHaveBeenCalledWith(
+        translate.instant('rfq.compare.rfqCancelled'),
+        translate.instant('rfq.history.dismiss'),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+
+      // Now split with rfq_cancelled
+      const resp1 = dummyResponses.items[0];
+      const resp2 = { ...dummyResponses.items[0], id: 'resp-usd-2', supplier_id: 'supp-2', quotation_id: 'quote-2' };
+      component.responses.set([resp1, resp2]);
+      fixture.detectChanges();
+
+      mockSnackBar.open.calls.reset();
+      mockRfqApi.splitRfq.and.returnValue(throwError(() => cancelledHttpError));
+      component.splitRfq();
+
+      expect(mockSnackBar.open).toHaveBeenCalledWith(
+        translate.instant('rfq.compare.rfqCancelled'),
+        translate.instant('rfq.history.dismiss'),
+        jasmine.objectContaining({ duration: 5000 }),
+      );
+    }));
   });
   it('renders API names for entities absent from lookups, including variants and landed cost names', () => {
     const reply = {
@@ -2464,6 +2816,23 @@ describe('CompareComponent (RFQ)', () => {
     expect(fixture.nativeElement.textContent).toContain('Unknown product');
     expect(fixture.nativeElement.textContent).not.toContain('unknown-supplier-uuid');
     expect(fixture.nativeElement.textContent).not.toContain('unknown-product-uuid');
+  });
+
+  it('rotates the prepare key when the branch changes after an ambiguous failure', () => {
+    const reply = dummyResponses.items[0];
+    component.selectedBranchId.set('branch-1');
+    component.requiredByDate.set(new Date(2026, 11, 1));
+    mockRfqApi.prepareRequest.and.returnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+    component.prepareRequest(reply);
+    const first = mockRfqApi.prepareRequest.calls.mostRecent().args[2];
+    component.prepareRequest(reply);
+    expect(mockRfqApi.prepareRequest.calls.mostRecent().args[2]).toBe(first);
+    component.selectedBranchId.set('branch-2');
+    component.prepareRequest(reply);
+    const changed = mockRfqApi.prepareRequest.calls.mostRecent().args[2];
+    expect(changed).not.toBe(first);
+    component.prepareRequest(reply);
+    expect(mockRfqApi.prepareRequest.calls.mostRecent().args[2]).toBe(changed);
   });
 
   it('reuses prepare keys on ambiguous failure and drops them on success or definitive rejection', () => {

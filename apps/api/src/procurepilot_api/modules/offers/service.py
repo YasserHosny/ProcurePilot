@@ -112,6 +112,9 @@ limit %(limit)s offset %(offset)s
 """
 
 
+COMPARE_OFFER_CAP = 101  # offers one comparison shows; beyond it the response says so
+
+
 class OfferService:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
@@ -165,15 +168,16 @@ class OfferService:
                 quantity=quantity,
                 include_expired=True,
                 offset=0,
-                limit=101,
+                limit=COMPARE_OFFER_CAP + 1,  # one extra row proves there are more
             )
+            offers_truncated = len(rows) > COMPARE_OFFER_CAP
             offers = [
                 _offer(
                     row,
                     quantity=quantity,
                     freshness_target_days=self._settings.offer_freshness_target_days,
                 )
-                for row in rows
+                for row in rows[:COMPARE_OFFER_CAP]
             ]
             supplier_risk_scores: dict[UUID, str] = {}
             supplier_ids = list({offer.supplier_id for offer in offers})
@@ -205,6 +209,7 @@ class OfferService:
             product=ProductRef(id=product_id, tenant_name=str(product["tenant_name"])),
             requested_quantity=_quantity_string(quantity),
             offers=offers,
+            offers_truncated=offers_truncated,
             recommendation=recommend_offer(offers, supplier_risk_scores=supplier_risk_scores),
         )
 

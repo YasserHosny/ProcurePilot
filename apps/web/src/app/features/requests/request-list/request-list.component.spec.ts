@@ -1,17 +1,20 @@
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import type { ComponentFixture } from '@angular/core/testing';
-import { TestBed } from '@angular/core/testing';
+import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSelect } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { By } from '@angular/platform-browser';
-import { Router, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter, type ParamMap } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { Observable, Subject, of, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, of, throwError } from 'rxjs';
 
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
+import { FormatService } from '../../../core/format/format.service';
+import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
 import type { Branch, BranchList, Me, PurchaseRequest, Role } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
@@ -109,6 +112,32 @@ describe('RequestListComponent (T017)', () => {
     fixture.detectChanges();
   });
 
+  it('PPS-193 renders Created, Requested by and Lines columns with requester fallbacks in en and ar', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('ar', arCatalog);
+    component.requests.set([
+      { ...mockRequests[0], requester_name: 'Mona', requester_email: 'mona@example.com',
+        lines: [{ id: 'l1', workspace_product_id: 'p1', quantity: '2',
+          quoted_prices_include_vat: false, quoted_vat_rate: null, quoted_net_unit_price: null }] },
+      { ...mockRequests[1], requester_email: 'ali@example.com' },
+      { ...mockRequests[0], id: 'r3' },
+    ]);
+    for (const locale of ['en', 'ar']) {
+      translate.use(locale);
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelector('th.mat-column-created')?.textContent?.trim()).toBe(locale === 'en' ? 'Created' : 'تاريخ الإنشاء');
+      expect(root.querySelector('th.mat-column-requester')?.textContent?.trim()).toBe(locale === 'en' ? 'Requested by' : 'مقدّم الطلب');
+      expect(root.querySelector('th.mat-column-lines')?.textContent?.trim()).toBe(locale === 'en' ? 'Lines' : 'البنود');
+      const names = Array.from(root.querySelectorAll('td.mat-column-requester'));
+      expect(names.map(cell => cell.textContent?.trim())).toEqual(['Mona', 'ali@example.com', '—']);
+      expect(names.every(cell => cell.getAttribute('dir') === 'auto')).toBeTrue();
+      expect(root.querySelector('td.mat-column-created')?.textContent?.trim()).toBe(
+        TestBed.inject(FormatService).formatDate(mockRequests[0].created_at));
+      expect(Array.from(root.querySelectorAll('td.mat-column-lines')).map(cell => cell.textContent?.trim())).toEqual(['1', '0', '0']);
+    }
+  });
+
   it('should load requests on init', () => {
     expect(requestsApi.listRequests).toHaveBeenCalledWith({ status: undefined });
     expect(organisationApi.listBranches).toHaveBeenCalledWith({ limit: 100 });
@@ -136,7 +165,7 @@ describe('RequestListComponent (T017)', () => {
   });
 
   it('renders a Supplier column placed after Branch, showing source.supplier_name or —', () => {
-    expect(component.displayedColumns).toEqual([
+    expect(component.displayedColumns.filter(column => !['created', 'requester', 'lines'].includes(column))).toEqual([
       'requiredByDate',
       'branch',
       'supplier',
@@ -393,8 +422,8 @@ describe('RequestListComponent (T017)', () => {
     });
   });
 
-  it('hides Withdraw on ordered and terminal requests and shows it on draft and submitted (PPS-188)', () => {
-    for (const status of ['ordered', 'withdrawn', 'rejected', 'approved'] as const) {
+  it('offers withdrawal for approved and legacy ordered requests; server checks live orders', () => {
+    for (const status of ['withdrawn', 'rejected', 'delivered'] as const) {
       component.requests.set([{ ...mockRequests[0], status }]);
       fixture.detectChanges();
       const element = fixture.nativeElement as HTMLElement;
@@ -402,7 +431,7 @@ describe('RequestListComponent (T017)', () => {
       expect(component.canWithdraw(component.requests()[0])).toBeFalse();
     }
 
-    for (const status of ['draft', 'submitted'] as const) {
+    for (const status of ['draft', 'submitted', 'approved', 'ordered'] as const) {
       component.requests.set([{ ...mockRequests[0], status }]);
       fixture.detectChanges();
       const element = fixture.nativeElement as HTMLElement;
@@ -440,7 +469,7 @@ describe('RequestListComponent (T017)', () => {
     { label: 'owner', memberId: 'm2', role: 'owner' },
     { label: 'another buyer', memberId: 'm2', role: 'buyer' },
   ] as const) {
-    it(`never shows ordered Withdraw regardless of role (PPS-188): ${scenario.label}`, () => {
+    it(`offers ordered withdrawal subject to server authorization: ${scenario.label}`, () => {
       currentMember.set({ id: 'user-1', membership_id: scenario.memberId });
       role.set(scenario.role);
       component.requests.set([{ ...mockRequests[0], status: 'ordered' }]);
@@ -449,8 +478,8 @@ describe('RequestListComponent (T017)', () => {
       const button = (fixture.nativeElement as HTMLElement).querySelector(
         'button[aria-label="Withdraw request"]',
       );
-      expect(button).toBeNull();
-      expect(component.canWithdraw(component.requests()[0])).toBeFalse();
+      expect(button).not.toBeNull();
+      expect(component.canWithdraw(component.requests()[0])).toBeTrue();
     });
   }
 
@@ -649,7 +678,7 @@ describe('RequestListComponent (T017)', () => {
       const loadMoreBtn = fixture.nativeElement.querySelector('.load-more-btn') as HTMLButtonElement;
       expect(loadMoreBtn).toBeTruthy();
 
-      const liveRegion = fixture.nativeElement.querySelector('[aria-live="polite"]');
+      const liveRegion = fixture.nativeElement.querySelector('[role="status"][aria-live="polite"]');
       expect(liveRegion).toBeTruthy();
       expect(liveRegion?.textContent).toContain('1 requests loaded');
 
@@ -737,14 +766,14 @@ describe('RequestListComponent (T017)', () => {
       const emptyEl = fixture.nativeElement.querySelector('.empty-state') as HTMLElement;
       expect(emptyEl).toBeTruthy();
       expect(emptyEl.textContent).toContain('No purchase requests yet. Create your first request to get started.');
-      expect(emptyEl.textContent).not.toContain('No purchase requests match this filter.');
+      expect(emptyEl.textContent).not.toContain('No purchase requests match these filters.');
       expect(emptyEl.querySelector('.clear-filter-btn')).toBeNull();
 
       // 2. Filtered empty
       component.onStatusFilterChange('approved');
       fixture.detectChanges();
 
-      expect(emptyEl.textContent).toContain('No purchase requests match this filter.');
+      expect(emptyEl.textContent).toContain('No purchase requests match these filters.');
       expect(emptyEl.textContent).not.toContain('No purchase requests yet. Create your first request to get started.');
       const clearBtn = emptyEl.querySelector('.clear-filter-btn') as HTMLButtonElement;
       expect(clearBtn).toBeTruthy();
@@ -886,6 +915,211 @@ describe('RequestListComponent (T017)', () => {
         expect(result.items[0].id).toBe('b-1');
         expect(result.items[49].id).toBe('b-50');
         done();
+      });
+    });
+  });
+
+  describe('PPS-193 (P-169) request list search, sort, mine and URL state', () => {
+    describe('API Client params', () => {
+      let requestsApiService: RequestsApiService;
+      let httpMock: HttpTestingController;
+
+      beforeEach(() => {
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({
+          providers: [
+            ApiService,
+            RequestsApiService,
+            provideHttpClient(),
+            provideHttpClientTesting(),
+          ],
+        });
+        requestsApiService = TestBed.inject(RequestsApiService);
+        httpMock = TestBed.inject(HttpTestingController);
+      });
+
+      afterEach(() => httpMock.verify());
+
+      it('params sent to the API only when set: ApiService and RequestsApiService send q, sort, and mine query params only when set', () => {
+        // 1. With active non-default filters: q is trimmed, sort not default, mine is true
+        requestsApiService.listRequests({
+          status: 'submitted',
+          q: '  fresh milk  ',
+          sort: 'total_desc',
+          mine: true,
+        }).subscribe();
+
+        const req1 = httpMock.expectOne((r) => r.url.startsWith('/api/v1/requests'));
+        expect(req1.request.url).toBe('/api/v1/requests?status=submitted&q=fresh+milk&sort=total_desc&mine=true');
+        req1.flush({ items: [], next_cursor: null });
+
+        // 2. Defaults omitted: q whitespace/empty, sort is created_desc, mine is false
+        requestsApiService.listRequests({
+          q: '   ',
+          sort: 'created_desc',
+          mine: false,
+        }).subscribe();
+
+        const req2 = httpMock.expectOne('/api/v1/requests');
+        expect(req2.request.url).toBe('/api/v1/requests');
+        req2.flush({ items: [], next_cursor: null });
+      });
+    });
+
+    describe('URL-backed state & controls', () => {
+      let queryParamMapSubject: BehaviorSubject<ParamMap>;
+      let fixtureLocal: ComponentFixture<RequestListComponent>;
+      let comp: RequestListComponent;
+
+      beforeEach(async () => {
+        TestBed.resetTestingModule();
+        queryParamMapSubject = new BehaviorSubject<ParamMap>(
+          convertToParamMap({
+            status: 'approved',
+            q: 'coffee beans',
+            sort: 'total_asc',
+            mine: 'true',
+          }),
+        );
+
+        requestsApi.listRequests.calls.reset();
+        organisationApi.listBranches.calls.reset();
+        routerSpy.navigate.calls.reset();
+
+        await TestBed.configureTestingModule({
+          imports: [RequestListComponent],
+          providers: [
+            provideTranslateService(),
+            {
+              provide: ActivatedRoute,
+              useValue: {
+                queryParamMap: queryParamMapSubject.asObservable(),
+                snapshot: {
+                  get queryParamMap() {
+                    return queryParamMapSubject.value;
+                  },
+                },
+              },
+            },
+            { provide: SessionService, useValue: { currentMember, role } },
+            { provide: RequestsApiService, useValue: requestsApi },
+            { provide: OrganisationApiService, useValue: organisationApi },
+          ],
+        })
+          .overrideComponent(RequestListComponent, {
+            set: {
+              providers: [
+                { provide: MatSnackBar, useValue: snackBarSpy },
+                { provide: Router, useValue: routerSpy },
+                { provide: MatDialog, useValue: dialogSpy },
+              ],
+            },
+          })
+          .compileComponents();
+
+        const translate = TestBed.inject(TranslateService);
+        translate.setTranslation('en', enCatalog);
+        translate.use('en');
+
+        fixtureLocal = TestBed.createComponent(RequestListComponent);
+        comp = fixtureLocal.componentInstance;
+        fixtureLocal.detectChanges();
+      });
+
+      it('debounces and trims search, preserves focus, and clears immediately', fakeAsync(() => {
+        const input = fixtureLocal.nativeElement.querySelector('input[type="search"]') as HTMLInputElement;
+        expect(input).toBeTruthy();
+        input.focus();
+        requestsApi.listRequests.calls.reset();
+        input.value = '  tea  ';
+        input.dispatchEvent(new Event('input'));
+        tick(299);
+        expect(requestsApi.listRequests).not.toHaveBeenCalled();
+        tick(1);
+        expect(comp.searchQuery()).toBe('tea');
+        expect(requestsApi.listRequests.calls.mostRecent().args[0]?.q).toBe('tea');
+        fixtureLocal.detectChanges();
+        expect(document.activeElement).toBe(input);
+        requestsApi.listRequests.calls.reset();
+        input.value = 'tea ';
+        input.dispatchEvent(new Event('input'));
+        tick(300);
+        expect(requestsApi.listRequests).not.toHaveBeenCalled();
+        const clear = fixtureLocal.nativeElement.querySelector('.clear-search-btn') as HTMLButtonElement;
+        clear.click();
+        fixtureLocal.detectChanges();
+        expect(comp.searchQuery()).toBe('');
+        expect(input.value).toBe('');
+        expect(document.activeElement).toBe(input);
+      }));
+
+      it('sort and mine reset rows and cursor and reload with matching params', () => {
+        requestsApi.listRequests.and.returnValue(new Subject());
+        comp.nextCursor.set('old');
+        comp.onSortChange('required_by_asc');
+        expect(comp.requests()).toEqual([]);
+        expect(comp.nextCursor()).toBeNull();
+        expect(requestsApi.listRequests.calls.mostRecent().args[0]?.sort).toBe('required_by_asc');
+        comp.requests.set(mockRequests);
+        comp.nextCursor.set('old');
+        comp.onMineToggleChange(false);
+        expect(comp.requests()).toEqual([]);
+        expect(comp.nextCursor()).toBeNull();
+        expect(requestsApi.listRequests.calls.mostRecent().args[0]?.mine).toBeUndefined();
+      });
+
+      it('writes merged URL state, omits defaults and ignores its own navigation echo', () => {
+        comp.onSortChange('created_desc');
+        comp.clearFilter();
+        expect(routerSpy.navigate).toHaveBeenCalledWith([], {
+          queryParams: { status: null, q: null, sort: null, mine: null },
+          queryParamsHandling: 'merge', replaceUrl: true,
+        });
+        requestsApi.listRequests.calls.reset();
+        queryParamMapSubject.next(convertToParamMap({}));
+        expect(requestsApi.listRequests).not.toHaveBeenCalled();
+      });
+
+      it('updates controls and reloads on back or forward query changes, normalizing invalid sort and long q', () => {
+        requestsApi.listRequests.calls.reset();
+        queryParamMapSubject.next(convertToParamMap({ q: 'x'.repeat(120), sort: 'invalid' }));
+        fixtureLocal.detectChanges();
+        expect(comp.searchQuery()).toBe('x'.repeat(100));
+        expect(comp.sortOption()).toBe('created_desc');
+        expect(comp.mineFilter()).toBeFalse();
+        expect(comp.statusFilter()).toBe('');
+        expect(requestsApi.listRequests).toHaveBeenCalledTimes(1);
+        expect(fixtureLocal.nativeElement.querySelector('input').value).toBe('x'.repeat(100));
+        const selects = fixtureLocal.debugElement.queryAll(By.directive(MatSelect));
+        expect(selects[1].componentInstance.value).toBe('created_desc');
+      });
+
+      it('shows filtered empty for q or mine, clears all filters while preserving sort and announces zero results', () => {
+        requestsApi.listRequests.and.returnValue(of({ items: [], next_cursor: null }));
+        queryParamMapSubject.next(convertToParamMap({ q: 'tea', mine: 'true', sort: 'total_desc' }));
+        fixtureLocal.detectChanges();
+        expect(fixtureLocal.nativeElement.textContent).toContain('No purchase requests match these filters.');
+        expect(fixtureLocal.nativeElement.querySelector('[role="status"]').textContent).toContain('0 requests loaded');
+        fixtureLocal.nativeElement.querySelector('.clear-filter-btn').click();
+        fixtureLocal.detectChanges();
+        expect(comp.searchQuery()).toBe('');
+        expect(comp.mineFilter()).toBeFalse();
+        expect(comp.statusFilter()).toBe('');
+        expect(comp.sortOption()).toBe('total_desc');
+        expect(fixtureLocal.nativeElement.querySelector('.clear-filter-btn')).toBeNull();
+      });
+
+      it('initial state from the URL: reads status, q, sort, and mine from route queryParamMap on initialization and loads with matching params', () => {
+        expect(comp.searchQuery()).toBe('coffee beans');
+        expect(comp.sortOption()).toBe('total_asc');
+        expect(comp.mineFilter()).toBeTrue();
+        expect(comp.statusFilter()).toBe('approved');
+        expect(requestsApi.listRequests).toHaveBeenCalledWith({
+          status: 'approved',
+          q: 'coffee beans',
+          sort: 'total_asc',
+          mine: true,
+        });
       });
     });
   });

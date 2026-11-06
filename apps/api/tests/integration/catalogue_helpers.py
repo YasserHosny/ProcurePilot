@@ -91,6 +91,18 @@ def act_as(cur: psycopg.Cursor, workspace: Workspace) -> None:
     cur.execute("select set_config('request.jwt.claims', %s, true)", (workspace.claims(),))
 
 
+def execute_as_table_owner(cur: psycopg.Cursor, workspace: Workspace, *args: object) -> None:
+    """Shape a guarded table's rows in a fixture, then act as `workspace` again.
+
+    Some tables carry guard triggers that only restrict client roles (`authenticated`, `anon`);
+    a fixture that needs a state no client session may write (a decided step, a back-dated
+    row) writes it as the table owner.
+    """
+    cur.execute("reset role")
+    cur.execute(*args)
+    act_as(cur, workspace)
+
+
 def reset_role(cur: psycopg.Cursor) -> None:
     cur.execute("reset role")
     cur.execute("select set_config('request.jwt.claims', '{}', true)")

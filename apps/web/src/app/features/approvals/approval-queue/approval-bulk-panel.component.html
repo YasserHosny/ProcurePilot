@@ -1,0 +1,30 @@
+@if (error()) { <p role="alert" class="error" data-testid="bulk-error">{{ 'approvals.bulk.batchError' | translate }}</p> }
+@if (result(); as response) {
+  <section role="region" aria-labelledby="bulk-results-heading" data-testid="bulk-results">
+    <h2 id="bulk-results-heading">{{ 'approvals.bulk.resultsTitle' | translate }}</h2>
+    <p role="status" aria-live="polite" aria-atomic="true">{{ 'approvals.bulk.resultsSummary' | translate: {decided: plural('decided', response.decided_count), failed: plural('failed', response.failed_count)} }}</p>
+    <ul>
+      @for (failure of failures(); track failure.requestId) {
+        <li><a [routerLink]="['/approvals', failure.requestId]" dir="auto">{{ failure.label }}</a>: {{ failure.reasonKey | translate }}</li>
+      }
+    </ul>
+  </section>
+}
+@if (count() > 0) {
+  <section class="bulk-bar" role="region" aria-labelledby="bulk-heading" [attr.aria-busy]="busy()" data-testid="bulk-bar">
+    <h2 id="bulk-heading">{{ 'approvals.bulk.title' | translate }}</h2>
+    <p aria-live="polite" aria-atomic="true">{{ plural('selected', count()) }}</p>
+    <ul class="totals" [attr.aria-label]="'approvals.bulk.totals' | translate">
+      @for (total of totals(); track total.currency) { <li class="pp-figures">{{ money(total) }}</li> }
+    </ul>
+    @if (incomplete()) { <p>{{ 'approvals.bulk.incomplete' | translate }}</p> }
+    <div class="actions">
+      <button mat-flat-button type="button" [disabled]="disabled()" (click)="approve.emit()" data-testid="bulk-approve">{{ 'approvals.bulk.approve' | translate }}</button>
+      <button mat-stroked-button class="pp-danger" type="button" [disabled]="disabled()" (click)="reject.emit()" data-testid="bulk-reject">{{ 'approvals.bulk.reject' | translate }}</button>
+      <button mat-button type="button" [disabled]="disabled()" (click)="clearSelection.emit()">{{ 'approvals.bulk.clear' | translate }}</button>
+    </div>
+    @if (busy()) {
+      <div role="status" class="progress"><mat-spinner diameter="20" [attr.aria-label]="'approvals.bulk.progress' | translate" /><span>{{ 'approvals.bulk.progress' | translate }}</span></div>
+    }
+  </section>
+}

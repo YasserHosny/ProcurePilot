@@ -146,6 +146,7 @@ class OfferComparison(BaseModel):
     product: ProductRef
     requested_quantity: str
     offers: list[Offer]
+    offers_truncated: bool = False
     recommendation: Recommendation | None
 
 
@@ -328,6 +329,24 @@ class PackSnapshot(StrictApiModel):
 
     base_quantity: StrictStr
     base_unit: StrictStr
+
+
+class BasketSplitJobSummary(BaseModel):
+    """One earlier split in the history list."""
+
+    id: UUID
+    status: BasketStatus
+    created_at: datetime
+    supplier_ids: list[UUID]
+    supplier_names: list[str] = Field(default_factory=list)
+    item_count: int
+    rfq_id: UUID | None = None
+    total_landed_cost: Money | None = None
+
+
+class BasketSplitJobList(BaseModel):
+    items: list[BasketSplitJobSummary]
+    next_cursor: str | None = None
 
 
 class BasketRequestSettings(BaseModel):

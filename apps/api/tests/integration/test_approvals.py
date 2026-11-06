@@ -29,6 +29,7 @@ from integration.catalogue_helpers import (
     Workspace,
     act_as,
     connection,
+    execute_as_table_owner,
     make_workspace,
 )
 from integration.quotation_helpers import PsycopgSupabaseClient
@@ -115,7 +116,9 @@ def test_a_step_cannot_be_decided_without_recording_who_and_when(conn: object) -
         step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
         with pytest.raises(psycopg.errors.CheckViolation):
-            cur.execute(
+            execute_as_table_owner(
+                cur,
+                owner,
                 "update approval_step set status = 'approved' where id = %s",
                 (step_id,),
             )
@@ -131,7 +134,9 @@ def test_a_pending_step_cannot_carry_a_decider_or_a_decided_at(conn: object) -> 
         step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
         with pytest.raises(psycopg.errors.CheckViolation):
-            cur.execute(
+            execute_as_table_owner(
+                cur,
+                owner,
                 "update approval_step set decided_at = now() where id = %s",
                 (step_id,),
             )
@@ -146,7 +151,9 @@ def test_a_full_decision_pair_satisfies_the_constraint(conn: object) -> None:
         request_id = _make_submitted_request(cur, owner, branch_id)
         step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
-        cur.execute(
+        execute_as_table_owner(
+            cur,
+            owner,
             "update approval_step set status = 'approved', "
             "decided_by_membership_id = %s, decided_at = now() where id = %s",
             (approver.membership_id, step_id),
@@ -170,7 +177,9 @@ def test_owner_override_decider_may_differ_from_the_assignee(conn: object) -> No
         request_id = _make_submitted_request(cur, owner, branch_id)
         step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
 
-        cur.execute(
+        execute_as_table_owner(
+            cur,
+            owner,
             "update approval_step set status = 'rejected', "
             "decided_by_membership_id = %s, decided_at = now() where id = %s",
             (owner.membership_id, step_id),
@@ -213,7 +222,9 @@ def test_approving_moves_request_and_step_to_approved(conn: object) -> None:
             "where id = %s and status = 'submitted'",
             (request_id,),
         )
-        cur.execute(
+        execute_as_table_owner(
+            cur,
+            owner,
             "update approval_step set status = 'approved', comment = 'ok', "
             "decided_by_membership_id = %s, decided_at = now() "
             "where id = %s and status = 'pending'",
@@ -241,7 +252,9 @@ def _seed_step_for_visibility(
     act_as(cur, owner)
     branch_id = _make_branch(cur, owner)
     request_id = _make_submitted_request(cur, requester, branch_id)
+    act_as(cur, requester)  # routing runs as the member who submits
     step_id = _make_pending_step(cur, owner.tenant_id, request_id, approver.membership_id)
+    act_as(cur, owner)
     return owner, requester, approver, other, step_id
 
 
@@ -281,7 +294,9 @@ def test_a_decided_step_is_still_visible_but_out_of_the_pending_queue(conn: obje
     with conn.cursor() as cur:
         owner, _requester, approver, _other, step_id = _seed_step_for_visibility(cur)
         act_as(cur, owner)
-        cur.execute(
+        execute_as_table_owner(
+            cur,
+            owner,
             "update approval_step set status = 'approved', "
             "decided_by_membership_id = %s, decided_at = now() where id = %s",
             (approver.membership_id, step_id),
@@ -320,6 +335,9 @@ def test_pending_queue_excludes_terminal_requests(
 def _queue_service(
     conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, workspace: Workspace
 ) -> RequestsService:
+    from contextlib import nullcontext
+
+    monkeypatch.setattr(module.db, "connect", lambda *_args, **_kwargs: nullcontext(conn))
     client = PsycopgSupabaseClient(conn, claims=workspace.claims())
     monkeypatch.setattr(module, "authenticated_client", lambda *_: client)
     service = module.RequestsService()
@@ -352,7 +370,9 @@ def test_pending_queue_paginates_only_visible_requests_and_preserves_tenant_scop
             request = _make_submitted_request(cur, owner, branch)
             step = _make_pending_step(cur, owner.tenant_id, request, owner.membership_id)
             _set_request_status(cur, request, owner.membership_id, status)
-            cur.execute(
+            execute_as_table_owner(
+                cur,
+                owner,
                 "update approval_step set created_at='2026-10-01'::timestamptz + "
                 "%s * interval '1 second' where id=%s",
                 (index, step),
@@ -405,3 +425,50 @@ def test_member_removal_escalates_only_live_pending_steps(
         removed_membership_id=removed.membership_id,
     )
     assert count == 1
+
+
+def test_approved_request_get_includes_recorded_decider_contact(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from procurepilot_api.deps import bearer_token, current_member
+    from procurepilot_api.errors import register_exception_handlers
+    from procurepilot_api.modules.requests.router import router
+    from procurepilot_api.modules.requests.schemas import ApprovalDecisionInput
+    from procurepilot_api.modules.requests.service import get_requests_service
+
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "approval-detail-owner")
+        approver = _make_member(cur, owner.tenant_id, "approval-detail-decider", "approver")
+        cur.execute(
+            "update membership set display_name = 'ليلى' where id = %s", (approver.membership_id,)
+        )
+        act_as(cur, owner)
+        branch = _make_branch(cur, owner)
+        request = _make_submitted_request(cur, owner, branch)
+        _make_pending_step(cur, owner.tenant_id, request, approver.membership_id)
+    service = _queue_service(conn, monkeypatch, owner)
+    monkeypatch.setattr(module, "enqueue_push_job", lambda *_: None)
+    approved = service.approve_request(
+        bearer_token="test",
+        member=member_from_workspace(approver),
+        request_id=request,
+        payload=ApprovalDecisionInput(),
+    )
+    assert approved.approval_step is not None
+    assert approved.approval_step.decided_name == "ليلى"
+    app = FastAPI()
+    register_exception_handlers(app)
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[current_member] = lambda: member_from_workspace(owner)
+    app.dependency_overrides[bearer_token] = lambda: "test"
+    app.dependency_overrides[get_requests_service] = lambda: service
+    with TestClient(app) as client:
+        response = client.get(f"/api/v1/requests/{request}")
+    assert response.status_code == 200, response.text
+    assert response.json()["approval_step"]["decided_name"] == "ليلى"
+    assert (
+        response.json()["approval_step"]["decided_email"] == "approval-detail-decider@example.test"
+    )

@@ -144,6 +144,46 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '422': { $ref: '#/components/responses/Unprocessable' }
 
+  /quotations/{quotation_id}/archive:
+    post:
+      summary: Archive a quotation
+      description: >-
+        Owner or buyer only. Sets deleted_at and archive_idempotency_key and resolves
+        open or in-progress review tasks using the same archive timestamp.
+        Cross-tenant quotations return 404.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - { name: quotation_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Archived quotation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quotation' }
+        '403': { description: Write role required }
+        '404': { description: Quotation not found }
+  /quotations/{quotation_id}/restore:
+    post:
+      summary: Restore an archived quotation
+      description: >-
+        Owner or buyer only. Clears deleted_at and archive_idempotency_key. Reopens as
+        open only resolved review tasks whose resolved_at equals the previous deleted_at;
+        formerly in-progress tasks also reopen as open. Tasks resolved by review remain
+        resolved. Records quotation.restored and enqueues guardrail evaluation only on a
+        successful restore. Restoring a non-archived quotation or losing a concurrent
+        restore race returns the current quotation with 200 and no side effects.
+        Cross-tenant quotations return 404.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - { name: quotation_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Restored or unchanged quotation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quotation' }
+        '403': { description: Write role required }
+        '404': { description: Quotation not found }
   /quotations/{quotation_id}/extract:
     parameters:
       - { name: quotation_id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -212,7 +252,31 @@ paths:
         - name: priority
           in: query
           schema: { type: string, enum: [low, normal, high] }
+        - name: supplier_id
+          in: query
+          description: Exact supplier match, intersected with search; scoped by JWT tenancy.
+          schema: { type: string, format: uuid }
+        - name: reason
+          in: query
+          schema:
+            type: string
+            enum: [ready_to_authorise, low_confidence, arithmetic_mismatch, read_failure, review_required, no_supplier_match, currency_unresolved, date_unparsed, merged_line_items, line_count_mismatch, total_unverified]
+        - name: quotation_status
+          in: query
+          description: Quotation lifecycle status, independent of review task status.
+          schema: { type: string, enum: [pending, extracting, extracted, in_review, reviewed, refused] }
+        - { name: search, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: date_from, in: query, schema: { type: string } }
+        - { name: date_to, in: query, schema: { type: string } }
+        - name: sort_by
+          in: query
+          schema: { type: string, enum: [created_at, stated_total, priority, status], default: created_at }
+        - name: sort_order
+          in: query
+          schema: { type: string, enum: [asc, desc], default: desc }
       responses:
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
         '200':
           description: Review tasks
           content:

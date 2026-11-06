@@ -393,6 +393,24 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 - Returns `409` when the quotation is not editable in its current state.
 - Returns `422` when validation fails.
 
+### `POST /quotations/{quotation_id}/archive`
+
+- Owner or buyer only; tenant scope comes from the verified JWT. Other tenants' quotations return `404`.
+- Sets `deleted_at` and `archive_idempotency_key`, and resolves open/in-progress review tasks
+  with `resolved_at` equal to the archive timestamp. Returns the quotation (`200`).
+- The quotation review page's archive confirmation offers Undo for eight seconds through the restore endpoint (archiving from the queue offers none).
+
+### `POST /quotations/{quotation_id}/restore`
+
+- Same authenticated client and write-role requirement as archive. Other tenants' quotations return `404`.
+- Clears `deleted_at` and `archive_idempotency_key`. Reopens only resolved review tasks whose
+  `resolved_at` equals the quotation's previous `deleted_at`. Formerly in-progress tasks return
+  as open; tasks resolved by review at a different timestamp remain resolved.
+- Records `quotation.restored` and enqueues guardrail evaluation only when the guarded update
+  restores the quotation. Restoring a non-archived quotation, including a concurrent restore
+  that loses the update race, returns the current quotation unchanged (`200`) without side effects.
+- Response model remains `Quotation`. No migration is required.
+
 ### `POST /quotations/{quotation_id}/extract`
 
 - Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
@@ -425,6 +443,18 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 - Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50,
   optional `status` (`open`, `in_progress`, `resolved`, or `all`) defaulting to `open`, optional
   `priority` (`low`, `normal`, or `high`).
+- Optional `supplier_id` (UUID), `reason` (`ready_to_authorise`, `low_confidence`,
+  `arithmetic_mismatch`, `read_failure`, `review_required`, `no_supplier_match`,
+  `currency_unresolved`, `date_unparsed`, `merged_line_items`, `line_count_mismatch`,
+  `total_unverified`), and `quotation_status` (`pending`, `extracting`, `extracted`,
+  `in_review`, `reviewed`, `refused`) narrow the queue before pagination. Lifecycle status
+  belongs to the quotation; `status` belongs to the review task.
+- Existing optional `search` (supplier name or quotation ID prefix, at most 200 characters),
+  `date_from` and `date_to` (inclusive calendar day or timestamp), `sort_by` (`created_at`,
+  `stated_total`, `priority`, `status`; default `created_at`), and `sort_order` (`asc`, `desc`;
+  default `desc`) combine with all filters using AND. Ordering retains the ID tie-breaker.
+- Supplier filtering intersects supplier-name search. A supplier outside the JWT tenant
+  returns an empty list. Unknown reason/lifecycle values or malformed supplier UUIDs return `422`.
 - Returns `200` with `items` containing `ReviewTask` resources and nullable `next_cursor`.
 - Review task fields include `id`, `quotation_id`, `status`, `priority`, `reason`, `created_at`,
   and optional `resolved_at`.
@@ -485,6 +515,22 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
   shown at a flat value). A quotation with no RFQ is matched as before.
 - `decision` carries `supersedes_decision_id` and `learned_from_decision_id` (nullable uuid). The
   decision returned is the current one (head of the chain, ADR-022).
+
+### `GET /quotation-lines/{line_id}/match/history`
+
+- Requires bearer auth; any member of the workspace.
+- Returns every decision on the line, oldest first: the correction chain ADR-022 keeps. Each item is a
+  decision with `supersedes_decision_id` and, for a human decision, `decided_by_email`. The last item
+  is the current decision. A line of another tenant returns `404`.
+- The decision on a match task also carries `decided_by_email` for a human decision.
+
+### `POST /quotation-lines/{line_id}/match-candidates/manual`
+
+- Requires bearer auth and owner or buyer role. Body: `{ "product_id": uuid }`.
+- Records an active catalogue product the buyer picked as a candidate for the line, so a decision can
+  point at it. The row has scoring version `manual-v1`, confidence `0.0000`, no signal and
+  `reasons.manual = true`. Picking the same product again returns the existing candidate.
+- A product that is archived returns `409`; a product or line of another tenant returns `404`.
 
 ### `POST /quotation-lines/{line_id}/match/corrections`
 
@@ -1472,8 +1518,8 @@ Request:
 
 ### `POST /requests/{request_id}/withdraw`
 
-- The requester or a workspace owner may withdraw a `draft`, `submitted`, or `ordered` request.
-- An `ordered` request may be withdrawn only when no purchase order references it with a status
+- The requester or a workspace owner may withdraw a `draft`, `submitted`, `approved`, or `ordered` request.
+- An `approved` or `ordered` request may be withdrawn only when no purchase order references it with a status
   other than `cancelled`. Even a draft PO blocks withdrawal (`409`, `purchase_order_exists`).
 - Sets `status = withdrawn`, stamps `withdrawn_at`, and records
   `requests.purchase_request_withdrawn` with `previous_status` in the audit target.
@@ -1490,7 +1536,23 @@ Request:
 
 - Requires bearer auth. Lists requests awaiting the caller's decision — the assigned approver
   sees their own pending steps; an owner sees every pending step (FR-007 standing override).
+  Requests submitted by the caller are excluded unless the caller is the workspace's only
+  active owner (ADR-024).
 - Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50.
+- Optional `sort`: `submitted_desc` (default, approval-step creation time descending),
+  `submitted_asc`, `required_by_asc`, `total_desc`, or `total_asc`. Required-by and total
+  sorts use request columns; null values sort last. Every sort ends with step ID ascending.
+  Totals sort by the stored amount without currency conversion.
+- Optional `branch_id` (UUID) filters requests under the same RLS visibility. Invisible,
+  nonexistent and empty branches return an empty list. Invalid sort or UUID returns `422`.
+- Returns `PendingApprovalList` with `items`, `next_cursor`, and integer `total`: the matching
+  pending-decision count for this caller, independent of cursor and limit. Assignment,
+  terminal-status and own-request exclusions apply equally to items and total. Total is
+  recalculated on each call, so decisions and submissions can change it between pages.
+- Cursors encode sort, branch, last sort value and step ID. Reusing a cursor with a different
+  sort or branch returns `422` with `details: {"cursor": "invalid"}`. Legacy unfiltered
+  default-sort cursors remain accepted. Keyset traversal preserves existing rows through
+  decisions and insertions; newly inserted rows before the cursor appear on refresh.
 - Returns `200` with `items` of `PurchaseRequest`, each embedding the full decision context
   (requester, branch, cost centre, lines, required-by date, `approval_step`, and `budget_status`
   when applicable) so the approver never has to navigate elsewhere (FR-005). Each request also
@@ -1498,6 +1560,17 @@ Request:
   RFQ split, `null` for an ordinary request. A decided request no longer appears here.
 
 ### `POST /requests/{request_id}/approve` · `POST /requests/{request_id}/reject`
+
+ADR-024 applies to approve and reject, keyed and unkeyed, and to the group approve/reject
+endpoints. After existing authorization, a requester who is not the workspace's only active
+owner receives `403` with `details.reason: self_decision_not_allowed`. Existing pending steps
+keep their assignee. Submission routes away from the requester to another active owner
+(`owner_fallback`); delegation to the requester is skipped.
+
+`ApprovalStep.self_approval` is a derived boolean (default `false`) in request detail, list,
+queue and decision responses: for pending steps the assignee is the requester; for decided
+steps the recorded decider is the requester. A requester decision's audit target includes
+`self_approved: true` for single and group decisions; other decisions omit that key.
 
 - Accepts an optional `Idempotency-Key` UUID header. Within the decision transaction, an
   authorized retry with the same tenant, actor, action, request and key returns the current
@@ -1511,10 +1584,12 @@ Request:
 - Records a human decision — sets `status`, `decided_by_membership_id`, and `decided_at`
   together on the step (FR-006, enforced by the `approval_step` check constraint), and audits
   `requests.approval_step_approved` / `requests.approval_step_rejected` recording that human
-  decision unchanged. The request row itself moves to **`ordered`** on approval (not `approved` —
-  as of chunk R2.3, `010-mobile-approvals-receipt`, there is no separate "place the order" human
-  action this release, so the same decision that approves a request is also what marks it
-  ordered) or to `rejected` on rejection. The request row is updated before the step so a
+  decision unchanged. The request row moves to **`approved`** on approval (ADR-025), or to
+  `rejected` on rejection. It becomes `ordered` when a live purchase order first takes quantity
+  from it, and returns to `approved` when its last live order is cancelled or detached.
+  These order-side writes share the order transaction and existing request advisory locks.
+  Legacy `ordered` requests without an order remain unchanged and orderable.
+  The request row is updated before the step so a
   concurrent withdrawal cannot strand a decided step on a non-submitted request.
 - Returns `200` with the `PurchaseRequest`.
 - Returns `403` (`not_assigned_approver`) when the caller is neither the assignee nor an owner.
@@ -2683,6 +2758,24 @@ different response that confirms existence.
 - Records `orders.purchase_order_cancelled`. Idempotent replay with the same key returns the
   cancelled order; a different key on an already-cancelled order returns a conflict.
 
+### `POST /orders/{order_id}/withdraw`
+
+- Requires owner or buyer role and `Idempotency-Key`.
+- Takes a `submitted` order back to `draft` while no supplier confirmation, delivery receipt or
+  purchase outcome is recorded. Any other status returns `409` with `order_not_submitted`; recorded evidence returns
+  `409` with `order_has_evidence`. A database guard enforces the same rule.
+- Records `orders.purchase_order_withdrawn`. A retry with the same key returns the order as it is
+  now and does not withdraw it again, even after a re-submit. A retry of the original submit key
+  after a withdraw returns the draft and does not submit again.
+
+### `POST /orders/{order_id}/close`
+
+- Requires owner or buyer role and `Idempotency-Key`.
+- Moves a `received` order to `closed`; any other status returns `409` with
+  `order_not_closable`. Closed is final: no evidence, edits or cancellation follow.
+- Records `orders.purchase_order_closed`. Replay with the same key returns the closed order; a
+  different key on an already-closed order returns `409` with `order_already_closed`.
+
 ### `POST /orders/{order_id}/submit`
 
 - Requires owner or buyer role and `Idempotency-Key`.
@@ -2924,18 +3017,20 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
 - Any owner or buyer may call this endpoint.
 - A recipient supplier with no on-file contact email is silently excluded from the created RFQ
   and reported back in `rejected_recipients`, rather than failing the whole request.
-- Returns `201` with the created `Rfq`, its `RfqLine`s, its `RfqRecipient`s, and
+- Returns `201` with the created `Rfq` (including `reference_number`, assigned by trigger and formatted by clients as `RFQ-000123`), its `RfqLine`s, its `RfqRecipient`s, and
   `rejected_recipients`.
 
 ### `GET /rfq/{rfq_id}`
 
 - The RFQ's creator (whatever their current role) or any owner or buyer may read an RFQ in their
   workspace (`rfq_select` RLS policy); another workspace's RFQ returns `404`.
-- Returns the `Rfq`, including nullable `cancelled_at`, with its lines and recipients
+- Returns the `Rfq`, including `reference_number` (formatted as `RFQ-000123`) and nullable `cancelled_at`, with its lines and recipients
   (`RfqDetail`), so a saved draft can be reopened
   for editing.
 - Each recipient includes `response_count` (integer, default `0`): the number of `rfq_response`
-  rows with that recipient's `rfq_recipient_id` and `tenant_id`.
+  rows with that recipient's `rfq_recipient_id` and `tenant_id`. Recipient send record fields
+  track delivery state: `failure_reason` (`delivery_error`, `missing_contact_email`, or `null`),
+  `send_attempts` (integer >= 0), and `last_attempt_at` (nullable timestamptz).
 - Also carries `converted_purchase_request_ids` (every purchase request prepared from this RFQ —
   one per supplier in a split) and `request_group_id` (the split's group, once prepared)
   (spec 024; rolling out).
@@ -2949,18 +3044,23 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
 - Only the RFQ's creator may edit it (`403`, `reason: not_creator`). A non-draft RFQ returns `409`
   (`reason: not_draft`); a draft that already has supplier responses returns `409`
   (`reason: has_responses`).
-- Returns `200` with the same shape as `POST /rfq`, including `rejected_recipients`.
+- Returns `200` with the same shape as `POST /rfq`, including `rejected_recipients` and `reference_number`.
 
 ### `POST /rfq/{rfq_id}/send`
 
 - Accepts `Idempotency-Key` (required).
-- Dispatches the RFQ by email (via Mailgun — ADR-018) to every recipient still in `draft` status;
+- An active owner or the RFQ's creator may send or retry sending the RFQ (PPS-179); any other member
+  receives `403` (`details: {"resource": "rfq", "reason": "not_creator"}`).
+- Dispatches the RFQ by email (via Mailgun — ADR-018) to every recipient still in `draft` or `failed` status;
   a recipient already `sent` from a prior call is left untouched, making a retry naturally
   idempotent without needing the idempotency key for this specific case.
-- A per-recipient send failure leaves that one recipient `draft` (not `failed` unless the mailer
-  itself reports a hard failure) rather than failing the whole call — the RFQ's own `status`
-  moves to `sent` as soon as at least one recipient succeeds.
-- Returns `200` with the updated `Rfq` and all its `RfqRecipient`s.
+- For each attempted recipient delivery, `send_attempts` increments by 1 and `last_attempt_at` is set
+  to current time. On mailer success, `status` moves to `sent` and `failure_reason` is set to `null`. On
+  mailer failure, `status` moves to `failed` and `failure_reason` is set to `delivery_error` (without provider text).
+  Recipients whose supplier lacks a contact email are set to `failed` with `failure_reason: missing_contact_email`
+  (attempts unchanged).
+- The RFQ's own `status` moves to `sent` as soon as at least one recipient succeeds.
+- Returns `200` with the updated `Rfq` (including `reference_number`) and all its `RfqRecipient`s with their send records.
 
 ### `POST /rfq/{rfq_id}/cancel`
 
@@ -3017,8 +3117,24 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
 
 ### `GET /rfq`
 
+- Optional `q` is trimmed; empty or whitespace-only text applies no search filter. At most
+  100 characters are accepted after trimming; longer text returns `422` with
+  `details: {"reason": "invalid_query", "field": "q"}`.
+- Search matches any recipient supplier's name or line product's `workspace_product.tenant_name`
+  by case-insensitive substring, within the caller's tenant. `%`, `_`, and `\` match literally.
+  It also matches an exact reference number: `2`, `0002`, `rfq-2`, and `RFQ-000002` match
+  reference 2, never 12 or 20. Names are searched using the original trimmed text.
+  `tenant_terms` is not searched. Arabic text is supported without diacritic removal,
+  letter normalization, or transliteration; case matching follows PostgreSQL `ILIKE`.
+- Optional `sort` accepts `created_desc` (default), `created_asc`, `needed_asc`, `needed_desc`,
+  `reference_desc`, or `reference_asc`, ordering by creation time, needed-by date, or numeric
+  reference respectively. Every order uses `id` as a tiebreaker in the same direction.
+  Unknown values return `422` with `details: {"reason": "invalid_sort", "field": "sort"}`.
+- `q`, `sort`, and `status` combine. Cursors remain offsets: clients must reuse the same
+  `q`, `sort`, and `status` for subsequent pages. Ordering is stable for unchanged data;
+  concurrent changes can shift offsets. No matches returns `{"items": [], "next_cursor": null}`.
 - Lists every RFQ visible to the caller, cursor-paginated (`limit` capped at 100), each with its
-  recipient count, response count, and — once `status = converted` — the id of the purchase
+  `reference_number` (formatted as `RFQ-000123`), recipient count, response count, and — once `status = converted` — the id of the purchase
   request it produced. Each `RfqSummary` also carries `converted_purchase_request_ids` (every
   purchase request prepared from the RFQ — one per supplier in a split) and `request_group_id`
   (the split's group, once prepared) (spec 024).
@@ -3132,3 +3248,39 @@ contract: `specs/024-rfq-basket-split/contracts/rfq-split.openapi.yaml`.
 - Accepts `Idempotency-Key` (required).
 - Withdraws every request of the split.
 - Returns `200` with the group's requests, all withdrawn.
+
+Approval steps include nullable `decided_name` and `decided_email`, resolved from the recorded
+decider membership in the same contact batch as the requester and assignee. Pending steps
+return null for both. Request visibility and cross-tenant not-found behavior are unchanged.
+
+
+### Bulk single-request approval decisions (P-177 stage 3)
+
+`POST /api/v1/approvals/bulk-decisions` uses the same verified bearer-token and current-member
+dependencies as the single approve/reject endpoints. `Idempotency-Key: UUID` is required.
+The body is `{decision: "approved" | "rejected", comment?: string | null, request_ids: UUID[]}`.
+There must be 1–25 distinct ids. Rejection requires a non-blank comment; any comment is at most
+2000 characters and is preserved verbatim. Invalid bodies, duplicate ids or invalid/missing keys
+return 422 before processing any item.
+
+Each item calls the existing single-request decision path with `uuid5(batch_key, str(request_id))`.
+There is no batch transaction: each decision independently commits its request/step updates,
+append-only audit event and push outbox entry, or rolls them back together. Existing assignment,
+owner, ADR-024 self-decision and RLS checks remain authoritative. The batch neither purchases
+anything nor combines monetary amounts or currencies.
+
+A valid batch returns 200 with `{results: [{request_id, outcome: "decided" | "failed",
+error_code: string | null, request: PurchaseRequest | null}], decided_count, failed_count}`.
+Results retain input order. Successful items carry the existing enriched request response and
+null error_code; failures carry null request. Error codes are `not_found` for invisible/foreign
+requests, `group_request_use_group_decision` for split members (use the group decision endpoint),
+`self_decision_not_allowed` for ADR-024 refusals, and `unavailable` for infrastructure or unexpected
+item failures. Other errors retain the single path's top-level code, including `conflict` and
+`auth.permission_denied`; no raw exception text or group identifiers are returned.
+
+Replaying the same key uses the existing actor/tenant/action/request-scoped audit lookup and
+returns the current recorded result without another decision audit or push entry. Changing the
+batch decision uses the single path's normal conflict behavior. A response-enrichment failure
+can produce unavailable after that item's decision committed; replaying the same batch key
+recovers the response without repeating the write. Failed items are retried against current
+state; no new batch ledger or table is introduced.

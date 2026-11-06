@@ -42,8 +42,27 @@
     <header class="page-header">
       <div class="header-titles">
         <h1 class="page-title">{{ 'rfq.detail.title' | translate }}</h1>
+        @if (formatRfqReference(detail.rfq.reference_number); as reference) {
+          <p class="page-subtitle" data-testid="rfq-reference"><bdi dir="ltr">{{ reference }}</bdi></p>
+        }
         <p class="page-subtitle">{{ 'rfq.detail.subtitle' | translate }}</p>
       </div>
+      @if (canDuplicate() || canCancel()) {
+        <div class="header-actions">
+          @if (canDuplicate()) {
+            <a mat-stroked-button routerLink="/rfq/create" [queryParams]="{ from: detail.rfq.id }"
+              data-testid="rfq-detail-duplicate-button">
+              {{ 'rfq.history.duplicate' | translate }}
+            </a>
+          }
+          @if (canCancel()) {
+            <button mat-stroked-button class="pp-danger" type="button"
+              [disabled]="cancelling()" (click)="onCancelRfq()" data-testid="rfq-detail-cancel-button">
+              {{ 'rfq.cancel.confirm' | translate }}
+            </button>
+          }
+        </div>
+      }
     </header>
 
     <!-- Tabs -->
@@ -128,16 +147,18 @@
                   <h2>{{ 'rfq.compare.draftNoticeTitle' | translate }}</h2>
                   <p>{{ 'rfq.compare.draftNoticeDescription' | translate }}</p>
                 </div>
-                @if (isCreator()) {
+                @if (canSend()) {
                   <div class="draft-notice-actions">
-                    <button
-                      mat-stroked-button
-                      type="button"
-                      (click)="onEditDraft()"
-                      data-testid="rfq-detail-edit-button"
-                    >
-                      {{ 'rfq.compare.editDraft' | translate }}
-                    </button>
+                    @if (isCreator()) {
+                      <button
+                        mat-stroked-button
+                        type="button"
+                        (click)="onEditDraft()"
+                        data-testid="rfq-detail-edit-button"
+                      >
+                        {{ 'rfq.compare.editDraft' | translate }}
+                      </button>
+                    }
                     <button
                       mat-flat-button
                       color="primary"
@@ -224,6 +245,12 @@
                   }
                 </dd>
               </div>
+              @if (detail.rfq.cancelled_at) {
+                <div class="detail-field" data-testid="rfq-detail-cancelled-at">
+                  <dt>{{ 'rfq.detail.cancelledAtLabel' | translate }}</dt>
+                  <dd>{{ formatDate(detail.rfq.cancelled_at) }} · {{ formatTime(detail.rfq.cancelled_at) }}</dd>
+                </div>
+              }
             </dl>
           </mat-card>
         </div>
@@ -273,6 +300,26 @@
       <!-- Tab 2: Recipients (n) -->
       <mat-tab [label]="'rfq.detail.tabRecipients' | translate: { count: detail.recipients.length }">
         <div class="tab-content">
+          @if (neededInDays() !== null) {
+            <div class="needed-hint" role="status" data-testid="rfq-detail-needed-hint">
+              <mat-icon aria-hidden="true">schedule</mat-icon>
+              <span>{{ neededHintText() }}</span>
+            </div>
+          }
+          @if (hasRemindableRecipients()) {
+            <div class="reminder-actions">
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                [disabled]="remindingAll()"
+                (click)="onRemindAll()"
+                data-testid="rfq-detail-remind-all-button"
+              >
+                {{ 'rfq.detail.remindAllAwaiting' | translate }}
+              </button>
+            </div>
+          }
           <mat-card class="table-card">
             <div class="table-container">
               <table mat-table [dataSource]="detail.recipients" class="recipients-table">
@@ -308,6 +355,24 @@
                         {{ 'rfq.detail.recipientStatus_' + recipient.status | translate }}
                       </span>
                     </div>
+                    @if ((recipient.status === 'failed' || recipient.status === 'draft') &&
+                      (detail.rfq.status === 'sent' || detail.rfq.status === 'responded' || detail.rfq.status === 'expired')) {
+                      <div class="send-record text-muted">
+                        @if (recipient.failure_reason === 'delivery_error') {
+                          <div>{{ 'rfq.detail.deliveryError' | translate }}</div>
+                        } @else if (recipient.failure_reason === 'missing_contact_email') {
+                          <div>{{ 'rfq.detail.missingContactEmail' | translate }}</div>
+                        }
+                        @if ((recipient.send_attempts ?? 0) > 0) {
+                          <div class="send-attempts">
+                            {{ sendAttemptsText(recipient) }}
+                            @if (recipient.last_attempt_at) {
+                              · {{ formatDate(recipient.last_attempt_at) }} · {{ formatTime(recipient.last_attempt_at) }}
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
                   </td>
                 </ng-container>
 
@@ -337,6 +402,38 @@
                     } @else {
                       <span class="text-muted">—</span>
                     }
+                  </td>
+                </ng-container>
+
+                <!-- Reminders Column -->
+                <ng-container matColumnDef="reminders">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'rfq.detail.reminders' | translate }}</th>
+                  <td mat-cell *matCellDef="let recipient">
+                    <div class="recipient-reminders-cell">
+                      @if ((recipient.reminder_count ?? 0) > 0) {
+                        <span class="reminder-history" [attr.data-testid]="'recipient-reminders-' + recipient.id">
+                          {{ reminderHistoryText(recipient) }}
+                        </span>
+                      }
+                      @if (reminderBlockedText(recipient); as blockedText) {
+                        <span
+                          class="reminder-blocked text-muted"
+                          [attr.data-testid]="'recipient-reminder-blocked-' + recipient.id"
+                        >{{ blockedText }}</span>
+                      }
+                      @if (canRemindRecipient(recipient)) {
+                        <button
+                          mat-stroked-button
+                          type="button"
+                          class="remind-button"
+                          (click)="onRemindRecipient(recipient)"
+                          [attr.data-testid]="'recipient-remind-' + recipient.id"
+                        >
+                          <mat-icon aria-hidden="true">notifications_active</mat-icon>
+                          {{ 'rfq.detail.sendReminder' | translate }}
+                        </button>
+                      }
+                    </div>
                   </td>
                 </ng-container>
 

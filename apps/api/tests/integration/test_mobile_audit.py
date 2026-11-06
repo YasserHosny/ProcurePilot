@@ -201,10 +201,9 @@ def _client_for(
     # A bare object() was enough for create_request/submit_request (only ever passed through to
     # authenticated_client, itself monkeypatched above) but approve_request's own
     # _decide_and_notify opens a SEPARATE raw psycopg connection via
-    # self._settings.database_url.get_secret_value() for its atomic multi-write transaction
-    # (Wave 9's own approved->ordered change) -- it needs a real Settings with a real
-    # database_url, matching test_decision_atomicity.py's own precedent for exercising that exact
-    # method against real Postgres.
+    # self._settings.database_url.get_secret_value() for its atomic multi-write transaction --
+    # it needs a real Settings with a real database_url, matching test_decision_atomicity.py's
+    # own precedent for exercising that exact method against real Postgres.
     service._settings = _test_settings()
     service._estimate_products = lambda product_ids, **_kw: [
         LineEstimate(None, None, None) for _product_id in product_ids
@@ -380,10 +379,9 @@ def test_post_requests_approve_records_approval_step_approved(
         branch_id = _make_branch(cur, workspace)
         product_id = make_workspace_product(cur, workspace, name="Audit Approve Widget")
     # approve_request's own _decide_and_notify opens a SEPARATE raw psycopg connection (its own
-    # atomic multi-write transaction, Wave 9's approved->ordered change) -- that connection can
-    # only see this fixture's rows once they're actually committed, not merely written on `conn`'s
-    # own still-open transaction (matches test_decision_atomicity.py's own precedent for this
-    # exact situation).
+    # atomic multi-write transaction) -- that connection can only see this fixture's rows once
+    # they're actually committed, not merely written on `conn`'s own still-open transaction
+    # (matches test_decision_atomicity.py's own precedent for this exact situation).
     conn.commit()
     with conn.cursor() as cur:
         act_as(cur, workspace)
@@ -417,7 +415,7 @@ def test_post_requests_approve_records_approval_step_approved(
             headers=headers,
         )
         assert approved.status_code == 200, approved.text
-        assert approved.json()["status"] == "ordered"
+        assert approved.json()["status"] == "approved"
 
         row = _audit_row(
             cur, tenant_id=workspace.tenant_id, action="requests.approval_step_approved"
@@ -430,6 +428,7 @@ def test_post_requests_approve_records_approval_step_approved(
             "approval_step_id": approval_step_id,
             "decided_by_membership_id": str(workspace.membership_id),
             "comment": "Approved for audit coverage",
+            "self_approved": True,
         }
 
 
@@ -471,7 +470,12 @@ def test_post_confirm_delivery_records_delivery_confirmed(
         act_as(cur, workspace)
         approved = client.post(f"/api/v1/requests/{request_id}/approve", json={}, headers=headers)
         assert approved.status_code == 200, approved.text
-        assert approved.json()["status"] == "ordered"
+        assert approved.json()["status"] == "approved"
+
+        # ADR-025: approval leaves the request "approved"; it reaches "ordered" only once a live
+        # purchase order exists. Seed that state directly so the delivery path this test audits
+        # is reachable.
+        cur.execute("update purchase_request set status='ordered' where id=%s", (request_id,))
 
         confirmed = client.post(
             f"/api/v1/requests/{request_id}/confirm-delivery",
@@ -525,6 +529,11 @@ def test_post_quality_issues_records_quality_issue_reported(
         act_as(cur, workspace)
         approved = client.post(f"/api/v1/requests/{request_id}/approve", json={}, headers=headers)
         assert approved.status_code == 200, approved.text
+
+        # ADR-025: approval leaves the request "approved"; it reaches "ordered" only once a live
+        # purchase order exists. Seed that state directly so the delivery path this test audits
+        # is reachable.
+        cur.execute("update purchase_request set status='ordered' where id=%s", (request_id,))
 
         confirmed = client.post(
             f"/api/v1/requests/{request_id}/confirm-delivery",

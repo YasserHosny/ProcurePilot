@@ -14,10 +14,12 @@ from httpx import Response
 from psycopg import sql
 
 from integration.catalogue_helpers import TEST_DATABASE_URL, Workspace, make_workspace, reset_role
+from integration.quotation_helpers import make_quotation, make_supplier
 from integration.test_confirm_delivery import _add_line, _payload
 from integration.test_purchase_requests import _current_member, _make_member
 from integration.test_request_group_read import api_as as read_api_as
 from integration.test_request_group_schema import _insert_group, _setup
+from procurepilot_api.errors import ConflictError
 from procurepilot_api.modules.requests import service as service_module
 from procurepilot_api.modules.requests.service import RequestsService
 
@@ -56,7 +58,7 @@ class Split:
 
 def seed(conn: psycopg.Connection) -> Split:
     with conn.cursor() as cur:
-        owner, branch, rfq, job = _setup(cur, "group-approval")
+        owner, branch, rfq, job = _setup(cur, f"group-approval-{uuid4().hex[:8]}")
         requester, a, b = [
             _make_member(cur, owner.tenant_id, f"group-{role}-{uuid4().hex[:8]}", role)
             for role in ("buyer", "approver", "approver")
@@ -124,6 +126,56 @@ def submit(conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, data: Spli
     assert_state(conn, data, "submitted")
 
 
+@pytest.mark.parametrize("action", ["submit", "withdraw"])
+def test_group_action_returns_sibling_supplier_names_and_positions(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    data = seed(conn)
+    with conn.cursor() as cur:
+        reset_role(cur)
+        cur.execute("select rfq_id from purchase_request_group where id=%s", (data.group,))
+        rfq = cur.fetchone()[0]
+        for position, request_id in enumerate(data.requests, 1):
+            supplier = make_supplier(cur, data.owner, f"Action supplier {position}")
+            quotation = make_quotation(cur, data.owner, supplier_id=supplier)
+            reset_role(cur)
+            recipient, response_id = uuid4(), uuid4()
+            cur.execute(
+                "insert into rfq_recipient (id,tenant_id,rfq_id,supplier_id,status) "
+                "values (%s,%s,%s,%s,'sent')",
+                (recipient, data.owner.tenant_id, rfq, supplier),
+            )
+            cur.execute(
+                "insert into rfq_response (id,tenant_id,rfq_recipient_id,quotation_id) "
+                "values (%s,%s,%s,%s)",
+                (response_id, data.owner.tenant_id, recipient, quotation),
+            )
+            cur.execute(
+                "update purchase_request set source_rfq_response_id=%s, "
+                "created_at='2026-10-01'::timestamptz + %s * interval '1 second' where id=%s",
+                (response_id, position, request_id),
+            )
+    conn.commit()
+
+    with api_as(conn, monkeypatch, data.requester) as (client, _service, _queries):
+        response = post(client, data, action)
+        assert response.status_code == 200, response.text
+        requests = response.json()
+        assert {request["id"] for request in requests} == {str(id_) for id_ in data.requests}
+        for request in requests:
+            position = data.requests.index(UUID(request["id"])) + 1
+            assert request["source"]["supplier_name"] == f"Action supplier {position}"
+            assert request["request_group"]["siblings"] == [
+                {
+                    "id": str(request_id),
+                    "position": position,
+                    "supplier_name": f"Action supplier {position}",
+                }
+                for position, request_id in enumerate(data.requests, 1)
+                if str(request_id) != request["id"]
+            ]
+
+
 def test_submit_and_approve_as_one_and_each_can_become_a_po(
     conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -135,7 +187,7 @@ def test_submit_and_approve_as_one_and_each_can_become_a_po(
         response = post(client, data, "approve")
         assert response.status_code == 200, response.text
         requests = response.json()
-        assert {r["status"] for r in requests} == {"ordered"}
+        assert {r["status"] for r in requests} == {"approved"}
         steps = [r["approval_step"] for r in requests]
         assert len({s["decided_at"] for s in steps}) == 1
         assert {s["comment"] for s in steps} == {"One decision"}
@@ -144,8 +196,8 @@ def test_submit_and_approve_as_one_and_each_can_become_a_po(
             approved = service.validate_approved_request_for_order(
                 bearer_token="token", member=_current_member(data.b, data.b), request_id=request_id
             )
-            assert approved.status == "ordered"
-    assert_state(conn, data, "ordered")
+            assert approved.status == "approved"
+    assert_state(conn, data, "approved")
     with conn.cursor() as cur:
         cur.execute(
             "select member_id from push_notification where tenant_id=%s", (data.owner.tenant_id,)
@@ -162,7 +214,7 @@ def test_submit_and_approve_as_one_and_each_can_become_a_po(
 
 
 @pytest.mark.parametrize("action", ["confirm_delivery", "withdraw"])
-def test_group_approved_requests_can_be_delivered_or_withdrawn(
+def test_group_approved_requests_allow_withdrawal_but_require_an_order_for_delivery(
     conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, action: str
 ) -> None:
     data = seed(conn)
@@ -180,21 +232,18 @@ def test_group_approved_requests_can_be_delivered_or_withdrawn(
     with api_as(conn, monkeypatch, data.requester) as (client, service, _queries):
         if action == "confirm_delivery":
             for request_id, line_id in zip(data.requests, lines, strict=True):
-                delivered = service.confirm_delivery(
-                    bearer_token="token",
-                    member=_current_member(data.requester, data.requester),
-                    request_id=request_id,
-                    payload=_payload([(line_id, "2")]),
-                )
-                assert delivered.status == "delivered"
-                assert delivered.has_delivery_discrepancy is False
-                assert delivered.delivered_at is not None
-                assert delivered.delivery_confirmed_by_membership_id == data.requester.membership_id
-                assert delivered.lines[0].quantity_received == "2.000000"
+                with pytest.raises(ConflictError) as error:
+                    service.confirm_delivery(
+                        bearer_token="token",
+                        member=_current_member(data.requester, data.requester),
+                        request_id=request_id,
+                        payload=_payload([(line_id, "2")]),
+                    )
+                assert error.value.details == {"reason": "not_ordered"}
         else:
             response = post(client, data, "withdraw")
             assert response.status_code == 200, response.text
-    assert_state(conn, data, "delivered" if action == "confirm_delivery" else "withdrawn")
+    assert_state(conn, data, "approved" if action == "confirm_delivery" else "withdrawn")
 
 
 @pytest.mark.parametrize("action,status", [("reject", "rejected"), ("withdraw", "withdrawn")])
@@ -394,7 +443,7 @@ def test_owner_can_decide_the_whole_group(
         assert {r["approval_step"]["decided_by_membership_id"] for r in response.json()} == {
             str(data.owner.membership_id)
         }
-    assert_state(conn, data, "ordered" if action == "approve" else "rejected")
+    assert_state(conn, data, "approved" if action == "approve" else "rejected")
 
 
 def test_draft_withdraw_and_requester_authorization(
@@ -557,8 +606,8 @@ def test_concurrent_actions_cannot_split_statuses_or_duplicate_notifications(
         assert outcomes[0] == outcomes[1]
         assert outcomes[0][0] == 200
     elif other_action == "withdraw" and all(code == 200 for code, _ in outcomes):
-        # Approval may serialize first: ordered requests remain withdrawable without a PO.
-        assert {r["status"] for r in outcomes[0][1]} == {"ordered"}
+        # Approval may serialize first: approved requests remain withdrawable without a PO.
+        assert {r["status"] for r in outcomes[0][1]} == {"approved"}
         assert {r["status"] for r in outcomes[1][1]} == {"withdrawn"}
     else:
         assert sorted(code for code, _ in outcomes) == [200, 409]
@@ -648,4 +697,52 @@ def test_budget_status_sees_both_just_submitted_requests_and_does_not_block_appr
         response = post(client, data, "approve")
         assert response.status_code == 200, response.text
         assert {r["budget_status"]["status"] for r in response.json()} == {"over"}
-    assert_state(conn, data, "ordered")
+    assert_state(conn, data, "approved")
+
+
+@pytest.mark.parametrize("statuses", [("approved", "approved"), ("approved", "ordered")])
+@pytest.mark.parametrize("live_order", [False, True])
+def test_approved_split_withdrawal_checks_live_orders(
+    conn: psycopg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+    statuses: tuple[str, str],
+    live_order: bool,
+) -> None:
+    from integration.quotation_helpers import make_supplier
+
+    data = seed(conn)
+    monkeypatch.setattr(service_module, "enqueue_push_job", lambda *_: None)
+    submit(conn, monkeypatch, data)
+    with api_as(conn, monkeypatch, data.b) as (client, _service, _queries):
+        response = post(client, data, "approve")
+        assert response.status_code == 200, response.text
+    with conn.cursor() as cur:
+        reset_role(cur)
+        for request_id, status in zip(data.requests, statuses, strict=True):
+            cur.execute("update purchase_request set status=%s where id=%s", (status, request_id))
+        if live_order:
+            supplier = make_supplier(cur, data.owner, name="Split supplier")
+            reset_role(cur)
+            cur.execute(
+                "insert into purchase_order (tenant_id,order_number,supplier_id,status,order_date,"
+                "total_amount,total_currency,tax_amount,tax_currency,source_kind,source_reference,"
+                "source_request_id,created_by,create_idempotency_key) "
+                "values (%s,%s,%s,'draft',current_date,1,'SAR',0,'SAR','manual','test',%s,%s,%s)",
+                (
+                    data.owner.tenant_id,
+                    f"PO-{uuid4().hex[:12]}",
+                    supplier,
+                    data.requests[0],
+                    data.owner.membership_id,
+                    uuid4(),
+                ),
+            )
+    conn.commit()
+    with api_as(conn, monkeypatch, data.requester) as (client, _service, _queries):
+        response = post(client, data, "withdraw")
+        if live_order:
+            assert response.status_code == 409, response.text
+            assert response.json()["details"]["reason"] == "purchase_order_exists"
+        else:
+            assert response.status_code == 200, response.text
+            assert {r["status"] for r in response.json()} == {"withdrawn"}

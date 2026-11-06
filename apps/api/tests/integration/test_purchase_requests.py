@@ -20,6 +20,7 @@ from integration.catalogue_helpers import (
     Workspace,
     act_as,
     connection,
+    execute_as_table_owner,
     make_workspace,
     make_workspace_product,
     reset_role,
@@ -304,7 +305,9 @@ def test_approval_step_decision_fields_paired_rejects_approved_without_decided(
         branch_id = _make_branch(cur, ws)
         request_id = _make_request(cur, ws, branch_id, status="submitted")
         with pytest.raises(psycopg.errors.CheckViolation):
-            cur.execute(
+            execute_as_table_owner(
+                cur,
+                ws,
                 "insert into approval_step "
                 "(id,tenant_id,purchase_request_id,"
                 "assigned_membership_id,source,status) "
@@ -327,7 +330,9 @@ def test_approval_step_accepts_approved_with_decided(
         branch_id = _make_branch(cur, ws)
         request_id = _make_request(cur, ws, branch_id, status="submitted")
         step_id = uuid4()
-        cur.execute(
+        execute_as_table_owner(
+            cur,
+            ws,
             "insert into approval_step "
             "(id,tenant_id,purchase_request_id,"
             "assigned_membership_id,source,status,"
@@ -1073,6 +1078,11 @@ def test_concurrent_update_vs_submit_loser_gets_conflict(
     )
     monkeypatch.setattr(
         service,
+        "_fetch_owner_membership_ids",
+        lambda _client: [owner.membership_id],
+    )
+    monkeypatch.setattr(
+        service,
         "_estimate_products",
         lambda product_ids, **_kw: [
             LineEstimate(
@@ -1519,6 +1529,11 @@ def test_create_and_update_happy_paths_preserve_response_shapes(
         "_fetch_owner_membership_id",
         lambda _client: owner.membership_id,
     )
+    monkeypatch.setattr(
+        service,
+        "_fetch_owner_membership_ids",
+        lambda _client: [owner.membership_id],
+    )
     submitted_req = service.submit_request(
         bearer_token="token",
         member=owner_cm,
@@ -1790,3 +1805,89 @@ def test_idempotent_key_does_not_replay_across_different_tenants(
         act_as(cur, owner_2)
         cur.execute("select tenant_id from purchase_request where id = %s", (req_t2.id,))
         assert cur.fetchone()[0] == owner_2.tenant_id
+
+
+@pytest.mark.parametrize("operation", ["create", "update"])
+@pytest.mark.parametrize("note", ["x" * 501, "م" * 501], ids=["ascii", "arabic"])
+def test_note_too_long_rejected_before_writes(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, operation: str, note: str
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-note-limit")
+        branch = _make_branch(cur, owner)
+        product = make_workspace_product(cur, owner, name="Note product")
+        request_id = _make_request(cur, owner, branch)
+        _add_line_no_estimate(cur, owner, request_id, product)
+        cur.execute(
+            "select * from purchase_request_line where purchase_request_id = %s", (request_id,)
+        )
+        original_lines = cur.fetchall()
+    conn.commit()
+    service = _service(conn, monkeypatch)
+    lines = [PurchaseRequestLineInput(workspace_product_id=product, quantity="2", note=note)]
+    with pytest.raises(UnprocessableEntityError) as exc:
+        if operation == "create":
+            service.create_request(
+                bearer_token="token",
+                member=_current_member(owner, owner),
+                payload=PurchaseRequestCreate(
+                    branch_id=branch, required_by_date=date.today() + timedelta(days=7), lines=lines
+                ),
+            )
+        else:
+            service.update_request(
+                bearer_token="token",
+                member=_current_member(owner, owner),
+                request_id=request_id,
+                patch=PurchaseRequestUpdate(lines=lines),
+            )
+    assert exc.value.status_code == 422
+    assert exc.value.details == {"field": "lines[0].note", "reason": "note_too_long"}
+    with conn.cursor() as cur:
+        reset_role(cur)
+        cur.execute("select id from purchase_request where tenant_id = %s", (owner.tenant_id,))
+        assert cur.fetchall() == [(request_id,)]
+        cur.execute(
+            "select * from purchase_request_line where purchase_request_id = %s", (request_id,)
+        )
+        assert cur.fetchall() == original_lines
+
+
+@pytest.mark.parametrize(
+    "note",
+    ["  " + "x" * 500 + "  ", "  " + "م" * 500 + "  ", " \t\n " * 200],
+    ids=["ascii", "arabic", "blank"],
+)
+def test_note_trimmed_boundary_stored_on_create_and_update(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch, note: str
+) -> None:
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "pr-note-boundary")
+        branch = _make_branch(cur, owner)
+        product = make_workspace_product(cur, owner, name="Note product")
+    conn.commit()
+    service = _service(conn, monkeypatch)
+    lines = [PurchaseRequestLineInput(workspace_product_id=product, quantity="2", note=note)]
+    request, created = service.create_request(
+        bearer_token="token",
+        member=_current_member(owner, owner),
+        payload=PurchaseRequestCreate(
+            branch_id=branch, required_by_date=date.today() + timedelta(days=7), lines=lines
+        ),
+    )
+    assert created
+    for operation in ["create", "update"]:
+        if operation == "update":
+            service.update_request(
+                bearer_token="token",
+                member=_current_member(owner, owner),
+                request_id=request.id,
+                patch=PurchaseRequestUpdate(lines=lines),
+            )
+        with conn.cursor() as cur:
+            reset_role(cur)
+            cur.execute(
+                "select note from purchase_request_line where purchase_request_id = %s",
+                (request.id,),
+            )
+            assert cur.fetchall() == [(note.strip() or None,)]

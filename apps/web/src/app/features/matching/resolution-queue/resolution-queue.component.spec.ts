@@ -5,6 +5,7 @@ import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Subject, firstValueFrom, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
 import type { CatalogueRefreshReview, MatchQueueItem, MatchTask, MatchTaskReason, Role } from '../../../core/api/models';
@@ -474,9 +475,10 @@ describe('ResolutionQueueComponent', () => {
     expect(compiled.querySelector('.clear-filters-btn')).toBeTruthy();
   });
 
-  it('shows "All lines of this quote are matched" empty state with compare responses button and clear filters link when filtered by quotation_id', () => {
-    component.tasks.set([]);
+  it('shows "All lines of this quote are matched" empty state with a compare link to its RFQ and a clear filters link when filtered by quotation_id', () => {
+    apiService.getMatchTasks.and.returnValue(of({ items: [], next_cursor: null, rfq_id: 'rfq-7' }));
     component.quotationId.set('q-101');
+    component.loadTasks();
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
@@ -486,13 +488,25 @@ describe('ResolutionQueueComponent', () => {
     const compareBtn = compiled.querySelector('a.compare-responses-btn') as HTMLAnchorElement | null;
     expect(compareBtn).toBeTruthy();
     expect(compareBtn?.textContent?.trim()).toContain(enCatalog.matching.queue.compareResponses);
-    expect(compareBtn?.getAttribute('href')).toBe('/rfq/history');
+    expect(compareBtn?.getAttribute('href')).toBe('/rfq/compare/rfq-7');
 
     const clearBtn = compiled.querySelector('.clear-filters-btn') as HTMLButtonElement | null;
     expect(clearBtn).toBeTruthy();
 
     clearBtn?.click();
     expect(component.quotationId()).toBeNull();
+  });
+
+  it('offers no compare link when the quotation did not answer an RFQ', () => {
+    apiService.getMatchTasks.and.returnValue(of({ items: [], next_cursor: null, rfq_id: null }));
+    component.quotationId.set('q-101');
+    component.loadTasks();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('[data-testid="quotation-all-matched"]')).toBeTruthy();
+    expect(compiled.querySelector('a.compare-responses-btn')).toBeNull();
+    expect(compiled.querySelector('.clear-filters-btn')).toBeTruthy();
   });
 
   it('should handle error when loading tasks fails', () => {
@@ -657,6 +671,20 @@ describe('ResolutionQueueComponent', () => {
       );
     });
 
+    it('shows each line number with Arabic-Indic digits in Arabic (P-159)', () => {
+      const badges = Array.from(el().querySelectorAll('.line-number-badge'));
+      expect(badges.length).toBeGreaterThan(0);
+      expect(badges[0].textContent).toMatch(/#[0-9]/);
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('ar', arCatalog);
+      translate.use('ar');
+      fixture.detectChanges();
+      for (const badge of Array.from(el().querySelectorAll('.line-number-badge'))) {
+        expect(badge.textContent).toMatch(/#[٠-٩]/);
+        expect(badge.textContent).not.toMatch(/[0-9]/);
+      }
+    });
+
     it('shows how many lines and quotations are listed, and that more can be loaded', () => {
       const count = el().querySelector('[data-testid="queue-result-summary"]') as HTMLElement;
       expect(count.classList.contains('visually-hidden')).withContext('visible to everyone').toBeFalse();
@@ -713,6 +741,34 @@ describe('ResolutionQueueComponent', () => {
       expect(component.sortBy()).toBe('created_at');
       expect(component.sortOrder()).toBe('desc');
       expect(component.hasActiveFilters()).toBeFalse();
+    });
+  });
+
+  describe('paging and refresh (P-153, PPS-197)', () => {
+    it('does not list a task twice when Load more brings back one that moved between pages', () => {
+      const dup = mockTasks[0] as unknown as MatchQueueItem;
+      expect(component.tasks().length).toBe(2);
+      apiService.getMatchTasks.and.returnValue(
+        of({ items: [dup, { ...(mockTasks[1] as unknown as MatchQueueItem), id: 'task-new' }], next_cursor: null }),
+      );
+
+      component.loadMore();
+
+      const ids = component.tasks().map((t) => t.id);
+      expect(new Set(ids).size).withContext(ids.join(',')).toBe(ids.length);
+      expect(ids).toContain('task-new');
+    });
+
+    it('lets the buyer refresh the list in place', () => {
+      const refresh = (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="queue-refresh"]',
+      ) as HTMLButtonElement | null;
+      expect(refresh).withContext('refresh button').toBeTruthy();
+
+      apiService.getMatchTasks.calls.reset();
+      refresh!.click();
+
+      expect(apiService.getMatchTasks).toHaveBeenCalledTimes(1);
     });
   });
 

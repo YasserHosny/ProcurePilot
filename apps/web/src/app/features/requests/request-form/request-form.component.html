@@ -19,6 +19,28 @@
     }
   </div>
 
+  @if (existingRequest(); as req) {
+    <section class="request-details">
+      <h2>{{ 'requests.details.title' | translate }}</h2>
+      <dl>
+        <div>
+          <dt>{{ 'requests.details.requester' | translate }}</dt>
+          <dd dir="auto">{{ req.requester_name || req.requester_email || ('requests.details.unavailable' | translate) }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'requests.details.created' | translate }}</dt>
+          <dd><time [attr.datetime]="req.created_at">{{ req.created_at | formatDate }}</time></dd>
+        </div>
+        @if (req.submitted_at) {
+          <div>
+            <dt>{{ 'requests.details.submitted' | translate }}</dt>
+            <dd><time [attr.datetime]="req.submitted_at">{{ req.submitted_at | formatDate }}</time></dd>
+          </div>
+        }
+      </dl>
+    </section>
+  }
+
   @if (duplicateSourceStatus(); as status) {
     <div class="duplicate-banner" role="status">
       {{ 'requests.duplicate.banner' | translate: { status: ('requests.status.' + status | translate) } }}
@@ -48,11 +70,24 @@
         @if (group.sibling_request_ids.length > 0) {
           <span class="split-siblings">
             · {{ 'requests.split.siblingsLabel' | translate }}:
-            @for (siblingId of group.sibling_request_ids; track siblingId; let last = $last) {
-              <a [routerLink]="['/requests', siblingId]" class="sibling-link">
-                {{ 'requests.split.siblingLink' | translate: { id: siblingId.slice(0, 8) } }}
-              </a>
-              @if (!last) { , }
+            @if (group.siblings; as siblings) {
+              @for (sibling of siblings; track sibling.id; let last = $last) {
+                <a [routerLink]="['/requests', sibling.id]" class="sibling-link">
+                  @if (sibling.supplier_name) {
+                    {{ 'requests.split.siblingLabel' | translate: { position: sibling.position, size: group.size, supplier: sibling.supplier_name } }}
+                  } @else {
+                    {{ 'requests.split.siblingPosition' | translate: { position: sibling.position, size: group.size } }}
+                  }
+                </a>
+                @if (!last) {, }
+              }
+            } @else {
+              @for (siblingId of group.sibling_request_ids; track siblingId; let last = $last) {
+                <a [routerLink]="['/requests', siblingId]" class="sibling-link">
+                  {{ 'requests.split.siblingLink' | translate: { id: siblingId.slice(0, 8) } }}
+                </a>
+                @if (!last) { , }
+              }
             }
           </span>
         }
@@ -80,10 +115,10 @@
     </div>
   }
 
-  @if (errorMessage()) {
+  @if (errorMessage(); as errorKey) {
     <div class="error-banner" role="alert" tabindex="-1">
       <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
-      <span>{{ errorMessage() }}</span>
+      <span>{{ errorKey | translate }}</span>
     </div>
   }
 
@@ -187,9 +222,9 @@
                 <input
                   matInput
                   [formControl]="lineGroup.controls.quantity"
-                  [type]="form.disabled ? 'text' : 'number'"
-                  min="0"
-                  step="any"
+                  type="text"
+                  inputmode="decimal"
+                  (input)="normaliseQuantity($event, lineGroup.controls.quantity)"
                 />
                 @if (!form.disabled) {
                   <span matSuffix>{{ 'requests.form.packsSuffix' | translate }}</span>
@@ -213,7 +248,13 @@
 
               <mat-form-field appearance="outline" class="line-note">
                 <mat-label>{{ 'requests.form.noteLabel' | translate }}</mat-label>
-                <input matInput [formControl]="lineGroup.controls.note" />
+                <input matInput [formControl]="lineGroup.controls.note" maxlength="500" />
+                <mat-hint>{{ 'requests.form.noteCounter' | translate: { count: lineGroup.controls.note.value.length } }}</mat-hint>
+                @if (lineGroup.controls.note.hasError('maxlength')) {
+                  <mat-error>{{ 'requests.form.noteTooLong' | translate }}</mat-error>
+                } @else if (lineGroup.controls.note.errors?.['server']; as serverError) {
+                  <mat-error>{{ serverError | translate }}</mat-error>
+                }
               </mat-form-field>
 
               @if (getLineEstimate(lineGroup); as estimate) {
@@ -286,6 +327,24 @@
               <span class="status-chip" [attr.data-status]="step.status">
                 {{ 'requests.status.' + step.status | translate }}
               </span>
+
+              @if (step.self_approval) {
+                <div class="self-approval">
+                  <mat-icon aria-hidden="true">person</mat-icon>
+                  <div>
+                    @if (step.status === 'pending') {
+                      <span>{{ 'requests.approval.selfApprovalPending' | translate }}</span>
+                    } @else {
+                      @if (step.status === 'approved') {
+                        <span>{{ 'requests.approval.selfApproved' | translate }}</span>
+                      } @else if (step.status === 'rejected') {
+                        <span>{{ 'requests.approval.selfRejected' | translate }}</span>
+                      }
+                      <p>{{ 'requests.approval.selfApprovedHint' | translate }}</p>
+                    }
+                  </div>
+                </div>
+              }
 
               <div class="approval-meta">
                 <span>{{ 'requests.approval.assignedTo' | translate }}</span>
@@ -400,7 +459,7 @@
             }
           }
 
-          @if (canWithdraw() && existingRequest()?.status === 'submitted') {
+          @if (canWithdraw() && existingRequest()?.status !== 'draft') {
             <button
               mat-stroked-button
               type="button"
@@ -417,5 +476,20 @@
         </div>
       </form>
     </mat-card>
+  }
+  @if (existingRequest()) {
+    <section>
+      <h2>{{ 'requests.history.title' | translate }}</h2>
+      <ol class="request-history" [attr.aria-label]="'requests.history.title' | translate">
+        @for (event of history(); track event.key) {
+          <li>
+            <span>{{ 'requests.history.' + event.key | translate }}</span>
+            @if (event.actor) { <span dir="auto">{{ event.actor }}</span> }
+            <time [attr.datetime]="event.timestamp">{{ event.timestamp | formatDate }}</time>
+            @if (event.comment) { <p dir="auto">{{ event.comment }}</p> }
+          </li>
+        }
+      </ol>
+    </section>
   }
 </div>

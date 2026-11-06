@@ -204,9 +204,11 @@ export async function confirmQuotation(page: Page): Promise<void> {
   await expect(dialog).toBeVisible();
   await dialog.locator('.confirm-dialog-actions .mat-mdc-unelevated-button').click();
   await expect(page.locator('.status-pill.status-reviewed')).toBeVisible();
-  const continueLink = page.getByRole('link', { name: 'Continue to Product Matching' });
-  await expect(continueLink).toBeVisible({ timeout: 30000 });
-  await expect(continueLink).toHaveAttribute('href', /\/matching\?quotation_id=/);
+  const matchButton = page.getByTestId('next-step-card').getByRole('button', { name: 'Match lines' });
+  await expect(matchButton).toBeVisible({ timeout: 30000 });
+  await matchButton.click();
+  // Matching preparation is a real round trip (several seconds on hosted data).
+  await expect(page).toHaveURL(/\/matching\?quotation_id=/, { timeout: 60000 });
 }
 
 /** The full upload → correct → confirm recipe, for specs that just need a confirmed quotation. */

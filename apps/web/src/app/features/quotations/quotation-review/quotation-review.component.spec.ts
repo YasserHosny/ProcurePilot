@@ -127,6 +127,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       'replaceDocument',
       'refuseQuotation',
       'archiveQuotation',
+      'restoreQuotation',
       'retryExtraction',
     ]);
     apiService.getQuotation.and.returnValue(of(mockQuotationDetail));
@@ -209,6 +210,131 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     fixture.detectChanges();
   });
 
+  describe('document preview improvements', () => {
+    it('preserves the safe URL reference across refreshes and equivalent field selections', () => {
+      const base = 'https://example.com/quote.pdf?token=a%2Bb';
+      component.documentPreviewUrl.set(base);
+      const extraction = mockQuotationDetail.field_extractions[0];
+      component.activeExtraction.set({ ...extraction, source_page: 2 });
+      const original = component.safePreviewUrl();
+      component.quotation.set({ ...mockQuotationDetail });
+      expect(component.safePreviewUrl()).toBe(original);
+      component.activeExtraction.set({ ...extraction, source_page: 2 });
+      expect(component.safePreviewUrl()).toBe(original);
+      component.activeExtraction.set(null);
+      const noPage = component.safePreviewUrl();
+      component.activeExtraction.set({ ...extraction, source_page: null });
+      expect(component.safePreviewUrl()).toBe(noPage);
+      component.activeExtraction.set({ ...extraction, source_page: 3 });
+      expect(component.safePreviewUrl()).not.toBe(original);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('iframe').getAttribute('src')).toBe(base + '#page=3');
+    });
+
+    it('keeps the displayed iframe through a pending and failed silent refetch', () => {
+      const pending = new Subject<{ download_url: string }>();
+      const url = component.documentPreviewUrl();
+      const frame = fixture.nativeElement.querySelector('iframe');
+      apiService.getDocumentDownloadUrl.and.returnValue(pending);
+      component.loadQuotation('q-review-1', { silent: true });
+      fixture.detectChanges();
+      expect(component.documentPreviewUrl()).toBe(url);
+      expect(fixture.nativeElement.querySelector('iframe')).toBe(frame);
+      pending.error(new Error('transient'));
+      fixture.detectChanges();
+      expect(component.documentPreviewUrl()).toBe(url);
+      expect(component.documentPreviewError()).toBeFalse();
+      expect(fixture.nativeElement.querySelector('iframe')).toBe(frame);
+      expect(fixture.nativeElement.querySelector('.preview-retry')).toBeNull();
+    });
+
+    it('shows the error card when a silent refetch fails without a displayed URL', () => {
+      component.documentPreviewUrl.set(null);
+      apiService.getDocumentDownloadUrl.and.returnValue(throwError(() => new Error('failed')));
+      component.loadQuotation('q-review-1', { silent: true });
+      fixture.detectChanges();
+      expect(component.documentPreviewError()).toBeTrue();
+      expect(fixture.nativeElement.querySelector('.preview-retry')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('iframe')).toBeNull();
+    });
+
+    it('fetches a replacement PDF once when polling replaces a CSV', fakeAsync(() => {
+      const csv: QuotationDetail = {
+        ...mockQuotationDetail, status: 'extracting',
+        document: { ...mockQuotationDetail.document, id: 'csv-doc', mime_type: 'text/csv' },
+      };
+      component.quotation.set(csv);
+      component.loadDocumentPreview('csv-doc');
+      apiService.retryExtraction.and.returnValue(of(csv));
+      apiService.getQuotation.and.returnValue(of(csv));
+      spyOn(window, 'confirm').and.returnValue(true);
+      component.retryExtraction();
+      apiService.getDocumentDownloadUrl.calls.reset();
+      apiService.getQuotation.and.returnValue(of({
+        ...csv, document: { ...mockQuotationDetail.document, id: 'new-pdf' },
+      }));
+      tick(2000);
+      tick(2000);
+      expect(apiService.getDocumentDownloadUrl).toHaveBeenCalledOnceWith('new-pdf');
+      component.stopExtractionPolling();
+    }));
+
+    it('retries a failed URL load and clears the error while pending and on success', () => {
+      const pending = new Subject<{ download_url: string }>();
+      component.documentPreviewUrl.set(null);
+      apiService.getDocumentDownloadUrl.and.returnValue(throwError(() => new Error('failed')));
+      component.loadDocumentPreview('doc-1');
+      fixture.detectChanges();
+      expect(component.documentPreviewError()).toBeTrue();
+      apiService.getDocumentDownloadUrl.and.returnValue(pending);
+      const calls = apiService.getDocumentDownloadUrl.calls.count();
+      fixture.nativeElement.querySelector('.preview-retry').click();
+      fixture.detectChanges();
+      expect(apiService.getDocumentDownloadUrl.calls.count()).toBe(calls + 1);
+      expect(component.documentPreviewError()).toBeFalse();
+      expect(fixture.nativeElement.querySelector('.doc-preview-loading mat-spinner')).not.toBeNull();
+      pending.next({ download_url: 'https://example.com/retry.pdf' });
+      fixture.detectChanges();
+      expect(component.documentPreviewError()).toBeFalse();
+      expect(component.documentPreviewUrl()).toBe('https://example.com/retry.pdf');
+    });
+
+    for (const mime of ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/tiff']) {
+      it(`does not fetch a preview URL for ${mime}`, () => {
+        component.quotation.set({ ...mockQuotationDetail, document: { ...mockQuotationDetail.document, mime_type: mime } });
+        apiService.getDocumentDownloadUrl.calls.reset();
+        component.loadDocumentPreview('doc-1');
+        fixture.detectChanges();
+        expect(apiService.getDocumentDownloadUrl).not.toHaveBeenCalled();
+        expect(fixture.nativeElement.querySelector('[role="status"]')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('iframe')).toBeNull();
+      });
+    }
+
+    it('changes only the PDF page fragment and preserves the signed query', () => {
+      const base = 'https://example.com/quote.pdf?token=a%2Bb&expires=123';
+      component.documentPreviewUrl.set(base + '#old');
+      const extraction = mockQuotationDetail.field_extractions[0];
+      const calls = apiService.getDocumentDownloadUrl.calls.count();
+      for (const page of [3, 5, null, 0, -1]) {
+        component.activeExtraction.set({ ...extraction, source_page: page });
+        fixture.detectChanges();
+        const frame = fixture.nativeElement.querySelector('iframe') as HTMLIFrameElement;
+        expect(frame.getAttribute('src')).toBe(base + (page && page >= 1 ? `#page=${page}` : ''));
+      }
+      component.activeExtraction.set(null);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('iframe').getAttribute('src')).toBe(base);
+      for (const mime of ['image/png', 'image/jpeg', 'text/plain']) {
+        component.quotation.set({ ...mockQuotationDetail, document: { ...mockQuotationDetail.document, mime_type: mime } });
+        component.activeExtraction.set({ ...extraction, source_page: 3 });
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('iframe').getAttribute('src')).toBe(base);
+      }
+      expect(apiService.getDocumentDownloadUrl.calls.count()).toBe(calls);
+    });
+  });
+
   it('prefers the original Unicode filename over the ASCII storage key', () => {
     component.quotation.set({
       ...mockQuotationDetail,
@@ -270,6 +396,37 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     component.quotation.set({ ...mockQuotationDetail, field_extractions: [unitPrice] });
     component.confirmFieldAsIs('quotation_line', 'line-1', 'unit_price');
     expect(component.pendingCorrections().get(unitPrice.id)).toEqual(unitPrice.extracted_value);
+  });
+
+  it('gives every header confirm-as-is button the accessible name of its tooltip (PPS-162)', () => {
+    const extractions = [
+      { field_name: 'currency', extracted_value: 'GBP' },
+      { field_name: 'issue_date', extracted_value: '2026-08-20' },
+      { field_name: 'expiry_date', extracted_value: '2026-09-20' },
+      { field_name: 'stated_total', extracted_value: { amount: '250.00', currency: 'GBP' } },
+      { field_name: 'prices_include_vat', extracted_value: true },
+      { field_name: 'vat_rate', extracted_value: '0.15' },
+    ].map((field): FieldExtraction => ({
+      ...field,
+      id: `fe-${field.field_name}`,
+      quotation_id: mockQuotationDetail.id,
+      entity_type: 'quotation',
+      entity_id: mockQuotationDetail.id,
+      confidence: '0.5000',
+      extraction_method: 'bedrock',
+      model_version: 'v1',
+      corrected_value: null,
+      corrected_by: null,
+      corrected_at: null,
+    }));
+    component.quotation.set({ ...mockQuotationDetail, prices_include_vat: true, vat_rate: '0.15', field_extractions: extractions });
+    fixture.detectChanges();
+
+    const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.confirm-as-is-btn'));
+    expect(buttons.length).toBe(6);
+    for (const button of buttons) {
+      expect(button.getAttribute('aria-label')).toBe(enCatalog.quotations.review.corrections.confirmAsIsTooltip);
+    }
   });
 
   it('requests inline preview URLs and attachment URLs from the download button', () => {
@@ -948,6 +1105,153 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     const inboxBtn = fixture.nativeElement.querySelector('[data-testid="next-step-back-inbox"]');
     expect(inboxBtn).toBeTruthy();
     expect(inboxBtn.textContent.trim()).toBe('Back to the inbox');
+  });
+
+
+  describe('next step after confirm', () => {
+    function confirm(): void {
+      const confirmed = { ...mockQuotationDetail, status: 'reviewed' as const, supplier_id: 'sup-1' };
+      component.quotation.set({ ...mockQuotationDetail, supplier_id: 'sup-1' });
+      component.selectedSupplierId.set('sup-1');
+      apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
+      apiService.confirmQuotation.and.returnValue(of(confirmed));
+      apiService.getQuotation.and.returnValue(of(confirmed));
+      component.confirmQuotation();
+      fixture.detectChanges();
+    }
+
+    for (const reduced of [false, true]) {
+      it(`scrolls the card and focuses Match lines after confirm (reduced motion: ${reduced})`, fakeAsync(() => {
+        spyOn(window, 'matchMedia').and.returnValue({ matches: reduced } as MediaQueryList);
+        const scroll = spyOn(HTMLElement.prototype, 'scrollIntoView');
+        confirm();
+        tick();
+        fixture.detectChanges();
+        const card = fixture.nativeElement.querySelector('[data-testid="next-step-card"]') as HTMLElement;
+        expect(document.activeElement).toBe(card.querySelector('[data-testid="next-step-match-lines"]'));
+        expect(scroll).toHaveBeenCalledOnceWith({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
+        expect(scroll.calls.mostRecent()?.object).toBe(card);
+      }));
+    }
+
+    it('does not scroll or steal focus on plain reviewed quotation load', fakeAsync(() => {
+      const scroll = spyOn(HTMLElement.prototype, 'scrollIntoView');
+      const focusBefore = document.activeElement;
+      apiService.getQuotation.and.returnValue(of({ ...mockQuotationDetail, status: 'reviewed' }));
+      paramMapSubject.next(convertToParamMap({ id: mockQuotationDetail.id }));
+      fixture.detectChanges();
+      tick();
+      expect(document.activeElement).toBe(focusBefore);
+      expect(scroll).not.toHaveBeenCalled();
+      expect(apiService.getQuotationMatches).not.toHaveBeenCalled();
+    }));
+
+    it('prepares matching silently once after confirm without navigation', fakeAsync(() => {
+      const pending = new Subject<{ quotation_id: string; lines: [] }>();
+      apiService.getQuotationMatches.and.returnValue(pending);
+      const navigate = spyOn(TestBed.inject(Router), 'navigate');
+      confirm();
+      tick();
+      expect(apiService.getQuotationMatches).toHaveBeenCalledOnceWith(mockQuotationDetail.id);
+      expect(component.matchingSetupStatus()).toBe('idle');
+      expect(fixture.nativeElement.querySelector('[data-testid="next-step-card"] [role="status"]')).toBeNull();
+      pending.next({ quotation_id: mockQuotationDetail.id, lines: [] });
+      pending.complete();
+      expect(component.matchingSetupStatus()).toBe('idle');
+      expect(navigate).not.toHaveBeenCalled();
+    }));
+
+    for (const apiMessage of [true, false]) {
+      it(`shows preparation failure and retries on click (API message: ${apiMessage})`, fakeAsync(() => {
+        const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+        apiService.getQuotationMatches.and.returnValue(throwError(() => apiMessage
+          ? new HttpErrorResponse({ status: 500, error: { message: 'Matching unavailable' } })
+          : new Error('offline')));
+        confirm();
+        tick();
+        fixture.detectChanges();
+        const card = fixture.nativeElement.querySelector('[data-testid="next-step-card"]') as HTMLElement;
+        const button = card.querySelector('[data-testid="next-step-match-lines"]') as HTMLButtonElement;
+        expect(apiService.getQuotationMatches).toHaveBeenCalledOnceWith(mockQuotationDetail.id);
+        expect(card.querySelector('[role="alert"]')?.textContent).toContain(
+          apiMessage ? 'Matching unavailable' : enCatalog.quotations.review.matchingSetup.error,
+        );
+        expect(button.textContent).toContain(enCatalog.quotations.review.matchingSetup.retry);
+        expect(navigate).not.toHaveBeenCalled();
+        apiService.getQuotationMatches.and.returnValue(of({ quotation_id: mockQuotationDetail.id, lines: [] }));
+        button.click();
+        tick();
+        expect(apiService.getQuotationMatches).toHaveBeenCalledTimes(2);
+        expect(navigate).toHaveBeenCalledOnceWith(['/matching'], {
+          queryParams: { quotation_id: mockQuotationDetail.id },
+        });
+      }));
+    }
+  });
+
+  describe('single matching next step', () => {
+    let card: HTMLElement;
+    let button: HTMLButtonElement;
+
+    beforeEach(() => {
+      component.quotation.set({ ...mockQuotationDetail, status: 'reviewed' });
+      fixture.detectChanges();
+      card = fixture.nativeElement.querySelector('[data-testid="next-step-card"]') as HTMLElement;
+      button = card.querySelector('[data-testid="next-step-match-lines"]') as HTMLButtonElement;
+      apiService.getQuotationMatches.calls.reset();
+    });
+
+    it('shows one prompt without the old matching footer or labels', () => {
+      expect(fixture.nativeElement.querySelectorAll('[data-testid="next-step-card"]').length).toBe(1);
+      expect(fixture.nativeElement.querySelector('.review-footer-bar')).toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('Prepare Product Matching');
+      expect(fixture.nativeElement.textContent).not.toContain('Continue to Product Matching');
+      expect(card.querySelector('h2')).toBeTruthy();
+    });
+
+    it('prepares matching once before navigating with the quotation id', () => {
+      const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+      expect(button.tagName).toBe('BUTTON');
+      button.click();
+      expect(apiService.getQuotationMatches).toHaveBeenCalledOnceWith(mockQuotationDetail.id);
+      expect(navigate).toHaveBeenCalledOnceWith(['/matching'], {
+        queryParams: { quotation_id: mockQuotationDetail.id },
+      });
+    });
+
+    it('disables the button and announces loading while preparation is pending', () => {
+      const pending = new Subject<{ quotation_id: string; lines: [] }>();
+      apiService.getQuotationMatches.and.returnValue(pending);
+      const navigate = spyOn(TestBed.inject(Router), 'navigate');
+      button.click();
+      fixture.detectChanges();
+      expect(button.disabled).toBeTrue();
+      expect(card.querySelector('[role="status"]')?.textContent).toContain(enCatalog.quotations.review.matchingSetup.loading);
+      expect(card.querySelector('mat-spinner')?.getAttribute('aria-label')).toBe(enCatalog.common.loading);
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('announces errors, keeps button focus and retries on a second click', () => {
+      const pending = new Subject<{ quotation_id: string; lines: [] }>();
+      apiService.getQuotationMatches.and.returnValue(pending);
+      const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+      button.focus();
+      button.click();
+      fixture.detectChanges();
+      pending.error(new HttpErrorResponse({ status: 500, error: { message: 'Matching unavailable' } }));
+      fixture.detectChanges();
+      expect(card.querySelector('[role="alert"]')?.textContent).toContain('Matching unavailable');
+      expect(button.textContent).toContain(enCatalog.quotations.review.matchingSetup.retry);
+      expect(button.disabled).toBeFalse();
+      expect(document.activeElement).toBe(button);
+      expect(navigate).not.toHaveBeenCalled();
+      apiService.getQuotationMatches.and.returnValue(of({ quotation_id: mockQuotationDetail.id, lines: [] }));
+      button.click();
+      expect(apiService.getQuotationMatches).toHaveBeenCalledTimes(2);
+      expect(navigate).toHaveBeenCalledOnceWith(['/matching'], {
+        queryParams: { quotation_id: mockQuotationDetail.id },
+      });
+    });
   });
 
   it('distinguishes between changed value (Corrected by Human) and confirmed-as-is (Confirmed)', () => {
@@ -3519,6 +3823,120 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       });
     });
 
+    describe('Retry and Archive use the app confirm dialog (PPS-216 / P-192)', () => {
+      const ofDialog = (result: boolean) =>
+        ({ afterClosed: () => of(result) }) as MatDialogRef<CatalogueConfirmDialogComponent, boolean>;
+
+      it('Retry Extraction asks through the modal dialog, never window.confirm, and does nothing when cancelled', () => {
+        const nativeConfirm = spyOn(window, 'confirm');
+        dialogSpy.open.calls.reset();
+        apiService.retryExtraction.calls.reset();
+        dialogSpy.open.and.returnValue(ofDialog(false));
+
+        component.retryExtraction();
+
+        expect(nativeConfirm).not.toHaveBeenCalled();
+        expect(dialogSpy.open).toHaveBeenCalledWith(
+          CatalogueConfirmDialogComponent,
+          jasmine.objectContaining({
+            data: jasmine.objectContaining({
+              titleKey: 'quotations.review.retryDialog.title',
+              messageKey: 'quotations.review.retryDialog.message',
+              confirmKey: 'quotations.review.retryDialog.confirm',
+              cancelKey: 'quotations.review.retryDialog.cancel',
+            }),
+          }),
+        );
+        expect(apiService.retryExtraction).not.toHaveBeenCalled();
+        expect(component.isRetryingExtraction()).toBeFalse();
+      });
+
+      it('Retry Extraction runs once the dialog is confirmed', () => {
+        spyOn(window, 'confirm');
+        dialogSpy.open.calls.reset();
+        apiService.retryExtraction.calls.reset();
+        dialogSpy.open.and.returnValue(ofDialog(true));
+        apiService.retryExtraction.and.returnValue(of(mockQuotationDetail));
+
+        component.retryExtraction();
+
+        expect(apiService.retryExtraction).toHaveBeenCalledTimes(1);
+      });
+
+      it('Archive asks through the modal dialog, never window.confirm, and does nothing when cancelled', () => {
+        const nativeConfirm = spyOn(window, 'confirm');
+        component.quotation.set(mockQuotationDetail);
+        fixture.detectChanges();
+        dialogSpy.open.calls.reset();
+        apiService.archiveQuotation.calls.reset();
+        dialogSpy.open.and.returnValue(ofDialog(false));
+
+        component.archiveQuotation();
+
+        expect(nativeConfirm).not.toHaveBeenCalled();
+        expect(dialogSpy.open).toHaveBeenCalledWith(
+          CatalogueConfirmDialogComponent,
+          jasmine.objectContaining({
+            data: jasmine.objectContaining({
+              titleKey: 'quotations.review.archiveDialog.title',
+              messageKey: 'quotations.review.archiveDialog.message',
+              confirmKey: 'quotations.review.archiveDialog.confirm',
+              cancelKey: 'quotations.review.archiveDialog.cancel',
+            }),
+          }),
+        );
+        expect(apiService.archiveQuotation).not.toHaveBeenCalled();
+        expect(component.isArchiving()).toBeFalse();
+      });
+
+      it('Archive runs once the dialog is confirmed', () => {
+        spyOn(window, 'confirm');
+        component.quotation.set(mockQuotationDetail);
+        fixture.detectChanges();
+        dialogSpy.open.calls.reset();
+        apiService.archiveQuotation.calls.reset();
+        dialogSpy.open.and.returnValue(ofDialog(true));
+        apiService.archiveQuotation.and.returnValue(of(mockQuotationDetail));
+        spyOn(TestBed.inject(Router), 'navigate');
+
+        component.archiveQuotation();
+
+        expect(apiService.archiveQuotation).toHaveBeenCalledWith(mockQuotationDetail.id);
+      });
+
+      for (const fails of [false, true]) {
+        it(`archive Undo ${fails ? 'reports failure without navigation' : 'restores and returns to review'}`, () => {
+          component.quotation.set(mockQuotationDetail);
+          fixture.detectChanges();
+          dialogSpy.open.and.returnValue(ofDialog(true));
+          const action = new Subject<void>();
+          const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+          const open = spyOn(snackBar, 'open').and.returnValue(jasmine.createSpyObj<ReturnType<MatSnackBar['open']>>('snackRef', { onAction: action }));
+          const navigate = spyOn(TestBed.inject(Router), 'navigate');
+          apiService.restoreQuotation.and.returnValue(fails ? throwError(() => new Error('restore failed')) : of(mockQuotationDetail));
+          component.archiveQuotation();
+          expect(open).toHaveBeenCalledWith('Quotation archived', 'Undo', { duration: 8000 });
+          navigate.calls.reset();
+          fixture.destroy();
+          action.next();
+          action.next();
+          expect(apiService.restoreQuotation).toHaveBeenCalledOnceWith(mockQuotationDetail.id);
+          if (fails) {
+            expect(navigate).not.toHaveBeenCalled();
+            expect(open).toHaveBeenCalledWith('Could not restore the quotation', undefined, { duration: 3000 });
+          } else {
+            expect(navigate).toHaveBeenCalledWith(['/quotations', mockQuotationDetail.id, 'review']);
+            expect(open).toHaveBeenCalledWith('Quotation restored', undefined, { duration: 3000 });
+          }
+        });
+      }
+
+      it('a refused quotation cannot be retried (refusal cannot be undone)', () => {
+        expect(component.canRetryExtraction({ ...mockQuotationDetail, status: 'refused' })).toBeFalse();
+        expect(component.canRetryExtraction({ ...mockQuotationDetail, status: 'in_review' })).toBeTrue();
+      });
+    });
+
     describe('Finding 3: Refused quotation controls', () => {
       it('hides or disables editing controls, lines editing, Save and Confirm on refused quotation', () => {
         const refusedQuote: QuotationDetail = {
@@ -3546,6 +3964,40 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
 
         // Audit trail is still present
         expect(fixture.nativeElement.querySelector('app-quotation-audit-trail')).toBeTruthy();
+      });
+    });
+
+    describe('Header field boxes are groups, not buttons (PPS-162 / P-130)', () => {
+      it('wraps each header control in a named group instead of a role=button that nests inputs', () => {
+        component.quotation.set({ ...mockQuotationDetail, id: 'q-a11y-1' });
+        fixture.detectChanges();
+
+        const boxes = Array.from(
+          (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('.field-box'),
+        );
+        expect(boxes.length).toBeGreaterThan(0);
+        for (const box of boxes) {
+          expect(box.getAttribute('role')).not.toBe('button');
+          expect(box.getAttribute('tabindex')).toBeNull();
+          expect(box.getAttribute('role')).toBe('group');
+          const labelledBy = box.getAttribute('aria-labelledby');
+          const name = labelledBy
+            ? (fixture.nativeElement as HTMLElement).querySelector('#' + labelledBy)?.textContent?.trim()
+            : box.getAttribute('aria-label')?.trim();
+          expect(name).withContext(box.id).toBeTruthy();
+        }
+      });
+
+      it('focusing a control inside a field box selects that field (keyboard and mouse)', () => {
+        component.quotation.set({ ...mockQuotationDetail, id: 'q-a11y-2' });
+        fixture.detectChanges();
+        const spy = spyOn(component, 'selectField').and.callThrough();
+
+        const box = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.field-box');
+        expect(box).not.toBeNull();
+        box!.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+
+        expect(spy).toHaveBeenCalledTimes(1);
       });
     });
 

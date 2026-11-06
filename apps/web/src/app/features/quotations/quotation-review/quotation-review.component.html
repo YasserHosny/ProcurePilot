@@ -14,7 +14,7 @@
       </nav>
 
       @if (showNextStep() || q.status === 'reviewed') {
-        <mat-card class="next-step-card" data-testid="next-step-card">
+        <mat-card #nextStepCard class="next-step-card" data-testid="next-step-card">
           <div class="next-step-body">
             <div class="next-step-info">
               <mat-icon class="next-step-icon" aria-hidden="true">task_alt</mat-icon>
@@ -24,15 +24,17 @@
               </div>
             </div>
             <div class="next-step-actions">
-              <a
+              <button
                 mat-flat-button
                 color="primary"
-                [routerLink]="['/matching']"
-                [queryParams]="{ quotation_id: q.id }"
+                type="button"
+                (click)="initializeMatching(q.id)"
+                [disabled]="matchingSetupStatus() === 'loading'"
+                #nextStepMatchLines
                 data-testid="next-step-match-lines"
               >
-                {{ 'quotations.review.nextStep.matchLines' | translate }}
-              </a>
+                {{ (matchingSetupStatus() === 'error' ? 'quotations.review.matchingSetup.retry' : 'quotations.review.nextStep.matchLines') | translate }}
+              </button>
               <a
                 mat-stroked-button
                 routerLink="/quotations"
@@ -42,6 +44,14 @@
               </a>
             </div>
           </div>
+          @if (matchingSetupStatus() === 'loading') {
+            <div class="matching-setup-status" role="status">
+              <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="20"></mat-spinner>
+              <span>{{ 'quotations.review.matchingSetup.loading' | translate }}</span>
+            </div>
+          } @else if (matchingSetupStatus() === 'error') {
+            <p role="alert">{{ matchingSetupError() }}</p>
+          }
         </mat-card>
       }
 
@@ -188,6 +198,8 @@
       <app-quotation-doc-preview
         [quotation]="q"
         [safePreviewUrl]="safePreviewUrl()"
+        [documentPreviewError]="documentPreviewError()"
+        (retry)="loadDocumentPreview(q.document.id)"
         [documentFileName]="documentFileName()"
         [activeExtraction]="activeExtraction()"
         [isWriter]="isWriter()"
@@ -391,11 +403,9 @@
                 class="field-box"
                 [class.field-needs-review]="isCurrencyFallback(getFieldExtraction('quotation', q.id, 'currency')) && !isFieldCorrected('quotation', q.id, 'currency')"
                 [id]="'field-' + (getFieldExtraction('quotation', q.id, 'currency')?.id || 'currency')"
-                tabindex="0"
-                role="button"
-                (click)="selectField('quotation', q.id, 'currency')"
-                (keydown.enter)="selectField('quotation', q.id, 'currency')"
-                (keydown.space)="selectField('quotation', q.id, 'currency')"
+                role="group"
+                [attr.aria-label]="'quotations.review.header.currencyLabel' | translate"
+                (focusin)="selectField('quotation', q.id, 'currency')"
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.currencyLabel' | translate }}</mat-label>
@@ -429,6 +439,7 @@
                     type="button"
                     (click)="confirmFieldAsIs('quotation', q.id, 'currency'); $event.stopPropagation()"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
@@ -440,11 +451,9 @@
               <div
                 class="field-box"
                 [id]="'field-' + (getFieldExtraction('quotation', q.id, 'issue_date')?.id || 'issue_date')"
-                tabindex="0"
-                role="button"
-                (click)="selectField('quotation', q.id, 'issue_date')"
-                (keydown.enter)="selectField('quotation', q.id, 'issue_date')"
-                (keydown.space)="selectField('quotation', q.id, 'issue_date')"
+                role="group"
+                [attr.aria-label]="'quotations.review.header.issueDateLabel' | translate"
+                (focusin)="selectField('quotation', q.id, 'issue_date')"
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.issueDateLabel' | translate }}</mat-label>
@@ -486,6 +495,7 @@
                     type="button"
                     (click)="confirmFieldAsIs('quotation', q.id, 'issue_date'); $event.stopPropagation()"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
@@ -500,11 +510,9 @@
               <div
                 class="field-box"
                 [id]="'field-' + (getFieldExtraction('quotation', q.id, 'expiry_date')?.id || 'expiry_date')"
-                tabindex="0"
-                role="button"
-                (click)="selectField('quotation', q.id, 'expiry_date')"
-                (keydown.enter)="selectField('quotation', q.id, 'expiry_date')"
-                (keydown.space)="selectField('quotation', q.id, 'expiry_date')"
+                role="group"
+                [attr.aria-label]="'quotations.review.header.expiryDateLabel' | translate"
+                (focusin)="selectField('quotation', q.id, 'expiry_date')"
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.expiryDateLabel' | translate }}</mat-label>
@@ -551,6 +559,7 @@
                     type="button"
                     (click)="confirmFieldAsIs('quotation', q.id, 'expiry_date'); $event.stopPropagation()"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
@@ -565,11 +574,9 @@
               <div
                 class="field-box"
                 [id]="'field-' + (getFieldExtraction('quotation', q.id, 'stated_total')?.id || 'stated_total')"
-                tabindex="0"
-                role="button"
-                (click)="selectField('quotation', q.id, 'stated_total')"
-                (keydown.enter)="selectField('quotation', q.id, 'stated_total')"
-                (keydown.space)="selectField('quotation', q.id, 'stated_total')"
+                role="group"
+                [attr.aria-label]="'quotations.review.header.statedTotalLabel' | translate"
+                (focusin)="selectField('quotation', q.id, 'stated_total')"
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.statedTotalLabel' | translate }}</mat-label>
@@ -599,6 +606,7 @@
                     type="button"
                     (click)="confirmFieldAsIs('quotation', q.id, 'stated_total'); $event.stopPropagation()"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
@@ -611,11 +619,9 @@
                 class="field-box vat-inclusive-field"
                 [class.field-needs-review]="getFieldConfidence('quotation', q.id, 'prices_include_vat') < 0.85 && !isFieldCorrected('quotation', q.id, 'prices_include_vat')"
                 [id]="'field-' + (getFieldExtraction('quotation', q.id, 'prices_include_vat')?.id || 'prices_include_vat')"
-                tabindex="0"
-                role="button"
-                (click)="selectField('quotation', q.id, 'prices_include_vat')"
-                (keydown.enter)="selectField('quotation', q.id, 'prices_include_vat')"
-                (keydown.space)="selectField('quotation', q.id, 'prices_include_vat')"
+                role="group"
+                [attr.aria-label]="'quotations.review.header.pricesIncludeVatLabel' | translate"
+                (focusin)="selectField('quotation', q.id, 'prices_include_vat')"
               >
                 <div class="checkbox-control-wrapper">
                   <mat-checkbox
@@ -643,6 +649,7 @@
                     type="button"
                     (click)="confirmFieldAsIs('quotation', q.id, 'prices_include_vat'); $event.stopPropagation()"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
@@ -655,11 +662,9 @@
                 class="field-box"
                 [id]="'field-' + (getFieldExtraction('quotation', q.id, 'vat_rate')?.id || 'vat_rate')"
                 [class.field-needs-review]="getFieldConfidence('quotation', q.id, 'vat_rate') < 0.85 && !isFieldCorrected('quotation', q.id, 'vat_rate')"
-                tabindex="0"
-                role="button"
-                (click)="selectField('quotation', q.id, 'vat_rate')"
-                (keydown.enter)="selectField('quotation', q.id, 'vat_rate')"
-                (keydown.space)="selectField('quotation', q.id, 'vat_rate')"
+                role="group"
+                [attr.aria-label]="'quotations.review.header.vatRateLabel' | translate"
+                (focusin)="selectField('quotation', q.id, 'vat_rate')"
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.vatRateLabel' | translate }}</mat-label>
@@ -697,6 +702,7 @@
                     type="button"
                     (click)="confirmFieldAsIs('quotation', q.id, 'vat_rate'); $event.stopPropagation()"
                     [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    [attr.aria-label]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
                     class="confirm-as-is-btn"
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
@@ -809,7 +815,7 @@
 
         <!-- Actions Bar -->
         @if (isWriter() && q.status !== 'reviewed' && q.status !== 'refused') {
-          <div class="review-footer-bar">
+          <div class="review-actions-bar">
             <button
               mat-stroked-button
               color="warn"
@@ -895,37 +901,6 @@
           }
         }
 
-        @if (q.status === 'reviewed') {
-          <div class="review-footer-bar" role="status">
-            @if (matchingSetupStatus() === 'loading') {
-              <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="20"></mat-spinner>
-              <span>{{ 'quotations.review.matchingSetup.loading' | translate }}</span>
-            } @else if (matchingSetupStatus() === 'ready') {
-              <mat-icon aria-hidden="true">check_circle</mat-icon>
-              <span>{{ 'quotations.review.matchingSetup.ready' | translate }}</span>
-              <div class="action-spacer"></div>
-              <a mat-flat-button color="primary" [routerLink]="['/matching']" [queryParams]="{ quotation_id: q.id }">
-                <mat-icon aria-hidden="true">arrow_forward</mat-icon>
-                {{ 'quotations.review.matchingSetup.continue' | translate }}
-              </a>
-            } @else if (matchingSetupStatus() === 'error') {
-              <mat-icon color="warn" aria-hidden="true">error_outline</mat-icon>
-              <span>{{ matchingSetupError() }}</span>
-              <div class="action-spacer"></div>
-              <button mat-stroked-button type="button" (click)="initializeMatching(q.id)">
-                <mat-icon aria-hidden="true">refresh</mat-icon>
-                {{ 'quotations.review.matchingSetup.retry' | translate }}
-              </button>
-            } @else {
-              <span>{{ 'quotations.review.matchingSetup.idle' | translate }}</span>
-              <div class="action-spacer"></div>
-              <button mat-flat-button color="primary" type="button" (click)="initializeMatching(q.id)">
-                <mat-icon aria-hidden="true">rule</mat-icon>
-                {{ 'quotations.review.matchingSetup.start' | translate }}
-              </button>
-            }
-          </div>
-        }
       </section>
     </div>
 

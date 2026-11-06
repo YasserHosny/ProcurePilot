@@ -105,6 +105,11 @@ class ServiceUnavailableError(AppError):
     safe_message = "Service is unavailable."
 
 
+class ReminderDeliveryFailedError(ServiceUnavailableError):
+    code = "reminder_delivery_failed"
+    safe_message = "Reminder could not be delivered."
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)

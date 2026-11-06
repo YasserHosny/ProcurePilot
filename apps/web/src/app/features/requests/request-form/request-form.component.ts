@@ -22,6 +22,7 @@ import { ApiService } from '../../../core/api/api.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatService } from '../../../core/format/format.service';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
+import { normaliseDigits } from '../../../core/format/money-input';
 import { trimDecimal } from '../../../core/format/trim-decimal';
 import type {
   ApiError,
@@ -46,6 +47,7 @@ import { AppDateAdapter, provideAppDateAdapter } from '../../../core/i18n/date-a
 const I18N = 'requests';
 
 const SERVER_ERROR_KEYS: Record<string, string> = {
+  note_too_long: 'requests.form.noteTooLong',
   quantity_not_positive: 'requests.errors.quantity_not_positive',
   required_by_in_the_past: 'requests.errors.required_by_in_the_past',
   duplicate_product: 'requests.errors.duplicate_product',
@@ -143,6 +145,7 @@ export class RequestFormComponent implements OnInit {
   readonly isLoading = signal<boolean>(false);
   readonly isSaving = signal<boolean>(false);
   readonly isSubmitting = signal<boolean>(false);
+  /** Translation key; the template resolves it in the active language. */
   readonly errorMessage = signal<string | null>(null);
   readonly branches = signal<Branch[]>([]);
   readonly allCostCentres = signal<CostCentre[]>([]);
@@ -153,6 +156,24 @@ export class RequestFormComponent implements OnInit {
   readonly products = signal<Product[]>([]);
   readonly existingRequest = signal<PurchaseRequest | null>(null);
   readonly isEditMode = signal<boolean>(false);
+
+  readonly history = computed(() => {
+    const req = this.existingRequest();
+    const events: { key: string; timestamp: string; actor?: string; comment?: string | null }[] = [];
+    if (!req) return events;
+    if (req.created_at) events.push({ key: 'created', timestamp: req.created_at,
+      actor: req.requester_name || req.requester_email || undefined });
+    if (req.submitted_at) events.push({ key: 'submitted', timestamp: req.submitted_at });
+    const approval = req.approval_step;
+    if (approval?.decided_at && (approval.status === 'approved' || approval.status === 'rejected')) {
+      events.push({ key: approval.status, timestamp: approval.decided_at,
+        actor: approval.decided_by_membership_id === approval.assigned_membership_id
+          ? approval.assigned_name || approval.assigned_email || undefined : undefined, comment: approval.comment });
+    }
+    if (req.withdrawn_at) events.push({ key: 'withdrawn', timestamp: req.withdrawn_at });
+    if (req.delivered_at) events.push({ key: 'delivered', timestamp: req.delivered_at });
+    return events.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+  });
 
   readonly allocations = signal<RequestAllocation | null>(null);
   readonly isAllocationsLoading = signal<boolean>(false);
@@ -266,7 +287,7 @@ export class RequestFormComponent implements OnInit {
 
   readonly canWithdraw = computed<boolean>(() => {
     const req = this.existingRequest();
-    return req !== null && (req.status === 'draft' || req.status === 'submitted');
+    return req !== null && ['draft', 'submitted', 'approved', 'ordered'].includes(req.status);
   });
 
   getGroupSubmitLabel(size: number): string {
@@ -404,10 +425,17 @@ export class RequestFormComponent implements OnInit {
           nonNullable: true,
           validators: [Validators.required, Validators.pattern(/^(?!0(?:\.0+)?$)\d+(?:\.\d{1,6})?$/)],
         }),
-        note: new FormControl<string>('', { nonNullable: true }),
+        note: new FormControl<string>('', { nonNullable: true, validators: [Validators.maxLength(500)] }),
       }),
     );
     this.formChangeSignal.update((v) => v + 1);
+  }
+
+  normaliseQuantity(event: Event, control: FormControl<string>): void {
+    const input = event.target as HTMLInputElement;
+    const value = normaliseDigits(input.value).replace(/[\u066C\s]/g, '');
+    input.value = value;
+    control.setValue(value);
   }
 
   removeLine(index: number): void {
@@ -793,23 +821,23 @@ export class RequestFormComponent implements OnInit {
 
   private getValidationErrorMessage(): string {
     if (this.form.controls.branch_id.invalid) {
-      return this.translate.instant(`${I18N}.form.branchRequired`);
+      return `${I18N}.form.branchRequired`;
     }
     if (this.form.controls.required_by_date.invalid) {
-      return this.translate.instant(`${I18N}.form.requiredByDateRequired`);
+      return `${I18N}.form.requiredByDateRequired`;
     }
     if (this.lines.length === 0) {
-      return this.translate.instant(`${I18N}.form.atLeastOneLineRequired`);
+      return `${I18N}.form.atLeastOneLineRequired`;
     }
     for (const group of this.lines.controls) {
       if (group.controls.workspace_product_id.invalid) {
-        return this.translate.instant(`${I18N}.form.productRequired`);
+        return `${I18N}.form.productRequired`;
       }
       if (group.controls.quantity.invalid) {
-        return this.translate.instant(`${I18N}.form.quantityRequired`);
+        return `${I18N}.form.quantityRequired`;
       }
     }
-    return this.translate.instant(`${I18N}.genericError`);
+    return `${I18N}.genericError`;
   }
 
   private buildRequestPayload() {
@@ -882,7 +910,7 @@ export class RequestFormComponent implements OnInit {
       }),
       catchError(() => {
         this.resetState();
-        this.errorMessage.set(this.translate.instant('requests.genericError'));
+        this.errorMessage.set('requests.genericError');
         this.focusErrorBanner();
         return of(null);
       }),
@@ -913,7 +941,7 @@ export class RequestFormComponent implements OnInit {
               nonNullable: true,
               validators: [Validators.required, Validators.pattern(/^(?!0(?:\.0+)?$)\d+(?:\.\d{1,6})?$/)],
             }),
-            note: new FormControl<string>(line.note ?? '', { nonNullable: true }),
+            note: new FormControl<string>(line.note ?? '', { nonNullable: true, validators: [Validators.maxLength(500)] }),
           });
           this.savedLineMeta.set(group, {
             pack_base_quantity: line.pack_base_quantity ?? null,
@@ -1037,7 +1065,7 @@ export class RequestFormComponent implements OnInit {
       }
 
       if (err.status === 409 && details?.reason === 'part_of_split') {
-        this.errorMessage.set(this.translate.instant(`${I18N}.partOfSplitError`));
+        this.errorMessage.set(`${I18N}.partOfSplitError`);
         this.focusErrorBanner();
         return;
       }
@@ -1058,19 +1086,19 @@ export class RequestFormComponent implements OnInit {
           }
         }
         if (isQuantityField) {
-          this.errorMessage.set(this.translate.instant(`${I18N}.genericError`));
+          this.errorMessage.set(`${I18N}.genericError`);
         } else {
-          this.errorMessage.set(this.translate.instant(key));
+          this.errorMessage.set(key);
         }
         this.focusErrorBanner();
         return;
       }
 
-      this.errorMessage.set(this.translate.instant(`${I18N}.genericError`));
+      this.errorMessage.set(`${I18N}.genericError`);
       this.focusErrorBanner();
       return;
     }
-    this.errorMessage.set(this.translate.instant(`${I18N}.genericError`));
+    this.errorMessage.set(`${I18N}.genericError`);
     this.focusErrorBanner();
   }
 }

@@ -28,7 +28,7 @@
             type="radio"
             name="candidate_selection"
             class="cand-radio-input"
-            [attr.aria-label]="'matching.resolution.candidates.selectLabel' | translate: { rank: cand.rank, name: cand.candidate_product.tenant_name }"
+            [attr.aria-label]="'matching.resolution.candidates.selectLabel' | translate: { rank: (cand.rank | formatQuantity), name: cand.candidate_product.tenant_name }"
             [value]="cand.id"
             [checked]="selectedCandidateId === cand.id && selectedOutcome !== 'no_match_new_product'"
             (change)="candidateSelected.emit(cand.id)"
@@ -37,19 +37,27 @@
           <!-- Candidate Card Header -->
           <div class="cand-header">
             <div class="cand-rank-group">
-              <span class="cand-rank-badge">#{{ cand.rank }}</span>
-              <span class="cand-key-hint"><kbd>{{ cand.rank }}</kbd></span>
+              @if (!cand.reasons.manual) {
+                <span class="cand-rank-badge">#{{ cand.rank | formatQuantity }}</span>
+                <span class="cand-key-hint"><kbd>{{ cand.rank }}</kbd></span>
+              }
             </div>
-            <div
-              class="cand-confidence-badge"
-              [class.high]="formatScore(cand.confidence) >= 90"
-              [class.medium]="(formatScore(cand.confidence) >= 70 && formatScore(cand.confidence) < 90) || isRfqCandidate(cand)"
-              [class.low]="formatScore(cand.confidence) < 70 && !isRfqCandidate(cand)"
-              [class.rfq-info]="isRfqCandidate(cand)"
-            >
-              <span class="conf-score">{{ formatScore(cand.confidence) }}%</span>
-              <span class="conf-label">{{ 'matching.resolution.candidates.confidence' | translate }}</span>
-            </div>
+            @if (cand.reasons.manual) {
+              <div class="cand-confidence-badge medium">
+                <span class="conf-label">{{ 'matching.resolution.picker.manualBadge' | translate }}</span>
+              </div>
+            } @else {
+              <div
+                class="cand-confidence-badge"
+                [class.high]="formatScore(cand.confidence) >= 90"
+                [class.medium]="(formatScore(cand.confidence) >= 70 && formatScore(cand.confidence) < 90) || isRfqCandidate(cand)"
+                [class.low]="formatScore(cand.confidence) < 70 && !isRfqCandidate(cand)"
+                [class.rfq-info]="isRfqCandidate(cand)"
+              >
+                <span class="conf-score">{{ formatScore(cand.confidence) | formatPercent }}</span>
+                <span class="conf-label">{{ 'matching.resolution.candidates.confidence' | translate }}</span>
+              </div>
+            }
           </div>
 
           <!-- Product Overview -->
@@ -130,10 +138,10 @@
                       @if (sig.isTextOnly) {
                         <span class="sig-text">{{ sig.textKey | translate }}</span>
                       } @else if (sig.isFullSentence) {
-                        <span class="sig-sentence">{{ sig.labelKey | translate: { percent: sig.percent } }}</span>
+                        <span class="sig-sentence">{{ sig.labelKey | translate: { percent: (sig.percent | formatQuantity) } }}</span>
                       } @else {
                         <span class="sig-label">{{ sig.labelKey | translate }}</span>
-                        <span class="sig-score">{{ sig.percent }}%</span>
+                        <span class="sig-score">{{ sig.percent | formatPercent }}</span>
                       }
                     </div>
                   }

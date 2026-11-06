@@ -20,7 +20,6 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ApiService } from '../../../core/api/api.service';
 import type {
   ApiError,
-  BaseUnit,
   CatalogueRefreshReview,
   MatchCorrectionRequest,
   MatchQueueItem,
@@ -32,10 +31,12 @@ import type {
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { FormatPercentPipe } from '../../../core/format/percent.pipe';
+import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
-import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS } from '../match-resolution/correct-match-dialog.component';
+import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS, type SelectableUnit } from '../match-resolution/correct-match-dialog.component';
 import { formatSweptLinesMessage, appendSweptMessage, CorrectionKeyManager } from '../matching-api';
 
 type MatchTaskSortBy = 'created_at' | 'priority' | 'status';
@@ -70,6 +71,8 @@ export interface QuotationTaskGroup {
     UnitLabelPipe,
     FormatDatePipe,
     FormatMoneyPipe,
+    FormatPercentPipe,
+    FormatQuantityPipe,
   ],
   templateUrl: './resolution-queue.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -112,7 +115,8 @@ export class ResolutionQueueComponent implements OnInit {
   readonly isLoadingRefreshReviews = signal<boolean>(true);
   readonly refreshReviewDecisionId = signal<string | null>(null);
   readonly quotationId = signal<string | null>(null);
-  readonly baseUnits = signal<BaseUnit[]>([]);
+  readonly quotationRfqId = signal<string | null>(null);
+  readonly baseUnits = signal<SelectableUnit[]>([]);
   readonly collapsedGroupIds = signal<ReadonlySet<string>>(new Set<string>());
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
   private latestLoadRequestId = 0;
@@ -298,6 +302,9 @@ export class ResolutionQueueComponent implements OnInit {
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
     this.nextCursor.set(null);
+    if (this.quotationId() === null) {
+      this.quotationRfqId.set(null);
+    }
 
     const status = this.statusFilter();
     const priority = this.priorityFilter();
@@ -321,6 +328,7 @@ export class ResolutionQueueComponent implements OnInit {
           if (requestId !== this.latestLoadRequestId) return;
           this.tasks.set(res.items);
           this.nextCursor.set(res.next_cursor);
+          this.quotationRfqId.set(this.quotationId() !== null ? (res.rfq_id ?? null) : null);
           this.tasksLoadFailed.set(false);
           this.isLoading.set(false);
         },
@@ -328,6 +336,7 @@ export class ResolutionQueueComponent implements OnInit {
           if (requestId !== this.latestLoadRequestId) return;
           this.tasks.set([]);
           this.nextCursor.set(null);
+          this.quotationRfqId.set(null);
           this.tasksLoadFailed.set(true);
           this.isLoading.set(false);
           this.handleError(err);
@@ -363,7 +372,16 @@ export class ResolutionQueueComponent implements OnInit {
       .subscribe({
         next: (res) => {
           if (requestId !== this.latestLoadRequestId) return;
-          this.tasks.set([...this.tasks(), ...res.items]);
+          const current = this.tasks();
+          const seen = new Set(current.map((t) => t.id));
+          const toAdd: MatchQueueItem[] = [];
+          for (const item of res.items) {
+            if (!seen.has(item.id)) {
+              seen.add(item.id);
+              toAdd.push(item);
+            }
+          }
+          this.tasks.set([...current, ...toAdd]);
           this.nextCursor.set(res.next_cursor);
           this.isLoadingMore.set(false);
         },
@@ -473,6 +491,7 @@ export class ResolutionQueueComponent implements OnInit {
   clearFilters(): void {
     this.clearCorrectionNotices();
     this.quotationId.set(null);
+    this.quotationRfqId.set(null);
     this.statusFilter.set('open');
     this.priorityFilter.set('all');
     this.reasonFilter.set('all');

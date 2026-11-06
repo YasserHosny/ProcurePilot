@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
@@ -128,12 +129,15 @@ def test_requests_and_approval_queue_carry_member_display_names(
             client = PsycopgSupabaseClient(conn, claims=context.workspace.claims())
             monkeypatch.setattr(requests_module, "authenticated_client", lambda *_: client)
             service = requests_module.RequestsService(settings_for_test_db(monkeypatch))
-            queued = {
-                item.id: item
-                for item in service.list_pending_approvals(
-                    bearer_token="test-token", member=member
-                ).items
-            }[request_id]
+            # Reuse the fixture transaction so authenticated SQL sees its uncommitted rows.
+            with monkeypatch.context() as patch:
+                patch.setattr(requests_module.db, "connect", lambda *_a, **_kw: nullcontext(conn))
+                queued = {
+                    item.id: item
+                    for item in service.list_pending_approvals(
+                        bearer_token="test-token", member=member
+                    ).items
+                }[request_id]
             listed = {
                 item.id: item for item in service.list_requests(bearer_token="test-token").items
             }[request_id]
@@ -185,9 +189,12 @@ def test_approval_queue_includes_requester_email_and_branch_budget_reasons(
                     )
             client = PsycopgSupabaseClient(conn, claims=context.workspace.claims())
             monkeypatch.setattr(requests_module, "authenticated_client", lambda *_: client)
-            result = requests_module.RequestsService(
-                settings_for_test_db(monkeypatch)
-            ).list_pending_approvals(bearer_token="test-token", member=member)
+            # Reuse the fixture transaction so authenticated SQL sees its uncommitted rows.
+            with monkeypatch.context() as patch:
+                patch.setattr(requests_module.db, "connect", lambda *_a, **_kw: nullcontext(conn))
+                result = requests_module.RequestsService(
+                    settings_for_test_db(monkeypatch)
+                ).list_pending_approvals(bearer_token="test-token", member=member)
             by_id = {item.id: item for item in result.items}
             assert (
                 by_id[request_ids[0]].requester_email
@@ -437,6 +444,8 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
                         response_id,
                     ),
                 )
+                # a client session cannot insert a decided step; the fixture writes it as owner
+                cur.execute("reset role")
                 cur.execute(
                     "insert into approval_step (tenant_id,purchase_request_id,"
                     "assigned_membership_id,"
@@ -449,6 +458,7 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
                         context.workspace.membership_id,
                     ),
                 )
+                cur.execute("set local role authenticated")
                 cur.execute(
                     "insert into purchase_request (id,tenant_id,branch_id,"
                     "requested_by_membership_id,"
@@ -472,6 +482,8 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
                         context.workspace.membership_id,
                     ),
                 )
+                # a client session cannot insert a decided step; the fixture writes it as owner
+                cur.execute("reset role")
                 cur.execute(
                     "insert into approval_step (tenant_id,purchase_request_id,"
                     "assigned_membership_id,"
@@ -484,6 +496,7 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
                         context.workspace.membership_id,
                     ),
                 )
+                cur.execute("set local role authenticated")
                 cur.execute(
                     "insert into purchase_order (tenant_id,order_number,supplier_id,status,order_date,total_amount,total_currency,tax_amount,tax_currency,source_kind,source_reference,created_by,create_idempotency_key) values (%s,'PO-000009',%s,'draft',current_date,1,'GBP',0,'GBP','manual','fixture',%s,%s)",  # noqa: E501
                     (

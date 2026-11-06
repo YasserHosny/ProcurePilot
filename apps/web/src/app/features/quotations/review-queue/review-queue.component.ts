@@ -22,7 +22,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Subscription, of } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
-import type { ApiError, ReviewTask, ReviewTaskPriority, ReviewTaskStatus } from '../../../core/api/models';
+import type { ApiError, QuotationStatus, ReviewTask, ReviewTaskPriority, ReviewTaskReason, ReviewTaskStatus, Supplier } from '../../../core/api/models';
 import { RoleDirective } from '../../../core/auth/role.directive';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -80,11 +80,31 @@ export class ReviewQueueComponent implements OnInit {
   readonly nextCursor = signal<string | null>(null);
   readonly statusFilter = signal<ReviewTaskStatus | 'all'>('open');
   readonly priorityFilter = signal<ReviewTaskPriority | 'all'>('all');
+  readonly supplierFilter = signal<string | null>(null);
+  readonly reasonFilter = signal<ReviewTaskReason | 'all'>('all');
+  readonly lifecycleFilter = signal<QuotationStatus | 'all'>('all');
+  readonly suppliers = signal<Supplier[]>([]);
+  readonly supplierLabel = computed(() =>
+    this.suppliers().find((supplier) => supplier.id === this.supplierFilter())?.name ?? this.supplierFilter(),
+  );
+  readonly reasons: readonly ReviewTaskReason[] = [
+    'ready_to_authorise', 'low_confidence', 'arithmetic_mismatch', 'read_failure',
+    'review_required', 'no_supplier_match', 'currency_unresolved', 'date_unparsed',
+    'merged_line_items', 'line_count_mismatch', 'total_unverified',
+  ];
+  readonly lifecycles: readonly QuotationStatus[] = [
+    'pending', 'extracting', 'extracted', 'in_review', 'reviewed', 'refused',
+  ];
   readonly searchQuery = signal<string>('');
   readonly dateFrom = signal<string | null>(null);
   readonly dateTo = signal<string | null>(null);
   readonly dateFromModel = computed(() => parseIsoDateLocal(this.dateFrom()));
   readonly dateToModel = computed(() => parseIsoDateLocal(this.dateTo()));
+  readonly dateRangeInvalid = computed(() => {
+    const from = this.dateFrom();
+    const to = this.dateTo();
+    return from !== null && to !== null && from > to;
+  });
   readonly sortBy = signal<ReviewTaskSortBy>('created_at');
   readonly sortOrder = signal<ReviewTaskSortOrder>('desc');
   readonly errorMessage = signal<string | null>(null);
@@ -109,6 +129,9 @@ export class ReviewQueueComponent implements OnInit {
     () =>
       this.statusFilter() !== 'open' ||
       this.priorityFilter() !== 'all' ||
+      this.supplierFilter() !== null ||
+      this.reasonFilter() !== 'all' ||
+      this.lifecycleFilter() !== 'all' ||
       this.searchQuery().trim().length > 0 ||
       this.dateFrom() !== null ||
       this.dateTo() !== null,
@@ -143,6 +166,7 @@ export class ReviewQueueComponent implements OnInit {
   );
 
   ngOnInit(): void {
+    this.loadSuppliers();
     this.queryParamSub?.unsubscribe();
     const queryParamMap$ =
       this.route.queryParamMap ?? of(this.route.snapshot?.queryParamMap ?? convertToParamMap({}));
@@ -150,6 +174,22 @@ export class ReviewQueueComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((params) => {
         this.handleQueryParamChange(params);
+      });
+  }
+
+  // The supplier endpoint has no name sort: load up to 20 pages and sort by name here.
+  private loadSuppliers(cursor?: string, loaded: Supplier[] = [], page = 1): void {
+    this.api.suppliers({ limit: 100, status: 'all', cursor })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (response) => {
+          const all = [...loaded, ...response.items];
+          this.suppliers.set(all.sort((a, b) => a.name.localeCompare(b.name)));
+          if (response.next_cursor && page < 20) this.loadSuppliers(response.next_cursor, all, page + 1);
+        },
+        error: (error: unknown) => {
+          if (page === 1) this.handleError(error);
+        },
       });
   }
 
@@ -162,10 +202,18 @@ export class ReviewQueueComponent implements OnInit {
     }
     this.isLoadingMore.set(false);
 
-    this.isLoading.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
     this.nextCursor.set(null);
+
+    if (this.dateRangeInvalid()) {
+      // From after To can never match: show the error instead of asking the API.
+      this.tasks.set([]);
+      this.isLoading.set(false);
+      return;
+    }
+
+    this.isLoading.set(true);
 
     const status = this.statusFilter();
     const priority = this.priorityFilter();
@@ -176,6 +224,7 @@ export class ReviewQueueComponent implements OnInit {
       .getReviewTasks({
         status,
         priority: priority === 'all' ? undefined : priority,
+        ...this.additionalRequestFilters(),
         search,
         date_from,
         date_to,
@@ -224,6 +273,7 @@ export class ReviewQueueComponent implements OnInit {
         cursor,
         status,
         priority: priority === 'all' ? undefined : priority,
+        ...this.additionalRequestFilters(),
         search,
         date_from,
         date_to,
@@ -277,6 +327,37 @@ export class ReviewQueueComponent implements OnInit {
     this.loadTasks();
   }
 
+  onSupplierChange(value: string | null): void {
+    this.supplierFilter.set(value);
+    this.updateQueryParams();
+    this.loadTasks();
+  }
+
+  onReasonChange(value: ReviewTaskReason | 'all'): void {
+    this.reasonFilter.set(value);
+    this.updateQueryParams();
+    this.loadTasks();
+  }
+
+  onLifecycleChange(value: QuotationStatus | 'all'): void {
+    this.lifecycleFilter.set(value);
+    this.updateQueryParams();
+    this.loadTasks();
+  }
+
+  private additionalRequestFilters(): {
+    supplier_id?: string; reason?: ReviewTaskReason; quotation_status?: QuotationStatus;
+  } {
+    const supplier = this.supplierFilter();
+    const reason = this.reasonFilter();
+    const lifecycle = this.lifecycleFilter();
+    return {
+      ...(supplier ? { supplier_id: supplier } : {}),
+      ...(reason !== 'all' ? { reason } : {}),
+      ...(lifecycle !== 'all' ? { quotation_status: lifecycle } : {}),
+    };
+  }
+
   onSearchChange(value: string): void {
     this.searchQuery.set(value);
     this.updateQueryParams();
@@ -322,6 +403,9 @@ export class ReviewQueueComponent implements OnInit {
     }
     this.statusFilter.set('open');
     this.priorityFilter.set('all');
+    this.supplierFilter.set(null);
+    this.reasonFilter.set('all');
+    this.lifecycleFilter.set('all');
     this.searchQuery.set('');
     this.dateFrom.set(null);
     this.dateTo.set(null);
@@ -620,6 +704,9 @@ export class ReviewQueueComponent implements OnInit {
   private parseFiltersFromParams(params: ParamMap): {
     status: ReviewTaskStatus | 'all';
     priority: ReviewTaskPriority | 'all';
+    supplier: string | null;
+    reason: ReviewTaskReason | 'all';
+    lifecycle: QuotationStatus | 'all';
     search: string;
     dateFrom: string | null;
     dateTo: string | null;
@@ -633,10 +720,16 @@ export class ReviewQueueComponent implements OnInit {
     const dateTo = params.get('date_to');
     const sort = params.get('sort');
     const order = params.get('order');
+    const supplier = params.get('supplier_id');
+    const reason = params.get('reason');
+    const lifecycle = params.get('quotation_status');
 
     return {
       status: status && this.isValidStatus(status) ? status : 'open',
       priority: priority && this.isValidPriority(priority) ? priority : 'all',
+      supplier: supplier && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(supplier) ? supplier : null,
+      reason: this.reasons.find((value) => value === reason) ?? 'all',
+      lifecycle: this.lifecycles.find((value) => value === lifecycle) ?? 'all',
       search: search ? search.trim() : '',
       dateFrom: dateFrom && this.isValidDateString(dateFrom) ? dateFrom : null,
       dateTo: dateTo && this.isValidDateString(dateTo) ? dateTo : null,
@@ -648,6 +741,9 @@ export class ReviewQueueComponent implements OnInit {
   private hasFilterStateChanged(target: {
     status: ReviewTaskStatus | 'all';
     priority: ReviewTaskPriority | 'all';
+    supplier: string | null;
+    reason: ReviewTaskReason | 'all';
+    lifecycle: QuotationStatus | 'all';
     search: string;
     dateFrom: string | null;
     dateTo: string | null;
@@ -657,6 +753,9 @@ export class ReviewQueueComponent implements OnInit {
     return (
       this.statusFilter() !== target.status ||
       this.priorityFilter() !== target.priority ||
+      this.supplierFilter() !== target.supplier ||
+      this.reasonFilter() !== target.reason ||
+      this.lifecycleFilter() !== target.lifecycle ||
       this.searchQuery().trim() !== target.search ||
       this.dateFrom() !== target.dateFrom ||
       this.dateTo() !== target.dateTo ||
@@ -668,6 +767,9 @@ export class ReviewQueueComponent implements OnInit {
   private applyFilterState(target: {
     status: ReviewTaskStatus | 'all';
     priority: ReviewTaskPriority | 'all';
+    supplier: string | null;
+    reason: ReviewTaskReason | 'all';
+    lifecycle: QuotationStatus | 'all';
     search: string;
     dateFrom: string | null;
     dateTo: string | null;
@@ -676,6 +778,9 @@ export class ReviewQueueComponent implements OnInit {
   }): void {
     this.statusFilter.set(target.status);
     this.priorityFilter.set(target.priority);
+    this.supplierFilter.set(target.supplier);
+    this.reasonFilter.set(target.reason);
+    this.lifecycleFilter.set(target.lifecycle);
     this.searchQuery.set(target.search);
     this.dateFrom.set(target.dateFrom);
     this.dateTo.set(target.dateTo);
@@ -719,6 +824,9 @@ export class ReviewQueueComponent implements OnInit {
     return {
       status: status !== 'open' ? status : null,
       priority: priority !== 'all' ? priority : null,
+      supplier_id: this.supplierFilter(),
+      reason: this.reasonFilter() !== 'all' ? this.reasonFilter() : null,
+      quotation_status: this.lifecycleFilter() !== 'all' ? this.lifecycleFilter() : null,
       search: search.length > 0 ? search : null,
       date_from: dateFrom ? dateFrom : null,
       date_to: dateTo ? dateTo : null,

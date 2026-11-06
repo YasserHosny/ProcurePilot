@@ -15,7 +15,13 @@ from fastapi.testclient import TestClient
 from psycopg import sql
 
 from integration.catalogue_helpers import TEST_DATABASE_URL, Workspace, make_workspace, reset_role
-from integration.quotation_helpers import PsycopgSupabaseClient, PsycopgTableQuery, _Response
+from integration.quotation_helpers import (
+    PsycopgSupabaseClient,
+    PsycopgTableQuery,
+    _Response,
+    make_quotation,
+    make_supplier,
+)
 from integration.test_purchase_requests import _current_member, _make_branch, _make_member
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.errors import AppError, NotFoundError, app_error_handler
@@ -35,15 +41,18 @@ class GroupQuery(PsycopgTableQuery):
 
     def select(self, columns: str = "*") -> GroupQuery:
         assert "purchase_request_request_group_fkey" in columns
+        self._request_columns = columns.split("request_group:", 1)[0].rstrip(",").split(",")
         super().select(columns)
         return self
 
     def _execute_select(self) -> object:
         where, params = self._where_sql()
         query = sql.SQL(
-            "select pr.*, row_to_json(g) as request_group from purchase_request pr "
+            "select {}, row_to_json(g) as request_group from purchase_request pr "
             "left join purchase_request_group g "
             "on g.tenant_id = pr.tenant_id and g.id = pr.request_group_id"
+        ).format(
+            sql.SQL(",").join(sql.Identifier("pr", column) for column in self._request_columns)
         )
         if where is not None:
             # All filters in this query belong to purchase_request; qualify to avoid
@@ -124,6 +133,25 @@ def seed(conn: psycopg.Connection, *, count: int = 2, totals: bool = True) -> Se
             "required_by_date,status) values (%s,%s,%s,%s,current_date+7,'submitted')",
             (ordinary, ws.tenant_id, branch, ws.membership_id),
         )
+        for index, request_id in enumerate(ids[:2]):
+            supplier = make_supplier(cur, ws, f"Sibling supplier {index + 1}")
+            quotation = make_quotation(cur, ws, supplier_id=supplier)
+            reset_role(cur)
+            recipient, response = uuid4(), uuid4()
+            cur.execute(
+                "insert into rfq_recipient (id,tenant_id,rfq_id,supplier_id,status) "
+                "values (%s,%s,%s,%s,'sent')",
+                (recipient, ws.tenant_id, rfq, supplier),
+            )
+            cur.execute(
+                "insert into rfq_response (id,tenant_id,rfq_recipient_id,quotation_id) "
+                "values (%s,%s,%s,%s)",
+                (response, ws.tenant_id, recipient, quotation),
+            )
+            cur.execute(
+                "update purchase_request set source_rfq_response_id=%s where id=%s",
+                (response, request_id),
+            )
         for request in [*ids, ordinary]:
             cur.execute(
                 "insert into approval_step (tenant_id,purchase_request_id,assigned_membership_id,"
@@ -142,6 +170,16 @@ def api_as(
 
     class Client(PsycopgSupabaseClient):
         def table(self, name: str) -> PsycopgTableQuery:
+            def tracked(query: PsycopgTableQuery) -> PsycopgTableQuery:
+                original_execute = query.execute
+
+                def execute() -> object:
+                    queries.append("table:" + name)
+                    return original_execute()
+
+                query.execute = execute
+                return query
+
             query = super().table(name)
             if name == "purchase_request":
                 # Only the group batch uses a relation embedding. Ordinary reads retain
@@ -151,19 +189,21 @@ def api_as(
                 def select(columns: str = "*") -> PsycopgTableQuery:
                     if "purchase_request_request_group_fkey" in columns:
                         queries.append("group")
-                        return GroupQuery(conn, name, claims=ws.claims()).select(columns)
+                        return tracked(GroupQuery(conn, name, claims=ws.claims()).select(columns))
                     return original_select(columns)
 
                 query.select = select
-            return query
+            return tracked(query)
 
-    # Raw SQL paths use the real database and verified-member claims. Count only the new
-    # group enrichment: pre-existing per-request budget/source reads are outside T007.
+    # Raw SQL paths use the real database and verified-member claims. Track group
+    # enrichment separately from the PostgREST reads counted on execute above.
     original_connect = service_module.db.connect
 
     class Cursor(psycopg.Cursor):
         def execute(self, query: object, params: object = None, **kwargs: object) -> Cursor:
-            if "purchase_request_group" in str(query):
+            statement = str(query)
+            # Approval list/count joins are not group-enrichment queries.
+            if "purchase_request_group" in statement and "from approval_step" not in statement:
                 queries.append("group")
             return super().execute(query, params, **kwargs)
 
@@ -201,6 +241,17 @@ def assert_group(
     assert group["position"] == position
     assert group["size"] == len(ids)
     assert group["sibling_request_ids"] == [str(id_) for id_ in ids if str(id_) != body["id"]]
+    assert group["siblings"] == [
+        {
+            "id": str(id_),
+            "position": index,
+            "supplier_name": f"Sibling supplier {data.requests.index(id_) + 1}"
+            if id_ in data.requests[:2]
+            else None,
+        }
+        for index, id_ in enumerate(ids, 1)
+        if str(id_) != body["id"]
+    ]
     for field, amount in (
         ("combined_total", "4063"),
         ("best_single_total", "4137"),
@@ -222,6 +273,9 @@ def test_get_and_member_read_return_positions_siblings_and_currency(
             response = client.get(f"/api/v1/requests/{request_id}")
             assert response.status_code == 200, response.text
             assert_group(response.json(), data, position)
+            sibling = response.json()["request_group"]["siblings"][0]
+            other = client.get(f"/api/v1/requests/{sibling['id']}").json()
+            assert sibling["supplier_name"] == other["source"]["supplier_name"]
             member_read = service.get_request(
                 bearer_token="token",
                 member=_current_member(data.ws, data.ws),
@@ -259,7 +313,7 @@ def test_lists_batch_group_context_and_keep_ordinary_requests_null(
         for position, request_id in enumerate(data.requests, 1):
             assert_group(items[str(request_id)], data, position)
         assert items[str(data.ordinary)]["request_group"] is None
-        assert queries == ["group"], "group enrichment must cost one query regardless of page size"
+        assert queries.count("group") == 1, "group enrichment must cost one query per page"
         queries.clear()
         # A page containing one request still includes siblings outside the page.
         page = client.get("/api/v1" + path, params={"limit": 1}).json()
@@ -365,3 +419,21 @@ def test_an_rls_hidden_group_leaves_a_visible_request_with_null_context(
         items = client.get("/api/v1/requests").json()["items"]
         assert len(items) == 3
         assert all(item["request_group"] is None for item in items)
+
+
+def test_request_list_total_batch_query_count_does_not_grow_with_siblings(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    counts = []
+    for count in (2, 8):
+        data = seed(conn, count=count)
+        with (
+            monkeypatch.context() as patch,
+            api_as(conn, patch, data.ws) as (client, _service, queries),
+        ):
+            response = client.get("/api/v1/requests")
+            assert response.status_code == 200, response.text
+            assert len(response.json()["items"]) == count + 1
+            counts.append(sum(query.startswith("table:") for query in queries))
+            assert queries.count("table:supplier") == 2
+    assert counts[0] == counts[1], "list source/group enrichment must remain batched"

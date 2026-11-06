@@ -4,11 +4,14 @@ import { Observable } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import type {
   ApprovalDecisionInput,
+  BulkApprovalDecisionInput,
+  BulkApprovalDecisionResponse,
   ApprovalDelegation,
   ApprovalDelegationCreate,
   ApprovalDelegationList,
+  PendingApprovalList,
+  PendingApprovalSort,
   PurchaseRequest,
-  PurchaseRequestList,
   RequestGroupSummary,
   ThresholdRule,
   ThresholdRuleCreate,
@@ -18,9 +21,13 @@ import type {
 
 export type {
   ApprovalDecisionInput,
+  BulkApprovalDecisionInput,
+  BulkApprovalDecisionResponse,
   ApprovalDelegation,
   ApprovalDelegationCreate,
   ApprovalDelegationList,
+  PendingApprovalList,
+  PendingApprovalSort,
   PurchaseRequest,
   RequestGroupSummary,
   ThresholdRule,
@@ -33,10 +40,16 @@ export type {
 export class ApprovalsApiService {
   private readonly api = inject(ApiService);
 
+  bulkDecide(body: BulkApprovalDecisionInput, idempotencyKey: string): Observable<BulkApprovalDecisionResponse> {
+    return this.api.bulkDecide(body, idempotencyKey);
+  }
+
   listPendingApprovals(params?: {
+    sort?: PendingApprovalSort;
+    branch_id?: string;
     cursor?: string;
     limit?: number;
-  }): Observable<PurchaseRequestList> {
+  }): Observable<PendingApprovalList> {
     return this.api.listPendingApprovals(params);
   }
 

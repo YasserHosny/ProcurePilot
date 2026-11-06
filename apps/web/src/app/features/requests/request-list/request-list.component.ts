@@ -1,29 +1,32 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnInit, ViewChild, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatOptionModule } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe,
 TranslateService } from '@ngx-translate/core';
 import { RoleDirective } from '../../../core/auth/role.directive';
 import { EMPTY, Subject, defer, forkJoin, of, type Observable, type Subscription } from 'rxjs';
-import { catchError, expand, reduce, switchMap } from 'rxjs/operators';
+import { catchError, debounceTime, distinctUntilChanged, expand, map, reduce, switchMap } from 'rxjs/operators';
 
 import type { ApiError, Branch, BranchList, PurchaseRequest } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { parseIsoDateLocal } from '../../../core/format/iso-date';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
-import { RequestsApiService, type PurchaseRequestStatus } from '../requests-api';
+import { RequestsApiService, type PurchaseRequestSort, type PurchaseRequestStatus } from '../requests-api';
 
 const I18N = 'requests';
 
@@ -35,9 +38,12 @@ const I18N = 'requests';
     MatTableModule,
     MatButtonModule,
     MatIconModule,
+    MatFormFieldModule,
+    MatInputModule,
     MatOptionModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    MatSlideToggleModule,
     MatSnackBarModule,
     MatDialogModule,
     MatTooltipModule,
@@ -53,9 +59,13 @@ export class RequestListComponent implements OnInit {
   private readonly organisationApi = inject(OrganisationApiService);
   private readonly formatService = inject(FormatService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
+
+  @ViewChild('searchInput', { read: ElementRef }) searchInput?: ElementRef<HTMLInputElement>;
 
   readonly isLoading = signal<boolean>(true);
   readonly isLoadingMore = signal<boolean>(false);
@@ -65,20 +75,42 @@ export class RequestListComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
   readonly statusFilter = signal<PurchaseRequestStatus | ''>('');
+  readonly searchQuery = signal<string>('');
+  readonly sortOption = signal<PurchaseRequestSort>('created_desc');
+  readonly mineFilter = signal<boolean>(false);
 
-  private readonly reloadSubject = new Subject<{ status?: PurchaseRequestStatus }>();
+  readonly hasActiveFilters = computed<boolean>(() => {
+    return !!this.statusFilter() || !!this.searchQuery().trim() || this.mineFilter();
+  });
+
+  readonly searchText = signal('');
+  readonly sortOptions: PurchaseRequestSort[] = [
+    'created_desc', 'created_asc', 'required_by_asc', 'required_by_desc', 'total_desc', 'total_asc',
+  ];
+  private readonly searchSubject = new Subject<string>();
+  private readonly reloadSubject = new Subject<Parameters<RequestsApiService['listRequests']>[0]>();
   private loadMoreSub?: Subscription;
 
   constructor() {
+    this.searchSubject.pipe(
+      map((value) => value.trim().slice(0, 100)),
+      debounceTime(300),
+      distinctUntilChanged((previous, current) => previous === current && current === this.searchQuery()),
+      takeUntilDestroyed(),
+    ).subscribe((value) => {
+      if (value === this.searchQuery()) return;
+      this.searchQuery.set(value);
+      this.filtersChanged();
+    });
     this.reloadSubject
       .pipe(
-        switchMap(({ status }) => {
+        switchMap((params) => {
           this.isLoading.set(true);
           this.errorMessage.set(null);
           this.errorTraceId.set(null);
 
           return forkJoin({
-            requests: this.requestsApi.listRequests({ status }),
+            requests: this.requestsApi.listRequests(params),
             branches: this.loadBranches(),
           }).pipe(
             catchError((err: unknown) => {
@@ -110,6 +142,9 @@ export class RequestListComponent implements OnInit {
 
   readonly displayedColumns: readonly string[] = [
     'requiredByDate',
+    'created',
+    'requester',
+    'lines',
     'branch',
     'supplier',
     'status',
@@ -118,15 +153,42 @@ export class RequestListComponent implements OnInit {
   ];
 
   ngOnInit(): void {
-    this.loadRequests();
+    let initialized = false;
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const status = params.get('status') as PurchaseRequestStatus | null;
+      const validStatus = ['draft', 'submitted', 'approved', 'ordered', 'delivered', 'rejected', 'withdrawn'];
+      const nextStatus = status && validStatus.includes(status) ? status : '';
+      const q = (params.get('q') ?? '').trim().slice(0, 100);
+      const rawSort = params.get('sort') as PurchaseRequestSort;
+      const sort = this.sortOptions.includes(rawSort) ? rawSort : 'created_desc';
+      const mine = params.get('mine') === 'true';
+      const changed = nextStatus !== this.statusFilter() || q !== this.searchQuery()
+        || sort !== this.sortOption() || mine !== this.mineFilter();
+      if (initialized && !changed) return;
+      if (initialized) this.searchSubject.next(q);
+      this.statusFilter.set(nextStatus);
+      this.searchQuery.set(q);
+      this.searchText.set(q);
+      this.sortOption.set(sort);
+      this.mineFilter.set(mine);
+      if (changed || !initialized) this.resetAndReload();
+      initialized = true;
+    });
+  }
+
+  private listParams(): Parameters<RequestsApiService['listRequests']>[0] {
+    return {
+      status: this.statusFilter() || undefined,
+      ...(this.searchQuery() ? { q: this.searchQuery() } : {}),
+      ...(this.sortOption() !== 'created_desc' ? { sort: this.sortOption() } : {}),
+      ...(this.mineFilter() ? { mine: true } : {}),
+    };
   }
 
   loadRequests(): void {
     this.loadMoreSub?.unsubscribe();
     this.isLoadingMore.set(false);
-    this.reloadSubject.next({
-      status: this.statusFilter() || undefined,
-    });
+    this.reloadSubject.next(this.listParams());
   }
 
   loadMore(): void {
@@ -142,7 +204,7 @@ export class RequestListComponent implements OnInit {
     this.loadMoreSub?.unsubscribe();
     this.loadMoreSub = this.requestsApi
       .listRequests({
-        status: this.statusFilter() || undefined,
+        ...this.listParams(),
         cursor,
       })
       .subscribe({
@@ -160,15 +222,64 @@ export class RequestListComponent implements OnInit {
       });
   }
 
-  onStatusFilterChange(value: PurchaseRequestStatus | ''): void {
-    this.statusFilter.set(value);
+  private resetAndReload(): void {
     this.requests.set([]);
     this.nextCursor.set(null);
     this.loadRequests();
   }
 
+  private filtersChanged(): void {
+    this.resetAndReload();
+    void this.router.navigate([], {
+      queryParams: {
+        status: this.statusFilter() || null,
+        q: this.searchQuery() || null,
+        sort: this.sortOption() === 'created_desc' ? null : this.sortOption(),
+        mine: this.mineFilter() ? true : null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  onStatusFilterChange(value: PurchaseRequestStatus | ''): void {
+    this.statusFilter.set(value);
+    this.filtersChanged();
+  }
+
+  onSearchInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.searchText.set(value);
+    this.searchSubject.next(value);
+  }
+
+  clearSearch(): void {
+    this.searchText.set('');
+    this.searchSubject.next('');
+    if (this.searchQuery()) {
+      this.searchQuery.set('');
+      this.filtersChanged();
+    }
+    this.searchInput?.nativeElement.focus();
+  }
+
+  onSortChange(value: PurchaseRequestSort): void {
+    this.sortOption.set(value);
+    this.filtersChanged();
+  }
+
+  onMineToggleChange(checked: boolean): void {
+    this.mineFilter.set(checked);
+    this.filtersChanged();
+  }
+
   clearFilter(): void {
-    this.onStatusFilterChange('');
+    this.statusFilter.set('');
+    this.searchQuery.set('');
+    this.searchText.set('');
+    this.searchSubject.next('');
+    this.mineFilter.set(false);
+    this.filtersChanged();
   }
 
   navigateToCreate(): void {
@@ -178,6 +289,10 @@ export class RequestListComponent implements OnInit {
   
   navigateToCreateOrder(request: PurchaseRequest): void {
     this.router.navigate(['/orders/new'], { queryParams: { source_request_id: request.id } });
+  }
+
+  formatCreated(value: string): string {
+    return this.formatService.formatDate(value);
   }
 
   formatRequiredBy(value: string | null | undefined): string {
@@ -203,7 +318,7 @@ export class RequestListComponent implements OnInit {
   }
 
   canWithdraw(request: PurchaseRequest): boolean {
-    return request.status === 'draft' || request.status === 'submitted';
+    return ['draft', 'submitted', 'approved', 'ordered'].includes(request.status);
   }
 
   withdrawRequest(request: PurchaseRequest): void {
