@@ -102,7 +102,7 @@
           @if (l.pack) {
             <div class="metric-item">
               <span class="metric-label">{{ 'matching.resolution.lineDetails.pack' | translate }}</span>
-              <span class="metric-value">{{ l.pack.pack_count }} × {{ l.pack.unit_size }} {{ l.pack.unit | unitLabel }}</span>
+              <span class="metric-value">{{ packText(l.pack) }} {{ l.pack.unit | unitLabel }}</span>
             </div>
           }
           @if (l.unit_price) {
