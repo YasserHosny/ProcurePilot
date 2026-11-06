@@ -360,6 +360,74 @@ describe('ApprovalQueueComponent', () => {
         {request_id: 'req-002', outcome: 'failed' as const, error_code: 'self_decision_not_allowed', request: null},
       ], decided_count: 1, failed_count: 1};
     }
+    for (const action of ['row', 'all', 'all-add', 'clear', 'dialog'] as const) {
+      it(`clears previous results when starting another selection or dialog: ${action}`, () => {
+        selectBoth();
+        approvalsApi.bulkDecide.and.returnValue(of(bulkResponse()));
+        component.submitBulk('approved', null); fixture.detectChanges();
+        expect(component.bulkResult()).not.toBeNull();
+        expect(component.bulkFailures().length).toBe(1);
+
+        if (action === 'row') component.toggleSelection(row('req-002'));
+        if (action === 'all') component.toggleSelectAll();
+        if (action === 'all-add') {
+          component.pendingRequests.set([mockPendingRequests[0], ...component.pendingRequests()]);
+          fixture.detectChanges();
+          component.toggleSelectAll();
+        }
+        if (action === 'clear') component.clearSelection();
+        if (action === 'dialog') {
+          dialogSpy.open.and.returnValue({afterClosed: () => of(undefined)} as MatDialogRef<ApprovalDecisionDialogComponent>);
+          component.openBulkDialog('approved');
+        }
+        fixture.detectChanges();
+        expect(component.bulkResult()).toBeNull();
+        expect(component.bulkFailures()).toEqual([]);
+        expect(query('[data-testid="bulk-results"]')).toBeNull();
+      });
+    }
+    it('keeps failed-subset retry results and selection until the next user change', () => {
+      selectBoth();
+      approvalsApi.bulkDecide.and.returnValue(of(bulkResponse()));
+      component.submitBulk('approved', null); fixture.detectChanges();
+      const retry = {...bulkResponse(), results: [bulkResponse().results[1]], decided_count: 0};
+      approvalsApi.bulkDecide.and.returnValue(of(retry));
+      component.submitBulk('approved', null); fixture.detectChanges();
+      expect(component.bulkResult()).toEqual(retry);
+      expect(component.bulkFailures().map(failure => failure.requestId)).toEqual(['req-002']);
+      expect([...component.selectedIds()]).toEqual(['req-002']);
+      expect(query('[data-testid="bulk-results"]')).not.toBeNull();
+      fixture.detectChanges();
+      expect(component.bulkResult()).toEqual(retry);
+      component.toggleSelection(row('req-002')); fixture.detectChanges();
+      expect(query('[data-testid="bulk-results"]')).toBeNull();
+    });
+    for (const direction of ['ltr', 'rtl']) {
+      it(`keeps rows stationary with a sticky bulk bar and results after the table in ${direction}`, () => {
+        fixture.nativeElement.setAttribute('dir', direction);
+        fixture.detectChanges();
+        const table = query('.approvals-table')!;
+        const firstRow = table.querySelector<HTMLElement>('tr.mat-mdc-row')!;
+        const offset = firstRow.offsetTop;
+        component.toggleSelection(row()); fixture.detectChanges();
+        const bar = query('[data-testid="bulk-bar"]')!;
+        expect(table.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(getComputedStyle(bar).position).toBe('sticky');
+        expect(getComputedStyle(bar).insetBlockEnd).toBe('0px');
+        expect(firstRow.offsetTop).toBe(offset);
+        component.clearSelection(); fixture.detectChanges();
+        expect(firstRow.offsetTop).toBe(offset);
+        selectBoth();
+        approvalsApi.bulkDecide.and.returnValue(of(bulkResponse()));
+        component.submitBulk('approved', null); fixture.detectChanges();
+        const remainingRow = table.querySelector<HTMLElement>('tr.mat-mdc-row')!;
+        const remainingOffset = remainingRow.offsetTop;
+        const results = query('[data-testid="bulk-results"]')!;
+        expect(table.compareDocumentPosition(results) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        component.toggleSelection(row('req-002')); fixture.detectChanges();
+        expect(remainingRow.offsetTop).toBe(remainingOffset);
+      });
+    }
     it('removes decided rows, adjusts total and retains failures with translated reasons', () => {
       selectBoth(); approvalsApi.bulkDecide.and.returnValue(of(bulkResponse()));
       component.submitBulk('approved', null); fixture.detectChanges();

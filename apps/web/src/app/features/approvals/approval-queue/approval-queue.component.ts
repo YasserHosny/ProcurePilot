@@ -445,6 +445,7 @@ export class ApprovalQueueComponent implements OnInit {
     const selected = new Set(this.selectedIds());
     if (selected.has(row.id)) selected.delete(row.id); else selected.add(row.id);
     this.selection.set(selected);
+    this.clearBulkResults();
     this.bulkError.set(false);
   }
 
@@ -457,14 +458,21 @@ export class ApprovalQueueComponent implements OnInit {
       selected.add(request.id);
     }
     this.selection.set(selected);
+    this.clearBulkResults();
     this.bulkError.set(false);
   }
 
   clearSelection(): void {
     if (this.bulkBusy()) return;
     this.selection.set(new Set());
+    this.clearBulkResults();
     this.bulkAttempt = null;
     this.bulkError.set(false);
+  }
+
+  private clearBulkResults(): void {
+    this.bulkResult.set(null);
+    this.bulkFailures.set([]);
   }
 
   selectionLabel(request: PurchaseRequest): string {
@@ -473,6 +481,7 @@ export class ApprovalQueueComponent implements OnInit {
 
   openBulkDialog(decision: 'approved' | 'rejected'): void {
     if (this.bulkDisabled() || this.selectedIds().size === 0) return;
+    this.clearBulkResults();
     const signature = JSON.stringify([...this.selectedIds()].sort());
     const count = this.selectedIds().size;
     const category = new Intl.PluralRules(this.formatService.locale()).select(count);

@@ -101,7 +101,8 @@
   background-color: var(--pp-surface-card);
   border: 1px solid var(--pp-border);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
+  // Clip rounded corners without creating a scroll container that traps the sticky bar.
+  overflow: clip;
 }
 
 .queue-controls {

@@ -127,13 +127,6 @@
       {{ announcementText() }}
     </div>
 
-    <app-approval-bulk-panel [count]="selectedIds().size" [totals]="selectionTotals()"
-      [incomplete]="selectionIncomplete()" [busy]="bulkBusy()" [disabled]="bulkDisabled()"
-      [error]="bulkError()" [result]="bulkResult()" [failures]="bulkFailures()"
-      (approve)="openBulkDialog('approved')" (reject)="openBulkDialog('rejected')"
-      (clearSelection)="clearSelection()" />
-    @if (capReached()) { <p id="bulk-selection-cap" role="status">{{ 'approvals.bulk.capHint' | translate }}</p> }
-
     @if (isLoading()) {
       <div class="loading-state" aria-live="polite">
         <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
@@ -475,6 +468,13 @@
         }
       </div>
     }
+    <app-approval-bulk-panel [count]="selectedIds().size" [totals]="selectionTotals()"
+      [incomplete]="selectionIncomplete()" [busy]="bulkBusy()" [disabled]="bulkDisabled()"
+      [error]="bulkError()" [result]="bulkResult()" [failures]="bulkFailures()"
+      (approve)="openBulkDialog('approved')" (reject)="openBulkDialog('rejected')"
+      (clearSelection)="clearSelection()" />
+    @if (capReached()) { <p id="bulk-selection-cap" role="status">{{ 'approvals.bulk.capHint' | translate }}</p> }
+
   </mat-card>
 
   <ng-template #budgetBadgeTmpl let-req>
