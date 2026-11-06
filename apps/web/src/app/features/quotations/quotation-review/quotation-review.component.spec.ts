@@ -981,6 +981,153 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(inboxBtn.textContent.trim()).toBe('Back to the inbox');
   });
 
+
+  describe('next step after confirm', () => {
+    function confirm(): void {
+      const confirmed = { ...mockQuotationDetail, status: 'reviewed' as const, supplier_id: 'sup-1' };
+      component.quotation.set({ ...mockQuotationDetail, supplier_id: 'sup-1' });
+      component.selectedSupplierId.set('sup-1');
+      apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
+      apiService.confirmQuotation.and.returnValue(of(confirmed));
+      apiService.getQuotation.and.returnValue(of(confirmed));
+      component.confirmQuotation();
+      fixture.detectChanges();
+    }
+
+    for (const reduced of [false, true]) {
+      it(`scrolls the card and focuses Match lines after confirm (reduced motion: ${reduced})`, fakeAsync(() => {
+        spyOn(window, 'matchMedia').and.returnValue({ matches: reduced } as MediaQueryList);
+        const scroll = spyOn(HTMLElement.prototype, 'scrollIntoView');
+        confirm();
+        tick();
+        fixture.detectChanges();
+        const card = fixture.nativeElement.querySelector('[data-testid="next-step-card"]') as HTMLElement;
+        expect(document.activeElement).toBe(card.querySelector('[data-testid="next-step-match-lines"]'));
+        expect(scroll).toHaveBeenCalledOnceWith({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
+        expect(scroll.calls.mostRecent()?.object).toBe(card);
+      }));
+    }
+
+    it('does not scroll or steal focus on plain reviewed quotation load', fakeAsync(() => {
+      const scroll = spyOn(HTMLElement.prototype, 'scrollIntoView');
+      const focusBefore = document.activeElement;
+      apiService.getQuotation.and.returnValue(of({ ...mockQuotationDetail, status: 'reviewed' }));
+      paramMapSubject.next(convertToParamMap({ id: mockQuotationDetail.id }));
+      fixture.detectChanges();
+      tick();
+      expect(document.activeElement).toBe(focusBefore);
+      expect(scroll).not.toHaveBeenCalled();
+      expect(apiService.getQuotationMatches).not.toHaveBeenCalled();
+    }));
+
+    it('prepares matching silently once after confirm without navigation', fakeAsync(() => {
+      const pending = new Subject<{ quotation_id: string; lines: [] }>();
+      apiService.getQuotationMatches.and.returnValue(pending);
+      const navigate = spyOn(TestBed.inject(Router), 'navigate');
+      confirm();
+      tick();
+      expect(apiService.getQuotationMatches).toHaveBeenCalledOnceWith(mockQuotationDetail.id);
+      expect(component.matchingSetupStatus()).toBe('idle');
+      expect(fixture.nativeElement.querySelector('[data-testid="next-step-card"] [role="status"]')).toBeNull();
+      pending.next({ quotation_id: mockQuotationDetail.id, lines: [] });
+      pending.complete();
+      expect(component.matchingSetupStatus()).toBe('idle');
+      expect(navigate).not.toHaveBeenCalled();
+    }));
+
+    for (const apiMessage of [true, false]) {
+      it(`shows preparation failure and retries on click (API message: ${apiMessage})`, fakeAsync(() => {
+        const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+        apiService.getQuotationMatches.and.returnValue(throwError(() => apiMessage
+          ? new HttpErrorResponse({ status: 500, error: { message: 'Matching unavailable' } })
+          : new Error('offline')));
+        confirm();
+        tick();
+        fixture.detectChanges();
+        const card = fixture.nativeElement.querySelector('[data-testid="next-step-card"]') as HTMLElement;
+        const button = card.querySelector('[data-testid="next-step-match-lines"]') as HTMLButtonElement;
+        expect(apiService.getQuotationMatches).toHaveBeenCalledOnceWith(mockQuotationDetail.id);
+        expect(card.querySelector('[role="alert"]')?.textContent).toContain(
+          apiMessage ? 'Matching unavailable' : enCatalog.quotations.review.matchingSetup.error,
+        );
+        expect(button.textContent).toContain(enCatalog.quotations.review.matchingSetup.retry);
+        expect(navigate).not.toHaveBeenCalled();
+        apiService.getQuotationMatches.and.returnValue(of({ quotation_id: mockQuotationDetail.id, lines: [] }));
+        button.click();
+        tick();
+        expect(apiService.getQuotationMatches).toHaveBeenCalledTimes(2);
+        expect(navigate).toHaveBeenCalledOnceWith(['/matching'], {
+          queryParams: { quotation_id: mockQuotationDetail.id },
+        });
+      }));
+    }
+  });
+
+  describe('single matching next step', () => {
+    let card: HTMLElement;
+    let button: HTMLButtonElement;
+
+    beforeEach(() => {
+      component.quotation.set({ ...mockQuotationDetail, status: 'reviewed' });
+      fixture.detectChanges();
+      card = fixture.nativeElement.querySelector('[data-testid="next-step-card"]') as HTMLElement;
+      button = card.querySelector('[data-testid="next-step-match-lines"]') as HTMLButtonElement;
+      apiService.getQuotationMatches.calls.reset();
+    });
+
+    it('shows one prompt without the old matching footer or labels', () => {
+      expect(fixture.nativeElement.querySelectorAll('[data-testid="next-step-card"]').length).toBe(1);
+      expect(fixture.nativeElement.querySelector('.review-footer-bar')).toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('Prepare Product Matching');
+      expect(fixture.nativeElement.textContent).not.toContain('Continue to Product Matching');
+      expect(card.querySelector('h2')).toBeTruthy();
+    });
+
+    it('prepares matching once before navigating with the quotation id', () => {
+      const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+      expect(button.tagName).toBe('BUTTON');
+      button.click();
+      expect(apiService.getQuotationMatches).toHaveBeenCalledOnceWith(mockQuotationDetail.id);
+      expect(navigate).toHaveBeenCalledOnceWith(['/matching'], {
+        queryParams: { quotation_id: mockQuotationDetail.id },
+      });
+    });
+
+    it('disables the button and announces loading while preparation is pending', () => {
+      const pending = new Subject<{ quotation_id: string; lines: [] }>();
+      apiService.getQuotationMatches.and.returnValue(pending);
+      const navigate = spyOn(TestBed.inject(Router), 'navigate');
+      button.click();
+      fixture.detectChanges();
+      expect(button.disabled).toBeTrue();
+      expect(card.querySelector('[role="status"]')?.textContent).toContain(enCatalog.quotations.review.matchingSetup.loading);
+      expect(card.querySelector('mat-spinner')?.getAttribute('aria-label')).toBe(enCatalog.common.loading);
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('announces errors, keeps button focus and retries on a second click', () => {
+      const pending = new Subject<{ quotation_id: string; lines: [] }>();
+      apiService.getQuotationMatches.and.returnValue(pending);
+      const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+      button.focus();
+      button.click();
+      fixture.detectChanges();
+      pending.error(new HttpErrorResponse({ status: 500, error: { message: 'Matching unavailable' } }));
+      fixture.detectChanges();
+      expect(card.querySelector('[role="alert"]')?.textContent).toContain('Matching unavailable');
+      expect(button.textContent).toContain(enCatalog.quotations.review.matchingSetup.retry);
+      expect(button.disabled).toBeFalse();
+      expect(document.activeElement).toBe(button);
+      expect(navigate).not.toHaveBeenCalled();
+      apiService.getQuotationMatches.and.returnValue(of({ quotation_id: mockQuotationDetail.id, lines: [] }));
+      button.click();
+      expect(apiService.getQuotationMatches).toHaveBeenCalledTimes(2);
+      expect(navigate).toHaveBeenCalledOnceWith(['/matching'], {
+        queryParams: { quotation_id: mockQuotationDetail.id },
+      });
+    });
+  });
+
   it('distinguishes between changed value (Corrected by Human) and confirmed-as-is (Confirmed)', () => {
     const lowConfField = {
       ...mockQuotationDetail.field_extractions[0],
