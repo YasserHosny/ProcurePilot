@@ -972,6 +972,11 @@
       }
     },
     "review": {
+      "preview": {
+        "unavailable": "The preview could not be loaded.",
+        "unsupported": "No preview for this file type.",
+        "retry": "Retry"
+      },
       "loadError": {
         "title": "Unable to load quotation",
         "notFound": "Quotation not found",

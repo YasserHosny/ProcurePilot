@@ -43,7 +43,7 @@ import { CurrencySymbolPipe } from '../../../core/format/currency-symbol.pipe';
 import { FormatExtractionPipe } from '../../../core/format/extraction-value.pipe';
 import { parseMoneyInput } from '../../../core/format/money-input';
 import { QuotationReviewBannersComponent } from './quotation-review-banners.component';
-import { QuotationDocPreviewComponent } from './quotation-doc-preview.component';
+import { QuotationDocPreviewComponent, isDocumentPreviewable } from './quotation-doc-preview.component';
 import { QuotationLinesComponent } from './quotation-lines.component';
 import { QuotationAuditTrailComponent } from './quotation-audit-trail.component';
 import { sameReviewedValue } from './reviewed-value';
@@ -231,9 +231,20 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   readonly activeExtraction = signal<FieldExtraction | null>(null);
 
   // PDF preview URL (signed)
+  readonly documentPreviewError = signal(false);
   readonly documentPreviewUrl = signal<string | null>(null);
-  readonly safePreviewUrl = computed<SafeResourceUrl | null>(() => {
+  private previewDocumentId: string | null = null;
+  readonly previewUrl = computed<string | null>(() => {
     const url = this.documentPreviewUrl();
+    if (!url) return null;
+    const base = url.split('#')[0];
+    const page = this.activeExtraction()?.source_page;
+    const fragment = this.quotation()?.document.mime_type === 'application/pdf' && page && page >= 1
+      ? `#page=${page}` : '';
+    return base + fragment;
+  });
+  readonly safePreviewUrl = computed<SafeResourceUrl | null>(() => {
+    const url = this.previewUrl();
     return url ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : null;
   });
 
@@ -518,7 +529,9 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
     this.isCreatingSupplierFromExtraction.set(false);
 
     this.activeExtraction.set(null);
+    this.previewDocumentId = null;
     this.documentPreviewUrl.set(null);
+    this.documentPreviewError.set(false);
     this.currentFlaggedIndex.set(0);
 
     this.auditTrail.set([]);
@@ -659,16 +672,25 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
     });
   }
 
-  private loadDocumentPreview(documentId: string): void {
+  loadDocumentPreview(documentId: string): void {
+    this.documentPreviewError.set(false);
+    if (this.previewDocumentId !== documentId) {
+      this.previewDocumentId = documentId;
+      this.documentPreviewUrl.set(null);
+    }
+    if (!isDocumentPreviewable(this.quotation()?.document.mime_type ?? '')) return;
     this.api
       .getDocumentDownloadUrl(documentId)
       .pipe(takeUntil(this.cancelLoads$))
       .subscribe({
       next: ({ download_url }) => {
+        if (this.previewDocumentId !== documentId) return;
+        this.documentPreviewError.set(false);
         this.documentPreviewUrl.set(download_url);
       },
       error: () => {
-        // Non-fatal — falls back to text simulation
+        if (this.previewDocumentId !== documentId) return;
+        this.documentPreviewError.set(!this.documentPreviewUrl());
       },
     });
   }
@@ -1997,7 +2019,11 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
             this.loadQuotation(q.id, { silent: true });
             return;
           }
+          const previousDocumentId = this.quotation()?.document.id;
           this.quotation.set(q);
+          if (q.document.id !== previousDocumentId) {
+            this.loadDocumentPreview(q.document.id);
+          }
           this.scheduleNextPoll(quotationId);
         },
         error: (err: unknown) => {
