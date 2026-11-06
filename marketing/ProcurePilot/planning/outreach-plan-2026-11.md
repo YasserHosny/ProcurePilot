@@ -62,6 +62,8 @@ silent after two follow-ups (move them to "Not now").
 
 ## Message library
 
+**WhatsApp kit (2026-11-07):** messages, quick replies, images, videos and setup are in `docs/gtm/prospects/whatsapp-kit/`, local only (gitignored) because it holds prices. First WhatsApp messages carry no attachment and ask for permission (Egypt Law 151/2020, articles 17 and 18; lawyer to confirm).
+
 The **approved DM script** (PPS-14, rev 6) stays the base for first messages, replies, the day-3 and day-7
 follow-ups, and objection answers:
 https://claude.ai/code/artifact/30523eee-168f-4a1c-b7ac-dcb50cd9ded8.
