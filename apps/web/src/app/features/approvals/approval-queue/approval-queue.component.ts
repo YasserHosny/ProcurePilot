@@ -903,6 +903,8 @@ export class ApprovalQueueComponent implements OnInit {
     });
   }
 
+  private singleDecision: { signature: string; key: string } | null = null;
+
   submitDecision(requestId: string, action: 'approve' | 'reject', comment?: string): void {
     this.processingRequestId.set(requestId);
     this.errorMessage.set(null);
@@ -912,13 +914,19 @@ export class ApprovalQueueComponent implements OnInit {
       comment: comment?.trim() || undefined,
     };
 
+    const signature = JSON.stringify([requestId, action, body.comment]);
+    if (this.singleDecision?.signature !== signature) {
+      this.singleDecision = { signature, key: crypto.randomUUID() };
+    }
+    const key = this.singleDecision.key;
     const action$ =
       action === 'approve'
-        ? this.requestsApi.approveRequest(requestId, body)
-        : this.requestsApi.rejectRequest(requestId, body);
+        ? this.requestsApi.approveRequest(requestId, body, key)
+        : this.requestsApi.rejectRequest(requestId, body, key);
 
     action$.subscribe({
       next: () => {
+        if (this.singleDecision?.key === key) this.singleDecision = null;
         this.processingRequestId.set(null);
         this.loadPendingApprovals();
         if (action === 'approve') {

@@ -75,12 +75,12 @@ export class RequestsApiService {
     return this.api.withdrawRequest(requestId, idempotencyKey);
   }
 
-  approveRequest(requestId: string, body: ApprovalDecisionInput): Observable<PurchaseRequest> {
-    return this.api.approveRequest(requestId, body);
+  approveRequest(requestId: string, body: ApprovalDecisionInput, idempotencyKey?: string): Observable<PurchaseRequest> {
+    return this.api.approveRequest(requestId, body, idempotencyKey);
   }
 
-  rejectRequest(requestId: string, body: ApprovalDecisionInput): Observable<PurchaseRequest> {
-    return this.api.rejectRequest(requestId, body);
+  rejectRequest(requestId: string, body: ApprovalDecisionInput, idempotencyKey?: string): Observable<PurchaseRequest> {
+    return this.api.rejectRequest(requestId, body, idempotencyKey);
   }
 
   submitGroup(groupId: string, idempotencyKey?: string): Observable<PurchaseRequest[]> {

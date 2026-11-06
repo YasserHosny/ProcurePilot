@@ -85,6 +85,8 @@ class _ApprovalDecisionScreenState extends State<ApprovalDecisionScreen> {
 
   String? _groupDecisionAction;
   String? _groupDecisionKey;
+  String? _singleDecisionAction;
+  String? _singleDecisionKey;
 
   @override
   void dispose() {
@@ -131,16 +133,24 @@ class _ApprovalDecisionScreenState extends State<ApprovalDecisionScreen> {
             idempotencyKey: key,
           );
         }
-      } else if (action == 'approve') {
-        await _apiClient.approveRequest(
-          request.id,
-          comment: _commentController.text,
-        );
       } else {
-        await _apiClient.rejectRequest(
-          request.id,
-          comment: _commentController.text,
-        );
+        if (_singleDecisionAction != action) {
+          _singleDecisionAction = action;
+          _singleDecisionKey = const Uuid().v4();
+        }
+        if (action == 'approve') {
+          await _apiClient.approveRequest(
+            request.id,
+            comment: _commentController.text,
+            idempotencyKey: _singleDecisionKey,
+          );
+        } else {
+          await _apiClient.rejectRequest(
+            request.id,
+            comment: _commentController.text,
+            idempotencyKey: _singleDecisionKey,
+          );
+        }
       }
       if (!mounted) return;
       final successText = _i18n.t(

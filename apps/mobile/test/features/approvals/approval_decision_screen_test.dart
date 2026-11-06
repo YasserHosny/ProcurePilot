@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:procurepilot_mobile/core/api/approvals_api_client.dart';
 import 'package:procurepilot_mobile/core/api/models.dart';
+import 'package:procurepilot_mobile/core/api/requests_api_client.dart';
 import 'package:procurepilot_mobile/features/approvals/approval_decision_screen.dart';
 import 'package:procurepilot_mobile/features/approvals/approval_group.dart';
 
@@ -17,23 +18,23 @@ class DelayingRequestsApiClient extends FakeRequestsApiClient {
   Completer<PurchaseRequest>? inFlightCompleter;
 
   @override
-  Future<PurchaseRequest> approveRequest(String requestId, {String? comment}) {
+  Future<PurchaseRequest> approveRequest(String requestId, {String? comment, String? idempotencyKey}) {
     approveCalls.add(requestId);
     approveComments.add(comment);
     if (inFlightCompleter != null) {
       return inFlightCompleter!.future;
     }
-    return super.approveRequest(requestId, comment: comment);
+    return super.approveRequest(requestId, comment: comment, idempotencyKey: idempotencyKey);
   }
 
   @override
-  Future<PurchaseRequest> rejectRequest(String requestId, {String? comment}) {
+  Future<PurchaseRequest> rejectRequest(String requestId, {String? comment, String? idempotencyKey}) {
     rejectCalls.add(requestId);
     rejectComments.add(comment);
     if (inFlightCompleter != null) {
       return inFlightCompleter!.future;
     }
-    return super.rejectRequest(requestId, comment: comment);
+    return super.rejectRequest(requestId, comment: comment, idempotencyKey: idempotencyKey);
   }
 }
 
@@ -52,6 +53,7 @@ void main() {
       Object request, {
       String locale = 'en',
       ApprovalsApiClient? approvalsApiClient,
+      RequestsApiClient? requestsApiClient,
     }) async {
       await pumpWithServices(
         tester,
@@ -69,7 +71,7 @@ void main() {
             child: const Text('Open'),
           ),
         ),
-        requestsApiClient: fakeClient,
+        requestsApiClient: requestsApiClient ?? fakeClient,
         approvalsApiClient: approvalsApiClient ?? fakeApprovalsClient,
       );
       await tester.tap(find.text('Open'));
@@ -161,6 +163,66 @@ void main() {
       await tester.tap(button);
       await tester.pumpAndSettle();
     }
+
+    for (final action in ['Approve', 'Reject']) {
+      testWidgets('single $action sends a UUID and reuses it on retry', (
+        tester,
+      ) async {
+        final calls = <http.Request>[];
+        final client = RequestsApiClient(
+          apiBaseUrl: 'https://test.api/api/v1',
+          httpClient: MockClient((request) async {
+            calls.add(request);
+            if (calls.length == 1) throw Exception('lost response');
+            return http.Response(jsonEncode(decisionRequest().toJson()), 200);
+          }),
+        );
+        await pumpDecision(
+          tester,
+          decisionRequest(),
+          requestsApiClient: client,
+        );
+        await enterComment(tester, 'Reason');
+        await tapDecision(tester, action);
+        expect(find.byType(ApprovalDecisionScreen), findsOneWidget);
+        await tapDecision(tester, action);
+        expect(calls, hasLength(2));
+        final key = calls.first.headers['Idempotency-Key'];
+        expect(
+          key,
+          matches(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+          ),
+        );
+        expect(calls.last.headers['Idempotency-Key'], key);
+        expect(
+          calls.last.url.path,
+          '/api/v1/requests/req-1/${action.toLowerCase()}',
+        );
+        expect(find.byType(ApprovalDecisionScreen), findsNothing);
+      });
+    }
+
+    testWidgets('single switching approve/reject starts a new key', (
+      tester,
+    ) async {
+      final calls = <http.Request>[];
+      final client = RequestsApiClient(
+        apiBaseUrl: 'https://test.api/api/v1',
+        httpClient: MockClient((request) async {
+          calls.add(request);
+          throw Exception('lost response');
+        }),
+      );
+      await pumpDecision(tester, decisionRequest(), requestsApiClient: client);
+      await enterComment(tester, 'Reason');
+      await tapDecision(tester, 'Approve');
+      await tapDecision(tester, 'Reject');
+      await tapDecision(tester, 'Approve');
+      final keys = calls.map((r) => r.headers['Idempotency-Key']).toList();
+      expect(keys, everyElement(isNotNull));
+      expect(keys.toSet(), hasLength(3));
+    });
 
     testWidgets(
       'approves the group once with an Idempotency-Key and no single decisions',

@@ -751,6 +751,7 @@ class FakeRequestsApiClient extends RequestsApiClient {
   Future<PurchaseRequest> approveRequest(
     String requestId, {
     String? comment,
+    String? idempotencyKey,
   }) async {
     approveCalls.add(requestId);
     approveComments.add(comment);
@@ -772,6 +773,7 @@ class FakeRequestsApiClient extends RequestsApiClient {
   Future<PurchaseRequest> rejectRequest(
     String requestId, {
     String? comment,
+    String? idempotencyKey,
   }) async {
     rejectCalls.add(requestId);
     rejectComments.add(comment);

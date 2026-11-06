@@ -1105,15 +1105,19 @@ export class ApiService {
   approveRequest(
     requestId: string,
     body: ApprovalDecisionInput,
+    idempotencyKey?: string,
   ): Observable<PurchaseRequest> {
-    return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/approve`, body);
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/approve`, body, { headers });
   }
 
   rejectRequest(
     requestId: string,
     body: ApprovalDecisionInput,
+    idempotencyKey?: string,
   ): Observable<PurchaseRequest> {
-    return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/reject`, body);
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/reject`, body, { headers });
   }
 
   submitGroup(groupId: string, idempotencyKey?: string): Observable<PurchaseRequest[]> {
