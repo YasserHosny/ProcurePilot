@@ -127,6 +127,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       'replaceDocument',
       'refuseQuotation',
       'archiveQuotation',
+      'restoreQuotation',
       'retryExtraction',
     ]);
     apiService.getQuotation.and.returnValue(of(mockQuotationDetail));
@@ -3902,6 +3903,33 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
 
         expect(apiService.archiveQuotation).toHaveBeenCalledWith(mockQuotationDetail.id);
       });
+
+      for (const fails of [false, true]) {
+        it(`archive Undo ${fails ? 'reports failure without navigation' : 'restores and returns to review'}`, () => {
+          component.quotation.set(mockQuotationDetail);
+          fixture.detectChanges();
+          dialogSpy.open.and.returnValue(ofDialog(true));
+          const action = new Subject<void>();
+          const snackBar = (component as unknown as { snackBar: MatSnackBar }).snackBar;
+          const open = spyOn(snackBar, 'open').and.returnValue(jasmine.createSpyObj<ReturnType<MatSnackBar['open']>>('snackRef', { onAction: action }));
+          const navigate = spyOn(TestBed.inject(Router), 'navigate');
+          apiService.restoreQuotation.and.returnValue(fails ? throwError(() => new Error('restore failed')) : of(mockQuotationDetail));
+          component.archiveQuotation();
+          expect(open).toHaveBeenCalledWith('Quotation archived', 'Undo', { duration: 8000 });
+          navigate.calls.reset();
+          fixture.destroy();
+          action.next();
+          action.next();
+          expect(apiService.restoreQuotation).toHaveBeenCalledOnceWith(mockQuotationDetail.id);
+          if (fails) {
+            expect(navigate).not.toHaveBeenCalled();
+            expect(open).toHaveBeenCalledWith('Could not restore the quotation', undefined, { duration: 3000 });
+          } else {
+            expect(navigate).toHaveBeenCalledWith(['/quotations', mockQuotationDetail.id, 'review']);
+            expect(open).toHaveBeenCalledWith('Quotation restored', undefined, { duration: 3000 });
+          }
+        });
+      }
 
       it('a refused quotation cannot be retried (refusal cannot be undone)', () => {
         expect(component.canRetryExtraction({ ...mockQuotationDetail, status: 'refused' })).toBeFalse();

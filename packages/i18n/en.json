@@ -1207,6 +1207,9 @@
       "archiveConfirm": "Archive this quotation?",
       "retryConfirm": "Re-run extraction? Existing extracted data will be replaced.",
       "archived": "Quotation archived",
+      "undo": "Undo",
+      "restored": "Quotation restored",
+      "restoreFailed": "Could not restore the quotation",
       "status": {
         "pending": "Pending Extraction",
         "extracting": "Extracting",

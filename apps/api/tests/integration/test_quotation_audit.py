@@ -21,7 +21,7 @@ from integration.quotation_helpers import (
     make_review_task,
 )
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import ServiceUnavailableError
+from procurepilot_api.errors import NotFoundError, ServiceUnavailableError
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.quotations import (
     confirmation_service as confirmation_service_module,
@@ -57,9 +57,7 @@ class _PsycopgAuditWriter:
         del bearer_token
         with self._conn.cursor() as cur:
             cur.execute(
-                "select record_audit_event("
-                "%s, %s, %s::uuid, %s::uuid, %s, %s::jsonb, %s"
-                ")",
+                "select record_audit_event(%s, %s, %s::uuid, %s::uuid, %s, %s::jsonb, %s)",
                 (
                     event.action,
                     event.outcome,
@@ -386,6 +384,252 @@ def test_archive_retry_repairs_an_audit_write_failure(
         cur.execute(
             "select count(*) from audit_event where tenant_id = %s "
             "and action = 'quotation.archived' and target->>'quotation_id' = %s",
+            (workspace.tenant_id, str(fixture.quotation_id)),
+        )
+        assert cur.fetchone() == (1,)
+
+
+def test_restore_retry_repairs_an_audit_write_failure(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _wire_services(conn, monkeypatch)
+    from procurepilot_api.modules.ingestion import guardrail_jobs
+
+    enqueued: list[UUID] = []
+    monkeypatch.setattr(
+        guardrail_jobs,
+        "enqueue_guardrail_evaluation",
+        lambda _settings, *, tenant_id, quotation_id: enqueued.append(quotation_id),
+    )
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "restore-audit-retry")
+        member = _member(workspace)
+        fixture = make_extracted_quotation(cur, workspace)
+        act_as(cur, workspace)
+        service = QuotationService()
+        service.archive_quotation(
+            bearer_token="test-token", member=member, quotation_id=fixture.quotation_id
+        )
+        enqueued.clear()  # archiving queues its own guardrail run
+        original_record = QuotationService._record
+        calls = 0
+
+        def fail_once(self: QuotationService, **kwargs: object) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise ServiceUnavailableError(details={"dependency": "audit"})
+            original_record(self, **kwargs)
+
+        monkeypatch.setattr(QuotationService, "_record", fail_once)
+        with pytest.raises(ServiceUnavailableError):
+            service.restore_quotation(
+                bearer_token="test-token", member=member, quotation_id=fixture.quotation_id
+            )
+        # The state change committed; a retry writes the missing audit event and guardrail run.
+        for _ in range(3):
+            service.restore_quotation(
+                bearer_token="test-token", member=member, quotation_id=fixture.quotation_id
+            )
+        cur.execute(
+            "select count(*) from audit_event where tenant_id = %s "
+            "and action = 'quotation.restored' and target->>'quotation_id' = %s",
+            (workspace.tenant_id, str(fixture.quotation_id)),
+        )
+        assert cur.fetchone() == (1,)
+        assert enqueued == [fixture.quotation_id]
+
+
+@pytest.mark.parametrize("initial_status", ["open", "in_progress"])
+def test_restore_reopens_only_archive_resolved_tasks(
+    conn: object, monkeypatch: pytest.MonkeyPatch, initial_status: str
+) -> None:
+    _wire_services(conn, monkeypatch)
+    from procurepilot_api.modules.ingestion import guardrail_jobs
+
+    calls: list[UUID] = []
+    monkeypatch.setattr(
+        guardrail_jobs,
+        "enqueue_guardrail_evaluation",
+        lambda _settings, *, tenant_id, quotation_id: calls.append(quotation_id),
+    )
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "restore-tasks")
+        member = _member(workspace)
+        fixture = make_extracted_quotation(cur, workspace)
+        make_field(
+            cur,
+            workspace,
+            fixture.quotation_id,
+            field_name="issue_date",
+            extracted_value="2026-08-21",
+            confidence=Decimal("0.6200"),
+        )
+        reviewed = make_review_task(cur, workspace, fixture.quotation_id, reason="low_confidence")
+        cur.execute(
+            "update review_task set status = 'resolved', resolved_at = '2020-01-01Z' where id = %s",
+            (reviewed,),
+        )
+        task = make_review_task(cur, workspace, fixture.quotation_id, reason="low_confidence")
+        cur.execute("update review_task set status = %s where id = %s", (initial_status, task))
+        service = QuotationService()
+        service.archive_quotation(
+            bearer_token="test-token",
+            member=member,
+            quotation_id=fixture.quotation_id,
+            idempotency_key=uuid4(),
+        )
+        calls.clear()
+        for _ in range(2):
+            service.restore_quotation(
+                bearer_token="test-token",
+                member=member,
+                quotation_id=fixture.quotation_id,
+            )
+        cur.execute(
+            "select deleted_at, archive_idempotency_key from quotation where id = %s",
+            (fixture.quotation_id,),
+        )
+        assert cur.fetchone() == (None, None)
+        cur.execute("select status, resolved_at from review_task where id = %s", (task,))
+        assert cur.fetchone() == ("open", None)
+        cur.execute(
+            "select status, resolved_at is not null from review_task where id = %s", (reviewed,)
+        )
+        assert cur.fetchone() == ("resolved", True)
+        assert (
+            _audit_actions_for(
+                service, bearer_token="test-token", member=member, quotation_id=fixture.quotation_id
+            ).count("quotation.restored")
+            == 1
+        )
+        assert calls == [fixture.quotation_id]
+        queue = service.list_review_tasks(bearer_token="test-token")
+        assert task in {item.id for item in queue.items}
+
+
+def test_restore_active_quotation_is_noop(conn: object, monkeypatch: pytest.MonkeyPatch) -> None:
+    _wire_services(conn, monkeypatch)
+    from procurepilot_api.modules.ingestion import guardrail_jobs
+
+    def unexpected(*args: object, **kwargs: object) -> None:
+        pytest.fail("active restore must not enqueue guardrails")
+
+    monkeypatch.setattr(guardrail_jobs, "enqueue_guardrail_evaluation", unexpected)
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "restore-noop")
+        fixture = make_extracted_quotation(cur, workspace)
+        member = _member(workspace)
+        act_as(cur, workspace)
+        cur.execute("select to_jsonb(q) from quotation q where id = %s", (fixture.quotation_id,))
+        before = cur.fetchone()
+        service = QuotationService()
+        service.restore_quotation(
+            bearer_token="test-token", member=member, quotation_id=fixture.quotation_id
+        )
+        cur.execute("select to_jsonb(q) from quotation q where id = %s", (fixture.quotation_id,))
+        assert cur.fetchone() == before
+        assert "quotation.restored" not in _audit_actions_for(
+            service, bearer_token="test-token", member=member, quotation_id=fixture.quotation_id
+        )
+
+
+def test_restore_other_tenant_is_not_found(conn: object, monkeypatch: pytest.MonkeyPatch) -> None:
+    _wire_services(conn, monkeypatch)
+    with conn.cursor() as cur:
+        other = make_workspace(cur, "restore-other")
+        fixture = make_extracted_quotation(cur, other)
+        workspace = make_workspace(cur, "restore-caller")
+        act_as(cur, workspace)
+        with pytest.raises(NotFoundError):
+            QuotationService().restore_quotation(
+                bearer_token="test-token",
+                member=_member(workspace),
+                quotation_id=fixture.quotation_id,
+            )
+
+
+def test_restore_concurrent_race_records_one_audit_event(
+    conn: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import psycopg
+
+    from integration.catalogue_helpers import TEST_DATABASE_URL
+
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, f"restore-concurrent-race-{uuid4().hex[:8]}")
+        member = _member(workspace)
+        fixture = make_extracted_quotation(cur, workspace)
+        act_as(cur, workspace)
+        cur.execute(
+            "update quotation set deleted_at = now() where id = %s", (fixture.quotation_id,)
+        )
+        conn.commit()
+    barrier = threading.Barrier(2)
+    results: list[object] = []
+    errors: list[BaseException] = []
+    thread_state = threading.local()
+
+    def client_factory(_settings: object, _token: str) -> PsycopgSupabaseClient:
+        return PsycopgSupabaseClient(thread_state.conn)
+
+    def audit_factory() -> _PsycopgAuditWriter:
+        return _PsycopgAuditWriter(thread_state.conn)
+
+    monkeypatch.setattr(quotation_service_module, "authenticated_client", client_factory)
+    monkeypatch.setattr(quotation_service_module, "get_audit_writer", audit_factory)
+    from procurepilot_api.modules.ingestion import guardrail_jobs
+
+    guardrail_calls: list[UUID] = []
+    monkeypatch.setattr(
+        guardrail_jobs,
+        "enqueue_guardrail_evaluation",
+        lambda _settings, *, tenant_id, quotation_id: guardrail_calls.append(quotation_id),
+    )
+
+    original_row = quotation_service_module._quotation_row
+
+    def synchronized_row(client: object, quotation_id: UUID) -> dict[str, object]:
+        row = original_row(client, quotation_id)
+        if not getattr(thread_state, "read_once", False):
+            thread_state.read_once = True
+            barrier.wait(timeout=10)
+        return row
+
+    monkeypatch.setattr(quotation_service_module, "_quotation_row", synchronized_row)
+
+    def restore() -> None:
+        thread_state.conn = psycopg.connect(TEST_DATABASE_URL, prepare_threshold=None)
+        try:
+            with thread_state.conn.cursor() as cur:
+                act_as(cur, workspace)
+            results.append(
+                QuotationService().restore_quotation(
+                    bearer_token="test-token",
+                    member=member,
+                    quotation_id=fixture.quotation_id,
+                )
+            )
+            thread_state.conn.commit()
+        except BaseException as exc:  # pragma: no cover - makes thread failures visible
+            errors.append(exc)
+        finally:
+            thread_state.conn.close()
+
+    threads = [threading.Thread(target=restore) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    assert len(results) == 2
+    assert guardrail_calls == [fixture.quotation_id]
+    with conn.cursor() as cur:
+        cur.execute(
+            "select count(*) from audit_event where tenant_id = %s "
+            "and action = 'quotation.restored' and target->>'quotation_id' = %s",
             (workspace.tenant_id, str(fixture.quotation_id)),
         )
         assert cur.fetchone() == (1,)

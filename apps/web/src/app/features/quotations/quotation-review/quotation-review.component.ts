@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, ElementRef, Injector, afterNextRender, viewChild, DestroyRef, HostListener, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Observable, Subject, Subscription, map, of, switchMap, takeUntil, timer } from 'rxjs';
+import { Observable, Subject, Subscription, map, of, switchMap, take, takeUntil, timer } from 'rxjs';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -1594,8 +1594,25 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
         next: () => {
           this.isArchiving.set(false);
           this.leavingAfterArchive = true;
-          this.snackBar.open(this.translate.instant('quotations.review.archived'), undefined, {
-            duration: 3000,
+          // Undo belongs to the snackbar and must survive navigation destroying this component.
+          this.snackBar.open(
+            this.translate.instant('quotations.review.archived'),
+            this.translate.instant('quotations.review.undo'),
+            { duration: 8000 },
+          ).onAction().pipe(take(1)).subscribe(() => {
+            this.api.restoreQuotation(q.id).subscribe({
+              next: () => {
+                this.router.navigate(['/quotations', q.id, 'review']);
+                this.snackBar.open(this.translate.instant('quotations.review.restored'), undefined, {
+                  duration: 3000,
+                });
+              },
+              error: () => {
+                this.snackBar.open(this.translate.instant('quotations.review.restoreFailed'), undefined, {
+                  duration: 3000,
+                });
+              },
+            });
           });
           this.router.navigate(['/quotations']);
         },
