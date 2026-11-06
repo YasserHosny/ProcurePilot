@@ -1,4 +1,18 @@
-:host { display: block; }
+:host { display: contents; }
+// Keep the strip in the card's flow and reserve its height after the last row.
+.bulk-bar {
+  position: sticky;
+  inset-block-end: 0;
+  z-index: 2;
+  margin-block: var(--pp-space-4) 0;
+  margin-inline: 0;
+  padding-block: var(--pp-space-4);
+  padding-inline: var(--pp-space-4);
+  border: 0;
+  border-block-start: 1px solid var(--pp-border);
+  border-radius: 0;
+  background: var(--pp-surface-card);
+}
 section { margin-block: var(--pp-space-4); margin-inline: var(--pp-space-4); padding-block: var(--pp-space-4); padding-inline: var(--pp-space-4); border: 1px solid var(--pp-border); border-radius: var(--pp-radius-card); background: var(--pp-surface-card); color: var(--pp-text); }
 h2 { font-size: var(--pp-size-18); color: var(--pp-text-strong); margin-block: 0 var(--pp-space-3); }
 p { margin-block: var(--pp-space-3); }

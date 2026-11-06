@@ -1,5 +1,17 @@
+@if (error()) { <p role="alert" class="error" data-testid="bulk-error">{{ 'approvals.bulk.batchError' | translate }}</p> }
+@if (result(); as response) {
+  <section role="region" aria-labelledby="bulk-results-heading" data-testid="bulk-results">
+    <h2 id="bulk-results-heading">{{ 'approvals.bulk.resultsTitle' | translate }}</h2>
+    <p role="status" aria-live="polite" aria-atomic="true">{{ 'approvals.bulk.resultsSummary' | translate: {decided: plural('decided', response.decided_count), failed: plural('failed', response.failed_count)} }}</p>
+    <ul>
+      @for (failure of failures(); track failure.requestId) {
+        <li><a [routerLink]="['/approvals', failure.requestId]" dir="auto">{{ failure.label }}</a>: {{ failure.reasonKey | translate }}</li>
+      }
+    </ul>
+  </section>
+}
 @if (count() > 0) {
-  <section role="region" aria-labelledby="bulk-heading" [attr.aria-busy]="busy()" data-testid="bulk-bar">
+  <section class="bulk-bar" role="region" aria-labelledby="bulk-heading" [attr.aria-busy]="busy()" data-testid="bulk-bar">
     <h2 id="bulk-heading">{{ 'approvals.bulk.title' | translate }}</h2>
     <p aria-live="polite" aria-atomic="true">{{ plural('selected', count()) }}</p>
     <ul class="totals" [attr.aria-label]="'approvals.bulk.totals' | translate">
@@ -14,17 +26,5 @@
     @if (busy()) {
       <div role="status" class="progress"><mat-spinner diameter="20" [attr.aria-label]="'approvals.bulk.progress' | translate" /><span>{{ 'approvals.bulk.progress' | translate }}</span></div>
     }
-  </section>
-}
-@if (error()) { <p role="alert" class="error" data-testid="bulk-error">{{ 'approvals.bulk.batchError' | translate }}</p> }
-@if (result(); as response) {
-  <section role="region" aria-labelledby="bulk-results-heading" data-testid="bulk-results">
-    <h2 id="bulk-results-heading">{{ 'approvals.bulk.resultsTitle' | translate }}</h2>
-    <p role="status" aria-live="polite" aria-atomic="true">{{ 'approvals.bulk.resultsSummary' | translate: {decided: plural('decided', response.decided_count), failed: plural('failed', response.failed_count)} }}</p>
-    <ul>
-      @for (failure of failures(); track failure.requestId) {
-        <li><a [routerLink]="['/approvals', failure.requestId]" dir="auto">{{ failure.label }}</a>: {{ failure.reasonKey | translate }}</li>
-      }
-    </ul>
   </section>
 }
