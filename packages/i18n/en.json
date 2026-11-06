@@ -1173,11 +1173,7 @@
         "createRequote": "Create Re-Quote"
       },
       "matchingSetup": {
-        "idle": "Product matching is ready to be prepared for this authorized quotation.",
-        "start": "Prepare Product Matching",
         "loading": "Preparing product matching…",
-        "ready": "Product matching is ready.",
-        "continue": "Continue to Product Matching",
         "error": "Matching setup needs retry.",
         "retry": "Retry Matching Setup"
       },

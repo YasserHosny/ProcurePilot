@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, HostListener, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ElementRef, Injector, afterNextRender, viewChild, DestroyRef, HostListener, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subject, Subscription, map, of, switchMap, takeUntil, timer } from 'rxjs';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
@@ -152,6 +152,9 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   private readonly sanitizer = inject(DomSanitizer);
   private readonly destroyRef = inject(DestroyRef);
   private readonly dialog = inject(MatDialog);
+  private readonly injector = inject(Injector);
+  private readonly nextStepCard = viewChild<unknown, ElementRef<HTMLElement>>('nextStepCard', { read: ElementRef });
+  private readonly nextStepMatchLines = viewChild<unknown, ElementRef<HTMLButtonElement>>('nextStepMatchLines', { read: ElementRef });
   private readonly cancelLoads$ = new Subject<void>();
   private priorQuotationsSub: Subscription | null = null;
   private extractionPollSub: Subscription | null = null;
@@ -240,7 +243,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
   readonly confirmBlockedReason = signal<string | null>(null);
-  readonly matchingSetupStatus = signal<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  readonly matchingSetupStatus = signal<'idle' | 'loading' | 'error'>('idle');
   readonly matchingSetupError = signal<string | null>(null);
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
@@ -1835,6 +1838,13 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
         next: (confirmed) => {
           this.isConfirming.set(false);
           this.showNextStep.set(true);
+          afterNextRender(() => {
+            this.nextStepCard()?.nativeElement.scrollIntoView?.({
+              block: 'center',
+              behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+            });
+            this.nextStepMatchLines()?.nativeElement.focus({ preventScroll: true });
+          }, { injector: this.injector });
           this.quotation.update((current) =>
             current
               ? {
@@ -1846,12 +1856,14 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
               : null,
           );
           this.loadQuotation(confirmed.id, { silent: true });
+          this.api.getQuotationMatches(confirmed.id)
+            .pipe(takeUntil(this.cancelLoads$))
+            .subscribe({ error: (err: unknown) => this.setMatchingSetupError(err) });
           this.snackBar.open(
             this.translate.instant('quotations.review.actions.confirmSuccess'),
             undefined,
             { duration: 4000 },
           );
-          this.initializeMatching(confirmed.id);
         },
         error: (err: unknown) => {
           this.isConfirming.set(false);
@@ -1875,22 +1887,29 @@ export class QuotationReviewComponent implements OnInit, OnDestroy, CanComponent
   }
 
   initializeMatching(quotationId = this.quotationId()): void {
-    if (!quotationId) return;
+    if (!quotationId || this.matchingSetupStatus() === 'loading') return;
     this.matchingSetupStatus.set('loading');
     this.matchingSetupError.set(null);
     this.api
       .getQuotationMatches(quotationId)
       .pipe(takeUntil(this.cancelLoads$))
       .subscribe({
-      next: () => this.matchingSetupStatus.set('ready'),
+      next: () => {
+        this.matchingSetupStatus.set('idle');
+        void this.router.navigate(['/matching'], { queryParams: { quotation_id: quotationId } });
+      },
       error: (err: unknown) => {
-        this.matchingSetupStatus.set('error');
-        const apiError = err instanceof HttpErrorResponse ? (err.error as ApiError | undefined) : null;
-        this.matchingSetupError.set(
-          apiError?.message ?? this.translate.instant('quotations.review.matchingSetup.error'),
-        );
+        this.setMatchingSetupError(err);
       },
     });
+  }
+
+  private setMatchingSetupError(err: unknown): void {
+    this.matchingSetupStatus.set('error');
+    const apiError = err instanceof HttpErrorResponse ? (err.error as ApiError | undefined) : null;
+    this.matchingSetupError.set(
+      apiError?.message ?? this.translate.instant('quotations.review.matchingSetup.error'),
+    );
   }
 
   showAddLineForm(): void {
