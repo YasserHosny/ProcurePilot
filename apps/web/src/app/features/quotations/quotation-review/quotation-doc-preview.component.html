@@ -48,7 +48,25 @@
 
       <!-- PDF Preview or Fallback -->
       <div class="doc-preview-viewport">
-        @if (safePreviewUrl) {
+        @if (documentPreviewError || !isPreviewable(quotation.document.mime_type)) {
+          <section class="preview-fallback" [attr.aria-label]="documentFileName">
+            <mat-icon aria-hidden="true">description</mat-icon>
+            <span dir="auto">{{ documentFileName }}</span>
+            <p [attr.role]="documentPreviewError ? 'alert' : 'status'">
+              {{ (documentPreviewError ? 'quotations.review.preview.unavailable' : 'quotations.review.preview.unsupported') | translate }}
+            </p>
+            <div class="preview-actions">
+              @if (documentPreviewError) {
+                <button mat-button type="button" class="preview-retry" (click)="retry.emit()">
+                  {{ 'quotations.review.preview.retry' | translate }}
+                </button>
+              }
+              <button mat-button type="button" class="preview-download" (click)="download.emit()">
+                {{ 'quotations.review.downloadOriginal' | translate }}
+              </button>
+            </div>
+          </section>
+        } @else if (safePreviewUrl) {
           <iframe
             class="pdf-preview-frame"
             [src]="safePreviewUrl"

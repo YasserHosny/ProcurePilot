@@ -198,6 +198,8 @@
       <app-quotation-doc-preview
         [quotation]="q"
         [safePreviewUrl]="safePreviewUrl()"
+        [documentPreviewError]="documentPreviewError()"
+        (retry)="loadDocumentPreview(q.document.id)"
         [documentFileName]="documentFileName()"
         [activeExtraction]="activeExtraction()"
         [isWriter]="isWriter()"

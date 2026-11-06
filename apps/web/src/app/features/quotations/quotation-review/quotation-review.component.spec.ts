@@ -209,6 +209,131 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     fixture.detectChanges();
   });
 
+  describe('document preview improvements', () => {
+    it('preserves the safe URL reference across refreshes and equivalent field selections', () => {
+      const base = 'https://example.com/quote.pdf?token=a%2Bb';
+      component.documentPreviewUrl.set(base);
+      const extraction = mockQuotationDetail.field_extractions[0];
+      component.activeExtraction.set({ ...extraction, source_page: 2 });
+      const original = component.safePreviewUrl();
+      component.quotation.set({ ...mockQuotationDetail });
+      expect(component.safePreviewUrl()).toBe(original);
+      component.activeExtraction.set({ ...extraction, source_page: 2 });
+      expect(component.safePreviewUrl()).toBe(original);
+      component.activeExtraction.set(null);
+      const noPage = component.safePreviewUrl();
+      component.activeExtraction.set({ ...extraction, source_page: null });
+      expect(component.safePreviewUrl()).toBe(noPage);
+      component.activeExtraction.set({ ...extraction, source_page: 3 });
+      expect(component.safePreviewUrl()).not.toBe(original);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('iframe').getAttribute('src')).toBe(base + '#page=3');
+    });
+
+    it('keeps the displayed iframe through a pending and failed silent refetch', () => {
+      const pending = new Subject<{ download_url: string }>();
+      const url = component.documentPreviewUrl();
+      const frame = fixture.nativeElement.querySelector('iframe');
+      apiService.getDocumentDownloadUrl.and.returnValue(pending);
+      component.loadQuotation('q-review-1', { silent: true });
+      fixture.detectChanges();
+      expect(component.documentPreviewUrl()).toBe(url);
+      expect(fixture.nativeElement.querySelector('iframe')).toBe(frame);
+      pending.error(new Error('transient'));
+      fixture.detectChanges();
+      expect(component.documentPreviewUrl()).toBe(url);
+      expect(component.documentPreviewError()).toBeFalse();
+      expect(fixture.nativeElement.querySelector('iframe')).toBe(frame);
+      expect(fixture.nativeElement.querySelector('.preview-retry')).toBeNull();
+    });
+
+    it('shows the error card when a silent refetch fails without a displayed URL', () => {
+      component.documentPreviewUrl.set(null);
+      apiService.getDocumentDownloadUrl.and.returnValue(throwError(() => new Error('failed')));
+      component.loadQuotation('q-review-1', { silent: true });
+      fixture.detectChanges();
+      expect(component.documentPreviewError()).toBeTrue();
+      expect(fixture.nativeElement.querySelector('.preview-retry')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('iframe')).toBeNull();
+    });
+
+    it('fetches a replacement PDF once when polling replaces a CSV', fakeAsync(() => {
+      const csv: QuotationDetail = {
+        ...mockQuotationDetail, status: 'extracting',
+        document: { ...mockQuotationDetail.document, id: 'csv-doc', mime_type: 'text/csv' },
+      };
+      component.quotation.set(csv);
+      component.loadDocumentPreview('csv-doc');
+      apiService.retryExtraction.and.returnValue(of(csv));
+      apiService.getQuotation.and.returnValue(of(csv));
+      spyOn(window, 'confirm').and.returnValue(true);
+      component.retryExtraction();
+      apiService.getDocumentDownloadUrl.calls.reset();
+      apiService.getQuotation.and.returnValue(of({
+        ...csv, document: { ...mockQuotationDetail.document, id: 'new-pdf' },
+      }));
+      tick(2000);
+      tick(2000);
+      expect(apiService.getDocumentDownloadUrl).toHaveBeenCalledOnceWith('new-pdf');
+      component.stopExtractionPolling();
+    }));
+
+    it('retries a failed URL load and clears the error while pending and on success', () => {
+      const pending = new Subject<{ download_url: string }>();
+      component.documentPreviewUrl.set(null);
+      apiService.getDocumentDownloadUrl.and.returnValue(throwError(() => new Error('failed')));
+      component.loadDocumentPreview('doc-1');
+      fixture.detectChanges();
+      expect(component.documentPreviewError()).toBeTrue();
+      apiService.getDocumentDownloadUrl.and.returnValue(pending);
+      const calls = apiService.getDocumentDownloadUrl.calls.count();
+      fixture.nativeElement.querySelector('.preview-retry').click();
+      fixture.detectChanges();
+      expect(apiService.getDocumentDownloadUrl.calls.count()).toBe(calls + 1);
+      expect(component.documentPreviewError()).toBeFalse();
+      expect(fixture.nativeElement.querySelector('.doc-preview-loading mat-spinner')).not.toBeNull();
+      pending.next({ download_url: 'https://example.com/retry.pdf' });
+      fixture.detectChanges();
+      expect(component.documentPreviewError()).toBeFalse();
+      expect(component.documentPreviewUrl()).toBe('https://example.com/retry.pdf');
+    });
+
+    for (const mime of ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/tiff']) {
+      it(`does not fetch a preview URL for ${mime}`, () => {
+        component.quotation.set({ ...mockQuotationDetail, document: { ...mockQuotationDetail.document, mime_type: mime } });
+        apiService.getDocumentDownloadUrl.calls.reset();
+        component.loadDocumentPreview('doc-1');
+        fixture.detectChanges();
+        expect(apiService.getDocumentDownloadUrl).not.toHaveBeenCalled();
+        expect(fixture.nativeElement.querySelector('[role="status"]')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('iframe')).toBeNull();
+      });
+    }
+
+    it('changes only the PDF page fragment and preserves the signed query', () => {
+      const base = 'https://example.com/quote.pdf?token=a%2Bb&expires=123';
+      component.documentPreviewUrl.set(base + '#old');
+      const extraction = mockQuotationDetail.field_extractions[0];
+      const calls = apiService.getDocumentDownloadUrl.calls.count();
+      for (const page of [3, 5, null, 0, -1]) {
+        component.activeExtraction.set({ ...extraction, source_page: page });
+        fixture.detectChanges();
+        const frame = fixture.nativeElement.querySelector('iframe') as HTMLIFrameElement;
+        expect(frame.getAttribute('src')).toBe(base + (page && page >= 1 ? `#page=${page}` : ''));
+      }
+      component.activeExtraction.set(null);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('iframe').getAttribute('src')).toBe(base);
+      for (const mime of ['image/png', 'image/jpeg', 'text/plain']) {
+        component.quotation.set({ ...mockQuotationDetail, document: { ...mockQuotationDetail.document, mime_type: mime } });
+        component.activeExtraction.set({ ...extraction, source_page: 3 });
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('iframe').getAttribute('src')).toBe(base);
+      }
+      expect(apiService.getDocumentDownloadUrl.calls.count()).toBe(calls);
+    });
+  });
+
   it('prefers the original Unicode filename over the ASCII storage key', () => {
     component.quotation.set({
       ...mockQuotationDetail,
