@@ -62,7 +62,7 @@ silent after two follow-ups (move them to "Not now").
 
 ## Message library
 
-**WhatsApp plan (2026-11-07):** [whatsapp-plan-2026-11.md](whatsapp-plan-2026-11.md), how we reach founders one to one on WhatsApp, with targets, rules and the image for each step.
+**WhatsApp plan (2026-11-07):** kept with the rest of the WhatsApp kit in `marketing/whatsapp/02-whatsapp-plan-2026-11.md` (local only, gitignored, owner 2026-11-10): how we reach founders one to one on WhatsApp, with targets, rules and the image for each step.
 
 **WhatsApp kit (2026-11-07):** messages, quick replies, images, videos and setup are in `marketing/whatsapp/`, local only (gitignored) because it holds prices. First WhatsApp messages carry no attachment and ask for permission (Egypt Law 151/2020, articles 17 and 18; lawyer to confirm).
 
