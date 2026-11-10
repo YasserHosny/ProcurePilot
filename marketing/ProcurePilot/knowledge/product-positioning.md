@@ -40,6 +40,14 @@ Risks the owner accepted with this choice: (1) Arabic support is a feature compe
 public message is "built in Arabic", never "the only Arabic…"; (2) "verified savings" invites "how much?", which is
 answered honestly ("measured against your own prices in the pilot") until a pilot produces a real, permissioned figure.
 
+## Proposed revision after MD-20 (2026-11-04, not approved)
+
+Yasser said the product is for procurement, not just restaurants. Proposed wording, changing only the target:
+
+For **companies in Egypt and Saudi Arabia that buy from many suppliers across several branches**, whose **suppliers send quotes in Arabic, as PDFs, photos and WhatsApp messages**, **ProcurePilot** is **purchasing software built in Arabic** that **reads those quotes, compares them on their true landed cost, and counts a saving only once someone on the team verifies it**.
+
+The approved statement above still applies until Yasser approves this.
+
 ## Earlier working draft (hypothesis A, kept for reference)
 
 For **restaurant groups with several branches** who **buy the same staples from several suppliers and compare their

@@ -1,6 +1,6 @@
 ---
 scope: company (Iron Systems) website
-status: prompt for the website session; copy marked "draft" needs Yasser's approval before it ships
+status: not used. Yasser, 2026-11-03: "the site i need it like it now" (live site stays as it is)
 created: 2026-11-02
 based_on: strategy/b2b-focus-2026-11.md (section 2, decisions B-2 to B-4)
 sources_at: website a1904c7 (lib/site.ts, app/components/Contact.tsx) · ProcurePilot docs/gtm/video/README.md (WhatsApp number)
@@ -44,7 +44,7 @@ material (our own screens and video) and no claims we can't show.
   - **WhatsApp:** `https://wa.me/201027354140` with a short prefilled message
     (EN "Hi, I'd like to talk about a project with Iron Systems." · AR «مرحبًا، أودّ التحدث معكم عن مشروع.»).
     Add the number to `lib/site.ts` next to `EMAILS` so it's set in one place. It's the same number shown in the
-    ProcurePilot demo video. Show it as `+20 102 735 4140` (LTR in the Arabic page).
+    ProcurePilot demo video (confirmed by Yasser, 2026-11-03). Show it as `+20 102 735 4140` (LTR in the Arabic page).
   - **Email:** `hello@iron-sys.com` (already in `lib/site.ts`).
 - The form can stay underneath as a secondary option, or be removed. Ask Yasser.
 - **No booking link.** Add a reply-time line ("We reply within one working day") only if Yasser confirms he can

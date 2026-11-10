@@ -19,6 +19,7 @@ claims register), `strategy/content-strategy.md` (pillars, draft), `config/chann
 | CD-02 | **Lead message: AI solutions first** (as on LinkedIn), with software, automation and integration as the foundation | Resolves D-04 for social channels. The website keeps its four-discipline layout unless Yasser asks for a website change |
 | CD-03 | **Market: Egypt + Saudi Arabia** | Arabic and English. Company Arabic is Modern Standard Arabic (neutral across both markets, as on the website); dialects stay for ProcurePilot posts and video |
 | CD-05 | **LinkedIn first (2026-10-29).** X, Facebook and Instagram wait until the owner restarts them; the competitor-research merge with docs/gtm/competitor-profiles waits too | Profile kits stay as drafts; no new channel work until asked |
+| CD-06 | **B2B focus (B-1, 2026-11-02).** Measure conversations and meetings. LinkedIn plus direct outreach (WhatsApp, email, in person). Facebook only for posting in Arabic owner groups, when restarted | Replaces followers as the main measure. See `strategy/b2b-focus-2026-11.md` |
 | CD-04 | **Channels: Iron Systems LinkedIn page, X (Twitter), Facebook, Instagram.** Not chosen: website articles, founder reshares of company posts | X added to `config/channels.yaml`. Facebook, Instagram and X accounts don't exist yet: Yasser creates them; profile kits are prepared (below) |
 
 ## Goal and measures
@@ -27,7 +28,8 @@ claims register), `strategy/content-strategy.md` (pillars, draft), `config/chann
 |---|---|
 | Project inquiries | Inquiries to hello@iron-sys.com that mention a post or channel (Yasser notes the source) |
 | Credibility for ProcurePilot | ProcurePilot pilot conversations that mention Iron Systems' pages |
-| Audience | Followers and engagement per channel, monthly (`analytics/reporting-template.md`) |
+| Conversations (main measure) | Conversations started and meetings booked each week, from the Sales Pipeline (SP) |
+| Audience (side effect) | Followers and engagement per channel, monthly (`analytics/reporting-template.md`) |
 
 ## Audience (hypotheses until conversations confirm them)
 
@@ -36,7 +38,7 @@ claims register), `strategy/content-strategy.md` (pillars, draft), `config/chann
 | Owner / GM of a mid-size business | Egypt, Saudi Arabia | A builder who understands the operation and ships something that runs | H |
 | Operations leader | same | Less manual work: documents, approvals, re-typed data | H (website "The problem" lines) |
 | Head of IT / technical lead | same | AI that is evaluated, integrated and maintainable | H |
-| Multi-branch restaurant groups | same | ProcurePilot (product plan) | V (team choice) |
+| Companies buying from many suppliers across branches, restaurants first | same | ProcurePilot (product plan, MD-20) | V for restaurants (team choice); H for other sectors |
 
 ## Message
 

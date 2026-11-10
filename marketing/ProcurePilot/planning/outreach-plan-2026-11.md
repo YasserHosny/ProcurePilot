@@ -1,6 +1,6 @@
 ---
 scope: ProcurePilot, first customer
-status: draft, awaiting Yasser's approval (decision B-5); nothing is sent by Claude
+status: confirmed by Yasser 2026-11-04 ("go with outreach plan"); message texts stay drafts he can change; nothing is sent by Claude
 created: 2026-11-02
 based_on: strategy/b2b-focus-2026-11.md §3 · docs/gtm/first-customer-gtm-plan.md (Phase 1–2, the product's plan stays the source of truth) · approved DM script (PPS-14, rev 6) · D-2 pricing · MD-07
 ---
@@ -16,16 +16,16 @@ drafts, personalises and keeps the pipeline tidy; Claude never contacts a lead.
 **20 real conversations** (Sales Pipeline status "Talked") and **one pilot offered** by the end of November.
 Weeks run Sunday to Thursday, starting Sunday 1 November.
 
-## Who we contact first (B-6 parked)
+## Who we contact first
 
-Yasser's list of 20 personal contacts is on hold (B-6, "keep this now"). Until then, start with these:
+Yasser, 2026-11-04: assume no personal contacts, and the product is for procurement, not just restaurants. So outreach is cold at first, and it covers other companies that buy from several suppliers. **The named list and per-company messages are in `docs/gtm/prospects/outreach-wave1-2026-11.md`**, which is local only (gitignored) because this repo is public.
 
 | Source | Who | Channel |
 |---|---|---|
-| Sales Pipeline, Egypt | The 9 Egypt companies already in SP (SP-2 to SP-15, Egypt only). Find the owner or operations manager on LinkedIn | LinkedIn first, then email |
+| Wave 1 list | 20 Egyptian companies: the 9 in SP plus 11 new, across restaurants, clinics and labs, pharmacy, food retail and contractors | LinkedIn from Yasser's personal profile |
 | LinkedIn post engagement | Anyone in a restaurant or retail group who likes or comments on one of the 10 scheduled posts | LinkedIn message, same day |
 | Communities | Egyptian F&B owner and founder groups on Facebook and WhatsApp | Group post (the existing pilot caption), then private messages to people who answer |
-| Yasser's own contacts | Anyone who comes to mind while the list is parked. Add them as you go | WhatsApp |
+| Events | Founder meetups and trade shows (`docs/gtm/community/g7-community-plan.md`) | In person |
 
 The 5 Saudi leads wait until after the first Egyptian pilot.
 
@@ -35,7 +35,7 @@ The 5 Saudi leads wait until after the first Egyptian pilot.
 |---|---|---|
 | **WhatsApp** | People you know, people introduced to you, and anyone who's replied and gave you their number. The main channel in Egypt | Yasser's number, +20 102 735 4140 |
 | **LinkedIn message** | People you don't know yet, and people who engage with our posts | Yasser's LinkedIn profile |
-| **Email** | Bigger companies with a formal process; recaps after a call; sending the pilot agreement | `yasser.hosny@iron-sys.com` (copy `hello@iron-sys.com` if you want a record) |
+| **Email** | Recaps after a call and sending the pilot agreement; a few hand-written first emails only. No cold campaigns until the sending domain and postal address in `docs/gtm/outreach/cold-email-sequence.md` exist | `yasser.hosny@iron-sys.com` (copy `hello@iron-sys.com` if you want a record) |
 
 The **WhatsApp Business app** is worth installing on that number (free). It gives labels (New, Talked, Pilot),
 quick replies for the texts below, and a business profile with the website. Yasser installs it; it's optional.
@@ -61,6 +61,10 @@ Weekly review, Thursday, 15 minutes: how many messages sent, how many at "Talked
 silent after two follow-ups (move them to "Not now").
 
 ## Message library
+
+**WhatsApp plan (2026-11-07):** kept with the rest of the WhatsApp kit in `marketing/whatsapp/02-whatsapp-plan-2026-11.md` (local only, gitignored, owner 2026-11-10): how we reach founders one to one on WhatsApp, with targets, rules and the image for each step.
+
+**WhatsApp kit (2026-11-07):** messages, quick replies, images, videos and setup are in `marketing/whatsapp/`, local only (gitignored) because it holds prices. First WhatsApp messages carry no attachment and ask for permission (Egypt Law 151/2020, articles 17 and 18; lawyer to confirm).
 
 The **approved DM script** (PPS-14, rev 6) stays the base for first messages, replies, the day-3 and day-7
 follow-ups, and objection answers:
@@ -101,24 +105,7 @@ EN
 
 ### W4 · WhatsApp: the pilot and founding-customer offer (only after a good call)
 
-Prices are for conversations only, never public posts (MD-07).
-
-AR
-> زي ما وعدتك، ده ملخص التجربة:
-> • أسبوعين مجانًا، وأنا اللي هجهّز السيستم معاكم (الموردين والأصناف والفروع).
-> • بنقيس من الأول: أسعار [١٠–٢٠] صنف وقت وصول العروض، وفي الآخر نشوف الفرق بالأرقام.
-> • لو كمّلتوا: ١٬٥٠٠ جنيه للفرع في الشهر. وعشان إنتوا من أول العملاء، خصم ٥٠٪ أول ١٢ شهر مقابل إننا نكتب تجربتكم ونحط اللوجو بتاعكم.
-> • ولو التوفير في أي شهر أقل من ٣ أضعاف الاشتراك، الشهر اللي بعده مجانًا.
-> أبعتلك اتفاقية التجربة تقراها؟
-
-EN
-> As promised, the pilot in short:
-> • Two weeks free, and I set the system up with you (suppliers, items, branches).
-> • We measure first: prices for [10–20] key items and how long quotes take, then compare at the end.
-> • If you continue: EGP 1,500 per branch per month. As one of our first customers, 50% off for the first 12
->   months, in exchange for a short case study and your logo.
-> • If the saving in any month is less than 3× the fee, the next month is free.
-> Shall I send you the pilot agreement to read?
+The text contains prices, which stay private (MD-07), so it moved to `docs/gtm/prospects/outreach-wave1-2026-11.md`, with the offer sheet `docs/gtm/prospects/founding-customer-offer.pdf`.
 
 ### W5 · WhatsApp: asking a friend for an introduction
 
@@ -195,6 +182,6 @@ follow-ups with no reply, stop and move the lead to "Not now".
 
 ## What Claude needs from Yasser
 
-1. OK on this plan (B-5).
-2. Confirm the WhatsApp number +20 102 735 4140 is the one to use for outreach and on the website.
+1. ~~OK on this plan (B-5)~~ confirmed 2026-11-04.
+2. ~~Confirm the WhatsApp number~~ confirmed 2026-11-03: +20 102 735 4140 for outreach and the website.
 3. Each evening, or whenever it suits you: who you messaged and who replied, so the pipeline stays current.
