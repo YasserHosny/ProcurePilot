@@ -10,6 +10,7 @@ folder `marketing/ProcurePilot/`). Product docs outside `marketing/` belong to t
 | `campaigns/` | One folder per ProcurePilot campaign (`npm run new:campaign -- YYYY-MM-procurepilot-<slug>`) | Marketing OS (`campaign-operations`) |
 | `demo-video/` | Demo video versions kept for marketing (`VERSIONS.md`) | Add versions; never overwrite |
 | `design-system/` | Product brand reference compiled 2026-10-21 (logos, palette, app stills) | Keep; see D-08 for what is out of date |
+| `team-brief/` | The idea-and-product brief for the marketing team, as PDF in English and Arabic | Add dated versions; never overwrite |
 
 ## Status
 

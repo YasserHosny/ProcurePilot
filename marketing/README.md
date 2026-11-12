@@ -10,6 +10,7 @@ The Iron Systems brand source of truth is `<workspace>\Branding\Identity-v3`. Th
 
 - `ProcurePilot\demo-video` — versioned demo videos, see `VERSIONS.md`.
 - `ProcurePilot\design-system` — ProcurePilot brand reference page, logos, app stills.
+- `ProcurePilot\team-brief` — the idea-and-product brief for the marketing team (PDF, English and Arabic).
 - `LinkedIn\company-page` — Iron Systems LinkedIn company page kit (copy EN/AR, logo, cover, setup steps), one folder per version.
 
 `Social\profiles\` holds the profile kits (names, bios, images) for the Iron Systems X, Facebook and Instagram
