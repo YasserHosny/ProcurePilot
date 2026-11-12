@@ -84,7 +84,10 @@ otherwise). Add anything else per job with `--relay-arg`.
   `[ -z "$(git status --porcelain | grep -v '^?? FACTORY_SMOKE.md$')" ]` instead.
 - A gate that needs the hosted DB needs `TEST_DATABASE_URL` in the env file (port 5432, session mode).
 - Prefer a mutation check for security controls: a gate that breaks the control and expects the test to fail.
-- Keep each gate under the per-gate timeout (`--gate-timeout`, default 60 minutes).
+- Keep each gate under the per-gate timeout (`--gate-timeout`, default 60 minutes). Each gate runs
+  in its own process group; a timeout or a `stop` kills the whole group, Karma and Chrome included.
+- Changes are measured against the recorded checkpoint sha, not the `factory/checkpoint` tag, so an
+  implementer that moves the tag still shows its diff.
 
 ## After a job
 

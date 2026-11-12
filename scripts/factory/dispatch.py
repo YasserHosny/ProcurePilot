@@ -77,6 +77,7 @@ MIN_MEM_GB = float(os.environ.get("FACTORY_MIN_MEM_GB", "3"))
 
 LFS_EXCLUDE = "docs/gtm/video"  # demo-video media: pointers are enough in a clone
 HEARTBEAT_SECONDS = 15
+POLL_SECONDS = 1
 STALE_AFTER_SECONDS = 180
 TERMINAL = {
     "preflight_failed",
@@ -500,6 +501,7 @@ def start_supervisor(job: Job) -> None:
         die(
             f"job {job.id} is already {job.data['status']} (pid {job.data['supervisor_pid']})"
         )
+    (job.dir / "STOP").unlink(missing_ok=True)
     with open(job.log, "ab") as log:
         proc = subprocess.Popen(
             [sys.executable, str(Path(__file__).resolve()), "_supervise", job.id],
@@ -510,9 +512,26 @@ def start_supervisor(job: Job) -> None:
             close_fds=True,
             cwd=str(job.clone),
         )
-    (job.dir / "STOP").unlink(missing_ok=True)
-    job.data["supervisor_pid"] = proc.pid
-    job.event(None, f"supervisor started pid {proc.pid}")
+    # From here the supervisor owns job.json. It records its own pid first thing;
+    # wait for that instead of writing a snapshot that could clobber its state.
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        try:
+            recorded = json.loads(job.file.read_text()).get("supervisor_pid")
+        except (OSError, ValueError):
+            recorded = None
+        if recorded == proc.pid:
+            break
+        if proc.poll() is not None:
+            die(
+                f"supervisor exited early with code {proc.returncode}; see {job.log}", 1
+            )
+        time.sleep(0.2)
+    else:
+        print(
+            f"warning: supervisor pid {proc.pid} has not recorded itself yet; check `status`",
+            file=sys.stderr,
+        )
     print(f"supervisor pid {proc.pid}; follow with: dispatch.py logs {job.id} --follow")
 
 
@@ -535,9 +554,52 @@ def cmd_start(args: argparse.Namespace) -> None:
     start_supervisor(job)
 
 
+def kill_group(pid: int, grace: int = 20) -> None:
+    """SIGTERM the process group, then SIGKILL whatever is left after `grace` seconds."""
+    try:
+        os.killpg(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    deadline = time.time() + grace
+    while time.time() < deadline:
+        try:
+            os.killpg(pid, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.5)
+    try:
+        os.killpg(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+
+
+def wait_child(job: Job, proc: subprocess.Popen, timeout_seconds: float | None) -> str:
+    """Poll a child started with start_new_session until it exits, the STOP sentinel appears,
+    or the timeout passes. Heartbeats job.json while waiting. Returns exited | stopped | timeout."""
+    deadline = time.time() + timeout_seconds if timeout_seconds else None
+    last_beat = 0.0
+    while proc.poll() is None:
+        time.sleep(POLL_SECONDS)
+        if time.time() - last_beat >= HEARTBEAT_SECONDS:
+            job.data["heartbeat_at"] = now()
+            job.save()
+            last_beat = time.time()
+        if (job.dir / "STOP").exists():
+            kill_group(proc.pid)
+            proc.wait()
+            return "stopped"
+        if deadline and time.time() > deadline:
+            kill_group(proc.pid)
+            proc.wait()
+            return "timeout"
+    return "exited"
+
+
 def supervise(job_id: str) -> None:
     """Runs detached. Everything it learns goes into job.json and the job dir."""
     job = Job.load(job_id)
+    job.data["supervisor_pid"] = os.getpid()
+    job.event(None, f"supervisor started pid {os.getpid()}")
     env = job_env(job)
     relay_dir = job.dir / "relay"
     relay_dir.mkdir(exist_ok=True)
@@ -573,21 +635,11 @@ def supervise(job_id: str) -> None:
         )
     job.data["relay_pid"] = proc.pid
     job.save()
-    while proc.poll() is None:
-        time.sleep(HEARTBEAT_SECONDS)
-        job.data["heartbeat_at"] = now()
-        job.save()
-        if (
-            job.dir / "STOP"
-        ).exists():  # sentinel: the supervisor owns job.json while running
-            os.killpg(proc.pid, signal.SIGTERM)
-            try:
-                proc.wait(timeout=20)
-            except subprocess.TimeoutExpired:
-                os.killpg(proc.pid, signal.SIGKILL)
-            job.event("stopped", "stop requested")
-            write_summary(job)
-            return
+    # The relay enforces its own --timeout, so no second deadline here.
+    if wait_child(job, proc, None) == "stopped":
+        job.event("stopped", "stop requested while the implementer was running")
+        write_summary(job)
+        return
     job.data["relay_exit_code"] = proc.returncode
 
     result_file = relay_dir / "result.json"
@@ -600,7 +652,14 @@ def supervise(job_id: str) -> None:
     job.data["relay_status"] = relay_status
     print(f"[{now()}] relay exit {proc.returncode}, status {relay_status}", flush=True)
 
-    changed = record_changes(job)
+    try:
+        changed = record_changes(job)
+    except RuntimeError as exc:
+        job.event(
+            "implementer_failed", f"could not diff against the checkpoint: {exc}"[:500]
+        )
+        write_summary(job)
+        return
     if relay_status == "timeout":
         job.event("timeout", "relay watchdog fired")
     elif relay_status != "completed":
@@ -619,31 +678,46 @@ def supervise(job_id: str) -> None:
 
 
 def record_changes(job: Job) -> int:
+    """Diff the clone against the recorded checkpoint sha (not the tag, which the implementer
+    could move). Raises RuntimeError when git cannot answer, instead of parsing error text."""
     clone = job.clone
+    base = job.data["checkpoint_sha"]
+
+    def g(*args: str) -> str:
+        res = subprocess.run(
+            ["git", "-C", str(clone), *args],
+            text=True,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            check=False,
+        )
+        if res.returncode != 0:
+            raise RuntimeError(f"git {args[0]} failed: {res.stderr.strip()[:300]}")
+        return res.stdout
+
     # Stage everything briefly so untracked files show in the patch, then unstage.
-    git(clone, "add", "-A")
-    stat = git(clone, "diff", "--cached", "--stat", "factory/checkpoint", check=False)
-    patch = run(
-        ["git", "-C", str(clone), "diff", "--cached", "--binary", "factory/checkpoint"],
-        check=False,
-    ).stdout
-    files = git(
-        clone, "diff", "--cached", "--name-only", "factory/checkpoint", check=False
-    ).splitlines()
-    git(clone, "reset", "-q")
+    g("add", "-A")
+    try:
+        stat = g("diff", "--cached", "--stat", base).strip()
+        patch = g("diff", "--cached", "--binary", base)
+        files = g("diff", "--cached", "--name-only", base).splitlines()
+        commits = int(g("rev-list", "--count", f"{base}..HEAD").strip() or "0")
+    finally:
+        subprocess.run(
+            ["git", "-C", str(clone), "reset", "-q"],
+            stdin=subprocess.DEVNULL,
+            check=False,
+        )
     (job.dir / "changes.patch").write_text(patch)
     (job.dir / "changes.stat").write_text(stat + "\n")
-    commits = (
-        git(clone, "rev-list", "--count", "factory/checkpoint..HEAD", check=False)
-        or "0"
-    )
     job.data["changed_files"] = files
-    job.data["commits_since_checkpoint"] = int(commits)
+    job.data["commits_since_checkpoint"] = commits
     job.save()
-    return len(files) + int(commits)
+    return len(files) + commits
 
 
-def run_gates(job: Job, env: dict[str, str]) -> bool:
+def run_gates(job: Job, env: dict[str, str]) -> str:
+    """Run the gates in order in their own process groups. Returns passed | gate_failed | stopped."""
     results = []
     all_ok = True
     for i, gate in enumerate(job.data["gates"], start=1):
@@ -653,21 +727,24 @@ def run_gates(job: Job, env: dict[str, str]) -> bool:
         with open(log_path, "wb") as fh:
             fh.write(f"$ {gate}\n(cwd {job.clone})\n\n".encode())
             fh.flush()
-            try:
-                proc = subprocess.run(
-                    ["bash", "-o", "pipefail", "-c", gate],
-                    cwd=str(job.clone),
-                    env=env,
-                    stdin=subprocess.DEVNULL,
-                    stdout=fh,
-                    stderr=subprocess.STDOUT,
-                    timeout=job.data["gate_timeout_seconds"],
-                    check=False,
-                )
+            proc = subprocess.Popen(
+                ["bash", "-o", "pipefail", "-c", gate],
+                cwd=str(job.clone),
+                env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=fh,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            outcome = wait_child(job, proc, job.data["gate_timeout_seconds"])
+            if outcome == "exited":
                 code = proc.returncode
-            except subprocess.TimeoutExpired:
+            elif outcome == "timeout":
                 code = -1
-                fh.write(b"\n[gate timed out]\n")
+                fh.write(b"\n[gate timed out; process group killed]\n")
+            else:
+                code = -2
+                fh.write(b"\n[stopped; process group killed]\n")
         ok = code == 0
         all_ok &= ok
         results.append(
@@ -682,14 +759,17 @@ def run_gates(job: Job, env: dict[str, str]) -> bool:
         )
         job.data["gate_results"] = results
         job.save()
-        print(f"[{now()}] gate {i} exit {code}", flush=True)
+        print(f"[{now()}] gate {i} exit {code} ({outcome})", flush=True)
+        if outcome == "stopped":
+            job.event("stopped", f"stop requested during gate {i}")
+            return "stopped"
         if not ok:
             break  # later gates usually depend on earlier ones
+    status = "passed" if all_ok else "gate_failed"
     job.event(
-        "passed" if all_ok else "gate_failed",
-        f"{sum(r['ok'] for r in results)}/{len(job.data['gates'])} gates passed",
+        status, f"{sum(r['ok'] for r in results)}/{len(job.data['gates'])} gates passed"
     )
-    return all_ok
+    return status
 
 
 def tail(path: Path, lines: int = 40) -> str:
@@ -834,9 +914,12 @@ def cmd_gate(args: argparse.Namespace) -> None:
         job.data.get("supervisor_pid")
     ):
         die("job is still running; stop it first or wait")
-    record_changes(job)
+    try:
+        record_changes(job)
+    except RuntimeError as exc:
+        die(str(exc), 1)
     job.event("gating", "manual gate run")
-    ok = run_gates(job, job_env(job))
+    ok = run_gates(job, job_env(job)) == "passed"
     write_summary(job)
     print((job.dir / "summary.md").read_text())
     sys.exit(0 if ok else 1)
@@ -848,7 +931,10 @@ def cmd_diff(args: argparse.Namespace) -> None:
         die(
             f"clone is gone: {job.clone}; the last recorded patch is {job.dir / 'changes.patch'}"
         )
-    record_changes(job)
+    try:
+        record_changes(job)
+    except RuntimeError as exc:
+        die(str(exc), 1)
     if args.patch:
         print((job.dir / "changes.patch").read_text())
     else:
@@ -866,7 +952,7 @@ def cmd_stop(args: argparse.Namespace) -> None:
         die(f"job is not running (status {job.data['status']})")
     (job.dir / "STOP").write_text(now() + "\n")
     print(
-        f"stop requested; the supervisor (pid {pid}) will terminate the relay within {HEARTBEAT_SECONDS}s"
+        f"stop requested; the supervisor (pid {pid}) will kill the implementer or the running gate within a few seconds"
     )
     if args.force:
         for key in ("relay_pid", "supervisor_pid"):
@@ -905,7 +991,11 @@ def cmd_clean(args: argparse.Namespace) -> None:
                 or CLONES_DIR.resolve() not in clone.resolve().parents
             ):
                 die(f"refusing to remove {clone}: not under {CLONES_DIR}")
-            record_changes(job) if (clone / ".git").exists() else None
+            if (clone / ".git").exists():
+                try:
+                    record_changes(job)
+                except RuntimeError as exc:
+                    print(f"warning: could not save a final patch for {job.id}: {exc}")
             shutil.rmtree(clone)
             job.event(None, "clone removed")
             print(f"removed {clone} (patch kept at {job.dir / 'changes.patch'})")
