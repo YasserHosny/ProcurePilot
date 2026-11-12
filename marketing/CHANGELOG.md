@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Marketing kit for the marketing team (PPS-219, 2026-11-12): `LinkedIn/marketing-kit_2026-11-12/`, one folder with the idea and approved positioning and claims, Iron Systems and ProcurePilot brand files, product flow diagrams and walkthrough, a new 14-slide overview deck (`05-Presentations-and-Print/ProcurePilot-Marketing-Overview.pptx`, approved claims only), images, the v2.5 demo videos (Egypt + Saudi, via Git LFS, `LinkedIn/.gitattributes`) and sales material. Start at its `00-START-HERE.md`. The validator's link check skips `marketing-kit_*` snapshot folders (their links point at the original docs).
 - LinkedIn page growth (2026-11-10/11): 299 page-follow invites sent from the Iron Systems page (batch 1 of a ranked list of Yasser's connections, SiliconExpert and Arrow people excluded; lists kept in the gitignored `linkedin-invites/` folder as personal data, the repo being public). Page edits: Year founded 2026; custom button left as Visit website.
 - DM-01 (`campaigns/2026-11-company-ai-in-production/assets/approved/DM-01-page-invite-ask.md`, v3 approved by Yasser 2026-11-11): asks supporters to follow the page and invite their own connections; test send to one connection approved; v2 is English only, shorter and formal; v3 drops the how-to and limits from the invite ask.
 

@@ -254,7 +254,10 @@ export function runChecks(root = ROOT) {
   let mirrorSkipped = 0;
   const upstreamDirs = upstreamNames.map((s) => path.join(skillsDir, s) + path.sep);
   const isUpstream = (p) => upstreamDirs.some((d) => p.startsWith(d));
-  const mdFiles = walk(root, (p) => p.endsWith('.md'));
+  // Marketing kits (LinkedIn/marketing-kit_*) are verbatim snapshots of product docs sent to outside teams; their
+  // relative links point at the docs' original places, so the link check skips them (all other checks still run).
+  const isKitSnapshot = (p) => p.split(path.sep).some((part) => part.startsWith('marketing-kit_'));
+  const mdFiles = walk(root, (p) => p.endsWith('.md') && !isKitSnapshot(p));
   let refsChecked = 0;
   let upstreamMissing = 0;
   for (const f of mdFiles) {

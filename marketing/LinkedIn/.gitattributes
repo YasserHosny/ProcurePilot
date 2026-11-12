@@ -1,0 +1,4 @@
+# Marketing kit copies of the demo videos reuse the same LFS objects as docs/gtm/video (no extra plain-git history).
+# The WhatsApp card videos stay in plain git, as they are in docs/gtm/whatsapp-card (same blobs).
+marketing-kit_*/07-Videos/demo-*/*.mp4 filter=lfs diff=lfs merge=lfs -text
+marketing-kit_*/07-Videos/brand-motion/**/*.mp4 filter=lfs diff=lfs merge=lfs -text

@@ -1,0 +1,1406 @@
+# ProcurePilot User Documentation
+
+> Complete system journey with annotated screenshots for every screen.
+> Last updated: 2 Oct 2026.
+>
+> Covers the web app only. For the mobile app (sign-in, biometric unlock, role-aware home
+> screen), see [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md).
+
+---
+
+## Table of Contents
+
+1. [Sign In](#1-sign-in)
+2. [Dashboard](#2-dashboard)
+3. [Product Catalogue](#3-product-catalogue)
+4. [Create / Edit Product](#4-create--edit-product)
+5. [Suppliers](#5-suppliers)
+6. [Import Wizard](#6-import-wizard)
+7. [Quotation Review Queue](#7-quotation-review-queue)
+8. [Upload Supplier Quotation](#8-upload-supplier-quotation)
+9. [Quotation Review & Authorization](#9-quotation-review--authorization)
+10. [Match Resolution Queue](#10-match-resolution-queue)
+11. [Order Tracking & Three-Way Match](#11-order-tracking--three-way-match)
+12. [Smart Compare](#12-smart-compare)
+13. [Basket Split & Advanced Optimiser](#13-basket-split--advanced-optimiser)
+14. [Supplier Scorecards & Supplier IQ](#14-supplier-scorecards--supplier-iq)
+15. [Alerts Inbox & Anomaly Detection](#15-alerts-inbox--anomaly-detection)
+16. [Savings Ledger](#16-savings-ledger)
+17. [Export Savings](#17-export-savings)
+18. [Purchase Requests](#18-purchase-requests)
+19. [New Purchase Request](#19-new-purchase-request)
+20. [Approval Queue](#20-approval-queue)
+21. [Team Management](#21-team-management)
+22. [Organisation Settings](#22-organisation-settings)
+23. [Reports Center](#23-reports-center)
+24. [Report Schedules & Schedule Form](#24-report-schedules--schedule-form)
+25. [Weekly Digest & Digest Settings](#25-weekly-digest--digest-settings)
+26. [Roles & Permissions](#26-roles--permissions)
+27. [Ingestion Dashboard](#27-ingestion-dashboard)
+28. [Email Forwarding Setup](#28-email-forwarding-setup)
+29. [Email Ingestion Log](#29-email-ingestion-log)
+30. [Capture a Quotation (Photo or Upload)](#30-capture-a-quotation-photo-or-upload)
+31. [Catalogue Import (Bulk Price List)](#31-catalogue-import-bulk-price-list)
+32. [Catalogue Refresh Schedules](#32-catalogue-refresh-schedules)
+33. [Accounting Integration](#33-accounting-integration)
+34. [POS & Inventory Integration](#34-pos--inventory-integration)
+35. [Reorder Forecasts & Reorder Queue](#35-reorder-forecasts--reorder-queue)
+36. [Supplier Risk Queue & Negotiation Briefs](#36-supplier-risk-queue--negotiation-briefs)
+37. [Procurement Analyst](#37-procurement-analyst)
+38. [RFQ Sourcing & Response Comparison](#38-rfq-sourcing--response-comparison)
+39. [FAQ](#39-faq)
+40. [Known Issues](#40-known-issues)
+
+---
+
+For breadcrumb-style navigation paths across the app, see [ProcurePilot User Flows](user-flows.md).
+For the business/revenue value behind each major function, see [Function Business Value](../product/function-business-value.md).
+
+Authenticated page screenshots are cropped to the working content area for print clarity. The shared
+top bar and sidebar are documented once in the Dashboard section, then omitted from later screenshots
+so tables, forms, and review panels remain legible.
+
+---
+
+## 1. Sign In
+
+**Route:** `/auth/sign-in`
+
+![Sign In](screenshots/01-sign-in.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **ProcurePilot logo** | Brand identity — confirms you are on the correct application. |
+| 2 | **Email Address field** | Enter the work email associated with your workspace account. |
+| 3 | **Forgot password? link** | Opens the password-reset flow. You will receive a reset email. |
+| 4 | **Password field** | Enter your account password. The eye icon toggles visibility. |
+| 5 | **Sign In button** | Authenticates your session and redirects to the Dashboard. |
+| 6 | **Create workspace link** | If you have a platform invitation token, this starts the sign-up flow to create a new business workspace. |
+
+**Tips:**
+- ProcurePilot supports English and Arabic. Language can be changed after sign-in from the account menu.
+- If you receive an "Invalid email or password" error, check your email address for typos or use **Forgot password?** to reset.
+
+**Business value:** secure sign-in and invitation-gated workspace creation protect supplier pricing, savings evidence, and operational settings from unauthorized access. The flow also ensures each user enters the correct isolated workspace before procurement data is shown.
+
+### Password reset
+
+**Route:** `/auth/password-reset`
+
+![Password Reset](screenshots/01b-password-reset.jpg)
+
+Enter your work email and submit the form to request a reset email. The flow stays outside the authenticated app shell, so users who are locked out can recover access without selecting a workspace first.
+
+The email's link opens **Choose a new password** (`/auth/update-password`). Enter the new password twice (at least 12 characters) and save, then sign in with it. A link that has expired or was already used shows **Request a new link** instead; request a fresh email and open its newest link.
+
+### Create workspace
+
+**Route:** `/onboarding/signup`
+
+![Create Workspace](screenshots/01c-workspace-signup.jpg)
+
+Workspace creation is invitation-gated during the pilot programme. The form captures the platform invitation token, business name, the owner's name (shown to colleagues, for example in the Approval Queue), owner email, password, operating region, primary currency, tax model, and default locale; successful completion creates the isolated tenant and first owner account, then takes you to a **Plan Confirmation** screen (`/onboarding/plan`) before entering the workspace.
+
+Under the **Create Workspace & Sign In** button, a notice says that creating an account means agreeing to the **Terms of Service** (`/terms`) and acknowledging the **Privacy Policy** (`/privacy`). Both links open in a new tab and need no sign-in.
+
+### Accept invitation
+
+**Route:** `/onboarding/accept-invitation?token=...`
+
+![Accept Invitation](screenshots/01d-accept-invitation.jpg)
+
+Invited members arrive here from their email link. The token identifies the pending invitation, then the user signs in or creates credentials before being added to the workspace with the role assigned by the owner.
+
+When the invitation is for a new account, the same Terms of Service and Privacy Policy notice appears under the submit button. It is not shown to people who sign in with an existing account.
+
+### Plan Confirmation
+
+**Route:** `/onboarding/plan` (reached automatically after Create Workspace)
+
+The final step of workspace creation: a summary card showing the workspace's plan name, a features-included checklist (AI matching, Smart Compare, Basket Split, Savings Ledger, Alerts), and how many active catalogue products the plan allows versus how many currently exist. A **Continue** button proceeds into the authenticated app. The same screen also exists at `/plan` inside the authenticated shell, but nothing in the app links to it there — it's reachable only by typing the URL directly once signed in.
+
+---
+
+## 2. Dashboard
+
+**Route:** `/home`
+
+![Dashboard](screenshots/02-dashboard.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Top bar** | Shows the ProcurePilot brand, your active workspace name, the workspace switcher, and the account menu (language, contact support, sign out). |
+| 2 | **Side navigation** | Provides module switching for authenticated users. It is shown separately below so page screenshots can focus on the work area. |
+| 3 | **Welcome banner** | Displays your workspace name and confirms your workspace is provisioned with database-level tenant isolation and role-based access control. |
+| 4 | **Tenant & Security card** | Shows your Tenant ID, workspace slug, and the isolation level (PostgreSQL Row-Level Security, FORCED). This is read-only and confirms your data is fully isolated. |
+| 5 | **Regional & Financial Settings card** | Displays your region (e.g. United Kingdom), primary currency (e.g. GBP), tax model (e.g. UK VAT (standard)), shown by its readable name, and default locale (the workspace language, which an Owner can change under **Workspace language** in Organisation Settings, §22). The primary currency is your workspace's **home currency**: it is chosen at sign-up and pre-selected in new orders, guardrails and budgets. An Owner can change it afterwards under **Home currency** in Organisation Settings (§22); the change is audited. The other values are immutable. |
+| 6 | **Current User Authority card** | Shows your email, assigned role (Owner, Buyer, etc.), and MFA status. |
+| 7 | **What you can do** | A grid of links to the main modules — Quotations, RFQs, Compare offers, Purchase requests, Approvals, Orders, Savings, Procurement analyst, Products and Suppliers. Each card opens that module; cards are hidden for roles that cannot use the module (the same rules as the side navigation). |
+
+### Authenticated app sidebar
+
+![Authenticated Sidebar](screenshots/02b-sidebar-navigation.jpg)
+
+The sidebar is grouped by the job you are doing. **Overview** sits on top; the five groups below it can each be collapsed with the arrow beside the group name, and the sidebar remembers which groups you collapsed on this browser. The group holding the page you are on always stays open. Some links appear only for certain roles, as noted.
+
+| Group | Link | Opens |
+|---|---|---|
+| — | **Overview** | The Dashboard and workspace security summary. |
+| **Sourcing** | **Quotation Inbox** | Quotation upload, review, authorisation and audit-trail workflows. |
+| | **Match Resolution** | Quotation-line product matching tasks. |
+| | **RFQ History** | RFQ sourcing history, create and compare screens (§38). |
+| | **Smart Compare** | Supplier offer comparison and price intelligence tools. |
+| | **Basket Split** | The multi-supplier basket optimisation workflow. |
+| **Purchasing** | **Purchase Requests** | Request intake. |
+| | **Approval Queue** | Requests waiting for your approval. |
+| | **Order Tracking** | The purchase order lifecycle screens (§11). |
+| **Catalogue** | **Products** | The Product Catalogue. |
+| | **Suppliers** | Supplier records and supplier profile management. |
+| | **Supplier Risk** | The workspace-wide Supplier Risk Queue (§36). |
+| | **Import Catalogue** | The CSV import workflow for bulk product/supplier updates (Owner/Buyer). |
+| **Insight** | **Savings Ledger** | Savings records, evidence, outcome capture and export workflows. |
+| | **Reports** | The Reports Center (§23). |
+| | **Reorder Forecasts** | The demand-forecast reorder queue (§35, Owner/Buyer only). |
+| | **Alerts Inbox** | Detected pricing and procurement alerts. |
+| | **Procurement Analyst / Analyst History** | The grounded Q&A assistant and its conversation history (§37). |
+| **Setup** | **Team Management** | Member administration (Owner only). |
+| | **Settings** | Organisation configuration screens. |
+| | **Ingestion** | The automated-ingestion hub (§27). |
+| | **Accounting** | Accounting Integration (§33). |
+| | **Point of Sale** | POS & Inventory Integration (§34). |
+
+**Business value:** the dashboard gives users a quick confidence check that they are in the right workspace, under the right role, with the right tenant isolation and financial settings. That reduces setup uncertainty before they begin uploading quotes, comparing offers, or approving spend.
+
+---
+
+## 3. Product Catalogue
+
+**Route:** `/products`
+
+![Product Catalogue](screenshots/03-products-list.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Product Master"** | The master list of all products in your workspace. Products are the items you purchase and compare across suppliers. |
+| 2 | **Import Products button** | Opens the Import Wizard to bulk-upload products from a CSV file. |
+| 3 | **+ New Product button** | Opens the product creation form to add a single product manually. |
+| 4 | **Search bar** | Type to filter products by name. The search is instant and case-insensitive. |
+| 5 | **Status filter dropdown** | Filter by Active, Archived, or All products. Archived products are hidden from comparison and request flows. |
+| 6 | **Product table** | Lists all products with columns for name, brand, variant, GTIN, pack definition, normalised base quantity, and status. Click the pencil icon to edit; the red icon archives a product. |
+| 7 | **Empty state** | When no products exist, a prompt guides you to add your first product. |
+
+**Workflow:**
+1. Start by importing your existing product list via CSV, or add products one by one.
+2. Each product needs at minimum a **name** and a **base measurement unit** (kg, litre, piece, etc.).
+3. Products can be archived (soft-deleted) — they are never hard-deleted.
+
+**Business value:** the product catalogue is the vocabulary that makes every later comparison possible. Clean product identities reduce duplicate spend, group supplier volume for negotiation, and stop teams from comparing two offers that look similar but refer to different products or pack sizes.
+
+---
+
+## 4. Create / Edit Product
+
+**Route:** `/products/new` or `/products/:id`
+
+![Create Product](screenshots/04-product-form.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Product Name** (required) | The primary display name for this product across the system. |
+| 2 | **Brand** | The manufacturer or brand. Used as a matching signal when AI resolves extracted quotation lines. |
+| 3 | **Variant** | Size, colour, flavour, or other distinguishing detail. |
+| 4 | **GTIN / Barcode** | The Global Trade Item Number (EAN/UPC). When present, this is the strongest matching signal for quotation extraction. |
+| 5 | **Base Measurement Unit** (required) | The unit used for price normalisation — Each, Gram, Kilogram, Litre, Millilitre, etc. All suppliers' prices are normalised to this unit so you can compare like-for-like. |
+| 6 | **Canonical Name** | An optional standardised name. If left blank, it defaults to the product name. |
+| 7 | **Pack Definition & Normalisation** | Define how this product is packaged. **Pack Count** (e.g. 5) times **Unit Size** (e.g. 500 each) equals the **Normalised Base Quantity**, calculated live as you type — e.g. `5 × 500 each = 2500 each`. |
+| 8 | **Preferred Supplier** | Optionally assign a default supplier for this product. |
+
+**Key concept — Pack Normalisation:**
+A supplier may quote "1 case of 12 x 500ml bottles" while another quotes "1 pack of 6 x 1L bottles." ProcurePilot normalises both to a per-litre price so you see the true cost comparison.
+
+**Business value:** pack normalisation protects margin. It exposes when a low unit price is only low because the pack, size, or base unit is different, and it gives buyers a defensible per-unit basis for supplier negotiation.
+
+---
+
+## 5. Suppliers
+
+**Route:** `/suppliers`
+
+![Suppliers](screenshots/05-suppliers-list.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Suppliers"** | The master list of all suppliers in your workspace. |
+| 2 | **Import Suppliers button** | Bulk-import suppliers from a CSV via the Import Wizard. |
+| 3 | **+ New Supplier button** | Opens the supplier creation form. |
+| 4 | **Status filter** | Filter by Active, Preferred, Blocked, Archived, or All. Blocked suppliers trigger a policy flag if their offers appear in Smart Compare. |
+| 5 | **Supplier table** | Lists all suppliers with columns for name, payment terms, lead time, minimum order value, delivery fee, and status. Click the pencil icon to edit. |
+
+**Supplier statuses:**
+- **Active** — available for quotations and purchasing.
+- **Preferred** — prioritised in recommendations.
+- **Blocked** — offers from this supplier are flagged in Smart Compare; purchasing requires an exception.
+- **Archived** — hidden from active workflows.
+
+**Business value:** supplier profiles turn supplier knowledge into reusable operating data. Payment terms, lead time, delivery fees, minimum order values, and status all influence the true business cost of buying, so ProcurePilot can recommend the supplier that is commercially best, not just cheapest on the line item.
+
+### Create Supplier form
+
+![Create Supplier](screenshots/05b-supplier-form.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Supplier Name** (required) | The only mandatory field — a supplier can be created with just a name and completed later. |
+| 2 | **Contact Email** | The address ProcurePilot sends RFQs to when you include this supplier in a Create RFQ send (§38). Optional, but validated as a real email address if you enter one. A supplier with no contact email on file simply won't appear in the RFQ supplier picker — there's no other purchasing workflow it blocks. |
+| 3 | **Payment Terms** | Free text, e.g. "Net 30". |
+| 4 | **Lead Time (Days)** | Typical delivery lead time, used in Smart Compare's scoring. |
+| 5 | **Minimum Order Amount / Currency** | Both fields are required together — Constitution Principle VII: no bare numbers for money. Leave both blank if there is no minimum. |
+| 6 | **Delivery Fee Amount / Currency** | Same paired-currency rule as the minimum order amount. |
+
+---
+
+## 6. Import Wizard
+
+**Route:** `/import`
+
+![Import Wizard](screenshots/06-import-wizard.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Import type selector** | Choose whether to import a **Products Catalogue** or a **Suppliers List**. |
+| 2 | **Drag-and-drop zone** | Drag a CSV file here or click to browse. Accepts comma-delimited `.csv` files with a header row. |
+| 3 | **Safety notice** | "No data is saved during validation" — you will preview and confirm before any records are created. |
+| 4 | **Upload & Validate File button** | Uploads the file, parses it, and shows a preview with validation results. Duplicates can be handled with "skip" or "update" policies. |
+
+**Tips:**
+- Prepare your CSV with a header row matching the column names shown in the app's own product/supplier tables (product name, brand, variant, GTIN, base unit, pack details for products; name, payment terms, lead time, minimum order value/currency, delivery fee/currency for suppliers).
+- The wizard detects duplicates by GTIN (products) or name (suppliers) and lets you choose to skip or update existing records.
+
+**Business value:** import reduces time-to-value. A business can bring its existing product and supplier records into ProcurePilot quickly, while preview and validation prevent messy spreadsheet data from polluting the trusted purchasing dataset.
+
+---
+
+## 7. Quotation Review Queue
+
+**Route:** `/quotations`
+
+![Quotation Review Queue](screenshots/07-quotation-review-queue.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Quotation Review Queue"** | Lists all quotations that have been extracted and need human review before they become trusted commercial data. |
+| 2 | **Upload Quotation button** | Opens the upload screen to add a new supplier quotation. |
+| 3 | **Search by supplier or ID** | Instant, case-insensitive search across the queue. |
+| 4 | **Filter by Status** | Open, Resolved, or All. |
+| 5 | **Filter by Priority** | High, Medium, Low, or All — priority is set based on the reason for review (an arithmetic mismatch is always High). |
+| 6 | **From date / To date** | Filters the queue by created date range. |
+| 7 | **Select-all checkbox + row checkboxes** | Select one or more rows to reveal a bulk-action bar: bulk archive, bulk refuse, and bulk re-prioritise (set High/Normal/Low across the selection at once). |
+| 8 | **Review task table** | Each row is clickable and shows: Quotation ID, Supplier, Reason for Review, Priority, Status, Stated Total, Created date, and **Age** (a relative "3h ago" style indicator, with the full timestamp on hover). The ID badge is shortened for scanning; the full UUID remains the backend identifier in the route and API. |
+| 9 | **Review & Authorize action** | Opens the detailed review screen for that quotation. |
+| 10 | **Empty state** | When no review tasks match the current filters, a message confirms this rather than showing a blank table. |
+
+**Tips:**
+- Clicking anywhere on a row (not just the ID or action button) opens the review screen.
+- The "Reason for Review" shown here uses the same VAT-aware arithmetic check as the detail page, so the queue and the detail screen never disagree about whether a quotation's totals reconcile.
+- **Date Not Recognised** («تعذّر التعرّف على التاريخ») means extraction found a quote date it couldn't read. The quotation is not refused for this: it comes here with the date left empty so you can enter it on the review screen (section 9).
+- **Multiple items were merged into one line** («دُمجت عدة أصناف في بند واحد») means one extracted line contains several of the supplier's items. On the review screen, remove that line and add each item as its own line.
+- **Some quotation lines could not be extracted** («تعذّر استخراج بعض بنود عرض السعر») means the quote's table has more item rows than the lines extracted. Compare with the original document and add the missing lines.
+- **Quotation total could not be verified** («تعذّر التحقق من إجمالي عرض السعر») means a PDF or image quote had no stated total, or its line totals couldn't be computed, so the arithmetic couldn't be checked. Confirm the lines and total against the document.
+
+**Business value:** the review queue protects decision quality at scale. Instead of asking buyers to inspect every field manually, it prioritises the quotations most likely to affect trust, cost, or revenue leakage: low-confidence extraction, arithmetic mismatches, and stale unresolved reviews.
+
+---
+
+## 8. Upload Supplier Quotation
+
+**Route:** `/quotations/upload`
+
+![Upload Quotation](screenshots/08-quotation-upload.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Upload Supplier Quotation"** | Upload a document to start the AI extraction process. |
+| 2 | **Back to Review Queue link** | Returns to the quotation review queue without uploading. |
+| 3 | **Drag-and-drop zone** | Drag a quotation file here or click **Choose File** to browse. Selecting a valid file starts the upload automatically. |
+| 4 | **Supported formats** | PDF, PNG, JPEG, TIFF, CSV, XLS, XLSX — up to 25 MB. |
+| 5 | **Security notice** | "Documents are uploaded securely and directly to encrypted storage." |
+| 6 | **Try with a sample quotation** | Six pre-built sample quotations covering every supported format, so you can test the extraction pipeline without a real supplier document: **Acme Foods** (5 items, CSV), **Fresh Direct** (6 items, CSV), **Al-Faisal Trading** (6 items, PDF), **Helios Packaging** (7 items, PDF), **Brightwell Electronics** (6 items, PNG), and **Oakridge Industrial** (8 items, XLSX). |
+
+**After upload:**
+1. The file is uploaded via a presigned URL directly to encrypted storage.
+2. An extraction job starts automatically (usually under 45 seconds per page).
+3. A progress indicator shows the extraction state (uploading → processing → extracted).
+4. When complete, a **Proceed to Review** link appears with the new quotation ID. Click it to inspect the extracted data, or upload another quotation.
+
+**Business value:** upload removes the manual retyping bottleneck. More supplier quotes can be captured before prices expire, and every extracted value remains tied to the source document so later savings claims can be defended.
+
+---
+
+## 9. Quotation Review & Authorization
+
+**Route:** `/quotations/:id/review`
+
+![Quotation Review](screenshots/08b-quotation-review.jpg)
+
+After AI extraction finishes, each quotation lands in the review queue. Open a review task to inspect, correct, and authorize the extracted data before it feeds into matching and comparison.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Breadcrumb** | "Quotation Inbox › {id}" — click to return to the queue. The visible ID is shortened; the full quotation UUID remains in the URL. |
+| 2 | **Action bar** | Always includes Export CSV (download extracted header + lines) and Back to Review Queue. Users with write access also see Archive. Retry Extraction appears only while the quotation is `Extracted`, `In Review`, or `Refused`; it is hidden after the quotation is reviewed. Create Re-Quote appears before authorization and is hidden once the quotation reaches `Reviewed & Authorized`. |
+| 3 | **Arithmetic status banner** | Green "Arithmetic Verified" when line subtotals reconcile with the stated total (after applying any inferred document-level VAT), or an amber "Arithmetic Discrepancy Detected" banner showing both figures side by side when they don't, with a checkbox to proceed anyway with an acknowledgement. |
+| 4 | **Attention-required navigation** | Counts and lets you step through fields still needing a decision (low confidence or extraction warnings) with **Previous/Next Flagged Field** buttons and the Alt+N / Alt+P keyboard shortcuts. Fields you have corrected or confirmed as-is no longer count. |
+| 5 | **Flagged fields panel** | Appears above the two-column layout while any field blocks authorization. Each row shows the field name and extracted value, a **Go to field** link when the field has an inline control, and **Confirm as-is** to accept the extracted value without editing. Selecting a supplier resolves a low-confidence extracted supplier name, so it no longer blocks authorization. The system's currency suggestion never blocks authorization; a quotation with no currency cannot be authorized until a currency is chosen. |
+| 6 | **Confidence legend** | An info bar explaining the 85% confidence threshold, with green (≥85%) and amber (<85%) badge examples, so you know what triggers a flag before you start reviewing fields. |
+| 7 | **Source document evidence panel** | The original uploaded document evidence shown alongside the extraction results, with source metadata and a download button for the original file via a time-limited secure URL. The original filename, including Arabic characters, is shown and used for downloads. Renderable formats show the document preview controls; structured CSV/XLSX uploads show the secure file evidence and extracted fields. |
+| 8 | **Quotation details form** | Editable header fields: supplier, currency, issue date, expiry date, and stated total. The supplier field is a dropdown loaded from the workspace supplier list, with a small **Add a supplier** link to create a missing supplier manually. If the supplier list is completely empty, an empty-state message also links directly to supplier creation. When no supplier is selected and the quotation has an extracted vendor name, the page can offer to create that supplier directly even if other suppliers already exist. If the extracted vendor resembles an existing supplier, a supplier-match banner appears below the dropdown — see below. Each field shows its confidence score. If the document does not show which currency it is in, ProcurePilot does not guess: the currency is left empty, the quotation is sent to review with the reason **Currency Not Found**, and your workspace's home currency appears only as a low-confidence suggestion that you must confirm. |
+| 9 | **Expiry badge** | Next to the Expiry Date field, a "Valid for N days" (or "Expired") badge makes quote validity visible at a glance instead of a plain date. |
+| 10 | **Extracted line items table** | One row per line, expandable to show quantity, pack details, unit price, delivery fee, discount, VAT %, and line total. Add lines with **+ Add Line Item**. Remove an existing editable line with the trash icon in that line's header; removal is staged and only applied when you save corrections. The computed total recalculates live as you edit any field or add/remove a line. |
+| 11 | **Field provenance panel** | For the field currently in focus (its name shown in your interface language), shows the source page, original AI value, and (if edited) the corrected value and who corrected it — labelled "Corrected by Human" on any field you've changed. The extraction provider and model are kept off the screen, in the tooltip of the ⓘ icon next to the panel title; the document's file type is in the tooltip of its file-name badge. Arabic and other right-to-left original values display in their own direction. |
+| 12 | **Reviewer Notes** | A free-text field for recording why a correction was made or leaving context for whoever authorizes the quotation. Saved together with corrections. |
+| 13 | **Audit Trail** | An expandable panel at the bottom logging every action taken on this quotation — upload, extraction, field corrections, status changes, matching setup, automatic match acceptance, and reviewer match decisions — with actor and timestamp. |
+| 14 | **Save Corrections** | Persist manual edits without changing the quotation's status — you can return later. |
+| 15 | **Confirm & Authorize Quotation** | Marks the quotation as reviewed. **Match lines** in the **Next step** card prepares matching and opens only this quotation's matching group; retry from the same button if setup fails. A confirmation dialog states plainly that authorization **cannot be undone**. |
+
+**If authorization is blocked:** the page shows **Select a supplier before authorizing this quotation.** when no supplier is selected, **Resolve or acknowledge the arithmetic mismatch before confirming.** when a discrepancy is unacknowledged, **Review or confirm the flagged extraction fields before confirming.** while flagged fields remain unresolved (the first blocking field is highlighted and scrolled into view), **Set the quotation currency before confirming.** when currency is missing, and **This quotation is not in a state that can be confirmed.** when the quotation has already been actioned.
+
+**Quote dates:** extraction reads the supplier's issue and expiry dates itself. It accepts Arabic-Indic digits and month names in English or Arabic (Egyptian and Levantine names), and reads numeric dates in your workspace region's convention: DD/MM/YYYY for EG, SA, AE, KW, QA, BH, OM, JO, and GB workspaces, MM/DD/YYYY for US workspaces. When the day and month are both 12 or less (for example `03/04/2026`), the date is read in the region's convention and the field is flagged low-confidence so you check it. When a date can't be read at all, the field stays empty, the quotation enters the review queue as **Date Not Recognised**, and the original wording appears under the date picker as "Text in document: …". You must enter a valid date before that blocker clears; a correction that isn't a valid calendar date is rejected.
+
+**Quote lines and totals:** extraction reads the quote's line-item table by its column headings, in Arabic or English (الصنف or البيان, الكمية, الوحدة, سعر الوحدة, الإجمالي; Item, Qty, Unit Price, Total), producing one line per table row whichever direction the columns run. A delivery-charge row such as «مصاريف نقل» becomes the quotation's delivery fee, not an item. The stated grand total («الإجمالي النهائي», «الإجمالي قبل الضريبة», or Total) is read so the arithmetic check can run. A PDF or image quote is accepted automatically only when its line totals reconcile with that stated total; high extraction confidence alone never auto-accepts it. Otherwise it comes to the review queue as **Multiple items were merged into one line**, **Some quotation lines could not be extracted**, or **Quotation total could not be verified**. Saving your corrections clears these three reasons; an arithmetic mismatch that remains after your edits still blocks authorization.
+
+**Supplier auto-match:** when the extracted vendor name resembles one of your existing suppliers closely enough, a banner appears below the supplier dropdown offering to pre-select it ("Suggested: {name} — {pct}% match", or a more tentative "Possible match" wording for a lower-confidence guess) — you still confirm it explicitly, nothing is ever auto-selected. If no reasonable match is found but a vendor name was extracted, the banner can instead offer to create the supplier directly from that name without leaving the page.
+
+**After authorization:** once a quotation is confirmed, product matching runs only against that reviewed quotation. Lines with a strong deterministic match, such as a known GTIN, supplier product code, or previously learned supplier wording, can be accepted automatically. Lines matched only by similar wording are never accepted automatically; they go to the Match Resolution Queue for confirmation. Lines that are uncertain become match-resolution tasks instead of being silently used in comparison.
+
+**Review workflow:**
+1. Open a task from the review queue (section 7).
+2. Check the arithmetic status banner — if it flags a discrepancy, compare stated total against the line sum.
+3. Walk through attention-required fields, correcting any extraction errors inline — the totals and mismatch banner update as you go.
+4. Confirm or add the supplier, using the auto-match banner if one appears.
+5. Click **Save Corrections** to persist your edits, or go straight to **Confirm & Authorize Quotation** once satisfied. Use **Match lines** in the **Next step** card to open product matching; retry from the same button if setup fails.
+
+**Business value:** quotation review turns AI output into trusted commercial data. A wrong supplier, date, quantity, or total can create a false recommendation and a false saving; this page makes the reviewer's corrections auditable before the data affects matching, comparison, or reporting.
+
+![Quotation Review — Line Items](screenshots/08c-quotation-review-lines.jpg)
+
+---
+
+## 10. Match Resolution Queue
+
+**Route:** `/matching`
+
+![Match Resolution Queue](screenshots/09-match-resolution-queue.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Match Resolution Queue"** | Lists quotation lines from **confirmed** quotations that need a human decision: which catalogue product each extracted line refers to. Matching only runs once a quotation has been authorized (section 9). |
+| 2 | **Search by supplier or ID** | Filters tasks by supplier wording, supplier name, quotation ID, or line identifier. |
+| 3 | **Status filter** | `Awaiting Match Decision` (open), `Being Reviewed` (in_progress), `Resolved`, `Auto-accepted` (view-only audit, `apps/web/src/app/features/matching/resolution-queue/resolution-queue.component.html:44`), or `All`. Select `Auto-accepted` to audit lines automatically matched by an exact GTIN, supplier product code or learned alias above the threshold — they show a green `Auto-accepted` badge instead of a routing reason and are always `View Details` only (`component.html:172,188`). Default remains `Open`, so the worklist shows only lines that need a human decision. |
+| 4 | **Priority filter** | Filter by priority. Auto-accepted audit items are `Normal` priority; hidden if you filter to `High`/`Low`. |
+| 5 | **Routing Reason filter** | Filter by why the line was routed here: Below Match Threshold, Close Candidates, Close Match — Needs Confirmation, No Candidate, or Alias Conflict. Close Match — Needs Confirmation means the top candidate cleared the auto-accept score but matched on wording alone, so a person must confirm it. Auto-accepted items use `Auto-accepted` reason and are hidden unless filter is `All`. |
+| 6 | **From date / To date** | Filters tasks by when they entered the matching queue (`Auto-accepted` uses `decided_at`). |
+| 7 | **Quotation groups** | Tasks are grouped by their uploaded quotation. Each group shows supplier, original source filename (including Arabic filenames), quotation reviewer, review time, issue date, and authoritative open/total line progress. Groups can be collapsed when you want to scan quotations without reading every line, then expanded again to resolve individual tasks. Empty queues show "No match tasks found" rather than a blank surface; filtering to `Auto-accepted` with no matches shows the same empty state for that subset. |
+| 8 | **Line evidence** | Each line shows its displayed line number, complete supplier wording with **queue age directly beneath it** (relative time like `just now`, `2h ago`, `3d ago` — full `created_at` on hover via `schedule` icon, `apps/web/src/app/features/matching/resolution-queue/resolution-queue.component.html:157`, `ageLabel()` `component.ts:265`), quoted exposure with currency, routing reason **or** `Auto-accepted` badge, top candidate and score, and matching status (`Awaiting Match Decision` / `Resolved` / `Auto-accepted`). `Below Match Threshold` refers to product matching, not OCR or quotation-review confidence. A line may be fully extracted and arithmetically verified in quotation review while still needing a product-matching decision here. |
+| 9 | **Resolve Match / View Details action** | Opens the resolution screen for that quotation line while preserving quotation context. The line itself is not clickable, so keyboard and screen-reader users get one predictable action target. Human-resolved lines and **all auto-accepted lines** use the view-only `View Details` action for auditing (`component.html:193`); only open `Awaiting Match Decision` lines show `Resolve Match` (for Owner/Buyer). |
+
+**Fuzzy matches no longer auto-accept by default:** a candidate that only scored well on text similarity — no GTIN match, no supplier product code, and no previously learned alias — is never auto-accepted by default, even if its score clears the auto-accept threshold. It is routed here instead with the reason **Close Match — Needs Confirmation**, so a human confirms the product identity before it reaches comparison. This is a deliberate precision guard, not a bug: a workspace can restore the old behaviour (auto-accepting a high-scoring similarity-only match) by enabling a settings flag, but that is off by default until the fuzzy score is calibrated against real outcomes.
+
+**Confirm all exact matches:** when some open lines use exactly the same wording as a catalogue product's name (ignoring case, spacing and Unicode width differences), Owners and Buyers see a banner at the top of the queue — "N exact name matches ready to confirm" — with a **Confirm all exact matches (N)** button. Nothing is accepted automatically: the button records your decision for each line, exactly as if you had confirmed them one by one, and saves an alias so the same wording matches automatically next time. Lines that cannot be confirmed this way (an alias conflict, or already resolved) are counted in a follow-up message; open them individually.
+
+### Match Resolution detail
+
+![Match Resolution Detail](screenshots/09b-match-resolution-detail.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Keyboard Controls bar** | 1–9 selects a candidate by rank, arrow keys navigate, O cycles through outcomes, Ctrl+Enter (Cmd+Enter on macOS) confirms the decision — the whole screen is operable without a mouse. |
+| 2 | **Line detail** | The extracted line text, quantity, unit price, quoted line exposure, and any mixed-currency warning for context. This lets you compare the matching decision against the value that will later appear in Smart Compare. |
+| 3 | **Ranked Product Candidates** | Each candidate card shows the product's brand, variant, GTIN, and base unit, plus a **Match Score** and a reason breakdown (GTIN match, supplier-code match, alias hit, lexical similarity, brand/variant/pack-unit/pack-size/price agreement, and semantic signal where available — shown as "Not available" when the workspace has no semantic-matching provider configured). An explainer states plainly that this score ranks candidates — **it is not yet a calibrated probability** — so treat it as a ranking signal, not a statistical confidence level. |
+
+![Match Resolution Outcomes](screenshots/09c-match-resolution-outcomes.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 4 | **Select Resolution Outcome** | Choose how the line resolves: **Same Product** (exact match), **Different Pack Size** (same product, different packaging), **Different Variant** (same family, different specification), **Compatible Alternative** (functional substitute), or **No Match — Create New Product** (adds a new catalogue product and maps this line to it). Close-candidate tasks require an explicit candidate choice; the screen does not preselect the top ranked option for you. |
+| 5 | **Confirm Match Decision** | Saves the outcome. Confirming "Same Product" (or any outcome that selects a candidate) also learns the exact supplier wording as an alias, so an identical wording on a future quotation resolves automatically without going through this queue again. If the same save request is retried because of a network interruption, ProcurePilot reuses the original saved decision instead of creating a duplicate. |
+
+**Business value:** matching is where supplier wording becomes business intelligence. It prevents fake comparisons, teaches the system each supplier's vocabulary, and reduces future operating work because repeated descriptions can resolve automatically once a human has confirmed them. Filtering `Status = Auto-accepted` lets you audit every automatic acceptance — all of which come from exact GTIN, supplier-code or alias matches — without polluting the default `Open` worklist.
+
+**Audit note:** match-routing, automatic acceptance (`matching.auto_accepted`), and human resolution (`matching.resolved`) events are written to the quotation audit trail and are also surfaced read-only via `Status = Auto-accepted` or the quotation's match overview (`GET /quotations/{id}/matches`). Matching and landed-cost history is append-only; corrections to a confirmed match require a future correction/supersession workflow rather than editing the saved decision in place. Use `View Details` on an auto-accepted line to inspect its candidate, score, and landed cost — no `Resolve` is offered.
+
+---
+
+## 11. Order Tracking & Three-Way Match
+
+**Route:** `/orders`
+
+Tracks a purchase order's lifecycle — submitted, confirmed by the supplier, delivered, and (where an accounting connection exists) reconciled against the supplier's invoice. ProcurePilot never sends, confirms, cancels, or pays an order with the supplier through any integration; every write on these screens is an internal evidence record.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Order Tracking"** | Lists every purchase order in your workspace, newest first. Open to every role, including Viewer. |
+| 2 | **Refresh button** | Reloads the list from the server. |
+| 3 | **Create Order button** | Owner/Buyer only. Opens a blank draft order form (below). Hidden for other roles. |
+| 4 | **Order rows** | Each row: order number (links to detail), a status chip, the order date, line count, and total value. |
+| 5 | **Load more** | Cursor-paginated; click to fetch older orders. |
+| 6 | **Empty state** | "No purchase orders yet" — shown until an order exists. |
+
+**Order statuses:** Draft, Submitted, Confirmed, Partially Received, Received, Cancelled, Closed.
+
+**No bulk import tool or accounting/POS provider writer exists for orders.** Besides the web app's own Create Order flow (below), the only other way to produce a purchase order is a direct `POST /orders` API call. `source_kind` (manual, import, or provider) is just a label the caller sets on that request; only `manual` is ever actually produced by anything currently running. Approving a purchase request (§20) still does not automatically create an order — a buyer creates one explicitly, either standalone or from that request.
+
+### Create, Edit & Cancel a Draft Order
+
+**Route:** `/orders/new` (Owner/Buyer), or `/orders/:id/edit` to edit an existing draft
+
+Reached from **Create Order** on the order list (blank), **From approved request** on the order list (pick an approved request from the menu), the **Create Order** icon on a request whose approval decision is Approved and that still has something left to order — such a request is listed with status `ordered` in Purchase Requests (§18), not `approved`, or **Create purchase order** on an approved request's own page (§19), shown only while some line still has quantity left to order. All of them open this form; none places an order without it.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Source request banner** | Shown only when arriving from a purchase request. Names the request you're creating from, for context. |
+| 2 | **Order Number, Supplier, Order Date, Expected Delivery Date, Currency** | Standard header fields. Order Number is pre-filled with a suggested next number, which you can change. Currency starts as your workspace's home currency and can be changed per order. When the request was prepared from a supplier's RFQ response, **Supplier** is pre-filled with that supplier; otherwise you choose it here. |
+| 3 | **Order Lines** | When creating from a request: one line per request line that still has quantity left to allocate (lines fully covered by an earlier draft are left out entirely). If every line of the request has already been ordered, the form shows "Everything on this request has already been ordered." with links to the request's purchase orders, and no order lines. Each line's **Product**, **Description**, and **Base Unit** are pre-filled from the request line; **Unit Price** is left for you to enter — the request's estimated price is never used as the real price silently. The one exception: if the request was prepared from a supplier's RFQ response, **Unit Price** starts filled with that supplier's quoted price per pack, which you can still change. Quantities are in packs, and the description says the pack size (for example "pack of 18 litre"). |
+| 4 | **Estimate badge** | Shown only when creating a new order from a request (not when re-opening an existing draft via **Edit Draft**). Shows the purchase request's own estimated unit price next to the matching line, as a reference-only figure — it has no effect on the order total unless it is in **Unit Price**, either because you typed it or because the request came from an RFQ response (row 3). |
+| 5 | **"Still to order" badge / quantity cap** | Also shown only when creating from a request. Shows how much of that request line's quantity is still unallocated across all non-cancelled draft/submitted orders, and **Quantity** on that line is capped at this figure so you cannot over-allocate a request across multiple orders. |
+| 6 | **Add Line / Remove Line** | Add a line with no source request (manual), or remove any line, same as a plain manual order. |
+| 7 | **Lines Total / Order Tax / Order Total** | Recalculates live as you edit quantity, unit price, or line tax. |
+| 8 | **Create Purchase Order button** | Submits the draft — the button reads the same whether you're creating a new order or editing an existing draft. After one click it stays disabled and you land on the order's detail screen. If that screen does not open, a notice says «PO-… was created.» with an **Open order** link, so there is never a reason to click twice. If part of the request was ordered after you opened the form, the order is refused: "Part of this request was ordered after you opened this form. Reload the page to see what is still to order." |
+
+**Editing and cancelling a draft:** from Order Detail (below), a `Draft` order shows **Edit Draft** (reopens this same form, pre-filled from the saved order) and **Cancel Order**. Cancelling asks for confirmation first: "Are you sure you want to cancel this order? Any received quantity will remain consumed, and any unreceived quantity will be released back to the source request." — the wording mentions the source request even for a standalone order with none. Both actions, and Submit, are only available while the order is still a `Draft`.
+
+**Business value:** this closes the gap between approving demand and acting on it, without turning approval into a silent purchase. The estimate stays visibly a reference, not a hidden substitute for the real negotiated price, and quantity allocation prevents the same approved need from being over-ordered across more than one draft.
+
+### Order Detail
+
+**Route:** `/orders/:id` (Owner or Buyer — opening this page with any other role redirects you back to the Dashboard)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Back to orders link** | Returns to the order list. |
+| 2 | **Header** | Order number, a status chip, and the creation date. |
+| 3 | **Summary cards** | Order date, expected delivery date, order total, and two evidence-state cards — **Supplier confirmation** and **Delivery receipt** — each reading **Pending**, **Available**, or **Unavailable** rather than silently showing zero when no evidence has been recorded yet. |
+| 4 | **Evidence by line** | One row per order line: description, unit price and base unit, ordered quantity, confirmed quantity (with its own evidence state), received quantity (with its own evidence state), and the remaining quantity still outstanding. |
+| 5 | **Edit Draft / Cancel Order / Submit order buttons** | Visible only while the order is `Draft`. **Edit Draft** reopens the Create Order form pre-filled from this order. **Cancel Order** asks for confirmation (received quantity stays consumed; unreceived quantity is released back to the source request) before moving the order to `Cancelled`. **Submit order** moves it to `Submitted`. |
+| 6 | **Record confirmation / Record delivery buttons** | Visible for any order that isn't `Draft`, `Cancelled`, or `Closed`. Each opens an inline form: a reference, a date, and a quantity field per line (confirmed quantity, or received quantity). Delivery receipts are cumulative — recording a second, partial receipt adds to the first rather than replacing it; the line's remaining quantity is recomputed deterministically each time. |
+| 7 | **Evidence timeline** | A chronological log: order created, confirmation recorded (if any), and one entry per delivery receipt (with its reference). |
+
+**Business value:** order tracking closes the loop after a purchase request is approved. It gives buyers one place to see whether a supplier confirmed what was ordered and how much has actually arrived, without ProcurePilot ever contacting the supplier itself — every write here is an internal evidence record that later feeds three-way-match reconciliation.
+
+**Related screen:** when an accounting connection exists, mismatches between what was ordered, confirmed, received, and invoiced surface as three-way-match discrepancies on the Reconciliation Discrepancies screen — see [§33 Accounting Integration](#33-accounting-integration).
+
+---
+
+## 12. Smart Compare
+
+**Route:** `/offers/compare`
+
+![Smart Compare](screenshots/10-smart-compare.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Smart Compare"** | Compare supplier offers side-by-side with true landed cost and evidence-backed recommendations. |
+| 2 | **Product selector** | Select a product from your catalogue to see all available supplier offers. |
+| 3 | **Required Quantity field** | Enter the quantity you need, in packs (the unit you buy in, for example tins or sacks). A hint underneath converts it, for example "10 pack(s) × 18 litre = 180 litre". Prices recalculate live — tiers, minimum order values, and delivery thresholds update instantly. |
+| 4 | **Include expired offers toggle** | Check to include expired quotation offers in the comparison. |
+| 5 | **Recommended Offer banner** | Shown when a matched and costed offer exists: a confidence badge (High/Medium/Low), a recommendation score, risk considerations (e.g. "Product match score is below 85%. Verify product specifications."), validity window, and scoring evidence breakdown. When Supplier IQ risk evaluation influenced the recommendation, a **Supplier IQ / Risk** evidence chip and risk panel appear with a direct **View Supplier Scorecard** link. |
+| 6 | **Comparison table** | Each row is one supplier offer: unit price, total landed cost, lead time, reliability, stock availability, **Match Score**, validity, and status. A product match that a person confirmed shows as 100% with a **Verified by buyer** badge, and is not flagged as a low-confidence match. Next to each supplier's name, a scorecard icon button allows navigating directly to that supplier's detailed Supplier IQ scorecard (`/suppliers/:id/scorecard`). |
+| 7 | **Record Purchase action** | From the banner or any table row, click "Record Purchase" to open the outcome-capture form (section 16) and have the savings automatically calculated. |
+
+**Mixed-currency offers:** ProcurePilot has no foreign-exchange rate data, so it never converts or silently mixes currencies when scoring a recommendation. If the offers for the selected product span more than one currency — for example, one supplier quoted in USD and the rest in GBP — the comparison table (item 6 above) still lists every offer regardless of currency, but the Recommended Offer banner only scores and ranks offers in a single reference currency: whichever currency the most suppliers quoted in, tied-broken first by the lowest supplier ID and then by the currency code itself. Offer(s) in any other currency are excluded from the recommendation and its ranking entirely. When this happens, the banner's Risk Considerations list includes a note: "One or more offers in a different currency were excluded from this comparison rather than converted." See [§40 Known Issues](#40-known-issues) for a current display defect affecting this specific note.
+
+**Business value:** Smart Compare converts cleaned data into a buying decision. It lowers recurring purchasing cost, gives buyers evidence for negotiation, and helps owners see why a recommendation was made before money is spent.
+
+**Data readiness:** Smart Compare depends on the full chain being complete: upload quotation → review and authorize → resolve product matching where needed → compute landed cost. If an expected quote is missing from comparison, check the Quotation Review Queue and Match Resolution Queue first.
+
+**Related screens:**
+- **Basket Split & Advanced Optimiser** — see next section.
+
+### Product Price Intelligence
+
+**Route:** `/offers/product-intelligence` or `/offers/product-intelligence/:id`
+
+![Product Price Intelligence](screenshots/10b-product-intelligence.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Product selector** | Choose the catalogue product whose price history you want to inspect. A product ID in the route preselects this field. |
+| 2 | **Supplier filter** | Restrict the history to one supplier or keep all suppliers. |
+| 3 | **Time window** | Switch between the available history windows, such as 6 months. |
+| 4 | **Price intelligence panel** | Shows landed-cost trend metrics and historical records once reviewed quotations have been matched and costed for the selected product. Until then, the page displays a no-history state with a link back to the Quotation Inbox so you can build source data. |
+| 5 | **Smart Compare / View Product actions** | Jump back to Smart Compare or open the selected product's catalogue record. |
+
+**Business value:** price intelligence gives the business purchase memory. It helps buyers challenge increases, spot supplier drift, time negotiations, and decide whether a current offer is truly good compared with actual historical landed cost.
+
+---
+
+## 13. Basket Split & Advanced Optimiser
+
+**Route:** `/offers/basket-split`
+
+![Basket Split](screenshots/11-basket-split.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Basket Split"** | Optimise purchasing across 2 to 10 selected suppliers for minimum total landed cost using an exact constraint-programming solver (Google OR-Tools CP-SAT). |
+| 2 | **Supplier selectors** | Choose 2 to 10 suppliers. The selector dynamically enforces mutual exclusion. |
+| 3 | **Commercial Constraints panel** | Toggle to configure supplier commercial terms: Minimum Order Values (MOV), Free Delivery Thresholds, Delivery Fees, and Quantity Tiers. |
+| 4 | **Risk & Urgency controls** | Set Risk Tolerance (`low`, `medium`, `high`), Delivery Urgency (`normal`, `urgent`), and explicit supplier exclusions. |
+| 5 | **Optimisation Weights** | Customise relative weighting sliders for price, preferred suppliers, risk, lead time, and quality. |
+| 6 | **Basket Items section** | Add catalogue products and required quantities, in packs; a hint under each quantity shows the total in the product's base unit. Click **+ Add Item** to add more lines. |
+| 7 | **Optimise Basket button** | Submits the constrained basket to the solver. Execution runs asynchronously with live polling. |
+
+**Results and Analysis:**
+- **Feasible Allocation:** Clear per-supplier breakdown detailing assigned items, quantities, sub-totals, delivery fees, and overall minimum landed cost.
+- **Single-Supplier Baselines:** Evaluates whether splitting across suppliers saves money versus purchasing entirely from a single supplier.
+- **Applied & Violated Constraints:** Inspect which commercial terms (MOV, delivery fee) were applied and which constraints were violated if infeasible.
+- **Advisory-Only Protection:** In strict adherence to system principles, basket optimisation is purely advisory and never autonomously creates orders or commits funds.
+
+**Mixed-currency offers:** as in Smart Compare, ProcurePilot never converts or mixes currencies here either. In **Basket Split**, if any basket item's offers span more than one currency (or that item's currency doesn't match the currency the rest of the basket is priced in), the whole optimisation is reported as infeasible in the Commercial Infeasibility Report, the same as any other item with no eligible offer. The **Advanced Multi-Supplier Optimiser** is stricter still: any currency inconsistency anywhere in the basket — across any item, supplier term, or fee — fails the entire optimisation job outright before solving even starts, rather than excluding just the affected item and solving around it.
+
+**Business value:** basket optimisation finds the lowest total landed cost across a real order, not just the cheapest line item. It accounts for supplier minimums, delivery fees, price tiers, urgency, risk, and quality so buyers can avoid overpaying because of supplier constraints while still keeping the final purchasing decision human-authorized.
+
+---
+
+## 14. Supplier Scorecards & Supplier IQ
+
+**Route:** `/suppliers/:id/scorecard`
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Scorecard Header** | Supplier name, rule version (`supplier-risk-v1`), and back-link to supplier profile. |
+| 2 | **Time Window Selector** | Toggle analysis window between 3, 6, and 12 months. |
+| 3 | **Overall Risk Score Card** | Weighted composite risk score (0-100%) with risk level indicator (Low/Medium/High) and component breakdown. |
+| 4 | **Performance Metrics Grid** | Dense operational cards displaying Fulfilment Rate, On-Time Delivery, Quality Incident Rate, Price Competitiveness, Spend Exposure, and Dispute Rate. |
+| 5 | **Evidence Sources Panel** | Transparent transaction counts showing total quotations, delivery confirmations, and quality issue records analysed. |
+| 6 | **Insufficient Evidence State** | Automatically flagged when transaction history is sparse, informing buyers that scores reflect limited sample observations. |
+
+**Business value:** Supplier IQ transforms fragmented operational and commercial records into defensible risk indicators, empowering buyers to detect vendor drift and quality issues before awarding orders.
+
+**R4.1 extension:** this page now ends with a **Supplier Risk Evidence** panel (the v2 risk model, with a component-level evidence table and a **Prepare negotiation brief** button) and is also reachable from a workspace-wide **Supplier Risk Queue**. See [§36 Supplier Risk Queue & Negotiation Briefs](#36-supplier-risk-queue--negotiation-briefs).
+
+---
+
+## 15. Alerts Inbox & Anomaly Detection
+
+**Route:** `/alerts`
+
+![Alerts Inbox](screenshots/12-alerts-inbox.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Actionable Alerts Inbox"** | Proactive commercial signals and anomaly alerts computed live from current quotations, deliveries, and price history. |
+| 2 | **Filter by Alert Type** | Filter by type: Price Expiring, Supplier Disappeared, Price Swing, Price Spike, Duplicate Quotation Line, Decimal/Quantity Anomaly, Delivery Cost Anomaly, Quality Trend Change, or All. |
+| 3 | **Alert cards** | Each alert displays severity (info/warning/critical), confidence rating (High/Medium/Low), affected supplier/product, recurrence key, and actionable routing. |
+| 4 | **Action routing links** | Direct action buttons: **Inspect Scorecard** (navigates to Supplier Scorecard), **Review Quotation** (navigates to quotation review), **Compare Offers**, or **View Delivery Issues**. |
+| 5 | **Dismiss action** | Dismisses alerts with recurrence suppression; recurring alerts only resurface if underlying commercial evidence changes. |
+| 6 | **All clear state** | Confirms no commercial anomalies or warning conditions require immediate buyer attention. |
+
+**Alert kinds:**
+- **Price Expiring** — a quotation is about to expire and no renewal has been uploaded.
+- **Supplier Disappeared** — a supplier that previously quoted for a product has not submitted a quotation in the current cycle.
+- **Price Swing** — a significant price change compared to previous quotes.
+- **Price Spike Anomaly** — sudden abnormal price surge compared to workspace baselines.
+- **Likely Duplicate Quotation Line** — multiple identical quotation lines detected across current uploads.
+- **Decimal / Quantity Anomaly** — potential decimal shift or unit-of-measure mismatch in supplier quotation.
+- **Delivery Cost Anomaly** — abnormal surge in delivery fee relative to order value.
+- **Supplier Quality Trend Change** — sharp increase in delivery discrepancies or quality complaints.
+
+**Business value:** live anomaly detection intercepts erroneous quotes, supplier performance degradation, and commercial leakage before purchasing decisions are finalized.
+
+---
+
+## 16. Savings Ledger
+
+**Route:** `/savings`
+
+![Savings Ledger](screenshots/13-savings-ledger.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Savings Ledger"** | Defensible record of procurement savings calculated against verified historical baselines. |
+| 2 | **Export Savings button** | Opens the export screen to generate an audit-ready Excel or PDF report. |
+| 3 | **+ Record Purchase Outcome button** | Opens the outcome capture form (below) to record a purchase and automatically calculate savings. |
+| 4 | **Stats cards** | Three summary cards: **Total Verified Savings**, **Verified Outcomes** (count), **Pending Outcomes** (count). |
+| 5 | **Filters** | Status (All/Verified/Pending), supplier, and date range. **Clear Filters** resets all. |
+| 6 | **Savings table** | Each row: product, supplier, baseline value (with the baseline policy used beneath it, e.g. "Last PO Price"), actual paid, **Saving (Delta)**, status, and recorded date. The status chip is the verification signal: a Pending row's delta is a calculated saving, shown outlined with "Calculated, not yet verified" beneath it, and only counts toward **Total Verified Savings** once an owner or buyer verifies it. Click **View Evidence** to drill into the full calculation. |
+| 7 | **Empty state** | When no savings exist, "No savings recorded yet" with a **+ Record First Purchase** link. |
+
+### Record Purchase Outcome
+
+Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purchase Outcome** on the ledger itself. To record what a purchase order bought, use **Record outcome** on the order instead (below) — it fills every line for you.
+
+![Record Purchase Outcome](screenshots/13b-outcome-capture.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Historical Baseline Note** | Explains the baseline: the last purchase-order price for the product, or the last quoted price when the product has no earlier purchase order. |
+| 2 | **Product / Supplier** | Pre-filled when arriving from Smart Compare. |
+| 3 | **Actual Quantity Ordered / Base Unit** | What you actually bought, in the product's normalised unit, chosen from the supported units (each, kg, g, L, mL — shown in your interface language). |
+| 4 | **Actual Unit Price / Currency / Total Amount Paid** | What you actually paid — always with an explicit currency, which defaults to your workspace's home currency (or the offer's currency when you arrive from Smart Compare). |
+| 5 | **Delivery Outcome** | Delivered, Partially Delivered, Not Delivered, etc. |
+| 6 | **Order Date** | When the order was placed. Typed dates are DD/MM/YYYY in Arabic and in every workspace outside the US region (MM/DD/YYYY only for an English-language US workspace) — the same convention extraction uses for quote dates — and Arabic-Indic digits are accepted. This applies to every date picker in the app. |
+| 7 | **Notes / Reference ID** | Optional free text, e.g. a PO number. |
+| 8 | **Record Outcome & Compute Saving** | Saves the outcome and immediately computes the saving against the baseline, taking you to the Saving Evidence screen. If the selected product has no price history yet, the form flags that no baseline is available for that product. |
+
+### Record Outcome from a Purchase Order
+
+**Route:** `/orders/:id/record-outcome` — the **Record outcome** button on a submitted, confirmed, received, or closed purchase order (owner and buyer).
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Baseline note** | Savings are measured against the last purchase-order price for each product, excluding this order. |
+| 2 | **Delivery Outcome** | Pre-selected from the order status (Ordered, Partially Delivered, or Delivered); change it if needed. |
+| 3 | **One line per order line** | Each line shows the pack conversion (e.g. "2 × pack of 30 piece = 60 piece"), with the quantity in base units and the total paid (excluding tax) pre-filled without trailing zeros (e.g. «675», «1230») and editable; the value shown is the value saved. Untick a line to skip it. |
+| 4 | **Lines that cannot be recorded** | Lines not linked to a catalogue product, with nothing ordered, or already recorded are greyed out; an already-recorded line links to its saving. |
+| 5 | **Save outcomes** | Records one purchase outcome per selected line, each linked to its order line. A line can be recorded only once. |
+
+### Saving Evidence & Calculation
+
+![Saving Evidence](screenshots/13c-saving-evidence.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Verification banner** | "Pending Verification" (amber, with a **Verify Saving** button) until an owner or buyer verifies it, after which it reads "Verified (Immutable)" (green, with a lock icon) and the record can no longer be edited or deleted. |
+| 2 | **Saving Summary** | Net saving, actual vs. baseline total value, baseline unit price, baseline policy used, the purchase order the baseline came from (for "Last PO Price", linked), status, recorded/verified dates, and the calculation version. |
+| 3 | **Purchase Details** | The full purchase record as entered. |
+| 4 | **Calculation Snapshot** | The exact formula applied ("Baseline Value − Actual Paid = Net Saving") and the competing offers that were on the table at compare time — the full evidence chain from quotation → match → offer → purchase → saving. |
+
+**Key concept — the baseline:** the saving is measured against the **last purchase-order price** for the product: the newest submitted, confirmed, received, or closed order line in the same base unit, excluding the order being recorded. PO prices are per pack, so the baseline is scaled to the outcome's base units (a carton of 30 at 172 against 60 pieces gives a baseline of 344). Without an earlier purchase order, the baseline falls back to the **last quoted price**, scaled from the quote's landed total so a whole number of packs gives the quote's exact total (85 per 45 kg pack against 675 kg gives 1,275.00), then the 6-month quoted average; otherwise no baseline is available. The baseline unit price shown is rounded to 4 decimals, so unit price × quantity can differ from the baseline value in the last digits.
+
+**Key concept — Verified Savings:**
+- Verified savings are **immutable** — once verified, they cannot be edited or deleted. If a correction is needed, a new adjustment record is created.
+- The evidence chain traces from quotation → match → offer → purchase → saving, providing full auditability.
+
+**Business value:** savings only matter when they can be proven. The ledger connects recommendation, purchase outcome, baseline, and evidence so owners can measure real procurement impact, report it confidently, and avoid inflated or unverifiable savings claims.
+
+---
+
+## 17. Export Savings
+
+**Route:** `/savings/export`
+
+![Export Savings](screenshots/14-export-savings.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Export Savings Ledger"** | Generate audit-ready reports of verified savings, spend by supplier, or commercial alerts. |
+| 2 | **Compliance notice** | "Only verified savings are included in the export. Pending rows are excluded per audit compliance rules." |
+| 3 | **Export Kind selector** | Choose **Savings Ledger**, **Spend by Supplier**, or **Commercial Alerts Summary**. |
+| 4 | **Export Format selector** | Choose **Excel Spreadsheet (.xlsx)**, **CSV Spreadsheet (.csv)**, or **PDF Summary Report (.pdf)**. |
+| 5 | **Period Start Date / Period End Date** | Filters the export by recorded date; default to year-to-date. |
+| 6 | **Filter by Branch / Supplier** | Optionally restrict the export to an enabled branch or specific supplier. |
+| 7 | **Schedule as Weekly Report link** | Pre-populates the Report Schedule form (§24) with the selected kind, format, and filters. |
+| 8 | **Generate Export button** | Submits the export job. A progress indicator shows processing status, and a download link appears when complete. |
+
+**Business value:** exports make procurement value portable. Finance, owners, and external advisors can review verified savings and spend intelligence outside the app without losing the evidence discipline that produced the numbers. Export generation is capped at 10,000 rows with a strict 60-second execution budget to protect workspace performance.
+
+---
+
+## 18. Purchase Requests
+
+**Route:** `/requests`
+
+![Purchase Requests](screenshots/15-purchase-requests-empty.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Purchase Requests"** | Create and track purchase requests for your branches and cost centres. |
+| 2 | **+ Save Draft button** | Opens the new purchase request form. The label currently describes the first action on the next screen rather than the navigation action. |
+| 3 | **Status filter** | All, Draft, Submitted, Approved, Rejected, or Withdrawn. |
+| 4 | **Request table** | Each row shows the required-by date, branch, status, estimated total, and row actions. Current rows can show an internal branch UUID in the list; the request detail screen resolves the branch and cost-centre names. A request drafted by an RFQ guardrail rather than a person carries an **Auto-prepared** badge next to its status; hover it to see whose quote it came from. |
+| 5 | **Row actions** | Use the eye icon to open the request. Submitted rows also expose withdrawal where allowed by status. `approved` rows additionally show a **Create Order** icon (Owner/Buyer) that opens the order-create screen pre-filled from that request — see [§11 Order Tracking & Three-Way Match](#11-order-tracking--three-way-match). |
+
+**Request lifecycle:**
+1. **Draft** — a request is created and can be freely edited. Lines can be added/removed.
+2. **Submitted** — the request is sent for approval. It can no longer be edited, but can be withdrawn.
+3. **Approved / Rejected** — decided by an approver. Cannot be withdrawn after a decision.
+4. **Withdrawn** — the requester pulled back a draft or submitted request before a decision.
+
+**Business value:** purchase requests capture demand before spend happens. That shifts procurement from reactive buying to controlled intake, giving owners visibility by branch, cost centre, need date, and estimated impact.
+
+---
+
+## 19. New Purchase Request
+
+**Route:** `/requests/new` or `/requests/:id`
+
+![Purchase Request Form](screenshots/16-request-form.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 0 | **Auto-prepared banner** | Shown only on a request an RFQ guardrail drafted (§38): "Prepared automatically by a guardrail" and the supplier whose quote won. On a draft it asks the owner to review and submit it; nothing is ordered until the request is approved. Approvers see the same banner. |
+| 1 | **Page title** | Reads "New Purchase Request" when creating a draft, "Edit Purchase Request" when editing a draft, and "Purchase Request" (with its status) when the request can no longer be edited. An approved request shows a **Create purchase order** button (§11) while at least one line still has quantity left to order (draft orders count as ordered). Once orders exist, the page lists them under **Purchase orders** as links (for example «PO-000005»). When nothing is left to order, the button is replaced by "Everything on this request has been ordered." |
+| 2 | **Branch selector** (required) | Select the branch this request is for. Branches are defined in Organisation Settings (section 22) — a request cannot be created until at least one branch exists. Existing requests show the saved branch. |
+| 3 | **Cost Centre selector** (optional) | Optionally assign the request to a cost centre for budget tracking. |
+| 4 | **Required By date** (required) | The date by which the goods are needed. |
+| 5 | **Line Items section** | Each line needs a **Product**, a **Quantity**, and an optional **Note**. |
+| 6 | **+ Add Line button** | Adds another line item row. At least one line is required to submit. |
+| 7 | **Save Draft / Submit controls** | **Submit** saves your latest edits first, then submits; if the form is invalid or the save fails, nothing is submitted. Submitted requests become read-only except for status-specific actions such as withdrawal. |
+
+**Current display limitation:** existing submitted requests can show the saved product UUID in the line-item field instead of the product name. The underlying relationship is stored correctly, but the detail display still needs the same friendly-name resolution used elsewhere in the app.
+
+**Approval status (once submitted):** once a request has been routed to an approver, the detail view shows an **Approval** section below the budget status: a status chip (Pending / Approved / Rejected), who it's assigned to, and — once a decision has been made — the approver's comment (if any) and the decision timestamp. This is read-only; only the assigned approver can act on it, from the Approval Queue (section 20).
+
+**Business value:** a structured request preserves the context that is usually lost in chat messages: who needs the item, where it is needed, when it is needed, and what budget or price history should influence the decision.
+
+---
+
+## 20. Approval Queue
+
+**Route:** `/approvals`
+
+![Approval Queue](screenshots/17-approval-queue.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you — directly, or via an active delegation (section 22) — based on threshold approval rules appear here. |
+| 2 | **Approvals table** | One row per pending request: required-by date, requester (their name; a member with no name shows the part of their email before the @ on one line, with the full address on hover), branch, cost centre, estimated total (with an "incomplete estimate" badge when some lines lack pricing), budget status, and line count. Budget status uses the most specific budget that applies: the cost centre's, otherwise the branch's, otherwise an organisation-wide budget; only when none of the three exists does it show **No budget configured** and say why. |
+| 3 | **Budget Status column** | Shows the remaining budget after this request, or an amber "Budget Exceeded" badge with a tooltip and the remaining-budget figure when the request would exceed the applicable budget. When no cost-centre, branch or organisation budget applies it shows **No budget configured** with the reason; it is blank only when the request cannot be valued (no budget status). |
+| 4 | **Lines column + expand toggle** | Shows the line count; the expand icon reveals a nested table underneath the row with each line's product, quantity, unit price, and note — so you can review the full request without leaving the queue. |
+| 5 | **Approve / Reject buttons** | Each row has both actions. Either opens a confirmation dialog with an optional comment field before committing the decision. |
+| 6 | **Empty state** | "No requests awaiting your decision" style message when the queue is empty, instead of a blank table. |
+
+**Approve / Reject dialog:**
+- A comment is optional on both approve and reject — use it to record why, especially on a rejection.
+- Ctrl+Enter (or Cmd+Enter) submits the dialog without reaching for the mouse.
+- Confirming removes the request from the queue immediately and shows a snackbar confirmation; the request's own detail page (section 19) then shows the decision, approver's comment, and timestamp.
+
+**Business value:** approval routing reduces cycle time without giving up spend control. The queue surfaces the commercial context needed to decide quickly — branch, amount, budget impact, and full line detail — right where the decision is made, and every decision (with its comment) becomes part of the request's own audit trail.
+
+---
+
+## 21. Team Management
+
+**Route:** `/team` (Owner only)
+
+![Team Management](screenshots/18-team-management.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Team Management"** | Manage workspace members, invite colleagues, and configure role-based access. |
+| 2 | **Invite Member button** | Opens a dialog to invite a colleague by email, optionally with their name. You assign them a role (Owner, Buyer, Branch Manager, Approver, Viewer) at invitation time. |
+| 3 | **Members tab** | Lists all current members with columns: name (or «No name»), email address, role (colour-coded pill), status (Active/Removed), MFA status, and join date. |
+| 4 | **Pending Invitations tab** | Lists all sent invitations with email, assigned role, status (Pending/Accepted/Revoked/Expired), and expiry date. |
+| 5 | **Actions menu** (per member) | Options: Edit name, Change Role, Remove Member. The name is what colleagues see in approvals and the team list. The workspace owner cannot be removed. |
+
+**Invitation flow:**
+1. Click **Invite Member** → enter their name (optional), email and role → send.
+2. When Mailgun is configured, the invitee receives an email in the workspace language with a link to accept. The dialog confirms “Invitation emailed to” their address. If email is not configured or sending fails, a distinct warning explains that the email was not sent and asks you to copy the link below.
+3. The copy-link fallback is always available. Keep or share it before closing the dialog: the token is shown once.
+4. Use **Resend invitation** next to Revoke on a pending invitation to create and email a new link. The old link stops working immediately and the expiry restarts. A second resend within about a minute is refused with a message. The result dialog shows delivery status and the new copy-link fallback.
+5. They can create a new account or sign in with an existing one.
+6. Once accepted, they appear in the Members tab with their assigned role and the name you gave them.
+
+**Business value:** Team Management lets the owner delegate procurement work while preserving accountability. Each role creates a clear operating boundary, so buyers can move quickly and sensitive controls stay with the right people.
+
+---
+
+## 22. Organisation Settings
+
+**Route:** `/settings`
+
+![Organisation Settings](screenshots/19-settings.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Organisation Settings"** | Manage your organisation's branches, cost centres, and budgets in one place. |
+| 2 | **Home currency section** (Owners only) | A currency dropdown and a **Save currency** button, showing the current home currency. The home currency is pre-selected in new orders, guardrails and budgets; it never changes existing records. |
+| 2a | **Workspace language section** | English or Arabic. RFQ emails to suppliers, member invitations and scheduled reports go out in this language, and members who have not chosen their own language see the app in it. Owners change it with **Save language** (the change is audited); other roles see it read-only. |
+| 3 | **Branches section** | Define your physical locations or operational divisions. Click **+ New Branch** to add one — only a name is required; address and region are optional. |
+| 4 | **Cost Centres section** | Define cost centres for budget tracking, each with a required **Code** and an optional link to a **Branch**. |
+| 5 | **Budgets section** | Define budgets scoped to the whole organisation, a specific branch, or a specific cost centre, with an amount, currency, period (Monthly/Quarterly/Annual), and period start date. |
+| 6 | **Approval Delegations section** | Lets an approver delegate their pending decisions to a colleague for a date range (e.g. while on leave). Shows a table of the current member's own delegations: delegate, start date, end date, and a cancel action. **+ New Delegation** opens a dialog to pick the delegate (from a dropdown of workspace members), a start date, and an end date. While a delegation is active, requests that would route to the delegating approver are routed to the delegate instead, and appear in the delegate's own Approval Queue (section 20). |
+
+**Create Cost Centre form:**
+
+![Cost Centre Form](screenshots/19b-cost-centre-form.jpg)
+
+**Define Budget form:**
+
+![Budget Form](screenshots/19c-budget-form.jpg)
+
+**Why this matters:**
+- Purchase requests require a **branch** — this determines who can see and approve the request. A branch must exist before you can create your first request (section 19).
+- Cost centres and budgets enable budget-impact visibility on purchase requests.
+- When a request's estimated total would exceed a budget, a warning is shown.
+
+**Business value:** organisation settings connect procurement activity to the way the business is managed. Branches, cost centres, and budgets turn isolated purchases into accountable spend by location, department, and financial period.
+
+**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§40 Known Issues](#40-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
+
+---
+
+## 23. Reports Center
+
+**Route:** `/reports`
+
+The unified workspace hub for generated reporting artifacts and recurring report schedules.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Reports Center"** | Browse, filter, and download all generated exports and manage automated reporting schedules. |
+| 2 | **Tabs — Artifacts & Schedules** | Toggle between generated report artifacts and recurring report schedules. |
+| 3 | **Filter Toolbar** | Filter artifacts by report kind (Savings Ledger, Spend by Supplier, Commercial Alerts Summary) and status (Completed, Queued, Failed, Expired). |
+| 4 | **Artifacts List** | Comprehensive table displaying report kind, format pill, creation date, period, row count, and status badge. |
+| 5 | **Download Action** | Generates a secure, signed URL (short-lived TTL) for downloading completed Excel, CSV, or PDF artifacts directly from storage. Purged/expired artifacts indicate expiry. |
+| 6 | **Operational Deep Links** | Per-kind operational shortcuts allowing instant navigation from artifacts to real actionable contexts: Alerts to the inbox, Savings to the ledger, and Spend to Smart Compare. |
+
+**Print support:** the Reports Center includes a dedicated print stylesheet (`@media print`) that isolates the artifact list and suppresses navigation chrome, filters, and tab headers for clean audit printing.
+
+**Business value:** the Reports Center gives owners and finance one governed place to retrieve procurement evidence after exports are generated. It reduces time spent hunting for spreadsheets, preserves report status and expiry context, and links reports back to the operational screens where follow-up action happens.
+
+---
+
+## 24. Report Schedules & Schedule Form
+
+**Route:** `/reports/schedule-form` (or via **+ New Schedule** in the Reports Center)
+
+Configure automated recurring weekly reports delivered directly to the Reports Center.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Report Kind** | Select **Savings Ledger**, **Spend by Supplier**, or **Commercial Alerts Summary**. Note: Spend by Supplier is available for Excel and CSV only. |
+| 2 | **Format** | Choose **Excel Spreadsheet (.xlsx)**, **CSV Spreadsheet (.csv)**, or **PDF Summary Report (.pdf)**. |
+| 3 | **Filter by Branch / Supplier** | Optionally scope the recurring report to a specific branch or supplier. |
+| 4 | **Delivery Day (Weekday)** | Choose which day of the week (Monday through Sunday) the report automatically generates at midnight in your workspace reporting timezone. |
+| 5 | **Locale** | Choose report language (**English** or **Arabic** with full RTL layout and typography). |
+| 6 | **Schedule Management** | Active schedules automatically enqueue export jobs weekly. Schedules can be paused or resumed at any time, and survive creator deactivation to preserve operational continuity. |
+
+**Rate limiting & caps:** schedule creation and mutation are rate-limited and capped per member to prevent resource exhaustion. Duplicate schedules matching an existing member/kind/filters configuration return a structured conflict notification.
+
+**Business value:** scheduled reports turn procurement governance into a routine instead of an ad hoc manual task. Weekly exports keep savings, spend, and alert evidence visible to the right people without relying on a buyer to remember to regenerate the same report every week.
+
+---
+
+## 25. Weekly Digest & Digest Settings
+
+**Route:** `/reports/digest-settings`
+
+Personalized weekly intelligence digests assembling key procurement metrics and pending actions into a single actionable overview.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Subscription Controls** | Configure your personal weekly digest subscription, choose delivery channel (**In-App** or **Email**), and select locale. |
+| 2 | **Delivery Status & Onboarding** | Displays current delivery state (e.g. "Delivered", or "Email not configured" if workspace SMTP settings are unset). New members receive an active default in-app subscription on invitation acceptance. |
+| 3 | **Latest In-App Digest View** | Shown in your current interface language (the subscription's locale only sets the language of the emailed digest). Browse the latest complete weekly digest organized in the standardized six-section hierarchy: **Verified Savings** (hero), **Pending Verifications**, **Pending Approvals**, **Pending Product Match Reviews**, **Commercial Anomalies**, and **Expiring Validity**. The Pending Product Match Reviews section surfaces open product-matching decisions from the Match Resolution Queue (§10) and is only populated for Owner/Buyer subscribers — other roles see it present but empty, since only Owner/Buyer can resolve a match task. |
+| 4 | **Actionable Deep Links** | Every digest section and flagged item contains direct deep links to the responsible review, compare, or approval screen. |
+| 5 | **Strictly Advisory** | Digests never execute autonomous purchasing, approvals, or ordering (FR-017). Human authorization is required on the respective surface. |
+
+**Business value:** weekly digests keep commercial attention focused on the highest-value next actions: verified savings, pending approvals, unresolved anomalies, and expiring opportunities. They reduce management blind spots without turning the system into autonomous purchasing.
+
+---
+
+## 26. Roles & Permissions
+
+| Role | Description | Key capabilities |
+|------|-------------|-----------------|
+| **Owner** | Full administrative access. | Manage billing, team, settings; all buyer capabilities. |
+| **Buyer** | Day-to-day procurement operator. | Upload quotations, compare offers, record purchases, manage catalogue, create requests. |
+| **Branch Manager** | Location-level requestor. | Create purchase requests, confirm deliveries. |
+| **Approver** | Decision authority. | Approve or reject purchase requests within assigned thresholds. |
+| **Viewer** | Read-only access. | View dashboards, reports, and savings data. Cannot modify any data. |
+
+**Notes:**
+- Roles are assigned at invitation time and can be changed by the Owner from Team Management.
+- Role-based visibility is enforced for selected navigation items and route guards.
+- Current client-side route guards restrict product/supplier creation, catalogue import, quotation upload, savings outcome/export, order detail, order create/edit, RFQ create/history/compare, the RFQ guardrail settings screen (Owner only), reorder forecasting, and Team Management. Other authenticated pages still rely on backend authorization for unsafe operations.
+
+**Business value:** roles and permissions protect the purchasing process from accidental or unauthorized action. They let the business separate request, buying, approval, administration, and read-only oversight while preserving a clear audit trail of who was allowed to do what.
+
+---
+
+## 27. Ingestion Dashboard
+
+**Route:** `/ingestion`
+
+![Ingestion Dashboard](screenshots/26-ingestion-dashboard.jpg)
+
+The hub page for automated quotation intake — the landing screen for the five channels documented
+in the sections that follow, plus a rolling view of recent activity.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Stat cards** | Three counters: **Emails Today**, **Capture Uploads**, and **Catalogue Imports** — same-day activity across all three inbound channels. |
+| 2 | **Rate indicators** | **Supplier Match Rate** and **Extraction Success Rate** — how often inbound documents are automatically linked to a known supplier and successfully parsed into structured line items. |
+| 3 | **Integration Coverage cards** | Three cards below the rate indicators: the share of active quotations sourced from an integration rather than a manual upload (with the raw count), how many days of purchase history the workspace has accumulated (with a "Ready"/"Collecting" state), and how many active catalogue refresh schedules are linked to a completed import versus how many exist in total. |
+| 4 | **Channel cards** | One card per inbound channel — **Email Forwarding** (§28), **Email Ingestion Log** (§29), **Capture a Quotation** (§30), **Catalogue Import** (§31), and **Refresh Schedules** (§32) — each with a direct action button into that screen. |
+| 5 | **Recent Emails panel** | A short preview of the most recently received inbound emails, with a **View All** link into the full Email Ingestion Log (§29). Shows an empty state when nothing has arrived yet. |
+
+**Business value:** the dashboard turns "did automated ingestion actually work today" into a single glance, instead of requiring a buyer to open each channel separately to check whether emails are arriving, captures are processing, catalogue imports are landing cleanly, or refresh schedules are actually wired to a source.
+
+---
+
+## 28. Email Forwarding Setup
+
+**Route:** `/ingestion/email-config`
+
+Configure automated inbound email forwarding and domain security to receive and extract supplier quotations directly from your inbox.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Inbound Forwarding Address** | Your workspace's unique ingestion email address. Forward supplier quote emails or PDF attachments to this address to begin automated quotation extraction. |
+| 2 | **Copy Address button** | Copies the inbound forwarding email address to your clipboard with one click so you can share it with buyers or set up automated email forwarding rules. |
+| 3 | **Email Ingestion Status toggle** | Turn email quotation processing on or off for the workspace. When enabled, incoming emails are processed into quotations; when disabled, incoming emails are rejected. Only workspace owners can turn this on or off (other roles see an informational notice). |
+| 4 | **Domain Allowlist input & chips** | Enter approved supplier domains (e.g. `supplier.com`) and click **Add Domain**. Each allowed domain appears as an interactive chip with a remove button. Leave empty to accept inbound emails from all domains. |
+| 5 | **Daily Processing Limit counter** | Shows your workspace's daily email volume and processing quota (e.g. "Processed 12 of 100 emails today") to monitor inbound activity and prevent accidental email loops. |
+| 6 | **SPF / DKIM Verification badge** | Displays whether strict sender identity verification is active, ensuring inbound messages legitimately originate from the sender's domain. |
+
+**Security and spam controls:** the domain allowlist is a critical abuse-prevention control, not just a technical filter. When empty, emails from any sender domain are accepted; once one or more domains are added, ProcurePilot strictly rejects emails from unapproved domains. This prevents spam, unsolicited marketing messages, or unauthorized external emails from polluting your quotation review queue or consuming your workspace's daily processing allowance.
+
+**Business value:** email forwarding captures supplier quotes where they already arrive, instead of forcing buyers to download and re-upload every attachment manually. The controls reduce missed quotes, speed up comparison readiness, and keep the intake channel clean enough to trust.
+
+---
+
+## 29. Email Ingestion Log
+
+**Route:** `/ingestion/email-log`
+
+![Email Ingestion Log](screenshots/28-email-ingestion-log.jpg)
+
+An audit trail of every email received on your workspace's forwarding address, whether or not it
+was successfully turned into a quotation.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Status filter** | Filter by processing status (received, processing, completed, failed, duplicate, or rejected) or view all. |
+| 2 | **From Domain filter** | Restrict the log to emails from a specific sender domain. |
+| 3 | **Date From / Date To filters** | Restrict the log to a received-date range. |
+| 4 | **Reset filters button** | Clears all active filters at once; disabled when no filter is applied. |
+| 5 | **Log table** | One row per received email: received time, sender address and domain, subject (with an attachment-count chip when attachments were present), status badge, matched supplier by name with how it was matched — sender address, domain, thread, reply to an RFQ, or manual — (or "unmatched"), a link to the resulting quotation when one was created, and error details when processing failed. |
+| 6 | **Load more** | Cursor-paginated — click to fetch the next page of older emails; shows "no more" once the log is exhausted. |
+| 7 | **Empty state** | Shown when no emails have been received yet. |
+
+**Tips:**
+- An email rejected for an unapproved sender domain (see §28's domain allowlist) still appears here with a rejected status, so you can confirm the block worked as expected rather than wondering if the email was simply lost.
+- The quotation link only appears once an email has been successfully parsed into a quotation — use the error details column to see why a failed email didn't produce one.
+- Support can retry a failed email without asking you to forward it again.
+
+**Business value:** the log is what makes an automated, unattended intake channel trustworthy. Without it, a rejected or failed email is invisible; with it, a buyer can confirm every forwarded quote either became a quotation or has a clear, specific reason it didn't.
+
+---
+
+## 30. Capture a Quotation (Photo or Upload)
+
+**Route:** `/ingestion/capture`
+
+Quickly capture paper quotes using your mobile device camera or upload quotation documents from your desktop for automated line-item extraction.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Document Dropzone & Browse Files** | Drag and drop a quotation document into the dropzone or click **Browse Files** to select a file from your computer. Supports PDF, JPEG, PNG, and HEIC files up to 10 MB. |
+| 2 | **Take Photo (Capture with Camera)** | On mobile devices or tablets, tap **Take Photo** to open your camera and capture a clear photo of a printed quote, physical invoice, or paper price sheet on the spot. |
+| 3 | **Supplier (Optional) selector** | Optionally link the upload to an existing supplier from the dropdown. If left unselected, ProcurePilot's extraction engine will automatically identify the supplier from the document. |
+| 4 | **Notes (Optional) field** | Add optional notes or context (such as delivery terms, project codes, or special instructions) to accompany the quotation document. |
+| 5 | **Upload & Process button** | Submits the captured file to the ingestion queue. A progress indicator confirms that the document is being uploaded and queued for automated line-item extraction. |
+| 6 | **Success confirmation & deep links** | Displays the generated quotation reference (e.g. "Quotation #42 created successfully") with a **View Quotation** button to open the review screen immediately, and a **Capture Another Document** button to submit more quotes. |
+
+**Review workflow:** capturing quotations is available to workspace Owners and Buyers. Once submitted, the captured document enters the automated line-item extraction queue and becomes a standard quotation for review. Line items, prices, and quantities can then be reviewed, adjusted, and authorized in the Quotation Review Queue (§7) and Quotation Review & Authorization screen (§9) exactly like any manually uploaded quotation.
+
+**Business value:** capture lets buyers preserve price evidence at the moment they receive it, even when the source is a paper quote, phone photo, or ad hoc document. That widens the pool of supplier prices available for comparison and reduces the chance that useful market data stays outside the system.
+
+---
+
+## 31. Catalogue Import (Bulk Price List)
+
+**Route:** `/ingestion/catalogue-import`
+
+Bulk-import supplier price lists and catalogues from CSV or Excel spreadsheets into your product matching and comparison catalogue.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Supplier selector (Required)** | Select the supplier whose price list you are importing. Because price lists represent supplier-specific contractual pricing rather than generic products, selecting a supplier is required before choosing or uploading a file. |
+| 2 | **Catalogue Dropzone & Browse Files** | Drag and drop a spreadsheet or click **Browse Files** once a supplier is selected. Supports CSV and Excel (`.xlsx`) files up to 25 MB. |
+| 3 | **Import Catalogue button** | Uploads the spreadsheet, parses product line items, and runs the automated product matching pipeline against your catalogue. |
+| 4 | **Import Results summary** | Displays a stat breakdown upon completion showing Total Rows, Imported Rows, Skipped Rows, and Error Rows, along with an overall summary (e.g. "Successfully imported 142 of 150 rows"). |
+| 5 | **Error Details table** | When unparseable rows occur, an expandable table details the exact spreadsheet Row number, Column name, and plain-language Error Description (such as missing product names, unparseable prices, or invalid currency codes). |
+| 6 | **Import Another Catalogue button** | Resets the import form so you can import price lists for additional suppliers. |
+
+**Spreadsheet format & partial import resilience:** available to workspace Owners and Buyers. Spreadsheets must include three required columns: product name (accepted headers: `product_name`, `name`, `item`, or `description`), unit price (accepted headers: `unit_price`, `price`, or `rate`; must be a positive number), and currency (accepted headers: `currency` or `curr`; a valid 3-letter currency code such as GBP, USD, or SAR). Optional columns include unit of measure (`unit`, `uom`, or `unit_of_measure`) and minimum order quantity (`qty`, `quantity`, or `moq`). If some rows contain errors, they are listed in the Error Details table and skipped without blocking the rows that succeeded — all valid rows are imported immediately.
+
+**Business value:** catalogue import turns supplier price lists into comparable offer data quickly, instead of waiting for each item to appear on a quotation. Partial import handling keeps good rows moving while making bad rows easy to fix, which improves price coverage without sacrificing data quality.
+
+---
+
+## 32. Catalogue Refresh Schedules
+
+**Route:** `/ingestion/refresh-schedules`
+
+Configures how often a supplier catalogue import should be treated as due for a refresh, and which completed catalogue import feeds each product/supplier pairing.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Refresh button** | Reloads the schedule list. |
+| 2 | **Add refresh schedule form** | Four fields: **Catalogue product**, **Supplier**, **Cadence (days)** (1–365), and an optional **Source catalogue** (a completed catalogue import for that supplier — or "Assign later" to leave it unset). **Add schedule** creates it. |
+| 3 | **Schedule table** | One row per schedule: product, supplier, cadence in days, next refresh date, a **Source catalogue** picker (assignable/changeable inline — the choices are filtered to completed imports for that row's supplier), and status (**Active**, **Paused**, or **Due**). |
+| 4 | **Pause / Resume action** | Toggles a schedule between Active and Paused without deleting it. |
+| 5 | **Empty state** | "No refresh schedules configured yet." |
+
+**Business value:** refresh schedules turn "is this supplier's pricing stale" from a guess into a tracked cadence, and the Ingestion Dashboard's coverage cards (§27) show how many of them are actually linked to a real source import versus still needing one assigned — closing the loop between "we imported a price list once" and "we keep it current."
+
+---
+
+## 33. Accounting Integration
+
+**Route:** `/accounting`
+
+Connects your accounting software so supplier bills can be synced and reconciled against ProcurePilot's own purchase and delivery records. ProcurePilot only ever reads from the connected provider — it never creates, edits, or pays a bill.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Accounting Integration"** | States the purpose: sync bills and reconcile spend against purchase records. |
+| 2 | **Empty state (never connected)** | "Connect your accounting system" with a **Connect** button that starts an OAuth authorization flow. The button itself is visible to every role, but the underlying API only accepts the request from an Owner — see [§40 Known Issues](#40-known-issues). |
+| 3 | **Connection status card** | Once connected: the account's display name, provider, a status badge (**Active**, **Needs Re-authorization**, or **Disconnected**), connected date, and last-synced date. |
+| 4 | **Needs re-authorization banner** | Shown when the provider's OAuth token has expired or was revoked; a **Reconnect** button restarts authorization. |
+| 5 | **View Synced Bills button** | Opens the Synced Bills screen (below). Open to any role while a connection is active. |
+| 6 | **Disconnect / Reconnect button** | Owner only. Disconnecting stops future syncs but does not delete already-synced bills or discrepancy history. |
+
+**Which provider:** the specific accounting system (QuickBooks Online or Xero) is configured for your workspace's deployment — it is not chosen on this screen. Once connected, the connection status card's account name reflects whichever provider is actually configured; see [§40 Known Issues](#40-known-issues) for a labelling inconsistency elsewhere on this screen.
+
+### Synced Bills & Invoices
+
+**Route:** `/accounting/bills`
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Synced Bills & Invoices"** | Supplier bills imported from your accounting software and their purchase-record matches. |
+| 2 | **Sync now button** | Owner/Buyer only. Triggers an on-demand sync from the provider; disabled while a sync is already running or no connection exists. |
+| 3 | **Match Status filter** | All, Matched, or Unmatched. |
+| 4 | **Bills table** | One row per synced bill: vendor/supplier name, amount (with currency), bill date, provider status (Open/Paid/Void), and reconciliation status (Matched/Unmatched). |
+| 5 | **Load more** | Cursor-paginated. |
+| 6 | **Empty state** | "No synced bills found" — shown until a sync has run and produced at least one bill. |
+
+### Reconciliation Discrepancies (Three-Way Match)
+
+**Route:** `/accounting/discrepancies` — no in-app link reaches it yet; open it directly by URL.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Reconciliation Discrepancies"** | Discrepancies found between synced bills, purchase records, and — where an order's evidence chain exists — the order/confirmation/receipt lifecycle from Order Tracking (§11). |
+| 2 | **Status filter** | Open or Resolved. |
+| 3 | **Discrepancy types** | Amount Mismatch, Unmatched Bill, Unmatched Purchase Record, Missing Supplier Confirmation, Missing Delivery Receipt, Quantity Variance, Price Variance, Currency Mismatch, Invoice Without Order, Ambiguous Order, Over-billed Quantity, and Over-billed Price. |
+| 4 | **Three-way comparison detail** | For discrepancies tied to a purchase order: the order number and status, then ordered/confirmed/received/invoiced quantities side by side (each confirmed/received cell showing its own evidence state — Pending/Available/Unavailable), the unit price before and after invoicing, the tolerance ruleset version applied, and when it was evaluated (and reopened, if applicable). |
+| 5 | **Amount-mismatch / unmatched detail** | For accounting-only discrepancies: the synced bill's vendor and amount side by side with the matching (or missing) purchase record. |
+| 6 | **Resolve action** | Owner/Buyer only, on open discrepancies: an inline form with an optional resolution note, then **Resolve**. |
+| 7 | **Resolution info** | On resolved discrepancies: who resolved it (or a "System resolved" badge if it cleared automatically once the underlying data reconciled), when, and the note if one was left. |
+| 8 | **Load more** | Cursor-paginated. |
+
+**Business value:** reconciliation closes the gap between what procurement agreed to buy, what a supplier actually delivered, and what accounting was actually billed for. Because ProcurePilot never writes back to the accounting provider, every match or discrepancy here is a read-only cross-check a buyer can act on with confidence — see `docs/product/function-business-value.md` for the wider case.
+
+---
+
+## 34. POS & Inventory Integration
+
+**Route:** `/pos`
+
+Connects a point-of-sale/inventory system (Square) so sales velocity and stock-on-hand data can inform reorder forecasting (§35). ProcurePilot only reads from the connected provider — it never writes sales, inventory, or catalogue data back to it.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Point of Sale & Inventory Integration"** | States the purpose: sync sales velocity and stock-on-hand signals. |
+| 2 | **Empty state (never connected)** | "Connect your POS & inventory system" with a **Connect** button that starts a Square OAuth authorization flow. As with Accounting Integration, the button is visible to every role but the API only accepts the request from an Owner — see [§40 Known Issues](#40-known-issues). |
+| 3 | **Connection status card** | Once connected: display name, provider (Square), a status badge (**Active**, **Needs Re-authorization**, or **Disconnected**), connected date, and last-synced date. |
+| 4 | **Needs re-authorization banner** | Shown when Square's OAuth token has expired or was revoked; a **Reconnect** button restarts authorization. |
+| 5 | **View Synced Signals button** | Opens the Signals Review screen (below). Open to any role while a connection is active. |
+| 6 | **Disconnect / Reconnect button** | Owner only. |
+
+### Synced Product Signals
+
+**Route:** `/pos/signals`
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Sync now button** | Triggers an on-demand sync from Square. Owner or Buyer only — see Known Issues below. |
+| 2 | **Unmatched Signals table** | Square catalogue items that couldn't be automatically matched to a ProcurePilot product: item name, stock on hand (with last-synced time), sales velocity per day, and a **Match to Product** action (Owner or Buyer only — see Known Issues below) — pick a catalogue product from the dropdown and confirm. A velocity figure carries a **Provisional** tag when the observed window is shorter than the full velocity window the metric is normally computed over. |
+| 3 | **Matched Signals table** | Signals already linked to a catalogue product: item name, the matched product, stock on hand, sales velocity, and a Matched status badge. |
+| 4 | **Empty states** | Shown separately for each table when there's nothing to review or nothing matched yet. |
+
+**Business value:** matching POS signals to catalogue products is what lets Reorder Forecasts (§35) work from real, current stock and sales data instead of purchase history alone — without ProcurePilot ever writing anything back into the POS system itself.
+
+---
+
+## 35. Reorder Forecasts & Reorder Queue
+
+**Route:** `/forecasting` (Owner or Buyer)
+
+![Reorder Forecasts](screenshots/31-reorder-queue.jpg)
+
+Demand forecasting per product, surfaced as a queue of reorder proposals a buyer reviews and can turn into a draft purchase request.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Reorder Forecasts"** | Lists demand-forecast-driven reorder proposals for products with enough purchase and stock history to forecast. |
+| 2 | **Refresh forecasts button** | Recomputes forecasts and reorder proposals on demand; shows a snackbar confirmation on completion. |
+| 3 | **G3 evidence banner** | A persistent notice stating these forecasts are an R4 preview: connected commercial history has not yet validated the model, so every provisional result must be reviewed by a human before acting on it. |
+| 4 | **Draft request details panel** | Two controls used when preparing a request from a proposal: a **Branch** selector (defaults to your first active branch) and a **Required by date** field (defaults to 14 days out). These apply to whichever proposal you next prepare. |
+| 5 | **Proposal cards** | One card per product with an open or prepared proposal, showing stock on hand, expected demand, an uncertainty range (low–high), and a suggested reorder quantity. |
+| 6 | **Evidence row** | Below the metrics, each card shows the observed history length in days, the forecast's evidence state (Full history / Provisional history / Insufficient evidence), and how long the current forecast stays valid. |
+| 7 | **Prepare draft request button** | Turns an open proposal into a draft purchase request using the selected branch and required-by date. Once prepared, the card shows "Draft request is ready in Purchase Requests" instead of the button — the draft still goes through the normal submit/approve workflow. |
+
+**Evidence states:**
+- **Full history** — at least 180 days of observed demand history back the forecast.
+- **Provisional history** — fewer than 180 days of history; the card carries a warning that it must be reviewed before use.
+- **Insufficient evidence** — neither demand nor stock evidence is available yet; no quantity can be suggested and the Prepare button is hidden.
+
+**Tips:**
+- A proposal only appears after a matched POS signal has been synchronized and a forecast has been computed — if the list is empty, refreshing forecasts after new sales/stock data has landed is usually the fix. Matching a POS signal happens on the Synced Product Signals screen (§34).
+- **Prepare draft request** never submits or approves anything — it only creates a **Draft** row in Purchase Requests (§18), which still needs to be reviewed, submitted, and approved like any other request.
+- This screen, like Basket Split (§13), is Owner/Buyer only — other roles won't see **Reorder Forecasts** in the side navigation.
+
+**Business value:** reorder forecasting turns historical demand into a reviewed, evidence-backed replenishment suggestion instead of a buyer's guess or a stockout after the fact. Because every proposal shows its uncertainty range and evidence state up front, and preparing a request never bypasses approval, the feature speeds up routine restocking without weakening spend control — see `docs/product/function-business-value.md` for how this connects to reduced stockouts and carrying cost.
+
+---
+
+## 36. Supplier Risk Queue & Negotiation Briefs
+
+**Route:** `/supplier-risk`
+
+![Supplier Risk Queue](screenshots/32-supplier-risk-queue.jpg)
+
+A workspace-wide queue of the latest evidence-based risk snapshot for every active supplier, extending Supplier IQ (§14) with a comparative view across your whole supplier base.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Supplier Risk"** | Scans the latest risk position for every active supplier in one table instead of opening each supplier's scorecard individually. |
+| 2 | **Recompute risk button** | Recomputes risk snapshots for all suppliers. Visible to Owner/Buyer only; other roles see a read-only notice instead. |
+| 3 | **G3 evidence banner** | States these risk signals are advisory and require human review — they cannot authorise a purchase. |
+| 4 | **Risk table** | One row per supplier: name (links to that supplier's scorecard), risk level (Low/Medium/High or "Insufficient data") with the underlying percentage, confidence (Low/Medium/High), evidence state (Ready/Provisional/Insufficient data), top risk driver (spend concentration, price drift, delivery reliability, or single-source exposure), release posture, and validity (Current or Stale, with the exact valid-until date). |
+| 5 | **View scorecard action** | Opens that supplier's full Supplier IQ scorecard (§14), where the detailed risk evidence and the option to prepare a negotiation brief live. |
+| 6 | **Load more** | Cursor-paginated in pages of 50; click to fetch older/lower-ranked snapshots. |
+| 7 | **Empty state** | "No supplier risk snapshots yet" — shown until an owner or buyer computes the first snapshots. |
+
+### Supplier Risk Evidence panel (on the Supplier Scorecard, §14)
+
+The Supplier Scorecard page (`/suppliers/:id/scorecard`) now ends with a **Supplier Risk Evidence** panel — the v2 risk model underneath the Supplier IQ metrics already documented in §14.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Evidence state & posture tags** | Shows the snapshot's evidence state, release posture, and whether it's current or stale, with the exact valid-until date. |
+| 2 | **Prepare negotiation brief button** | Visible to Owner/Buyer when a ready or provisional, non-stale v2 snapshot exists. Generates a negotiation brief and navigates straight to it. |
+| 3 | **Component evidence table** | One row per risk component (spend concentration, price drift, delivery reliability, single-source exposure): its risk percentage, weight in the overall score, confidence, the sample count and calculation numerator/denominator behind it, any excluded evidence (e.g. cancelled orders, out-of-window records) with counts, and links to the underlying purchase orders or catalogue products. |
+| 4 | **Spend by currency table** | Shown only for the concentration component when the supplier is quoted in more than one currency: supplier spend, workspace spend, share, and sample count per currency — so a risk score is never built by silently mixing currencies. |
+
+### Negotiation Brief detail
+
+**Route:** `/negotiation-briefs/:id`
+
+![Negotiation Brief](screenshots/32b-negotiation-brief.jpg)
+
+An AI-generated, evidence-backed set of talking points for a risky supplier, reached from the **Prepare negotiation brief** button above.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Back to supplier risk link** | Returns to the Supplier Risk Queue. |
+| 2 | **Status tag** | Prepared, Acknowledged, or Dismissed. |
+| 3 | **G3 posture notice** | States plainly the brief is advisory and cannot authorise or send a purchase. |
+| 4 | **Validity row** | Valid-from and valid-until dates, with a stale/"Expired" tag once the brief is past its validity window. |
+| 5 | **Brief items** | A ranked list of talking points — price trajectory, comparable alternatives, service performance, concentration and volume, payment context, or purchase pattern — each with its underlying value, risk percentage, monetary amount (with currency) where relevant, the calculation version used, links to its source evidence (purchase orders, delivery receipts, landed-cost observations, etc.), and a suggested question to ask the supplier. |
+| 6 | **Record your review panel** | Visible to Owner/Buyer while the brief is still "Prepared". A required dismissal-reason field, plus **Acknowledge brief** and **Dismiss brief** buttons. Acting records an append-only decision — it never contacts the supplier or changes a purchase itself. |
+
+**Business value:** Supplier Risk and negotiation briefs turn scattered delivery, pricing, and concentration signals into a defensible case a buyer can use in a real supplier conversation. Because every driver, score, and talking point cites its source evidence, and every action taken on a brief is logged rather than automated, buyers get real leverage in negotiation without the system ever contacting a supplier or committing spend on its own — see `docs/product/function-business-value.md` for the wider risk-reduction rationale.
+
+---
+
+## 37. Procurement Analyst
+
+**Route:** `/analyst` or `/analyst/:conversationId`
+
+![Procurement Analyst](screenshots/33-analyst-conversation.jpg)
+
+A grounded, cited question-and-answer assistant over your own tenant data — spend and savings, supplier performance and risk, orders and quotations, and reorder forecasts.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Procurement Analyst"** | States plainly the assistant only answers from your own data and shows its calculation and sources with every answer. |
+| 2 | **Question History button** | Opens the Question History screen (below). |
+| 3 | **G3 evidence banner** | Confirms the analyst never places, drafts, or sends a purchase — advisory only, reviewed by a human. |
+| 4 | **Ask a question field** | A single-line text input. Submitting sends the question to the analyst; the field clears once an answer is added to the thread. |
+| 5 | **Conversation thread** | Each turn shows your question and the analyst's answer. A turn with no citations and no calculation is a refusal (the analyst declined to answer, e.g. because it couldn't find grounding data) and is styled distinctly from an answered turn. |
+| 6 | **Show calculation panel** | An expandable panel on turns that computed a number: the exact formula used and its inputs, so the figure can be checked rather than taken on faith. |
+| 7 | **Sources list** | Every citation backing the answer, labelled by kind — purchase order, quotation line, landed cost, saving record, supplier scorecard, delivery receipt, or reorder proposal. |
+| 8 | **Next-step link** | Some answers (supplier performance/risk, reorder forecasts, spend/savings) include a deep link straight to the relevant screen — the supplier's negotiation brief, the Reorder Queue, or a report — so an answer can be acted on immediately. |
+| 9 | **Empty state** | "No questions yet" with example topics (spend and savings, supplier performance and risk, orders and quotations, reorder forecasts) to prompt a first question. |
+
+**Follow-up questions:** asking a second question in the same browser session continues the same conversation — the analyst resolves context from the immediately preceding turn on the server, not from anything held in the browser. Opening the page via a history entry reopens that specific conversation by its ID in the route.
+
+### Question History
+
+**Route:** `/analyst/history`
+
+![Question History](screenshots/33b-analyst-history.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Question History"** | Lists every past conversation with the analyst. |
+| 2 | **New Conversation button** | Returns to `/analyst` to start a fresh conversation. |
+| 3 | **History cards** | One card per conversation: the date it started, how many turns it contains, and the first question asked. Click anywhere on a card (or press Enter) to reopen that conversation. |
+| 4 | **Load More button** | Cursor-paginated in pages of 50. |
+| 5 | **Empty state** | "No past conversations found" when nothing has been asked yet. |
+
+**Business value:** the analyst collapses the time it takes to answer a commercial question — "how much have we saved with Supplier X this quarter", "which suppliers are our biggest concentration risk" — from a manual spreadsheet exercise into a cited, checkable answer with a direct link to act on it. Because every answer shows its formula and sources (or explicitly refuses rather than guessing), it extends trust rather than spending it — see `docs/product/function-business-value.md` for the broader case.
+
+---
+
+## 38. RFQ Sourcing & Response Comparison
+
+**Route:** `/rfq/create` (Owner or Buyer) — reached via the **Create RFQ** button on RFQ History (below), or by navigating directly. A saved draft reopens for editing at `/rfq/:id/edit` (its creator only), from its RFQ History row.
+
+![Create RFQ](screenshots/34-rfq-create.jpg)
+
+Sends a structured request for quotation to one or more suppliers by email. Replies are captured and matched automatically; a buyer then compares them side by side and turns a chosen response into a draft purchase request. The screen uses the same Material form components, and is translated into Arabic, like the rest of the app.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Items section** | One row per line: a **Product** dropdown (populated from your catalogue, showing product name and variant — not a raw ID) and a **Quantity** field. **Add Line** adds another row; **Remove** deletes one (at least one line must remain). |
+| 2 | **Suppliers dropdown** | A multi-select populated with your active suppliers, showing supplier name. Only suppliers that have a contact email on file (§5) appear in the list — a supplier without one simply isn't selectable here. |
+| 3 | **Needed By Date field** | A date picker for the date the buyer needs the goods by. |
+| 4 | **Terms and Conditions field** | Optional free text included with the RFQ (e.g. delivery or payment terms suppliers should quote against). |
+| 5 | **Save Draft button** | The first save creates the RFQ in `draft` status; later saves update the same draft, and a confirmation appears after each save. The button stays enabled until the RFQ is sent. |
+| 6 | **Rejected Suppliers list** | Appears only if the backend still excluded a selected supplier from the RFQ (for example, its contact email was removed between when the page loaded and when you saved). Since the dropdown already limits selection to suppliers with a contact email on file, this list is expected to stay empty in normal use. |
+| 7 | **Send RFQ button** | Appears once the draft is saved. Dispatches the RFQ by email to every recipient still pending, and shows the current RFQ status ("draft" or "sent"). The email — subject, needed-by date and body — is written in the sender's interface language, falling back to the workspace's default language. |
+
+### RFQ History
+
+**Route:** `/rfq/history` (Owner or Buyer)
+
+![RFQ History](screenshots/34b-rfq-history.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "RFQ History"** | Tracks every request for quotation you've created. |
+| 2 | **Create RFQ button** | Top-right of the header. Navigates to `/rfq/create` (above) — this is the app's navigation entry point into Create RFQ. |
+| 3 | **Guardrails button** | Owner only. Navigates to the guardrail settings screen (below). |
+| 4 | **RFQ table** | One row per RFQ: status (Draft/Sent/Responded/Expired/Converted), needed-by date, sent date, recipient count, and response count. |
+| 5 | **Row click** | A `Draft` row you created reopens the draft for editing (`/rfq/:id/edit`); anyone else's draft, and any `Sent`/`Responded`/`Expired` row, opens the Compare RFQ Responses screen (below). A `Converted` row opens the purchase request it produced (§19). |
+| 6 | **Edit / Send (draft rows)** | Shown only on drafts you created. **Edit** reopens the draft; **Send** asks for confirmation, then emails the RFQ to every recipient — the same as **Send RFQ** on the form. |
+
+### Guardrail settings
+
+**Route:** `/rfq/guardrails` (Owner only — reached from the **Guardrails** button on RFQ History, or by navigating directly)
+
+A screen for owners to configure auto-preparation guardrails without needing API/engineering support: list existing guardrails, create a new one, edit one, or enable/disable one.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Human-approval note** | A standing banner: "Guardrails only prepare DRAFT requests. A human must still approve every purchase." |
+| 2 | **Create/Edit guardrail form** | **Maximum order value** (a positive amount) plus a **Currency** dropdown (loaded from the workspace's configured currency list). **Minimum responses** (a whole number, at least 1) — how many responses the RFQ needs before the guardrail is even considered. **Maximum price variance** — entered as a percent (e.g. `10` for 10%); the form stores it as a fraction under the hood, so what you type and what you see afterwards are both percentages. **Supplier allowlist** — a multi-select of suppliers; leave it empty to allow any supplier. **Default branch** — the branch a request is drafted into when this guardrail fires (required). **Default cost centre** — optional; lists only the active cost centres on the default branch, and is cleared when you change the branch. If the cost centre is later archived or moved to another branch, the guardrail drafts the request without one rather than charge the wrong place. An **Enabled** toggle. |
+| 3 | **Save guardrail button** | Validates all four numeric/required fields client-side before submitting (maximum order value > 0, minimum responses ≥ 1, price variance between 0–100%, a branch selected) and surfaces the same validation inline if the API rejects the payload (e.g. an invalid currency code). |
+| 3a | **When a guardrail fires** | It drafts the request in the default branch (and cost centre, if set), marks it **Auto-prepared** with the winning supplier's name, and emails the owner who created the guardrail, in their language, with a link to the draft (sent through the workspace's Mailgun configuration, like RFQ emails). The request stays a draft until a person submits it. |
+| 4 | **Guardrail list** | One card per configured guardrail: its maximum order value as the heading, formatted like every other amount (e.g. «٣٠٬٠٠٠٫٠٠ ج.م.» in Arabic), a one-line summary ("At least N response(s), price variance up to X%."), an Enabled/Disabled status chip, and **Edit** / **Enable**-**Disable** actions. |
+| 5 | **Empty state** | "No guardrails configured." |
+
+**What isn't on this screen:** a category allowlist exists in the underlying data model, but this screen doesn't expose a field for it — a guardrail created here always has an empty category allowlist. (If one were ever set through the API directly, every candidate response would currently fail with "Category rules are unavailable," since category-based filtering isn't implemented yet — the reason code is deliberately explicit about this rather than silently ignoring the rule.)
+
+### Compare RFQ Responses
+
+**Route:** `/rfq/compare/:id` (Owner or Buyer)
+
+![Compare RFQ Responses](screenshots/34c-rfq-compare.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "RFQ Responses"** | Compares every captured supplier response to this RFQ side by side. |
+| 2 | **Deliver to Branch / Required By controls** | Set once and used for whichever response you prepare into a request. |
+| 3 | **Response cards** | One card per supplier response: supplier name, submitted date, and a line table (product, quantity, unit price, total value). A line whose product hasn't been matched yet to a catalogue product shows a **Pending Match** badge instead of a price line. |
+| 4 | **Guardrail outcomes panel** | Shown on each response card, for both Owners and Buyers, whenever at least one guardrail is configured: one row per guardrail, labelled by its limit ("Up to GBP 500"), with a plain-language reason for why it did or didn't fire for *this* response. A fired guardrail's row is visually distinguished from the rest. |
+| 5 | **Deliver to Branch + Prepare Request** | Choose the branch first (pre-selected when you have only one, or your last choice); **Prepare Request** is refused until a branch is set. It creates a draft purchase request priced from this response's quoted prices, with its Required By date taken from the RFQ's needed-by date, and marks the RFQ `Converted`. Disabled while any line on the response is still a pending match. The confirmation has an **Open draft** action and then opens the new draft. |
+| 6 | **No responses state** | Shown until at least one supplier reply has been captured and matched. |
+
+**Guardrail outcome reasons (what each one means):**
+
+| Reason shown | Meaning |
+|---|---|
+| Guardrail fired and prepared a draft request. | This guardrail is the one that actually auto-prepared the request. |
+| This response would fire the guardrail. | Every condition currently holds for this response — it just hasn't been evaluated at match-decision time yet, or another response tied/won first. |
+| Would fire, but another guardrail also matches — ambiguous, so neither fires. | More than one enabled guardrail would independently fire for this RFQ; to avoid an arbitrary pick between them, neither fires automatically. |
+| This is not the lowest eligible response. | Another response on the same RFQ is cheaper and also eligible — only the single lowest-priced eligible response can fire a guardrail. |
+| Responses are tied at the lowest price. | Two or more eligible responses share the exact same lowest total — a tie never fires. |
+| Other responses are still pending review. | The RFQ has responses that haven't finished the capture/matching pipeline yet; the guardrail waits for all of them to settle before it will fire. |
+| The minimum response count is not met. | Fewer responses have arrived than the guardrail's configured minimum. |
+| The RFQ is not open. | The RFQ isn't in `Sent` or `Responded` status (e.g. it's still a draft, expired, or already converted). |
+| Not all RFQ lines are matched. | At least one line on this response is still a **Pending Match** — see the line table above. |
+| The response currency does not match. | This response's currency differs from the guardrail's configured currency. |
+| The supplier is not allowlisted. | The guardrail has a supplier allowlist configured, and this response's supplier isn't on it. |
+| The order exceeds the maximum value. | This response's total is above the guardrail's configured maximum order value. |
+| There is not enough price history. | ProcurePilot doesn't have enough recent purchase history for one of this response's products to check the price-variance condition. |
+| The price variance is too high. | At least one line's unit price is further from recent purchase history than the guardrail's configured maximum variance allows. |
+| This response predates the guardrail. | The response was captured before this guardrail was created, so it was never eligible for it. |
+| This response is archived. / This response was refused. | The response itself is no longer active, so no guardrail can fire on it. |
+| No eligible response was found. | No response on this RFQ currently passes every guardrail condition. |
+| Category rules are unavailable. | The guardrail has a category allowlist configured (via the API — this screen doesn't expose one), which isn't supported yet; every response fails this check. |
+
+**Guarded automatic preparation:** a tenant owner can configure an auto-preparation guardrail (maximum order value, optional supplier allowlist, minimum response count, maximum price variance, default branch) from the Guardrail settings screen above; when every condition is met and one response is unambiguously the lowest-priced eligible one, ProcurePilot runs the same prepare-request step automatically and the RFQ simply appears here already `Converted` — there is no separate confirmation step for it. Guardrails are evaluated at match-decision time (ADR-019), not at the moment an email reply is captured. Whether prepared manually or automatically, every path still produces an ordinary draft purchase request that goes through the unchanged approval workflow — nothing in this release creates, submits, or sends a purchase order to a supplier.
+
+**Business value:** automated RFQ sourcing collapses the slowest part of competitive sourcing — chasing multiple suppliers by email and re-keying their replies into a comparison — into an automatic capture-and-compare step, while keeping the final purchasing decision with a human on every path, guarded or manual. Because every guardrail outcome is explained in plain language rather than left as a silent yes/no, a buyer can trust why a request was (or wasn't) auto-prepared instead of treating it as a black box. See `docs/product/function-business-value.md` for how faster, evidence-backed sourcing rounds translate into negotiating leverage and cycle-time savings.
+
+---
+
+## 39. FAQ
+
+**Q: Can I edit a verified saving?**
+A: No. Verified savings are immutable. If a correction is needed, a new adjustment record is created.
+
+**Q: Why is extraction confidence low?**
+A: Usually because the document is blurry, handwritten, or uses an unfamiliar layout. Your corrections improve future extraction accuracy.
+
+**Q: What happens if a supplier is blocked?**
+A: Smart Compare flags offers from blocked suppliers, and purchasing requires an exception justification.
+
+**Q: Can I use ProcurePilot in Arabic?**
+A: Yes. Click the account menu (top right) and select "Arabic". The entire layout switches to RTL automatically, including navigation, forms, and data tables.
+
+**Q: What file formats can I upload for quotation extraction?**
+A: PDF, PNG, JPEG, TIFF, CSV, XLS, and XLSX — up to 25 MB per file. Six sample files covering every format are available directly on the upload screen if you want to try the pipeline first.
+
+**Q: How does pack normalisation work?**
+A: Each product has a base unit (kg, litre, piece, etc.). When you define the pack count and unit size, ProcurePilot calculates the normalised base quantity live. All supplier prices are converted to this normalised unit for true like-for-like comparison.
+
+**Q: Is the "Match Score" on a candidate product a real confidence percentage?**
+A: Not yet. It's a heuristic score used to rank and route candidates — the app is explicit about this on the Match Resolution screen. It is not a calibrated statistical probability, so don't read a 65% match score as "65% likely correct"; it's the best available ranking of the candidates found.
+
+**Q: Can I switch between multiple workspaces?**
+A: Yes. If you belong to multiple workspaces, use the workspace switcher in the top bar to switch. Each workspace has its own data, members, and settings — completely isolated.
+
+**Q: Who can approve purchase requests?**
+A: Users with the Approver or Owner role. Approval routing is based on configurable thresholds — requests above a certain amount may require a higher-level approver. If the assigned approver has set up an active delegation (section 22), the request routes to the delegate instead, and the decision is made from the delegate's own Approval Queue.
+
+**Q: What happens if an email is forwarded from a domain not on the allowlist?**
+A: If you have configured a domain allowlist, any incoming email sent from an unapproved domain is rejected. It will not be processed into a quotation or added to your review queue, protecting your workspace from spam and unverified submissions.
+
+**Q: What happens if some rows in my catalogue spreadsheet contain errors?**
+A: ProcurePilot uses partial import resilience. All valid rows are imported into the supplier catalogue immediately, while rows with errors (such as missing product names or invalid currency codes) are reported in the expandable Error Details table with their row number and reason so you can fix and re-import them.
+
+**Q: Who can create a purchase order, and where?**
+A: An Owner or Buyer, from Order Tracking (§11). Click **Create Order** on the order list for a blank draft, **From approved request** on the order list, or **Create Order** / **Create purchase order** on an `approved` purchase request that still has something left to order to open the same screen pre-filled from that request. There is still no bulk import tool or accounting/POS provider writer for orders — those remain API-only. Once an order exists, use Order Tracking to edit or cancel it while it's a draft, submit it, record supplier confirmations, and record deliveries.
+
+**Q: A page reloaded by itself when I opened it. Why?**
+A: A new version of ProcurePilot was released while you had the app open. The app loads that page again in full so you get the new version. Your saved work is not affected.
+
+**Q: Why didn't my RFQ auto-prepare a request through the guardrail?**
+A: Every condition has to hold at once: the RFQ still open, at least the configured minimum number of responses received, every line on that response matched to a catalogue product, its currency matching the guardrail's currency exactly, its supplier allowed (if a supplier allowlist is configured), its total under the configured maximum, its price within the configured variance of your recent purchase history for that product, and it must be the single lowest-priced eligible response — a tie never fires, and if more than one guardrail would independently fire the result is treated as ambiguous rather than picked arbitrarily. If even one condition fails, the response is simply left for you to prepare manually from RFQ Responses (§38) — which now also tells you exactly which condition failed for each response, per guardrail.
+
+**Q: What happens if a supplier never replies to an RFQ?**
+A: Nothing breaks. The RFQ stays in `Sent` status with a response count lower than its recipient count, and you can still compare and prepare a request from whichever suppliers do reply. A supplier that never responds simply never produces a card on the Compare RFQ Responses screen (§38).
+
+---
+
+## 40. Known Issues
+
+Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`; extended 25 Sep 2026 to cover R4.0–R4.3; re-checked 26 Sep 2026 against Create RFQ's Material/i18n rewrite (PR #29); re-audited 27 Sep 2026 across the entire app for this documentation pass (PR #42 and earlier); re-checked 28 Sep 2026 against the mixed-currency comparison fix (PR #47); re-checked 2 Oct 2026 against the fuzzy-match auto-accept gate (PR #59) and request-based draft orders (PR #61).
+
+| # | Where | Issue |
+|---|-------|-------|
+| 1 | Order Tracking (§11) | There is still no bulk import tool and no accounting/POS provider writer for purchase orders — those remain API-only. Approving a purchase request still does not automatically create an order; a buyer now creates one explicitly from the request instead (see "Create, Edit & Cancel a Draft Order" below). Found 27 Sep 2026, narrowed 2 Oct 2026. |
+| 2 | Quotation CSV samples (§8–9) | The sample `discount_percent` column is not imported: the quotation model represents discounts as currency amounts, so a percentage is not converted or treated as money. |
+
+**Resolved since the original pass:** the Approval Queue (§20) previously rendered only its title/subtitle with no request cards. It is now fully functional — pending requests, budget status, expandable line detail, and an approve/reject dialog with an optional comment — and an approval-delegation management UI (§22) has been added. **Resolved 26 Sep 2026:** Create RFQ (§38) previously used plain HTML controls with no Material styling, no Arabic translation, a supplier picker hardcoded to placeholder `sup-1`/`sup-2` options, and no navigation entry point (reachable only by typing `/rfq/create`). It now uses full Material form components, is translated into English and Arabic, populates real suppliers and products from your workspace data, and is reachable from a **Create RFQ** button on RFQ History. **Resolved 27 Sep 2026 (PR #42):** RFQ auto-preparation guardrails previously required API/engineering support to configure — there is now a full owner-only settings screen at `/rfq/guardrails` (§38), reachable from a **Guardrails** button on RFQ History, and the Compare RFQ Responses screen now explains in plain language why each guardrail did or didn't fire for every response. **Resolved 28 Sep 2026 (PR #51):** Smart Compare's `currency_mismatch_excluded` recommendation risk note now has English and Arabic translations. **Resolved 29 Sep 2026:** Accounting Integration (§33) no longer hardcodes QuickBooks in the never-connected empty state or connected-state provider label; neutral copy is used before connection, and the connected account displays QuickBooks Online or Xero from the API response. The Accounting and POS Integration never-connected screens now also hide Connect from non-owner roles and show the owner-only notice instead. POS synced-product signals now hide **Sync now** and **Match to Product** from roles that cannot call those APIs, showing read-only notices instead. Purchase Requests (§18), Purchase Request detail (§19), and Approval Queue (§20) now resolve branch/product IDs to branch names and product catalogue names where lookup data is available, falling back to the ID only when the referenced row cannot be loaded. **Resolved 30 Sep 2026:** CSV sample quotation extraction now maps supplier/date, product description, pack, unit, and VAT aliases to compatible canonical parser fields. VAT percentages are normalized as fractions; percent discounts remain listed above because the current quotation model stores discount amounts as money. **Resolved 2 Oct 2026:** Order Tracking (§11) previously had no way to create a purchase order from the web app at all. There is now a **Create Order** screen reachable both standalone from the order list and, for an `approved` purchase request, pre-filled from that request's lines; a draft order can also be edited and cancelled from the order detail screen. Bulk import and an accounting/POS provider writer for orders are unaffected by this and remain the open issue above. Smart Compare and the Match Resolution Queue's "Match Confidence" wording is now "Match Score" throughout (the underlying API field and scoring are unchanged), and a close-match candidate that only scored well on text similarity — with no GTIN, supplier-code, or alias signal — no longer auto-accepts by default; it routes to the Match Resolution Queue as **Close Match — Needs Confirmation** instead.
+
+If you hit any of these, it's not something wrong with your setup — flag it to the product team.
+
+---
+
+## Getting Help
+
+- In the app: **Account menu → Contact support** opens an email to support.
+- Email: support@iron-sys.com.
+- Security issues: security@iron-sys.com (see `SECURITY.md`). Privacy and data requests: privacy@iron-sys.com.
+- Response target: within 1 business day for paid plans.
