@@ -28,3 +28,6 @@ desktop.ini
 
 # WhatsApp kit: holds private prices and large videos; the repo is public (MD-07)
 whatsapp/
+
+# LinkedIn page invites: lists of Yasser's connections (names, profile links, scores); personal data, the repo is public
+linkedin-invites/
