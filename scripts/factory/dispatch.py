@@ -918,7 +918,14 @@ def cmd_gate(args: argparse.Namespace) -> None:
         record_changes(job)
     except RuntimeError as exc:
         die(str(exc), 1)
-    job.event("gating", "manual gate run")
+    if args.gate:
+        job.data["previous_gates"] = job.data["gates"]
+        job.data["gates"] = args.gate
+        job.event(
+            "gating", f"manual gate run with {len(args.gate)} replacement gate(s)"
+        )
+    else:
+        job.event("gating", "manual gate run")
     ok = run_gates(job, job_env(job)) == "passed"
     write_summary(job)
     print((job.dir / "summary.md").read_text())
@@ -1071,6 +1078,11 @@ def main() -> None:
 
     g = sub.add_parser("gate", help="re-run the gates in the foreground")
     g.add_argument("job")
+    g.add_argument(
+        "--gate",
+        action="append",
+        help="replace the job's saved gates with these for this and later runs; repeatable",
+    )
     g.set_defaults(fn=cmd_gate)
 
     df = sub.add_parser("diff", help="changes against the checkpoint")
