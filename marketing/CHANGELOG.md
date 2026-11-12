@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- LinkedIn page growth (2026-11-10/11): 299 page-follow invites sent from the Iron Systems page (batch 1 of a ranked list of Yasser's connections, SiliconExpert and Arrow people excluded; lists kept outside the repo as personal data). Page edits: Year founded 2026; custom button left as Visit website.
+- LinkedIn page growth (2026-11-10/11): 299 page-follow invites sent from the Iron Systems page (batch 1 of a ranked list of Yasser's connections, SiliconExpert and Arrow people excluded; lists kept in the gitignored `linkedin-invites/` folder as personal data, the repo being public). Page edits: Year founded 2026; custom button left as Visit website.
 - DM-01 (`campaigns/2026-11-company-ai-in-production/assets/approved/DM-01-page-invite-ask.md`, v3 approved by Yasser 2026-11-11): asks supporters to follow the page and invite their own connections; test send to one connection approved; v2 is English only, shorter and formal; v3 drops the how-to and limits from the invite ask.
 
 ## 2.1.0 · 2026-11-02
