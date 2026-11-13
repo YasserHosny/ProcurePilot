@@ -10,7 +10,7 @@ direction: [`../../cuts/gcc-sa-ad-v1/script.md`](../../cuts/gcc-sa-ad-v1/script.
 | Picture | A new HTML engine (`index.html`, `ad.js`) rendered frame by frame with Playwright, 30 fps. Brand system from [`../../motion-style.md`](../../motion-style.md): Navy, Teal, Mist, Paper, Readex Pro, the Converge bars as wipes, the logo built from the official SVG. |
 | Product | Real screens only: the round A screenshots of «مطاعم رواق» in [`../../../gcc/rounds/screens/ar/`](../../../gcc/rounds/screens/ar/) (email already masked), shown as plates with a camera and highlight rings. Nothing is redrawn or patched. The problem scene uses the round A quotes ([`../../../gcc/setup/quotes/round-A/`](../../../gcc/setup/quotes/round-A/)) and the Saudi opening animation ([`../../renders/sa/`](../../renders/sa/)). |
 | Figures | From round A: الذهبي ١٬٥٢٠ ر.س against الوفرة ١٬٥٦٠ ر.س on 10 tins of oil (٤٠ ر.س), and ١٩٠ ر.س saved on the order against the last purchase price. |
-| Voice | Generated, not recorded: Microsoft neural voice `ar-SA-HamedNeural` through `edge-tts` (`vo_gen.py`), one file per line in `vo/` with word timings in `vo/raw-timing.json`. `prep_vo.py` shortens long pauses and places the lines. |
+| Voice | Generated, not recorded: ElevenLabs Eleven v4 through Higgsfield, preset voice «Callum», chosen by the owner from two auditions on 2026-11-13. It is one take of the nine lines with a performance direction on each, plus a separate re-take of line 7 (`vo/elevenlabs-full.mp3`, `vo/elevenlabs-line7.mp3`, text and directions in `vo/script.json`). `align_vo.py` cuts it into `vo/s1…s9.mp3` at the measured pauses and estimates word timings (the engine returns none): phrase starts are measured, words inside a phrase are spread by their relative lengths in `vo/reference-word-lengths.json`. `prep_vo.py` shortens long pauses and places the lines. The first build used the Microsoft voice `ar-SA-HamedNeural` (`vo_gen_edge.py`); the owner found it flat and machine-like. |
 | Timing | Every scene and every kinetic line is placed from the word timings (`timeline.json`), so type lands on the spoken word. |
 | Music | «Antalya Beaches» by DayFox, the track the other cuts use ([`../../fetch-assets.sh`](../../fetch-assets.sh)). It is offset so its chorus (track 0:53.47) lands on «كم وفّرنا؟», ducked under the voice, and held lower through the chorus. |
 | Sound effects | Synthesised in `audio.py` (whoosh, tick, pop, thump, chime, riser), placed on the same word timings. No third-party effect files. |
@@ -32,16 +32,25 @@ mkdir -p fonts && curl -fsSL -o fonts/ReadexPro.ttf "https://raw.githubuserconte
 ```
 
 `rebuild.sh h` or `rebuild.sh v` builds one format. The Pexels clips in `fetch-assets.sh` are not used here; if
-they fail to download, the music line is the one that matters. To change the voiceover text, edit
-`vo/script.json`, run `python3 vo_gen.py vo/script.json vo`, copy `vo/timing.json` over `vo/raw-timing.json`,
-then rebuild: the scenes follow the new timings, but `ad.js` addresses words by index, so check each scene's
-`T(k)` calls against the new word list.
+they fail to download, the music line is the one that matters.
+
+Write the text sent to the voice with vowel marks (تشكيل) wherever a word can be read two ways (owner,
+2026-11-13): the first take read «الطلب يتجهّز لك مسودة» wrongly until it was marked. The marked text goes in
+`vo/script.json` as `tts`; `text` stays unmarked for captions.
+
+To replace the voiceover (a new take, or a recorded voice artist): put the one-take file at
+`vo/elevenlabs-full.mp3` or the nine lines at `vo/s1…s9.mp3`, update the pause table in `align_vo.py` (or write
+`vo/raw-timing.json` by hand: per word, start and length in seconds from the start of its line file), then
+rebuild. The scenes follow the new timings. If the wording changes, `ad.js` addresses words by index, so check
+each scene's `T(k)` calls against the new word list.
 
 ## Limits
 
-- The voice is synthetic. It reads Saudi-dialect copy in a Saudi voice, but nobody has listened to it for
-  dialect and pronunciation in this build; the owner's ear is the check. A recorded Saudi voice artist can
-  replace `vo/*.mp3` with the same line split.
+- The voice is synthetic. The owner picked it by ear from a ten-second audition; the full take has not been
+  listened to end to end by anyone when this was written. A recorded Saudi voice artist remains the surest way
+  to a native read.
+- Word timings inside a phrase are estimates (about a tenth of a second), so a kinetic word can land slightly
+  early or late; phrase starts are measured.
 - The screens are stills from the recorded round, so there is no live cursor; motion comes from the camera,
   the rings and the phone tap mark. Some stills carry the recording's own pointer.
 - The end card uses the existing contact (WhatsApp +20 102 735 4140, iron-sys.com); a Saudi contact is still

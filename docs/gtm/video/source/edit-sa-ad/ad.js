@@ -313,7 +313,7 @@ scene('s8',C.navy,(root)=>{
 
 // ================= S9 brand + CTA =================
 scene('s9',C.teal,(root)=>{
-  const T=k=>wt('s9',k),tb=T(5)-.35,tc=T(11)-.3,D=dur('s9');
+  const T=k=>wt('s9',k),tb=T(5)-.35,tc=T(10)+.7,D=dur('s9');
   const navy=mk(root,'abs',{...box(0,0,W,H),background:C.navy});
   const bars=[[.14,.5],[.74,.36]].map(([y,w])=>mk(navy,'abs',{left:0,top:H*y+'px',width:W*w+'px',height:(V?130:110)+'px',borderRadius:'0 999px 999px 0',background:C.mist,opacity:.05}));
   const lw=V?800:900,ly=V?560:230,logo=Logo(navy,'dark',(W-lw)/2,ly,lw);

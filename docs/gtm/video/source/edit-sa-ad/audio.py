@@ -65,7 +65,7 @@ EV=[
  (wt('s8',8)-.3,whoosh(.45,400,2400),-13,0),(wt('s8',12),tick(),-10,0),
  (S['s9']['start']-.1,whoosh(.7,300,3600),-9,0),(wt('s9',0)+.35,pop(660),-11,0),
  (wt('s9',2),tick(),-8,.4),(wt('s9',3),tick(),-8,0),(wt('s9',4),pop(820),-8,-.4),(wt('s9',4)+.05,shimmer(),-12,0),
- (wt('s9',5)-.4,whoosh(.5,400,3000),-11,0),(wt('s9',11)-.3,pop(600),-11,0),(wt('s9',11)+.1,chime(),-9,0),
+ (wt('s9',5)-.4,whoosh(.5,400,3000),-11,0),(wt('s9',10)+.7,pop(600),-11,0),(wt('s9',10)+1.1,chime(),-9,0),
 ]
 def render_sfx():
     n=int(DUR*SR);y=np.zeros((n,2),np.float32)
@@ -79,7 +79,7 @@ def run(args):
     return p.stderr
 def main():
     render_sfx()
-    off=TL['music_offset'];delay=max(0,-off);start=max(0,off);fade=DUR-2.6
+    off=TL['music_offset'];delay=max(0,-off);start=max(0,off);fade=DUR-3.2
     # voice: gentle clean-up and level; music: ducked by the voice (sidechain), held lower through the louder chorus
     # (from scene s8), faded out under the end card; effects sit under the voice too
     filt=(f"[0:a]highpass=f=75,equalizer=f=220:t=q:w=1:g=-2,equalizer=f=4200:t=q:w=1.2:g=2.5,acompressor=threshold=-20dB:ratio=3:attack=8:release=140:makeup=3,"

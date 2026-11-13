@@ -1,7 +1,7 @@
 #!/bin/bash
 # Saudi ad cut: voice timing -> assets -> frames (4 Chrome workers) -> sound -> mp4. usage: ./rebuild.sh [h] [v]
 # Needs: ffmpeg, python3 (numpy, pillow), node with playwright + Chromium, ../../fetch-assets.sh run once (music),
-# fonts/ReadexPro.ttf (see README). vo/*.mp3 are committed; `python3 vo_gen.py vo/script.json vo` regenerates them.
+# fonts/ReadexPro.ttf (see README). vo/*.mp3 are committed (align_vo.py cuts them from vo/elevenlabs-full.mp3).
 set -euo pipefail
 cd "$(dirname "$0")"
 export NODE_PATH=${NODE_PATH:-$(npm root -g)}

@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parent;SR=48000;FPS=30
 MAXGAP={'default':.40,'s9':.55,'s1':.38,'s8':.62}   # longest pause kept inside a segment (s)
 LEAD=.30      # video starts, then the first word
 GAP=.38       # between segments
-TAIL=2.6      # hold on the end card after the last word
+TAIL=3.6      # hold on the end card after the last word
 DROP=53.47    # the track's chorus drop (s); it lands on the start of scene s8
 
 def load(p):
