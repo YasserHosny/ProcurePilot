@@ -1,0 +1,4 @@
+# Build outputs and fetched inputs; the committed inputs are the scripts, vo/ and timeline.json.
+build/
+fonts/
+__pycache__/
