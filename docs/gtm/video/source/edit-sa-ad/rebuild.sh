@@ -20,5 +20,8 @@ for fmt in "${@:-h v}"; do for f in $fmt; do
   ffmpeg -v error -y -framerate 30 -i $d/%05d.jpg -i build/mix.wav -c:v libx264 -preset slow -crf 17 -pix_fmt yuv420p \
     -colorspace bt709 -color_primaries bt709 -color_trc bt709 -c:a aac -b:a 256k -movflags +faststart -shortest "$OUT/$name"
   echo "built $OUT/$name"
+  # the same picture with music and effects only (no voiceover)
+  ffmpeg -v error -y -i "$OUT/$name" -i build/mix-novo.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 256k -movflags +faststart -shortest "$OUT/${name%.mp4}-no-vo.mp4"
+  echo "built $OUT/${name%.mp4}-no-vo.mp4"
 done; done
 cp build/captions.srt "$OUT/procurepilot-ad-sa-ar.srt"
