@@ -16,6 +16,7 @@ direction: [`../../cuts/gcc-sa-ad-v1/script.md`](../../cuts/gcc-sa-ad-v1/script.
 | Music | «Antalya Beaches» by DayFox, the track the other cuts use ([`../../fetch-assets.sh`](../../fetch-assets.sh)). It is offset so its chorus (track 0:53.47) lands on «كم وفّرنا؟», ducked under the voice, and held lower through the chorus. |
 | Sound effects | Synthesised in `audio.py` (whoosh, tick, pop, thump, chime, riser), placed on the same word timings. No third-party effect files. |
 | Mix | −14 LUFS, true peak ≤ −1.4 dBFS. The voice is at least 9 dB above music and effects in every scene (measured per scene). |
+| No-voiceover cuts | `audio.py` also writes `build/mix-novo.wav`: the music at one steady level (nothing to duck under) and the same effects, at −14 LUFS. `rebuild.sh` muxes it onto the rendered picture without re-encoding it, as `…-no-vo.mp4` beside each cut, so the picture is bit-identical to the voiced cut (owner, 2026-11-13). |
 | Captions | `build/captions.srt`, copied beside the cuts, from the same word timings. |
 
 ## Rebuild

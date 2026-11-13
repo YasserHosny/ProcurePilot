@@ -1,5 +1,6 @@
 """Sound for the ad: voiceover (build/vo.wav), the licensed track ducked under the voice, and synthesised
-sound effects placed on the same word timings the picture uses. Output: build/mix.wav (48 kHz stereo)."""
+sound effects placed on the same word timings the picture uses. Outputs (48 kHz stereo): build/mix.wav with the
+voice, build/mix-novo.wav with music and effects only."""
 import json,subprocess,wave,re
 from pathlib import Path
 import numpy as np
@@ -90,6 +91,16 @@ def main():
           f"[2:a]volume=-6dB[fx0];[fx0][vk2]sidechaincompress=threshold=0.05:ratio=3:attack=10:release=200:makeup=1[fx];"
           f"[v][md][fx]amix=inputs=3:normalize=0:duration=first,loudnorm=I=-14:TP=-1.5:LRA=9,alimiter=limit=0.84:level=false[a]")
     run(['-i',str(B/'vo.wav'),'-i',str(MUSIC),'-i',str(B/'sfx.wav'),'-filter_complex',filt,'-map','[a]','-t',f'{DUR:.3f}','-ar','48000','-c:a','pcm_s16le',str(B/'mix.wav')])
-    out=run(['-i',str(B/'mix.wav'),'-af','ebur128=peak=true','-f','null','-'])
-    s=out[out.rfind('Summary:'):];print(re.search(r'I:\s*(-?[\d.]+) LUFS',s)[0],re.search(r'Peak:\s*(-?[\d.]+) dBFS',s)[0])
+    report(B/'mix.wav')
+    # No-voiceover version (owner, 2026-11-13), for feeds that autoplay muted or where the voice is not wanted: the same
+    # music and effects with nothing to duck under, the music at one steady level, the on-screen type carrying the message.
+    # (single-pass loudnorm lands about 1 dB hot on music alone, hence the trim to -14 LUFS.)
+    nv=(f"[0:a]atrim=start={start}:duration={DUR},asetpts=PTS-STARTPTS,adelay={int(delay*1000)}:all=1,aformat=sample_rates=48000:channel_layouts=stereo,"
+        f"volume=0.5,afade=t=in:st={delay}:d=1.2,afade=t=out:st={fade}:d=2.5[m];[1:a]volume=-4dB[fx];"
+        f"[m][fx]amix=inputs=2:normalize=0:duration=first,loudnorm=I=-14:TP=-1.5:LRA=9,volume=-1.1dB,alimiter=limit=0.84:level=false[a]")
+    run(['-i',str(MUSIC),'-i',str(B/'sfx.wav'),'-filter_complex',nv,'-map','[a]','-t',f'{DUR:.3f}','-ar','48000','-c:a','pcm_s16le',str(B/'mix-novo.wav')])
+    report(B/'mix-novo.wav')
+def report(p):
+    out=run(['-i',str(p),'-af','ebur128=peak=true','-f','null','-'])
+    s=out[out.rfind('Summary:'):];print(p.name,re.search(r'I:\s*(-?[\d.]+) LUFS',s)[0],re.search(r'Peak:\s*(-?[\d.]+) dBFS',s)[0])
 if __name__=='__main__':main()
