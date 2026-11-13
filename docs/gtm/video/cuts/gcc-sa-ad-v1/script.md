@@ -1,6 +1,7 @@
 # Saudi ad — script, voice direction and timings (PPS-220)
 
-Status 2026-11-13: **built, waiting for the owner's review** (listen to the voice first). Cuts:
+Status 2026-11-13: **approved by the owner** (voice A, line 7 re-voiced with tashkeel, «راسلنا واتساب اليوم»
+removed from the voice, picture cues 0.1 s ahead of the voice). Still open: a Saudi contact for the end card. Cuts:
 `procurepilot-ad-sa-ar-16x9.mp4`, `procurepilot-ad-sa-ar-9x16.mp4` (1:11), captions `procurepilot-ad-sa-ar.srt`.
 Source: [`../../source/edit-sa-ad/`](../../source/edit-sa-ad/).
 
