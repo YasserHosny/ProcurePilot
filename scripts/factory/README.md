@@ -22,6 +22,7 @@ scripts/factory/dispatch.py status <job>           # summary with gate output
 scripts/factory/dispatch.py logs <job> --follow    # supervisor log (--relay for the implementer's)
 scripts/factory/dispatch.py diff <job> [--patch]   # changes against the checkpoint
 scripts/factory/dispatch.py gate <job>             # re-run the gates in the foreground
+scripts/factory/dispatch.py gate <job> --gate '<cmd>'  # replace the saved gates first (a wrong gate command)
 scripts/factory/dispatch.py stop <job> [--force]
 scripts/factory/dispatch.py clean <job> | --done   # remove clones; job records and patches stay
 ```
