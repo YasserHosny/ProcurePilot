@@ -8,7 +8,9 @@ const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),pr=(t,a,d)=>cl((t-a)/d),lerp=(a,
 const E={out:x=>1-Math.pow(1-x,3),expo:x=>x>=1?1:1-Math.pow(2,-10*x),io:x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2,
   back:x=>{const c=1.6;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)},in:x=>x*x*x};
 const SEG=Object.fromEntries(AD.segments.map(s=>[s.id,s]));
-const wt=(id,k)=>SEG[id].at-SEG[id].start+SEG[id].words[k][0];
+// Picture cues lead the voice by LEAD seconds: word times inside a phrase are estimates, and a word that shows a
+// moment before it is heard reads as in sync, while one that shows after it does not.
+const LEAD=.10,wt=(id,k)=>Math.max(0,SEG[id].at-SEG[id].start+SEG[id].words[k][0]-LEAD);
 const dur=id=>SEG[id].end-SEG[id].start;
 const AR='٠١٢٣٤٥٦٧٨٩',arNum=n=>String(Math.round(n)).replace(/\d/g,d=>AR[d]);
 const pending=[];
