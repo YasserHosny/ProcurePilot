@@ -62,9 +62,9 @@ silent after two follow-ups (move them to "Not now").
 
 ## Message library
 
-**WhatsApp plan (2026-11-07):** kept with the rest of the WhatsApp kit in `marketing/whatsapp/02-whatsapp-plan-2026-11.md` (local only, gitignored, owner 2026-11-10): how we reach founders one to one on WhatsApp, with targets, rules and the image for each step.
+**WhatsApp plan (2026-11-07):** kept with the rest of the WhatsApp kit in `marketing/whatsapp/02-whatsapp-plan-2026-11.md` (in the repo since 2026-11-13): how we reach founders one to one on WhatsApp, with targets, rules and the image for each step.
 
-**WhatsApp kit (2026-11-07):** messages, quick replies, images, videos and setup are in `marketing/whatsapp/`, local only (gitignored) because it holds prices. First WhatsApp messages carry no attachment and ask for permission (Egypt Law 151/2020, articles 17 and 18; lawyer to confirm).
+**WhatsApp kit (2026-11-07):** messages, quick replies, images, videos and setup are in `marketing/whatsapp/`, in the repo since 2026-11-13 (Yasser); the videos and the kit zip stay local only. First WhatsApp messages carry no attachment and ask for permission (Egypt Law 151/2020, articles 17 and 18; lawyer to confirm).
 
 The **approved DM script** (PPS-14, rev 6) stays the base for first messages, replies, the day-3 and day-7
 follow-ups, and objection answers:

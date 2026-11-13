@@ -26,8 +26,9 @@ desktop.ini
 # Generated mirrors of product repos (recreated by npm run sources:sync); large video cuts never committed
 */product-repo/video-cuts-latest/
 
-# WhatsApp kit: holds private prices and large videos; the repo is public (MD-07)
-whatsapp/
+# WhatsApp kit: committed since 2026-11-13 (Yasser), except the large videos and the kit zip
+whatsapp/videos/
+whatsapp/*.zip
 
 # LinkedIn page invites: lists of Yasser's connections (names, profile links, scores); personal data, the repo is public
 linkedin-invites/

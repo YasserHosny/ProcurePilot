@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- WhatsApp kit (2026-11-13, Yasser): `whatsapp/` is now committed (messages, plan, roadmap, contacts, images, PDFs). The videos and `ProcurePilot-whatsapp-kit.zip` stay local only (`.gitignore`).
+
 - Team brief (2026-11-13): `ProcurePilot/team-brief/` holds a 10-page PDF on the ProcurePilot idea and product for the marketing team, in English and Arabic, built from the approved claims, positioning and campaign images.
 
 - LinkedIn page growth (2026-11-10/11): 299 page-follow invites sent from the Iron Systems page (batch 1 of a ranked list of Yasser's connections, SiliconExpert and Arrow people excluded; lists kept in the gitignored `linkedin-invites/` folder as personal data, the repo being public). Page edits: Year founded 2026; custom button left as Visit website.
