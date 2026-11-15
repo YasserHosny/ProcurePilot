@@ -19,15 +19,15 @@
 
 ## Set up once (10 minutes)
 
-Install the free **WhatsApp Business** app on +20 102 735 4140. It's your decision; moving the number to it needs care, so back up your chats first.
+**Update 2026-11-16:** WhatsApp Business is set up on the Iron Systems company number +20 10 5087 8238, business name **Iron Systems**, used for every Iron Systems product. Current setup steps and texts: `roadmap/02-setup-whatsapp-business.md` (they replace this section where the two differ).
 
 | Setting | Use |
 |---|---|
-| Profile picture | `images/profile/profile-picture.png`, or your own photo. A person's face may get more replies |
-| Name | Dr. Yasser Hosny · ProcurePilot |
+| Profile picture | Iron Systems symbol (`../brand/iron-systems/iron-system-app-icon-metal-1024.png`) |
+| Name | Iron Systems (company number, all products; 2026-11-16) |
 | Category | Software company (or the closest option) |
-| Website | https://procurepilot.iron-sys.com |
-| Email | yasser.hosny@iron-sys.com |
+| Website | https://www.iron-sys.com and https://procurepilot.iron-sys.com |
+| Email | hello@iron-sys.com |
 | Description AR | نظام مشتريات للشركات اللي بتشتري من موردين كتير وعندها أكتر من فرع. بيقرا عروض الأسعار، يقارنها عبوة بعبوة، وشخص من فريقك بيوافق على كل عملية شراء. من Iron Systems. |
 | Description EN | Purchasing software for companies buying from many suppliers across branches. It reads quotes, compares them pack for pack, and a person on your team approves every purchase. By Iron Systems. |
 | Labels | New · Replied · Call booked · Talked · Pilot offered · Not now |
@@ -52,28 +52,28 @@ Send one thing at a time. Don't send everything at once.
 Fill in `[brackets]` and make each one sound like you. Arabic is the default; use English only if they write in English. The Arabic uses "you" in the plural, so it fits anyone.
 
 ### 1. First message: published business number, you know who owns it
-> أهلًا [الاسم]، أنا د. ياسر حسني من Iron Systems. [سطر شخصي: مثلًا «مبروك فرع [المنطقة]»].
+> أهلًا [الاسم]، معاكم Iron Systems. [سطر شخصي: مثلًا «مبروك فرع [المنطقة]»].
 > بنعمل نظام مشتريات للشركات اللي عندها أكتر من فرع، وعندي سؤال واحد بس لو مش هيضايقكم: عروض أسعار الموردين بتوصلكم إزاي، وبتقارنوها فين؟
 > لو مش مناسب قولولي وهقفل الموضوع.
 
-> Hello [Name], I'm Dr. Yasser Hosny from Iron Systems. [Personal line, e.g. "Congratulations on the [area] branch."]
+> Hello [Name], this is Iron Systems. [Personal line, e.g. "Congratulations on the [area] branch."]
 > We build purchasing software for companies with several branches, and I have one question, if you don't mind: how do supplier quotes reach you, and where do you compare them?
 > If this isn't a good fit, just say so and I'll close the topic.
 
 ### 2. First message: branch or customer service number
-> أهلًا، أنا د. ياسر حسني من Iron Systems. مش عميل ومش ببيع حاجة دلوقتي. ممكن أعرف مين المسؤول عن المشتريات عندكم، وأوصله إزاي؟ عندي سؤال واحد ليه. شكرًا جدًا.
+> أهلًا، معاكم Iron Systems، بخصوص ProcurePilot نظام المشتريات بتاعنا. مش عميل ومش ببيع حاجة دلوقتي. ممكن أعرف مين المسؤول عن المشتريات عندكم، وأوصله إزاي؟ عندي سؤال واحد ليه. شكرًا جدًا.
 
-> Hello, I'm Dr. Yasser Hosny from Iron Systems. I'm not a customer and I'm not selling anything right now. Could you tell me who handles purchasing, and how I can reach them? I have one question for them. Thank you.
+> Hello, this is Iron Systems, about ProcurePilot, our purchasing system. I'm not a customer and I'm not selling anything right now. Could you tell me who handles purchasing, and how I can reach them? I have one question for them. Thank you.
 
 ### 3. First message: someone gave you the number
-> أهلًا [الاسم]، أنا د. ياسر حسني. [اسم اللي عرّفنا] اداني رقمكم وقال أكلمكم. بنعمل نظام مشتريات للشركات اللي عندها أكتر من فرع. عندي سؤال واحد: عروض الموردين بتوصلكم إزاي، وبتقارنوها فين؟
+> أهلًا [الاسم]، معاكم Iron Systems. [اسم اللي عرّفنا] ادانا رقمكم وقال نكلمكم. بنعمل نظام مشتريات للشركات اللي عندها أكتر من فرع. عندي سؤال واحد: عروض الموردين بتوصلكم إزاي، وبتقارنوها فين؟
 
-> Hello [Name], I'm Dr. Yasser Hosny. [Introducer] gave me your number and suggested I reach out. We build purchasing software for companies with several branches. One question: how do supplier quotes reach you, and where do you compare them?
+> Hello [Name], this is Iron Systems. [Introducer] gave us your number and suggested we reach out. We build purchasing software for companies with several branches. One question: how do supplier quotes reach you, and where do you compare them?
 
 ### 4. First message: you met at an event or spoke on LinkedIn
-> أهلًا [الاسم]، د. ياسر حسني. اتكلمنا في [المكان]. زي ما قلتلك، بنعمل نظام لمشتريات الشركات متعددة الفروع. لسه حابب أفهم منكم: عروض الموردين بتوصلكم إزاي؟
+> أهلًا [الاسم]، معاكم Iron Systems. اتكلمنا في [المكان]. زي ما قلتلك، بنعمل نظام لمشتريات الشركات متعددة الفروع. لسه حابب أفهم منكم: عروض الموردين بتوصلكم إزاي؟
 
-> Hello [Name], Dr. Yasser Hosny. We spoke at [place]. As I mentioned, we build purchasing software for multi-branch companies. I'd still like to understand: how do supplier quotes reach you?
+> Hello [Name], this is Iron Systems. We spoke at [place]. As I mentioned, we build purchasing software for multi-branch companies. I'd still like to understand: how do supplier quotes reach you?
 
 ### 5. Follow-up, day 3 (once only)
 > أهلًا [الاسم]، بس بفكركم بسؤالي: عروض الموردين بتوصلكم إزاي؟ رد بسطر واحد كفاية.
@@ -135,7 +135,7 @@ Save these as quick replies in WhatsApp Business. Type the shortcut and it fills
 
 | Shortcut | They say | Answer AR | Answer EN |
 |---|---|---|---|
-| `/who` | Who are you? | أنا د. ياسر حسني، مؤسس Iron Systems. بنعمل برمجيات للشركات، ومنها ProcurePilot للمشتريات. ده موقعنا: https://procurepilot.iron-sys.com | I'm Dr. Yasser Hosny, founder of Iron Systems. We build software for businesses, including ProcurePilot for purchasing. Our site: https://procurepilot.iron-sys.com |
+| `/who` | Who are you? | إحنا Iron Systems، شركة برمجيات للشركات، ومن منتجاتنا ProcurePilot للمشتريات. https://www.iron-sys.com · https://procurepilot.iron-sys.com | We are Iron Systems, a software house for businesses; ProcurePilot, for purchasing, is one of our products. https://www.iron-sys.com · https://procurepilot.iron-sys.com |
 | `/number` | Where did you get my number? | لقيته على [المكان]. لو تحبوا مبعتش تاني قولولي وهشيله فورًا. | I found it on [place]. If you'd rather I don't message again, tell me and I'll remove it right away. |
 | `/stop` | Stop | تحت أمركم، مش هبعت تاني. آسف على الإزعاج. | Of course, I won't message again. Sorry for the disturbance. |
 | `/no` | Not interested | تمام، شكرًا على ردكم. لو احتجتوا حاجة في المشتريات بعدين أنا موجود. | No problem, thanks for replying. I'm here if purchasing comes up later. |

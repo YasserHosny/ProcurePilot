@@ -15,7 +15,7 @@ Channel definitions, formats and quality rules are in `config/channels.yaml`. Th
 | Facebook | Secondary: reach for Arabic-speaking business audiences, repurposed content | No page found in the workspace (unknown) | Reach, engagement |
 | Instagram | Secondary: visual product education, reels | No account found in the workspace (unknown) | Reach, saves, shares, profile visits |
 | Video | Format across channels: product demos, explainers, shorts | ProcurePilot demo v2.2 (approved), v2.3 (awaiting review) | Views, average watch time, completion |
-| WhatsApp, email, in person (sales, not posting) | Direct outreach by Yasser (B-1). Outreach plan: `ProcurePilot/planning/outreach-plan-2026-11.md` | WhatsApp +20 102 735 4140 confirmed; first messages not sent yet | Messages sent, conversations at "Talked", pilots offered |
+| WhatsApp, email, in person (sales, not posting) | Direct outreach by Yasser (B-1). Outreach plan: `ProcurePilot/planning/outreach-plan-2026-11.md` | WhatsApp: Iron Systems company number +20 10 5087 8238 since 2026-11-16 (was +20 102 735 4140); first messages not sent yet | Messages sent, conversations at "Talked", pilots offered |
 
 ## Rules
 

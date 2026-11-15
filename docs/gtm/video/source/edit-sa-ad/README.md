@@ -55,5 +55,5 @@ each scene's `T(k)` calls against the new word list.
   early or late; phrase starts are measured.
 - The screens are stills from the recorded round, so there is no live cursor; motion comes from the camera,
   the rings and the phone tap mark. Some stills carry the recording's own pointer.
-- The end card uses the existing contact (WhatsApp +20 102 735 4140, iron-sys.com); a Saudi contact is still
+- The end card uses the existing contact (WhatsApp +20 10 5087 8238, iron-sys.com); a Saudi contact is still
   to come from the owner ([`../../../gcc/script-saudi.md`](../../../gcc/script-saudi.md)).

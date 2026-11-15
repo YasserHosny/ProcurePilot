@@ -325,7 +325,7 @@ scene('s9',C.teal,(root)=>{
   const offer=KT(navy,'جرّبه أسبوعين *مجانًا',{...box(V?40:0,V?640:330,V?1000:W),fontSize:(V?132:164)+'px',justifyContent:'center',color:C.white,hot:C.tealOn});
   const sub=LN(navy,'وحنّا نجهّزه معك',{...box(0,V?990:560,W),textAlign:'center',fontSize:(V?66:72)+'px',color:C.mist,fontWeight:500});
   const pw=V?860:1180,pill=mk(navy,'abs',{...box((W-pw)/2,V?1160:700,pw,V?210:150),borderRadius:'32px',background:C.tealOn,display:'flex',flexDirection:V?'column':'row-reverse',alignItems:'center',justifyContent:'center',gap:V?'6px':'36px',direction:'ltr'},
-    `<span style="direction:rtl;white-space:nowrap;font-size:${V?46:48}px;font-weight:600;color:#0B2545">راسلنا واتساب</span><span class="ltr" style="white-space:nowrap;font-size:${V?78:76}px;font-weight:700;color:#fff;letter-spacing:.01em">+20 102 735 4140</span>`);
+    `<span style="direction:rtl;white-space:nowrap;font-size:${V?46:48}px;font-weight:600;color:#0B2545">راسلنا واتساب</span><span class="ltr" style="white-space:nowrap;font-size:${V?78:76}px;font-weight:700;color:#fff;letter-spacing:.01em">+20 10 5087 8238</span>`);
   const foot=LN(navy,'<span class="ltr">www.iron-sys.com &nbsp;·&nbsp; hello@iron-sys.com</span>',{...box(0,V?1420:900,W),textAlign:'center',fontSize:(V?36:36)+'px',color:C.mist,fontWeight:400});
   return t=>{
     tf(navy,W*(1-E.io(pr(t,0,.55))),0);bars.forEach((e,k)=>tf(e,-W*.4*(1-E.expo(pr(t,.2+k*.1,.9)))+t*(8+k*6),0));

@@ -16,9 +16,9 @@ PP_MARK = ('<svg aria-hidden="true" width="{s}" height="{s}" viewBox="0 0 64 64"
            'stroke-width="3" stroke-linejoin="round"/><rect x="6" y="42" width="16" height="8" rx="4" fill="#C9D6E3"/></svg>')
 COPY = {
     'ar': dict(lang='ar', dir='rtl', head='جرّبه أسبوعين مجانًا', sub='وإحنا اللي هنجهّزه معاك.', wa='واتساب',
-               founder='د. ياسر حسني — المؤسس', product='أحد منتجات'),
+               product='أحد منتجات'),
     'en': dict(lang='en', dir='ltr', head='Try it free for 2 weeks', sub='— we set it up with you.', wa='WhatsApp',
-               founder='Dr. Yasser Hosny — Founder', product='A product of'),
+               product='A product of'),
 }
 CSS = """body{margin:0;background:#0B2545}
 .in{animation:cardIn 6s cubic-bezier(.2,.8,.2,1) infinite both}
@@ -36,8 +36,8 @@ def card_16x9(c):
 <div class="in d3" style="font-size:46px;color:#D7E3F0">{c['sub']}</div>
 </div>
 <div class="in d4" style="display:flex;align-items:flex-end;gap:72px;padding-top:12px;border-top:2px solid #1F3D63">
-<div style="display:flex;flex-direction:column;gap:6px;padding-top:28px"><span style="font-size:26px;color:#AFC3D9">{c['wa']}</span><span class="ltr" style="font-size:72px;font-weight:600;color:#19B8A4;letter-spacing:0.01em">+20 102 735 4140</span></div>
-<div style="display:flex;flex-direction:column;gap:10px;padding-bottom:10px"><span style="font-size:34px;font-weight:500">{c['founder']}</span><span class="ltr" style="font-size:30px;color:#D7E3F0">yasser.hosny@iron-sys.com</span></div>
+<div style="display:flex;flex-direction:column;gap:6px;padding-top:28px"><span style="font-size:26px;color:#AFC3D9">{c['wa']}</span><span class="ltr" style="font-size:72px;font-weight:600;color:#19B8A4;letter-spacing:0.01em">+20 10 5087 8238</span></div>
+<div style="display:flex;flex-direction:column;gap:10px;padding-bottom:10px"></div>
 </div>
 <div class="in d5" style="position:absolute;left:0;right:0;bottom:0;height:140px;box-sizing:border-box;padding:0 160px;background:#071A33;border-top:2px solid #1F3D63;display:flex;align-items:center;justify-content:space-between">
 <div style="display:flex;align-items:center;gap:24px"><span style="font-size:28px;color:#AFC3D9">{c['product']}</span><span class="iron" style="height:64px">{LOGO}</span></div>
@@ -55,9 +55,7 @@ def card_9x16(c):
 </div>
 <div class="in d4" style="display:flex;flex-direction:column;align-items:center;gap:12px">
 <span style="font-size:30px;color:#AFC3D9">{c['wa']}</span>
-<span class="ltr" style="font-size:76px;font-weight:600;color:#19B8A4">+20 102 735 4140</span>
-<span style="font-size:36px;font-weight:500;padding-top:14px">{c['founder']}</span>
-<span class="ltr" style="font-size:32px;color:#D7E3F0">yasser.hosny@iron-sys.com</span>
+<span class="ltr" style="font-size:76px;font-weight:600;color:#19B8A4">+20 10 5087 8238</span>
 </div>
 <div class="in d5" style="width:100%;box-sizing:border-box;padding:34px 40px;border-radius:24px;background:#071A33;border:2px solid #1F3D63;display:flex;flex-direction:column;align-items:center;gap:20px">
 <div style="display:flex;align-items:center;gap:22px"><span style="font-size:30px;color:#AFC3D9">{c['product']}</span><span class="iron" style="height:68px">{LOGO}</span></div>

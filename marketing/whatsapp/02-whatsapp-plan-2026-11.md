@@ -12,7 +12,7 @@ founders and market the product". This plan sits next to the [outreach plan](../
 stays the master plan for LinkedIn, email and events. This one covers WhatsApp only: who to reach, how, in what
 order, with which message and image, and how we know it's working.
 
-**Yasser sends every message** from the business number +20 102 735 4140. Claude prepares lists, messages and
+**Yasser sends every message** from the Iron Systems company number +20 10 5087 8238 (set up 2026-11-16, business name Iron Systems, shared by every product). Claude prepares lists, messages and
 images and keeps the pipeline tidy; Claude never contacts anyone.
 
 The texts and images live in `marketing/whatsapp/` (in the repo since 2026-11-13; the videos and the kit zip stay local only):
@@ -78,14 +78,14 @@ without their OK, a personal number nobody gave you.
 
 ## 5. Setup (once, about an hour)
 
-- WhatsApp Business app on +20 102 735 4140 (kit "Set up once"): ProcurePilot profile picture
+- WhatsApp Business app on +20 10 5087 8238 (setup: `roadmap/02-setup-whatsapp-business.md`): Iron Systems profile picture
   (`images/profile/`), business description, website, hours.
 - **Catalogue**, three items, no prices: "Free pilot", "How it works" (image 2), "Why the cheapest costs more" (image 3).
 - **Labels**: New · Replied · Call booked · Pilot offered · Pilot · Not now · Do not contact.
 - **Quick replies** from the kit table (`/who`, `/price`, `/excel`, `/save`, `/clients`).
 - **Greeting message** (for people who message first): "أهلًا بيك في ProcurePilot من Iron Systems 👋 قولي اسمك وشغلك إيه، وهرد عليك في أقرب وقت."
 - **Away message** outside working hours.
-- Short link `wa.me/201027354140?text=تجربة` for LinkedIn, the email signature and event cards (the landing page already links to WhatsApp).
+- Short link `wa.me/201050878238?text=تجربة` for LinkedIn, the email signature and event cards (the landing page already links to WhatsApp).
 
 ## 6. The conversation path
 

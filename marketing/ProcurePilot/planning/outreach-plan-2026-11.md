@@ -33,7 +33,7 @@ The 5 Saudi leads wait until after the first Egyptian pilot.
 
 | Channel | Use it for | From |
 |---|---|---|
-| **WhatsApp** | People you know, people introduced to you, and anyone who's replied and gave you their number. The main channel in Egypt | Yasser's number, +20 102 735 4140 |
+| **WhatsApp** | People you know, people introduced to you, and anyone who's replied and gave you their number. The main channel in Egypt | Iron Systems company number +20 10 5087 8238 (since 2026-11-16, all products) |
 | **LinkedIn message** | People you don't know yet, and people who engage with our posts | Yasser's LinkedIn profile |
 | **Email** | Recaps after a call and sending the pilot agreement; a few hand-written first emails only. No cold campaigns until the sending domain and postal address in `docs/gtm/outreach/cold-email-sequence.md` exist | `yasser.hosny@iron-sys.com` (copy `hello@iron-sys.com` if you want a record) |
 
@@ -125,21 +125,21 @@ Subject: سؤال عن طريقة جمع عروض الموردين في [الش�
 AR
 > أهلًا أستاذ/أستاذة [الاسم]،
 >
-> أنا د. ياسر حسني من Iron Systems. بنعمل ProcurePilot، نظام مشتريات للمطاعم اللي عندها أكتر من فرع: بيقرا عروض أسعار الموردين (PDF أو صورة)، يقارنها بالعبوة شامل الضريبة والتوصيل، والمدير يوافق من الموبايل.
+> معاكم Iron Systems. بنعمل ProcurePilot، نظام مشتريات للمطاعم اللي عندها أكتر من فرع: بيقرا عروض أسعار الموردين (PDF أو صورة)، يقارنها بالعبوة شامل الضريبة والتوصيل، والمدير يوافق من الموبايل.
 >
 > قبل أي حاجة عايز أفهم: إنتوا بتلمّوا عروض الموردين إزاي بين الفروع دلوقتي؟ لو عندك ربع ساعة الأسبوع ده أوريك النظام على مثال زي بتاعكم.
 >
 > فيديو قصير (بيانات تجريبية): [الرابط]
 >
 > شكرًا،
-> د. ياسر حسني
-> المؤسس، Iron Systems · واتساب ‎+20 102 735 4140
+> فريق Iron Systems
+> واتساب ‎+20 10 5087 8238 · hello@iron-sys.com
 > procurepilot.iron-sys.com
 
 EN
 > Hello [Name],
 >
-> I'm Dr. Yasser Hosny from Iron Systems. We build ProcurePilot, a purchasing system for restaurant groups with
+> This is Iron Systems. We build ProcurePilot, a purchasing system for restaurant groups with
 > more than one branch. It reads supplier quotes (PDF or photo), compares them per pack with VAT and delivery
 > included, and lets a manager approve from their phone.
 >
@@ -149,8 +149,8 @@ EN
 > Short video (demo data): [link]
 >
 > Thanks,
-> Dr. Yasser Hosny
-> Founder, Iron Systems · WhatsApp +20 102 735 4140
+> The Iron Systems team
+> WhatsApp +20 10 5087 8238 · hello@iron-sys.com
 > procurepilot.iron-sys.com
 
 ### E2 · Email: recap after a call
@@ -183,5 +183,5 @@ follow-ups with no reply, stop and move the lead to "Not now".
 ## What Claude needs from Yasser
 
 1. ~~OK on this plan (B-5)~~ confirmed 2026-11-04.
-2. ~~Confirm the WhatsApp number~~ confirmed 2026-11-03: +20 102 735 4140 for outreach and the website.
+2. ~~Confirm the WhatsApp number~~ confirmed 2026-11-03: +20 102 735 4140 for outreach and the website. **Changed 2026-11-16:** outreach now uses the Iron Systems company number +20 10 5087 8238 (business name Iron Systems, all products). The website and demo videos still show the old number until Yasser decides.
 3. Each evening, or whenever it suits you: who you messaged and who replied, so the pipeline stays current.
