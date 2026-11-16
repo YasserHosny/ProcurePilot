@@ -2,8 +2,8 @@
 product_id: procurepilot
 positioning_status: approved   # draft | in-review | approved
 approved_by: Claude, wording delegated by Yasser (MD-11); direction chosen by Yasser (MD-05)
-approved_on: 2026-10-27
-last_reviewed: 2026-10-27
+approved_on: 2026-11-16   # target widened (MD-21); statement first approved 2026-10-27
+last_reviewed: 2026-11-16
 ---
 
 # ProcurePilot: positioning
@@ -19,9 +19,10 @@ Yasser chose **hypothesis C (Arabic-first) as the lead, with B (verified savings
 MD-05 in `ProcurePilot/planning/decisions.md`). Hypothesis A (traceable prices) stays as supporting proof. Markets:
 Egypt and Saudi Arabia (MD-02).
 
-## Positioning statement (approved 2026-10-27)
+## Positioning statement (approved 2026-10-27; target widened 2026-11-16, MD-21)
 
-For **multi-branch restaurant groups in Egypt and Saudi Arabia** whose **suppliers send quotes in Arabic, as PDFs,
+For **companies in Egypt and Saudi Arabia that buy from many suppliers across several branches** (restaurant groups
+first, because the demo fits them) whose **suppliers send quotes in Arabic, as PDFs,
 photos and WhatsApp messages**, **ProcurePilot** is **purchasing software built in Arabic** that **reads those quotes,
 compares them on their true landed cost, and counts a saving only once someone on the team verifies it**.
 Unlike **WhatsApp threads and Excel sheets**, it **works in the team's own language and currency, and keeps a person
@@ -29,7 +30,7 @@ approving every purchase**.
 
 | Element | Draft | Evidence label | Source |
 |---|---|---|---|
-| Target customer | Multi-branch restaurant groups in Egypt and Saudi Arabia | V (owner and team choice), fit H | MD-02, SRC-012, SRC-014 |
+| Target customer | Companies in Egypt and Saudi Arabia that buy from many suppliers across several branches; restaurant groups first | V (owner choice, MD-20/MD-21); fit outside restaurants H, untested | MD-02, MD-20, MD-21, SRC-012, SRC-014 |
 | Problem / job | Turn Arabic supplier quotes from many channels into a fair comparison and an approved purchase, without copying them by hand | H | SRC-012 (team framing) |
 | Category | "Purchasing software built in Arabic" (working term; to be checked against how buyers search) | ? | No search data yet |
 | Key benefit | Your quotes, read and compared in Arabic and in EGP/SAR; savings you can trust because someone verified them | V capabilities (C-01, C-03, C-07, C-08); benefit I | proof-points.md |
@@ -40,13 +41,14 @@ Risks the owner accepted with this choice: (1) Arabic support is a feature compe
 public message is "built in Arabic", never "the only Arabic…"; (2) "verified savings" invites "how much?", which is
 answered honestly ("measured against your own prices in the pilot") until a pilot produces a real, permissioned figure.
 
-## Proposed revision after MD-20 (2026-11-04, not approved)
+## Revision after MD-20 (proposed 2026-11-04, approved by Yasser 2026-11-16, MD-21)
 
 Yasser said the product is for procurement, not just restaurants. Proposed wording, changing only the target:
 
 For **companies in Egypt and Saudi Arabia that buy from many suppliers across several branches**, whose **suppliers send quotes in Arabic, as PDFs, photos and WhatsApp messages**, **ProcurePilot** is **purchasing software built in Arabic** that **reads those quotes, compares them on their true landed cost, and counts a saving only once someone on the team verifies it**.
 
-The approved statement above still applies until Yasser approves this.
+Approved 2026-11-16 and merged into the statement above. The live landing page still addresses restaurants; changing
+it is the product team's call.
 
 ## Earlier working draft (hypothesis A, kept for reference)
 
@@ -116,3 +118,4 @@ names or features are stated.
 |---|---|---|---|---|
 | 2026-10-27 | 0.2 | Direction chosen: C (Arabic-first) leads, B (verified savings) second, A supporting | Yasser | MD-05 |
 | 2026-10-27 | 1.0 | Statement approved as drafted | Claude, delegated by Yasser | MD-11. Headlines chosen separately (MD-09) |
+| 2026-11-16 | 1.1 | Target widened to all multi-branch, multi-supplier companies; restaurants first | Yasser | MD-21 ("All multi-branch"), the target question on the Arabic product overview |
