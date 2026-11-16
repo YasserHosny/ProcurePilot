@@ -2,7 +2,7 @@
 id: DM-01
 title: Ask supporters to follow the Iron Systems page and invite their connections
 channel: LinkedIn direct message (sent by Yasser from his personal profile)
-status: approved (v3, 2026-11-11, Yasser; not sent to anyone beyond the two tests. v2 and v1 kept below for reference)
+status: approved (v4, 2026-11-17, Yasser; not sent to anyone. v3, v2 and v1 kept below for reference)
 audience: team members, friends, partners, advisors (not page admins)
 claims_used: CO-02 (capability, approved)
 ---
@@ -14,7 +14,28 @@ than 5,000 followers: up to 50 a month, or 30 a month for their employer's page.
 page's 300 Premium credits. Steps verified against LinkedIn Help "Invite connections to follow a LinkedIn Page you
 don't manage" (help/lms/answer/a590020), 2026-11-11.
 
-## v3 (current): English, formal, no how-to
+## v4 (current): recommendation, approved 2026-11-17
+
+Yasser wanted the message to read as a recommendation of the company, without saying he launched it. It doesn't
+claim he is an outside customer either. Only claim: CO-02. Drafts A–A4 are in
+`../drafts/DM-01-v4-recommendation.md`; this is A5.
+
+---
+
+Hi [Name],
+
+I hope you are well. I'd recommend Iron Systems to anyone thinking about using AI in their business. They build AI solutions and software for companies.
+
+You can follow them on LinkedIn here: https://www.linkedin.com/company/iron-sys
+
+If you know business owners or managers who could use this, they're worth sharing with.
+
+Best regards,
+Yasser
+
+---
+
+## v3 (superseded): English, formal, no how-to
 
 Yasser didn't like v2's invite paragraph (menu path and monthly limits). v3 makes the same ask in one plain
 sentence; the "More > Invite connections" steps go in a reply only if someone asks how. He also dropped "and our

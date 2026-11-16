@@ -12,6 +12,7 @@ An approval is valid for the item, version and action named in its row only.
 | 2026-11-11 | G-send | DM-01 v1 (page invite ask), test send to one connection: Omar Medhat | approved | Yasser | chat ("draft it and send it to omar medhat to test") | Test only; any wider sending needs its own approval. Sent 2026-11-11 on LinkedIn (one message, AR + EN). Finding: LinkedIn shows the whole message right-to-left, so the English half renders with punctuation at the line start |
 | 2026-11-11 | G-send | DM-01 v2 (English, formal), second test send to Omar Medhat | approved | Yasser | chat ("Yes, send to Omar") | Sent 2026-11-11; delivered once, left to right, LinkedIn adds a preview card of the page. Wider sending needs its own approval |
 | 2026-11-11 | G-asset | DM-01 v3 text (English, formal; no "page is new", invite ask in one sentence) | approved | Yasser | chat ("Yes, it's ready") | Moved to `assets/approved/`. Approved text only: no recipients approved yet |
+| 2026-11-17 | G-asset | DM-01 v4 text (A5: recommendation framing, no "we launched") | approved | Yasser | chat ("Approve A5") | Replaces v3 as current. Approved text only: no recipients approved yet. Drafts A–A4 kept in `assets/drafts/DM-01-v4-recommendation.md` |
 
 ## Review results (campaign-review)
 
