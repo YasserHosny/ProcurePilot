@@ -18,7 +18,9 @@ from pathlib import Path
 
 import smart_swap
 
-ORIG_REF = 'origin/main'
+# The last main commit before any video was changed (#580). Not a branch name: main now holds the updated files,
+# and rebuilding from those would re-encode already re-encoded footage.
+ORIG_REF = 'c4889305745e6d28668054d8fe88ddbcbaa41a5f'
 REPO = Path(__file__).resolve().parents[5]
 CUTS = 'docs/gtm/video/cuts'
 GULF = 'marketing/ProcurePilot/demo-video/v2.3-editorial-gulf-pp_2026-10-21'
