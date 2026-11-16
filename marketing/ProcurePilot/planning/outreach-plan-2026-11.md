@@ -183,5 +183,5 @@ follow-ups with no reply, stop and move the lead to "Not now".
 ## What Claude needs from Yasser
 
 1. ~~OK on this plan (B-5)~~ confirmed 2026-11-04.
-2. ~~Confirm the WhatsApp number~~ confirmed 2026-11-03 (Yasser's personal number). **Changed 2026-11-16:** outreach now uses the Iron Systems company number +20 10 5087 8238 (business name Iron Systems, all products). The demo videos were updated the same day (Yasser, 2026-11-15: the old number is removed everywhere); the live website is outside this repo and still needs the change.
+2. ~~Confirm the WhatsApp number~~ confirmed 2026-11-03 (Yasser's personal number). **Changed 2026-11-16:** outreach now uses the Iron Systems company number +20 10 5087 8238 (business name Iron Systems, all products). The demo videos were updated the same day (Yasser, 2026-11-15: the old number is removed everywhere); Yasser updated the live website himself the same day.
 3. Each evening, or whenever it suits you: who you messaged and who replied, so the pipeline stays current.

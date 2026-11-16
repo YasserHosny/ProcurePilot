@@ -19,3 +19,18 @@ claims register is the approved wording, and published Arabic copy still needs a
 Status: added to the repo on 2026-11-13 at Yasser's request. Sending it to the team is Yasser's action.
 
 When a claim or the positioning changes, make a new dated version of both files; don't overwrite these.
+
+## Arabic product overview (2026-11-16)
+
+A plain-language overview in Arabic for the marketing team, so they can connect a customer's needs to the product.
+Made at Yasser's request and approved by him on 2026-11-17. Target customer follows MD-21 (all multi-branch companies,
+restaurants first).
+
+| File | What it is |
+|---|---|
+| `ProcurePilot-Product-Overview_AR_2026-11-16.md` | Full overview (Modern Standard Arabic): product description, the problems it solves, features grouped by value, availability, internal notes on what not to claim |
+| `ProcurePilot-Overview-Team-Message_AR_2026-11-16.md` | The same, shortened to a message in Egyptian Arabic (WhatsApp formatting) |
+| `ProcurePilot-Overview-Team-Message_AR_2026-11-16.pdf` | The short message as a one-page A4 PDF, marked internal |
+
+Every statement traces to an approved claim in `../knowledge/proof-points.md` (C-13 left out: still held). Sending them
+to the team is Yasser's action.
