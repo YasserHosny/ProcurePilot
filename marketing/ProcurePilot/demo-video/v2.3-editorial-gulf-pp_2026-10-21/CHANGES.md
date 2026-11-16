@@ -7,3 +7,11 @@ Refinement of the approved v2.2 editorial cut. Only three changes:
 
 Files: procurepilot-demo-ar-16x9-gulf-pp.mp4 (2:03), procurepilot-demo-ar-9x16-gulf-pp.mp4 (0:57). -14.1 / -14.3 LUFS, peaks -1.6 / -2.4 dBFS.
 Source: drop source/* over a copy of docs/gtm/video/source/edit-editorial (plus is/ logo crops + Inter fonts) and render as in that README.
+
+## 2026-11-16: company-only contact (owner)
+
+At Yasser's request (2026-11-15) both files were updated in place, an exception to the never-overwrite rule for this
+folder: the end card now shows the Iron Systems WhatsApp +20 10 5087 8238, www.iron-sys.com and hello@iron-sys.com
+instead of the founder's name, his number and his personal email. The engine source was never committed, so the card's
+contact lines were redrawn in place by `docs/gtm/video/source/contact-swap/gulf_patch.py`; everything else, including
+the audio, is unchanged. The earlier files remain in git history.
