@@ -9,6 +9,7 @@
 | Proof ids | CO-08, CO-09, CO-10 · ProcurePilot C-01, C-02, C-05, C-07, C-14, C-16 |
 | Link | `www.iron-sys.com` at the end of the post (owner, 2026-10-29) |
 | Status | approved 2026-10-29 by Yasser (G-asset); **scheduled** on the Iron Systems LinkedIn page for 2026-11-15 10:00 Cairo (owner's instruction, 2026-10-29) with the light Arabic 9:16 cut (1:14, 4.9 MB, made by Yasser from v2.5) and LinkedIn's own frame as thumbnail (the landscape thumbnail does not fit a vertical video); not yet live |
+| Update 2026-11-16 | Old CP-03 (live 15 Nov) ended on the old WhatsApp number and the founder name. At Yasser's instruction it was deleted and reposted the same day with the same text and the updated v2.5 Arabic 9:16 cut (end card: company number +20 10 5087 8238, hello@iron-sys.com, no founder; light copy 720x1280, 8.2 MB). |
 
 This is the company angle on ProcurePilot: what it shows about how Iron Systems builds. The product's own posts
 (founder voice) stay in `ProcurePilot/campaigns/`.

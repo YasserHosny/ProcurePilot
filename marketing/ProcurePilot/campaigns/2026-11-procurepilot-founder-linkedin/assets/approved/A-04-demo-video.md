@@ -9,6 +9,7 @@
 | Proof ids | C-01, C-03, C-07, C-09, C-14, C-15 and **C-16 (proposed: one RFQ to every supplier)** |
 | Link | `procurepilot.iron-sys.com` at the end of the post (owner, 2026-10-29) |
 | Status | approved 2026-10-29 by Yasser (G-asset); **scheduled** on the Iron Systems LinkedIn page for 2026-11-22 10:00 Cairo (owner's instruction, 2026-10-29) with the light Arabic 16:9 cut (2:09, 720p, 7.1 MB, made by Yasser from v2.5) and the A-04 thumbnail; not yet live |
+| Update 2026-11-16 | The scheduled post was edited in place (Yasser's instruction): the old video, whose end card showed the old WhatsApp number and the founder name, was replaced with the updated v2.5 Arabic 16:9 cut (company number +20 10 5087 8238, hello@iron-sys.com, no founder; light copy 1280x720, 9 MB) and the A-04 thumbnail. Text and slot (2026-11-22 10:00 Cairo) unchanged. |
 
 Text reuses the owner-approved v2.5 script: the bridge line of beat 1 and the recap rows (SRC-029). The video's
 disclosure pill was removed in v2.5 because "the description carries the disclosure": the last line below is that
