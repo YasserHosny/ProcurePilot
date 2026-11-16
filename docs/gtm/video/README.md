@@ -149,11 +149,15 @@ loudness ≈ −14 LUFS for the outros (social standard), peaks ≤ −1.6 dBFS 
 | `logo-sting-16x9-en.mp4`, `end-card-16x9-en.mp4`, `logo-sting-9x16-fast-en.mp4`, `end-card-9x16-en.mp4` | — | English separate pieces |
 
 Approved by the user 2026-10-15; in `renders/`. Re-rendered 2026-10-15 with the founder title
-«د. ياسر حسني» / "Dr. Yasser Hosny"; English versions added the same day.
+«د. ياسر حسني» / "Dr. Yasser Hosny"; English versions added the same day. (The founder line was removed from every card on
+2026-11-16; see below.)
 
 **2026-11-16 (Yasser):** the WhatsApp is now the Iron Systems company number +20 10 5087 8238, and the end
 cards show company contact only (no founder name, hello@iron-sys.com instead of a personal email). The sources
-above are updated; the MP4s in `renders/` and `cuts/` still show the old number until they are re-rendered.
+above are updated, and since the same day so is every MP4: `renders/outro-*` and `renders/end-card-*` were
+re-rendered, and every cut in `cuts/` (and the two Gulf editorial cuts in `marketing/ProcurePilot/demo-video/`)
+had its end card replaced in place, body and audio unchanged. How each kind of cut was done, and the OCR check
+that no closing frame still shows the old number or the founder: [`source/contact-swap/`](source/contact-swap/).
 
 ## Rebuilding
 

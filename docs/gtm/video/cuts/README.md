@@ -1,5 +1,7 @@
 # Demo video cuts
 
+**Contact (2026-11-16):** every cut below ends on the company-only card: the Iron Systems WhatsApp +20 10 5087 8238, www.iron-sys.com and hello@iron-sys.com, no founder name or personal email. The files were updated in place (end card replaced, body and audio unchanged; [`../source/contact-swap/`](../source/contact-swap/)); older copies remain only in git history.
+
 Every rendered version of the «مطاعم سند» demo video (and, from GCC Saudi v1, the «مطاعم رواق» Saudi demo), newest first. Each version has four cuts: Arabic and English, 16:9 (YouTube, LinkedIn, website) and 9:16 (Reels, TikTok, Shorts, WhatsApp status), named `procurepilot-demo-{ar,en}-{16x9,9x16-60s}.mp4` (from v2.5, `…-9x16.mp4`). Up to v2.2 the app screens are Arabic in every cut and the English cuts only translate the captions; the v2.2 English-UI cuts show the English interface.
 
 How each version was made: [`../generation-plan.md`](../generation-plan.md). Reviews: [`../review-codex-2026-10-19.md`](../review-codex-2026-10-19.md) (led to v2.0) and [`../source/edit-v2.2/OWNER-REVIEW-FINDINGS.md`](../source/edit-v2.2/OWNER-REVIEW-FINDINGS.md) (owner comments, led to v2.2).
