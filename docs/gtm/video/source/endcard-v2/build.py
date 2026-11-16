@@ -13,7 +13,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-FF = '/home/yasserhosny/Work/pp-video-env/lib/python3.12/site-packages/imageio_ffmpeg/binaries/ffmpeg-linux-x86_64-v7.0.2'
+import os
+import shutil
+FF = os.environ.get('PP_FFMPEG') or shutil.which('ffmpeg')
 VIDEO = Path(__file__).resolve().parents[2]
 RENDERS = VIDEO / 'renders'
 CUTS = VIDEO / 'cuts'

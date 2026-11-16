@@ -1,0 +1,22 @@
+# Company-only contact in every demo video (2026-11-16)
+
+Yasser, 2026-11-15: the WhatsApp on everything is the Iron Systems company number **+20 10 5087 8238**, and the
+demos show the company and its contacts only, no founder name or personal email. The text sources were changed in
+#580; this folder holds what updated the rendered files.
+
+| What | Files | How |
+|---|---|---|
+| Outro and end-card renders | `../../renders/outro-*`, `end-card-*` | `../endcard-v2/`: `make_boards.py` → `render_frames.cjs` → `build.py` (`build_outros` only) |
+| Standard cuts (56) | `../../cuts/*/` except the two editorial folders and the ad | `swap_cards.py`: the last 157 (16:9) or 165 (9:16) frames, the end card, become the new card. Every one of these cuts' card starts on a blank navy frame, so the join is seamless. Body frames re-encoded at CRF 16, audio copied |
+| Editorial cuts (4) | `v2.2-editorial/`, `v2.3-brand/` | Their engines re-render the outro pixel-for-pixel from the updated specs (with a stub plate index: the outro uses no plates); `swap_cards.py` replaces the frames from the outro start |
+| Gulf editorial cuts (2) | `marketing/ProcurePilot/demo-video/v2.3-editorial-gulf-pp_2026-10-21/` | No engine source in the repo: `gulf_patch.py` redraws the contact lines on the card frames (font fitted to the original number, its fade kept) |
+| Saudi ad (4) | `../../cuts/gcc-sa-ad-v1/` | `../edit-sa-ad/`: the closing scene re-rendered with the new number, then both mixes muxed |
+| WhatsApp photo cards (2) | `../../../whatsapp-card/pilot-card-*-photo.mp4` | `pilot_card_video.py`: the original opening footage, a cross-fade into the corrected card PNG, then a slow push-in (the footage behind the old card is not in the repo) |
+| Old one-pager PDF | `../../../one-pager/ProcurePilot-one-pager.pdf` | `pdf_contact.py`: the footer contact line rewritten (source not in the repo) |
+| Check | all of the above | `verify_contact.py`: OCR of the closing 14 s at 3 fps; no frame may show the old number or the founder, and the new number must appear |
+
+Result 2026-11-16: 76 videos checked, none shows the old number or the founder's name or email in its closing seconds. 73
+also show the new number to OCR; the other 3 are Saudi ad cuts, whose number is white on the teal call-to-action pill,
+which tesseract does not read. Their last frames were checked by eye and show +20 10 5087 8238.
+
+`kit_patch.py` (the WhatsApp-kit images) is kept for reference; #580 regenerated those images from their own sources.
