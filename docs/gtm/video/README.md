@@ -95,8 +95,8 @@ Music: **Antalya Beaches — DayFox** (below). Its sections line up with the sto
 ## End card (decided)
 
 Navy, follows the sting seamlessly; elements fade up 0.27 s apart: logo · «جرّبه أسبوعين مجانًا» ·
-«وإحنا اللي هنجهّزه معاك.» · WhatsApp **+20 102 735 4140** (large, teal, screenshot-able) ·
-«د. ياسر حسني — المؤسس» · yasser.hosny@iron-sys.com · «أحد منتجات Iron Systems». The 9:16 card keeps
+«وإحنا اللي هنجهّزه معاك.» · WhatsApp **+20 10 5087 8238** (large, teal, screenshot-able) ·
+www.iron-sys.com · hello@iron-sys.com · «أحد منتجات Iron Systems». The 9:16 card keeps
 everything inside the WhatsApp/Reels safe area (top ~250 px, bottom ~350 px).
 
 **End card v2 (2026-10-26, owner):** the closing «أحد منتجات Iron Systems» / "A product of Iron Systems" line was
@@ -114,7 +114,7 @@ Same keyframes, beats, sound cues and mix as the Arabic outro — only the text 
 
 - **Sting tagline:** "Compare. Choose. Save." — one word per bar, revealed left-to-right; "Save." in teal.
 - **End card (LTR):** logo · **Try it free for 2 weeks** · "— we set it up with you." · WhatsApp
-  **+20 102 735 4140** · "Dr. Yasser Hosny — Founder" · yasser.hosny@iron-sys.com · "A product of Iron Systems".
+  **+20 10 5087 8238** · www.iron-sys.com · hello@iron-sys.com · "A product of Iron Systems".
 - Canvas boards 10–13 on the logo canvas (`AnimEn16x9`, `EndCardEn16x9`, `AnimEn9x16Fast`, `EndCardEn9x16`).
 - Same placement as the Arabic outros (2:50.25 in the 3-minute cut, 0:51.34 in the 60-second cut).
 
@@ -150,6 +150,10 @@ loudness ≈ −14 LUFS for the outros (social standard), peaks ≤ −1.6 dBFS 
 
 Approved by the user 2026-10-15; in `renders/`. Re-rendered 2026-10-15 with the founder title
 «د. ياسر حسني» / "Dr. Yasser Hosny"; English versions added the same day.
+
+**2026-11-16 (Yasser):** the WhatsApp is now the Iron Systems company number +20 10 5087 8238, and the end
+cards show company contact only (no founder name, hello@iron-sys.com instead of a personal email). The sources
+above are updated; the MP4s in `renders/` and `cuts/` still show the old number until they are re-rendered.
 
 ## Rebuilding
 

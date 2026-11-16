@@ -7,6 +7,6 @@ export const environment = {
   supportEmail: 'support@iron-sys.com',
   // New-business address listed on www.iron-sys.com.
   salesEmail: 'hello@iron-sys.com',
-  // Founder's WhatsApp for new business, international format without '+' (wa.me links).
-  salesWhatsapp: '201027354140',
+  // Iron Systems company WhatsApp for new business (all products, since 2026-11-16), international format without '+' (wa.me links).
+  salesWhatsapp: '201050878238',
 } as const;

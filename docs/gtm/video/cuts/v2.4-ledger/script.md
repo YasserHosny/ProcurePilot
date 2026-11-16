@@ -221,11 +221,11 @@ Each batch of Gmail replies is sent only after the owner's OK for that batch, as
 
 AR: «ProcurePilot لمديري المشتريات في المطاعم: طلب عرض سعر واحد لكل الموردين، عروض بتتقري لوحدها من PDF
 وصور الواتساب، مقارنة بالعبوة، اعتماد من الموبايل، وأمر شراء والتوفير متسجّل. تشغيل حقيقي ببيانات تجريبية.
-جرّبه أسبوعين مجانًا — كلّمنا واتساب ‎+20 102 735 4140»
+جرّبه أسبوعين مجانًا — كلّمنا واتساب ‎+20 10 5087 8238»
 
 EN: "ProcurePilot for restaurant purchasing managers: one RFQ to every supplier, quotes read from PDFs and
 WhatsApp photos, per-pack comparison, approval from the phone, and a PO with the saving logged. A real run
-on demo data. Try it free for two weeks: WhatsApp +20 102 735 4140."
+on demo data. Try it free for two weeks: WhatsApp +20 10 5087 8238."
 
 ## Pass threshold (skill gates)
 

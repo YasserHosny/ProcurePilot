@@ -204,7 +204,7 @@ for(const i of [1,5,7]) PASS(ST[i]);
   const dk=IMG(LOGO+'procurepilot-horizontal-dark.svg',{w:500,h:115,x:300,y:540,z:42,fit:'contain',t0:a(4.75),t1:a(D)+.1});
   K(dk,'y',[a(4.75),700],[a(5.15),540,'out']); K(dk,'o',[a(4.75),0],[a(5.0),1,'lin']);
   const L=[['جرّبه أسبوعين مجانًا',{size:120,y:300}],['وإحنا اللي هنجهّزه معاك.',{size:56,w:500,y:430}],['واتساب',{size:34,w:500,color:C.mid,y:565}],
-    ['+20 102 735 4140',{size:110,w:600,dir:'ltr',color:C.tealText,y:650}],['د. ياسر حسني — المؤسس',{size:42,w:500,y:810}],['yasser.hosny@iron-sys.com',{size:36,w:400,dir:'ltr',y:870}],['أحد منتجات Iron Systems',{size:32,w:400,color:C.mid,y:975}]];
+    ['+20 10 5087 8238',{size:110,w:600,dir:'ltr',color:C.tealText,y:650}],['www.iron-sys.com',{size:42,w:500,y:810}],['hello@iron-sys.com',{size:36,w:400,dir:'ltr',y:870}],['أحد منتجات Iron Systems',{size:32,w:400,color:C.mid,y:975}]];
   const step=[1,2,3,3,4,4,5];
   L.forEach(([s,o],i)=>{ const e=T(s,Object.assign({x:1800,ax:1,z:41,t0:a(4.5),t1:a(D)+.1},o)); up(e,a(4.5+.27*step[i])); });
   const wu=R({w:860,h:14,x:1800,y:722,ax:1,ay:.5,z:41,color:C.mist,t0:a(5.3),t1:a(D)+.1}); K(wu,'sx',[a(5.35),0],[a(5.75),1]);

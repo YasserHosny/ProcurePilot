@@ -1,6 +1,6 @@
 # مسار المحادثة خطوة بخطوة (البند ٦ في الخطة)
 
-**مسودة للمراجعة، ٢٠٢٦-١١-١٠.** إنت اللي بتبعت كل رسالة. الملف ده بيجمع في مكان واحد: إمتى تبعت إيه، ومعاه أنهي صورة، وتحط أنهي ليبل، وإيه اللي بعده.
+**مسودة للمراجعة، ٢٠٢٦-١١-١٠، اتحدثت ٢٠٢٦-١١-١٦ (رقم الشركة).** إنت اللي بتبعت كل رسالة من رقم Iron Systems ‎+20 10 5087 8238. الملف ده بيجمع في مكان واحد: إمتى تبعت إيه، ومعاه أنهي صورة، وتحط أنهي ليبل، وإيه اللي بعده.
 النصوص مأخوذة من `../01-group-messages.md` و`../00-WHATSAPP-KIT.md` ومترتبة على الخطوات. لو غيّرت رسالة هنا، غيّرها هناك كمان.
 
 ## الخريطة في سطر
@@ -22,6 +22,8 @@
 - **مفيش أي رقم مش حقيقي**: مفيش عملاء، مفيش نسبة توفير، مفيش دقة. الأرقام اللي في الصور مكتوب عليها «مثال توضيحي».
 - لو حد قال «متبعتش تاني»: `/stop`، ليبل ⛔، ومتبعتلوش تاني أبدًا.
 - رد على الردود **قبل** ما تبعت رسايل جديدة.
+- **الرقم رقم الشركة، والرسالة عن منتج واحد.** البروفايل بيقول Iron Systems، فالرسالة تبدأ بالمنتج (ProcurePilot) على طول، ومتخلطش منتجين في نفس الشات. حط ليبل المنتج من أول رسالة.
+- اللي قال stop مبنبعتلوش تاني **عن أي منتج**.
 
 ---
 
@@ -67,9 +69,9 @@
 > Hi [name], [who introduced us] said you might help me. We're building ProcurePilot for companies buying from many suppliers, and I'd like to hear how you handle purchasing. Could we have 10 minutes whenever suits you?
 
 **١-هـ. رقم فرع أو خدمة عملاء**
-> أهلًا، معاكم فريق ProcurePilot من Iron Systems. مش عميل ومش ببيع حاجة دلوقتي. ممكن أعرف مين المسؤول عن المشتريات عندكم، وأوصله إزاي؟ عندي سؤال واحد ليه. شكرًا جدًا.
+> أهلًا، معاكم Iron Systems، بخصوص ProcurePilot نظام المشتريات بتاعنا. مش عميل ومش ببيع حاجة دلوقتي. ممكن أعرف مين المسؤول عن المشتريات عندكم، وأوصله إزاي؟ عندي سؤال واحد ليه. شكرًا جدًا.
 >
-> Hello, this is the ProcurePilot team at Iron Systems. I'm not a customer and I'm not selling anything right now. Could you tell me who handles purchasing, and how I can reach them? I have one question for them. Thank you.
+> Hello, this is Iron Systems, about ProcurePilot, our purchasing system. I'm not a customer and I'm not selling anything right now. Could you tell me who handles purchasing, and how I can reach them? I have one question for them. Thank you.
 
 ## الخطوة ٢: متابعة واحدة
 
@@ -209,7 +211,7 @@
 
 | الاختصار | لما يقول | الرد |
 |---|---|---|
-| `/who` | إنتوا مين؟ | إحنا Iron Systems، شركة برمجيات بتعمل أنظمة للشركات بالعربي، وProcurePilot هو نظام المشتريات بتاعنا. ده الموقع: https://procurepilot.iron-sys.com |
+| `/who` | إنتوا مين؟ | إحنا Iron Systems، شركة برمجيات هندسية بتعمل أنظمة وحلول ذكاء اصطناعي للشركات، وProcurePilot من منتجاتنا: نظام مشتريات بيقارن عروض الموردين. موقع المنتج: https://procurepilot.iron-sys.com وموقع الشركة: https://www.iron-sys.com |
 | `/what` | إيه هو ProcurePilot؟ | ProcurePilot نظام مشتريات من Iron Systems. بتبعتله عروض الموردين زي ما هي، وهو يقراها ويقارنها صح ويقولك مين الأوفر فعلًا، وإنت اللي بتوافق. التجربة مجانية، تحب نبدأ بمكالمة قصيرة؟ |
 | `/number` | جبت رقمي منين؟ | لقيته على [المكان]. لو تحبوا مبعتش تاني قولولي وهشيله فورًا. |
 | `/stop` | متبعتليش تاني | تحت أمركم، مش هبعت تاني. آسف على الإزعاج. |
