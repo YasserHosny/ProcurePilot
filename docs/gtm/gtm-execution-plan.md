@@ -157,7 +157,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-182 | PPS-206 | P-183 | PPS-207 | P-184 | PPS-208 |
 | P-185 | PPS-209 | P-186 | PPS-210 | P-187 | PPS-211 |
 | P-188 | PPS-212 | P-193 | PPS-218 | | |
-| P-194 | PPS-220 | P-195 | PPS-221 | | |
+| P-194 | PPS-220 | P-195 | PPS-221 | P-196 | PPS-222 |
 | P-160 | PPS-184 | P-161 | PPS-185 | P-162 | PPS-186 |
 | P-163 | PPS-187 | P-164 | PPS-188 | P-165 | PPS-189 |
 | P-166 | PPS-190 | P-167 | PPS-191 | P-168 | PPS-192 |
@@ -408,6 +408,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [x] P-188 | — | PO and split UX: PO PDF/print and CSV export, receive-all and remaining hints, overdue/progress chips, linked documents, split next step and history (E1–E7). Medium, owner scope call first | — | — | Done (PPS-212): print and CSV, receive-all, overdue and progress chips, linked documents, #494 (receipt line notes, back link to the split); live-checked 2026-11-05. Owner decisions 2026-11-05: no server-side PDF (print and CSV cover it), no branch-prefixed order numbers for now |
 | [x] P-194 | — | Saudi marketing ad with a Saudi-dialect voiceover for the marketing and media-buying team (owner, 2026-11-13): hook, problem, logo turn, five benefit chapters on the real «مطاعم رواق» screens, the saving and a call to action; generated ar-SA voice, picture timed to its words, music and sound effects; Arabic 16:9 and 9:16 with an `.srt` (`docs/gtm/video/source/edit-sa-ad/`, `docs/gtm/video/cuts/gcc-sa-ad-v1/`) | Orch, User (voice review, Saudi contact) | P-53 | Done (PPS-220), #577; approved by the owner 2026-11-13. No-voiceover versions of both formats added on the owner's request. Left over: a Saudi contact for the end card (same open item as the Saudi demo cuts) |
 | [x] P-195 | — | Company WhatsApp +20 10 5087 8238 and company-only contact in every demo video (owner, 2026-11-15): outro and end-card renders, the end card of every cut in `docs/gtm/video/cuts/` (body and audio unchanged), the two Gulf editorial cuts in `marketing/ProcurePilot/demo-video/`, the WhatsApp photo-card videos and the old one-pager PDF; OCR check of every closing frame (`docs/gtm/video/source/contact-swap/`). Sources were changed in #580 (PPS-153) | Orch | — | Done (PPS-221): #581, #582, #585 into `marketing`, #583 into `main`; the live website updated by Yasser 2026-11-16 |
+| [ ] P-196 | — | Commit the 2026-11-04 handoff note (`handoff-2026-11-04.md`) and the RFQ 2094fcc9 demo quotes (`gcc/setup/quotes/rfq-2094fcc9-2026-10-31/` + generator), left untracked on the owner's checkout; stale local branches and stash removed (owner, 2026-11-17) | Orch | — | PPS-222: #589 merged |
 
 ### E — Pilot environment
 
@@ -530,3 +531,4 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-11-13 | Claude | P-194 (PPS-220): no-voiceover versions of the Saudi ad added on the owner's request (`…-no-vo.mp4`, 16:9 and 9:16): the same picture, bit-identical, with music and effects only at −14 LUFS. | |
 | 2026-11-16 | Claude | P-195 (PPS-221): every demo video now ends on the company-only card (Iron Systems WhatsApp +20 10 5087 8238, www.iron-sys.com, hello@iron-sys.com; no founder name or personal email), built on #580's sources. 56 standard cuts had their end card swapped; the 2 editorial cuts were re-rendered from their engines; the 2 Gulf editorial cuts were patched in place; the 4 Saudi ad cuts were rebuilt; the photo-card videos and the old one-pager PDF were redone. Old files remain only in git history. The live website is outside this repo. | |
 | 2026-11-16 | Claude | P-195 (PPS-221) closed: on `main` via #583 (only the closing seconds of each video re-encoded, the rest byte-identical to the originals), `main` merged back into `marketing` (#584), rebuild script pinned to the pre-change originals (#585). Yasser updated the live website himself. No product or demo file shows the old number or the founder. | |
+| 2026-11-17 | Claude | P-196 (PPS-222): the uncommitted-work check found the 2026-11-04 handoff note and the RFQ 2094fcc9 quotes untracked; committed with a GTM README row (#589). 495 stale local branches and one stash removed from the owner's checkout (SHA manifest `~/Work/branch-cleanup-2026-11-17.txt`); `docs/user-documentation-business-value` kept for the owner to decide. | |
