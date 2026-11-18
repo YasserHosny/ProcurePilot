@@ -3,6 +3,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { OverlayContainer } from '@angular/cdk/overlay';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
@@ -11,6 +12,7 @@ import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { SessionService } from '../../../core/auth/session.service';
 import { I18nService } from '../../../core/i18n';
 import { FeedbackDraftStore } from '../feedback-draft.store';
+import { FeedbackDialogComponent } from './feedback-dialog.component';
 import { FeedbackWidgetComponent } from './feedback-widget.component';
 
 describe('FeedbackWidgetComponent (FR-001, FR-010, FR-011)', () => {
@@ -125,5 +127,47 @@ describe('FeedbackWidgetComponent (FR-001, FR-010, FR-011)', () => {
     member.set({ id: 'user-b' });
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-test="draft-dot"]')).toBeNull();
+  });
+
+  it('passes afterCapture: true on the next open after a capture close, and not on the open after that', async () => {
+    const dialogService = TestBed.inject(MatDialog);
+    spyOn(dialogService, 'open').and.callThrough();
+
+    fab().click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(dialogService.open).toHaveBeenCalledWith(
+      FeedbackDialogComponent,
+      jasmine.objectContaining({ data: undefined }),
+    );
+
+    overlay.querySelector<HTMLButtonElement>('[data-test="hide-to-capture"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    // Next open: should have afterCapture: true
+    fab().click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(dialogService.open).toHaveBeenCalledWith(
+      FeedbackDialogComponent,
+      jasmine.objectContaining({ data: { afterCapture: true } }),
+    );
+
+    overlay.querySelector<HTMLButtonElement>('[data-test="close"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    // Open after that: should not have afterCapture
+    fab().click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(dialogService.open).toHaveBeenCalledWith(
+      FeedbackDialogComponent,
+      jasmine.objectContaining({ data: undefined }),
+    );
   });
 });

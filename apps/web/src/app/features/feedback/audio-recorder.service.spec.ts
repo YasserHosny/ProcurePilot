@@ -18,6 +18,7 @@ class FakeRecorder implements MediaRecorderLike {
   mimeType: string;
   ondataavailable: ((e: { data: Blob }) => void) | null = null;
   onstop: (() => void) | null = null;
+  onerror: ((e: unknown) => void) | null = null;
   constructor(
     public stream: MediaStream,
     options?: { mimeType?: string },
@@ -200,5 +201,38 @@ describe('AudioRecorderService (FR-004, FR-006)', () => {
     await service.start();
     service.ngOnDestroy();
     expect(stopped).toHaveBeenCalled();
+  });
+
+  it('leaves the state idle, stops tracks, sets error to failed, and produces no result when start() throws', async () => {
+    class ThrowingRecorder extends FakeRecorder {
+      override start(): void {
+        throw new Error('start failed');
+      }
+    }
+    const { stream, stopped } = fakeStream();
+    const service = setup({
+      devices: { getUserMedia: () => Promise.resolve(stream) },
+      ctor: ThrowingRecorder,
+    });
+    await service.start();
+    expect(service.state()).toBe('idle');
+    expect(service.error()).toBe('failed');
+    expect(stopped).toHaveBeenCalled();
+    expect(service.takeResult()).toBeNull();
+  });
+
+  it('leaves the state idle, stops tracks, sets error to failed, and produces no result on onerror', async () => {
+    const { stream, stopped } = fakeStream();
+    const service = setup({
+      devices: { getUserMedia: () => Promise.resolve(stream) },
+      ctor: FakeRecorder,
+    });
+    await service.start();
+    expect(service.state()).toBe('recording');
+    FakeRecorder.last!.onerror?.(new Event('error'));
+    expect(service.state()).toBe('idle');
+    expect(service.error()).toBe('failed');
+    expect(stopped).toHaveBeenCalled();
+    expect(service.takeResult()).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -27,6 +27,7 @@ export class FeedbackWidgetComponent {
   private readonly draft = inject(FeedbackDraftStore);
 
   private dialogRef: MatDialogRef<FeedbackDialogComponent> | null = null;
+  readonly afterCapture = signal(false);
 
   /** Who the draft belongs to: member and workspace, so it never crosses to another person. */
   private readonly ownerKey = computed(() => {
@@ -48,16 +49,24 @@ export class FeedbackWidgetComponent {
   open(): void {
     if (this.dialogRef) return;
     this.draft.claim(this.ownerKey());
+    const afterCapture = this.afterCapture();
+    if (afterCapture) {
+      this.afterCapture.set(false);
+    }
     // Focus returns to the button on close (restoreFocus), and Material traps it meanwhile.
     this.dialogRef = this.dialog.open(FeedbackDialogComponent, {
       width: '560px',
       maxWidth: 'calc(100vw - 16px)',
       restoreFocus: true,
       ariaModal: true,
-      autoFocus: 'first-tabbable',
+      autoFocus: afterCapture ? false : 'first-tabbable',
+      data: afterCapture ? { afterCapture: true } : undefined,
     });
-    this.dialogRef.afterClosed().subscribe(() => {
+    this.dialogRef.afterClosed().subscribe((result) => {
       this.dialogRef = null;
+      if (result === 'capture') {
+        this.afterCapture.set(true);
+      }
     });
   }
 }

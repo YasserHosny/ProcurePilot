@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
@@ -12,7 +12,7 @@ import { I18nService } from '../../../core/i18n';
 import { AudioRecorderService } from '../audio-recorder.service';
 import { FeedbackDraftStore } from '../feedback-draft.store';
 import type { Submission } from '../feedback-api';
-import { FeedbackDialogComponent } from './feedback-dialog.component';
+import { FeedbackDialogComponent, type FeedbackDialogData } from './feedback-dialog.component';
 
 const en = enCatalog.feedback;
 
@@ -106,7 +106,9 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
     fixture.detectChanges();
   }
 
-  async function setup(opts: { recorderSupported?: boolean } = {}): Promise<void> {
+  async function setup(
+    opts: { recorderSupported?: boolean; data?: FeedbackDialogData } = {},
+  ): Promise<void> {
     recorder = makeRecorder(opts.recorderSupported ?? true);
     dialogRef = jasmine.createSpyObj('MatDialogRef', ['close']);
     await TestBed.configureTestingModule({
@@ -119,6 +121,7 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
         provideTranslateService(),
         { provide: I18nService, useValue: { currentLocale: signal('en') } },
         { provide: MatDialogRef, useValue: dialogRef },
+        { provide: MAT_DIALOG_DATA, useValue: opts.data ?? null },
       ],
     })
       .overrideComponent(FeedbackDialogComponent, {
@@ -398,6 +401,35 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
       const body = http.expectOne('/api/v1/feedback').request.body as FormData;
       expect(body.getAll('images').length).toBe(2);
     });
+
+    it('closes the dialog with "capture" from the hide button, and disables it while recording', () => {
+      click('[data-test="hide-to-capture"]');
+      expect(dialogRef.close).toHaveBeenCalledWith('capture');
+
+      recorder.state.set('recording');
+      fixture.detectChanges();
+      expect(q<HTMLButtonElement>('[data-test="hide-to-capture"]')!.disabled).toBeTrue();
+    });
+
+    it('focuses the dropzone and shows pasteNow when opened with afterCapture', async () => {
+      TestBed.resetTestingModule();
+      await setup({ data: { afterCapture: true } });
+      expect(text('[data-test="dropzone"]')).toContain(en.attachments.pasteNow);
+      expect(document.activeElement).toBe(q('[data-test="dropzone"]'));
+    });
+
+    it('shows thumb-failed placeholder on image error and clears on removal', () => {
+      chooseImages([file('a.png', 'image/png')]);
+      expect(q('[data-test="thumb-failed"]')).toBeNull();
+      const img = q<HTMLImageElement>('[data-test="thumb"] img')!;
+      img.dispatchEvent(new Event('error'));
+      fixture.detectChanges();
+      expect(q('[data-test="thumb-failed"]')).not.toBeNull();
+      expect(text('[data-test="thumb-failed"]')).toContain(en.attachments.previewFailed);
+      expect(q('[data-test="remove-image"]')).not.toBeNull();
+      click('[data-test="remove-image"]');
+      expect(q('[data-test="thumb"]')).toBeNull();
+    });
   });
 
   describe('voice message (US3)', () => {
@@ -480,6 +512,19 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
       click('[data-test="send"]');
       const body = http.expectOne('/api/v1/feedback').request.body as FormData;
       expect((body.get('audio') as File).name).toBe('note.wav');
+    });
+
+    it('shows audio-preview-failed on audio error and clears when audio is discarded', async () => {
+      await setup();
+      chooseAudio(file('note.m4a', 'audio/mp4'));
+      expect(q('[data-test="audio-preview-failed"]')).toBeNull();
+      const audioEl = q<HTMLAudioElement>('audio[data-test="audio-preview"]')!;
+      audioEl.dispatchEvent(new Event('error'));
+      fixture.detectChanges();
+      expect(q('[data-test="audio-preview-failed"]')).not.toBeNull();
+      expect(text('[data-test="audio-preview-failed"]')).toContain(en.audio.previewFailed);
+      click('[data-test="discard-audio"]');
+      expect(q('[data-test="audio-preview-failed"]')).toBeNull();
     });
   });
 });

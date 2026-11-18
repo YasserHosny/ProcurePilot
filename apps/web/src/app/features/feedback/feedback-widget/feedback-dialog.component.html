@@ -54,14 +54,21 @@
     <section class="fb-section" aria-labelledby="fb-shots-title">
       <h3 id="fb-shots-title">{{ 'feedback.attachments.title' | translate }}</h3>
       <div
+        #dropzone
         class="fb-dropzone"
         data-test="dropzone"
+        tabindex="0"
+        aria-labelledby="fb-shots-title"
         [class.fb-dropzone--active]="dragging()"
         (dragover)="onDragOver($event)"
         (dragleave)="onDragLeave()"
         (drop)="onDrop($event)"
       >
-        <p>{{ 'feedback.attachments.dropHint' | translate }}</p>
+        @if (afterCapture()) {
+          <p data-test="paste-now">{{ 'feedback.attachments.pasteNow' | translate }}</p>
+        } @else {
+          <p>{{ 'feedback.attachments.dropHint' | translate }}</p>
+        }
         <button mat-stroked-button type="button" (click)="imageInput.click()">
           <mat-icon aria-hidden="true">add_photo_alternate</mat-icon>
           {{ 'feedback.attachments.add' | translate }}
@@ -78,16 +85,37 @@
           (change)="onImagesChosen($event)"
         />
       </div>
+      <div class="fb-row">
+        <button
+          mat-stroked-button
+          type="button"
+          data-test="hide-to-capture"
+          [disabled]="recorder.state() === 'recording'"
+          (click)="hideToCapture()"
+        >
+          <mat-icon aria-hidden="true">screenshot_monitor</mat-icon>
+          {{ 'feedback.attachments.hideToCapture' | translate }}
+        </button>
+        <span class="fb-hint">{{ 'feedback.attachments.captureHint' | translate }}</span>
+      </div>
       <p class="fb-hint">{{ 'feedback.attachments.limits' | translate }}</p>
 
       @if (draft.images().length > 0) {
         <ul class="fb-thumbs">
           @for (image of draft.images(); track image.id; let i = $index) {
             <li class="fb-thumb" data-test="thumb">
-              <img
-                [src]="image.previewUrl"
-                [alt]="'feedback.attachments.previewAlt' | translate: { number: i + 1 }"
-              />
+              @if (failedImageIds().has(image.id)) {
+                <div class="fb-thumb-failed" data-test="thumb-failed">
+                  <mat-icon aria-hidden="true">broken_image</mat-icon>
+                  <span>{{ 'feedback.attachments.previewFailed' | translate }}</span>
+                </div>
+              } @else {
+                <img
+                  [src]="image.previewUrl"
+                  [alt]="'feedback.attachments.previewAlt' | translate: { number: i + 1 }"
+                  (error)="onImageError(image.id)"
+                />
+              }
               <button
                 mat-mini-fab
                 class="fb-thumb-remove"
@@ -120,7 +148,13 @@
           controls
           [src]="audio.previewUrl"
           [attr.aria-label]="'feedback.audio.previewLabel' | translate"
+          (error)="onAudioError()"
         ></audio>
+        @if (audioPreviewFailed()) {
+          <p class="fb-error" data-test="audio-preview-failed" role="alert">
+            {{ 'feedback.audio.previewFailed' | translate }}
+          </p>
+        }
         <p class="fb-hint" data-test="audio-notice" role="status">
           @if (recorder.autoStopped()) {
             {{ 'feedback.audio.autoStopped' | translate }}
