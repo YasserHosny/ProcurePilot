@@ -80,7 +80,8 @@ def test_user_without_a_membership_still_loses_the_workspace_claims(
     conn: psycopg.Connection,
 ) -> None:
     with conn.cursor() as cur:
-        ws = make_workspace(cur, "hooknomem")
+        # A buyer, not the owner: the owner guard refuses removing a workspace's last owner.
+        ws = make_workspace(cur, "hooknomem", role="buyer")
         cur.execute("update membership set status = 'removed' where user_id = %s", (ws.user_id,))
         claims = _claims(cur, ws)
     assert "tenant_id" not in claims and "member_role" not in claims

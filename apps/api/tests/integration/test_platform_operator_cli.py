@@ -67,7 +67,8 @@ def test_grant_refuses_unknown_users_and_non_members(capsys: pytest.CaptureFixtu
     assert main(["grant", "nobody-at-all@example.test"]) == 1
     assert "no user with email" in capsys.readouterr().err
 
-    with committed_workspace("clinm") as ws:
+    # A buyer, not the owner: the owner guard refuses removing a workspace's last owner.
+    with committed_workspace("clinm", role="buyer") as ws:
         with psycopg.connect(TEST_DATABASE_URL or "") as conn:
             conn.execute(
                 "update membership set status = 'removed' where user_id = %s", (ws.user_id,)

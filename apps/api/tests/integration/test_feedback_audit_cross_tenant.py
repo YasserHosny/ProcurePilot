@@ -9,7 +9,9 @@ Reading of the migration: it is. The guard only fires for the `anon` / `authenti
 caller with a tenant claim, and the server-side form is neither. These tests pin that down against
 a real database:
 
-* RED here means the answer is no. Then add
+* Answer (run 2026-11-18): yes for the guard, but audit_event's composite FK means the event
+  cannot carry the operator's membership id; it carries actor_email only.
+  RED here means no. Then add
   `supabase/migrations/20261118000650_record_operator_audit_event.sql`, a SECURITY DEFINER
   `record_operator_audit_event(...)` executable only by operators, and have the operator service
   call it instead (that migration is CONDITIONAL and is not written while these tests are green).
@@ -48,7 +50,13 @@ def conn() -> Iterator[psycopg.Connection]:
 def test_server_side_form_records_an_event_for_a_tenant_other_than_the_operators(
     conn: psycopg.Connection,
 ) -> None:
-    """The positive case the operator audit trail depends on (answers research D2 'Verify')."""
+    """The positive case the operator audit trail depends on (answers research D2 'Verify').
+
+    The event names the operator by actor_email only: audit_event's composite FK
+    (tenant_id, actor_membership_id) -> membership cannot hold a membership of another workspace,
+    so the operator service sends no actor_membership_id for a cross-workspace event
+    (`actor_membership_for`).
+    """
     with conn.cursor() as cur:
         operators_home = make_workspace(cur, "auditop")
         submissions_tenant = make_workspace(cur, "auditsub")
@@ -57,7 +65,7 @@ def test_server_side_form_records_an_event_for_a_tenant_other_than_the_operators
         AuditWriter().record(
             AuditEventCreate(
                 tenant_id=submissions_tenant.tenant_id,
-                actor_membership_id=operators_home.membership_id,
+                actor_membership_id=None,
                 actor_email="operator@example.test",
                 action="feedback.operator_viewed",
                 target={"submission_id": "00000000-0000-0000-0000-000000000001"},
@@ -66,14 +74,29 @@ def test_server_side_form_records_an_event_for_a_tenant_other_than_the_operators
         )
         with conn.cursor() as cur:
             cur.execute(
-                "select tenant_id, actor_membership_id from audit_event "
+                "select tenant_id, actor_membership_id, actor_email from audit_event "
                 "where action = 'feedback.operator_viewed' and tenant_id = %s",
                 (submissions_tenant.tenant_id,),
             )
             rows = cur.fetchall()
-        assert rows == [(submissions_tenant.tenant_id, operators_home.membership_id)]
+        assert rows == [(submissions_tenant.tenant_id, None, "operator@example.test")]
     finally:
         _cleanup(conn, operators_home, submissions_tenant)
+
+
+def test_a_foreign_membership_id_cannot_be_filed_under_another_tenant(
+    conn: psycopg.Connection,
+) -> None:
+    """Why the operator service drops actor_membership_id on cross-workspace events."""
+    with conn.cursor() as cur:
+        operators_home = make_workspace(cur, "auditfkop")
+        submissions_tenant = make_workspace(cur, "auditfksub")
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            cur.execute(
+                "select record_audit_event('feedback.operator_viewed', 'success'::audit_outcome, "
+                "%s, %s, 'operator@example.test', null, null)",
+                (submissions_tenant.tenant_id, operators_home.membership_id),
+            )
 
 
 def test_aggregate_event_without_a_tenant_is_recorded_with_no_tenant(

@@ -126,8 +126,9 @@ create index feedback_submission_created_idx
 --   new ------------> resolved
 --
 -- No backward moves, and no change to any column except status, labels, status_changed_at and
--- status_changed_by. The two status_changed_* columns are written by this trigger, never by the
--- caller: a caller-supplied value is overwritten. Applies to every role, service role included.
+-- status_changed_by (plus submitter_membership_id to null, the FK's delete action). The two
+-- status_changed_* columns are written by this trigger, never by the caller: a caller-supplied
+-- value is overwritten. Applies to every role, service role included.
 -- ---------------------------------------------------------------------------
 create or replace function feedback_submission_guard()
 returns trigger
@@ -135,9 +136,15 @@ language plpgsql
 set search_path = pg_catalog, public
 as $$
 begin
-  if (to_jsonb(new) - array['status', 'labels', 'status_changed_at', 'status_changed_by'])
+  -- submitter_membership_id may only go to null: that is the membership FK's
+  -- `on delete set null (submitter_membership_id)` action when the member's membership is deleted.
+  if (to_jsonb(new) - array['status', 'labels', 'status_changed_at', 'status_changed_by',
+                            'submitter_membership_id'])
      is distinct from
-     (to_jsonb(old) - array['status', 'labels', 'status_changed_at', 'status_changed_by']) then
+     (to_jsonb(old) - array['status', 'labels', 'status_changed_at', 'status_changed_by',
+                            'submitter_membership_id'])
+     or (new.submitter_membership_id is distinct from old.submitter_membership_id
+         and new.submitter_membership_id is not null) then
     raise exception 'feedback_submission: only status and labels may change'
       using errcode = 'check_violation';
   end if;

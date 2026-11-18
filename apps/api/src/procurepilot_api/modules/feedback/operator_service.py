@@ -82,6 +82,18 @@ def assert_valid_transition(current: FeedbackStatus, target: FeedbackStatus) -> 
 # ---------------------------------------------------------------------------
 
 
+def actor_membership_for(operator: CurrentOperator, tenant_id: UUID | None) -> UUID | None:
+    """The operator's membership id, but only for an event in the operator's own workspace.
+
+    audit_event has a composite FK (tenant_id, actor_membership_id) -> membership, so an event
+    filed under ANOTHER workspace cannot name the operator's membership (it belongs to their home
+    workspace) and the insert fails. Those events identify the operator by actor_email alone.
+    """
+    if tenant_id is None or tenant_id == operator.tenant_id:
+        return operator.membership_id
+    return None
+
+
 def encode_cursor(created_at: datetime, row_id: UUID) -> str:
     raw = json.dumps([created_at.isoformat(), str(row_id)]).encode()
     return base64.urlsafe_b64encode(raw).decode().rstrip("=")
@@ -234,7 +246,7 @@ class OperatorFeedbackService:
             self._audit.record(
                 AuditEventCreate(
                     tenant_id=item.tenant_id,
-                    actor_membership_id=operator.membership_id,
+                    actor_membership_id=actor_membership_for(operator, item.tenant_id),
                     actor_email=operator.email,
                     action="feedback.operator_viewed",
                     target={"submission_id": str(item.id)},
@@ -301,7 +313,7 @@ class OperatorFeedbackService:
                 self._audit.record(
                     AuditEventCreate(
                         tenant_id=tenant_id,
-                        actor_membership_id=operator.membership_id,
+                        actor_membership_id=actor_membership_for(operator, tenant_id),
                         actor_email=operator.email,
                         action="feedback.operator_status_changed",
                         target={
@@ -316,7 +328,7 @@ class OperatorFeedbackService:
                 self._audit.record(
                     AuditEventCreate(
                         tenant_id=tenant_id,
-                        actor_membership_id=operator.membership_id,
+                        actor_membership_id=actor_membership_for(operator, tenant_id),
                         actor_email=operator.email,
                         action="feedback.operator_labels_changed",
                         # Counts only: labels are internal and audit rows are tenant-readable.
@@ -351,7 +363,7 @@ class OperatorFeedbackService:
             self._audit.record(
                 AuditEventCreate(
                     tenant_id=row["tenant_id"],
-                    actor_membership_id=operator.membership_id,
+                    actor_membership_id=actor_membership_for(operator, row["tenant_id"]),
                     actor_email=operator.email,
                     action="feedback.operator_attachment_url_issued",
                     target={
