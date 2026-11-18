@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import re
+from pathlib import Path
 
 
 def _find_repo_root() -> Path:
@@ -30,7 +30,9 @@ def test_nginx_csp_configuration() -> None:
 
     csp_values = re.findall(r'add_header\s+Content-Security-Policy\s+"([^"]+)"', nginx_conf)
 
-    assert len(csp_values) == 3, f"Expected exactly 3 Content-Security-Policy headers, found {len(csp_values)}"
+    assert len(csp_values) == 3, (
+        f"Expected exactly 3 Content-Security-Policy headers, found {len(csp_values)}"
+    )
     assert csp_values[0] == csp_values[1] == csp_values[2], "All 3 CSP headers must be identical"
 
     for csp_policy in csp_values:
@@ -45,7 +47,9 @@ def test_nginx_csp_configuration() -> None:
         media_src_tokens = directives["media-src"]
         assert "'self'" in media_src_tokens, "media-src must contain 'self'"
         assert "blob:" in media_src_tokens, "media-src must contain blob:"
-        assert "https://*.supabase.co" in media_src_tokens, "media-src must contain https://*.supabase.co"
+        assert "https://*.supabase.co" in media_src_tokens, (
+            "media-src must contain https://*.supabase.co"
+        )
 
         # script-src is exactly 'self'
         assert "script-src" in directives, "script-src directive missing from CSP"
