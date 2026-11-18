@@ -549,3 +549,35 @@
   fragment and a stored `sent` is not by itself «open». `rfq.status` has one more value
   (`cancelled`) that exports and reports must handle. Reminders add two columns to `rfq_recipient`
   and one audit action; the rules above are enforced in the API, not by the database.
+
+## ADR-027 — Platform-Operator Access to Feedback Is a Narrow, Audited Cross-Workspace Exception
+
+- **Status:** Accepted (spec 025 / PPS-223; owner decisions 2026-11-18)
+- **Context:** The ProcurePilot team must read pilot feedback from every workspace and move it through
+  new, reviewed and resolved. Constitution Principle V says a user of workspace A cannot read workspace
+  B's data, and Principle IV says an insight surface must carry an action. Governance allows a justified,
+  owner-approved deviation recorded in a plan or ADR; this is that record. The owner approved both
+  deviations on 2026-11-18.
+- **Decision:**
+  - **Operator identity.** An operator is an existing workspace member (the JWT parser and shell require
+    a membership) who also has a live row in `platform_operator`, a table reachable only by the service
+    role. `is_platform_operator()` (SECURITY DEFINER, pinned search path) checks the row on every
+    request, so revoking takes effect on the next request. A `platform_operator` token claim, if
+    present, is a display hint only and never grants access.
+  - **Narrow policies, not service role.** Operators reach data through RLS policies on
+    `feedback_submission` and `feedback_attachment` only: `SELECT`, and a column-limited `UPDATE`
+    (status, labels, status_changed_at, status_changed_by). They use the same direct-connection-with-claims
+    path as members, never `service_role`, so nothing outside the two feedback tables is reachable.
+  - **Forward-only status.** A trigger rejects backward moves and any change to other columns.
+  - **Audit.** Operator list, view, attachment link, status and label changes, and operator grant and
+    revoke each write an append-only `audit_event`.
+  - **Labels are internal.** Tenants never see them.
+  - **Owner inbox (Principle IV).** The workspace owner's inbox is read-only. It is a support surface that
+    surfaces no derived value, saving or recommendation; the triage view carries the actions.
+- **Rejected:** a tenant-owner-only inbox (never reaches the team); `service_role` in operator routes
+  (blast radius is every table); a JWT claim as the authority (cannot be revoked before the token expires);
+  owners triaging their own feedback (a second status authority for a ProcurePilot-internal queue).
+- **Consequences:** `platform_operator` and its grant and revoke command (`platform_operator_cli`) are new
+  operational surface; the first operators are granted by an ops step after migrations. Isolation tests
+  gain operator cases (operator reads across workspaces, cannot read other tables). Flutter mobile is out
+  of scope for v1.

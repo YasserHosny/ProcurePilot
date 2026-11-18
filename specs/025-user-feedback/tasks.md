@@ -20,7 +20,7 @@
 
 - [ ] T001 Add feedback settings to `API/config.py` (`feedback_bucket`, `feedback_cooldown_seconds=30`, `rate_limit_feedback_submit`, `feedback_attachment_url_ttl_seconds=300`, `feedback_retention_months=12`, `feedback_digest_hour_utc`, `web_public_url` for the digest's triage link, image and audio size/count limits, `app_version`) and document each in `.env.example`
 - [ ] T002 [P] Create the empty module and feature skeletons: `API/modules/feedback/__init__.py`, `API/modules/auth/operator.py`, `WEB/features/feedback/`, `WEB/features/platform/feedback-triage/`
-- [ ] T003 [P] Amend `specs/025-user-feedback/spec.md` for the accepted plan items, each with a Clarifications line:
+- [x] T003 [P] Amend `specs/025-user-feedback/spec.md` for the accepted plan items, each with a Clarifications line:
   - FR-009 and story 1 scenario 5: the system sets workspace, submitter, role, demo flag, timestamp and app version; page address and language come from validated request headers, used for triage only.
   - FR-017, Assumptions ("granted and withdrawn… outside the workspace member system") and the Platform operator entity: an operator is an existing workspace member plus a live `platform_operator` record; drop the "dedicated verified credential" wording; any JWT claim is only a UI hint.
   - FR-014: operator labels are never shown to submitters or owners.
@@ -28,8 +28,8 @@
   - FR-023: "delete or anonymise" becomes "delete".
   - Edge cases: a double-click on Send creates one submission.
   - Add a short justification that the read-only owner inbox is a support surface, not an insight dashboard (constitution Principle IV requires such features to be justified in the spec).
-- [ ] T003a [P] Record the owner's exception under constitution Governance ("Deviations are documented"; "explicit, recorded exception… by the project owner") for Principle V (platform-operator cross-workspace access) and Principle IV (read-only owner inbox): add an "Owner approval" line with date to `plan.md` Complexity Tracking and to ADR-027. No constitution amendment is proposed; if the owner prefers one, add a Principle V clause and bump to 1.1.0 instead.
-- [ ] T004 [P] Draft ADR-027 "Platform-operator access to feedback" in `docs/architecture/adrs.md` (context, decision from research.md D2, consequences, rejected alternatives, the owner approval from T003a)
+- [x] T003a [P] Record the owner's exception under constitution Governance ("Deviations are documented"; "explicit, recorded exception… by the project owner") for Principle V (platform-operator cross-workspace access) and Principle IV (read-only owner inbox): add an "Owner approval" line with date to `plan.md` Complexity Tracking and to ADR-027. No constitution amendment is proposed; if the owner prefers one, add a Principle V clause and bump to 1.1.0 instead.
+- [x] T004 [P] Draft ADR-027 "Platform-operator access to feedback" in `docs/architecture/adrs.md` (context, decision from research.md D2, consequences, rejected alternatives, the owner approval from T003a)
 
 ---
 
@@ -105,7 +105,7 @@
 - [ ] T034 [US2] `API/modules/feedback/storage.py`: upload with the user-JWT client (`upsert=false`), delete and signed-URL with the service-role client, path `tenants/{tenant_id}/feedback/{submission_id}/{uuid}/{safe_object_name}` via `shared/storage_keys.py`
 - [ ] T035 [US2] Extend `service.submit()` and `router.py` for `images[]`: validate all, upload, insert in one transaction, delete uploaded objects on any failure
 - [ ] T036 [US2] `GET /feedback/{id}/attachments/{attachment_id}/url` in `router.py` and `service.py`: RLS row check first, then 300 s signed URL
-- [ ] T037 [P] [US2] `infra/nginx/nginx.conf`: route-specific `client_max_body_size 40m` for `POST /api/v1/feedback` (global limit stays 30m)
+- [x] T037 [P] [US2] `infra/nginx/nginx.conf`: route-specific `client_max_body_size 40m` for `POST /api/v1/feedback` (global limit stays 30m)
 - [ ] T038 [P] [US2] i18n: `feedback.attachments.*` in `en.json` and `ar.json` (add, remove, limits, paste hint, errors)
 - [ ] T039 [P] [US2] `WEB/features/feedback/attachment-rules.ts`: client-side type, size and count checks run before any upload
 - [ ] T040 [US2] Widget: image picker, drag and drop, clipboard paste on the dialog, thumbnails with remove, per-file errors; extend `feedback-api.ts` to send `images`
@@ -195,7 +195,7 @@
 
 - [ ] T074 [P] `TESTS/integration/test_feedback_retention.py` (write first): submissions older than 12 months are deleted with their objects, one aggregate `feedback.retention_purged` event, orphan objects older than 1 h swept, newer ones kept
 - [ ] T075 Implement retention purge and orphan sweep in `API/workers/feedback_worker.py` (service-role connection)
-- [ ] T076 [P] Add a `feedback-worker` service to `docker-compose.yml`
+- [x] T076 [P] Add a `feedback-worker` service to `docker-compose.yml`
 - [ ] T077 Confirm how production runs workers (`infra/terraform`, bunny Magic Containers) and record the answer and any needed change in `docs/operations/`
 - [ ] T078 [P] Playwright e2e `apps/web/tests/e2e/feedback.spec.ts`: submit, own list, owner inbox, operator triage, withdraw
 - [ ] T079 [P] axe-core scans for widget, lists and triage in English and Arabic, plus manual 360 px check in both directions

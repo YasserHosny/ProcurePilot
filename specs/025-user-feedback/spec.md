@@ -14,6 +14,12 @@
 - Q: How should the ProcurePilot team learn of new feedback? → A: Through the triage view as the primary channel, plus an optional daily email digest each operator can turn on for themselves; no immediate per-submission alerts.
 - Q: What submitter identity do operators see? → A: The submitter's name and email, plus workspace and role.
 - Q: How can members add screenshots? → A: By uploading image files from the device or pasting an image from the clipboard; no one-click page capture in v1.
+- Q: Which context does the system set, and which comes from the request? → A: The system sets workspace, submitter, role, demo flag, timestamp and app version. Page address and language come from standard request headers, are validated, and are used for triage only.
+- Q: What is a platform operator? → A: An existing workspace member (typically of an internal ProcurePilot workspace) who also has a live platform-operator record; there is no separate credential, and any token claim is only a display hint. Operators without a workspace membership are not supported in v1.
+- Q: Do tenants see operator labels? → A: No. Labels are internal to the ProcurePilot team; submitters and owners see status and category only.
+- Q: Can status move backwards? → A: No. Status moves forward only (new to reviewed to resolved, or new to resolved).
+- Q: What happens at retention? → A: Feedback and its attachments are deleted 12 months after submission (not anonymised).
+- Q: Why is the owner inbox read-only and not an insight dashboard? → A: It is a support surface that shows whether the team's reports are heard; it surfaces no derived value, saving or recommendation. The platform-operator triage view carries the actions (status, labels). The owner approved this deviation from the constitution's "every insight ends in an action" principle on 2026-11-18.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -31,7 +37,7 @@ A workspace member hits a problem or has an idea while working. From any page, t
 2. **Given** a member composing feedback, **When** the message is empty or only whitespace, **Then** sending is blocked and a validation message is shown.
 3. **Given** a member composing feedback, **When** the message reaches 2000 characters, **Then** no further characters are accepted and the remaining count reads 0.
 4. **Given** a member who just sent feedback, **When** they try to send again within 30 seconds, **Then** the second send is refused with a clear message showing the time left, and their draft is kept.
-5. **Given** a submission, **When** it is stored, **Then** the page address, app version, language, member role and demo-workspace flag recorded come from the system, and any values the client supplied for these are ignored.
+5. **Given** a submission, **When** it is stored, **Then** the workspace, submitter, role, demo-workspace flag, time and app version recorded are set by the system, any client-supplied values for these are ignored, and the page address and language are taken from validated request headers and used for triage only.
 6. **Given** a member with the Arabic language selected, **When** they open the feedback control, **Then** all text appears in Arabic and the layout is right-to-left.
 7. **Given** the feedback control is open, **When** the member reads it, **Then** a notice states that ProcurePilot staff can see their feedback, screenshots, name and email.
 8. **Given** a member composing feedback, **When** they send without choosing a category, **Then** the feedback is accepted with no category; **When** they choose one of Bug, Idea, Question or Other, **Then** that category is saved and shown with the submission in every view.
@@ -120,7 +126,7 @@ A ProcurePilot team member with platform-operator access reviews feedback from a
 ### Edge Cases
 
 - Feedback is sent while offline or the connection drops mid-send: the member sees an error, the draft and attachments stay in the form, and nothing is silently lost or half-saved.
-- A member double-clicks Send: only one submission is created.
+- A member double-clicks Send: only one submission is created (the control disables Send while a request is in flight, and a repeated request with the same key returns the original result).
 - The member's session expires while composing: they are asked to sign in again, and the draft is not discarded before that.
 - A screenshot contains a colleague's data: it is visible only to the sender, the owner of that workspace, and platform operators, which is why the notice is shown.
 - A member is removed from the workspace after sending: their earlier feedback remains visible to the owner and operators; the member can no longer access it.
@@ -145,7 +151,7 @@ A ProcurePilot team member with platform-operator access reviews feedback from a
 - **FR-006**: The system MUST hide or disable recording where the browser or permissions do not support it, leaving all other inputs usable.
 - **FR-007**: The system MUST refuse a second submission from the same member within 30 seconds, keep their draft, and say how long to wait.
 - **FR-008**: The system MUST treat a submission as all-or-nothing: if text or any attachment cannot be saved, nothing is stored and the member keeps their draft; a repeated send of the same submission MUST NOT create duplicates.
-- **FR-009**: The system MUST record, for each submission, the workspace, the submitter, the submission time, and the page address, app version, language, member role and demo-workspace flag, all set by the system from the verified session and request; client-supplied values for these MUST be ignored.
+- **FR-009**: The system MUST record, for each submission, the workspace, the submitter, the submission time, member role, demo-workspace flag and app version, all set by the system from the verified session; client-supplied values for these MUST be ignored. The page address and language MUST be taken from standard request headers, validated (same-origin address, supported language), and used for triage context only.
 - **FR-010**: The system MUST show a success confirmation after saving, and the notice that ProcurePilot staff can see feedback, screenshots and the submitter's name and email whenever the feedback control is open.
 - **FR-011**: The system MUST show every user-facing string in English or Arabic according to the member's language, with right-to-left layout for Arabic, and the control MUST be usable from 360 px width upward.
 
@@ -153,15 +159,15 @@ A ProcurePilot team member with platform-operator access reviews feedback from a
 
 - **FR-012**: Every member MUST be able to list and open their own submissions, with attachments and current status, and MUST NOT see anyone else's.
 - **FR-013**: The workspace owner MUST additionally have a read-only inbox of all submissions from members of their own workspace, and no other workspace role MAY access it.
-- **FR-014**: No workspace role, including owner, MAY change a submission's status or labels or delete a submission or attachment, with one exception: a submitter MAY withdraw their own submission while its status is "new". Withdrawal removes the text and all attachments from every view (the submitter's, the owner's and the operators') and deletes the stored files; once the status is "reviewed" or "resolved", withdrawal is refused.
+- **FR-014**: Operator labels MUST NOT be shown to submitters or owners. No workspace role, including owner, MAY change a submission's status or labels or delete a submission or attachment, with one exception: a submitter MAY withdraw their own submission while its status is "new". Withdrawal removes the text and all attachments from every view (the submitter's, the owner's and the operators') and deletes the stored files; once the status is "reviewed" or "resolved", withdrawal is refused.
 - **FR-015**: A request for a submission or attachment in another workspace MUST behave as "not found", never "forbidden".
 - **FR-016**: Feedback and attachments MUST be isolated per workspace at the data layer, not only in the application, and attachments MUST NOT be reachable by any permanent public address.
 
 **Platform-operator triage**
 
-- **FR-017**: The system MUST provide a separate platform-operator access path, identified by a dedicated verified credential and not by any workspace role, that lets the ProcurePilot team list and open feedback across all workspaces, filter by status, workspace and category, and view attachments.
+- **FR-017**: The system MUST provide a separate platform-operator access path, identified by a live platform-operator record held by an existing workspace member and not by any workspace role, that lets the ProcurePilot team list and open feedback across all workspaces, filter by status, workspace and category, and view attachments.
 - **FR-017a**: The triage view MUST show each submission's submitter name and email, workspace and member role to platform operators; the daily digest (FR-024) MUST NOT include the email address.
-- **FR-018**: A platform operator MUST be able to set status (new, reviewed, resolved) and edit labels, and MUST NOT be able to read or change anything outside feedback through that access.
+- **FR-018**: A platform operator MUST be able to move status forward only (new to reviewed to resolved, or new to resolved) and edit labels, and MUST NOT be able to read or change anything outside feedback through that access.
 - **FR-019**: Attachment access for operators and members MUST use links that expire within a short time and are issued only after an access check.
 - **FR-020**: The system MUST write an audit record when feedback is submitted, when an operator views a submission, when an operator changes status or labels, and when a submitter withdraws a submission (recording who, when and the submission identifier, but not the withdrawn content); audit records MUST be append-only.
 - **FR-021**: Withdrawing a platform operator's access MUST take effect on their next request.
@@ -170,14 +176,14 @@ A ProcurePilot team member with platform-operator access reviews feedback from a
 
 **Retention**
 
-- **FR-023**: The system MUST delete or anonymise feedback and its attachments 12 months after submission, regardless of status.
+- **FR-023**: The system MUST delete feedback and its attachments 12 months after submission, regardless of status.
 
 ### Key Entities
 
 - **Feedback submission**: One piece of feedback. Holds workspace, submitter, submission time, message text, optional submitter category (Bug, Idea, Question, Other), status (new, reviewed, resolved), operator labels, and system-captured context (page address, app version, language, member role, demo-workspace flag). Belongs to exactly one workspace.
 - **Feedback attachment**: A screenshot (up to 5) or one audio file linked to a submission. Stored privately within its workspace; never publicly addressable.
 - **Feedback label**: A short tag the ProcurePilot team applies during triage.
-- **Platform operator**: A ProcurePilot team member with a dedicated access credential, distinct from any workspace membership, limited to feedback triage, with a personal on/off setting for the daily digest.
+- **Platform operator**: A ProcurePilot team member who is an existing workspace member and holds a live operator record, distinct from any workspace role, limited to feedback triage, with a personal on/off setting for the daily digest.
 - **Audit record**: Append-only entry of who did what to which submission and when.
 
 ## Success Criteria *(mandatory)*
@@ -199,7 +205,7 @@ A ProcurePilot team member with platform-operator access reviews feedback from a
 - The workspace owner's inbox is read-only in v1; owners cannot reply, relabel or delete.
 - Submitters see status changes by opening their list; no email or push notification on status change in v1.
 - Feedback is internal: it is visible only to the submitter, their workspace owner, and platform operators.
-- Platform-operator access is granted and withdrawn by the ProcurePilot team outside the workspace member system; the mechanism is decided in planning.
+- Platform-operator access is granted and withdrawn by the ProcurePilot team through an operator command, not through workspace membership; the holder must also be an existing workspace member.
 - The same behaviour applies to demo workspaces, which are flagged for triage.
 - The 30-second cooldown, file limits and 2-minute recording limit follow the reference implementation (FormCraft specs 011 and 013).
 

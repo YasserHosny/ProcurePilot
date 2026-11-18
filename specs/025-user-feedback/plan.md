@@ -135,6 +135,8 @@ direct-psycopg-with-claims pattern for RLS-governed reads and writes. No new dep
 | **Read-only owner inbox** (Principle IV). | Owners need to see whether their team's issues are heard; the spec decided owners cannot act. | Letting owners triage would give tenants write access to a ProcurePilot-internal queue and a second status authority. It is a support surface, not an insight dashboard: it surfaces no derived value, saving or recommendation. |
 | **Client-originated request context** (spec FR-009). Page address (from `Referer`) and UI language (from `Accept-Language`) originate in the browser; the server validates and normalises them. | The server cannot know the SPA route or the UI language toggle on its own. | Ignoring them would drop the most useful triage context. All security-relevant context (tenant, user, role, demo flag, timestamp, app version) is set server-side. Spec wording should be adjusted: see below. |
 
+**Owner approval (2026-11-18):** the owner approved the two constitutional deviations above (Principle V platform-operator access, Principle IV read-only owner inbox) as recorded exceptions under Governance. See ADR-027 in `docs/architecture/adrs.md`. No constitution amendment is proposed.
+
 ## Items for the owner
 
 1. **Spec wording (FR-009, story 1 scenario 5)** says client-supplied context values are ignored. Page address and language can only come from the request. Proposed amendment: "tenant, submitter, role, demo flag, timestamp and app version are set by the system; page address and language are taken from standard request headers, validated, and used for triage context only."
