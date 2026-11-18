@@ -230,6 +230,7 @@ export class FeedbackDialogComponent {
       const reason = checkImage(file, this.draft.images().length);
       if (reason === null) {
         this.draft.addImage(file);
+        this.afterCapture.set(false);
       } else if (reason === 'count') {
         if (!messages.some((m) => m.key === 'feedback.attachments.count')) {
           messages.push({ key: 'feedback.attachments.count' });

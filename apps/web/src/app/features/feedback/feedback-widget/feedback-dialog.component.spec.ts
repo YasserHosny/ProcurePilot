@@ -418,6 +418,27 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
       expect(document.activeElement).toBe(q('[data-test="dropzone"]'));
     });
 
+    it('clears pasteNow and shows dropHint when a PNG is pasted after capture', async () => {
+      TestBed.resetTestingModule();
+      await setup({ data: { afterCapture: true } });
+      expect(q('[data-test="paste-now"]')).not.toBeNull();
+
+      paste(q('[data-test="dropzone"]')!, [file('shot.png', 'image/png')]);
+
+      expect(q('[data-test="paste-now"]')).toBeNull();
+      expect(text('[data-test="dropzone"]')).toContain(en.attachments.dropHint);
+    });
+
+    it('keeps pasteNow when a rejected file is pasted after capture', async () => {
+      TestBed.resetTestingModule();
+      await setup({ data: { afterCapture: true } });
+      expect(q('[data-test="paste-now"]')).not.toBeNull();
+
+      paste(q('[data-test="dropzone"]')!, [file('notes.txt', 'text/plain')]);
+
+      expect(q('[data-test="paste-now"]')).not.toBeNull();
+    });
+
     it('shows thumb-failed placeholder on image error and clears on removal', () => {
       chooseImages([file('a.png', 'image/png')]);
       expect(q('[data-test="thumb-failed"]')).toBeNull();
