@@ -16,6 +16,7 @@ import type { Locale, Role, WorkspaceSummary } from '../../core/api/models';
 import { RoleDirective } from '../../core/auth/role.directive';
 import { SessionService } from '../../core/auth/session.service';
 import { I18nService } from '../../core/i18n';
+import { FeedbackWidgetComponent } from '../../features/feedback/feedback-widget/feedback-widget.component';
 import { BrandLogoComponent } from '../brand-logo/brand-logo.component';
 import { environment } from '../../../environments/environment';
 
@@ -52,6 +53,7 @@ export interface NavGroup {
     MatListModule,
     TranslatePipe,
     RoleDirective,
+    FeedbackWidgetComponent,
   ],
   templateUrl: './shell.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -148,6 +150,8 @@ export class ShellComponent implements OnInit {
         { route: '/ingestion', labelKey: 'ingestion.nav', icon: 'inbox' },
         { route: '/accounting', labelKey: 'accounting.nav', icon: 'account_balance' },
         { route: '/pos', labelKey: 'pos.nav', icon: 'point_of_sale' },
+        { route: '/feedback', labelKey: 'shell.navFeedback', icon: 'rate_review', exact: true, groupPrefix: '/feedback' },
+        { route: '/feedback/workspace', labelKey: 'shell.navWorkspaceFeedback', icon: 'all_inbox', roles: 'owner' },
       ],
     },
   ];

@@ -5,6 +5,8 @@ import { quotationReviewGuard } from './features/quotations/quotation-review/quo
 import { rfqDirtyGuard } from './features/rfq/create/rfq-create.guard';
 
 export const rfqGuardrailsOwnerGuard = roleGuard('owner');
+/** The owner's read-only feedback inbox. A navigation convenience; the API answers 404 to non-owners. */
+export const feedbackWorkspaceOwnerGuard = roleGuard('owner');
 
 /**
  * Public routes and guarded routes are kept in separate blocks (FR-016).
@@ -195,6 +197,23 @@ export const routes: Routes = [
         canActivate: [roleGuard('owner')],
         loadComponent: () =>
           import('./features/team/team.component').then((m) => m.TeamComponent),
+      },
+      {
+        path: 'feedback',
+        title: 'feedback.list.myTitle',
+        loadComponent: () =>
+          import('./features/feedback/my-feedback/my-feedback.component').then(
+            (m) => m.MyFeedbackComponent,
+          ),
+      },
+      {
+        path: 'feedback/workspace',
+        title: 'feedback.list.workspaceTitle',
+        canActivate: [feedbackWorkspaceOwnerGuard],
+        loadComponent: () =>
+          import('./features/feedback/workspace-feedback/workspace-feedback.component').then(
+            (m) => m.WorkspaceFeedbackComponent,
+          ),
       },
       {
         path: 'quotations',

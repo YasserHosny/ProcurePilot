@@ -16,6 +16,9 @@ const i18nDir = join(here, '..', '..', '..', 'packages', 'i18n');
 const KNOWN_DYNAMIC_SUFFIXES = {
   // ingestion_email_log.match_method check constraint (20260924203652_rfq_reply_match_method.sql)
   'ingestion.emailLog.matchMethods.': ['address', 'domain', 'thread', 'manual', 'rfq_reply'],
+  // feedback_submission.category and .status enums (specs/025-user-feedback/data-model.md)
+  'feedback.category.': ['bug', 'idea', 'question', 'other'],
+  'feedback.status.': ['new', 'reviewed', 'resolved'],
 };
 
 function leafKeys(obj, prefix = '', out = new Set()) {

@@ -1,4 +1,4 @@
-import { routes, rfqGuardrailsOwnerGuard } from './app.routes';
+import { feedbackWorkspaceOwnerGuard, routes, rfqGuardrailsOwnerGuard } from './app.routes';
 import { guestGuard } from './core/auth/auth.guard';
 
 describe('application routes', () => {
@@ -7,6 +7,17 @@ describe('application routes', () => {
     const guardrailRoute = shell?.children?.find((route) => route.path === 'rfq/guardrails');
     expect(guardrailRoute).toBeDefined();
     expect(guardrailRoute?.canActivate).toEqual([rfqGuardrailsOwnerGuard]);
+  });
+
+  it('offers My feedback to every member and guards the workspace inbox with the owner role', () => {
+    const shell = routes.find((route) => route.path === '' && !!route.children);
+    const mine = shell?.children?.find((route) => route.path === 'feedback');
+    expect(mine).toBeDefined();
+    expect(mine?.canActivate).toBeUndefined();
+
+    const inbox = shell?.children?.find((route) => route.path === 'feedback/workspace');
+    expect(inbox).toBeDefined();
+    expect(inbox?.canActivate).toEqual([feedbackWorkspaceOwnerGuard]);
   });
 
   it('routes root path to the guest-guarded landing page', () => {

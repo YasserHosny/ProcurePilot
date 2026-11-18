@@ -226,4 +226,8 @@
       </main>
     </mat-sidenav-content>
   </mat-sidenav-container>
+
+  <!-- Sibling of the content, not inside main-content: the control must not scroll away or be
+       replaced when the routed page changes (spec 025 FR-001). -->
+  <app-feedback-widget />
 </div>

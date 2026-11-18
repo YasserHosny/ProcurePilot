@@ -1,0 +1,44 @@
+@switch (state()) {
+  @case ('loading') {
+    <div class="fa-loading">
+      <mat-spinner diameter="24" [attr.aria-label]="'common.loading' | translate" />
+    </div>
+  }
+  @case ('error') {
+    <div class="fa-error" role="status">
+      <span>{{ 'feedback.list.attachmentError' | translate }}</span>
+      <button mat-button type="button" data-test="retry" (click)="load()">
+        {{ 'feedback.list.attachmentRetry' | translate }}
+      </button>
+    </div>
+  }
+  @case ('ready') {
+    @if (attachment().kind === 'image') {
+      <a [href]="url()" target="_blank" rel="noopener" class="fa-image-link">
+        <img
+          class="fa-image"
+          [src]="url()"
+          [alt]="'feedback.list.screenshotAlt' | translate: { number: number() }"
+          (error)="onMediaError()"
+        />
+      </a>
+    } @else {
+      <audio
+        class="fa-audio"
+        controls
+        preload="metadata"
+        [src]="url()"
+        [attr.aria-label]="'feedback.audio.previewLabel' | translate"
+        (error)="onMediaError()"
+      ></audio>
+    }
+  }
+  @default {
+    @if (attachment().kind === 'audio') {
+      <button mat-stroked-button type="button" data-test="load-audio" (click)="load()">
+        <mat-icon aria-hidden="true">play_circle</mat-icon>
+        {{ 'feedback.list.loadAudio' | translate }}
+      </button>
+    }
+  }
+}
