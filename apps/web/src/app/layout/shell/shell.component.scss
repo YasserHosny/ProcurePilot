@@ -304,6 +304,9 @@
 .main-content {
   background-color: t.$surface-page;
   padding: 1.5rem;
+  // Room to scroll the last controls of any page clear of the fixed feedback button
+  // (feedback-widget: 16px inset plus a 56px-high button), e.g. triage's "Add label".
+  padding-block-end: calc(1.5rem + 72px);
   box-sizing: border-box;
   overflow-y: auto;
 }
