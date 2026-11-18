@@ -213,7 +213,84 @@ docs-only skip, five shards, accessibility split — is in `docs/operations/ci-p
   environment in English and Arabic (roadmap §6.3). The October 2026 demo build found 20 defects the suites had
   passed.
 
-## 13. Open Decisions
+## 13. In-App Feedback (spec `025-user-feedback`)
+
+Feedback is the one feature that deliberately crosses workspaces (platform operators, ADR-027), so its
+tests are weighted towards the database boundary. Integration tests need `TEST_DATABASE_URL` pointing at
+a Postgres with the spec 025 migrations applied and are skipped without it; storage, mail and, where
+noted, the audit writer are in-memory fakes, while row-level security, the unique indexes and the
+forward-only status trigger are always real.
+
+### 13.1 API unit tests (`apps/api/tests/unit/`, no database)
+- `test_feedback_validation.py`: files are judged by content (libmagic), never by name; count (422),
+  size (413) and type (415) limits; audio-only WebM and MP4 recorder output accepted, the same
+  containers with a video track refused. Fixtures from real Chrome, Safari and Firefox recordings are in
+  `apps/api/tests/fixtures/feedback/` (see its `README.md`).
+- `test_feedback_context.py`: page path from a same-origin `Referer` only; language from
+  `Accept-Language`, falling back to the workspace default.
+- `test_feedback_status_machine.py`: the API's forward-only pre-check and label rules (409
+  `feedback.invalid_transition`).
+- `test_feedback_storage.py`: tenant-prefixed object paths, signed URLs and deletes.
+- `test_feedback_digest_renderer.py`: digest content in English and Arabic, no email address.
+- `test_current_operator.py`: operator access needs the live `platform_operator` row; the token claim
+  alone is not enough; non-operators get 404.
+- `test_platform_operator_cli_parsing.py`: CLI arguments and email normalisation.
+
+### 13.2 Contract tests (`apps/api/tests/contract/test_feedback_contract.py`)
+The member and owner endpoints through the real app and router with the service mocked: status and
+error codes, client-supplied workspace, user, role and demo values ignored, a second voice message
+refused, `limit` capped at 100, the owner-only inbox answering 404 to other roles, and drift tests
+comparing the live OpenAPI document with `specs/025-user-feedback/contracts/feedback.openapi.yaml`.
+The `/platform/feedback` routes are covered over HTTP in `test_feedback_operator.py` (below), not here.
+
+### 13.3 Integration tests (`apps/api/tests/integration/`)
+- **`test_feedback_isolation.py` (schema-level isolation, the hard gate).** Runs as the real
+  `authenticated` and `anon` roles with JWT claims: both tables have RLS enabled and forced; no
+  cross-workspace read, insert, attach, update or delete; own-or-owner visibility; no member can change
+  status, labels or any other column, or insert a forged row; a tenant cannot select `labels` and
+  `feedback_operator_labels()` returns null to tenants; withdrawal only while `new`; operator reach and
+  forward-only status; `status_changed_*` cannot be forged; a revoked operator has no access;
+  `platform_operator` is unreachable by clients.
+- `test_tenant_isolation.py` (`pnpm test:isolation`) includes `feedback_submission` and
+  `feedback_attachment` in its forced-RLS set and workspace fixture.
+- `test_feedback_operator.py`: what the database lets an operator do (read every workspace; change
+  status and labels only, forward only; no other tenant table; nothing once revoked; digest functions
+  touch the caller's row only; workspace names for operators only), then the HTTP routes (404 for
+  non-operators on every route, one aggregate audit event per list, per-submission audit events,
+  revocation on the next request).
+- `test_feedback.py`: submit for every role with server-set context, cooldown, idempotent replay
+  (including parallel requests with one key), all-or-nothing uploads, audio, withdrawal and the
+  withdraw-versus-status-change race.
+- `test_feedback_rbac.py` and `test_feedback_visibility.py`: who sees what through the service, the
+  owner inbox, attachment URLs, no labels in any tenant payload, visibility after a member is removed.
+- `test_feedback_audit_cross_tenant.py`: the T058 gate spike. The audit writer's server-side form can
+  file an operator event under another workspace; a member session still cannot.
+- `test_feedback_retention.py` and `test_feedback_worker.py`: 12-month purge with objects first, orphan
+  sweep, and the operator digest (one per day, watermark, opt-in only, Arabic, retry after a failed
+  send).
+- `test_auth_hook_operator_claim.py` and `test_platform_operator_cli.py`: the UI-hint claim and the
+  grant, revoke and list commands with their audit events.
+
+### 13.4 Web unit tests (Karma + Jasmine)
+- `features/feedback/`: `attachment-rules.spec.ts` (client-side type, size and count checks before any
+  upload), `audio-recorder.service.spec.ts` (2-minute auto-stop, unsupported and denied microphone),
+  `feedback-draft.store.spec.ts` (draft kept across a closed dialog or an expired session, cleared for
+  another member), `feedback-api.spec.ts`, `feedback-widget/feedback-dialog.component.spec.ts` and
+  `feedback-widget.component.spec.ts`, `feedback-attachment/feedback-attachment.component.spec.ts`,
+  `my-feedback/my-feedback.component.spec.ts`, `workspace-feedback/workspace-feedback.component.spec.ts`.
+- `features/platform/feedback-triage/`: `feedback-triage.component.spec.ts`,
+  `feedback-detail/feedback-detail.component.spec.ts`, `platform-feedback-api.spec.ts`.
+- `core/auth/operator.guard.spec.ts`, `app.routes.spec.ts` and `layout/shell/shell.component.spec.ts`
+  (widget mounted in the shell, nav entries by role, the operator entry only for operators).
+
+### 13.5 End-to-end and accessibility (Playwright)
+- `apps/web/tests/e2e/feedback.spec.ts` (T078): submit from the widget, the submitter's own list, the
+  owner's read-only inbox, operator triage, withdrawal.
+- `apps/web/tests/e2e/feedback-a11y.spec.ts` (T079, tagged `@a11y`, so part of `pnpm test:a11y`): zero
+  axe violations for the widget, both lists and the triage view in English and Arabic (SC-007). The
+  360 px check in both reading directions is manual.
+
+## 14. Open Decisions
 
 1. Which Flutter testing framework (integration tests vs. Maestro).
 2. Whether to add synthetic data generation for performance testing.
