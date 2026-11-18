@@ -362,7 +362,7 @@ dashboard.
 | `API_HOST`, `API_PORT`, `API_ENV`, `API_LOG_LEVEL`, `API_CORS_ORIGINS` | yes | yes | Same as the backend. `API_LOG_LEVEL` sets the worker's log level |
 | `WEB_API_BASE_URL`, `WEB_DEFAULT_LOCALE` | yes | yes | Same as the backend |
 | `PLATFORM_INVITATION_TTL_DAYS`, `MEMBER_INVITATION_TTL_DAYS`, `RATE_LIMIT_AUTH` | yes | yes | Same as the backend |
-| `RFQ_MAILER_MODE` | **yes, `mailgun`** | yes, if RFQ emails go out | Selects the mailer. Any other value, or unset, uses the in-memory stub: the digest is "sent" nowhere, no error is logged and the operator's watermark still moves, so that day's digest is lost silently |
+| `RFQ_MAILER_MODE` | **yes, `mailgun`** | yes, if RFQ emails go out | Selects the mailer. Any other value, or unset, uses the in-memory stub. On `API_ENV` `staging` or `production` the worker then skips the digest each pass and logs `Feedback digest skipped: RFQ_MAILER_MODE is not 'mailgun'` at error level; watermarks do not move, so nothing is lost once mail is configured. Retention and the orphan sweep still run |
 | `MAILGUN_API_KEY`, `MAILGUN_SENDING_DOMAIN` | yes | yes, if RFQ emails go out | Same as the backend. The digest is sent from `noreply@<MAILGUN_SENDING_DOMAIN>` |
 | `WEB_PUBLIC_URL` | **yes in practice** | **new** | Public web origin, e.g. `https://pilot.iron-sys.com`, used for the triage link in the digest. Falls back to `WEB_ORIGIN`, then to `http://localhost:4200`. The backend can run without either (invitation links fall back to `API_CORS_ORIGINS`), so set this explicitly on the worker |
 | `FEEDBACK_BUCKET` | if changed | new, optional | Default `feedback-attachments`; must equal the backend's value |
