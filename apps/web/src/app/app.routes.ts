@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { authGuard, guestGuard, roleGuard } from './core/auth/auth.guard';
+import { operatorGuard } from './core/auth/operator.guard';
 import { quotationReviewGuard } from './features/quotations/quotation-review/quotation-review.guard';
 import { rfqDirtyGuard } from './features/rfq/create/rfq-create.guard';
 
@@ -195,6 +196,15 @@ export const routes: Routes = [
         canActivate: [roleGuard('owner')],
         loadComponent: () =>
           import('./features/team/team.component').then((m) => m.TeamComponent),
+      },
+      {
+        // UX guard only: the API answers 404 to anyone who is not a live platform operator.
+        path: 'platform/feedback',
+        canActivate: [operatorGuard],
+        loadComponent: () =>
+          import('./features/platform/feedback-triage/feedback-triage.component').then(
+            (m) => m.FeedbackTriageComponent,
+          ),
       },
       {
         path: 'quotations',

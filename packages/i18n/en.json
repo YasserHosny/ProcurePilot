@@ -5233,6 +5233,101 @@
       }
     }
   },
+  "platform": {
+    "feedback": {
+      "nav": "User feedback",
+      "title": "User feedback",
+      "subtitle": "Feedback from every workspace, newest first. Only platform operators can see this page.",
+      "loading": "Loading…",
+      "empty": "No feedback matches these filters.",
+      "loadError": "Feedback could not be loaded.",
+      "retry": "Try again",
+      "loadMore": "Load more",
+      "filters": {
+        "title": "Filters",
+        "status": "Status",
+        "category": "Category",
+        "demo": "Workspace type",
+        "workspace": "Workspace ID",
+        "workspaceHint": "Paste a workspace ID",
+        "workspaceInvalid": "Enter a valid workspace ID.",
+        "all": "All",
+        "realOnly": "Real workspaces",
+        "demoOnly": "Demo workspaces",
+        "clear": "Clear filters"
+      },
+      "status": {
+        "new": "New",
+        "reviewed": "Reviewed",
+        "resolved": "Resolved"
+      },
+      "category": {
+        "bug": "Bug",
+        "idea": "Idea",
+        "question": "Question",
+        "other": "Other",
+        "none": "No category"
+      },
+      "columns": {
+        "created": "Sent",
+        "workspace": "Workspace",
+        "submitter": "Submitter",
+        "category": "Category",
+        "status": "Status",
+        "preview": "Message"
+      },
+      "detail": {
+        "title": "Feedback details",
+        "empty": "Select a message to see its details.",
+        "loadError": "This feedback could not be loaded.",
+        "demoBadge": "Demo",
+        "submitter": "Name",
+        "email": "Email",
+        "role": "Role",
+        "workspace": "Workspace",
+        "filterWorkspace": "Show only this workspace",
+        "category": "Category",
+        "page": "Page",
+        "appVersion": "App version",
+        "language": "Language",
+        "languageEn": "English",
+        "languageAr": "Arabic",
+        "created": "Sent",
+        "statusChangedAt": "Status changed",
+        "text": "Message",
+        "attachments": "Attachments",
+        "noAttachments": "No attachments.",
+        "screenshots": "Screenshots",
+        "screenshotAlt": "Screenshot {{n}}",
+        "audio": "Voice note",
+        "attachmentError": "This file could not be loaded."
+      },
+      "actions": {
+        "title": "Status",
+        "markNew": "Mark as new",
+        "markReviewed": "Mark as reviewed",
+        "markResolved": "Mark as resolved",
+        "final": "This item is resolved. Status can only move forward.",
+        "invalidTransition": "That status change is no longer possible. The item was refreshed.",
+        "saveError": "The change could not be saved. Try again."
+      },
+      "labels": {
+        "title": "Labels",
+        "none": "No labels yet.",
+        "add": "New label",
+        "addAction": "Add label",
+        "remove": "Remove label {{label}}",
+        "tooLong": "A label can have at most {{max}} characters.",
+        "duplicate": "This label is already on the item.",
+        "max": "An item can have at most 10 labels."
+      },
+      "digest": {
+        "label": "Daily email digest",
+        "hint": "One email a day with new feedback. Only for you.",
+        "error": "The digest setting could not be saved."
+      }
+    }
+  },
   "about": {
     "title": "Help & about",
     "productByPrefix": "ProcurePilot by",
