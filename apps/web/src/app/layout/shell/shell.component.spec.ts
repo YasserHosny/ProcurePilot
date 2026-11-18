@@ -228,7 +228,15 @@ describe('ShellComponent account menu', () => {
         {
           id: 'setup',
           label: 'Setup',
-          routes: ['/team', '/settings', '/ingestion', '/accounting', '/pos'],
+          routes: [
+            '/team',
+            '/settings',
+            '/ingestion',
+            '/accounting',
+            '/pos',
+            '/feedback',
+            '/feedback/workspace',
+          ],
         },
       ];
 
@@ -539,6 +547,22 @@ describe('ShellComponent account menu', () => {
         fixture.componentInstance.focusMainContent(event);
       }).not.toThrow();
       expect(event.preventDefault).toHaveBeenCalled();
+    });
+  });
+
+  describe('feedback entry points (spec 025)', () => {
+    const root = (): HTMLElement => fixture.nativeElement as HTMLElement;
+
+    it('mounts the feedback widget as a sibling inside .shell-container, outside main-content', () => {
+      const widget = root().querySelector('app-feedback-widget');
+      expect(widget).not.toBeNull();
+      expect(widget!.parentElement!.classList.contains('shell-container')).toBeTrue();
+      expect(root().querySelector('#main-content')!.contains(widget)).toBeFalse();
+    });
+
+    it('lists My feedback for every member and hides the workspace inbox from non-owners', () => {
+      expect(root().querySelector('a[href="/feedback"]')).not.toBeNull();
+      expect(root().querySelector('a[href="/feedback/workspace"]')).toBeNull();
     });
   });
 });

@@ -1,0 +1,16 @@
+<button
+  mat-fab
+  extended
+  class="feedback-fab"
+  type="button"
+  data-test="fab"
+  aria-haspopup="dialog"
+  [attr.aria-label]="label()"
+  (click)="open()"
+>
+  <mat-icon aria-hidden="true">rate_review</mat-icon>
+  <span class="feedback-fab-label">{{ 'feedback.widget.open' | translate }}</span>
+  @if (hasDraft()) {
+    <span class="feedback-fab-dot" data-test="draft-dot" aria-hidden="true"></span>
+  }
+</button>

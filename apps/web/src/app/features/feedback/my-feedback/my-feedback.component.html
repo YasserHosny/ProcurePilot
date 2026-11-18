@@ -1,0 +1,57 @@
+<section class="fl-page">
+  <header class="fl-header">
+    <div>
+      <h1 #heading tabindex="-1">{{ 'feedback.list.myTitle' | translate }}</h1>
+      <p class="fl-intro">{{ 'feedback.list.myIntro' | translate }}</p>
+    </div>
+    @if (isOwner()) {
+      <a mat-stroked-button routerLink="/feedback/workspace" data-test="workspace-link">
+        <mat-icon aria-hidden="true">all_inbox</mat-icon>
+        {{ 'feedback.list.viewWorkspace' | translate }}
+      </a>
+    }
+  </header>
+
+  <div role="status" aria-live="polite">
+    @if (withdrawMessage(); as key) {
+      <p class="fl-notice" data-test="withdraw-message">{{ key | translate }}</p>
+    }
+  </div>
+
+  @if (list.failed()) {
+    <div class="fl-state" role="alert">
+      <p>{{ 'feedback.list.loadError' | translate }}</p>
+      <button mat-stroked-button type="button" data-test="retry" (click)="list.reload()">
+        {{ 'feedback.list.retry' | translate }}
+      </button>
+    </div>
+  } @else if (list.items().length === 0 && !list.loading()) {
+    <p class="fl-state">{{ 'feedback.list.empty' | translate }}</p>
+  }
+
+  <ul class="fl-cards">
+    @for (item of list.items(); track item.id) {
+      <li>
+        <app-feedback-card
+          [submission]="item"
+          [allowWithdraw]="true"
+          (withdraw)="onWithdraw($event)"
+        />
+      </li>
+    }
+  </ul>
+
+  @if (list.loading()) {
+    <div class="fl-state" role="status">
+      <mat-spinner diameter="28" [attr.aria-label]="'feedback.list.loading' | translate" />
+    </div>
+  }
+
+  @if (list.nextCursor() && !list.loading()) {
+    <div class="fl-more">
+      <button mat-stroked-button type="button" data-test="load-more" (click)="list.loadMore()">
+        {{ 'feedback.list.loadMore' | translate }}
+      </button>
+    </div>
+  }
+</section>

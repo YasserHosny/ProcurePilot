@@ -1,0 +1,79 @@
+:host {
+  display: block;
+}
+
+.fl-page {
+  max-inline-size: 760px;
+  margin-inline: auto;
+  padding: var(--pp-space-4, 1rem);
+}
+
+.fl-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-block-end: 1rem;
+
+  h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--pp-text-strong);
+
+    &:focus {
+      outline: none;
+    }
+  }
+}
+
+.fl-intro {
+  margin: 0.25rem 0 0;
+  color: var(--pp-text-muted);
+}
+
+.fl-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-block-end: 1rem;
+
+  mat-form-field {
+    flex: 1 1 160px;
+    min-inline-size: 0;
+  }
+}
+
+.fl-notice {
+  margin: 0 0 1rem;
+  padding-inline: 0.75rem;
+  padding-block: 0.5rem;
+  border-radius: 8px;
+  background-color: var(--pp-warning-container);
+  color: var(--pp-text-strong);
+}
+
+.fl-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding-block: 2rem;
+  color: var(--pp-text-muted);
+  text-align: center;
+}
+
+.fl-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fl-more {
+  display: flex;
+  justify-content: center;
+  margin-block-start: 1rem;
+}

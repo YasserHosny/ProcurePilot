@@ -1,0 +1,30 @@
+:host {
+  display: contents;
+}
+
+// Pinned to the corner of the viewport in the reading direction's end, clear of the page content.
+.feedback-fab {
+  position: fixed;
+  inset-block-end: 16px;
+  inset-inline-end: 16px;
+  z-index: 900;
+  min-inline-size: 56px;
+}
+
+.feedback-fab-dot {
+  position: absolute;
+  inset-block-start: 6px;
+  inset-inline-end: 6px;
+  inline-size: 10px;
+  block-size: 10px;
+  border-radius: 50%;
+  background-color: var(--pp-warning);
+  border: 2px solid var(--pp-surface-card);
+}
+
+// At phone width the label gives way to the icon so the button never covers more content than it must.
+@media (max-width: 599px) {
+  .feedback-fab-label {
+    display: none;
+  }
+}
