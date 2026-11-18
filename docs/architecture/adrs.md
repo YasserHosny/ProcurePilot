@@ -552,32 +552,65 @@
 
 ## ADR-027 — Platform-Operator Access to Feedback Is a Narrow, Audited Cross-Workspace Exception
 
-- **Status:** Accepted (spec 025 / PPS-223; owner decisions 2026-11-18)
+- **Status:** Accepted. Owner approval 2026-11-18 (spec `025-user-feedback`, PPS-223 / P-197); shipped
+  in wave 1, PR #590.
 - **Context:** The ProcurePilot team must read pilot feedback from every workspace and move it through
   new, reviewed and resolved. Constitution Principle V says a user of workspace A cannot read workspace
   B's data, and Principle IV says an insight surface must carry an action. Governance allows a justified,
-  owner-approved deviation recorded in a plan or ADR; this is that record. The owner approved both
-  deviations on 2026-11-18.
+  owner-approved deviation recorded in a plan or ADR; this is that record. On 2026-11-18 the owner
+  approved both deviations below as recorded exceptions, with no constitution amendment.
 - **Decision:**
-  - **Operator identity.** An operator is an existing workspace member (the JWT parser and shell require
-    a membership) who also has a live row in `platform_operator`, a table reachable only by the service
-    role. `is_platform_operator()` (SECURITY DEFINER, pinned search path) checks the row on every
-    request, so revoking takes effect on the next request. A `platform_operator` token claim, if
-    present, is a display hint only and never grants access.
-  - **Narrow policies, not service role.** Operators reach data through RLS policies on
-    `feedback_submission` and `feedback_attachment` only: `SELECT`, and a column-limited `UPDATE`
-    (status, labels, status_changed_at, status_changed_by). They use the same direct-connection-with-claims
-    path as members, never `service_role`, so nothing outside the two feedback tables is reachable.
-  - **Forward-only status.** A trigger rejects backward moves and any change to other columns.
-  - **Audit.** Operator list, view, attachment link, status and label changes, and operator grant and
-    revoke each write an append-only `audit_event`.
-  - **Labels are internal.** Tenants never see them.
+  - **Operator identity.** An operator is an existing workspace member (the JWT parser requires a
+    tenant claim) who also has a live row in `platform_operator` (`20261118000200`). The table has RLS
+    enabled and forced, no client policy and no client grant; only `service_role` touches it, and rows
+    are written only by `workers/platform_operator_cli.py` (`grant`, `revoke`, `list`). There is no
+    grant UI.
+  - **Live check, every request.** `is_platform_operator()` (SECURITY DEFINER, pinned `search_path`)
+    returns whether the JWT `sub` has a row with `revoked_at is null`. The API dependency
+    `current_operator` (`modules/auth/operator.py`) calls it on each request, so a revoke takes effect
+    on the next request; a non-operator gets the plain 404 of an unknown route. The `platform_operator`
+    token claim stamped by the auth hook (`20261118000700`) is a navigation hint only: neither the API
+    nor any policy reads it, and dropping that migration changes nobody's access.
+  - **Narrow policies, not service role.** Operators reach data only through `feedback_select_operator`
+    and `feedback_update_operator` on `feedback_submission` and the operator branch of
+    `feedback_attachment_select`. Operator requests run on the same direct-connection-with-claims path
+    as members (`set local role authenticated`), never as `service_role`, so a bug in an operator route
+    cannot read quotations, orders or any other table. The one service-role call is signing a storage
+    URL, after the attachment row check has passed.
+  - **Three definer functions, nothing wider.** `feedback_operator_labels(uuid)` is the operators' only
+    read of `labels`; `operator_tenant_names(uuid[])` (`20261118000600`) returns workspace display names,
+    and no other `tenant` column, for the ids asked about; `operator_digest_preference()` /
+    `set_operator_digest_preference()` touch the caller's own `platform_operator` row. Each returns
+    nothing (null or zero rows) to a non-operator or a revoked one.
+  - **Labels are internal.** The `authenticated` role's `SELECT` on `feedback_submission` is
+    column-level and omits `labels`, so no tenant JWT can read them, PostgREST included. Tenant-facing
+    API models have no labels field and audit targets carry label counts, not labels.
+  - **Status and labels only, forward only.** The update grant is column-level (`status`, `labels`,
+    `status_changed_at`, `status_changed_by`), and the `feedback_submission_guard` trigger allows only
+    `new -> reviewed -> resolved` or `new -> resolved`, refuses any other column change, and writes
+    `status_changed_at` / `status_changed_by` itself. It applies to every role, `service_role` included.
+    The API pre-checks the same table and answers 409 `feedback.invalid_transition`. Backward moves are
+    refused because they would reopen the submitter's withdrawal.
+  - **Audit on operator reads as well as writes.** Every operator list request writes one aggregate
+    `feedback.operator_listed` event (filters and result count, no tenant); every detail view, attachment
+    URL, status change and label change writes an event tagged with the submission's own workspace
+    (`feedback.operator_viewed`, `…_attachment_url_issued`, `…_status_changed`, `…_labels_changed`).
+    Events are written before data is returned or before the change commits, so a failed audit write
+    means the operator saw or changed nothing. Grant and revoke are audited by the CLI in the same
+    transaction. Events filed under another workspace name the operator by email with a null
+    `actor_membership_id`; the owner's workspace can read them, which makes operator access visible to
+    the tenant.
   - **Owner inbox (Principle IV).** The workspace owner's inbox is read-only. It is a support surface that
     surfaces no derived value, saving or recommendation; the triage view carries the actions.
 - **Rejected:** a tenant-owner-only inbox (never reaches the team); `service_role` in operator routes
   (blast radius is every table); a JWT claim as the authority (cannot be revoked before the token expires);
-  owners triaging their own feedback (a second status authority for a ProcurePilot-internal queue).
-- **Consequences:** `platform_operator` and its grant and revoke command (`platform_operator_cli`) are new
-  operational surface; the first operators are granted by an ops step after migrations. Isolation tests
-  gain operator cases (operator reads across workspaces, cannot read other tables). Flutter mobile is out
-  of scope for v1.
+  hiding labels only in the API response model (a tenant JWT could still read the column directly);
+  owners triaging their own feedback (a second status authority for a ProcurePilot-internal queue); a
+  separate database or service for feedback (a second deployable, against Principle VI).
+- **Consequences:** `platform_operator`, its CLI and the operator digest in `workers/feedback_worker.py`
+  are new operational surface; the first operators are granted by an ops step after migrations.
+  Operators without a workspace membership are not supported in v1. Isolation tests cover the operator
+  cases (`tests/integration/test_feedback_isolation.py`, `test_feedback_operator.py`): reads across
+  workspaces, forward-only status, no other column, no access once revoked, no reach into other tables.
+  Any later table an operator should see needs its own policy and a new ADR, not a wider function.
+  Flutter mobile is out of scope for v1.

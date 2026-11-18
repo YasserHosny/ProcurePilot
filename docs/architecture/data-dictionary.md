@@ -22,6 +22,7 @@ Entities for later chunks are marked as planned and are not present in the curre
 | `default_locale` | text | Required workspace fallback locale; `en` or `ar`, default `en` |
 | `platform_invitation_id` | uuid | Required unique FK -> `platform_invitation.id`; invitation that produced the workspace |
 | `reporting_timezone` | text | Chunk R2.5. IANA timezone name (e.g. `Africa/Cairo`, `UTC`); every scheduled-report window, digest window, and next-run instant for the workspace derives from this. Default `UTC`; owner-only write via `PATCH /api/v1/tenant`, validated as a real IANA name by the API |
+| `is_demo` | boolean | Spec 025 (`20261118000100`). Required, default `false`. True for hosted demo workspaces. Set by an ops step (`docs/gtm/demo-tenant/README.md`), never by a member: it is outside `authenticated`'s column-level `UPDATE` grant on `tenant`. Copied onto `feedback_submission.is_demo` at submit time, so changing it later does not rewrite history |
 | `created_at` | timestamptz | Audit field |
 
 `Tenant` is protected by RLS, but it is not keyed by `tenant_id`; its policy compares `id` to the
@@ -2449,3 +2450,174 @@ and every preparation is appended to `audit_event`.
 ### `PurchaseRequest.source_rfq_response_id` (R4.3 extension)
 
 `purchase_request` gains one nullable column, `source_rfq_response_id` (FK -> `RfqResponse`, composite tenant FK), set whenever a request is prepared — manually or automatically — from an RFQ response, satisfying FR-008's requirement that the draft cite the response it came from. Most purchase requests have no RFQ origin and leave this null.
+
+## In-app feedback (spec `025-user-feedback`)
+
+Migrations `20261118000100` (`tenant.is_demo`, above), `…000200` (`platform_operator`), `…000400`
+(feedback tables), `…000500` (storage), `…000600` (operator definer functions) and `…000700` (the
+`platform_operator` UI-hint claim). Members send feedback from the web app; the workspace owner reads
+the workspace's feedback; platform operators triage it across workspaces (ADR-027).
+
+### Enumerations
+
+- `feedback_status`: `new`, `reviewed`, `resolved`.
+- `feedback_category`: `bug`, `idea`, `question`, `other`.
+- `feedback_attachment_kind`: `image`, `audio`.
+
+### `PlatformOperator`
+
+A ProcurePilot team member allowed to triage feedback across workspaces (table `platform_operator`).
+The person must also be an active member of some workspace: the JWT parser requires a tenant claim.
+
+| Field | Type | Notes |
+|---|---|---|
+| `user_id` | uuid | PK, FK -> `auth.users.id`, `on delete cascade` |
+| `email` | text | Required; lower-cased snapshot taken at grant time, used for audit and the digest |
+| `granted_at` | timestamptz | Required, default `now()`; reset on a re-grant |
+| `granted_by` | text | Required; who ran the grant (`--granted-by`, default the OS user running the CLI) |
+| `revoked_at` | timestamptz | Nullable; a row with a value is inactive. A re-grant clears it |
+| `digest_opt_in` | boolean | Required, default `false`. The operator's daily email digest (FR-024) |
+| `digest_locale` | text | Required, default `en`; `en` or `ar` |
+| `digest_last_sent_at` | timestamptz | Nullable watermark: a digest lists only submissions newer than this. Set to `now()` when the digest is turned on, so no backlog is sent |
+
+Access: RLS is enabled and forced with **no policy for any client role**, and every grant to `public`,
+`anon` and `authenticated` is revoked; only `service_role` holds table privileges. Rows are written
+only by `python -m procurepilot_api.workers.platform_operator_cli grant|revoke|list` over
+`DATABASE_URL`, which audits `platform_operator.granted` / `platform_operator.revoked` in the same
+transaction. Grant requires an existing user with an active membership; a re-grant reactivates the row
+and keeps the digest preference; revoking a non-operator is a no-op. Clients reach the table only
+through SECURITY DEFINER functions with a pinned `search_path`, each about the caller's own `sub`:
+
+- `is_platform_operator()` returns a boolean: does the JWT subject have a row with `revoked_at is
+  null`. A missing or malformed `sub` gives `false`. Execute: `authenticated`, `service_role`.
+- `operator_digest_preference()` and `set_operator_digest_preference(p_enabled, p_locale)` read and
+  set the caller's own digest preference; both return zero rows for a revoked operator or a
+  non-operator. Execute: `authenticated`.
+
+The access-token hook stamps a `platform_operator: true` claim for active operators (`…000700`). It is
+a navigation hint for the web app only; the API and every RLS policy check the table live.
+
+### `FeedbackSubmission`
+
+One piece of feedback (table `feedback_submission`). Everything except `text_content`, `category` and
+the two headers-derived fields is set by the server from the verified session.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()`. Unique `(tenant_id, id)` backs the attachment FK |
+| `tenant_id` | uuid | Required FK -> Tenant, `on delete cascade`; RLS key |
+| `submitter_user_id` | uuid | Required; the submitter's `auth.users` id. RLS identity for own-row access |
+| `submitter_membership_id` | uuid | Nullable composite FK `(tenant_id, submitter_membership_id)` -> `membership (tenant_id, id)`, `on delete set null (submitter_membership_id)` |
+| `submitter_name` | text | Required snapshot of `membership.display_name`, or the email when no name is set |
+| `submitter_email` | text | Required snapshot. Shown to operators only, never in the digest |
+| `member_role` | text | Required; the submitter's live role at submit time: `owner`, `buyer`, `branch_manager`, `approver` or `viewer` |
+| `text_content` | text | Required; 1–2000 characters and not blank after trimming (the API trims first) |
+| `category` | feedback_category | Nullable; the submitter's optional choice (FR-002a) |
+| `status` | feedback_status | Required, default `new`. Forward only (below) |
+| `labels` | text[] | Required, default `{}`. Operator-only triage labels: at most 10, each 1–40 characters, none null (`feedback_labels_valid()`). **Outside the client role's column SELECT grant** (FR-014) |
+| `page_path` | text | Required, at most 2000 characters. Path plus query of a same-origin `Referer` (fragment and control characters dropped); empty string when the header is absent or foreign. Triage context only |
+| `app_version` | text | Required; the API's `APP_VERSION` build identifier (`dev` locally) |
+| `locale` | text | Required; `en` or `ar`. Best-ranked supported language in `Accept-Language`, else `tenant.default_locale`, else `en` |
+| `is_demo` | boolean | Required; `tenant.is_demo` at submit time |
+| `idempotency_key` | uuid | Required; unique `(tenant_id, idempotency_key)`. A replay by the same submitter returns the stored submission |
+| `created_at` | timestamptz | Required, default `now()`. Drives the 30-second cooldown and 12-month retention |
+| `status_changed_at` | timestamptz | Nullable; written by the trigger on a status change, never by the caller |
+| `status_changed_by` | uuid | Nullable; the `sub` of the JWT that changed the status (null for a server-side caller), written by the trigger |
+
+Indexes: `(tenant_id, created_at desc)`; `(tenant_id, submitter_user_id, created_at desc)` (own list
+and cooldown); `(status, created_at desc)` and `(category)` (operator filters); `(created_at)`
+(retention).
+
+**State machine and immutability.** The `feedback_submission_guard` `BEFORE UPDATE` trigger allows
+`new -> reviewed`, `new -> resolved` and `reviewed -> resolved`, nothing backwards, and refuses a change
+to any column except `status`, `labels`, the two `status_changed_*` columns (which it overwrites) and
+`submitter_membership_id` going to null (the FK's delete action). It raises `check_violation` and
+applies to every role, `service_role` included.
+
+**RLS** (enabled + forced):
+
+| Policy | Command | Rule |
+|---|---|---|
+| `feedback_select_own_or_owner` | select | `tenant_id = current_tenant_id()` and (`submitter_user_id = current_user_id()` or `current_membership_role() = 'owner'`) |
+| `feedback_select_operator` | select | `is_platform_operator()` |
+| `feedback_insert_member` | insert | Own workspace, own user id, a live membership, `member_role` equal to the live role, `is_demo` equal to the workspace's flag, `status = 'new'`, `labels = '{}'`, no status history |
+| `feedback_update_operator` | update | `USING` and `WITH CHECK` `is_platform_operator()` |
+| `feedback_delete_own_new` | delete | Own workspace, own submission, `status = 'new'` (withdrawal) |
+
+Role checks use the live `current_membership_role()`, not the JWT's `member_role`, so a removed or
+demoted member loses access on their next statement.
+
+Grants to `authenticated`: column-level `SELECT` on every column **except `labels`**; `INSERT`;
+`DELETE`; column-level `UPDATE (status, labels, status_changed_at, status_changed_by)`. Members hold
+the update grant but no update policy applies to them, so their updates change nothing. Because RLS
+hides rows, not columns, the column grant is what keeps labels from a tenant JWT, PostgREST included.
+Operators read labels only through `feedback_operator_labels(p_submission_id uuid) returns text[]`
+(SECURITY DEFINER, pinned `search_path`), which returns null to anyone who is not a live operator and
+for an unknown id. `service_role` has full table privileges (workers).
+
+`operator_tenant_names(p_tenant_ids uuid[])` (SECURITY DEFINER, `…000600`) returns `(tenant_id,
+tenant_name)` for the requested ids, and only to a live operator: the one tenant column the triage view
+needs. No other `tenant` column is readable by operators.
+
+### `FeedbackAttachment`
+
+A screenshot or voice message attached to a submission (table `feedback_attachment`).
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required; RLS key |
+| `submission_id` | uuid | Required composite FK `(tenant_id, submission_id)` -> `feedback_submission (tenant_id, id)`, `on delete cascade` |
+| `kind` | feedback_attachment_kind | Required; `image` or `audio` |
+| `storage_path` | text | Required; must start `tenants/{tenant_id}/feedback/`. Allocated by the server as `tenants/{tenant_id}/feedback/{submission_id}/{uuid}/{safe name}` |
+| `content_type` | text | Required; detected from the bytes by libmagic, never from the name or declared type. Images `image/jpeg`, `image/png`, `image/webp`; audio `audio/mpeg`, `audio/mp4`, `audio/wav`, `audio/webm` (WebM and MP4 containers are accepted as audio only when they hold no video track) |
+| `size_bytes` | integer | Required, > 0; image at most 5 MiB (5,242,880), audio at most 10 MiB (10,485,760) |
+| `display_order` | smallint | Required, 0–4; always 0 for audio |
+| `created_at` | timestamptz | Required, default `now()` |
+
+Constraints: unique `(submission_id, kind, display_order)`, so at most five images; partial unique
+index `(submission_id) where kind = 'audio'`, so at most one audio.
+
+RLS (enabled + forced): `feedback_attachment_select` shows a row when its submission is visible to the
+caller in their own workspace (the sub-select runs under the submission's RLS: own, or owner) or the
+caller is a platform operator; `feedback_attachment_insert` admits only the submission's own submitter
+in the same workspace. No update or delete policy; `authenticated` holds `SELECT` and `INSERT` only.
+Rows go by cascade when the submission is withdrawn or purged.
+
+### Storage: `feedback-attachments` bucket
+
+Private, 10 MiB object limit (the API enforces the per-kind limit). One client policy,
+`feedback_attachments_tenant_insert`: `INSERT` for `authenticated` when
+`(storage.foldername(name))[2] = current_tenant_id()::text`. No client select, update or delete:
+signed URLs (300 s, `FEEDBACK_ATTACHMENT_URL_TTL_SECONDS`) and deletes run through the API with the
+service-role client after the row check on `feedback_attachment`, so a guessed path is unreadable even
+inside the member's own workspace.
+
+### Lifecycle and retention
+
+Created by one atomic submit (files uploaded, then both tables inserted in one transaction; uploads are
+removed on any failure). Withdrawn by the submitter while `new` (row deleted, attachments cascade,
+objects deleted). Status moves forward under operator control. `workers/feedback_worker.py` deletes
+submissions older than `FEEDBACK_RETENTION_MONTHS` (12) by `created_at`, whatever their status,
+objects first, and sweeps bucket objects no row references after a one-hour grace period.
+
+### New audit events (spec 025)
+
+All append-only in `audit_event`. Targets carry ids and counts, never feedback text or labels, because
+tenants can read audit rows about their own workspace.
+
+| Action | Tenant | Target |
+|---|---|---|
+| `feedback.submitted` | submitter's | `submission_id`, `category`, `image_count`, `has_audio` |
+| `feedback.withdrawn` | submitter's | `submission_id` |
+| `feedback.operator_listed` | none | filters and `result_count` (one event per list request) |
+| `feedback.operator_viewed` | submission's | `submission_id` |
+| `feedback.operator_attachment_url_issued` | submission's | `submission_id`, `attachment_id` |
+| `feedback.operator_status_changed` | submission's | `submission_id`, `from`, `to` |
+| `feedback.operator_labels_changed` | submission's | `submission_id`, `label_count` |
+| `feedback.digest_preference_changed` | operator's own | `enabled`, `locale` |
+| `feedback.retention_purged` | none | counts only (one event per worker pass) |
+| `platform_operator.granted` / `platform_operator.revoked` | none | `operator_user_id`, `operator_email` |
+
+An operator event filed under another workspace has a null `actor_membership_id` (the operator's
+membership belongs to their home workspace) and names the operator by `actor_email`.
