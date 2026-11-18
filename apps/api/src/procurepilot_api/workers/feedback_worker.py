@@ -47,7 +47,7 @@ from procurepilot_api.shared.mailer import FakeMailer, Mailer, get_mailer
 logger = logging.getLogger(__name__)
 
 DEFAULT_RETENTION_MONTHS = 12
-DEFAULT_DIGEST_HOUR_UTC = 6
+DEFAULT_DIGEST_HOUR_UTC = 7  # same as config.feedback_digest_hour_utc
 DEFAULT_WEB_URL = "http://localhost:4200"
 ORPHAN_GRACE = timedelta(hours=1)
 BATCH_LIMIT = 500
