@@ -99,6 +99,37 @@ class UnsupportedMediaTypeError(AppError):
     safe_message = "File type is not supported."
 
 
+class PayloadTooLargeError(AppError):
+    status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+    code = "validation.payload_too_large"
+    safe_message = "File is too large."
+
+
+class FeedbackCooldownError(AppError):
+    """Spec 025 FR-007: one submission per member per cooldown window."""
+
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    code = "feedback.cooldown"
+    safe_message = "Please wait a moment before sending more feedback."
+
+    def __init__(self, retry_after_seconds: int) -> None:
+        super().__init__(details={"retry_after_seconds": max(1, int(retry_after_seconds))})
+
+
+class FeedbackWithdrawRefusedError(ConflictError):
+    """The submission already left status `new`, so it can no longer be withdrawn."""
+
+    code = "feedback.withdraw_refused"
+    safe_message = "This feedback can no longer be withdrawn."
+
+
+class FeedbackInvalidTransitionError(ConflictError):
+    """A status move that is not forward (new to reviewed to resolved, or new to resolved)."""
+
+    code = "feedback.invalid_transition"
+    safe_message = "That status change is not allowed."
+
+
 class ServiceUnavailableError(AppError):
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     code = "service_unavailable"
