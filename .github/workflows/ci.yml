@@ -227,7 +227,9 @@ jobs:
             id uuid primary key default gen_random_uuid(),
             bucket_id text references storage.buckets(id),
             name text,
-            owner uuid
+            owner uuid,
+            -- Real storage.objects has it; the feedback worker's orphan sweep reads it.
+            created_at timestamptz default now()
           );
           -- Real Supabase ships storage.objects with RLS already enabled and forced (see
           -- migration 20260819000020's own comment) — replicate that, or the tenant-isolation
@@ -409,7 +411,9 @@ jobs:
             id uuid primary key default gen_random_uuid(),
             bucket_id text references storage.buckets(id),
             name text,
-            owner uuid
+            owner uuid,
+            -- Real storage.objects has it; the feedback worker's orphan sweep reads it.
+            created_at timestamptz default now()
           );
           -- Real Supabase ships storage.objects with RLS already enabled and forced (see
           -- migration 20260819000020's own comment) — replicate that, or the tenant-isolation
