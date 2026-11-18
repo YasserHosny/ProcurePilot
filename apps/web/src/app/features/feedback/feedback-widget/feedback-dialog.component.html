@@ -245,9 +245,9 @@
         }
       }
     </span>
-    @if (formError(); as key) {
+    @if (formError(); as error) {
       <p class="fb-error" data-test="form-error" role="alert">
-        {{ key | translate }}
+        {{ error.key | translate: error.params }}
         @if (showDraftKept()) {
           {{ 'feedback.widget.draftKept' | translate }}
         }
@@ -272,7 +272,7 @@
       mat-flat-button
       type="button"
       data-test="send"
-      [disabled]="submitting() || cooldownSeconds() > 0"
+      [disabled]="submitting() || cooldownSeconds() > 0 || checkingImages() > 0"
       (click)="send()"
     >
       {{ (submitting() ? 'feedback.widget.sending' : 'feedback.widget.send') | translate }}

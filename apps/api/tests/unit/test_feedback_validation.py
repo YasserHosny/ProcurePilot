@@ -77,6 +77,19 @@ def test_renamed_text_file_is_rejected_even_with_an_image_extension_and_type(
         validate_attachments([upload], None, settings)
 
 
+def test_a_refused_file_is_named_in_the_error_details(settings: Settings) -> None:
+    """The widget can then say which attachment to remove (T083 hosted walkthrough finding)."""
+    uploads = [_image("ok.png", png_bytes()), _image("not-an-image.png", TEXT_BYTES)]
+    with pytest.raises(UnsupportedMediaTypeError) as caught:
+        validate_attachments(uploads, None, settings)
+    assert (caught.value.details or {}).get("name") == "not-an-image.png"
+
+    fake_audio = UploadedFile("voice.mp3", audio_fixture("renamed-fake.mp3"), "audio/mpeg")
+    with pytest.raises(UnsupportedMediaTypeError) as caught:
+        validate_attachments([], fake_audio, settings)
+    assert (caught.value.details or {}).get("name") == "voice.mp3"
+
+
 def test_valid_images_keep_order_and_report_the_sniffed_type_not_the_declared_one(
     settings: Settings,
 ) -> None:

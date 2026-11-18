@@ -1,7 +1,8 @@
 /**
  * Client-side attachment rules (FR-003, FR-004, FR-005). They run before any upload so an invalid
- * file is refused with a reason. The server repeats every check from the file's CONTENT (a renamed
- * file passes here by name or type but not there), so these are a convenience, not the control.
+ * file is refused with a reason. Images are also checked by their first bytes (hasImageSignature),
+ * so a renamed file is caught here and named. The server repeats every check from the file's
+ * CONTENT with libmagic, so these are a convenience, not the control.
  */
 
 export const FEEDBACK_TEXT_MAX = 2000;
@@ -54,6 +55,26 @@ export function checkImage(
   if (!typeOk) return 'type';
   if (file.size > MAX_IMAGE_BYTES) return 'size';
   return null;
+}
+
+const JPEG_SIGNATURE: readonly number[] = [0xff, 0xd8, 0xff];
+const PNG_SIGNATURE: readonly number[] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+const RIFF: readonly number[] = [0x52, 0x49, 0x46, 0x46];
+const WEBP: readonly number[] = [0x57, 0x45, 0x42, 0x50];
+
+/**
+ * True when the file starts with a JPEG, PNG or WEBP signature. Name and browser-reported type say
+ * nothing about the bytes: a renamed file passes checkImage and would only fail at the server.
+ */
+export async function hasImageSignature(file: Blob): Promise<boolean> {
+  const head = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  const startsWith = (signature: readonly number[], offset = 0): boolean =>
+    signature.every((byte, i) => head[offset + i] === byte);
+  return (
+    startsWith(JPEG_SIGNATURE) ||
+    startsWith(PNG_SIGNATURE) ||
+    (startsWith(RIFF) && startsWith(WEBP, 8))
+  );
 }
 
 /** The first rule a candidate audio file breaks, or null when it may be attached. */

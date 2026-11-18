@@ -26,6 +26,7 @@ import {
   FEEDBACK_TEXT_MAX,
   checkAudio,
   checkImage,
+  hasImageSignature,
   type AttachmentRejection,
 } from '../attachment-rules';
 import { AudioRecorderService } from '../audio-recorder.service';
@@ -89,7 +90,7 @@ export class FeedbackDialogComponent {
   readonly submitting = signal(false);
   readonly success = signal(false);
   readonly textError = signal(false);
-  readonly formError = signal<string | null>(null);
+  readonly formError = signal<Message | null>(null);
   readonly cooldownSeconds = signal(0);
   /** Fixed at the moment the cooldown starts, so a screen reader hears it once, not every second. */
   readonly cooldownAnnouncement = signal<Message | null>(null);
@@ -118,7 +119,9 @@ export class FeedbackDialogComponent {
     const seconds = String(total % 60).padStart(2, '0');
     return `${minutes}:${seconds}`;
   });
-  readonly showDraftKept = computed(() => this.formError() !== 'feedback.errors.sessionExpired');
+  readonly showDraftKept = computed(
+    () => this.formError()?.key !== 'feedback.errors.sessionExpired',
+  );
 
   private cooldownTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -159,7 +162,7 @@ export class FeedbackDialogComponent {
 
   onImagesChosen(event: Event): void {
     const input = event.target as HTMLInputElement;
-    this.addImages(Array.from(input.files ?? []));
+    void this.addImages(Array.from(input.files ?? []));
     input.value = '';
   }
 
@@ -175,7 +178,7 @@ export class FeedbackDialogComponent {
   onDrop(event: DragEvent): void {
     event.preventDefault();
     this.dragging.set(false);
-    this.addImages(Array.from(event.dataTransfer?.files ?? []));
+    void this.addImages(Array.from(event.dataTransfer?.files ?? []));
   }
 
   onPaste(event: ClipboardEvent): void {
@@ -198,7 +201,7 @@ export class FeedbackDialogComponent {
       this.attachmentMessages.set([{ key: 'feedback.attachments.pasteBadType' }]);
       return;
     }
-    this.addImages(images.map((f) => this.nameScreenshot(f)));
+    void this.addImages(images.map((f) => this.nameScreenshot(f)));
   }
 
   hideToCapture(): void {
@@ -222,24 +225,70 @@ export class FeedbackDialogComponent {
       return next;
     });
     this.attachmentMessages.set([]);
+    this.clearAttachmentSendError();
   }
 
-  private addImages(files: File[]): void {
+  /**
+   * The images being checked right now (their first bytes are read asynchronously). Adds run one
+   * after another, so the five-image limit holds however fast files arrive.
+   */
+  imageCheck: Promise<void> = Promise.resolve();
+
+  /** Image batches still being checked. Send waits for them so no chosen screenshot is left out. */
+  readonly checkingImages = signal(0);
+
+  private addImages(files: File[]): Promise<void> {
+    this.checkingImages.update((n) => n + 1);
+    this.imageCheck = this.imageCheck
+      .then(() => this.checkAndAddImages(files))
+      // A batch that fails must not stall the queue for the rest of the dialog's life.
+      .catch(() => undefined)
+      .finally(() => this.checkingImages.update((n) => n - 1));
+    return this.imageCheck;
+  }
+
+  private async checkAndAddImages(files: File[]): Promise<void> {
+    this.clearAttachmentSendError();
     const messages: Message[] = [];
+    const refuse = (reason: AttachmentRejection, name: string): void => {
+      if (reason !== 'count') messages.push(rejection(reason, name));
+      else if (!messages.some((m) => m.key === 'feedback.attachments.count')) {
+        messages.push({ key: 'feedback.attachments.count' });
+      }
+    };
     for (const file of files) {
       const reason = checkImage(file, this.draft.images().length);
-      if (reason === null) {
-        this.draft.addImage(file);
-        this.afterCapture.set(false);
-      } else if (reason === 'count') {
-        if (!messages.some((m) => m.key === 'feedback.attachments.count')) {
-          messages.push({ key: 'feedback.attachments.count' });
-        }
-      } else {
-        messages.push(rejection(reason, file.name));
+      if (reason !== null) {
+        refuse(reason, file.name);
+        continue;
       }
+      let isImage: boolean;
+      try {
+        isImage = await hasImageSignature(file);
+      } catch {
+        messages.push({ key: 'feedback.attachments.readFailed', params: { name: file.name } });
+        continue;
+      }
+      if (!isImage) {
+        refuse('type', file.name);
+        continue;
+      }
+      this.draft.addImage(file);
+      this.afterCapture.set(false);
     }
     this.attachmentMessages.set(messages);
+  }
+
+  /** A refused-type or too-large send error describes attachments that have since changed. */
+  private clearAttachmentSendError(): void {
+    const key = this.formError()?.key;
+    if (
+      key === 'feedback.errors.unsupportedType' ||
+      key === 'feedback.errors.unsupportedTypeNamed' ||
+      key === 'feedback.errors.tooLarge'
+    ) {
+      this.formError.set(null);
+    }
   }
 
   /** A pasted image arrives as `image.png` every time, which tells nobody anything. */
@@ -267,6 +316,7 @@ export class FeedbackDialogComponent {
   }
 
   onDiscardAudio(): void {
+    this.clearAttachmentSendError();
     this.draft.clearAudio();
     this.audioMessage.set(null);
     this.audioPreviewFailed.set(false);
@@ -291,6 +341,7 @@ export class FeedbackDialogComponent {
       return;
     }
     this.audioMessage.set(null);
+    this.clearAttachmentSendError();
     this.draft.setAudio(file);
   }
 
@@ -299,7 +350,7 @@ export class FeedbackDialogComponent {
   send(): void {
     // The guard is what makes a double-click create one submission: the button is only disabled
     // after the next change-detection pass, the second click can arrive before it.
-    if (this.submitting() || this.cooldownSeconds() > 0) return;
+    if (this.submitting() || this.cooldownSeconds() > 0 || this.checkingImages() > 0) return;
     const text = this.draft.text().trim();
     if (!text) {
       this.textError.set(true);
@@ -349,7 +400,12 @@ export class FeedbackDialogComponent {
       this.startCooldown(Number.isFinite(wait) && wait > 0 ? Math.ceil(wait) : 30);
       return;
     }
-    this.formError.set(errorKey(status));
+    const name = body?.details?.name;
+    if (status === 415 && typeof name === 'string' && name) {
+      this.formError.set({ key: 'feedback.errors.unsupportedTypeNamed', params: { name } });
+      return;
+    }
+    this.formError.set({ key: errorKey(status) });
   }
 
   private startCooldown(seconds: number): void {
@@ -372,7 +428,7 @@ export class FeedbackDialogComponent {
 
 interface ErrorBody {
   readonly code?: string;
-  readonly details?: { readonly retry_after_seconds?: unknown };
+  readonly details?: { readonly retry_after_seconds?: unknown; readonly name?: unknown };
 }
 
 function rejection(reason: AttachmentRejection, name: string): Message {
