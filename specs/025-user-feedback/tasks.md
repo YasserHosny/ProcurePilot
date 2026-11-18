@@ -1,7 +1,7 @@
 # Tasks: In-App User Feedback
 
 **Input**: `specs/025-user-feedback/` (plan.md, spec.md, research.md, data-model.md, contracts/feedback.openapi.yaml, quickstart.md)
-**Jira**: PPS-223 (`[P-196]`)
+**Jira**: PPS-223 (`[P-197]`)
 **Tests**: Included. Tenant-isolation tests are mandatory under constitution Principle V, and the repo default is test-first: every `Tests` block is written and seen to **fail (red)** before the implementation tasks of its phase.
 
 **Organization**: Grouped by user story (US1 to US5, priorities from spec.md) so each story is independently implementable and testable.

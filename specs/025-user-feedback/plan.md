@@ -1,7 +1,7 @@
 # Implementation Plan: In-App User Feedback
 
 **Branch**: `025-user-feedback` | **Date**: 2026-11-18 | **Spec**: [spec.md](spec.md)
-**Input**: Feature specification from `/specs/025-user-feedback/spec.md` (clarified 2026-11-18, PPS-223 / P-196)
+**Input**: Feature specification from `/specs/025-user-feedback/spec.md` (clarified 2026-11-18, PPS-223 / P-197)
 
 ## Summary
 
