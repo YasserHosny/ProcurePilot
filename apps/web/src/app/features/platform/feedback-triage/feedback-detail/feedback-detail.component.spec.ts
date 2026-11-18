@@ -133,6 +133,25 @@ describe('FeedbackDetailComponent', () => {
     expect(el.querySelector('[data-testid="move-reviewed"]')).toBeNull();
   });
 
+  it('keeps a newer selection when an earlier save completes late', () => {
+    open();
+    const emitted: OperatorSubmission[] = [];
+    fixture.componentInstance.updated.subscribe((s) => emitted.push(s));
+    el.querySelector<HTMLButtonElement>('[data-testid="move-reviewed"]')!.click();
+    const patchA = http.expectOne((r) => r.method === 'PATCH' && r.url === `${base}/f1`);
+
+    const b = submission({ id: 'f2', text: 'Second report', attachments: [] });
+    fixture.componentRef.setInput('feedbackId', 'f2');
+    fixture.detectChanges();
+    http.expectOne(`${base}/f2`).flush(b);
+    patchA.flush(submission({ status: 'reviewed' }));
+    fixture.detectChanges();
+
+    expect(emitted.map((s) => s.id)).toEqual(['f1']);
+    expect(el.querySelector('[data-testid="detail-text"]')?.textContent).toContain('Second report');
+    expect(el.querySelector('[data-testid="move-reviewed"]')).not.toBeNull();
+  });
+
   it('refreshes and explains when the server refuses a backward or stale move', () => {
     open();
     el.querySelector<HTMLButtonElement>('[data-testid="move-reviewed"]')!.click();

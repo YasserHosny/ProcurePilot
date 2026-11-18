@@ -14,8 +14,10 @@
 -- Authorisation decisions use the LIVE membership lookup current_membership_role(), not the JWT's
 -- member_role claim, so a removed or demoted member loses access on their next statement.
 --
--- Operator labels are never shown to tenants (FR-014). That is enforced in the API response
--- model; the table-level SELECT below does not hide the column.
+-- Operator labels are never shown to tenants (FR-014). The client role's SELECT grant is
+-- column-level and leaves `labels` out, so a tenant JWT cannot read it through PostgREST either.
+-- Operators read labels through feedback_operator_labels() (below), which returns null to anyone
+-- who is not a live platform operator.
 
 -- ---------------------------------------------------------------------------
 -- Enums
@@ -223,11 +225,35 @@ create policy feedback_delete_own_new on feedback_submission
 
 -- Members hold the column grant but no update policy applies to them, so their updates change
 -- nothing. Column-level, so the trigger's immutable columns are not even grantable.
+-- SELECT is column-level too and omits `labels` (FR-014): RLS hides rows, not columns.
 revoke all on feedback_submission from public, anon, authenticated;
-grant select, insert, delete on feedback_submission to authenticated;
+grant select (
+  id, tenant_id, submitter_user_id, submitter_membership_id, submitter_name, submitter_email,
+  member_role, text_content, category, status, page_path, app_version, locale, is_demo,
+  idempotency_key, created_at, status_changed_at, status_changed_by
+) on feedback_submission to authenticated;
+grant insert, delete on feedback_submission to authenticated;
 grant update (status, labels, status_changed_at, status_changed_by)
   on feedback_submission to authenticated;
 grant select, insert, update, delete on feedback_submission to service_role;
+
+-- The operator's only read of `labels`. Null for anyone who is not a live platform operator, and
+-- for an id that does not exist, so it leaks nothing a tenant could not already see.
+create or replace function feedback_operator_labels(p_submission_id uuid)
+returns text[]
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select s.labels
+  from feedback_submission s
+  where s.id = p_submission_id
+    and is_platform_operator();
+$$;
+
+revoke execute on function feedback_operator_labels(uuid) from public, anon;
+grant  execute on function feedback_operator_labels(uuid) to authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- feedback_attachment

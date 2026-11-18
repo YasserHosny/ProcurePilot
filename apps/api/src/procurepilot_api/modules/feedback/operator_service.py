@@ -151,8 +151,11 @@ def feedback_setting[T](settings: object, name: str, default: T) -> T:
 _SUBMISSION_COLUMNS = """
     s.id, s.tenant_id, s.text_content, s.category::text as category, s.status::text as status,
     s.submitter_name, s.submitter_email, s.member_role, s.page_path, s.locale, s.created_at,
-    s.labels, s.app_version, s.is_demo, s.status_changed_at
+    coalesce(feedback_operator_labels(s.id), '{}') as labels, s.app_version, s.is_demo,
+    s.status_changed_at
 """
+# `labels` is outside the client role's column grant (FR-014); feedback_operator_labels() is the
+# operator's only way to read it.
 
 
 class OperatorFeedbackService:
@@ -269,7 +272,8 @@ class OperatorFeedbackService:
             with conn.cursor(row_factory=dict_row) as cur:
                 # `for update` serialises a concurrent operator change and a member withdrawal.
                 cur.execute(
-                    "select tenant_id, status::text as status, labels "
+                    "select tenant_id, status::text as status, "
+                    "coalesce(feedback_operator_labels(id), '{}') as labels "
                     "from feedback_submission where id = %s for update",
                     (submission_id,),
                 )

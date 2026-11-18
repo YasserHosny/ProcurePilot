@@ -66,6 +66,12 @@ export class AudioRecorderService implements OnDestroy {
   readonly result = signal<File | null>(null);
   private discard = false;
   private timer: ReturnType<typeof setInterval> | null = null;
+  /**
+   * Bumped by every start() and cancel(). A microphone grant that resolves after the dialog closed
+   * (or after a newer start) no longer matches and is released at once instead of recording.
+   */
+  private generation = 0;
+  private destroyed = false;
 
   /** False hides the record control; text, screenshots and file upload keep working. */
   get supported(): boolean {
@@ -73,7 +79,8 @@ export class AudioRecorderService implements OnDestroy {
   }
 
   async start(): Promise<void> {
-    if (!this.supported || this.state() === 'recording') return;
+    if (!this.supported || this.destroyed || this.state() === 'recording') return;
+    const generation = ++this.generation;
     this.error.set(null);
     this.autoStopped.set(false);
     this.result.set(null);
@@ -84,7 +91,11 @@ export class AudioRecorderService implements OnDestroy {
     try {
       stream = await this.devices!.getUserMedia({ audio: true });
     } catch (e) {
-      this.error.set(errorKind(e));
+      if (generation === this.generation && !this.destroyed) this.error.set(errorKind(e));
+      return;
+    }
+    if (generation !== this.generation || this.destroyed) {
+      stream.getTracks().forEach((track) => track.stop());
       return;
     }
 
@@ -127,6 +138,7 @@ export class AudioRecorderService implements OnDestroy {
 
   /** Ends the recording and throws it away. */
   cancel(): void {
+    this.generation++;
     this.discard = true;
     this.stop();
   }
@@ -139,6 +151,7 @@ export class AudioRecorderService implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.cancel();
   }
 

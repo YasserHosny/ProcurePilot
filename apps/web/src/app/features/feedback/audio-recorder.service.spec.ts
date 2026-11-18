@@ -69,6 +69,38 @@ describe('AudioRecorderService (FR-004, FR-006)', () => {
     expect(setup({ devices: null, ctor: FakeRecorder }).supported).toBeFalse();
   });
 
+  it('releases a microphone granted after the dialog closed and never records', async () => {
+    const { stream, stopped } = fakeStream();
+    let grant!: (s: MediaStream) => void;
+    const service = setup({
+      devices: { getUserMedia: () => new Promise<MediaStream>((resolve) => (grant = resolve)) },
+      ctor: FakeRecorder,
+    });
+    const starting = service.start();
+    service.ngOnDestroy();
+    grant(stream);
+    await starting;
+    expect(stopped).toHaveBeenCalled();
+    expect(FakeRecorder.last).toBeNull();
+    expect(service.state()).toBe('idle');
+  });
+
+  it('releases a microphone granted after cancel() and never records', async () => {
+    const { stream, stopped } = fakeStream();
+    let grant!: (s: MediaStream) => void;
+    const service = setup({
+      devices: { getUserMedia: () => new Promise<MediaStream>((resolve) => (grant = resolve)) },
+      ctor: FakeRecorder,
+    });
+    const starting = service.start();
+    service.cancel();
+    grant(stream);
+    await starting;
+    expect(stopped).toHaveBeenCalled();
+    expect(FakeRecorder.last).toBeNull();
+    expect(service.state()).toBe('idle');
+  });
+
   it('reports recording as unsupported without a recorder constructor', () => {
     const { stream } = fakeStream();
     const service = setup({ devices: { getUserMedia: () => Promise.resolve(stream) }, ctor: null });

@@ -153,15 +153,19 @@ export class FeedbackDetailComponent implements OnChanges {
     if (!item || this.saving()) return;
     this.saving.set(true);
     this.actionError.set(null);
-    this.api.update(item.id, body).subscribe({
+    const id = item.id;
+    this.api.update(id, body).subscribe({
       next: (saved) => {
         this.saving.set(false);
-        this.item.set(saved);
+        // The list still needs to know, but a newer selection keeps its own detail pane.
         this.updated.emit(saved);
+        if (this.loadedFor !== id) return;
+        this.item.set(saved);
         onSaved?.();
       },
       error: (err: unknown) => {
         this.saving.set(false);
+        if (this.loadedFor !== id) return;
         const code = err instanceof HttpErrorResponse ? (err.error as { code?: string })?.code : '';
         this.actionError.set(
           code === 'feedback.invalid_transition'

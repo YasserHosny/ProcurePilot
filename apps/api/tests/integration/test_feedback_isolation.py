@@ -308,6 +308,37 @@ def test_member_cannot_change_status_or_labels(
         assert cur.rowcount == 0, "no update policy applies to members"
 
 
+@pytest.mark.parametrize("who", ["owner", "buyer"])
+def test_tenant_cannot_select_operator_labels(
+    world: tuple[psycopg.Connection, Tenant, Tenant], who: str
+) -> None:
+    """FR-014: labels are outside the client column grant, so PostgREST cannot expose them."""
+    conn, alpha, _b = world
+    with conn.cursor() as cur:
+        _act_as(cur, alpha, getattr(alpha, who))
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "select id, labels from feedback_submission where id = %s",
+                (alpha.buyer_submission_id,),
+            )
+
+
+@pytest.mark.parametrize("who", ["owner", "buyer"])
+def test_operator_labels_function_returns_null_to_tenants(
+    world: tuple[psycopg.Connection, Tenant, Tenant], who: str
+) -> None:
+    conn, alpha, _b = world
+    with conn.cursor() as cur:
+        _act_as_postgres(cur)
+        cur.execute(
+            "update feedback_submission set labels = array['internal'] where id = %s",
+            (alpha.buyer_submission_id,),
+        )
+        _act_as(cur, alpha, getattr(alpha, who))
+        cur.execute("select feedback_operator_labels(%s)", (alpha.buyer_submission_id,))
+        assert cur.fetchone() == (None,)
+
+
 @pytest.mark.parametrize(
     "column,value",
     [

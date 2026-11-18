@@ -143,7 +143,8 @@ def test_operator_updates_status_and_labels_only(conn: psycopg.Connection) -> No
         )
         assert cur.rowcount == 1
         cur.execute(
-            "select status::text, labels, status_changed_by from feedback_submission where id = %s",
+            "select status::text, feedback_operator_labels(id), status_changed_by "
+            "from feedback_submission where id = %s",
             (submission,),
         )
         status, labels, changed_by = cur.fetchone() or (None, None, None)
