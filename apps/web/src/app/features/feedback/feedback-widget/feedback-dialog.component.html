@@ -245,9 +245,9 @@
         }
       }
     </span>
-    @if (formError(); as key) {
+    @if (formError(); as error) {
       <p class="fb-error" data-test="form-error" role="alert">
-        {{ key | translate }}
+        {{ error.key | translate: error.params }}
         @if (showDraftKept()) {
           {{ 'feedback.widget.draftKept' | translate }}
         }

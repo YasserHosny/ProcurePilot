@@ -90,11 +90,19 @@ def _detect(content: bytes) -> str:
     return magic.from_buffer(content, mime=True)
 
 
-def sniff_image(content: bytes) -> str:
+def _refused(detected: str, kind: str, name: str | None) -> UnsupportedMediaTypeError:
+    # The file name is the member's own; returning it lets the widget say which file to remove.
+    details: dict[str, object] = {"detected_mime": detected, "kind": kind}
+    if name:
+        details["name"] = name
+    return UnsupportedMediaTypeError(details=details)
+
+
+def sniff_image(content: bytes, name: str | None = None) -> str:
     detected = _detect(content)
     stored = _IMAGE_TYPES.get(detected)
     if stored is None:
-        raise UnsupportedMediaTypeError(details={"detected_mime": detected, "kind": "image"})
+        raise _refused(detected, "image", name)
     return stored
 
 
@@ -109,7 +117,7 @@ def _webm_is_audio_only(content: bytes) -> bool:
     return has_audio and not has_video
 
 
-def sniff_audio(content: bytes) -> str:
+def sniff_audio(content: bytes, name: str | None = None) -> str:
     detected = _detect(content)
     stored = _AUDIO_TYPES.get(detected)
     if stored is not None:
@@ -119,7 +127,7 @@ def sniff_audio(content: bytes) -> str:
         return container
     if container == "audio/webm" and _webm_is_audio_only(content):
         return container
-    raise UnsupportedMediaTypeError(details={"detected_mime": detected, "kind": "audio"})
+    raise _refused(detected, "audio", name)
 
 
 def _check_size(file: UploadedFile, limit: int, kind: AttachmentKind) -> None:
@@ -148,7 +156,7 @@ def validate_attachments(
                 kind="image",
                 filename=image.filename,
                 content=image.content,
-                content_type=sniff_image(image.content),
+                content_type=sniff_image(image.content, image.filename),
                 size_bytes=len(image.content),
                 display_order=order,
             )
@@ -160,7 +168,7 @@ def validate_attachments(
                 kind="audio",
                 filename=audio.filename,
                 content=audio.content,
-                content_type=sniff_audio(audio.content),
+                content_type=sniff_audio(audio.content, audio.filename),
                 size_bytes=len(audio.content),
                 display_order=0,
             )

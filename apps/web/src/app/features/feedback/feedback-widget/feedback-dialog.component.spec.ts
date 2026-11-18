@@ -50,8 +50,24 @@ function makeRecorder(supported = true) {
   return rec;
 }
 
-function file(name: string, type: string, size = 10): File {
-  return new File([new Uint8Array(size)], name, { type });
+const SIGNATURES: Record<string, readonly number[]> = {
+  'image/png': [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+  'image/jpeg': [0xff, 0xd8, 0xff, 0xe0],
+  'image/webp': [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50],
+};
+
+/** A file of `size` bytes that starts with the real signature of `type` when it is an image. */
+function file(name: string, type: string, size = 16): File {
+  const bytes = new Uint8Array(size);
+  bytes.set((SIGNATURES[type] ?? []).slice(0, size));
+  return new File([bytes], name, { type });
+}
+
+/** A file named and typed as an image whose bytes are not one (a renamed executable). */
+function fakeImage(name: string): File {
+  const bytes = new Uint8Array(64);
+  bytes.set([0x4d, 0x5a, 0x90, 0x00]);
+  return new File([bytes], name, { type: 'image/png' });
 }
 
 describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
@@ -78,13 +94,19 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
     fixture.detectChanges();
   }
 
-  function chooseImages(files: File[]): void {
+  /** Waits for the widget's asynchronous image-signature check, then renders. */
+  async function settle(): Promise<void> {
+    await fixture.componentInstance.imageCheck;
+    fixture.detectChanges();
+  }
+
+  async function chooseImages(files: File[]): Promise<void> {
     const input = q<HTMLInputElement>('input[data-test="image-input"]')!;
     const transfer = new DataTransfer();
     files.forEach((f) => transfer.items.add(f));
     input.files = transfer.files;
     input.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
+    await settle();
   }
 
   function chooseAudio(f: File): void {
@@ -96,14 +118,14 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
     fixture.detectChanges();
   }
 
-  function paste(target: HTMLElement, files: File[], plainText?: string): void {
+  async function paste(target: HTMLElement, files: File[], plainText?: string): Promise<void> {
     const transfer = new DataTransfer();
     files.forEach((f) => transfer.items.add(f));
     if (plainText) transfer.setData('text/plain', plainText);
     target.dispatchEvent(
       new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }),
     );
-    fixture.detectChanges();
+    await settle();
   }
 
   async function setup(
@@ -332,26 +354,26 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
     });
   });
 
-  describe('screenshots (US2)', () => {
+  describe('screenshots (US2)', async () => {
     beforeEach(async () => setup());
 
-    it('adds previews from the picker and removes one on request', () => {
-      chooseImages([file('a.png', 'image/png'), file('b.jpg', 'image/jpeg')]);
+    it('adds previews from the picker and removes one on request', async () => {
+      await chooseImages([file('a.png', 'image/png'), file('b.jpg', 'image/jpeg')]);
       expect(root().querySelectorAll('[data-test="thumb"]').length).toBe(2);
       click('[data-test="remove-image"]');
       expect(root().querySelectorAll('[data-test="thumb"]').length).toBe(1);
       expect(draft.images()[0].file.name).toBe('b.jpg');
     });
 
-    it('refuses a sixth screenshot with a message', () => {
-      chooseImages(Array.from({ length: 5 }, (_, i) => file(`s${i}.png`, 'image/png')));
-      chooseImages([file('six.png', 'image/png')]);
+    it('refuses a sixth screenshot with a message', async () => {
+      await chooseImages(Array.from({ length: 5 }, (_, i) => file(`s${i}.png`, 'image/png')));
+      await chooseImages([file('six.png', 'image/png')]);
       expect(root().querySelectorAll('[data-test="thumb"]').length).toBe(5);
       expect(text('[data-test="attachment-messages"]')).toContain(en.attachments.count);
     });
 
-    it('rejects a wrong type or an oversized file before any upload, naming the reason', () => {
-      chooseImages([file('anim.gif', 'image/gif'), file('huge.png', 'image/png', 5 * 1024 * 1024 + 1)]);
+    it('rejects a wrong type or an oversized file before any upload, naming the reason', async () => {
+      await chooseImages([file('anim.gif', 'image/gif'), file('huge.png', 'image/png', 5 * 1024 * 1024 + 1)]);
       const messages = text('[data-test="attachment-messages"]');
       expect(messages).toContain('anim.gif was not added: only JPEG, PNG and WEBP');
       expect(messages).toContain('huge.png was not added: images can be at most 5 MB');
@@ -359,50 +381,50 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
       http.expectNone('/api/v1/feedback');
     });
 
-    it('adds a dropped image', () => {
+    it('adds a dropped image', async () => {
       const transfer = new DataTransfer();
       transfer.items.add(file('drop.webp', 'image/webp'));
       const zone = q('[data-test="dropzone"]')!;
       const event = new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true });
       zone.dispatchEvent(event);
-      fixture.detectChanges();
+      await settle();
       expect(event.defaultPrevented).toBeTrue();
       expect(draft.images().length).toBe(1);
     });
 
-    it('adds a pasted screenshot with a preview', () => {
-      paste(q('[data-test="dropzone"]')!, [file('image.png', 'image/png')]);
+    it('adds a pasted screenshot with a preview', async () => {
+      await paste(q('[data-test="dropzone"]')!, [file('image.png', 'image/png')]);
       expect(root().querySelectorAll('[data-test="thumb"]').length).toBe(1);
       expect(draft.images()[0].file.name).toBe('screenshot-1.png');
     });
 
-    it('says so when the clipboard holds no image', () => {
-      paste(q('[data-test="dropzone"]')!, []);
+    it('says so when the clipboard holds no image', async () => {
+      await paste(q('[data-test="dropzone"]')!, []);
       expect(draft.images().length).toBe(0);
       expect(text('[data-test="attachment-messages"]')).toContain(en.attachments.pasteNoImage);
     });
 
-    it('says so when the pasted file is not a supported image type', () => {
-      paste(q('[data-test="dropzone"]')!, [file('doc.pdf', 'application/pdf')]);
+    it('says so when the pasted file is not a supported image type', async () => {
+      await paste(q('[data-test="dropzone"]')!, [file('doc.pdf', 'application/pdf')]);
       expect(draft.images().length).toBe(0);
       expect(text('[data-test="attachment-messages"]')).toContain(en.attachments.pasteBadType);
     });
 
-    it('leaves an ordinary text paste into the message box alone', () => {
-      paste(q('textarea')!, [], 'some copied words');
+    it('leaves an ordinary text paste into the message box alone', async () => {
+      await paste(q('textarea')!, [], 'some copied words');
       expect(draft.images().length).toBe(0);
       expect(q('[data-test="attachment-messages"]')?.textContent?.trim() ?? '').toBe('');
     });
 
-    it('sends the screenshots in the same request as the text', () => {
-      chooseImages([file('a.png', 'image/png'), file('b.png', 'image/png')]);
+    it('sends the screenshots in the same request as the text', async () => {
+      await chooseImages([file('a.png', 'image/png'), file('b.png', 'image/png')]);
       typeText('See screenshots');
       click('[data-test="send"]');
       const body = http.expectOne('/api/v1/feedback').request.body as FormData;
       expect(body.getAll('images').length).toBe(2);
     });
 
-    it('closes the dialog with "capture" from the hide button, and disables it while recording', () => {
+    it('closes the dialog with "capture" from the hide button, and disables it while recording', async () => {
       click('[data-test="hide-to-capture"]');
       expect(dialogRef.close).toHaveBeenCalledWith('capture');
 
@@ -423,7 +445,7 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
       await setup({ data: { afterCapture: true } });
       expect(q('[data-test="paste-now"]')).not.toBeNull();
 
-      paste(q('[data-test="dropzone"]')!, [file('shot.png', 'image/png')]);
+      await paste(q('[data-test="dropzone"]')!, [file('shot.png', 'image/png')]);
 
       expect(q('[data-test="paste-now"]')).toBeNull();
       expect(text('[data-test="dropzone"]')).toContain(en.attachments.dropHint);
@@ -434,13 +456,13 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
       await setup({ data: { afterCapture: true } });
       expect(q('[data-test="paste-now"]')).not.toBeNull();
 
-      paste(q('[data-test="dropzone"]')!, [file('notes.txt', 'text/plain')]);
+      await paste(q('[data-test="dropzone"]')!, [file('notes.txt', 'text/plain')]);
 
       expect(q('[data-test="paste-now"]')).not.toBeNull();
     });
 
-    it('shows thumb-failed placeholder on image error and clears on removal', () => {
-      chooseImages([file('a.png', 'image/png')]);
+    it('shows thumb-failed placeholder on image error and clears on removal', async () => {
+      await chooseImages([file('a.png', 'image/png')]);
       expect(q('[data-test="thumb-failed"]')).toBeNull();
       const img = q<HTMLImageElement>('[data-test="thumb"] img')!;
       img.dispatchEvent(new Event('error'));
@@ -450,6 +472,52 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
       expect(q('[data-test="remove-image"]')).not.toBeNull();
       click('[data-test="remove-image"]');
       expect(q('[data-test="thumb"]')).toBeNull();
+    });
+
+    it('refuses a file named and typed as an image whose bytes are not one, naming it', async () => {
+      await chooseImages([file('ok.png', 'image/png'), fakeImage('not-an-image.png')]);
+      expect(draft.images().map((image) => image.file.name)).toEqual(['ok.png']);
+      expect(text('[data-test="attachment-messages"]')).toContain(
+        'not-an-image.png was not added: only JPEG, PNG and WEBP',
+      );
+    });
+
+    it('accepts JPEG and WEBP files by their signatures', async () => {
+      await chooseImages([file('a.jpg', 'image/jpeg'), file('b.webp', 'image/webp')]);
+      expect(draft.images().length).toBe(2);
+    });
+
+    it('names the refused file when the server rejects its type', async () => {
+      await chooseImages([file('a.png', 'image/png')]);
+      typeText('Try');
+      click('[data-test="send"]');
+      http.expectOne('/api/v1/feedback').flush(
+        {
+          code: 'validation.unsupported_media_type',
+          message: 'x',
+          details: { kind: 'image', name: 'a.png' },
+          trace_id: 't',
+        },
+        { status: 415, statusText: 'Unsupported Media Type' },
+      );
+      fixture.detectChanges();
+      expect(text('[data-test="form-error"]')).toContain(
+        en.errors.unsupportedTypeNamed.replace('{{name}}', 'a.png'),
+      );
+    });
+
+    it('clears a file-type send error once the attachments change', async () => {
+      await chooseImages([file('a.png', 'image/png'), file('b.png', 'image/png')]);
+      typeText('Try');
+      click('[data-test="send"]');
+      http
+        .expectOne('/api/v1/feedback')
+        .flush({ code: 'x', message: 'x', trace_id: 't' }, { status: 415, statusText: 'Err' });
+      fixture.detectChanges();
+      expect(q('[data-test="form-error"]')).not.toBeNull();
+
+      click('[data-test="remove-image"]');
+      expect(q('[data-test="form-error"]')).toBeNull();
     });
   });
 
