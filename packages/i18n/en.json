@@ -2056,6 +2056,7 @@
       "captureHint": "To capture this page, hide this window, take your screenshot, then reopen Send feedback and paste it here.",
       "pasteNow": "Paste your screenshot here (Ctrl+V or ⌘V).",
       "previewFailed": "Preview unavailable. You can still send it.",
+      "readFailed": "{{name}} could not be read. Try adding it again.",
       "limits": "Up to 5 images (JPEG, PNG or WEBP), 5 MB each.",
       "previewAlt": "Screenshot {{number}}",
       "remove": "Remove screenshot {{number}}",

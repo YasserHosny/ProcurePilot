@@ -506,6 +506,40 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
       );
     });
 
+    it('disables Send while an image is still being checked, then sends it with the text', async () => {
+      typeText('With a screenshot');
+      const input = q<HTMLInputElement>('input[data-test="image-input"]')!;
+      const transfer = new DataTransfer();
+      transfer.items.add(file('late.png', 'image/png'));
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      expect(q<HTMLButtonElement>('[data-test="send"]')!.disabled).toBeTrue();
+      click('[data-test="send"]');
+      http.expectNone('/api/v1/feedback');
+
+      await settle();
+      expect(q<HTMLButtonElement>('[data-test="send"]')!.disabled).toBeFalse();
+      click('[data-test="send"]');
+      const body = http.expectOne('/api/v1/feedback').request.body as FormData;
+      expect(body.getAll('images').length).toBe(1);
+    });
+
+    it('names a file that cannot be read and still accepts later images', async () => {
+      const unreadable = file('gone.png', 'image/png');
+      spyOn(unreadable, 'slice').and.returnValue({
+        arrayBuffer: () => Promise.reject(new DOMException('gone', 'NotReadableError')),
+      } as unknown as Blob);
+      await chooseImages([unreadable]);
+      expect(draft.images().length).toBe(0);
+      expect(text('[data-test="attachment-messages"]')).toContain(
+        en.attachments.readFailed.replace('{{name}}', 'gone.png'),
+      );
+
+      await chooseImages([file('next.png', 'image/png')]);
+      expect(draft.images().map((image) => image.file.name)).toEqual(['next.png']);
+    });
+
     it('clears a file-type send error once the attachments change', async () => {
       await chooseImages([file('a.png', 'image/png'), file('b.png', 'image/png')]);
       typeText('Try');

@@ -234,8 +234,16 @@ export class FeedbackDialogComponent {
    */
   imageCheck: Promise<void> = Promise.resolve();
 
+  /** Image batches still being checked. Send waits for them so no chosen screenshot is left out. */
+  readonly checkingImages = signal(0);
+
   private addImages(files: File[]): Promise<void> {
-    this.imageCheck = this.imageCheck.then(() => this.checkAndAddImages(files));
+    this.checkingImages.update((n) => n + 1);
+    this.imageCheck = this.imageCheck
+      .then(() => this.checkAndAddImages(files))
+      // A batch that fails must not stall the queue for the rest of the dialog's life.
+      .catch(() => undefined)
+      .finally(() => this.checkingImages.update((n) => n - 1));
     return this.imageCheck;
   }
 
@@ -254,7 +262,14 @@ export class FeedbackDialogComponent {
         refuse(reason, file.name);
         continue;
       }
-      if (!(await hasImageSignature(file))) {
+      let isImage: boolean;
+      try {
+        isImage = await hasImageSignature(file);
+      } catch {
+        messages.push({ key: 'feedback.attachments.readFailed', params: { name: file.name } });
+        continue;
+      }
+      if (!isImage) {
         refuse('type', file.name);
         continue;
       }
@@ -335,7 +350,7 @@ export class FeedbackDialogComponent {
   send(): void {
     // The guard is what makes a double-click create one submission: the button is only disabled
     // after the next change-detection pass, the second click can arrive before it.
-    if (this.submitting() || this.cooldownSeconds() > 0) return;
+    if (this.submitting() || this.cooldownSeconds() > 0 || this.checkingImages() > 0) return;
     const text = this.draft.text().trim();
     if (!text) {
       this.textError.set(true);

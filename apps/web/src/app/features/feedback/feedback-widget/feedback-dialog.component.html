@@ -272,7 +272,7 @@
       mat-flat-button
       type="button"
       data-test="send"
-      [disabled]="submitting() || cooldownSeconds() > 0"
+      [disabled]="submitting() || cooldownSeconds() > 0 || checkingImages() > 0"
       (click)="send()"
     >
       {{ (submitting() ? 'feedback.widget.sending' : 'feedback.widget.send') | translate }}
