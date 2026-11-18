@@ -1,0 +1,402 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot In-App Feedback API
+  version: 0.1.0
+  description: |
+    Member and owner endpoints under /api/v1/feedback; platform-operator endpoints under
+    /api/v1/platform/feedback. Base conventions follow specs/001-platform-foundation/contracts/auth-tenant.openapi.yaml:
+    `Authorization: Bearer <supabase_jwt>`, tenant from the verified token (never path, query or header),
+    cursor pagination with `limit` capped at 100, error envelope `{code, message, details, trace_id}`.
+    A resource in another workspace is always 404, never 403.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+
+paths:
+  /feedback:
+    post:
+      tags: [Feedback]
+      operationId: submitFeedback
+      summary: Submit feedback (any workspace role)
+      description: |
+        One atomic request. All-or-nothing: if any part fails nothing is stored. A repeated request with the
+        same Idempotency-Key returns the original result (200) and is exempt from the cooldown.
+        Context (tenant, submitter, role, demo flag, timestamp, app version) is set by the server. Page path is
+        taken from the same-origin Referer header and language from Accept-Language, both validated.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: Accept-Language
+          in: header
+          schema: { type: string, example: ar }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                category:
+                  $ref: '#/components/schemas/Category'
+                images:
+                  type: array
+                  maxItems: 5
+                  description: JPEG, PNG or WEBP, each at most 5 MiB, verified by content.
+                  items: { type: string, format: binary }
+                audio:
+                  type: string
+                  format: binary
+                  description: MP3, M4A, WAV or WebM, at most 10 MiB, at most one, verified by content.
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Submission' }
+        '200':
+          description: Idempotent replay of an earlier successful request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Submission' }
+        '413': { $ref: '#/components/responses/Error' }
+        '415': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '429':
+          description: Cooldown (code `feedback.cooldown`, `details.retry_after_seconds`) or rate limit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    get:
+      tags: [Feedback]
+      operationId: listWorkspaceFeedback
+      summary: Workspace inbox (owner only, read-only)
+      description: All submissions in the caller's workspace. Non-owners receive 404.
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/Status' }
+        - name: category
+          in: query
+          schema: { $ref: '#/components/schemas/Category' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubmissionPage' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /feedback/mine:
+    get:
+      tags: [Feedback]
+      operationId: listMyFeedback
+      summary: The caller's own submissions
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubmissionPage' }
+
+  /feedback/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Feedback]
+      operationId: getFeedback
+      summary: One submission (own, or any in the workspace for the owner)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Submission' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Feedback]
+      operationId: withdrawFeedback
+      summary: Withdraw own submission while its status is `new`
+      description: |
+        Removes the submission and its stored files. Atomic against operator status changes: if the status has
+        already moved past `new` the request is refused with 409 `feedback.withdraw_refused`.
+        Someone else's submission, including for the owner, is 404.
+      responses:
+        '204': { description: Withdrawn }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /feedback/{id}/attachments/{attachmentId}/url:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - name: attachmentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Feedback]
+      operationId: getAttachmentUrl
+      summary: Short-lived signed URL (300 s) for an attachment the caller may see
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignedUrl' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /platform/feedback:
+    get:
+      tags: [Platform operator]
+      operationId: operatorListFeedback
+      summary: Triage list across workspaces (platform operators only)
+      description: |
+        Non-operators receive 404. Records one aggregate audit event per request. The `tenant_id` filter narrows
+        within the operator's authorised scope and is not a tenancy mechanism.
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/Status' }
+        - name: category
+          in: query
+          schema: { $ref: '#/components/schemas/Category' }
+        - name: tenant_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: is_demo
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperatorSubmissionPage' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /platform/feedback/me:
+    get:
+      tags: [Platform operator]
+      operationId: operatorMe
+      summary: Is the caller an active platform operator, and their digest preference
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperatorMe' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /platform/feedback/digest-preference:
+    put:
+      tags: [Platform operator]
+      operationId: operatorSetDigestPreference
+      summary: Turn the daily digest on or off for the caller only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+                locale: { type: string, enum: [en, ar] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperatorMe' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /platform/feedback/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Platform operator]
+      operationId: operatorGetFeedback
+      summary: One submission with submitter name and email (records an audit event)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperatorSubmission' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Platform operator]
+      operationId: operatorUpdateFeedback
+      summary: Change status (forward only) and/or labels
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                status: { $ref: '#/components/schemas/Status' }
+                labels:
+                  type: array
+                  maxItems: 10
+                  items: { type: string, minLength: 1, maxLength: 40 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperatorSubmission' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409':
+          description: Backward or invalid status move (code `feedback.invalid_transition`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /platform/feedback/{id}/attachments/{attachmentId}/url:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - name: attachmentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Platform operator]
+      operationId: operatorGetAttachmentUrl
+      summary: Short-lived signed URL (300 s); records an audit event
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignedUrl' }
+        '404': { $ref: '#/components/responses/Error' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+  responses:
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Status:
+      type: string
+      enum: [new, reviewed, resolved]
+    Category:
+      type: string
+      enum: [bug, idea, question, other]
+    Error:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: { type: string, example: feedback.cooldown }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+        trace_id: { type: string }
+    Attachment:
+      type: object
+      required: [id, kind, content_type, size_bytes, display_order]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [image, audio] }
+        content_type: { type: string }
+        size_bytes: { type: integer }
+        display_order: { type: integer, minimum: 0, maximum: 4 }
+    Submission:
+      description: Tenant-facing view. Never includes operator labels.
+      type: object
+      required: [id, text, status, member_role, page_path, locale, created_at, attachments]
+      properties:
+        id: { type: string, format: uuid }
+        text: { type: string }
+        category: { oneOf: [{ $ref: '#/components/schemas/Category' }, { type: 'null' }] }
+        status: { $ref: '#/components/schemas/Status' }
+        submitter_name: { type: string, description: Present in the owner inbox }
+        member_role: { type: string, enum: [owner, buyer, branch_manager, approver, viewer] }
+        page_path: { type: string }
+        locale: { type: string, enum: [en, ar] }
+        created_at: { type: string, format: date-time }
+        can_withdraw: { type: boolean, description: True only for the submitter while status is new }
+        attachments:
+          type: array
+          items: { $ref: '#/components/schemas/Attachment' }
+    SubmissionPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Submission' }
+        next_cursor: { type: [string, 'null'] }
+    OperatorSubmission:
+      allOf:
+        - $ref: '#/components/schemas/Submission'
+        - type: object
+          required: [tenant_id, submitter_name, submitter_email, labels, app_version, is_demo]
+          properties:
+            tenant_id: { type: string, format: uuid }
+            tenant_name: { type: string }
+            submitter_email: { type: string, format: email }
+            labels:
+              type: array
+              items: { type: string }
+            app_version: { type: string }
+            is_demo: { type: boolean }
+            status_changed_at: { type: [string, 'null'], format: date-time }
+    OperatorSubmissionPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OperatorSubmission' }
+        next_cursor: { type: [string, 'null'] }
+    OperatorMe:
+      type: object
+      required: [digest_enabled, digest_locale]
+      properties:
+        digest_enabled: { type: boolean }
+        digest_locale: { type: string, enum: [en, ar] }
+    SignedUrl:
+      type: object
+      required: [url, expires_in]
+      properties:
+        url: { type: string, format: uri }
+        expires_in: { type: integer, example: 300 }
