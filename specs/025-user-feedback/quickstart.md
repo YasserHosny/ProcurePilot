@@ -6,9 +6,12 @@ the migrations and code from `tasks.md` exist.
 ## 1. Bring up the stack and apply migrations
 
 ```bash
-docker compose up --build
+docker compose up --build  # includes the feedback-worker service
 pnpm db:migrate            # applies 20261118000100..000700 and ends with db:check-privileges
 ```
+
+`supabase migration up` against a hosted database needs `--yes` when run by an agent, and the
+session pooler (port 5432), not the transaction pooler (6543).
 
 `db:check-privileges` must pass: both feedback tables forced-RLS, `platform_operator` unreachable by client
 roles, no client mutation of `audit_event`.
@@ -31,7 +34,11 @@ uv run python -m procurepilot_api.workers.platform_operator_cli list
 uv run python -m procurepilot_api.workers.platform_operator_cli revoke you@example.com
 ```
 
-The user must already be a member of a workspace.
+The user must already be a member of a workspace. The CLI loads the full API settings, so run it
+with the API's whole environment (`.env`), not only `DATABASE_URL`.
+
+An operator's digest preference is changed only through `set_operator_digest_preference()` (the
+triage page's toggle), never by updating `platform_operator` directly.
 
 ## 4. Walk the stories
 
@@ -59,11 +66,11 @@ Runs the digest, the 12-month retention purge and the orphan-object sweep once.
 ## 6. Test suites
 
 ```bash
-pnpm test:isolation        # includes the new feedback tables
-pnpm test:api              # unit, contract, integration (needs TEST_DATABASE_URL)
+pnpm test:isolation        # test_tenant_isolation.py only; it covers the feedback tables too
+pnpm test:api              # unit, contract, integration incl. test_feedback_isolation.py (needs TEST_DATABASE_URL)
 pnpm test:web              # Karma
-pnpm test:e2e              # Playwright: submit, own list, owner inbox, triage, withdraw
-pnpm test:a11y             # axe-core in en and ar
+pnpm test:e2e              # Playwright: feedback.spec.ts (submit, own list, owner inbox, triage, withdraw)
+pnpm test:a11y             # axe-core in en and ar: tests tagged @a11y (feedback-a11y.spec.ts)
 pnpm lint                  # ruff, Angular lint, i18n key check
 ```
 
@@ -76,4 +83,8 @@ pnpm --filter web docs:screenshots
 python scripts/docs_screenshots_diff.py
 ```
 
-If the diff exceeds the 1% threshold, commit the regenerated images in `docs/user/screenshots/`.
+If any image exceeds the 1% threshold (`THRESHOLD_PCT` in `scripts/docs_screenshots_diff.py`),
+commit the regenerated images in `docs/user/screenshots/`. Without a local stack, download the
+`regenerated-doc-screenshots` artifact from the failing "Capture and compare screenshots" CI run
+(`gh run download <run-id> -n regenerated-doc-screenshots`) and commit that instead; it includes
+`mobile/`. The widget alone moved every shell screenshot by 0.17% or more in PR #590.
