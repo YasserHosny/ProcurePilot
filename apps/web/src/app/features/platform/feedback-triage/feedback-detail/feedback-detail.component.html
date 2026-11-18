@@ -1,0 +1,182 @@
+<section class="detail" [attr.aria-busy]="loading()" data-testid="feedback-detail">
+  @if (loading()) {
+    <mat-spinner diameter="28" [attr.aria-label]="'platform.feedback.loading' | translate"></mat-spinner>
+  } @else if (loadFailed()) {
+    <p class="error" role="alert">{{ 'platform.feedback.detail.loadError' | translate }}</p>
+    <button mat-stroked-button type="button" (click)="load()">
+      {{ 'platform.feedback.retry' | translate }}
+    </button>
+  } @else if (item(); as it) {
+    <header class="detail-header">
+      <h2 class="detail-title">{{ 'platform.feedback.detail.title' | translate }}</h2>
+      <span class="status-pill status-{{ it.status }}">{{ statusLabelKeys[it.status] | translate }}</span>
+      @if (it.is_demo) {
+        <span class="demo-pill">{{ 'platform.feedback.detail.demoBadge' | translate }}</span>
+      }
+    </header>
+
+    <dl class="facts">
+      <div>
+        <dt>{{ 'platform.feedback.detail.submitter' | translate }}</dt>
+        <dd data-testid="detail-name">{{ it.submitter_name }}</dd>
+      </div>
+      <div>
+        <dt>{{ 'platform.feedback.detail.email' | translate }}</dt>
+        <dd data-testid="detail-email"><a [href]="'mailto:' + it.submitter_email">{{ it.submitter_email }}</a></dd>
+      </div>
+      <div>
+        <dt>{{ 'platform.feedback.detail.role' | translate }}</dt>
+        <dd>{{ (roleLabelKeys[it.member_role] ?? it.member_role) | translate }}</dd>
+      </div>
+      <div>
+        <dt>{{ 'platform.feedback.detail.workspace' | translate }}</dt>
+        <dd>
+          {{ it.tenant_name ?? it.tenant_id }}
+          <button mat-button type="button" class="link-button" (click)="filterWorkspace.emit(it.tenant_id)">
+            {{ 'platform.feedback.detail.filterWorkspace' | translate }}
+          </button>
+        </dd>
+      </div>
+      <div>
+        <dt>{{ 'platform.feedback.detail.category' | translate }}</dt>
+        <dd>
+          @if (it.category) {
+            {{ categoryLabelKeys[it.category] | translate }}
+          } @else {
+            {{ 'platform.feedback.category.none' | translate }}
+          }
+        </dd>
+      </div>
+      <div>
+        <dt>{{ 'platform.feedback.detail.page' | translate }}</dt>
+        <dd class="ltr-value">{{ it.page_path }}</dd>
+      </div>
+      <div>
+        <dt>{{ 'platform.feedback.detail.appVersion' | translate }}</dt>
+        <dd class="ltr-value">{{ it.app_version }}</dd>
+      </div>
+      <div>
+        <dt>{{ 'platform.feedback.detail.language' | translate }}</dt>
+        <dd>{{ it.locale === 'ar' ? ('platform.feedback.detail.languageAr' | translate) : ('platform.feedback.detail.languageEn' | translate) }}</dd>
+      </div>
+      <div>
+        <dt>{{ 'platform.feedback.detail.created' | translate }}</dt>
+        <dd>{{ it.created_at | formatDate }}</dd>
+      </div>
+      @if (it.status_changed_at) {
+        <div>
+          <dt>{{ 'platform.feedback.detail.statusChangedAt' | translate }}</dt>
+          <dd>{{ it.status_changed_at | formatDate }}</dd>
+        </div>
+      }
+    </dl>
+
+    <h3 class="section-title">{{ 'platform.feedback.detail.text' | translate }}</h3>
+    <p class="message" [attr.dir]="it.locale === 'ar' ? 'rtl' : 'ltr'" data-testid="detail-text">{{ it.text }}</p>
+
+    <h3 class="section-title">{{ 'platform.feedback.detail.attachments' | translate }}</h3>
+    @if (it.attachments.length === 0) {
+      <p class="muted">{{ 'platform.feedback.detail.noAttachments' | translate }}</p>
+    }
+    @if (images(it).length > 0) {
+      <ul class="screenshots" [attr.aria-label]="'platform.feedback.detail.screenshots' | translate">
+        @for (att of images(it); track att.id) {
+          <li>
+            @if (urls()[att.id]; as src) {
+              <a [href]="src" target="_blank" rel="noopener noreferrer">
+                <img
+                  [src]="src"
+                  [alt]="'platform.feedback.detail.screenshotAlt' | translate: { n: $index + 1 }"
+                  loading="lazy"
+                />
+              </a>
+            } @else if (failedAttachments().has(att.id)) {
+              <span class="muted">{{ 'platform.feedback.detail.attachmentError' | translate }}</span>
+            } @else {
+              <mat-spinner diameter="20" [attr.aria-label]="'platform.feedback.loading' | translate"></mat-spinner>
+            }
+          </li>
+        }
+      </ul>
+    }
+    @for (att of audio(it); track att.id) {
+      <div class="audio">
+        @if (urls()[att.id]; as src) {
+          <audio controls preload="none" [src]="src" [attr.aria-label]="'platform.feedback.detail.audio' | translate"></audio>
+        } @else if (failedAttachments().has(att.id)) {
+          <span class="muted">{{ 'platform.feedback.detail.attachmentError' | translate }}</span>
+        } @else {
+          <mat-spinner diameter="20" [attr.aria-label]="'platform.feedback.loading' | translate"></mat-spinner>
+        }
+      </div>
+    }
+
+    <h3 class="section-title">{{ 'platform.feedback.actions.title' | translate }}</h3>
+    <div class="status-actions">
+      @for (next of nextStatuses(it.status); track next) {
+        <button
+          mat-flat-button
+          type="button"
+          [attr.data-testid]="'move-' + next"
+          [disabled]="saving()"
+          (click)="moveTo(next)"
+        >
+          {{ statusActionKeys[next] | translate }}
+        </button>
+      } @empty {
+        <p class="muted">{{ 'platform.feedback.actions.final' | translate }}</p>
+      }
+    </div>
+
+    <h3 class="section-title" id="labels-heading">{{ 'platform.feedback.labels.title' | translate }}</h3>
+    <ul class="labels" aria-labelledby="labels-heading">
+      @for (label of it.labels; track label) {
+        <li class="label-chip">
+          <span>{{ label }}</span>
+          <button
+            type="button"
+            class="label-remove"
+            [disabled]="saving()"
+            [attr.aria-label]="'platform.feedback.labels.remove' | translate: { label: label }"
+            (click)="removeLabel(label)"
+          >
+            <mat-icon aria-hidden="true">close</mat-icon>
+          </button>
+        </li>
+      } @empty {
+        <li class="muted">{{ 'platform.feedback.labels.none' | translate }}</li>
+      }
+    </ul>
+    <form class="label-form" (ngSubmit)="addLabel()">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'platform.feedback.labels.add' | translate }}</mat-label>
+        <input
+          matInput
+          name="label"
+          autocomplete="off"
+          [maxlength]="maxLabelLength + 20"
+          [ngModel]="labelDraft()"
+          (ngModelChange)="labelDraft.set($event); labelProblem.set(null)"
+        />
+      </mat-form-field>
+      <button mat-stroked-button type="submit" [disabled]="saving() || !labelDraft().trim()">
+        {{ 'platform.feedback.labels.addAction' | translate }}
+      </button>
+    </form>
+    @switch (labelProblem()) {
+      @case ('tooLong') {
+        <p class="error" role="alert">{{ 'platform.feedback.labels.tooLong' | translate: { max: maxLabelLength } }}</p>
+      }
+      @case ('duplicate') {
+        <p class="error" role="alert">{{ 'platform.feedback.labels.duplicate' | translate }}</p>
+      }
+      @case ('max') {
+        <p class="error" role="alert">{{ 'platform.feedback.labels.max' | translate }}</p>
+      }
+    }
+
+    @if (actionError(); as key) {
+      <p class="error" role="alert" data-testid="action-error">{{ key | translate }}</p>
+    }
+  }
+</section>

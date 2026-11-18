@@ -13,6 +13,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { filter } from 'rxjs';
 
 import type { Locale, Role, WorkspaceSummary } from '../../core/api/models';
+import { OperatorService } from '../../core/auth/operator.service';
 import { RoleDirective } from '../../core/auth/role.directive';
 import { SessionService } from '../../core/auth/session.service';
 import { I18nService } from '../../core/i18n';
@@ -59,6 +60,7 @@ export interface NavGroup {
 })
 export class ShellComponent implements OnInit {
   private readonly session = inject(SessionService);
+  protected readonly operator = inject(OperatorService);
   private readonly router = inject(Router);
   private readonly breakpoint = inject(BreakpointObserver);
   readonly i18n = inject(I18nService);
@@ -154,6 +156,8 @@ export class ShellComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadWorkspaces();
+    // Reveals the operator nav entry; a 404 (not an operator) simply leaves it hidden.
+    this.operator.load().subscribe();
 
     this.breakpoint.observe('(max-width: 959px)').subscribe((result) => {
       this.isMobile.set(result.matches);

@@ -10,6 +10,7 @@ Jira keys, and the handoff log.
 |---|---|
 | [`first-customer-gtm-plan.md`](first-customer-gtm-plan.md) | The plan: ICP, fit and currency gaps (C1–C5, G1–G5), demo walkthrough, pilot prerequisites, sales-pipeline stages |
 | [`gtm-execution-plan.md`](gtm-execution-plan.md) | Execution tracker and cold-start handoff for any model: Jira setup, tasks, dependencies, handoff log |
+| [`handoff-2026-11-04.md`](handoff-2026-11-04.md) | Cold-start handoff as of 2026-11-04 (`main` at `0f0ea32b`): vision, ICP and terms, the product today, environments, open work, rules, reading order |
 | [`one-pager/ProcurePilot-one-pager.pdf`](one-pager/ProcurePilot-one-pager.pdf) | Approved one-pager, 2 × A4 (Arabic, English) — PP-8 |
 | [`demo-tenant/`](demo-tenant/) | Demo tenants (PP-5 / G-1): plan, restaurant dataset «مطاعم سند» on hosted, findings from building it live, lookups review |
 | [`demo-tenant/round-1/`](demo-tenant/round-1/) | Round 1 walkthrough with live screenshots: RFQ → supplier quotes → compare → request → approval → PO-000001 on the demo tenant |
