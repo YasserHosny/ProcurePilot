@@ -1,10 +1,13 @@
 import { Routes } from '@angular/router';
 
 import { authGuard, guestGuard, roleGuard } from './core/auth/auth.guard';
+import { operatorGuard } from './core/auth/operator.guard';
 import { quotationReviewGuard } from './features/quotations/quotation-review/quotation-review.guard';
 import { rfqDirtyGuard } from './features/rfq/create/rfq-create.guard';
 
 export const rfqGuardrailsOwnerGuard = roleGuard('owner');
+/** The owner's read-only feedback inbox. A navigation convenience; the API answers 404 to non-owners. */
+export const feedbackWorkspaceOwnerGuard = roleGuard('owner');
 
 /**
  * Public routes and guarded routes are kept in separate blocks (FR-016).
@@ -195,6 +198,32 @@ export const routes: Routes = [
         canActivate: [roleGuard('owner')],
         loadComponent: () =>
           import('./features/team/team.component').then((m) => m.TeamComponent),
+      },
+      {
+        // UX guard only: the API answers 404 to anyone who is not a live platform operator.
+        path: 'platform/feedback',
+        canActivate: [operatorGuard],
+        loadComponent: () =>
+          import('./features/platform/feedback-triage/feedback-triage.component').then(
+            (m) => m.FeedbackTriageComponent,
+          ),
+      },
+      {
+        path: 'feedback',
+        title: 'feedback.list.myTitle',
+        loadComponent: () =>
+          import('./features/feedback/my-feedback/my-feedback.component').then(
+            (m) => m.MyFeedbackComponent,
+          ),
+      },
+      {
+        path: 'feedback/workspace',
+        title: 'feedback.list.workspaceTitle',
+        canActivate: [feedbackWorkspaceOwnerGuard],
+        loadComponent: () =>
+          import('./features/feedback/workspace-feedback/workspace-feedback.component').then(
+            (m) => m.WorkspaceFeedbackComponent,
+          ),
       },
       {
         path: 'quotations',

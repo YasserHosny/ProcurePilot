@@ -1,0 +1,166 @@
+<div class="triage">
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">{{ 'platform.feedback.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'platform.feedback.subtitle' | translate }}</p>
+    </div>
+    <div class="digest">
+      <mat-slide-toggle
+        [checked]="digestEnabled()"
+        [disabled]="digestSaving()"
+        (change)="setDigest($event.checked)"
+        data-testid="digest-toggle"
+      >
+        {{ 'platform.feedback.digest.label' | translate }}
+      </mat-slide-toggle>
+      <span class="hint">{{ 'platform.feedback.digest.hint' | translate }}</span>
+      @if (digestFailed()) {
+        <span class="error" role="alert">{{ 'platform.feedback.digest.error' | translate }}</span>
+      }
+    </div>
+  </header>
+
+  <form class="filters" (ngSubmit)="applyWorkspace()" [attr.aria-label]="'platform.feedback.filters.title' | translate">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'platform.feedback.filters.status' | translate }}</mat-label>
+      <mat-select [value]="status()" (selectionChange)="setStatus($event.value)" data-testid="filter-status">
+        <mat-option [value]="null">{{ 'platform.feedback.filters.all' | translate }}</mat-option>
+        @for (s of statuses; track s) {
+          <mat-option [value]="s">{{ statusLabelKeys[s] | translate }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'platform.feedback.filters.category' | translate }}</mat-label>
+      <mat-select [value]="category()" (selectionChange)="setCategory($event.value)" data-testid="filter-category">
+        <mat-option [value]="null">{{ 'platform.feedback.filters.all' | translate }}</mat-option>
+        @for (c of categories; track c) {
+          <mat-option [value]="c">{{ categoryLabelKeys[c] | translate }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'platform.feedback.filters.demo' | translate }}</mat-label>
+      <mat-select [value]="demo()" (selectionChange)="setDemo($event.value)" data-testid="filter-demo">
+        <mat-option value="all">{{ 'platform.feedback.filters.all' | translate }}</mat-option>
+        <mat-option value="real">{{ 'platform.feedback.filters.realOnly' | translate }}</mat-option>
+        <mat-option value="demo">{{ 'platform.feedback.filters.demoOnly' | translate }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="workspace-field">
+      <mat-label>{{ 'platform.feedback.filters.workspace' | translate }}</mat-label>
+      <input
+        matInput
+        name="workspace"
+        dir="ltr"
+        autocomplete="off"
+        [placeholder]="'platform.feedback.filters.workspaceHint' | translate"
+        [ngModel]="workspaceDraft()"
+        (ngModelChange)="workspaceDraft.set($event)"
+        (blur)="applyWorkspace()"
+        [attr.aria-invalid]="workspaceInvalid()"
+        data-testid="filter-workspace"
+      />
+      @if (workspaceInvalid()) {
+        <mat-error>{{ 'platform.feedback.filters.workspaceInvalid' | translate }}</mat-error>
+      }
+    </mat-form-field>
+
+    <button mat-button type="button" (click)="clearFilters()">
+      {{ 'platform.feedback.filters.clear' | translate }}
+    </button>
+  </form>
+
+  <div class="layout">
+    <section class="list-pane" [attr.aria-busy]="loading()">
+      @if (loadFailed()) {
+        <p class="error" role="alert">{{ 'platform.feedback.loadError' | translate }}</p>
+        <button mat-stroked-button type="button" (click)="reload()">
+          {{ 'platform.feedback.retry' | translate }}
+        </button>
+      } @else if (!loading() && items().length === 0) {
+        <p class="empty" data-testid="empty">{{ 'platform.feedback.empty' | translate }}</p>
+      }
+
+      @if (items().length > 0) {
+        <div class="table-scroll">
+          <table class="feedback-table">
+            <caption class="visually-hidden">{{ 'platform.feedback.title' | translate }}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{{ 'platform.feedback.columns.created' | translate }}</th>
+                <th scope="col">{{ 'platform.feedback.columns.workspace' | translate }}</th>
+                <th scope="col">{{ 'platform.feedback.columns.submitter' | translate }}</th>
+                <th scope="col">{{ 'platform.feedback.columns.category' | translate }}</th>
+                <th scope="col">{{ 'platform.feedback.columns.status' | translate }}</th>
+                <th scope="col">{{ 'platform.feedback.columns.preview' | translate }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of items(); track item.id) {
+                <tr [class.selected]="item.id === selectedId()" data-testid="feedback-row">
+                  <td>{{ item.created_at | formatDate }}</td>
+                  <td>
+                    {{ item.tenant_name ?? item.tenant_id }}
+                    @if (item.is_demo) {
+                      <span class="demo-pill">{{ 'platform.feedback.detail.demoBadge' | translate }}</span>
+                    }
+                  </td>
+                  <td>
+                    {{ item.submitter_name }}
+                    <span class="sub">{{ (roleLabelKeys[item.member_role] ?? item.member_role) | translate }}</span>
+                  </td>
+                  <td>
+                    @if (item.category) {
+                      {{ categoryLabelKeys[item.category] | translate }}
+                    } @else {
+                      <span class="sub">{{ 'platform.feedback.category.none' | translate }}</span>
+                    }
+                  </td>
+                  <td>
+                    <span class="status-pill status-{{ item.status }}">{{ statusLabelKeys[item.status] | translate }}</span>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      class="open-row"
+                      [attr.aria-pressed]="item.id === selectedId()"
+                      (click)="select(item)"
+                    >
+                      {{ preview(item.text) }}
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      @if (loading()) {
+        <mat-spinner diameter="28" [attr.aria-label]="'platform.feedback.loading' | translate"></mat-spinner>
+      }
+
+      @if (nextCursor() && !loading()) {
+        <button mat-stroked-button type="button" (click)="loadMore()" data-testid="load-more">
+          {{ 'platform.feedback.loadMore' | translate }}
+        </button>
+      }
+    </section>
+
+    <aside class="detail-pane" [attr.aria-label]="'platform.feedback.detail.title' | translate">
+      @if (selectedId(); as id) {
+        <app-feedback-detail
+          [feedbackId]="id"
+          (updated)="onUpdated($event)"
+          (filterWorkspace)="filterToWorkspace($event)"
+        />
+      } @else {
+        <p class="empty">{{ 'platform.feedback.detail.empty' | translate }}</p>
+      }
+    </aside>
+  </div>
+</div>

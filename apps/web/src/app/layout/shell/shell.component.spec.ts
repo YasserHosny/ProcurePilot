@@ -1,3 +1,5 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component, Type, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -55,6 +57,8 @@ describe('ShellComponent account menu', () => {
       providers: [
         provideTranslateService(),
         provideNoopAnimations(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         provideRouter([{ path: '**', component: DummyRouteComponent }]),
         { provide: SessionService, useValue: session },
         { provide: I18nService, useValue: i18n },
@@ -71,6 +75,27 @@ describe('ShellComponent account menu', () => {
 
   afterEach(() => {
     localStorage.removeItem('pp.sidebar.collapsed');
+  });
+
+  describe('platform feedback nav entry', () => {
+    const link = (): HTMLElement | null =>
+      (fixture.nativeElement as HTMLElement).querySelector('a[href="/platform/feedback"]');
+    const meRequest = (): ReturnType<HttpTestingController['expectOne']> =>
+      TestBed.inject(HttpTestingController).expectOne((r) =>
+        r.url.endsWith('/platform/feedback/me'),
+      );
+
+    it('is hidden for a member who is not a platform operator', () => {
+      meRequest().flush({}, { status: 404, statusText: 'Not Found' });
+      fixture.detectChanges();
+      expect(link()).toBeNull();
+    });
+
+    it('is shown for a platform operator', () => {
+      meRequest().flush({ digest_enabled: false, digest_locale: 'en' });
+      fixture.detectChanges();
+      expect(link()).not.toBeNull();
+    });
   });
 
   it('offers a Contact support item that emails the support address', async () => {
@@ -203,7 +228,15 @@ describe('ShellComponent account menu', () => {
         {
           id: 'setup',
           label: 'Setup',
-          routes: ['/team', '/settings', '/ingestion', '/accounting', '/pos'],
+          routes: [
+            '/team',
+            '/settings',
+            '/ingestion',
+            '/accounting',
+            '/pos',
+            '/feedback',
+            '/feedback/workspace',
+          ],
         },
       ];
 
@@ -514,6 +547,22 @@ describe('ShellComponent account menu', () => {
         fixture.componentInstance.focusMainContent(event);
       }).not.toThrow();
       expect(event.preventDefault).toHaveBeenCalled();
+    });
+  });
+
+  describe('feedback entry points (spec 025)', () => {
+    const root = (): HTMLElement => fixture.nativeElement as HTMLElement;
+
+    it('mounts the feedback widget as a sibling inside .shell-container, outside main-content', () => {
+      const widget = root().querySelector('app-feedback-widget');
+      expect(widget).not.toBeNull();
+      expect(widget!.parentElement!.classList.contains('shell-container')).toBeTrue();
+      expect(root().querySelector('#main-content')!.contains(widget)).toBeFalse();
+    });
+
+    it('lists My feedback for every member and hides the workspace inbox from non-owners', () => {
+      expect(root().querySelector('a[href="/feedback"]')).not.toBeNull();
+      expect(root().querySelector('a[href="/feedback/workspace"]')).toBeNull();
     });
   });
 });

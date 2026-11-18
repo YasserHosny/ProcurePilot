@@ -1,0 +1,66 @@
+<section class="fl-page">
+  <header class="fl-header">
+    <div>
+      <h1>{{ 'feedback.list.workspaceTitle' | translate }}</h1>
+      <p class="fl-intro">{{ 'feedback.list.workspaceIntro' | translate }}</p>
+    </div>
+    <a mat-stroked-button routerLink="/feedback" data-test="mine-link">
+      <mat-icon aria-hidden="true">rate_review</mat-icon>
+      {{ 'feedback.list.viewMine' | translate }}
+    </a>
+  </header>
+
+  <div class="fl-filters">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'feedback.list.filterStatus' | translate }}</mat-label>
+      <mat-select [value]="status()" (selectionChange)="onStatusFilter($event.value)">
+        <mat-option [value]="null">{{ 'feedback.list.all' | translate }}</mat-option>
+        @for (s of statuses; track s) {
+          <mat-option [value]="s">{{ 'feedback.status.' + s | translate }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'feedback.list.filterCategory' | translate }}</mat-label>
+      <mat-select [value]="category()" (selectionChange)="onCategoryFilter($event.value)">
+        <mat-option [value]="null">{{ 'feedback.list.all' | translate }}</mat-option>
+        @for (c of categories; track c) {
+          <mat-option [value]="c">{{ 'feedback.category.' + c | translate }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  @if (list.failed()) {
+    <div class="fl-state" role="alert">
+      <p>{{ 'feedback.list.loadError' | translate }}</p>
+      <button mat-stroked-button type="button" data-test="retry" (click)="list.reload()">
+        {{ 'feedback.list.retry' | translate }}
+      </button>
+    </div>
+  } @else if (list.items().length === 0 && !list.loading()) {
+    <p class="fl-state">{{ 'feedback.list.emptyWorkspace' | translate }}</p>
+  }
+
+  <ul class="fl-cards">
+    @for (item of list.items(); track item.id) {
+      <li>
+        <app-feedback-card [submission]="item" [showSubmitter]="true" [allowWithdraw]="false" />
+      </li>
+    }
+  </ul>
+
+  @if (list.loading()) {
+    <div class="fl-state" role="status">
+      <mat-spinner diameter="28" [attr.aria-label]="'feedback.list.loading' | translate" />
+    </div>
+  }
+
+  @if (list.nextCursor() && !list.loading()) {
+    <div class="fl-more">
+      <button mat-stroked-button type="button" data-test="load-more" (click)="list.loadMore()">
+        {{ 'feedback.list.loadMore' | translate }}
+      </button>
+    </div>
+  }
+</section>
