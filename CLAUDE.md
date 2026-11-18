@@ -1,11 +1,12 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-10-31 · Active work: Egypt and Saudi pilot readiness. Specs `001`–`021`, `023`
+Last updated: 2026-11-18 · Active work: Egypt and Saudi pilot readiness. Specs `001`–`021`, `023`
 (RFQ-aware matching) and `024` (RFQ basket split) have shipped to `main`; `022-home-currency-readiness`
 is merged with three tasks open (T015 real-quote extraction run, T018 mobile screenshots, T020 full test
-pass). Since 2026-10-15 most changes have come from the hosted demo tenants («مطاعم سند»,
-«مطاعم رواق»; `docs/gtm/demo-tenant/README.md`) and their flow reviews rather than from a new spec. No
-new spec has been scoped; `docs/gtm/gtm-execution-plan.md` tracks pilot work.
+pass). `025-user-feedback` (in-app feedback, PPS-223) shipped wave 1 in PR #590; wave 2 is in progress.
+Most other changes come from the hosted demo tenants («مطاعم سند», «مطاعم رواق»;
+`docs/gtm/demo-tenant/README.md`) and their flow reviews; `docs/gtm/gtm-execution-plan.md` tracks pilot
+work.
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -147,7 +148,7 @@ demo findings and code alike (site, cloudId and the plan-ID → key map in
 |---|---|
 | Why does this exist, what ships when | `docs/roadmap/procurepilot_roadmap.md` |
 | What are the binding rules | `.specify/memory/constitution.md` |
-| What am I building now | `docs/gtm/gtm-execution-plan.md` (open work) · `specs/022-home-currency-readiness/tasks.md` · `specs/023-rfq-aware-matching/tasks.md` · `specs/024-rfq-basket-split/tasks.md` |
+| What am I building now | `docs/gtm/gtm-execution-plan.md` (open work) · `specs/022-home-currency-readiness/tasks.md` · `specs/023-rfq-aware-matching/tasks.md` · `specs/024-rfq-basket-split/tasks.md` · `specs/025-user-feedback/tasks.md` |
 | How was it decided | `specs/001-platform-foundation/research.md` |
 | Tables, RLS, state transitions | `specs/001-platform-foundation/data-model.md` |
 | How do I run it | `specs/001-platform-foundation/quickstart.md` |
@@ -158,8 +159,12 @@ demo findings and code alike (site, cloudId and the plan-ID → key map in
 ## Current phase
 
 Specs `001`–`021`, `023` and `024` are complete and merged. The open spec work is `022`'s three tasks
-(top of this file) and a few `023`/`024` tasks left open on purpose (below). The next feature has not
-been scoped. For what shipped when, read `git log` and the PRs.
+(top of this file), `025`'s wave 2 (`specs/025-user-feedback/tasks.md`) and a few `023`/`024` tasks
+left open on purpose (below). For what shipped when, read `git log` and the PRs.
+
+- Feedback (`025`): platform operators read and triage feedback across workspaces through narrow RLS
+  policies, never `service_role` (ADR-027). Grant them with
+  `python -m procurepilot_api.workers.platform_operator_cli`; the token claim is a UI hint only.
 
 - Some `tasks.md` boxes stay open on purpose: `specs/018-forecasting-reorder/tasks.md` T011, T016,
   T019, T020, T024 (tests never written). Tick them only with that evidence. In `023`, T027 (recorded

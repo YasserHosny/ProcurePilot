@@ -222,6 +222,63 @@ be merged and deployed before the first supplier quote is sent. **Done 2026-10-1
 to an RFQ sent to `+pp-nour` goes out from `+pp-nour` automatically. Owner address stays the default.
 Leave the suppliers' `email_domains` empty (all are `gmail.com`).
 
+## Demo flag (`tenant.is_demo`, spec 025)
+
+Status 2026-11-18: **both demo workspaces are flagged on hosted**, and they are the only demo
+workspaces there:
+
+| Workspace | Slug | `is_demo` |
+|---|---|---|
+| «مطاعم سند» (EGP, Egypt) | `workspace` | `true` |
+| «مطاعم رواق» (SAR, Saudi Arabia, `docs/gtm/gcc/`) | `mtaam-rwaq` | `true` |
+
+**Why it matters.** In-app feedback (spec 025) copies `tenant.is_demo` onto every submission when it
+is sent (`feedback_submission.is_demo`), and the triage view filters on it (**Workspace type →
+Real workspaces / Demo workspaces**), so feedback from our own demo rounds and recordings is kept apart
+from real pilot feedback. The copy is taken at submit time: flagging a workspace later does not re-tag
+feedback it already sent, so a new demo workspace must be flagged before anyone sends feedback from it.
+
+**Who sets it.** An operator, in SQL against the hosted database (Supabase SQL editor, or `psql` over
+`DATABASE_URL`). Workspace members cannot: the column is outside the client role's `UPDATE` grant on
+`tenant` (migration `20261118000100`). The flag changes nothing else in the product.
+
+Match on the name as well as the slug: `workspace` is a generic slug (finding 11) and says nothing
+about which workspace holds it, on hosted or on another database. The statement rolls back unless
+exactly two workspaces end up flagged:
+
+```sql
+begin;
+
+update tenant
+   set is_demo = true
+ where (slug = 'workspace'  and name = 'مطاعم سند')
+    or (slug = 'mtaam-rwaq' and name = 'مطاعم رواق');
+
+do $$
+begin
+  if (select count(*) from tenant where is_demo) <> 2 then
+    raise exception 'expected exactly 2 demo workspaces, found %',
+      (select count(*) from tenant where is_demo);
+  end if;
+end
+$$;
+
+select id, slug, name, is_demo from tenant where is_demo order by name;
+
+commit;
+```
+
+If the name check finds nothing (the stored name differs, for example by a diacritic), look the
+workspaces up first and use their ids instead:
+
+```sql
+select id, slug, name, is_demo from tenant where slug in ('workspace', 'mtaam-rwaq');
+update tenant set is_demo = true where id in ('<id-of-مطاعم-سند>', '<id-of-مطاعم-رواق>');
+```
+
+To take a workspace out of demo, set `is_demo = false` the same way; feedback it already sent keeps its
+demo tag.
+
 ## Remaining steps
 
 Round 1 step by step, with screenshots: [`round-1/README.md`](round-1/README.md).

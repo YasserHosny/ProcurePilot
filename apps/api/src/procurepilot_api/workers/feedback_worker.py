@@ -42,12 +42,12 @@ from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.modules.feedback.digest_renderer import DigestItem, render_feedback_digest
 from procurepilot_api.modules.feedback.operator_service import DEFAULT_BUCKET, feedback_setting
 from procurepilot_api.shared.logging import get_trace_id
-from procurepilot_api.shared.mailer import Mailer, get_mailer
+from procurepilot_api.shared.mailer import FakeMailer, Mailer, get_mailer
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_RETENTION_MONTHS = 12
-DEFAULT_DIGEST_HOUR_UTC = 6
+DEFAULT_DIGEST_HOUR_UTC = 7  # same as config.feedback_digest_hour_utc
 DEFAULT_WEB_URL = "http://localhost:4200"
 ORPHAN_GRACE = timedelta(hours=1)
 BATCH_LIMIT = 500
@@ -245,12 +245,26 @@ def tick(
     active_mailer = mailer or get_mailer()
     active_remover = remover or SupabaseObjectRemover(settings)
     results: dict[str, dict[str, int]] = {}
+    # The stub mailer "sends" nothing yet would advance digest_last_sent_at, losing the day's
+    # digest without a trace. On a real deployment, skip the digest until mail is configured.
+    stub_on_deployment = (
+        mailer is None and isinstance(active_mailer, FakeMailer) and settings.api_env != "local"
+    )
+    if stub_on_deployment:
+        logger.error(
+            "Feedback digest skipped: RFQ_MAILER_MODE is not 'mailgun' on %s, so no email "
+            "would be sent. Retention and the orphan sweep still run.",
+            settings.api_env,
+        )
+        results["digest"] = {"skipped_no_mailer": 1}
     jobs: dict[str, Any] = {
         "digest": lambda: run_digest(settings, active_mailer, moment),
         "retention": lambda: purge_retention(settings, active_remover, moment),
         "orphans": lambda: sweep_orphans(settings, active_remover, moment),
     }
     for name, job in jobs.items():
+        if name == "digest" and stub_on_deployment:
+            continue
         try:
             results[name] = job()
         except Exception:

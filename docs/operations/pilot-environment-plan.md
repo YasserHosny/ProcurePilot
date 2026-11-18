@@ -66,8 +66,8 @@ confirmed before anything billable is created).
 ### Phase B — Containers and deploys (Lane PR + User secrets) · ~1–2 days
 
 1. **User:** create two bunny.net apps mirroring staging: `procurepilot-prod` (backend +
-   frontend) and `procurepilot-prod-workers` (extraction, email-ingestion, optimiser, Redis with a
-   password). This is a one-time manual step, the same as staging (runbook §7.7).
+   frontend) and `procurepilot-prod-workers` (extraction, email-ingestion, optimiser, feedback
+   (runbook §7.9, added 2026-11-18), Redis with a password). This is a one-time manual step, the same as staging (runbook §7.7).
 2. **User:** create a GitHub Environment `production`, with **required reviewer = you** and
    environment-scoped secrets `BUNNY_BACKEND_APP_ID`, `BUNNY_FRONTEND_APP_ID`,
    `BUNNY_WORKERS_APP_ID`.

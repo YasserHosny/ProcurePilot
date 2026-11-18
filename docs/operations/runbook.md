@@ -148,7 +148,17 @@ Production uses **two separate bunny.net Magic Container apps**, not one:
 | App | Containers | Purpose |
 |---|---|---|
 | `procurepilot-production` | `procurepilot-backend` (port 8000), `procurepilot-frontend` (port 80) | API + SPA; shared network namespace |
-| `procurepilot-workers` | `procurepilot-extraction-worker`, `procurepilot-email-ingestion-worker`, `procurepilot-optimiser-worker`, `shared-redis` (port 6379) | Background extraction, inbound-email ingestion and basket-split jobs |
+| `procurepilot-workers` | `procurepilot-extraction-worker`, `procurepilot-email-ingestion-worker`, `procurepilot-optimiser-worker`, `procurepilot-feedback-worker` (§7.9, created by hand once), `shared-redis` (port 6379) | Background extraction, inbound-email ingestion, basket-split and feedback (digest, retention) jobs |
+
+Each worker container runs one image with its own `CMD`; there is no process manager running
+several workers in one container. Terraform (`infra/terraform/main.tf`) manages only the
+production app's backend and frontend containers; the workers app and its containers were created
+by hand in the bunny.net dashboard. A deploy workflow only swaps the image tag of a container that
+already exists.
+
+Other API-package workers (`export_worker`, `webhook_worker`, `offer_refresh_scheduler`,
+`catalogue_refresh_worker` and the rest of `apps/api/src/procurepilot_api/workers/`) run only in
+`docker-compose.yml`. None has a Dockerfile, deploy workflow or bunny.net container yet.
 
 Containers within the same app share a network namespace (communicate via `localhost`).
 Containers in **different** apps do not share a namespace — the backend API connects to the
@@ -302,6 +312,83 @@ The authoritative list of required settings is the set of `Settings` fields in
 **Diagnose lost inbound quotes:** is the container Running? Do its logs show jobs being claimed?
 Are there `ingestion_jobs` rows with `job_type='email_ingest'` stuck in `pending` (statuses: `pending`, `processing`, `completed`, `failed`)? The operator CLI
 `python -m procurepilot_api.workers.requeue_email_ingest` re-queues jobs by `--job-id` or `--all-failed` (try `--dry-run` first).
+
+### 7.9 Feedback Worker (spec 025)
+
+*(added 2026-11-18, T077, PPS-223)* `apps/api/src/procurepilot_api/workers/feedback_worker.py`
+runs three jobs every 900 s, each independent of the others:
+
+- **Operator digest:** one email per UTC day to each active platform operator who opted in, once
+  `FEEDBACK_DIGEST_HOUR_UTC` has passed and only when there is new feedback.
+- **Retention:** deletes feedback older than `FEEDBACK_RETENTION_MONTHS` together with its stored
+  files, and writes one `feedback.retention_purged` audit event per pass.
+- **Orphan sweep:** removes files in the feedback bucket, older than an hour, that no attachment
+  row references.
+
+If the worker is not running, feedback is still accepted and triaged in the app, but no digest is
+sent and nothing is ever purged, which breaks the 12-month retention promise.
+
+It runs like the email-ingestion worker (§7.8): image
+`ghcr.io/<owner>/procurepilot-feedback-worker`, built from `infra/docker/feedback-worker.Dockerfile`
+(`CMD python -m procurepilot_api.workers.feedback_worker --interval 900`) and rolled by
+`.github/workflows/deploy-feedback-worker.yml` on every push to `main` that touches `apps/api/**` or
+`packages/i18n/**`. The workflow only **updates** an existing container; until the container exists
+its last step fails, as the email-ingestion workflow's did before that container was created.
+
+**One-time owner steps:**
+
+1. In the `procurepilot-workers` app (the one `BUNNY_WORKERS_APP_ID` points at), create a container
+   named exactly `procurepilot-feedback-worker` from
+   `ghcr.io/<owner>/procurepilot-feedback-worker:latest`. No public port, no endpoint. Keep it at
+   **one instance**: the digest has no cross-process lock, so two instances can send an operator
+   the same digest twice.
+2. The image appears in GHCR only after the first run of the workflow. Either create the container
+   after that run (re-run the workflow with **Run workflow** once the container exists), or point
+   it at any existing tag first. Make the GHCR package readable by bunny.net the same way as the
+   other worker images (§10).
+3. Set the environment below, then **Save Changes** at the app level (§7.6).
+
+The worker loads the API's full `Settings`, so it exits at start-up unless every required API
+setting is present. The authoritative list is the `Settings` fields in
+`apps/api/src/procurepilot_api/config.py` with no default. Copy the values from the backend
+container; the third column is what the repo implies the backend has, not a check of the live
+dashboard.
+
+| Variable | Required | Expected on the backend container | Value |
+|---|---|---|---|
+| `DATABASE_URL` | yes | yes | Same as the backend (pooler URL; the worker connects through `db.connect`). Reads `storage.objects`, so it needs the same role as the backend's |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | yes | yes | Used to delete objects from the feedback bucket |
+| `SUPABASE_ANON_KEY`, `SUPABASE_JWT_AUDIENCE`, `SUPABASE_JWT_ISSUER` | yes | yes | Not used by the worker; required by `Settings` |
+| `API_HOST`, `API_PORT`, `API_ENV`, `API_LOG_LEVEL`, `API_CORS_ORIGINS` | yes | yes | Same as the backend. `API_LOG_LEVEL` sets the worker's log level |
+| `WEB_API_BASE_URL`, `WEB_DEFAULT_LOCALE` | yes | yes | Same as the backend |
+| `PLATFORM_INVITATION_TTL_DAYS`, `MEMBER_INVITATION_TTL_DAYS`, `RATE_LIMIT_AUTH` | yes | yes | Same as the backend |
+| `RFQ_MAILER_MODE` | **yes, `mailgun`** | yes, if RFQ emails go out | Selects the mailer. Any other value, or unset, uses the in-memory stub. On `API_ENV` `staging` or `production` the worker then skips the digest each pass and logs `Feedback digest skipped: RFQ_MAILER_MODE is not 'mailgun'` at error level; watermarks do not move, so nothing is lost once mail is configured. Retention and the orphan sweep still run |
+| `MAILGUN_API_KEY`, `MAILGUN_SENDING_DOMAIN` | yes | yes, if RFQ emails go out | Same as the backend. The digest is sent from `noreply@<MAILGUN_SENDING_DOMAIN>` |
+| `WEB_PUBLIC_URL` | **yes in practice** | **new** | Public web origin, e.g. `https://pilot.iron-sys.com`, used for the triage link in the digest. Falls back to `WEB_ORIGIN`, then to `http://localhost:4200`. The backend can run without either (invitation links fall back to `API_CORS_ORIGINS`), so set this explicitly on the worker |
+| `FEEDBACK_BUCKET` | if changed | new, optional | Default `feedback-attachments`; must equal the backend's value |
+| `FEEDBACK_RETENTION_MONTHS` | if changed | new, optional | Default `12` (FR-023) |
+| `FEEDBACK_DIGEST_HOUR_UTC` | if changed | new, optional | Default `7` (UTC hour after which the day's digest goes out) |
+
+`REDIS_URL` is not used. The other `FEEDBACK_*` settings in `.env.example` (cooldown, rate limit,
+size and count limits, URL TTL) are read only by the backend.
+
+**Check it is alive** (container **Logs** tab, §8.1). The worker uses plain `logging`, not the
+JSON format:
+
+- On start: `Starting ProcurePilot feedback worker (once=False)`.
+- Every 15 minutes: `Feedback pass completed: {'digest': {...}, 'retention': {...}, 'orphans': {...}}`.
+  Before `FEEDBACK_DIGEST_HOUR_UTC` the digest counters are all 0; `sent` rises by one per opted-in
+  operator on a day with new feedback.
+- A job that fails logs `Feedback worker job failed: <job>` with a traceback and shows
+  `{'failed': 1}` in that pass; the other jobs still run. `Feedback digest send failed` means
+  Mailgun refused the send; it is retried on the next pass.
+- A container that restarts in a loop is usually a missing required setting: the log ends in a
+  `pydantic` `ValidationError` that names the missing setting.
+
+To run one pass by hand, from a shell in the container: `python -m
+procurepilot_api.workers.feedback_worker --once`. In the database, `platform_operator.digest_last_sent_at`
+shows the last successful digest per operator, and `audit_event` rows with action
+`feedback.retention_purged` show each purge.
 
 ## 8. Logging & Diagnostics
 

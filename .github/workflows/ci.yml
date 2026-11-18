@@ -109,6 +109,12 @@ jobs:
         run: >-
           docker run --rm --entrypoint python pp-email-worker-ci -c
           "from procurepilot_api.shared.i18n import t, assert_catalogues_present; assert_catalogues_present(); s=t('rfq.email.subject','ar',tenant='X',date='D'); assert s!='rfq.email.subject' and 'X' in s, s; print('i18n ok:', s)"
+      - name: Build feedback worker image
+        run: docker build -f infra/docker/feedback-worker.Dockerfile -t pp-feedback-worker-ci .
+      - name: Check feedback worker image catalogues
+        run: >-
+          docker run --rm --entrypoint python pp-feedback-worker-ci -c
+          "from procurepilot_api.shared.i18n import t, assert_catalogues_present; assert_catalogues_present(); s=t('emails.feedbackDigest.title','ar'); assert s!='emails.feedbackDigest.title', s; print('i18n ok:', s)"
 
   secrets:
     name: Secret scan

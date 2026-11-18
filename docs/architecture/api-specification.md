@@ -2863,9 +2863,12 @@ Delivery requests contain `X-ProcurePilot-Event-Id`, `X-ProcurePilot-Event-Type`
 
 ### `GET /health`
 
+Public. `app_version` is the `APP_VERSION` build identifier (`dev` locally), the same value stamped
+on each feedback submission (spec 025).
+
 Response:
 ```json
-{ "status": "ok" }
+{ "status": "ok", "app_version": "dev" }
 ```
 
 ---
@@ -3284,3 +3287,152 @@ batch decision uses the single path's normal conflict behavior. A response-enric
 can produce unavailable after that item's decision committed; replaying the same batch key
 recovers the response without repeating the write. Failed items are retried against current
 state; no new batch ledger or table is introduced.
+
+---
+
+## Delivered In-App Feedback API (spec `025-user-feedback`)
+
+Contract: `specs/025-user-feedback/contracts/feedback.openapi.yaml`. Member and owner endpoints live
+under `/feedback`, platform-operator endpoints under `/platform/feedback` (ADR-027). All require bearer
+auth; the workspace, user and role come from the verified token and a live membership lookup, never
+from the body, path, query or a header. A resource in another workspace, or one the caller may not see,
+is `404`, never `403`.
+
+**`Submission`** (tenant-facing; never carries operator labels): `id`, `text`, `category`
+(`bug` | `idea` | `question` | `other` | null), `status` (`new` | `reviewed` | `resolved`),
+`submitter_name` (owner views only, otherwise null), `member_role`, `page_path`, `locale` (`en` | `ar`),
+`created_at`, `can_withdraw` (true only for the submitter while `new`), `attachments`: a list of
+`{id, kind: image | audio, content_type, size_bytes, display_order}`.
+
+**`OperatorSubmission`**: `id`, `tenant_id`, `tenant_name` (from `operator_tenant_names()`), `text`,
+`category`, `status`, `submitter_name`, `submitter_email`, `member_role`, `page_path`, `locale`,
+`created_at`, `labels`, `app_version`, `is_demo`, `status_changed_at`, `attachments` (same shape).
+
+Pages are `{items, next_cursor}`, keyset on `(created_at desc, id desc)`; `limit` defaults to 25 and is
+capped at 100. An undecodable `cursor` is `422`.
+
+### `POST /feedback`
+
+- Any workspace role. `multipart/form-data` with `text` (required, 1–2000 characters after trimming),
+  optional `category`, up to 5 `images` parts and at most one `audio` part.
+- `Idempotency-Key: <uuid>` required (`422` when missing or not a UUID). A repeat by the same submitter
+  with the same key returns `200` with the original submission, uploads nothing and is exempt from the
+  cooldown. The same key already used by a colleague in the workspace is `409` (`conflict`,
+  `details.reason = idempotency_key_reused`).
+- Files are checked before anything is stored, by content (libmagic), not by name: images JPEG, PNG or
+  WEBP up to 5 MiB each; audio MP3, M4A, WAV or WebM up to 10 MiB (audio-only WebM and MP4 recorder
+  output accepted). Order of refusal: count, then size, then type.
+- The server sets workspace, submitter, name, email, role, demo flag (`tenant.is_demo`), time and app
+  version. `page_path` is the path and query of a same-origin `Referer` (empty when absent or foreign);
+  `locale` is the best supported language in `Accept-Language`, else the workspace default. Neither
+  header can fail the request.
+- All-or-nothing: objects are uploaded, then the submission and attachment rows are inserted in one
+  transaction; any failure removes the uploaded objects. Audits `feedback.submitted` (counts, no text).
+- Body limit: Nginx allows 40 MB on exactly this path (`client_max_body_size 40m`: 5 × 5 MB + 10 MB
+  plus multipart overhead), above the global 30 MB.
+- Returns `201` with a `Submission`.
+- Returns `413` `validation.payload_too_large` (`details.kind`, `details.max_bytes`); `415`
+  `validation.unsupported_media_type` (`details.kind`, `details.detected_mime`); `422`
+  `validation.invalid_value` with `details.reason` `text_required`, `text_too_long`,
+  `too_many_images`, `too_many_audio`, `empty_file` or `expected_file`.
+- Returns `429` `feedback.cooldown` with `details.retry_after_seconds` when the same member sent
+  feedback in this workspace less than 30 s ago (`FEEDBACK_COOLDOWN_SECONDS`), and `429`
+  `rate_limit.exceeded` above `RATE_LIMIT_FEEDBACK_SUBMIT` (default `10/minute` per member).
+
+### `GET /feedback`
+
+- The workspace inbox: every submission in the caller's workspace, read-only, with `submitter_name`.
+- Owner only; every other role gets `404`.
+- Query: `cursor`, `limit`, optional `status`, optional `category`.
+- Returns `200` with a `Submission` page.
+
+### `GET /feedback/mine`
+
+- Any role. The caller's own submissions in the active workspace, newest first (`submitter_name` null).
+- Query: `cursor`, `limit`.
+- Returns `200` with a `Submission` page.
+
+### `GET /feedback/{id}`
+
+- The caller's own submission, or any submission in the workspace for the owner.
+- Returns `200` with a `Submission`; `404` otherwise.
+
+### `DELETE /feedback/{id}`
+
+- Withdraws the caller's own submission while its status is `new`: the row and its attachment rows are
+  deleted, then the stored objects. Atomic against an operator status change. Audits
+  `feedback.withdrawn` (id only).
+- Returns `204`.
+- Returns `409` `feedback.withdraw_refused` (`details.status`) when the status has moved past `new`.
+- Returns `404` for anyone else's submission, the owner included.
+
+### `GET /feedback/{id}/attachments/{attachment_id}/url`
+
+- For an attachment the caller can see (own submission, or the owner for the workspace).
+- Returns `200` with `{url, expires_in}`: a signed URL for the private `feedback-attachments` bucket,
+  valid for `FEEDBACK_ATTACHMENT_URL_TTL_SECONDS` (default 300). Signed with the service-role client
+  only after the row-level check.
+- Returns `404` for an unknown id, an attachment of another submission, or one the caller cannot see;
+  `503` (`service_unavailable`) when storage cannot sign.
+
+### Platform-operator endpoints
+
+Every `/platform/feedback` route depends on `current_operator`: the JWT plus a live
+`platform_operator` lookup on each request. A caller who is not an active operator gets the plain `404`
+of an unknown route (no `details`), and a revoke takes effect on the next request. The
+`platform_operator` token claim is not read. Reads and writes run as the `authenticated` role with the
+operator's claims, so the database policies decide what is reachable.
+
+### `GET /platform/feedback`
+
+- The triage list across every workspace, newest first.
+- Query: `cursor`, `limit`, optional `status`, `category`, `tenant_id` (a filter inside the operator's
+  scope, not tenancy) and `is_demo`.
+- Writes one `feedback.operator_listed` audit event per request (filters and result count).
+- Returns `200` with an `OperatorSubmission` page.
+
+### `GET /platform/feedback/me`
+
+- Returns `200` with `{digest_enabled, digest_locale}` for the calling operator. The web app uses it
+  to decide whether to show the triage navigation entry.
+
+### `PUT /platform/feedback/digest-preference`
+
+- Body `{enabled: boolean, locale?: "en" | "ar"}`; unknown fields are `422`.
+- Turns the caller's own daily digest on or off. Turning it on starts the watermark now, so no backlog
+  is sent. Audits `feedback.digest_preference_changed`.
+- Returns `200` with `{digest_enabled, digest_locale}`.
+
+### `GET /platform/feedback/{id}`
+
+- One submission with the submitter's name and email, workspace, labels, app version and demo flag.
+- Audits `feedback.operator_viewed` under the submission's workspace before returning.
+- Returns `200` with an `OperatorSubmission`; `404` for an unknown id.
+
+### `PATCH /platform/feedback/{id}`
+
+- Body: `status` and/or `labels` (at least one; unknown fields are `422`). `labels` replaces the whole
+  list: each label is trimmed, 1–40 characters, duplicates dropped, at most 10 (`422` otherwise).
+- Status moves forward only: `new -> reviewed`, `new -> resolved`, `reviewed -> resolved`. Repeating the
+  current status is a no-op. The database trigger enforces the same rule for every caller.
+- Audits `feedback.operator_status_changed` (`from`, `to`) and `feedback.operator_labels_changed` (label
+  count, not labels) in the same transaction, only for what actually changed.
+- Returns `200` with the updated `OperatorSubmission`.
+- Returns `409` `feedback.invalid_transition` (`details.from`, `details.to`) for a backward or other
+  invalid move; `404` for an unknown id.
+
+### `GET /platform/feedback/{id}/attachments/{attachment_id}/url`
+
+- Same response as the member route (`{url, expires_in}`, 300 s by default), for any workspace's
+  attachment. The operator policy on `feedback_attachment` is the access check; the URL is signed with
+  the service-role client afterwards.
+- Audits `feedback.operator_attachment_url_issued`.
+- Returns `404` for an unknown attachment or one that belongs to another submission.
+
+### Background jobs (no endpoint)
+
+`python -m procurepilot_api.workers.feedback_worker [--once] [--interval N]` (service
+`feedback-worker` in `docker-compose.yml`) runs three jobs each pass: the operator daily digest (one
+email per opted-in, active operator per UTC day after `FEEDBACK_DIGEST_HOUR_UTC`, default 7, only when
+something new arrived; workspace, category and excerpt per item and a triage link, never an email
+address or attachment), the 12-month retention purge, and the orphan-object sweep.

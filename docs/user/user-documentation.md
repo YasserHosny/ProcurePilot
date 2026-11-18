@@ -1,7 +1,7 @@
 # ProcurePilot User Documentation
 
 > Complete system journey with annotated screenshots for every screen.
-> Last updated: 2 Oct 2026.
+> Last updated: 18 Nov 2026 (§39 Sending Feedback).
 >
 > Covers the web app only. For the mobile app (sign-in, biometric unlock, role-aware home
 > screen), see [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md).
@@ -48,8 +48,9 @@
 36. [Supplier Risk Queue & Negotiation Briefs](#36-supplier-risk-queue--negotiation-briefs)
 37. [Procurement Analyst](#37-procurement-analyst)
 38. [RFQ Sourcing & Response Comparison](#38-rfq-sourcing--response-comparison)
-39. [FAQ](#39-faq)
-40. [Known Issues](#40-known-issues)
+39. [Sending Feedback](#39-sending-feedback)
+40. [FAQ](#40-faq)
+41. [Known Issues](#41-known-issues)
 
 ---
 
@@ -168,6 +169,8 @@ The sidebar is grouped by the job you are doing. **Overview** sits on top; the f
 | | **Ingestion** | The automated-ingestion hub (§27). |
 | | **Accounting** | Accounting Integration (§33). |
 | | **Point of Sale** | POS & Inventory Integration (§34). |
+| | **My feedback** | Feedback you have sent and its status (§39). |
+| | **Workspace feedback** | The workspace's feedback, read-only (§39, Owner only). |
 
 **Business value:** the dashboard gives users a quick confidence check that they are in the right workspace, under the right role, with the right tenant isolation and financial settings. That reduces setup uncertainty before they begin uploading quotes, comparing offers, or approving spend.
 
@@ -506,7 +509,7 @@ Reached from **Create Order** on the order list (blank), **From approved request
 | 6 | **Comparison table** | Each row is one supplier offer: unit price, total landed cost, lead time, reliability, stock availability, **Match Score**, validity, and status. A product match that a person confirmed shows as 100% with a **Verified by buyer** badge, and is not flagged as a low-confidence match. Next to each supplier's name, a scorecard icon button allows navigating directly to that supplier's detailed Supplier IQ scorecard (`/suppliers/:id/scorecard`). |
 | 7 | **Record Purchase action** | From the banner or any table row, click "Record Purchase" to open the outcome-capture form (section 16) and have the savings automatically calculated. |
 
-**Mixed-currency offers:** ProcurePilot has no foreign-exchange rate data, so it never converts or silently mixes currencies when scoring a recommendation. If the offers for the selected product span more than one currency — for example, one supplier quoted in USD and the rest in GBP — the comparison table (item 6 above) still lists every offer regardless of currency, but the Recommended Offer banner only scores and ranks offers in a single reference currency: whichever currency the most suppliers quoted in, tied-broken first by the lowest supplier ID and then by the currency code itself. Offer(s) in any other currency are excluded from the recommendation and its ranking entirely. When this happens, the banner's Risk Considerations list includes a note: "One or more offers in a different currency were excluded from this comparison rather than converted." See [§40 Known Issues](#40-known-issues) for a current display defect affecting this specific note.
+**Mixed-currency offers:** ProcurePilot has no foreign-exchange rate data, so it never converts or silently mixes currencies when scoring a recommendation. If the offers for the selected product span more than one currency — for example, one supplier quoted in USD and the rest in GBP — the comparison table (item 6 above) still lists every offer regardless of currency, but the Recommended Offer banner only scores and ranks offers in a single reference currency: whichever currency the most suppliers quoted in, tied-broken first by the lowest supplier ID and then by the currency code itself. Offer(s) in any other currency are excluded from the recommendation and its ranking entirely. When this happens, the banner's Risk Considerations list includes a note: "One or more offers in a different currency were excluded from this comparison rather than converted." See [§41 Known Issues](#41-known-issues) for a current display defect affecting this specific note.
 
 **Business value:** Smart Compare converts cleaned data into a buying decision. It lowers recurring purchasing cost, gives buyers evidence for negotiation, and helps owners see why a recommendation was made before money is spent.
 
@@ -826,7 +829,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 **Business value:** organisation settings connect procurement activity to the way the business is managed. Branches, cost centres, and budgets turn isolated purchases into accountable spend by location, department, and financial period.
 
-**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§40 Known Issues](#40-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
+**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§41 Known Issues](#41-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
 
 ---
 
@@ -1048,13 +1051,13 @@ Connects your accounting software so supplier bills can be synced and reconciled
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title — "Accounting Integration"** | States the purpose: sync bills and reconcile spend against purchase records. |
-| 2 | **Empty state (never connected)** | "Connect your accounting system" with a **Connect** button that starts an OAuth authorization flow. The button itself is visible to every role, but the underlying API only accepts the request from an Owner — see [§40 Known Issues](#40-known-issues). |
+| 2 | **Empty state (never connected)** | "Connect your accounting system" with a **Connect** button that starts an OAuth authorization flow. The button itself is visible to every role, but the underlying API only accepts the request from an Owner — see [§41 Known Issues](#41-known-issues). |
 | 3 | **Connection status card** | Once connected: the account's display name, provider, a status badge (**Active**, **Needs Re-authorization**, or **Disconnected**), connected date, and last-synced date. |
 | 4 | **Needs re-authorization banner** | Shown when the provider's OAuth token has expired or was revoked; a **Reconnect** button restarts authorization. |
 | 5 | **View Synced Bills button** | Opens the Synced Bills screen (below). Open to any role while a connection is active. |
 | 6 | **Disconnect / Reconnect button** | Owner only. Disconnecting stops future syncs but does not delete already-synced bills or discrepancy history. |
 
-**Which provider:** the specific accounting system (QuickBooks Online or Xero) is configured for your workspace's deployment — it is not chosen on this screen. Once connected, the connection status card's account name reflects whichever provider is actually configured; see [§40 Known Issues](#40-known-issues) for a labelling inconsistency elsewhere on this screen.
+**Which provider:** the specific accounting system (QuickBooks Online or Xero) is configured for your workspace's deployment — it is not chosen on this screen. Once connected, the connection status card's account name reflects whichever provider is actually configured; see [§41 Known Issues](#41-known-issues) for a labelling inconsistency elsewhere on this screen.
 
 ### Synced Bills & Invoices
 
@@ -1097,7 +1100,7 @@ Connects a point-of-sale/inventory system (Square) so sales velocity and stock-o
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title — "Point of Sale & Inventory Integration"** | States the purpose: sync sales velocity and stock-on-hand signals. |
-| 2 | **Empty state (never connected)** | "Connect your POS & inventory system" with a **Connect** button that starts a Square OAuth authorization flow. As with Accounting Integration, the button is visible to every role but the API only accepts the request from an Owner — see [§40 Known Issues](#40-known-issues). |
+| 2 | **Empty state (never connected)** | "Connect your POS & inventory system" with a **Connect** button that starts a Square OAuth authorization flow. As with Accounting Integration, the button is visible to every role but the API only accepts the request from an Owner — see [§41 Known Issues](#41-known-issues). |
 | 3 | **Connection status card** | Once connected: display name, provider (Square), a status badge (**Active**, **Needs Re-authorization**, or **Disconnected**), connected date, and last-synced date. |
 | 4 | **Needs re-authorization banner** | Shown when Square's OAuth token has expired or was revoked; a **Reconnect** button restarts authorization. |
 | 5 | **View Synced Signals button** | Opens the Signals Review screen (below). Open to any role while a connection is active. |
@@ -1334,7 +1337,91 @@ A screen for owners to configure auto-preparation guardrails without needing API
 
 ---
 
-## 39. FAQ
+## 39. Sending Feedback
+
+Tell the ProcurePilot team about a problem, an idea or a question without leaving the page you are on.
+Every member can send feedback, whatever their role. There is no screenshot of this screen yet.
+
+### Send feedback
+
+**Where:** the **Send feedback** button in the bottom corner of every page (an Arabic interface shows
+«أرسل ملاحظاتك»). A dot on the button means you have an unsent draft.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Notice** | At the top of the form: "ProcurePilot staff can see your feedback, any screenshots and voice message you add, and your name and email. Your workspace owner can see it too." |
+| 2 | **Your message** | Required, up to 2000 characters. The count of characters left is shown below the box. |
+| 3 | **Category (optional)** | **Bug**, **Idea**, **Question** or **Other**. Leave it on **No category** if none fits. |
+| 4 | **Screenshots** | **Add screenshots**, drop image files on the form, or paste a screenshot from the clipboard. Up to 5 images (JPEG, PNG or WEBP), 5 MB each. Each one shows a preview with a remove button. A file of the wrong type or size is refused straight away, with the reason. |
+| 5 | **Voice message** | **Record** up to 2 minutes in the browser (recording stops by itself at 2 minutes), play it back, then **Record again** or **Discard voice message**. Or **Upload an audio file**: MP3, M4A, WAV or WebM, 10 MB at most. One voice message per feedback. If the browser cannot record or the microphone is blocked, the form says so and you can still upload a file. |
+| 6 | **Send** | Sends the message and attachments together. Either everything is saved or nothing is. You then see "Thank you, we received your feedback" and a **See my feedback** link. |
+
+**Good to know:**
+
+- The page you were on, your language, your role and the app version are recorded with your feedback
+  automatically. You don't need to describe where you were.
+- You can send feedback once every 30 seconds. If you try sooner, the form tells you how many seconds to
+  wait and keeps your draft.
+- If sending fails (no connection, or your session expired), your draft and attachments stay in the
+  form. Closing the form keeps the draft too. Signing in as someone else on the same browser clears it.
+
+### My feedback
+
+**Route:** `/feedback` (every role). In the sidebar: **Setup → My feedback**.
+
+Lists the feedback you have sent in this workspace, newest first, with its status, category, the page
+it was sent from, its screenshots and voice message.
+
+| Status | Meaning |
+|---|---|
+| **New** | Sent and not yet looked at. |
+| **Reviewed** | The ProcurePilot team has looked at it. |
+| **Resolved** | The team has dealt with it. |
+
+Status only moves forward. You are not notified when it changes; open this page to check.
+
+**Withdraw:** while an item is still **New** you can **Withdraw** it. The message and its attachments are
+removed for everyone, including the ProcurePilot team, and this cannot be undone. Once an item is
+**Reviewed** or **Resolved** it can no longer be withdrawn.
+
+### Workspace feedback (owners)
+
+**Route:** `/feedback/workspace` (Owner only). In the sidebar: **Setup → Workspace feedback**.
+
+Every piece of feedback sent by members of this workspace, with who sent it and their role, filterable
+by **Status** and **Category**. The list is read-only: an owner cannot change a status, add a label, reply
+or delete someone else's feedback. Other roles do not see this page.
+
+### Who can see your feedback
+
+| Who | What they see |
+|---|---|
+| You | Your own feedback and its status. |
+| Your workspace owner | All feedback from your workspace, with your name and role. |
+| ProcurePilot staff (platform operators) | Your feedback, its screenshots and voice message, your name and email, your workspace and role, the page and app version. They set its status and may add internal labels, which nobody in your workspace sees. |
+| Other members, and other workspaces | Nothing. |
+
+ProcurePilot staff see attachments through short-lived links, and every time they open your feedback or
+change it, that is recorded in your workspace's audit trail. The ProcurePilot team uses feedback only to
+improve the product: nothing is bought, changed or approved because of it. Feedback and its attachments
+are deleted 12 months after they were sent.
+
+### Feedback triage (ProcurePilot staff only)
+
+**Route:** `/platform/feedback`. The sidebar shows **User feedback** only to ProcurePilot staff who have
+been given operator access; for everyone else the page does not exist. It lists feedback from every
+workspace with filters for **Status**, **Category**, **Workspace type** (**Real workspaces** or **Demo
+workspaces**) and **Workspace ID**. Opening an item shows its details, attachments, **Labels**, and the
+next status (**Mark as reviewed**, **Mark as resolved**). A **Daily email digest** switch sends that
+operator one email a day listing new feedback, and only on days when there is some.
+
+**Business value:** pilot users can report what gets in their way at the moment it happens, with a
+screenshot or a voice note, and see that their report was heard. The ProcurePilot team gets each report
+with the page, role and version already attached, so it can act without a round of follow-up questions.
+
+---
+
+## 40. FAQ
 
 **Q: Can I edit a verified saving?**
 A: No. Verified savings are immutable. If a correction is needed, a new adjustment record is created.
@@ -1383,7 +1470,7 @@ A: Nothing breaks. The RFQ stays in `Sent` status with a response count lower th
 
 ---
 
-## 40. Known Issues
+## 41. Known Issues
 
 Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`; extended 25 Sep 2026 to cover R4.0–R4.3; re-checked 26 Sep 2026 against Create RFQ's Material/i18n rewrite (PR #29); re-audited 27 Sep 2026 across the entire app for this documentation pass (PR #42 and earlier); re-checked 28 Sep 2026 against the mixed-currency comparison fix (PR #47); re-checked 2 Oct 2026 against the fuzzy-match auto-accept gate (PR #59) and request-based draft orders (PR #61).
 
