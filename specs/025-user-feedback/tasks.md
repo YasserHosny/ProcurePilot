@@ -18,16 +18,24 @@
 
 **Purpose**: Settings, skeletons, and the decisions the owner accepted on 2026-11-18
 
-- [ ] T001 Add feedback settings to `API/config.py` (`feedback_bucket`, `feedback_cooldown_seconds=30`, `rate_limit_feedback_submit`, `feedback_attachment_url_ttl_seconds=300`, `feedback_retention_months=12`, `feedback_digest_hour_utc`, image and audio size/count limits, `app_version`) and document each in `.env.example`
+- [ ] T001 Add feedback settings to `API/config.py` (`feedback_bucket`, `feedback_cooldown_seconds=30`, `rate_limit_feedback_submit`, `feedback_attachment_url_ttl_seconds=300`, `feedback_retention_months=12`, `feedback_digest_hour_utc`, `web_public_url` for the digest's triage link, image and audio size/count limits, `app_version`) and document each in `.env.example`
 - [ ] T002 [P] Create the empty module and feature skeletons: `API/modules/feedback/__init__.py`, `API/modules/auth/operator.py`, `WEB/features/feedback/`, `WEB/features/platform/feedback-triage/`
-- [ ] T003 [P] Amend `specs/025-user-feedback/spec.md` for the accepted plan items: FR-009 and story 1 scenario 5 (system sets tenant, submitter, role, demo flag, timestamp and app version; page address and language are validated request headers used for triage only), operators must be workspace members (Assumptions), operator labels hidden from tenants (FR-014), status moves forward only (FR-018); add a Clarifications line for each
-- [ ] T004 [P] Draft ADR-027 "Platform-operator access to feedback" in `docs/architecture/adrs.md` (context, decision from research.md D2, consequences, rejected alternatives)
+- [ ] T003 [P] Amend `specs/025-user-feedback/spec.md` for the accepted plan items, each with a Clarifications line:
+  - FR-009 and story 1 scenario 5: the system sets workspace, submitter, role, demo flag, timestamp and app version; page address and language come from validated request headers, used for triage only.
+  - FR-017, Assumptions ("granted and withdrawn… outside the workspace member system") and the Platform operator entity: an operator is an existing workspace member plus a live `platform_operator` record; drop the "dedicated verified credential" wording; any JWT claim is only a UI hint.
+  - FR-014: operator labels are never shown to submitters or owners.
+  - FR-018: status moves forward only (new to reviewed to resolved, or new to resolved).
+  - FR-023: "delete or anonymise" becomes "delete".
+  - Edge cases: a double-click on Send creates one submission.
+  - Add a short justification that the read-only owner inbox is a support surface, not an insight dashboard (constitution Principle IV requires such features to be justified in the spec).
+- [ ] T003a [P] Record the owner's exception under constitution Governance ("Deviations are documented"; "explicit, recorded exception… by the project owner") for Principle V (platform-operator cross-workspace access) and Principle IV (read-only owner inbox): add an "Owner approval" line with date to `plan.md` Complexity Tracking and to ADR-027. No constitution amendment is proposed; if the owner prefers one, add a Principle V clause and bump to 1.1.0 instead.
+- [ ] T004 [P] Draft ADR-027 "Platform-operator access to feedback" in `docs/architecture/adrs.md` (context, decision from research.md D2, consequences, rejected alternatives, the owner approval from T003a)
 
 ---
 
 ## Phase 2: Foundational (blocks every user story)
 
-**Purpose**: Schema, RLS, storage, shared types. No story can start until T015 is green.
+**Purpose**: Schema, RLS, storage, shared types. No story can start until T003, T003a and T058 are done and T015 is green.
 
 ### Tests (write first, expect red)
 
@@ -38,15 +46,16 @@
 ### Implementation
 
 - [ ] T008 `MIG/20261118000100_tenant_is_demo.sql`: `tenant.is_demo boolean not null default false`
-- [ ] T009 `MIG/20261118000200_platform_operator.sql`: `platform_operator` table (forced RLS, no client grants, service_role only) and `is_platform_operator()` definer function (fixed `search_path`, execute for `authenticated` only) per data-model.md
+- [ ] T009 (after T003a) `MIG/20261118000200_platform_operator.sql`: `platform_operator` table (forced RLS, no client grants, service_role only) and `is_platform_operator()` definer function (fixed `search_path`, execute for `authenticated` only) per data-model.md
 - [ ] T010 `MIG/20261118000400_feedback.sql`: enums, `feedback_submission`, `feedback_attachment`, indexes, constraints, ENABLE + FORCE RLS with `USING` and `WITH CHECK` policies (own-or-owner select, operator select, member insert, operator update, own-and-new delete), forward-only status trigger, column-level update grant, table grants
 - [ ] T011 `MIG/20261118000500_feedback_storage.sql`: private bucket `feedback-attachments` (10 MiB limit) and insert-only tenant-prefix policy on `storage.objects`
 - [ ] T012 [P] `API/modules/feedback/schemas.py`: Pydantic models for `Submission`, `Attachment`, `Category`, `Status`, page wrappers; tenant-facing models never carry `labels`
 - [ ] T013 [P] Add error types and codes in `API/errors.py` (`feedback.cooldown` with `retry_after_seconds`, `feedback.withdraw_refused`, `feedback.invalid_transition`) following the existing `AppError` pattern
 - [ ] T014 [P] Expose `app_version` on `GET /api/v1/health` (`API/modules/health/router.py`) and pass `APP_VERSION` as a build arg in the API Dockerfile under `infra/docker/`
 - [ ] T015 Apply with `pnpm db:migrate`; confirm T005, T006 and T007 are green and `pnpm db:check-privileges` passes
+- [ ] T058 Gate spike (ID kept; runs after T015) `TESTS/integration/test_feedback_audit_cross_tenant.py`: can the audit writer's server-side form record an event for a tenant other than the caller's (research D2, D8)? If red, add `MIG/20261118000650_record_operator_audit_event.sql` (definer function executable only by operators) and use it. T066 depends on this result.
 
-**Checkpoint**: schema and isolation proven; stories can start.
+**Checkpoint**: schema, isolation and the audit approach proven; stories can start.
 
 ---
 
@@ -58,11 +67,11 @@
 ### Tests (write first, expect red)
 
 - [ ] T016 [P] [US1] `TESTS/contract/test_feedback_contract.py`: `POST /feedback` (text and category only) and `GET /feedback/mine` match `contracts/feedback.openapi.yaml`; add the OpenAPI drift entry
-- [ ] T017 [P] [US1] `TESTS/integration/test_feedback.py`: all five roles submit; empty and whitespace text give 422; 2000-character limit; client-sent tenant, role, user or demo values are ignored; `Referer` and `Accept-Language` are validated and normalised; `is_demo` and `app_version` are copied; name and email are snapshotted from `membership.display_name` and the token; `feedback.submitted` audit event written; category optional
-- [ ] T018 [P] [US1] `TESTS/integration/test_feedback.py` (cooldown section): second submit inside 30 s returns 429 `feedback.cooldown` with `retry_after_seconds`; same `Idempotency-Key` replay returns 200 with the original body and is exempt; abuse rate limit returns 429
+- [ ] T017 [US1] `TESTS/integration/test_feedback.py`: all five roles submit; empty and whitespace text give 422; 2000-character limit; client-sent tenant, role, user or demo values are ignored; `Referer` and `Accept-Language` are validated and normalised; `is_demo` and `app_version` are copied; name and email are snapshotted from `membership.display_name` and the token; `feedback.submitted` audit event written; category optional
+- [ ] T018 [US1] `TESTS/integration/test_feedback.py` (cooldown section): second submit inside 30 s returns 429 `feedback.cooldown` with `retry_after_seconds`; same `Idempotency-Key` replay returns 200 with the original body and is exempt; abuse rate limit returns 429
 - [ ] T019 [P] [US1] `TESTS/integration/test_feedback_rbac.py` (submit part): each of owner, buyer, branch_manager, approver, viewer can submit; a response to a member never contains `labels`
 - [ ] T020 [P] [US1] `TESTS/unit/test_feedback_context.py`: same-origin `Referer` to path + query capped at 2000 chars, foreign-origin `Referer` rejected, `Accept-Language` normalised to `en`/`ar` with tenant-default fallback
-- [ ] T021 [P] [US1] Karma specs `WEB/features/feedback/feedback-widget/feedback-widget.component.spec.ts` and `WEB/features/feedback/feedback-api.spec.ts`: open and close, empty-text block, counter at 2000, optional category, cooldown message with time left, draft kept on failure, notice visible, `Idempotency-Key` reused on retry
+- [ ] T021 [P] [US1] Karma specs `WEB/features/feedback/feedback-widget/feedback-widget.component.spec.ts` and `WEB/features/feedback/feedback-api.spec.ts`: open and close, empty-text block, counter at 2000, optional category, cooldown message with time left, draft kept on failure, notice visible, `Idempotency-Key` reused on retry, Send disabled while a request is in flight (double-click sends once), expired session prompts sign-in and keeps the draft
 
 ### Implementation
 
@@ -86,7 +95,7 @@
 ### Tests (write first, expect red)
 
 - [ ] T029 [P] [US2] `TESTS/unit/test_feedback_validation.py`: content sniffing for JPEG, PNG, WEBP; renamed non-image rejected; 5 MiB limit; 6th image rejected
-- [ ] T030 [P] [US2] `TESTS/integration/test_feedback.py` (images): five images stored with attachment rows and tenant-prefixed paths; 6th gives 422; wrong type 415; oversize 413; injected failure on the 3rd upload leaves no rows and no objects; idempotent replay with files creates no second set
+- [ ] T030 [US2] `TESTS/integration/test_feedback.py` (images): five images stored with attachment rows and tenant-prefixed paths; 6th gives 422; wrong type 415; oversize 413; injected failure on the 3rd upload leaves no rows and no objects; idempotent replay with files creates no second set
 - [ ] T031 [P] [US2] `TESTS/integration/test_feedback_rbac.py` (attachment URL): own submitter gets a 300 s signed URL; another member in the workspace gets 404; another workspace gets 404; owner gets a URL
 - [ ] T032 [P] [US2] Karma specs `WEB/features/feedback/attachment-rules.spec.ts` and widget image cases: type, size and count rules; picker, drop and paste add previews; remove works; paste with no image shows a message
 
@@ -113,7 +122,7 @@
 ### Tests (write first, expect red)
 
 - [ ] T041 [P] [US3] Create fixtures in `TESTS/fixtures/feedback/` (WebM/Opus, MP4/AAC, MP3, M4A, WAV, and a renamed fake) from real recorder output where possible; record libmagic's reported type for each in a comment (research.md verify item 2)
-- [ ] T042 [P] [US3] `TESTS/unit/test_feedback_validation.py` and `TESTS/integration/test_feedback.py` (audio): every fixture accepted or rejected as expected; second audio gives 422; over 10 MiB gives 413; audio stored with `kind = 'audio'`
+- [ ] T042 [US3] `TESTS/unit/test_feedback_validation.py` and `TESTS/integration/test_feedback.py` (audio): every fixture accepted or rejected as expected; second audio gives 422; over 10 MiB gives 413; audio stored with `kind = 'audio'`
 - [ ] T043 [P] [US3] Karma specs `WEB/features/feedback/audio-recorder.service.spec.ts` and widget audio cases: feature detection hides recording; permission denied explained; 120 s auto-stop with fake timers; re-record and discard; file upload path
 
 ### Implementation
@@ -135,7 +144,7 @@
 
 ### Tests (write first, expect red)
 
-- [ ] T049 [P] [US4] `TESTS/integration/test_feedback_isolation.py` and `test_feedback_rbac.py`: member sees only own; owner sees all workspace rows; `GET /feedback` by a non-owner returns 404; cross-tenant id returns 404; owner cannot withdraw another member's item (404); no tenant payload contains `labels`
+- [ ] T049 [P] [US4] `TESTS/integration/test_feedback_isolation.py` and `test_feedback_rbac.py`: member sees only own; owner sees all workspace rows; `GET /feedback` by a non-owner returns 404; cross-tenant id returns 404; owner cannot withdraw another member's item (404); no tenant payload contains `labels`; after the submitter's membership is removed the owner and operators still see the item and the former member gets 404
 - [ ] T050 [P] [US4] `TESTS/integration/test_feedback.py` (withdraw): own `new` item returns 204, row and objects gone, `feedback.withdrawn` audit event without content; after status `reviewed` returns 409 `feedback.withdraw_refused`; concurrent operator status change and withdraw: exactly one wins
 - [ ] T051 [P] [US4] Karma specs for `my-feedback`, `workspace-feedback` and the owner route guard; withdraw offered only when `can_withdraw`
 
@@ -157,9 +166,8 @@
 **Goal**: platform operators list, open, filter, status-change and label feedback from all workspaces, with audit and an optional daily digest. Highest-risk story.
 **Independent test**: with operator access read feedback from two workspaces, change status and labels, confirm audit records; with a workspace owner confirm none of it is possible.
 
-### Spike and tests (write first, expect red)
+### Tests (write first, expect red; the audit spike T058 ran in Phase 2)
 
-- [ ] T058 [US5] Spike `TESTS/integration/test_feedback_audit_cross_tenant.py`: can the audit writer's server-side form record an event for a tenant other than the caller's (research D2, D8)? If red, add `MIG/20261118000450_record_operator_audit_event.sql` (definer function executable only by operators) and use it
 - [ ] T059 [P] [US5] `TESTS/integration/test_feedback_operator.py`: operator reads across workspaces; cannot read any other tenant table; update limited to status, labels and trigger columns; backward status move refused; no insert or delete; revoking takes effect on the next request; non-operator gets 404 on `/platform/*`; list writes one aggregate `feedback.operator_listed` event; detail writes `feedback.operator_viewed` tagged with the submission's tenant; label limits (10 labels, 1 to 40 characters)
 - [ ] T060 [P] [US5] `TESTS/integration/test_platform_operator_cli.py`: grant, revoke and list work and write `platform_operator.granted` and `platform_operator.revoked` audit events; revoke is idempotent
 - [ ] T061 [P] [US5] `TESTS/integration/test_feedback_worker.py` (digest) and `TESTS/unit/test_feedback_digest_renderer.py`: only opted-in operators; only items newer than `digest_last_sent_at`; no email on empty days; at most one per day; body has workspace, category, excerpt and link and never an email address or attachment; English and Arabic; uses `FakeMailer`
@@ -167,7 +175,7 @@
 
 ### Implementation
 
-- [ ] T063 [US5] `MIG/20261118000300_auth_hook_operator_claim.sql`: stamp a `platform_operator` claim in the access-token hook as a UI hint only (separable; fallback is `GET /platform/feedback/me`); add a claims test
+- [ ] T063 [US5] `MIG/20261118000700_auth_hook_operator_claim.sql`: stamp a `platform_operator` claim in the access-token hook as a UI hint only (separable; fallback is `GET /platform/feedback/me`); add a claims test
 - [ ] T064 [US5] `API/modules/auth/operator.py` `current_operator`: verify JWT, then live `platform_operator` check on every request (mirrors `API/deps.py:54`); operator DB access uses the direct-psycopg-with-claims path, never `service_role`
 - [ ] T065 [US5] `MIG/20261118000600_platform_operator_digest_pref.sql`: definer functions that read and write only the caller's own digest preference row
 - [ ] T066 [US5] `API/modules/feedback/operator_service.py` and `operator_router.py` under `/platform/feedback`: list with status, category, tenant and demo filters, detail with submitter name and email, `PATCH` status and labels, attachment signed URL, `me`, digest preference; audit actions per research D8; register in `API/main.py`
@@ -210,7 +218,7 @@
 - US5: needs US1 (data to triage). The operator digest and audit are independent of US2 to US4. Attachment viewing in the triage UI uses US2's storage helpers.
 - Retention (T074 to T075) needs US2 (objects exist) and the worker from T069.
 
-**Inside a story**: tests (red) then migrations or schemas, services, endpoints, then web. T058 must finish before T066. T063 can be dropped without affecting security.
+**Inside a story**: tests (red) then migrations or schemas, services, endpoints, then web. T058 (Phase 2 gate) must finish before T066. Migration timestamps only increase: `…000600` (T065), `…000650` (T058 if needed), `…000700` (T063), so nothing sorts before an already-applied file. T063 can be dropped without affecting security.
 
 ## Parallel opportunities
 

@@ -7,7 +7,7 @@ the migrations and code from `tasks.md` exist.
 
 ```bash
 docker compose up --build
-pnpm db:migrate            # applies 20261118000100..500 and ends with db:check-privileges
+pnpm db:migrate            # applies 20261118000100..000700 and ends with db:check-privileges
 ```
 
 `db:check-privileges` must pass: both feedback tables forced-RLS, `platform_operator` unreachable by client

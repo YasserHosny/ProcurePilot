@@ -38,7 +38,7 @@ no row (see D10).
   claims (precedent `offers/service.py:280`, `analyst/service.py:279`), **not** the `service_role` path.
 - Grant and revoke by CLI `workers/platform_operator_cli.py` (service role, audited). No grant UI in v1.
 - Optional: a dedicated `platform_operator` claim stamped by the auth hook, used only so the web app can show
-  the triage nav. Separate migration (`20261118000300`) so it can be dropped without affecting security. If
+  the triage nav. Separate migration (`20261118000700`) so it can be dropped without affecting security. If
   the hook change proves risky, fallback is a `GET /platform/feedback/me` call from the web app.
 
 **Rationale**: No platform-operator concept exists today (grep of API, migrations, web, docs found none; the

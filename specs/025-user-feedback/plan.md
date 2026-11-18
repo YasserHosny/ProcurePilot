@@ -44,7 +44,7 @@ confirm at implementation time are flagged there as **verify** with a stated fal
 | II. Deterministic, replayable | N/A | No normalisation or cost computation. Audit stays append-only. |
 | III. Human authority | Pass | FR-022: feedback triggers no business action; nothing is automated beyond a digest email. |
 | IV. Every insight ends in an action | **Justified exception** | The owner inbox is read-only by spec decision. It is a support channel, not an insight surface: see Complexity Tracking. The operator triage view carries actions (status, labels). |
-| V. Tenant isolation by construction | **Pass with documented exception** | `tenant_id` + ENABLE/FORCE RLS, `USING` and `WITH CHECK`, `tenant_id` from the verified JWT, cross-tenant read returns not found, isolation tests included. The operator path is a deliberate, narrow, audited cross-tenant exception: see Complexity Tracking and ADR-027. |
+| V. Tenant isolation by construction | **Pass with documented, owner-approved deviation** (Governance: "Deviations are documented"; task T003a records the approval) | `tenant_id` + ENABLE/FORCE RLS, `USING` and `WITH CHECK`, `tenant_id` from the verified JWT, cross-tenant read returns not found, isolation tests included. The operator path is a deliberate, narrow, audited cross-tenant exception: see Complexity Tracking and ADR-027. |
 | VI. Modular monolith | Pass | New module in `apps/api`, new worker module in the existing image; no new service. |
 | VII. Money, tax, language | Pass | en + ar catalogue, RTL logical properties, 360 px. No monetary values. |
 | Phase and stage gates | Pass | Pilot-readiness work in the current phase; no Phase N+1 functionality. |
@@ -75,9 +75,11 @@ specs/025-user-feedback/
 supabase/migrations/
 ├── 20261118000100_tenant_is_demo.sql
 ├── 20261118000200_platform_operator.sql          # table, is_platform_operator(), revoke all from clients
-├── 20261118000300_auth_hook_operator_claim.sql   # optional UI hint claim; separable (see research D2)
 ├── 20261118000400_feedback.sql                   # tables, enums, RLS, triggers, grants
-└── 20261118000500_feedback_storage.sql           # private bucket + insert-only policy
+├── 20261118000500_feedback_storage.sql           # private bucket + insert-only policy
+├── 20261118000600_platform_operator_digest_pref.sql
+├── 20261118000650_record_operator_audit_event.sql # only if the T058 spike needs it
+└── 20261118000700_auth_hook_operator_claim.sql   # optional UI hint claim; separable (see research D2)
 
 apps/api/src/procurepilot_api/
 ├── modules/feedback/

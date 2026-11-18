@@ -9,9 +9,14 @@ are design intent; exact SQL is written in the migrations.
 |---|---|
 | `20261118000100_tenant_is_demo.sql` | `alter table tenant add column is_demo boolean not null default false` |
 | `20261118000200_platform_operator.sql` | `platform_operator` table, `is_platform_operator()` |
-| `20261118000300_auth_hook_operator_claim.sql` | Optional UI-hint claim in the access-token hook (separable) |
 | `20261118000400_feedback.sql` | enums, `feedback_submission`, `feedback_attachment`, RLS, triggers, grants |
 | `20261118000500_feedback_storage.sql` | private bucket and insert-only storage policy |
+| `20261118000600_platform_operator_digest_pref.sql` | definer functions for the caller's own digest preference |
+| `20261118000650_record_operator_audit_event.sql` | Only if the T058 spike shows the audit writer cannot record cross-workspace events |
+| `20261118000700_auth_hook_operator_claim.sql` | Optional UI-hint claim in the access-token hook (separable) |
+
+Timestamps only increase through the sequence, so no file sorts before one already applied (hosted
+`supabase migration list` stays clean). `…000100`, `…000200`, `…000400` and `…000500` are applied together in T015.
 
 ## `tenant` (change)
 
