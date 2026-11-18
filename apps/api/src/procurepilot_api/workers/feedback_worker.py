@@ -91,7 +91,7 @@ def run_digest(settings: Settings, mailer: Mailer, now: datetime) -> dict[str, i
     hour = int(feedback_setting(settings, "feedback_digest_hour_utc", DEFAULT_DIGEST_HOUR_UTC))
     if now.hour < hour:
         return stats
-    web_url = str(feedback_setting(settings, "web_public_url", DEFAULT_WEB_URL))
+    web_url = settings.web_public_url or settings.web_origin or DEFAULT_WEB_URL
 
     with db.connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:

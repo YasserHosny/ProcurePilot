@@ -9,27 +9,20 @@ dependency on the member-side `schemas.py`.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import StrEnum
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from procurepilot_api.modules.feedback.schemas import Category, Status
+from procurepilot_api.modules.feedback.schemas import SignedUrl as SignedUrl  # re-exported
+
 MAX_LABELS = 10
 MAX_LABEL_LENGTH = 40
 
 
-class FeedbackStatus(StrEnum):
-    new = "new"
-    reviewed = "reviewed"
-    resolved = "resolved"
-
-
-class FeedbackCategory(StrEnum):
-    bug = "bug"
-    idea = "idea"
-    question = "question"
-    other = "other"
+FeedbackStatus = Status
+FeedbackCategory = Category
 
 
 class OperatorAttachment(BaseModel):
@@ -77,11 +70,6 @@ class DigestPreferenceRequest(BaseModel):
 
     enabled: bool
     locale: Literal["en", "ar"] | None = None
-
-
-class SignedUrl(BaseModel):
-    url: str
-    expires_in: int
 
 
 class OperatorUpdateRequest(BaseModel):

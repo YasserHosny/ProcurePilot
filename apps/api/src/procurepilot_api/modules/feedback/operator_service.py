@@ -32,7 +32,7 @@ from supabase import create_client
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.errors import (
-    ConflictError,
+    FeedbackInvalidTransitionError,
     NotFoundError,
     ServiceUnavailableError,
     UnprocessableEntityError,
@@ -51,17 +51,6 @@ from procurepilot_api.shared.audit import AuditEventCreate, AuditWriter
 
 DEFAULT_BUCKET = "feedback-attachments"
 DEFAULT_URL_TTL_SECONDS = 300
-
-
-class FeedbackInvalidTransitionError(ConflictError):
-    """A backward or otherwise invalid status move (spec FR-018, research D7).
-
-    Defined here so this module does not depend on the member-API builder's `errors.py`
-    additions; the code string is the contract (`feedback.invalid_transition`).
-    """
-
-    code = "feedback.invalid_transition"
-    safe_message = "Status can only move forward."
 
 
 # ---------------------------------------------------------------------------

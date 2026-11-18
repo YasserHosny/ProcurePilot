@@ -11,7 +11,7 @@ from enum import StrEnum
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from procurepilot_api.modules.auth.jwt import MemberRole
 
@@ -68,28 +68,3 @@ class SubmissionPage(BaseModel):
 class SignedUrl(BaseModel):
     url: str
     expires_in: int
-
-
-class OperatorSubmission(Submission):
-    """Operator view: adds workspace, contact, labels and build info."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    tenant_id: UUID
-    tenant_name: str | None = None
-    submitter_name: str
-    submitter_email: str
-    labels: list[str]
-    app_version: str
-    is_demo: bool
-    status_changed_at: datetime | None = None
-
-
-class OperatorSubmissionPage(BaseModel):
-    items: list[OperatorSubmission]
-    next_cursor: str | None = None
-
-
-class OperatorMe(BaseModel):
-    digest_enabled: bool
-    digest_locale: Literal["en", "ar"]
