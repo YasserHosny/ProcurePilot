@@ -14,6 +14,7 @@ router = APIRouter(tags=["health"])
 
 class HealthResponse(BaseModel):
     status: str
+    app_version: str
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -23,7 +24,7 @@ def health(settings: Annotated[Settings, Depends(get_settings)]) -> HealthRespon
         client.table("supported_region").select("code").limit(1).execute()
     except Exception as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-    return HealthResponse(status="ok")
+    return HealthResponse(status="ok", app_version=settings.app_version)
 
 
 def _probe_client(settings: Settings) -> Client:
