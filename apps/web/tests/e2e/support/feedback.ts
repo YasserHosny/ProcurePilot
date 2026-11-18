@@ -103,6 +103,9 @@ function operatorCliEnv(): NodeJS.ProcessEnv {
     PLATFORM_INVITATION_TTL_DAYS: '7',
     MEMBER_INVITATION_TTL_DAYS: '7',
     RATE_LIMIT_AUTH: '60/minute',
+    // Required by Settings too; CI scopes them to the seed/API steps, not the Playwright steps.
+    WEB_API_BASE_URL: 'http://localhost:8000/api/v1',
+    WEB_DEFAULT_LOCALE: 'en',
     SUPABASE_ANON_KEY: 'unused-by-platform-operator-cli',
     SUPABASE_SERVICE_ROLE_KEY: 'unused-by-platform-operator-cli',
     ...process.env,
