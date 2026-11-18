@@ -196,11 +196,11 @@
 - [x] T074 [P] `TESTS/integration/test_feedback_retention.py` (write first): submissions older than 12 months are deleted with their objects, one aggregate `feedback.retention_purged` event, orphan objects older than 1 h swept, newer ones kept
 - [x] T075 Implement retention purge and orphan sweep in `API/workers/feedback_worker.py` (service-role connection)
 - [x] T076 [P] Add a `feedback-worker` service to `docker-compose.yml`
-- [ ] T077 Confirm how production runs workers (`infra/terraform`, bunny Magic Containers) and record the answer and any needed change in `docs/operations/`
-- [ ] T078 [P] Playwright e2e `apps/web/tests/e2e/feedback.spec.ts`: submit, own list, owner inbox, operator triage, withdraw
-- [ ] T079 [P] axe-core scans for widget, lists and triage in English and Arabic, plus manual 360 px check in both directions
+- [x] T077 Confirm how production runs workers (`infra/terraform`, bunny Magic Containers) and record the answer and any needed change in `docs/operations/`
+- [x] T078 [P] Playwright e2e `apps/web/tests/e2e/feedback.spec.ts`: submit, own list, owner inbox, operator triage, withdraw
+- [x] T079 [P] axe-core scans for widget, lists and triage in English and Arabic, plus manual 360 px check in both directions
 - [ ] T080 Run `pnpm --filter web docs:screenshots` and `python scripts/docs_screenshots_diff.py`; regenerate and commit `docs/user/screenshots/` if the widget exceeds the 1% threshold
-- [ ] T081 [P] Docs: `docs/architecture/data-dictionary.md` (three tables), finalise ADR-027, `docs/quality/test-strategy.md`, `docs/architecture/api-specification.md`, `docs/user/user-documentation.md`, `docs/gtm/demo-tenant/README.md` (flag the two demo workspaces with `tenant.is_demo`), `GLOSSARY.md` ("platform operator"), `CLAUDE.md` current-phase paragraph
+- [x] T081 [P] Docs: `docs/architecture/data-dictionary.md` (three tables), finalise ADR-027, `docs/quality/test-strategy.md`, `docs/architecture/api-specification.md`, `docs/user/user-documentation.md`, `docs/gtm/demo-tenant/README.md` (flag the two demo workspaces with `tenant.is_demo`), `GLOSSARY.md` ("platform operator"), `CLAUDE.md` current-phase paragraph
 - [ ] T082 Run `pnpm test`, `pnpm test:isolation`, `pnpm test:a11y`, `pnpm lint` and gitleaks; all green
 - [ ] T083 Walk through `specs/025-user-feedback/quickstart.md` end to end and fix any drift
 - [ ] T084 Run `debate-review --local` and fix real findings; write the PR body with `mattpocock-skills:pr`; move PPS-223 to In Review with a Progress comment; after merge apply migrations to hosted with `pnpm db:migrate`, flag the demo workspaces, and grant the first operators
