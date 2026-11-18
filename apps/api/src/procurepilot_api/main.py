@@ -16,6 +16,7 @@ from procurepilot_api.modules.digests.router import router as digests_router
 from procurepilot_api.modules.documents.router import router as documents_router
 from procurepilot_api.modules.exports.router import router as exports_router
 from procurepilot_api.modules.extraction.router import router as extraction_router
+from procurepilot_api.modules.feedback.router import router as feedback_router
 from procurepilot_api.modules.forecasting.router import router as forecasting_router
 from procurepilot_api.modules.health.router import router as health_router
 from procurepilot_api.modules.ingestion.router import router as ingestion_router
@@ -93,6 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(pos_router, prefix=API_PREFIX)
     app.include_router(partner_router, prefix=API_PREFIX)
     app.include_router(webhooks_router, prefix=API_PREFIX)
+    app.include_router(feedback_router, prefix=API_PREFIX)
     return app
 
 
