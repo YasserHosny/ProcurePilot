@@ -14,7 +14,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -35,6 +35,10 @@ import {
   type FeedbackCategory,
 } from '../feedback-api';
 import { FeedbackDraftStore } from '../feedback-draft.store';
+
+export interface FeedbackDialogData {
+  readonly afterCapture?: boolean;
+}
 
 interface Message {
   readonly key: string;
@@ -68,6 +72,7 @@ const IMAGE_EXTENSION: Record<string, string> = {
 })
 export class FeedbackDialogComponent {
   private readonly dialogRef = inject(MatDialogRef<FeedbackDialogComponent>);
+  private readonly data = inject<FeedbackDialogData | null>(MAT_DIALOG_DATA, { optional: true });
   private readonly api = inject(FeedbackApiService);
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
@@ -78,6 +83,7 @@ export class FeedbackDialogComponent {
   readonly categories = FEEDBACK_CATEGORIES;
 
   private readonly textArea = viewChild<ElementRef<HTMLTextAreaElement>>('area');
+  private readonly dropzone = viewChild<ElementRef<HTMLElement>>('dropzone');
   private readonly successHeading = viewChild<ElementRef<HTMLElement>>('successHeading');
 
   readonly submitting = signal(false);
@@ -90,6 +96,9 @@ export class FeedbackDialogComponent {
   readonly attachmentMessages = signal<readonly Message[]>([]);
   readonly audioMessage = signal<Message | null>(null);
   readonly dragging = signal(false);
+  readonly afterCapture = signal(this.data?.afterCapture ?? false);
+  readonly failedImageIds = signal<ReadonlySet<string>>(new Set());
+  readonly audioPreviewFailed = signal(false);
 
   readonly remaining = computed(() => this.textMax - this.draft.text().length);
   readonly counter = computed<Message>(() => ({
@@ -114,6 +123,14 @@ export class FeedbackDialogComponent {
   private cooldownTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
+    if (this.afterCapture()) {
+      afterNextRender(
+        () => {
+          this.dropzone()?.nativeElement.focus();
+        },
+        { injector: this.injector },
+      );
+    }
     // A real MediaRecorder hands over its data after stop() returns, so the file arrives as a signal.
     effect(() => {
       if (this.recorder.result()) {
@@ -184,8 +201,26 @@ export class FeedbackDialogComponent {
     this.addImages(images.map((f) => this.nameScreenshot(f)));
   }
 
+  hideToCapture(): void {
+    this.dialogRef.close('capture');
+  }
+
+  onImageError(id: string): void {
+    this.failedImageIds.update((set) => {
+      const next = new Set(set);
+      next.add(id);
+      return next;
+    });
+  }
+
   removeImage(id: string): void {
     this.draft.removeImage(id);
+    this.failedImageIds.update((set) => {
+      if (!set.has(id)) return set;
+      const next = new Set(set);
+      next.delete(id);
+      return next;
+    });
     this.attachmentMessages.set([]);
   }
 
@@ -222,6 +257,7 @@ export class FeedbackDialogComponent {
 
   onReRecord(): void {
     this.draft.clearAudio();
+    this.audioPreviewFailed.set(false);
     this.onRecord();
   }
 
@@ -232,6 +268,11 @@ export class FeedbackDialogComponent {
   onDiscardAudio(): void {
     this.draft.clearAudio();
     this.audioMessage.set(null);
+    this.audioPreviewFailed.set(false);
+  }
+
+  onAudioError(): void {
+    this.audioPreviewFailed.set(true);
   }
 
   onAudioChosen(event: Event): void {
@@ -242,6 +283,7 @@ export class FeedbackDialogComponent {
   }
 
   private acceptAudio(file: File): void {
+    this.audioPreviewFailed.set(false);
     const reason = checkAudio(file);
     if (reason) {
       this.audioMessage.set(rejection(reason, file.name));

@@ -8,6 +8,7 @@ export interface MediaRecorderLike {
   mimeType: string;
   ondataavailable: ((event: { data: Blob }) => void) | null;
   onstop: (() => void) | null;
+  onerror?: ((event: unknown) => void) | null;
   start(): void;
   stop(): void;
 }
@@ -118,7 +119,21 @@ export class AudioRecorderService implements OnDestroy {
       if (event.data && event.data.size > 0) this.chunks.push(event.data);
     };
     recorder.onstop = () => this.finish(mimeType ?? recorder.mimeType);
-    recorder.start();
+    recorder.onerror = () => {
+      this.discard = true;
+      this.chunks = [];
+      this.release();
+      this.error.set('failed');
+    };
+    try {
+      recorder.start();
+    } catch {
+      this.discard = true;
+      this.chunks = [];
+      this.release();
+      this.error.set('failed');
+      return;
+    }
     this.elapsedSeconds.set(0);
     this.state.set('recording');
     this.timer = setInterval(() => {

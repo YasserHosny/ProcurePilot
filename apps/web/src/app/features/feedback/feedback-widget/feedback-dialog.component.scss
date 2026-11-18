@@ -91,6 +91,11 @@
   border: 2px dashed var(--pp-border-strong);
   border-radius: 8px;
 
+  &:focus-visible {
+    outline: 2px solid var(--pp-primary);
+    outline-offset: 2px;
+  }
+
   p {
     margin: 0;
     font-size: 0.875rem;
@@ -129,6 +134,37 @@
     inline-size: 100%;
     block-size: 100%;
     object-fit: cover;
+  }
+}
+
+.fb-thumb-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  inline-size: 100%;
+  block-size: 100%;
+  padding: 0.25rem;
+  box-sizing: border-box;
+  text-align: center;
+  color: var(--pp-text-muted);
+  font-size: 0.6875rem;
+  line-height: 1.2;
+
+  mat-icon {
+    font-size: 24px;
+    inline-size: 24px;
+    block-size: 24px;
+    color: var(--pp-text-muted);
+  }
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
 }
 
