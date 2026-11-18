@@ -33,6 +33,11 @@ COPY --chown=appuser:appgroup apps/api/ /workspace/apps/api/
 
 USER appuser
 
+# Build identity reported by GET /api/v1/health and stamped on feedback submissions (spec 025).
+# CI passes the commit SHA; a local build without the arg reports "dev".
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
+
 RUN uv pip install --no-cache -e .
 
 EXPOSE 8000

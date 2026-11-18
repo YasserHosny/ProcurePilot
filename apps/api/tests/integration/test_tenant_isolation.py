@@ -111,6 +111,9 @@ class Workspace:
         pos_connection_id: UUID,
         synced_product_signal_id: UUID,
         pos_product_match_id: UUID,
+        feedback_submission_id: UUID,
+        feedback_attachment_id: UUID,
+        feedback_storage_path: str,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
@@ -155,6 +158,9 @@ class Workspace:
         self.pos_connection_id = pos_connection_id
         self.synced_product_signal_id = synced_product_signal_id
         self.pos_product_match_id = pos_product_match_id
+        self.feedback_submission_id = feedback_submission_id
+        self.feedback_attachment_id = feedback_attachment_id
+        self.feedback_storage_path = feedback_storage_path
 
     def claims(self) -> str:
         return (
@@ -677,6 +683,38 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         ),
     )
 
+    # In-app feedback — 025-user-feedback (T006): a submission, an attachment row and a stored
+    # object, all under this workspace's own prefix.
+    feedback_submission_id, feedback_attachment_id = uuid4(), uuid4()
+    feedback_storage_path = f"tenants/{tenant_id}/feedback/{feedback_submission_id}/{label}.png"
+    cur.execute(
+        "insert into feedback_submission "
+        "(id,tenant_id,submitter_user_id,submitter_membership_id,submitter_name,"
+        "submitter_email,member_role,text_content,page_path,app_version,locale,is_demo,"
+        "idempotency_key) "
+        "values (%s,%s,%s,%s,%s,%s,'owner',%s,'/home','test','en',false,%s)",
+        (
+            feedback_submission_id,
+            tenant_id,
+            user_id,
+            membership_id,
+            f"{label} Owner",
+            f"{label}@example.test",
+            f"{label} private feedback",
+            uuid4(),
+        ),
+    )
+    cur.execute(
+        "insert into feedback_attachment "
+        "(id,tenant_id,submission_id,kind,storage_path,content_type,size_bytes,display_order) "
+        "values (%s,%s,%s,'image',%s,'image/png',1024,0)",
+        (feedback_attachment_id, tenant_id, feedback_submission_id, feedback_storage_path),
+    )
+    cur.execute(
+        "insert into storage.objects (bucket_id,name,owner) values ('feedback-attachments',%s,%s)",
+        (feedback_storage_path, user_id),
+    )
+
     return Workspace(
         tenant_id,
         user_id,
@@ -721,6 +759,9 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         pos_connection_id,
         synced_product_signal_id,
         pos_product_match_id,
+        feedback_submission_id,
+        feedback_attachment_id,
+        feedback_storage_path,
     )
 
 
@@ -2389,6 +2430,96 @@ def test_a_worker_session_cannot_write_pos_product_match_into_another_workspace(
             )
 
 
+# --- in-app feedback (025-user-feedback, T006) -------------------------------
+# Cross-tenant isolation only. Within-tenant rules (own-or-owner, operator, forward-only status)
+# have their proof in test_feedback_isolation.py.
+
+
+def test_another_workspaces_feedback_submissions_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from feedback_submission where id = %s", (beta.feedback_submission_id,)
+        )
+        assert cur.fetchall() == []
+        cur.execute("select id from feedback_submission")
+        assert cur.fetchall() == [(alpha.feedback_submission_id,)]
+
+
+def test_another_workspaces_feedback_attachments_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from feedback_attachment where id = %s", (beta.feedback_attachment_id,)
+        )
+        assert cur.fetchall() == []
+        cur.execute("select id from feedback_attachment")
+        assert cur.fetchall() == [(alpha.feedback_attachment_id,)]
+
+
+def test_a_member_cannot_write_a_feedback_submission_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into feedback_submission "
+                "(tenant_id,submitter_user_id,submitter_name,submitter_email,member_role,"
+                "text_content,page_path,app_version,locale,is_demo,idempotency_key) "
+                "values (%s,%s,'x','x@example.test','owner','hello','/','t','en',false,%s)",
+                (beta.tenant_id, alpha.user_id, uuid4()),
+            )
+
+
+def test_feedback_storage_object_from_another_workspace_is_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The feedback bucket is insert-only for clients: nothing is readable through Storage RLS,
+    not another workspace's object and not even the member's own."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select name from storage.objects where bucket_id = 'feedback-attachments' "
+            "and name = %s",
+            (beta.feedback_storage_path,),
+        )
+        assert cur.fetchall() == []
+        cur.execute(
+            "select name from storage.objects where bucket_id = 'feedback-attachments' "
+            "and name = %s",
+            (alpha.feedback_storage_path,),
+        )
+        assert cur.fetchall() == []
+
+
+def test_a_member_can_upload_only_under_their_own_feedback_prefix(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "insert into storage.objects (bucket_id,name,owner) "
+            "values ('feedback-attachments',%s,%s)",
+            (f"tenants/{alpha.tenant_id}/feedback/{uuid4()}/new.png", alpha.user_id),
+        )
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into storage.objects (bucket_id,name,owner) "
+                "values ('feedback-attachments',%s,%s)",
+                (f"tenants/{beta.tenant_id}/feedback/{uuid4()}/new.png", alpha.user_id),
+            )
+
+
 # --- the guarantee itself ---------------------------------------------------
 
 
@@ -2464,6 +2595,8 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "synced_product_signal",
         "pos_product_match",
         "purchase_order_edit_idempotency",
+        "feedback_submission",
+        "feedback_attachment",
     }
     with conn.cursor() as cur:
         cur.execute(
