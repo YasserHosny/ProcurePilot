@@ -5248,6 +5248,24 @@
     "footer": {
       "sentWith": "Sent with ProcurePilot by Iron Systems",
       "website": "www.iron-sys.com"
+    },
+    "feedbackDigest": {
+      "subject": "ProcurePilot feedback: {{count}} new",
+      "title": "New feedback from workspaces",
+      "summary": "New feedback since the last digest: {{count}}",
+      "workspaceLabel": "Workspace",
+      "categoryLabel": "Category",
+      "categories": {
+        "bug": "Bug",
+        "idea": "Idea",
+        "question": "Question",
+        "other": "Other",
+        "none": "No category"
+      },
+      "viewAction": "Open the triage view",
+      "moreItems": "and {{count}} more not shown",
+      "redacted": "[email hidden]",
+      "footer": "You receive this digest because you turned it on in the triage view. Turn it off there at any time."
     }
   }
 }

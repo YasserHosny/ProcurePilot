@@ -5248,6 +5248,24 @@
     "footer": {
       "sentWith": "أُرسلت عبر ProcurePilot من Iron Systems",
       "website": "www.iron-sys.com"
+    },
+    "feedbackDigest": {
+      "subject": "ملاحظات ProcurePilot: {{count}} جديدة",
+      "title": "ملاحظات جديدة من مساحات العمل",
+      "summary": "ملاحظات جديدة منذ آخر ملخص: {{count}}",
+      "workspaceLabel": "مساحة العمل",
+      "categoryLabel": "التصنيف",
+      "categories": {
+        "bug": "مشكلة",
+        "idea": "فكرة",
+        "question": "سؤال",
+        "other": "أخرى",
+        "none": "بدون تصنيف"
+      },
+      "viewAction": "افتح عرض المراجعة",
+      "moreItems": "و{{count}} أخرى غير معروضة",
+      "redacted": "[بريد إلكتروني مخفي]",
+      "footer": "تصلك هذه الرسالة لأنك فعّلت الملخص من عرض المراجعة. يمكنك إيقافه من هناك في أي وقت."
     }
   }
 }
