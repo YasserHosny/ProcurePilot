@@ -4,6 +4,7 @@ import 'package:procurepilot_mobile/core/api/models.dart';
 import 'package:procurepilot_mobile/features/about/about_screen.dart';
 import 'package:procurepilot_mobile/features/home/home_screen.dart';
 import 'package:procurepilot_mobile/features/low_stock/low_stock_report_screen.dart';
+import 'package:procurepilot_mobile/features/requests/request_list_screen.dart';
 
 import '../../test_helpers.dart';
 
@@ -312,6 +313,67 @@ void main() {
         }
       },
     );
+
+    testWidgets('request-capable roles get a My requests entry that opens the list', (
+      tester,
+    ) async {
+      final auth =
+          FakeAuthService(
+              storage: FakeStorage(),
+              httpClient: defaultTestHttpClient(),
+              supabaseUrl: 'https://test.supabase.co',
+              supabaseAnonKey: 'test-anon-key',
+            )
+            ..accessToken = makeAccessToken('buyer')
+            ..refreshToken = 'refresh-token'
+            ..tokenRole = 'buyer';
+
+      await pumpWithServices(
+        tester,
+        child: const HomeScreen(),
+        authService: auth,
+      );
+      await tester.pumpAndSettle();
+
+      final myRequests = find.byKey(const Key('homeMyRequestsButton'));
+      expect(myRequests, findsOneWidget);
+      expect(find.text('My requests'), findsOneWidget);
+
+      await tester.tap(myRequests);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(RequestListScreen), findsOneWidget);
+    });
+
+    testWidgets('My requests is hidden for roles that cannot request (approver, viewer)', (
+      tester,
+    ) async {
+      for (final role in ['approver', 'viewer']) {
+        final auth =
+            FakeAuthService(
+                storage: FakeStorage(),
+                httpClient: defaultTestHttpClient(),
+                supabaseUrl: 'https://test.supabase.co',
+                supabaseAnonKey: 'test-anon-key',
+              )
+              ..accessToken = makeAccessToken(role)
+              ..refreshToken = 'refresh-token'
+              ..tokenRole = role;
+
+        await pumpWithServices(
+          tester,
+          child: const HomeScreen(),
+          authService: auth,
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('homeMyRequestsButton')),
+          findsNothing,
+          reason: '$role cannot request items, so has no requests of their own',
+        );
+      }
+    });
 
     testWidgets('shows about action and navigates to AboutScreen', (
       tester,
