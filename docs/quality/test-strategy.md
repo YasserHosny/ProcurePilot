@@ -8,21 +8,27 @@
 
 | Layer | Tool | Responsibility | When |
 |---|---|---|---|
-| Unit | pytest (backend), Karma/Jasmine (frontend) | Functions, services, components, validators | Every PR |
+| Unit | pytest 8.3 + pytest-asyncio (backend, Python 3.12), Karma 6.4 / Jasmine 5.6 (frontend) | Functions, services, components, validators | Every PR |
 | Integration | pytest + httpx TestClient | API endpoints, DB queries, auth middleware | Every PR |
-| E2E | Playwright | Critical user journeys on web | Nightly + before release |
-| Mobile E2E | Flutter integration tests | Request, approval, delivery flows | Before store release |
+| Tenant isolation | pytest (`pnpm test:isolation` = `apps/api/tests/integration/test_tenant_isolation.py`) | Forced RLS, cross-tenant 404 | Every PR (`Tenant isolation` job) |
+| E2E | Playwright ^1.60 | Critical user journeys on web | Every PR, five shards (`docs/operations/ci-pipeline.md`) |
+| Mobile E2E | `flutter test` (`apps/mobile/test/`, including `integration/`) | Request, approval, delivery flows | Before store release (not in CI) |
 | AI eval | Custom harness + benchmark datasets | Extraction and matching accuracy | Every model/prompt change |
 | Performance | Locust / k6 | Latency, throughput, concurrent extraction | Before G1 and G2 |
 | Security | OWASP ZAP + penetration test | OWASP Top 10, auth, RLS | P1 ongoing + third-party at end P2 |
-| Accessibility | axe-core / Lighthouse | WCAG 2.1 AA | Every release |
+| Accessibility | axe-core (`@axe-core/playwright` ^4.14; `pnpm test:a11y` runs the `@a11y`-tagged Playwright tests) / Lighthouse | WCAG 2.1 AA | Every PR that touches the web app, and every push to `main` |
 
 ## 2. Test Environments
 
-- **Local:** `docker compose up` with seeded demo tenant.
-- **CI:** ephemeral containers spun up by GitHub Actions.
-- **Staging:** Bunny Magic Containers, seeded dataset, shared with design partners.
-- **Production:** live; feature flags protect new capabilities.
+- **Local:** `docker compose up` services against the hosted Supabase (`docs/operations/local-dev.md`).
+  `docker-compose.yml` has no Supabase or Postgres service; a local Supabase stack, when a test
+  needs one (as the E2E suite does), comes from `supabase start`.
+- **CI:** ephemeral containers spun up by GitHub Actions, each E2E shard with its own Supabase CLI
+  stack, Redis, API, extraction worker and web app.
+- **Staging/demo:** Bunny Magic Containers at `https://procurepilot.iron-sys.com` (API under
+  `/api/v1`), with the hosted demo tenants (`docs/gtm/demo-tenant/README.md`).
+- **Production:** not live yet; the pilot app is planned at `pilot.iron-sys.com`
+  (`docs/operations/pilot-environment-plan.md`). Feature flags will protect new capabilities.
 
 ## 3. Unit / Integration Test Targets
 
@@ -58,6 +64,10 @@
 ### Calibration
 - Expected calibration error (ECE) on confidence scores.
 - Confidence must match observed accuracy within 5% per bucket.
+- **Status (2026-11-19):** match-score calibration is not feasible yet. Hosted has far fewer than
+  the 500+ labelled match decisions the matching gate needs, and `ml/evals/product_matching/`
+  reports that rather than a calibrated score. Keep it that way until the benchmark exists. The
+  extraction harness (`ml/evals/quotation_extraction/`) likewise has no real held-out benchmark yet.
 
 ## 5. E2E Scenarios
 
@@ -68,6 +78,8 @@
 
 ### Mobile
 1. Branch manager creates request → approver receives push → approves → buyer records order → branch confirms delivery.
+   *(2026-11-19: the "receives push" step cannot pass yet; server-side push delivery is a stub
+   with no FCM/APNs credentials, so every send is recorded as not delivered. Runbook §3.5.)*
 2. Offline draft → sync on reconnect → no duplicate request.
 
 ## 6. Performance Targets

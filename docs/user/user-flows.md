@@ -1,7 +1,7 @@
 # ProcurePilot User Flows
 
 > Navigation paths for every user-facing page, with journey visualisations.
-> Last updated: 27 Sep 2026.
+> Last updated: 19 Nov 2026 (in-app feedback paths).
 >
 > Covers the web app only. The mobile app uses named routes rather than URLs; see
 > [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md) for its screens
@@ -243,6 +243,10 @@ journey
 - `/home` -> **Settings** -> `/settings` -> **+ New Delegation** -> pick delegate + date range -> save -> delegated requests route to the delegate's own Approval Queue
 - `/home` -> **Team Management** -> `/team` -> invite member -> pending invitation -> accept invitation flow
 - `/home` -> **Settings** -> `/settings` -> manage branches, cost centres, budgets, and approval delegations
+- Any page -> **Send feedback** (bottom corner) -> write a message, add up to 5 screenshots and one voice message -> **Send** -> **See my feedback** -> `/feedback`
+- Sidebar **Setup** -> **My feedback** -> `/feedback` -> **Withdraw** an item while it is still **New**
+- Sidebar **Setup** -> **Workspace feedback** (Owner only) -> `/feedback/workspace` -> filter by **Status** and **Category** (read-only)
+- Sidebar **User feedback** (ProcurePilot platform operators only) -> `/platform/feedback` -> open an item -> **Labels**, **Mark as reviewed** / **Mark as resolved**; **Daily email digest** switch
 - Unknown routes redirect to `/`, then to `/home` for signed-in users.
 
 ```mermaid

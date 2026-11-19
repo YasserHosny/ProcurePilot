@@ -13,19 +13,19 @@ procurepilot/
 │   ├── mobile/               # Flutter app
 │   └── api/                  # FastAPI modular monolith
 ├── services/
-│   ├── extraction-worker/    # Bedrock/Azure DI extraction pipeline
-│   ├── matching-worker/      # entity resolution + embeddings
+│   ├── extraction-worker/    # Bedrock/Azure DI/structured-parse extraction pipeline
+│   ├── matching-worker/      # README placeholder; matching runs inside apps/api
 │   └── optimiser/            # OR-Tools basket allocation
 ├── packages/
-│   ├── domain-types/         # OpenAPI-generated TS + Dart types
+│   ├── domain-types/         # shared TS types (money)
 │   ├── ui/                   # shared design tokens
-│   ├── validation/           # shared Zod schemas
+│   ├── py-logging/           # procurepilot-logging (API + extraction worker)
 │   └── i18n/                 # en + ar catalogues
 ├── ml/
 │   ├── benchmarks/           # extraction + matching eval datasets
 │   ├── evals/                # eval harness and reports
 │   └── notebooks/            # exploration
-├── .github/workflows/        # backend/frontend/mobile CI/CD
+├── .github/workflows/        # ci, deploy-* (backend, frontend, workers), docs-screenshots, mobile-build-size-check
 ├── docker-compose.yml        # local orchestration
 ├── infra/                    # Terraform, Dockerfiles, Nginx templates
 └── docs/                     # this document and other specs
@@ -35,28 +35,47 @@ procurepilot/
 
 ### 2.1 `apps/api` — FastAPI modular monolith
 
+Thirty-one modules under `apps/api/src/procurepilot_api/modules/` as of 2026-11-19 (`ls` for the
+current list):
+
 | Module | Responsibility |
 |---|---|
 | `auth` | Supabase JWT verification, tenant resolution, RBAC middleware |
+| `tenants` · `members` · `organisation` | Workspace settings, members and invitations, branches, cost centres, budgets |
 | `catalogue` | Products, suppliers, units, packs, aliases, CSV import |
 | `documents` | Upload presigns, document metadata, storage URIs |
-| `quotations` | Quotation lifecycle, extraction jobs, versioning |
+| `quotations` | Quotation lifecycle, review tasks, versioning |
 | `extraction` | Orchestrates extraction-worker; stores results and confidence |
+| `ingestion` | Inbound supplier email capture (Mailgun) into quotations |
 | `matching` | Candidate generation, scoring, auto-accept/reject thresholds |
-| `offers` | Normalised offers, landed-cost computations, bitemporal storage |
-| `compare` | Smart Compare aggregation, recommendation scorer |
-| `requests` | Purchase requests (P2) |
-| `approvals` | Routing, thresholds, audit trail (P2) |
-| `savings` | Savings ledger, outcome capture, verification |
-| `reports` | Excel/PDF export, scheduled reports |
-| `jobs` | Async job resource, polling, webhooks |
+| `landed_cost` | Landed-cost computation per match decision (rule versions, ADR-021) |
+| `offers` | Normalised offers, Smart Compare, basket split (`/baskets/optimise`), supplier scorecards |
+| `alerts` | Price, supplier-offer and quotation-anomaly alerts, with dismissals |
+| `requests` | Purchase requests, approvals, low-stock reports, delivery confirmation (P2) |
+| `orders` | Purchase orders and three-way match |
+| `rfq` | RFQ sourcing and guarded auto-preparation |
+| `savings` | Purchases, savings ledger, outcome capture, verification |
+| `exports` · `reports` · `digests` | Excel/PDF export, scheduled reports, digests |
+| `billing` | Plans, billing account, limits |
+| `devices` | Mobile device registration and push-notification outbox |
+| `accounting` · `pos` | Accounting and POS/inventory integrations |
+| `forecasting` | Forecasts and reorder proposals |
+| `analyst` | Grounded procurement analyst |
+| `partner` · `webhooks` | Partner API beta and outbound webhooks |
+| `feedback` | In-app feedback and the platform-operator view (spec 025, ADR-027) |
+| `jobs` · `health` | Async job resource and polling; `GET /api/v1/health` |
+
+Superseded 2026-11-19: the original table listed `compare` and `approvals` modules. They were never
+separate modules: Smart Compare lives in `offers` and approvals in `requests`.
 
 ### 2.2 `services/extraction-worker`
 
 - Receives document URI and tenant context.
 - Structured inputs (CSV/Excel) bypass the LLM.
-- Primary: call AWS Bedrock (Claude 3 Haiku) with strict JSON schema.
-- Fallback: Azure Document Intelligence for high-volume, low-variance layouts.
+- Primary: call AWS Bedrock with strict JSON schema (default model Claude Haiku 4.5 via
+  `BEDROCK_MODEL_ID`; ADR-004 chose Claude 3 Haiku).
+- Fallback: Azure Document Intelligence (`prebuilt-invoice`, then `prebuilt-layout` tables) when
+  Bedrock fails or is selected directly (ADR-014).
 - Validation layer: arithmetic checks and locale handling.
 - Returns extracted header + lines with confidence and page/region refs.
 
@@ -76,7 +95,7 @@ procurepilot/
 ### 2.4 `services/optimiser`
 
 - Input: basket of products, required quantities, supplier offers, MOVs, delivery tiers, urgency, preference weights.
-- Model: OR-Tools CP-SAT.
+- Model: OR-Tools CP-SAT, run by the `services/optimiser` worker from the `basket-split` RQ queue.
 - Output: recommended allocation, expected cost, policy exceptions.
 
 ## 3. API Patterns
@@ -93,9 +112,10 @@ procurepilot/
 - **Supabase Postgres 17** with `pgvector` and `pg_trgm`.
 - **RLS** policies enforce `tenant_id` isolation.
 - **Migrations:** versioned SQL files in `supabase/migrations/`.
-- **Redis** for sessions, rate-limit counters, lightweight job queues. Redis is the Phase 1 end
-  state but is not used in chunk 4.1; it is deferred to chunk 4.3, when the first background job
-  arrives. Current rate limiting uses SlowAPI's in-process store.
+- **Redis** + RQ for job queues (`quotation-extraction`, `basket-split`, `exports`,
+  `push-notifications`, plus webhook delivery). Redis is the Phase 1 end state but was not used in
+  chunk 4.1; it arrived in chunk 4.3 with the first background job. Rate limiting still uses
+  SlowAPI's in-process store, not Redis.
 - **Supabase Storage** for source documents.
 
 ## 5. Key Algorithms
@@ -122,13 +142,16 @@ landed_cost = (unit_price × quantity)
 ## 6. State Management
 
 ### Web
-- Angular services with RxJS for server state.
-- Reactive Forms + Zod for validation.
+- Angular services with RxJS for server state; signals for local component state.
+- Reactive Forms for validation. Zod (^4.6) is a declared dependency of `apps/web`, but as of
+  2026-11-19 no source file imports it and there is no `packages/validation`.
 - No complex global store; domain modules own state.
 
 ### Mobile
-- Flutter BLoC or Riverpod (decision deferred to mobile sprint).
-- Offline drafts queue with idempotency keys.
+- Plain Flutter widgets with an `InheritedWidget` service locator
+  (`apps/mobile/lib/features/service_provider.dart`); neither BLoC nor Riverpod was adopted.
+- Offline queue (Hive-backed, `apps/mobile/lib/core/offline_queue/`) replays mutations with
+  idempotency keys.
 
 ## 7. Security Model
 
@@ -161,12 +184,15 @@ maintain.
 
 - **Local development** uses `supabase start` (Supabase CLI) for a local Postgres + Auth +
   Storage stack, or connects directly to the hosted project.
-- **Docker Compose** does not include a Postgres service. It orchestrates the API and frontend
-  containers only; database services are external.
-- **Migrations** are versioned SQL files in `supabase/migrations/`, applied via
-  `supabase db push`. Forward-only; never edit after merge.
+- **Docker Compose** does not include a Postgres service. It orchestrates the API, web, Redis,
+  extraction worker, optimiser and the export, webhook, feedback, offer-refresh and
+  catalogue-refresh workers; database services are external.
+- **Migrations** are versioned SQL files in `supabase/migrations/` (197 as of 2026-11-19),
+  applied with `pnpm db:migrate`, which ends with `pnpm db:check-privileges`. Deploys never run
+  them. Forward-only; never edit after merge.
 - **RLS** on every tenant-scoped table with `USING` and `WITH CHECK` clauses from JWT claims.
-- **Connection pooling** via Supabase PgBouncer (transaction mode) for production.
+- **Connection pooling** via Supabase's transaction-mode pooler for production. Open every
+  connection through `procurepilot_api.db.connect` (it sets `prepare_threshold=None`; PR #87).
 
 ## 10. Logging & Observability
 
@@ -244,7 +270,10 @@ Log level is controlled by the `LOG_LEVEL` environment variable (default `info`)
 bunny.net Magic Containers expose container stdout/stderr via the dashboard:
 
 1. Go to bunny.net → App → Container → **Logs** tab.
-2. Logs are structured JSON from both the API and extraction worker.
+2. Logs are structured JSON from both the API and extraction worker. The production app
+   (`procurepilot-production`) holds backend and frontend; the workers app
+   (`procurepilot-workers`) holds shared Redis and the extraction, email-ingestion, optimiser and
+   feedback workers.
 3. Filter by trace ID: search for `"trace_id":"<value>"` in the log viewer.
 
 For persistent log aggregation, configure a log drain to an external service (Datadog,
@@ -253,5 +282,5 @@ Logflare, etc.) — not yet set up.
 ### 10.7 Audit Trail
 
 - Every mutation writes an `AuditEvent` (append-only, no UPDATE/DELETE).
-- Health endpoint: `GET /api/health`.
+- Health endpoint: `GET /api/v1/health` (returns `status` and `app_version`).
 - Extraction and matching metrics emitted per document.

@@ -14,12 +14,16 @@
 
 ## 2. Health Checks
 
+The hosted app serves the SPA and the API from one host, with the API under `/api/v1`
+(today `https://procurepilot.iron-sys.com`; `pilot.iron-sys.com` is the planned production pilot
+domain, not live yet).
+
 ```bash
-# Backend
-curl https://<project>-api.<domain>/api/health
+# Backend: 200 with {"status":"ok","app_version":"<sha>"}; 503 if the database is unreachable
+curl https://<host>/api/v1/health
 
 # Frontend
-curl -I https://<project>.<domain>/index.html
+curl -I https://<host>/index.html
 ```
 
 ## 3. Common Failures
@@ -48,8 +52,14 @@ curl -I https://<project>.<domain>/index.html
 3. If persistent, widen candidate generation or improve alias learning.
 
 ### 3.5 Mobile push failures
-1. Check Expo push service status.
-2. Verify push tokens are current in tenant profile.
+*(corrected 2026-11-19)* The mobile app is Flutter, not Expo. Server-side push delivery is still a
+stub: `modules/devices/push_job.py` `_send_to_device` has no FCM/APNs credentials, logs
+`stub push send — no real provider configured`, and marks the notification `failed` so the retry
+sweep keeps it visible. No worker in `docker-compose.yml` or bunny.net consumes the
+`push-notifications` RQ queue either. Until both exist, a missing push is expected, not an
+incident. Once it is:
+1. Check the FCM/APNs provider status.
+2. Verify the member's device registration is current (`modules/devices`).
 3. Test deep link routing.
 
 ### 3.6 Failed inbound email ingestion
@@ -148,7 +158,13 @@ Production uses **two separate bunny.net Magic Container apps**, not one:
 | App | Containers | Purpose |
 |---|---|---|
 | `procurepilot-production` | `procurepilot-backend` (port 8000), `procurepilot-frontend` (port 80) | API + SPA; shared network namespace |
-| `procurepilot-workers` | `procurepilot-extraction-worker`, `procurepilot-email-ingestion-worker`, `procurepilot-optimiser-worker`, `procurepilot-feedback-worker` (§7.9, created by hand once), `shared-redis` (port 6379) | Background extraction, inbound-email ingestion, basket-split and feedback (digest, retention) jobs |
+| `procurepilot-workers` | `procurepilot-extraction-worker`, `procurepilot-email-ingestion-worker`, `procurepilot-optimiser-worker`, `procurepilot-feedback-worker` (§7.9, created 2026-11-19), `shared-redis` (port 6379) | Background extraction, inbound-email ingestion, basket-split and feedback (digest, retention) jobs |
+
+**Scaling of the workers app (2026-11-19):** `procurepilot-workers` is pinned to a single instance
+in a single region (min 1 / max 1, Paris), so the feedback digest cannot be sent twice (§7.9). The
+cap is app-wide: it applies to every container in the app, so scaling the extraction worker
+horizontally (§3.2, §4) now means raising the cap for the whole app, or first moving the feedback
+worker to an app of its own.
 
 Each worker container runs one image with its own `CMD`; there is no process manager running
 several workers in one container. Terraform (`infra/terraform/main.tf`) manages only the
@@ -156,9 +172,11 @@ production app's backend and frontend containers; the workers app and its contai
 by hand in the bunny.net dashboard. A deploy workflow only swaps the image tag of a container that
 already exists.
 
-Other API-package workers (`export_worker`, `webhook_worker`, `offer_refresh_scheduler`,
-`catalogue_refresh_worker` and the rest of `apps/api/src/procurepilot_api/workers/`) run only in
-`docker-compose.yml`. None has a Dockerfile, deploy workflow or bunny.net container yet.
+Other API-package workers run only in `docker-compose.yml` (`export_worker`, `webhook_worker`,
+`offer_refresh_scheduler`, `catalogue_refresh_worker`) or nowhere yet (`digest_worker`,
+`report_scheduler`, `accounting_sync_worker`, `pos_sync_worker`: modules in
+`apps/api/src/procurepilot_api/workers/` with no compose service). None has a Dockerfile, deploy
+workflow or bunny.net container yet.
 
 Containers within the same app share a network namespace (communicate via `localhost`).
 Containers in **different** apps do not share a namespace — the backend API connects to the
@@ -335,13 +353,18 @@ It runs like the email-ingestion worker (§7.8): image
 `packages/i18n/**`. The workflow only **updates** an existing container; until the container exists
 its last step fails, as the email-ingestion workflow's did before that container was created.
 
+**Status (2026-11-19):** the `procurepilot-feedback-worker` container was created on 2026-11-19 and
+is running, and the workers app is pinned to one instance (§7.1). The steps below record how it was
+set up; repeat them only for a new environment (such as the production pilot app).
+
 **One-time owner steps:**
 
 1. In the `procurepilot-workers` app (the one `BUNNY_WORKERS_APP_ID` points at), create a container
    named exactly `procurepilot-feedback-worker` from
    `ghcr.io/<owner>/procurepilot-feedback-worker:latest`. No public port, no endpoint. Keep it at
    **one instance**: the digest has no cross-process lock, so two instances can send an operator
-   the same digest twice.
+   the same digest twice. bunny.net sets instance counts per app, not per container, so pin the
+   whole workers app to min 1 / max 1 in one region, as was done on 2026-11-19.
 2. The image appears in GHCR only after the first run of the workflow. Either create the container
    after that run (re-run the workflow with **Run workflow** once the container exists), or point
    it at any existing tag first. Make the GHCR package readable by bunny.net the same way as the
@@ -390,6 +413,20 @@ procurepilot_api.workers.feedback_worker --once`. In the database, `platform_ope
 shows the last successful digest per operator, and `audit_event` rows with action
 `feedback.retention_purged` show each purge.
 
+**Granting a platform operator.** The digest goes only to platform operators, and there is no
+grant UI. From an environment with the API's full env (the same required `Settings` as above,
+including `DATABASE_URL`), such as the backend or a worker container:
+
+```bash
+python -m procurepilot_api.workers.platform_operator_cli grant <email>
+python -m procurepilot_api.workers.platform_operator_cli list
+python -m procurepilot_api.workers.platform_operator_cli revoke <email>
+```
+
+The person must already be an active member of some workspace. Each grant and revoke writes a
+`platform_operator.granted` / `platform_operator.revoked` audit event, and revoking a non-operator
+is a no-op. Run outside the API's venv, put `packages/py-logging/src` on `PYTHONPATH` as well.
+
 ## 8. Logging & Diagnostics
 
 ### 8.1 Accessing Container Logs
@@ -433,7 +470,10 @@ Log level is controlled by the `LOG_LEVEL` env var on the worker container (defa
 ## 9. Deployment Day Checklist
 
 - [ ] Backend `.env` has all required credentials.
-- [ ] `/api/health` responds.
+- [ ] New migrations applied to hosted with `pnpm db:migrate` over the session pooler (port 5432,
+      not the 6543 transaction pooler) and checked with `supabase migration list`; deploys never
+      run migrations. Agents running the Supabase CLI against hosted must pass `--yes`.
+- [ ] `/api/v1/health` responds.
 - [ ] Frontend builds with `ng build --configuration=production`.
 - [ ] `docker compose up --build` succeeds locally.
 - [ ] GHCR images pushed with `latest` tag.
