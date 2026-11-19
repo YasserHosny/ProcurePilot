@@ -28,6 +28,14 @@ This document represents the **latest clarified version** of the ProcurePilot co
 > is in `CLAUDE.md`. The first pilot market is **Egypt** (EGP, Arabic-first users and suppliers) — see
 > `docs/gtm/first-customer-gtm-plan.md`. GBP figures in this document are the original illustrative
 > baseline. Decisions taken since are added to section 21; answered questions are marked in section 22.
+>
+> **Update (2026-11-19).** Since that note, the pilot specs `023` (RFQ-aware matching), `024` (RFQ basket
+> split) and `025` (in-app feedback, shipped 2026-11-19) have shipped, and `022` (home currency) is merged
+> with three tasks open. The Flutter mobile app is shipped (requests, approvals, delivery and quality
+> issues, low-stock reports). Push notifications are built (device registration, queued sends) but
+> not yet connected to a provider (no FCM/APNs), so none reach a phone. A hosted demo runs at `https://procurepilot.iron-sys.com` with two demo workspaces; the production pilot domain
+> `pilot.iron-sys.com` is planned, not live. Match scores are still uncalibrated (far fewer than 500
+> labelled decisions), and the G3 gate is unmet.
 
 For a function-by-function view of user value, business/revenue impact, and proof metrics, see
 [Function Business Value](function-business-value.md).
@@ -1537,6 +1545,14 @@ Added after the build (2026-10):
 16. English and Arabic (right-to-left) are both supported from the start.
 17. Automation may prepare and route purchases; a human always authorises them.
 
+Added 2026-10-30 to 2026-11-19:
+
+18. VAT-inclusive quotes keep their printed prices; orders and savings are net plus tax (ADR-021).
+19. A product match is corrected by a new, superseding decision, never edited in place (ADR-022).
+20. A basket split of an RFQ becomes one request group, approved or rejected as one (ADR-023).
+21. Users send product feedback from inside the app; ProcurePilot operators triage it across
+    workspaces through a narrow, audited exception to tenant isolation (spec 025, ADR-027).
+
 ---
 
 ## 22. Open Questions for Further Validation
@@ -1551,7 +1567,7 @@ Added after the build (2026-10):
 8. Should WhatsApp ingestion be direct or file-based? *(For now: manual capture; direct integration deferred.)*
 9. What product-matching accuracy is acceptable for launch?
 10. How should realised savings be verified?
-11. Which currencies, tax models, and languages are required first? *(Partly answered: EGP and English + Arabic; VAT-inclusive pricing and exchange rates are still open.)*
+11. Which currencies, tax models, and languages are required first? *(Partly answered: EGP and English + Arabic; VAT-inclusive quotes decided in ADR-021 (2026-10-30); exchange rates are still open.)*
 12. Should ordering remain external or be completed inside ProcurePilot?
 
 ---

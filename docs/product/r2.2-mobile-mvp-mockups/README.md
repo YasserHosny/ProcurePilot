@@ -3,7 +3,11 @@
 Generated 2026-09-11 from `docs/product/r2.2-mobile-mvp-DESIGN.md` and
 `docs/product/r2.2-mobile-mvp-ui-mockup-prompts.md` via Google Stitch. Visual reference for Wave 2
 implementers — **not** a source of requirements. The actual requirements are
-`specs/009-mobile-app-mvp/spec.md` and, once written, its `tasks.md`.
+`specs/009-mobile-app-mvp/spec.md` and its `tasks.md`.
+
+> **Status (2026-11-19):** superseded. The shipped app's real screenshots replaced these mockups in
+> the user docs on 2026-10-24 (PR #254, `docs/user/screenshots/mobile/`); the app uses the Ledger
+> design system, not these colors. Only `settings.png` still shows a screen the app does not have.
 
 **Read before building anything from these**: Stitch generated genuinely faithful screens against
 every explicit constraint in the DESIGN.md's Do's/Don'ts (no camera/barcode/photo control on any

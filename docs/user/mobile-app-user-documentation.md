@@ -1,7 +1,8 @@
 # ProcurePilot Mobile App User Documentation
 
 > Screen-by-screen guide to the ProcurePilot mobile app (Flutter, iOS + Android).
-> Last updated: 11 Oct 2026.
+> Last updated: 19 Nov 2026 (Home links to the low-stock report; Help & about screen; approval queue
+> paging and split decisions).
 
 ---
 
@@ -63,8 +64,8 @@ The mobile app covers the field half of the purchase-request lifecycle, end to e
 - Confirming delivery once an order has shipped, and reporting a delivery quality issue (with
   an optional camera photo) once it has arrived — both reached from that request's detail
   screen.
-- Reporting a shelf-level low-stock signal, unrelated to any specific request. This screen is
-  fully built, but nothing in the shipped app currently links to it — see section 17.
+- Reporting a shelf-level low-stock signal, unrelated to any specific request, from Home's
+  **Report low stock** button (Owner, Buyer, Branch Manager).
 - Requesting notification permission and registering the device so a tapped notification can
   open the right request directly — though no notification is actually sent to a device yet;
   see section 13 for what's real here and what's a deliberate placeholder.
@@ -75,7 +76,8 @@ The mobile app covers the field half of the purchase-request lifecycle, end to e
 Smart Compare, Basket Split, or savings screens — those stay web-only (section 2). There is
 also no bottom navigation, no in-app Settings screen, and no in-app language switcher yet
 (section 18 previews the target design for the one of these — Settings — that doesn't exist at
-all today).
+all today). A small **Help & about** screen (support, privacy, terms, app version) is reached
+from the info icon on Home.
 
 **Business value:** mobile now closes the field loop that used to require a desktop at every
 step — request, approve, confirm delivery, flag a problem — while the high-context, evidence-
@@ -98,7 +100,7 @@ access, identity, and the field side of the request lifecycle.
 | Purchase request creation and submission | Shipped (native, with offline queueing) | Mobile section 9, or web sections 18–19 |
 | Approval decisions | Shipped (native, with an optional comment) | Mobile section 10, or web section 20 |
 | Delivery confirmation and quality-issue reporting | Shipped (native, photo evidence optional) | Mobile section 11, or web section 11 |
-| Low-stock reporting | Built and working, but not yet linked from any screen | Direct route only today — see section 17 |
+| Low-stock reporting | Shipped (native, with offline queueing) | Mobile section 12 (Home -> **Report low stock**) |
 | Order tracking, accounting, and POS/inventory integration | Web-only beyond delivery/quality-issue reporting above | Web sections 11 and 33–34 |
 | Smart Compare, Basket Split, Alerts, and Savings | Web-only | Web sections 12–16 |
 | Team management and organisation settings | Web-only | Web sections 21–22 |
@@ -231,10 +233,11 @@ checks while still validating that the session can be trusted.
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **App bar — "Home"** | With a sign-out icon button in the top-right corner. |
+| 1 | **App bar — "Home"** | With two icon buttons in the top-right corner: **Help & about** (info icon: Contact support, Privacy Policy, Terms of Service, app version) and sign-out. |
 | 2 | **Your role** | Shows your workspace role (Owner, Buyer, Branch Manager, Approver, or Viewer) — the same roles as the web app (section 26 of the web documentation). |
 | 3 | **Request items button** | Visible to Owner, Buyer, and Branch Manager. A live, working action — tapping it opens **New Purchase Request** (section 9) directly. |
-| 4 | **Pending decisions count** | Visible to Approver and Owner roles: a card reading "N request(s) awaiting your decision," loaded from the same pending-approvals list the web Approval Queue uses. Tapping the card opens the **Approval Queue** (section 10) — this is also live, not read-only. Shows a spinner while loading and an inline error message if the count can't be fetched. |
+| 4 | **Report low stock button** | Visible to Owner, Buyer, and Branch Manager. Opens the **Low-Stock Report** (section 12). |
+| 5 | **Pending decisions count** | Visible to Approver and Owner roles: a card reading "N request(s) awaiting your decision," loaded from the same pending-approvals list the web Approval Queue uses. Tapping the card opens the **Approval Queue** (section 10) — this is also live, not read-only. Shows a spinner while loading and an inline error message if the count can't be fetched. |
 
 **What's deliberately absent:** Home itself has no approve/reject control and no request form —
 both are one tap away, opening the dedicated screens in sections 9 and 10. Home is a dashboard
@@ -243,7 +246,8 @@ and a launch point, not the decision surface itself.
 **Workflow:**
 1. Land on Home after sign-in or biometric unlock.
 2. Confirm the role shown on screen matches the responsibility you expect.
-3. If you're a request-capable role, tap **Request items** to start a new request.
+3. If you're a request-capable role, tap **Request items** to start a new request, or
+   **Report low stock** to flag a running-low shelf.
 4. If you're an approver or owner, check the pending-decision count and tap it to act.
 
 **Tips:**
@@ -358,7 +362,7 @@ real push provider — section 13) from a notification tap carrying that request
 | 2 | **Line items** | One row per line: product, quantity, quantity received (once delivery has started), and estimated unit price. |
 | 3 | **Confirm Delivery button** | Shown only while the request's status is `ordered`. Opens the Confirm Delivery screen (section 11). |
 | 4 | **Report Quality Issue button** | Shown only while the request's status is `delivered`. Opens the Quality Issue screen (section 11). |
-| 5 | **Approval section** | Read-only: a status chip, who it's assigned to, and — once decided — the approver's comment and decision timestamp. There is no approve/reject control on this screen; that lives in the Approval Queue (section 10). |
+| 5 | **Approval section** | Read-only: a status chip, who it's assigned to, and — once decided — the approver's comment and decision timestamp. A step the requester decided themselves is marked "Decided by the person who submitted it". There is no approve/reject control on this screen; that lives in the Approval Queue (section 10). |
 
 **Current display limitation:** lines show the product's catalogue name, or an "unknown product"
 label when the server sends no name. "Assigned to" shows the approver's email (or "Unknown approver"),
@@ -384,8 +388,9 @@ that drives the Home pending-decision count (section 6).
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **App bar — "Approval Queue"** | |
-| 2 | **Queue list** | One row per pending request: requester, required-by date, and estimated total. Tapping a row opens the decision screen below. |
-| 3 | **Empty state** | "No requests are currently awaiting your decision." |
+| 2 | **Queue list** | One row per pending request: requester, required-by date, and estimated total. Tapping a row opens the decision screen below. The requests of one basket split appear together and are decided as one group. |
+| 3 | **Load more** | Shown when more pending requests exist than the first page. Loads the next page; "Unable to load more requests. Please try again." if it fails. |
+| 4 | **Empty state** | "No requests are currently awaiting your decision." |
 
 ### Approval Decision
 
@@ -400,6 +405,11 @@ that drives the Home pending-decision count (section 6).
 | 3 | **Approve button** | Records an approval with the comment, if any. |
 | 4 | **Reject button** | Records a rejection with the comment, if any. |
 | 5 | **Result message** | Shown inline after a decision: a success confirmation, or — if someone else (on mobile or web) already decided the request first — a specific "already decided" message instead of a generic error. |
+
+**Basket splits:** a request that is part of a basket split (web section 13) is approved or
+rejected together with the other requests of that split, showing the **Split total**. The app
+loads every request of the split before it enables the decision; deciding one alone is refused
+with "This request is part of a split and must be decided as a group."
 
 **Business value:** approvers get the same decision authority on mobile as on web — context,
 an optional comment, and approve/reject — so a pending request doesn't have to wait for its
@@ -457,9 +467,8 @@ remember the details until they're back at a desktop. Photo evidence is optional
 ![Low-Stock Report](screenshots/mobile/08-low-stock-report.png)
 ![Low-Stock Report — Success](screenshots/mobile/08b-low-stock-report-success.png)
 
-A lightweight "shelf is running low" signal, unrelated to any specific purchase request — the
-screen itself is fully built and tested, but **nothing in the shipped app currently navigates
-to it**. It's reachable today only by its route name; see section 17.
+A lightweight "shelf is running low" signal, unrelated to any specific purchase request. Open
+it from Home's **Report low stock** button (Owner, Buyer, Branch Manager).
 
 | # | Element | Description |
 |---|---------|-------------|
@@ -473,9 +482,8 @@ issues applies here — a submission made without connectivity is queued and sho
 report queued — will send when back online," then replays automatically once the device is
 back online.
 
-**Business value:** the intent is a lightweight early-warning path distinct from raising a full
-purchase request — but it's currently unrealized in practice, since there's no way for a user
-to reach this screen without someone handing them the route name directly.
+**Business value:** a lightweight early-warning path distinct from raising a full purchase
+request, so a branch can flag a running-low item before it becomes a stock-out.
 
 ---
 
@@ -511,9 +519,9 @@ the role can raise requests, and whether it should see approval decisions.
 
 | Role | Mobile experience today |
 |------|--------------------------|
-| **Owner** | Everything: create/submit requests, approve/reject, confirm delivery, report quality issues, and (once reachable — section 17) low-stock reports. |
-| **Buyer** | Create/submit requests, confirm delivery, report quality issues. No approval decisions — Buyer isn't an approver role on mobile or web. |
-| **Branch Manager** | Create/submit requests, confirm delivery, report quality issues. No approval decisions. |
+| **Owner** | Everything: create/submit requests, approve/reject, confirm delivery, report quality issues, and low-stock reports. |
+| **Buyer** | Create/submit requests, confirm delivery, report quality issues, low-stock reports. No approval decisions — Buyer isn't an approver role on mobile or web. |
+| **Branch Manager** | Create/submit requests, confirm delivery, report quality issues, low-stock reports. No approval decisions. |
 | **Approver** | Approve/reject from the Approval Queue. No request-creation button on Home — Approver isn't a request-raising role on mobile or web. |
 | **Viewer** | Can sign in, see role, and sign out. No write action is available. |
 
@@ -601,10 +609,10 @@ A: No. It is optional and can always fall back to password sign-in.
 
 | # | Area | Limitation |
 |---|------|-----------|
-| 1 | Navigation | "My Requests" (section 9) and "Low-Stock Report" (section 12) are both fully built and tested, but no button, link, or menu anywhere in the shipped app navigates to either — they're reachable only by their route name. Home's **Request items** button opens the New Request form directly, not a list. |
+| 1 | Navigation | "My Requests" (section 9) is fully built and tested, but no button, link, or menu anywhere in the shipped app navigates to it — it's reachable only by its route name. Home's **Request items** button opens the New Request form directly, not a list. (The Low-Stock Report, once in the same position, is linked from Home since 19 Oct 2026.) |
 | 2 | Navigation | Because of #1, a request's Detail screen — and therefore Confirm Delivery and Report Quality Issue — currently has no reliable in-app path once you've navigated away from it, other than a notification tap naming that specific request. Push notifications aren't actually delivered yet (section 13), so in practice this path doesn't fire today outside of tests. |
 | 3 | Push notifications | The device-registration token is an honest local placeholder, not a real Firebase/APNs token; no push notification is actually sent to a device in this release (section 13). |
-| 4 | Navigation | No bottom navigation or Settings screen exists yet — every screen is reached by a specific action from wherever it's linked (see section 18 for the target design). |
+| 4 | Navigation | No bottom navigation or Settings screen exists yet — every screen is reached by a specific action from wherever it's linked (see section 18 for the target design). **Help & about** (Home's info icon) covers support, legal pages and the app version only. |
 | 5 | Language | No in-app language switcher; the app follows the device locale. |
 | 6 | Sessions | If a session is revoked server-side, the mobile client's own refresh-token exchange happens directly against Supabase Auth rather than through ProcurePilot's API — this path has a documented gap in test coverage, not a confirmed bug (see the engineering notes in `apps/api/tests/integration/test_session_revocation.py`). |
 | 7 | Documentation images | Mobile screenshots are real offline renders of the shipped Flutter app generated via `cd apps/mobile && flutter test --tags docs --run-skipped test/docs/` through the Ledger design system. Settings (section 18) remains the only design mockup because that screen is not yet implemented. |
@@ -624,9 +632,11 @@ Most of the screens originally previewed in this section are now shipped — see
 ![Settings — Design preview of future screen](screenshots/mobile/09-settings-mockup.png)
 
 A dedicated Settings screen: account info, assigned branch, a notification toggle, an in-app
-language switcher, help/feedback, app version, and sign-out. Today, the only settings-like
-control in the app is the sign-out icon in the Home app bar (section 7); language follows the
-device locale (section 8).
+language switcher, help/feedback, app version, and sign-out. Today, the settings-like controls
+in the app are the sign-out icon in the Home app bar (section 7) and the **Help & about** screen
+beside it (Contact support, Privacy Policy, Terms of Service, app version); language follows the
+device locale (section 8). There is no in-app feedback form on mobile; send feedback from the
+web app (web section 39).
 
 **Expected workflow:** review account details, adjust notifications and language, reach help,
 and sign out from one predictable place.
@@ -645,5 +655,6 @@ missing entry points rather than a missing tab.
 
 ## Getting Help
 
+- In the mobile app: **Help & about** (info icon on Home) -> **Contact support**.
 - In the web app: **Account menu -> Contact support** opens an email to support.
 - Email: support@iron-sys.com.

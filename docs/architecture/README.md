@@ -9,8 +9,8 @@
 - [`tech-stack-blueprint.md`](tech-stack-blueprint.md) — Technologies, versions and repository structure.
 - [`adrs.md`](adrs.md) — Architecture Decision Records and their rationale.
 - [`engineering-spec.md`](engineering-spec.md) — Low-level design: service boundaries, API patterns, data layer, security model.
-- [`api-specification.md`](api-specification.md) — OpenAPI-style contract for the Phase 1–2 endpoints.
-- [`data-dictionary.md`](data-dictionary.md) — Field-level definitions for the core entities.
+- [`api-specification.md`](api-specification.md) — OpenAPI-style contract for the endpoints, specs `001`–`025`.
+- [`data-dictionary.md`](data-dictionary.md) — Field-level definitions for the entities in `supabase/migrations/`.
 
 ## Flow diagrams
 

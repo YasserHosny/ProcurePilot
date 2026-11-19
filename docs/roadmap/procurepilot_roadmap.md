@@ -8,9 +8,9 @@
 | Field | Value |
 |---|---|
 | Document | ProcurePilot Master Roadmap |
-| Version | 1.2 |
+| Version | 1.3 |
 | Status | Active — delivery status maintained in the section "Delivery Status" below |
-| Last updated | 2026-10-31 |
+| Last updated | 2026-11-19 |
 | Source of truth | `procurepilot_ai_context.md` (product context package) |
 | Scope | Business vision, strategy, phased delivery, technical architecture, web and mobile implementation |
 | Planning horizon | 24 months (M0 – M24) |
@@ -33,10 +33,11 @@
 | 1.0 | 2026-09-10 | Original plan |
 | 1.1 | 2026-10-18 | Added Delivery Status (release ledger, gates, partial and deferred scope); first pilot market (Egypt); new risks 16–21 from the hosted demo build; walkthrough rule in the Definitions of Done; decision status in §20.2; current next actions in §21 |
 | 1.2 | 2026-10-18 | Delivery Status: demo findings count, security review (R3.2–R4.3), background workers not deployed on hosted; §10.8 internal review row; risk 19 widened; §21.1 refreshed |
+| 1.3 | 2026-11-19 | Delivery Status: spec 025 (in-app feedback) in the release ledger; feedback worker on hosted; VAT-inclusive quotes (ADR-021) no longer open; hosted demo and pilot domains |
 
 ---
 
-## Delivery Status (as of 2026-10-18)
+## Delivery Status (as of 2026-10-18; release ledger and hosting updated 2026-11-19)
 
 ### Release ledger
 
@@ -69,6 +70,7 @@ release's spec was built and merged; it does not mean the phase's business gate 
 | Pilot | Home currency (Egypt) | `022-home-currency-readiness` | Merged, 3 tasks open | Real-quote extraction run, mobile screenshots, full test pass |
 | Pilot | RFQ-aware matching | `023-rfq-aware-matching` | Shipped | Replies to an RFQ match the RFQ's own lines; match decisions are correctable by supersession (ADR-022). Open: T027 (recorded Azure DI fixtures), T030, T033, T034 |
 | Pilot | RFQ basket split | `024-rfq-basket-split` | Shipped | A split becomes one request group approved as one (ADR-023). Open: T002. Split is unreachable on a workspace with an enabled guardrail (W2, PPS-148) |
+| Pilot | In-app feedback | `025-user-feedback` | Shipped 2026-11-19 | PRs #590, #593, #596. Any member sends text, up to 5 screenshots and one voice message from the app shell and sees their own list (`/feedback`); the owner has a read-only workspace inbox (`/feedback/workspace`); platform operators triage across workspaces (`/platform/feedback`, ADR-027) with an optional daily digest. Kept 12 months |
 
 Since 2026-10-15 the hosted demo tenant build has produced 50 findings in `docs/gtm/demo-tenant/README.md`:
 47 are marked fixed, 20 is partly fixed, 43 is a recorded decision and 50 is not yet explained. The round-1
@@ -93,6 +95,14 @@ there.
 No metric in §15.2 has been measured against real customer data yet. The first pilot (Egypt, see
 §18) is what makes them measurable.
 
+### Hosted environments (2026-11-19)
+
+The hosted demo runs at `https://procurepilot.iron-sys.com`. Its two demo workspaces, «مطاعم سند» and
+«مطاعم رواق» (`docs/gtm/demo-tenant/README.md`), are flagged `is_demo`. The production pilot domain
+`pilot.iron-sys.com` is planned and not live. Match-score calibration is still not feasible (far fewer
+than the 500+ labelled decisions it needs), and G3 stays unmet on its operational metrics (pilot
+accounts, 180-day history, integration-sourced quotes).
+
 ### Partial and deferred scope
 
 | Item | Roadmap ref | State | Where recorded |
@@ -108,8 +118,8 @@ No metric in §15.2 has been measured against real customer data yet. The first 
 | Separate inventory-system connector | §8.1 | Stock on hand comes from the POS (Square) only | — |
 | Payment collection for plans | §6.2 R1.5 | Stub billing provider | — |
 | Exchange rates (pilot gap C4) | — | Cross-currency comparison refused by design | `docs/gtm/first-customer-gtm-plan.md` |
-| VAT-inclusive prices (C5) and GCC items G1–G5 | — | Open | `docs/gtm/first-customer-gtm-plan.md` |
-| Background workers on hosted | Risk 19 | Only the extraction, email-ingestion and optimiser workers are deployed. Report schedules, offer refresh, exports, digests, outbound webhooks and accounting/POS sync have no deploy workflow. Checked on hosted 2026-10-18: the only report schedule has been due since 2026-09-15 and never ran; 4 offer-refresh schedules are overdue; the only completed exports came from local E2E runs | `docker-compose.yml` lists them; `.github/workflows/deploy-*.yml` does not |
+| VAT-inclusive prices (C5) and GCC items G1–G5 | — | C5 shipped 2026-10-30: VAT-inclusive quotes keep their printed prices on rule `landed-cost-v2` (ADR-021). G1–G5 as recorded in the GTM plan | `docs/gtm/first-customer-gtm-plan.md`, `docs/architecture/adrs.md` |
+| Background workers on hosted | Risk 19 | Only the extraction, email-ingestion and optimiser workers are deployed, plus the feedback worker (digest and retention, spec 025) since 2026-11-19. Report schedules, offer refresh, exports, digests, outbound webhooks and accounting/POS sync have no deploy workflow. Checked on hosted 2026-10-18: the only report schedule has been due since 2026-09-15 and never ran; 4 offer-refresh schedules are overdue; the only completed exports came from local E2E runs | `docker-compose.yml` lists them; `.github/workflows/deploy-*.yml` does not |
 
 ---
 

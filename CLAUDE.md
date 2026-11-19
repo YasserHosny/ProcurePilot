@@ -45,13 +45,14 @@ Redis + RQ (job queues: extraction, basket-split, exports, report scheduling, pu
 
 **Mobile** — Flutter. Shipped, not a placeholder: auth (sign-in, biometric, device registration),
 home, purchase requests, approvals, low-stock reporting, delivery confirmation and quality-issue
-photos, push notifications (`apps/mobile/lib/features/`).
+photos, push notifications (`apps/mobile/lib/features/`). The push provider is still a stub: no
+FCM/APNs credentials yet, so sends are recorded as not delivered (`modules/devices/push_job.py`).
 
 ## Project structure
 
 ```text
 apps/api/          FastAPI modular monolith — the only backend deployable
-  src/procurepilot_api/modules/   30 modules (auth, tenants, catalogue, quotations, matching,
+  src/procurepilot_api/modules/   31 modules (auth, tenants, catalogue, quotations, matching,
                    offers, requests, orders, rfq, analyst, ...) — `ls` for the current list
   src/procurepilot_api/workers/   background workers run from the API image (email ingestion, exports,
                    digests, report scheduling, accounting/POS sync, webhooks, catalogue and offer
@@ -61,7 +62,7 @@ supabase/migrations/  versioned SQL, applied via Supabase CLI (apps/api/migratio
 apps/web/          Angular 22 SPA
   src/app/{core,layout,features}/
 apps/mobile/       Flutter app — shipped (auth, requests, approvals, low-stock, delivery, push)
-packages/          domain-types · ui · validation · i18n
+packages/          domain-types · ui · i18n · py-logging
 services/          extraction-worker (quotation extraction) · optimiser (basket-split solver) —
                    both real, independently deployed workers; matching-worker/ is an empty
                    placeholder (matching runs inside apps/api)
@@ -75,7 +76,7 @@ docs/              product, architecture, roadmap, quality, operations
 ## Commands
 
 ```bash
-docker compose up --build   # whole stack: api + web + local Supabase
+docker compose up --build   # api + workers + redis + web (Supabase runs via `supabase start`)
 pnpm db:migrate             # apply versioned SQL migrations
 pnpm db:check-privileges    # read-only: migrations applied, client-role grants as intended
 pnpm db:seed                # reference data + a platform invitation token
@@ -103,7 +104,7 @@ Contract: `specs/001-platform-foundation/contracts/auth-tenant.openapi.yaml`.
 interfaces, not shared internal state.
 
 **TypeScript** — strict mode, standalone components, signals for local state, RxJS for streams.
-No `any`. Shared validation schemas come from `packages/validation`.
+No `any`. Zod schemas live with the feature that uses them (there is no shared validation package).
 
 **Web dependencies** — CI installs `apps/web` from its own `apps/web/pnpm-lock.yaml`
 (`--ignore-workspace --frozen-lockfile`), not the root lockfile: after changing web dependencies,
