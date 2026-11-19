@@ -61,7 +61,7 @@ supabase/migrations/  versioned SQL, applied via Supabase CLI (apps/api/migratio
 apps/web/          Angular 22 SPA
   src/app/{core,layout,features}/
 apps/mobile/       Flutter app — shipped (auth, requests, approvals, low-stock, delivery, push)
-packages/          domain-types · ui · validation · i18n
+packages/          domain-types · ui · i18n · py-logging
 services/          extraction-worker (quotation extraction) · optimiser (basket-split solver) —
                    both real, independently deployed workers; matching-worker/ is an empty
                    placeholder (matching runs inside apps/api)
@@ -103,7 +103,7 @@ Contract: `specs/001-platform-foundation/contracts/auth-tenant.openapi.yaml`.
 interfaces, not shared internal state.
 
 **TypeScript** — strict mode, standalone components, signals for local state, RxJS for streams.
-No `any`. Shared validation schemas come from `packages/validation`.
+No `any`. Zod schemas live with the feature that uses them (there is no shared validation package).
 
 **Web dependencies** — CI installs `apps/web` from its own `apps/web/pnpm-lock.yaml`
 (`--ignore-workspace --frozen-lockfile`), not the root lockfile: after changing web dependencies,
