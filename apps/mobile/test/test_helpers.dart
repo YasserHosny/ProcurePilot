@@ -844,10 +844,12 @@ class FakeRequestsApiClient extends RequestsApiClient {
       'issueId': issueId,
       'filePath': filePath,
     });
-    if (uploadQualityIssuePhotoError != null)
+    if (uploadQualityIssuePhotoError != null) {
       throw uploadQualityIssuePhotoError!;
-    if (uploadQualityIssuePhotoResult != null)
+    }
+    if (uploadQualityIssuePhotoResult != null) {
       return uploadQualityIssuePhotoResult!;
+    }
     return QualityIssuePhoto(
       id: 'photo-1',
       deliveryQualityIssueId: issueId,
