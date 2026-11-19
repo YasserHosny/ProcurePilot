@@ -424,6 +424,7 @@
     "roleLabel": "Your role",
     "requestItems": "Request items",
     "reportLowStock": "Report low stock",
+    "myRequests": "My requests",
     "pendingApprovalsCount": "{{count}} request(s) awaiting your decision",
     "pendingCountError": "Unable to load pending count",
     "signOut": "Sign out"

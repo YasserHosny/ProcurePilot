@@ -12,8 +12,7 @@ import '../service_provider.dart';
 /// Role-aware home screen.
 ///
 /// - Request-capable roles (owner, buyer, branch_manager) see a primary
-///   "Request items" action. The actual request-submission flow is Phase 4;
-///   the button is currently disabled/placeholder.
+///   "Request items" action and a "My requests" entry to their own list.
 /// - Approvers additionally see an entry point to pending decisions from
 ///   [GET /approvals/pending].
 class HomeScreen extends StatefulWidget {
@@ -154,6 +153,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: () =>
                       Navigator.of(context).pushNamed('/requests/new'),
                 ),
+              if (canRequest) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  key: const Key('homeMyRequestsButton'),
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: Text(i18n.t('mobileHome.myRequests')),
+                  onPressed: () => Navigator.of(context).pushNamed('/requests'),
+                ),
+              ],
               if (canReportLowStock) ...[
                 if (canRequest) const SizedBox(height: 12),
                 ElevatedButton.icon(

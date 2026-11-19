@@ -6,11 +6,15 @@
 # ecosystem publishes a fix, and whenever the security review record
 # (docs/quality/r2.5-security-review-record.md) is refreshed.
 #
-# Enforcement: Python IDs are passed to `pip-audit --ignore-vuln <id>`; JS/npm GHSA IDs are
-# read by pnpm itself from `pnpm.auditConfig.ignoreGhsas` in the root package.json (kept in
-# sync with the GHSA column below — pnpm does not read this file).
+# Enforcement: Python IDs are passed to `pip-audit --ignore-vuln <id>` in ci.yml; JS/npm GHSA IDs
+# go in `pnpm.auditConfig.ignoreGhsas` in the root package.json (kept in sync with the GHSA
+# column below — pnpm does not read this file). There are no JS entries today, so package.json
+# carries no ignore list.
 #
-# Last reviewed: 2026-10-21, by Claude (orchestrator, CI dependency-audit follow-up).
+# Last reviewed: 2026-11-19, by Claude (orchestrator), re-running both audits with no ignores:
+# `pnpm audit --prod` at the repo root (Angular 22.2.3) reports 0 advisories; `pip-audit` reports
+# exactly the 12 Python IDs below, all in apps/api (services/extraction-worker and
+# services/optimiser are clean).
 
 ## Python (pip-audit)
 
@@ -31,6 +35,13 @@
 
 ## JavaScript (pnpm audit) — GHSA IDs, mirrored in `package.json`'s `pnpm.auditConfig.ignoreGhsas`
 
+None. The 11 Angular 19.2.25 entries below were removed on 2026-11-19: the app is on Angular
+22.2.3, and `pnpm audit --prod` with no ignore list reports no advisories, so the
+`ignoreGhsas` list was deleted from `package.json`. A new JS finding now fails the CI job until it
+is fixed or added back here with an owner and reason.
+
+### Removed 2026-11-19 (history)
+
 | GHSA ID                   | Package           | Installed | Fix available? | Owner  | Reason |
 |----------------------------|-------------------|-----------|-----------------|--------|--------|
 | GHSA-48r7-hpm6-gfxm        | @angular/common   | 19.2.25   | none            | FE/Agy | DoS via OOM in `formatDate`. No patched version listed on any Angular 19.x release as of 2026-09-16. |
@@ -45,9 +56,10 @@
 | GHSA-62vg-58rm-qff7        | @angular/router   | 19.2.25   | none            | FE/Agy | SSR-only DoS via unmatched empty-path outlet route matching. This app has no SSR, so it is not exposed; no fix on 19.x; added 2026-10-21. |
 | GHSA-jfgx-762w-99vr        | @angular/common   | 19.2.25   | none            | FE/Agy | XSRF token leakage via URL parsing in the HttpClient XSRF handling. Unlike the SSR-only entries this one is not SSR-specific, but this app authenticates with a bearer `Authorization` header (`auth.interceptor.ts`), configures no XSRF handling, and the API issues no XSRF cookie, so there is no token to leak; exposure is theoretical. No fix on 19.x; added 2026-10-21. |
 
-All ten JS findings and all four Python findings share one root cause category: **no upstream
-fix exists yet** at the pinned major/minor line this project is on (Angular 19, FastAPI 0.115.6 /
-Starlette 0.41.3, python-jose 3.3.0). None were introduced by this repo's own code. A full
-Angular 20 and FastAPI/Starlette major-version upgrade is out of scope for R2.5 — track as a
-follow-up, and re-run `pnpm audit --prod` / `pip-audit` after any such upgrade to confirm these
-entries can be removed rather than carried forward automatically.
+The 12 Python entries share one root-cause category: **no usable upstream fix** at the line this
+project is pinned to (FastAPI 0.115.6 / Starlette 0.41.3, python-jose 3.3.0 and its ecdsa
+dependency). None were introduced by this repo's own code. The Angular upgrade to 22 cleared all
+the JS entries; the remaining work is the same kind of upgrade on the Python side — FastAPI to a
+release that allows Starlette 0.47.2+ (clears 7 entries) and a move off python-jose to PyJWT or
+joserfc (clears the other 5). Re-run `pip-audit` after either, and remove entries rather than
+carry them forward.

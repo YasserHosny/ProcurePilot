@@ -112,6 +112,7 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'roleLabel': 'Your role',
         'requestItems': 'Request items',
         'reportLowStock': 'Report low stock',
+        'myRequests': 'My requests',
         'pendingApprovalsCount': '{{count}} pending',
         'pendingCountError': 'Count error',
         'signOut': 'Sign out',
@@ -439,6 +440,7 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'roleLabel': 'دورك',
         'requestItems': 'طلب عناصر',
         'reportLowStock': 'الإبلاغ عن انخفاض المخزون',
+        'myRequests': 'طلباتي',
         'pendingApprovalsCount': '{{count}} طلب(ات) بانتظار قرارك',
         'pendingCountError': 'تعذر تحميل عدد الطلبات المعلقة',
         'signOut': 'تسجيل الخروج',
@@ -844,10 +846,12 @@ class FakeRequestsApiClient extends RequestsApiClient {
       'issueId': issueId,
       'filePath': filePath,
     });
-    if (uploadQualityIssuePhotoError != null)
+    if (uploadQualityIssuePhotoError != null) {
       throw uploadQualityIssuePhotoError!;
-    if (uploadQualityIssuePhotoResult != null)
+    }
+    if (uploadQualityIssuePhotoResult != null) {
       return uploadQualityIssuePhotoResult!;
+    }
     return QualityIssuePhoto(
       id: 'photo-1',
       deliveryQualityIssueId: issueId,

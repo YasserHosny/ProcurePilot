@@ -24,10 +24,27 @@ here today:
    and confirm it both builds and correctly fails on an oversized APK before ever promoting it
    into `ci.yml`'s required set.
 
-**Status (checked 2026-11-19):** the workflow has been run twice, both on 2026-10-17 (runs
-`39075120933` and `39075595173`). It builds the release APK and its size check fails as designed:
-the APK was 54,438,989 bytes against the 31,457,280-byte (30 MB) budget. So the failure path is
-proven, the pass path is not, and the app is over budget. No run since. The app itself has shipped
+**Status (2026-11-19): size budget met, both paths proven.**
+
+- **Failure path:** proven on 2026-10-17 (runs `39075120933`, `39075595173`). That build made one
+  "fat" APK carrying the engine and app code for every CPU type: 54,438,989 bytes, over budget.
+- **Pass path:** proven on 2026-11-19 (run `44432335292`). The budget is a *download* size and a
+  device downloads one per-ABI build (from a Play app bundle, or a per-ABI APK), never the fat APK.
+  So the workflow now builds `--split-per-abi` (with `--split-debug-info`) and checks each APK:
+
+  | APK | Bytes | MB |
+  |---|---|---|
+  | `app-arm64-v8a-release.apk` (nearly all current phones) | 19,135,243 | 18.2 |
+  | `app-armeabi-v7a-release.apk` (older 32-bit phones) | 16,689,669 | 15.9 |
+  | `app-x86_64-release.apk` (emulators, Chromebooks) | 20,436,194 | 19.5 |
+
+- **Mobile suite in CI:** the same workflow now runs `flutter analyze --no-fatal-infos` and
+  `flutter test` (290 tests passing) first, and it runs on every PR that touches `apps/mobile/` as
+  well as on demand. It is still not a required check.
+- **Toolchain:** current stable Flutter needs Android Gradle Plugin 9.1.1 or later (bumped from
+  9.1.0 in `android/settings.gradle.kts`). It also reports every `package:flutter/material.dart`
+  import as deprecated in favour of `package:material_ui`; that migration is separate work, so
+  analyze does not fail on infos. The app itself has shipped
 (auth, home, requests, approvals, low-stock, delivery); this gate is about store submission. Push
 notifications are not delivered yet: the server-side sender is a stub with no FCM/APNs
 credentials (runbook §3.5), so a store release would ship without working pushes.
@@ -39,13 +56,18 @@ submission — not on every PR, not on a schedule, but as a deliberate release-r
 
 ```bash
 cd apps/mobile
-flutter build apk --release
-ls -la build/app/outputs/flutter-apk/app-release.apk
+flutter build apk --release --split-per-abi --split-debug-info=build/debug-info
+ls -la build/app/outputs/flutter-apk/app-*-release.apk
 ```
 
-- **Budget: under 30MB.** If the release APK exceeds this, check for the usual causes first
-  (unused asset bundling, a debug-only dependency that leaked into the release build, missing
-  `--split-per-abi`) before assuming the budget itself needs revisiting.
+- **Budget: under 30MB per ABI** — each `app-<abi>-release.apk` is what a device downloads. A
+  plain `flutter build apk --release` makes one fat APK for all CPU types (54MB on 2026-10-17);
+  that number is not the download size and is not the budget. For a store release, upload an app
+  bundle (`flutter build appbundle`), from which the store serves the per-ABI split. If a split APK
+  grows past budget, check the usual causes (unused asset bundling, a debug-only dependency leaking
+  into the release build) before revisiting the budget.
+- Keep `build/debug-info` (the workflow uploads it as the `mobile-debug-info` artifact): it is what
+  turns a release crash stack trace back into readable frames.
 - For iOS, the equivalent is `flutter build ipa --release` and the resulting `.ipa` size — this
   project has not yet needed an iOS release build, so no local recipe for it is recorded here yet;
   add one when that day comes rather than guessing at it now.
@@ -73,10 +95,8 @@ adb shell am start -W <package-name>/<launch-activity>
 ## When this can become a real CI job
 
 Once someone has:
-1. Run `.github/workflows/mobile-build-size-check.yml` manually at least once against a live
-   GitHub Actions runner and confirmed it builds successfully and correctly fails when the APK
-   exceeds budget (e.g., by temporarily lowering the threshold to prove the failure path works),
-   and
+1. ~~Run `.github/workflows/mobile-build-size-check.yml` against a live runner and seen it both
+   fail on an oversized APK and pass~~ — done (2026-10-17 failure, 2026-11-19 pass), and
 2. Found a reliable, non-flaky way to automate the cold-start measurement (a proven Android
    emulator GitHub Action, or accepted that it stays manual indefinitely because device-level
    timing in CI is inherently unreliable),
