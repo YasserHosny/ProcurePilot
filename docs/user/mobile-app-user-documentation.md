@@ -255,7 +255,8 @@ and a launch point, not the decision surface itself.
   authority.
 - If the count fails to load, sign out and back in, then use the web Approval Queue as a
   fallback.
-- Home itself never lists your past requests — see the "My Requests" gap noted in section 17.
+- Owners, Buyers and Branch Managers also get a **My requests** button under **Request items**,
+  which opens your own request list (section 9). Approvers and Viewers do not see it.
 
 **Business value:** Home gives the user a low-friction operational signal — who they are in the
 workspace and whether a request or an approval needs attention — with one tap into the screen
@@ -314,7 +315,7 @@ own requests, a create/edit form, and a read-only detail view.
 
 ### My Requests
 
-**Route:** `/requests`
+**Route:** `/requests` — opened from Home's **My requests** button (Owner, Buyer, Branch Manager).
 
 ![My Requests](screenshots/mobile/06-my-requests-list.png)
 ![My Requests — Empty State](screenshots/mobile/06b-my-requests-empty.png)
@@ -569,16 +570,12 @@ A: Yes. Tap the pending-decision count on Home (or open the Approval Queue direc
 the Approve/Reject buttons with an optional comment.
 
 **Q: Where do I see my own past requests?**
-A: The "My Requests" screen exists and works, but nothing in the app currently links to it —
-see the gap noted in section 17. For now, use the web app's Purchase Requests screen (web
-section 18) to browse your history.
+A: Tap **My requests** on Home (Owner, Buyer and Branch Manager roles). It lists your own
+requests with their status; tap one to open its Detail screen.
 
 **Q: Why can't I confirm delivery or report a quality issue on an older request?**
-A: Both actions live on that request's Detail screen, which today is only reached right after
-you submit a request, or from a notification tap that names a specific request. Since
-notifications aren't actually delivered yet (section 13) and there's no "My Requests" entry
-point (section 17), there's currently no reliable way back to an older request's Detail screen
-from inside the app. Use the web app's Order Tracking or Purchase Requests screens instead.
+A: Both actions live on that request's Detail screen. Open **My requests** from Home and tap the
+request to reach it.
 
 **Q: Does signing in request notification permission?**
 A: Yes, right after sign-in. Declining is safe — it just skips device registration and nothing
@@ -609,8 +606,8 @@ A: No. It is optional and can always fall back to password sign-in.
 
 | # | Area | Limitation |
 |---|------|-----------|
-| 1 | Navigation | "My Requests" (section 9) is fully built and tested, but no button, link, or menu anywhere in the shipped app navigates to it — it's reachable only by its route name. Home's **Request items** button opens the New Request form directly, not a list. (The Low-Stock Report, once in the same position, is linked from Home since 19 Oct 2026.) |
-| 2 | Navigation | Because of #1, a request's Detail screen — and therefore Confirm Delivery and Report Quality Issue — currently has no reliable in-app path once you've navigated away from it, other than a notification tap naming that specific request. Push notifications aren't actually delivered yet (section 13), so in practice this path doesn't fire today outside of tests. |
+| 1 | Navigation | *Resolved 2026-11-19:* "My Requests" (section 9) is now linked from Home's **My requests** button for Owner, Buyer and Branch Manager, so older requests — and their Confirm Delivery and Report Quality Issue actions — are reachable in the app. Approvers and Viewers, who cannot raise requests, have no own-request list. |
+| 2 | Navigation | *Resolved 2026-11-19 with #1.* |
 | 3 | Push notifications | The device-registration token is an honest local placeholder, not a real Firebase/APNs token; no push notification is actually sent to a device in this release (section 13). |
 | 4 | Navigation | No bottom navigation or Settings screen exists yet — every screen is reached by a specific action from wherever it's linked (see section 18 for the target design). **Help & about** (Home's info icon) covers support, legal pages and the app version only. |
 | 5 | Language | No in-app language switcher; the app follows the device locale. |
