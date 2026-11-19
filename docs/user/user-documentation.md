@@ -1,10 +1,11 @@
 # ProcurePilot User Documentation
 
 > Complete system journey with annotated screenshots for every screen.
-> Last updated: 18 Nov 2026 (§39 Sending Feedback).
+> Last updated: 19 Nov 2026 (§39 Sending Feedback; mobile scope line).
 >
-> Covers the web app only. For the mobile app (sign-in, biometric unlock, role-aware home
-> screen), see [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md).
+> Covers the web app only. For the mobile app (sign-in, biometric unlock, purchase requests,
+> approvals, delivery confirmation, quality issues, low-stock reports), see
+> [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md).
 
 ---
 
