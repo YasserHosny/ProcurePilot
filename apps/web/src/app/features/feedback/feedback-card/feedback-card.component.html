@@ -1,0 +1,66 @@
+<mat-card appearance="outlined" class="fc-card" data-test="card">
+  <mat-card-content>
+    <div class="fc-head">
+      <span class="fc-chip fc-chip--{{ submission().status }}" data-test="status">{{
+        'feedback.status.' + submission().status | translate
+      }}</span>
+      @if (submission().category; as category) {
+        <span class="fc-chip fc-chip--category" data-test="category">{{
+          'feedback.category.' + category | translate
+        }}</span>
+      }
+      <span class="fc-date">{{
+        'feedback.list.sentOn'
+          | translate: { date: (submission().created_at | formatDate: dateOptions) }
+      }}</span>
+    </div>
+
+    @if (showSubmitter() && submission().submitter_name) {
+      <p class="fc-submitter" data-test="submitter">
+        {{
+          'feedback.list.submittedBy'
+            | translate
+              : {
+                  name: submission().submitter_name,
+                  role: ('common.roles.' + submission().member_role | translate),
+                }
+        }}
+      </p>
+    }
+
+    <p class="fc-text">{{ submission().text }}</p>
+
+    <p class="fc-page">
+      {{ 'feedback.list.page' | translate: { path: '' } }}<bdi dir="ltr">{{ submission().page_path }}</bdi>
+    </p>
+
+    @if (images().length > 0) {
+      <h3 class="fc-subhead">{{ 'feedback.list.screenshots' | translate }}</h3>
+      <div class="fc-images">
+        @for (image of images(); track image.id; let i = $index) {
+          <app-feedback-attachment
+            [submissionId]="submission().id"
+            [attachment]="image"
+            [number]="i + 1"
+          />
+        }
+      </div>
+    }
+
+    @if (audio().length > 0) {
+      <h3 class="fc-subhead">{{ 'feedback.list.audio' | translate }}</h3>
+      @for (clip of audio(); track clip.id) {
+        <app-feedback-attachment [submissionId]="submission().id" [attachment]="clip" />
+      }
+    }
+  </mat-card-content>
+
+  @if (canWithdraw()) {
+    <mat-card-actions align="end">
+      <button mat-button type="button" data-test="withdraw" (click)="withdraw.emit(submission())">
+        <mat-icon aria-hidden="true">undo</mat-icon>
+        {{ 'feedback.withdraw.action' | translate }}
+      </button>
+    </mat-card-actions>
+  }
+</mat-card>

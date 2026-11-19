@@ -1,0 +1,40 @@
+:host {
+  display: block;
+}
+
+.fa-image-link {
+  display: block;
+  inline-size: 96px;
+  block-size: 96px;
+  overflow: hidden;
+  border: 1px solid var(--pp-border);
+  border-radius: 8px;
+}
+
+.fa-image {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.fa-audio {
+  inline-size: 100%;
+  max-inline-size: 360px;
+}
+
+.fa-loading {
+  display: grid;
+  place-items: center;
+  inline-size: 96px;
+  block-size: 96px;
+}
+
+.fa-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--pp-error);
+  font-size: 0.8125rem;
+}

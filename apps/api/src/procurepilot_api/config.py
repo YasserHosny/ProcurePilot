@@ -348,6 +348,41 @@ class Settings(BaseSettings):
         default=0.90, validation_alias="POS_MATCHING_AUTO_ACCEPT_THRESHOLD"
     )
 
+    # Spec 025 (in-app user feedback). Limits mirror data-model.md: images 0..4 by the
+    # feedback_attachment.display_order check, so the count cap cannot exceed 5, and at most
+    # one audio per submission by a partial unique index.
+    feedback_bucket: str = Field(default="feedback-attachments", validation_alias="FEEDBACK_BUCKET")
+    feedback_cooldown_seconds: int = Field(
+        default=30, validation_alias="FEEDBACK_COOLDOWN_SECONDS", ge=0
+    )
+    rate_limit_feedback_submit: str = Field(
+        default="10/minute", validation_alias="RATE_LIMIT_FEEDBACK_SUBMIT"
+    )
+    feedback_attachment_url_ttl_seconds: int = Field(
+        default=300, validation_alias="FEEDBACK_ATTACHMENT_URL_TTL_SECONDS", ge=30, le=3600
+    )
+    feedback_retention_months: int = Field(
+        default=12, validation_alias="FEEDBACK_RETENTION_MONTHS", ge=1
+    )
+    feedback_digest_hour_utc: int = Field(
+        default=7, validation_alias="FEEDBACK_DIGEST_HOUR_UTC", ge=0, le=23
+    )
+    feedback_image_max_bytes: int = Field(
+        default=5_242_880, validation_alias="FEEDBACK_IMAGE_MAX_BYTES", ge=1
+    )
+    feedback_image_max_count: int = Field(
+        default=5, validation_alias="FEEDBACK_IMAGE_MAX_COUNT", ge=0, le=5
+    )
+    feedback_audio_max_bytes: int = Field(
+        default=10_485_760, validation_alias="FEEDBACK_AUDIO_MAX_BYTES", ge=1
+    )
+    # Public origin of the web app, used for the triage link in the operator digest. Falls back
+    # to web_origin when unset.
+    web_public_url: str | None = Field(default=None, validation_alias="WEB_PUBLIC_URL")
+    # Build identifier stamped on each submission (and exposed on /health). The Docker build
+    # passes APP_VERSION; "dev" locally.
+    app_version: str = Field(default="dev", validation_alias="APP_VERSION", min_length=1)
+
     @field_validator("api_cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: object) -> tuple[str, ...] | object:
@@ -356,6 +391,13 @@ class Settings(BaseSettings):
             if not origins:
                 raise ValueError("API_CORS_ORIGINS must contain at least one origin")
             return origins
+        return value
+
+    @field_validator("web_public_url", mode="before")
+    @classmethod
+    def empty_web_public_url_to_none(cls, value: object) -> object | None:
+        if isinstance(value, str) and not value.strip():
+            return None
         return value
 
     @field_validator(

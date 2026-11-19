@@ -212,6 +212,15 @@
             </div>
           </div>
         }
+
+        @if (operator.isOperator()) {
+          <div class="nav-home-wrap">
+            <a mat-list-item routerLink="/platform/feedback" routerLinkActive="active" class="nav-item">
+              <mat-icon aria-hidden="true">rate_review</mat-icon>
+              <span class="nav-label">{{ 'platform.feedback.nav' | translate }}</span>
+            </a>
+          </div>
+        }
       </nav>
     </mat-sidenav>
 
@@ -226,4 +235,8 @@
       </main>
     </mat-sidenav-content>
   </mat-sidenav-container>
+
+  <!-- Sibling of the content, not inside main-content: the control must not scroll away or be
+       replaced when the routed page changes (spec 025 FR-001). -->
+  <app-feedback-widget />
 </div>

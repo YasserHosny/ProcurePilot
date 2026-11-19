@@ -88,11 +88,11 @@ Measured (one run each, ±30% runner noise):
 
 ## Docker layer cache (deploy workflows)
 
-The five `deploy-*.yml` workflows cache BuildKit layers in the Actions cache, each under its own `scope` (`api`,
-`email-ingestion-worker`, `extraction-worker`, `optimiser`, `web`). Before 2026-10-24 they all used the default scope
+The `deploy-*.yml` workflows cache BuildKit layers in the Actions cache, each under its own `scope` (`api`,
+`email-ingestion-worker`, `extraction-worker`, `feedback-worker` (added 2026-11-18), `optimiser`, `web`). Before 2026-10-24 they all used the default scope
 with `mode=max`: each image's build overwrote the shared cache index, so builds rarely reused each other's blobs,
 and the orphaned blobs filled 10.4 GB of the repository's 10 GB Actions cache. That evicted the pnpm and uv caches CI
-relies on. The four single-stage images now use `mode=min`, which stores the same layers for a single-stage build;
+relies on. The single-stage images now use `mode=min`, which stores the same layers for a single-stage build;
 `web.Dockerfile` is two-stage, so it keeps `mode=max` to cache its build stage.
 
 ## Frontend deployment and CDN purge

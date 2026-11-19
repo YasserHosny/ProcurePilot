@@ -210,6 +210,8 @@
     "navSavings": "Savings Ledger",
     "navRequests": "Purchase Requests",
     "navApprovals": "Approval Queue",
+    "navFeedback": "My feedback",
+    "navWorkspaceFeedback": "Workspace feedback",
     "navTeam": "Team Management",
     "navSettings": "Settings",
     "switchWorkspace": "Switch workspace",
@@ -2007,6 +2009,123 @@
     "empty": {
       "title": "All clear — No active alerts",
       "message": "No commercial conditions requiring immediate attention were detected in your current workspace data."
+    }
+  },
+  "feedback": {
+    "widget": {
+      "open": "Send feedback",
+      "title": "Send feedback",
+      "close": "Close",
+      "textLabel": "Your message",
+      "textPlaceholder": "What happened, or what would you like to see?",
+      "charsLeft": "{{count}} characters left",
+      "send": "Send",
+      "sending": "Sending…",
+      "successTitle": "Thank you, we received your feedback",
+      "successBody": "The ProcurePilot team will read it. You can follow its status under My feedback.",
+      "viewMine": "See my feedback",
+      "cooldown": "You just sent feedback. Please wait {{seconds}} s before sending again.",
+      "draftKept": "Your draft is kept.",
+      "draftBadge": "Draft saved"
+    },
+    "category": {
+      "label": "Category (optional)",
+      "none": "No category",
+      "bug": "Bug",
+      "idea": "Idea",
+      "question": "Question",
+      "other": "Other"
+    },
+    "notice": "ProcurePilot staff can see your feedback, any screenshots and voice message you add, and your name and email. Your workspace owner can see it too.",
+    "errors": {
+      "textRequired": "Write a message before sending.",
+      "network": "We could not reach ProcurePilot. Check your connection and try again.",
+      "tooLarge": "The files are too large to send. Remove an attachment or send the text alone.",
+      "unsupportedType": "One of the files is not a supported type. Remove it or send the text alone.",
+      "unsupportedTypeNamed": "{{name}} is not a supported file type. Remove it or send the text alone.",
+      "invalid": "The feedback could not be accepted. Check the message and attachments and try again.",
+      "sessionExpired": "Your session has expired. Sign in again; your draft is kept.",
+      "rateLimited": "Too many requests. Please wait a moment and try again.",
+      "server": "Something went wrong on our side. Try again in a moment."
+    },
+    "attachments": {
+      "title": "Screenshots",
+      "add": "Add screenshots",
+      "dropHint": "Drop images here, choose files, or paste a screenshot.",
+      "hideToCapture": "Hide to take a screenshot",
+      "captureHint": "To capture this page, hide this window, take your screenshot, then reopen Send feedback and paste it here.",
+      "pasteNow": "Paste your screenshot here (Ctrl+V or ⌘V).",
+      "previewFailed": "Preview unavailable. You can still send it.",
+      "readFailed": "{{name}} could not be read. Try adding it again.",
+      "limits": "Up to 5 images (JPEG, PNG or WEBP), 5 MB each.",
+      "previewAlt": "Screenshot {{number}}",
+      "remove": "Remove screenshot {{number}}",
+      "count": "You can attach at most 5 screenshots.",
+      "type": "{{name}} was not added: only JPEG, PNG and WEBP images are supported.",
+      "size": "{{name}} was not added: images can be at most 5 MB.",
+      "pasteNoImage": "There is no image on the clipboard, so nothing was added.",
+      "pasteBadType": "The pasted item is not a supported image type, so nothing was added."
+    },
+    "audio": {
+      "title": "Voice message",
+      "record": "Record",
+      "stop": "Stop",
+      "recording": "Recording… {{time}}",
+      "recorded": "Voice message ready. Play it back, or record again.",
+      "previewLabel": "Voice message preview",
+      "previewFailed": "This recording can't be played here. You can still send it.",
+      "reRecord": "Record again",
+      "discard": "Discard voice message",
+      "upload": "Upload an audio file",
+      "limits": "Up to 2 minutes. MP3, M4A, WAV or WebM, 10 MB at most.",
+      "autoStopped": "Recording stopped at the 2-minute limit.",
+      "unsupported": "Recording is not available in this browser. You can still upload an audio file.",
+      "denied": "Microphone access was refused. Allow it in your browser settings, or upload an audio file.",
+      "unavailable": "No microphone was found. You can upload an audio file instead.",
+      "failed": "Recording could not start. You can upload an audio file instead.",
+      "errorType": "{{name}} was not added: only MP3, M4A, WAV and WebM audio is supported.",
+      "errorSize": "{{name}} was not added: audio can be at most 10 MB."
+    },
+    "list": {
+      "myTitle": "My feedback",
+      "myIntro": "Feedback you sent, with its current status.",
+      "workspaceTitle": "Workspace feedback",
+      "workspaceIntro": "Feedback sent by members of this workspace. This list is read-only; the ProcurePilot team reviews every item.",
+      "viewWorkspace": "Workspace feedback",
+      "viewMine": "My feedback",
+      "empty": "You have not sent any feedback yet. Use the Send feedback button at any time.",
+      "emptyWorkspace": "No feedback matches this view.",
+      "loading": "Loading feedback…",
+      "loadError": "Feedback could not be loaded.",
+      "retry": "Try again",
+      "loadMore": "Load more",
+      "filterStatus": "Status",
+      "filterCategory": "Category",
+      "all": "All",
+      "submittedBy": "From {{name}} ({{role}})",
+      "sentOn": "Sent {{date}}",
+      "page": "Page: {{path}}",
+      "screenshots": "Screenshots",
+      "audio": "Voice message",
+      "screenshotAlt": "Screenshot {{number}}",
+      "loadAudio": "Load voice message",
+      "attachmentError": "This attachment could not be loaded.",
+      "attachmentRetry": "Try again"
+    },
+    "status": {
+      "new": "New",
+      "reviewed": "Reviewed",
+      "resolved": "Resolved"
+    },
+    "withdraw": {
+      "action": "Withdraw",
+      "title": "Withdraw this feedback?",
+      "message": "The message and its attachments will be removed for everyone, including the ProcurePilot team. This cannot be undone.",
+      "confirm": "Withdraw",
+      "cancel": "Keep it",
+      "success": "Feedback withdrawn.",
+      "refused": "This feedback has already been reviewed and can no longer be withdrawn.",
+      "failed": "The feedback could not be withdrawn. Try again."
     }
   },
   "savings": {
@@ -5233,6 +5352,101 @@
       }
     }
   },
+  "platform": {
+    "feedback": {
+      "nav": "User feedback",
+      "title": "User feedback",
+      "subtitle": "Feedback from every workspace, newest first. Only platform operators can see this page.",
+      "loading": "Loading…",
+      "empty": "No feedback matches these filters.",
+      "loadError": "Feedback could not be loaded.",
+      "retry": "Try again",
+      "loadMore": "Load more",
+      "filters": {
+        "title": "Filters",
+        "status": "Status",
+        "category": "Category",
+        "demo": "Workspace type",
+        "workspace": "Workspace ID",
+        "workspaceHint": "Paste a workspace ID",
+        "workspaceInvalid": "Enter a valid workspace ID.",
+        "all": "All",
+        "realOnly": "Real workspaces",
+        "demoOnly": "Demo workspaces",
+        "clear": "Clear filters"
+      },
+      "status": {
+        "new": "New",
+        "reviewed": "Reviewed",
+        "resolved": "Resolved"
+      },
+      "category": {
+        "bug": "Bug",
+        "idea": "Idea",
+        "question": "Question",
+        "other": "Other",
+        "none": "No category"
+      },
+      "columns": {
+        "created": "Sent",
+        "workspace": "Workspace",
+        "submitter": "Submitter",
+        "category": "Category",
+        "status": "Status",
+        "preview": "Message"
+      },
+      "detail": {
+        "title": "Feedback details",
+        "empty": "Select a message to see its details.",
+        "loadError": "This feedback could not be loaded.",
+        "demoBadge": "Demo",
+        "submitter": "Name",
+        "email": "Email",
+        "role": "Role",
+        "workspace": "Workspace",
+        "filterWorkspace": "Show only this workspace",
+        "category": "Category",
+        "page": "Page",
+        "appVersion": "App version",
+        "language": "Language",
+        "languageEn": "English",
+        "languageAr": "Arabic",
+        "created": "Sent",
+        "statusChangedAt": "Status changed",
+        "text": "Message",
+        "attachments": "Attachments",
+        "noAttachments": "No attachments.",
+        "screenshots": "Screenshots",
+        "screenshotAlt": "Screenshot {{n}}",
+        "audio": "Voice note",
+        "attachmentError": "This file could not be loaded."
+      },
+      "actions": {
+        "title": "Status",
+        "markNew": "Mark as new",
+        "markReviewed": "Mark as reviewed",
+        "markResolved": "Mark as resolved",
+        "final": "This item is resolved. Status can only move forward.",
+        "invalidTransition": "That status change is no longer possible. The item was refreshed.",
+        "saveError": "The change could not be saved. Try again."
+      },
+      "labels": {
+        "title": "Labels",
+        "none": "No labels yet.",
+        "add": "New label",
+        "addAction": "Add label",
+        "remove": "Remove label {{label}}",
+        "tooLong": "A label can have at most {{max}} characters.",
+        "duplicate": "This label is already on the item.",
+        "max": "An item can have at most 10 labels."
+      },
+      "digest": {
+        "label": "Daily email digest",
+        "hint": "One email a day with new feedback. Only for you.",
+        "error": "The digest setting could not be saved."
+      }
+    }
+  },
   "about": {
     "title": "Help & about",
     "productByPrefix": "ProcurePilot by",
@@ -5248,6 +5462,24 @@
     "footer": {
       "sentWith": "Sent with ProcurePilot by Iron Systems",
       "website": "www.iron-sys.com"
+    },
+    "feedbackDigest": {
+      "subject": "ProcurePilot feedback: {{count}} new",
+      "title": "New feedback from workspaces",
+      "summary": "New feedback since the last digest: {{count}}",
+      "workspaceLabel": "Workspace",
+      "categoryLabel": "Category",
+      "categories": {
+        "bug": "Bug",
+        "idea": "Idea",
+        "question": "Question",
+        "other": "Other",
+        "none": "No category"
+      },
+      "viewAction": "Open the triage view",
+      "moreItems": "and {{count}} more not shown",
+      "redacted": "[email hidden]",
+      "footer": "You receive this digest because you turned it on in the triage view. Turn it off there at any time."
     }
   }
 }

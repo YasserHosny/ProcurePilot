@@ -59,6 +59,8 @@ jobs:
           file: infra/docker/api.Dockerfile
           push: true
           platforms: linux/amd64
+          build-args: |
+            APP_VERSION=${{ github.sha }}
           tags: |
             ${{ steps.meta.outputs.tag_latest }}
             ${{ steps.meta.outputs.tag_sha }}

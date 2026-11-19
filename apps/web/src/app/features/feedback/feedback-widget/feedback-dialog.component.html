@@ -1,0 +1,281 @@
+<h2 mat-dialog-title>{{ 'feedback.widget.title' | translate }}</h2>
+
+<mat-dialog-content class="fb-body" (paste)="onPaste($event)">
+  <p class="fb-notice">
+    <mat-icon aria-hidden="true">visibility</mat-icon>
+    <span data-test="notice">{{ 'feedback.notice' | translate }}</span>
+  </p>
+
+  @if (success()) {
+    <div class="fb-success" data-test="success" role="status">
+      <mat-icon class="fb-success-icon" aria-hidden="true">check_circle</mat-icon>
+      <h3 #successHeading tabindex="-1">{{ 'feedback.widget.successTitle' | translate }}</h3>
+      <p>{{ 'feedback.widget.successBody' | translate }}</p>
+    </div>
+  } @else {
+    <div class="fb-field">
+      <mat-form-field appearance="outline" class="fb-text-field">
+        <mat-label>{{ 'feedback.widget.textLabel' | translate }}</mat-label>
+        <textarea
+          matInput
+          #area
+          rows="5"
+          [attr.maxlength]="textMax"
+          [value]="draft.text()"
+          [placeholder]="'feedback.widget.textPlaceholder' | translate"
+          [attr.aria-invalid]="textError() ? 'true' : null"
+          [attr.aria-describedby]="textError() ? 'fb-text-error fb-counter' : 'fb-counter'"
+          [attr.aria-required]="true"
+          (input)="onText($event)"
+        ></textarea>
+      </mat-form-field>
+      <div class="fb-field-meta">
+        @if (textError()) {
+          <span id="fb-text-error" class="fb-error" data-test="text-error" role="alert">{{
+            'feedback.errors.textRequired' | translate
+          }}</span>
+        }
+        <span id="fb-counter" class="fb-counter" data-test="counter">{{
+          counter().key | translate: counter().params
+        }}</span>
+      </div>
+    </div>
+
+    <mat-form-field appearance="outline" class="fb-category">
+      <mat-label>{{ 'feedback.category.label' | translate }}</mat-label>
+      <mat-select [value]="draft.category()" (selectionChange)="onCategory($event.value)">
+        <mat-option [value]="null">{{ 'feedback.category.none' | translate }}</mat-option>
+        @for (c of categories; track c) {
+          <mat-option [value]="c">{{ 'feedback.category.' + c | translate }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <section class="fb-section" aria-labelledby="fb-shots-title">
+      <h3 id="fb-shots-title">{{ 'feedback.attachments.title' | translate }}</h3>
+      <div
+        #dropzone
+        class="fb-dropzone"
+        data-test="dropzone"
+        tabindex="0"
+        aria-labelledby="fb-shots-title"
+        [class.fb-dropzone--active]="dragging()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave()"
+        (drop)="onDrop($event)"
+      >
+        @if (afterCapture()) {
+          <p data-test="paste-now">{{ 'feedback.attachments.pasteNow' | translate }}</p>
+        } @else {
+          <p>{{ 'feedback.attachments.dropHint' | translate }}</p>
+        }
+        <button mat-stroked-button type="button" (click)="imageInput.click()">
+          <mat-icon aria-hidden="true">add_photo_alternate</mat-icon>
+          {{ 'feedback.attachments.add' | translate }}
+        </button>
+        <input
+          #imageInput
+          class="fb-file-input"
+          data-test="image-input"
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/webp"
+          tabindex="-1"
+          aria-hidden="true"
+          (change)="onImagesChosen($event)"
+        />
+      </div>
+      <div class="fb-row">
+        <button
+          mat-stroked-button
+          type="button"
+          data-test="hide-to-capture"
+          [disabled]="recorder.state() === 'recording'"
+          (click)="hideToCapture()"
+        >
+          <mat-icon aria-hidden="true">screenshot_monitor</mat-icon>
+          {{ 'feedback.attachments.hideToCapture' | translate }}
+        </button>
+        <span class="fb-hint">{{ 'feedback.attachments.captureHint' | translate }}</span>
+      </div>
+      <p class="fb-hint">{{ 'feedback.attachments.limits' | translate }}</p>
+
+      @if (draft.images().length > 0) {
+        <ul class="fb-thumbs">
+          @for (image of draft.images(); track image.id; let i = $index) {
+            <li class="fb-thumb" data-test="thumb">
+              @if (failedImageIds().has(image.id)) {
+                <div class="fb-thumb-failed" data-test="thumb-failed">
+                  <mat-icon aria-hidden="true">broken_image</mat-icon>
+                  <span>{{ 'feedback.attachments.previewFailed' | translate }}</span>
+                </div>
+              } @else {
+                <img
+                  [src]="image.previewUrl"
+                  [alt]="'feedback.attachments.previewAlt' | translate: { number: i + 1 }"
+                  (error)="onImageError(image.id)"
+                />
+              }
+              <button
+                mat-mini-fab
+                class="fb-thumb-remove"
+                type="button"
+                data-test="remove-image"
+                [attr.aria-label]="'feedback.attachments.remove' | translate: { number: i + 1 }"
+                (click)="removeImage(image.id)"
+              >
+                <mat-icon aria-hidden="true">close</mat-icon>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+
+      <div class="fb-messages" data-test="attachment-messages" role="status" aria-live="polite">
+        @for (message of attachmentMessages(); track $index) {
+          <p class="fb-error">{{ message.key | translate: message.params }}</p>
+        }
+      </div>
+    </section>
+
+    <section class="fb-section" aria-labelledby="fb-voice-title">
+      <h3 id="fb-voice-title">{{ 'feedback.audio.title' | translate }}</h3>
+
+      @if (draft.audio(); as audio) {
+        <audio
+          class="fb-audio"
+          data-test="audio-preview"
+          controls
+          [src]="audio.previewUrl"
+          [attr.aria-label]="'feedback.audio.previewLabel' | translate"
+          (error)="onAudioError()"
+        ></audio>
+        @if (audioPreviewFailed()) {
+          <p class="fb-error" data-test="audio-preview-failed" role="alert">
+            {{ 'feedback.audio.previewFailed' | translate }}
+          </p>
+        }
+        <p class="fb-hint" data-test="audio-notice" role="status">
+          @if (recorder.autoStopped()) {
+            {{ 'feedback.audio.autoStopped' | translate }}
+          } @else {
+            {{ 'feedback.audio.recorded' | translate }}
+          }
+        </p>
+        <div class="fb-row">
+          @if (recorder.supported) {
+            <button mat-stroked-button type="button" data-test="re-record" (click)="onReRecord()">
+              <mat-icon aria-hidden="true">mic</mat-icon>
+              {{ 'feedback.audio.reRecord' | translate }}
+            </button>
+          }
+          <button mat-button type="button" data-test="discard-audio" (click)="onDiscardAudio()">
+            <mat-icon aria-hidden="true">delete</mat-icon>
+            {{ 'feedback.audio.discard' | translate }}
+          </button>
+        </div>
+      } @else {
+        <div class="fb-row">
+          @if (recorder.supported) {
+            @if (recorder.state() === 'recording') {
+              <button
+                mat-flat-button
+                color="warn"
+                type="button"
+                data-test="stop-recording"
+                (click)="onStopRecording()"
+              >
+                <mat-icon aria-hidden="true">stop</mat-icon>
+                {{ 'feedback.audio.stop' | translate }}
+              </button>
+              <span class="fb-timer" data-test="timer" aria-live="off">{{
+                'feedback.audio.recording' | translate: { time: elapsedLabel() }
+              }}</span>
+            } @else {
+              <button mat-stroked-button type="button" data-test="record" (click)="onRecord()">
+                <mat-icon aria-hidden="true">mic</mat-icon>
+                {{ 'feedback.audio.record' | translate }}
+              </button>
+            }
+          }
+          @if (recorder.state() !== 'recording') {
+            <button
+              mat-stroked-button
+              type="button"
+              data-test="upload-audio"
+              (click)="audioInput.click()"
+            >
+              <mat-icon aria-hidden="true">upload_file</mat-icon>
+              {{ 'feedback.audio.upload' | translate }}
+            </button>
+          }
+          <input
+            #audioInput
+            class="fb-file-input"
+            data-test="audio-input"
+            type="file"
+            accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/webm,.mp3,.m4a,.wav,.webm"
+            tabindex="-1"
+            aria-hidden="true"
+            (change)="onAudioChosen($event)"
+          />
+        </div>
+        @if (!recorder.supported) {
+          <p class="fb-hint" data-test="audio-unsupported">{{ 'feedback.audio.unsupported' | translate }}</p>
+        }
+      }
+      <p class="fb-hint">{{ 'feedback.audio.limits' | translate }}</p>
+      <div role="status" aria-live="polite">
+        @if (shownAudioMessage(); as message) {
+          <p class="fb-error" data-test="audio-error">{{ message.key | translate: message.params }}</p>
+        }
+      </div>
+    </section>
+
+    @if (cooldownSeconds() > 0) {
+      <p class="fb-error" data-test="cooldown" aria-live="off">
+        {{ 'feedback.widget.cooldown' | translate: { seconds: cooldownSeconds() } }}
+        {{ 'feedback.widget.draftKept' | translate }}
+      </p>
+    }
+    <span class="fb-sr-only" role="status">
+      @if (cooldownAnnouncement(); as announcement) {
+        @if (cooldownSeconds() > 0) {
+          {{ announcement.key | translate: announcement.params }}
+        }
+      }
+    </span>
+    @if (formError(); as error) {
+      <p class="fb-error" data-test="form-error" role="alert">
+        {{ error.key | translate: error.params }}
+        @if (showDraftKept()) {
+          {{ 'feedback.widget.draftKept' | translate }}
+        }
+      </p>
+    }
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  @if (success()) {
+    <a mat-button routerLink="/feedback" (click)="close()">{{
+      'feedback.widget.viewMine' | translate
+    }}</a>
+    <button mat-flat-button type="button" data-test="close" (click)="close()">
+      {{ 'feedback.widget.close' | translate }}
+    </button>
+  } @else {
+    <button mat-button type="button" data-test="close" (click)="close()">
+      {{ 'feedback.widget.close' | translate }}
+    </button>
+    <button
+      mat-flat-button
+      type="button"
+      data-test="send"
+      [disabled]="submitting() || cooldownSeconds() > 0 || checkingImages() > 0"
+      (click)="send()"
+    >
+      {{ (submitting() ? 'feedback.widget.sending' : 'feedback.widget.send') | translate }}
+    </button>
+  }
+</mat-dialog-actions>

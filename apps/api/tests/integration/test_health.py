@@ -49,7 +49,9 @@ def test_reports_ok_when_the_database_answers(
     monkeypatch.setattr(health_router, "_probe_client", lambda _s: _FakeClient(fail=False))
     response = client.get("/api/v1/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert isinstance(body["app_version"], str)
 
 
 def test_reports_unhealthy_when_the_database_is_unreachable(
