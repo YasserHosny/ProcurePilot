@@ -4,8 +4,12 @@
 > Companion to the [Master Roadmap](../roadmap/procurepilot_roadmap.md).
 > For detailed business/revenue value by function, see [Function Business Value](function-business-value.md).
 >
-> **Status (2026-10-18):** Phases 1–4 are built (`specs/001`–`021`); what is partial or deferred is in the
+> **Status (2026-11-19):** Phases 1–4 are built (`specs/001`–`021`), and so are the pilot specs
+> `023` (RFQ-aware matching), `024` (RFQ basket split) and `025` (in-app feedback, shipped 2026-11-19).
+> `022` (home currency) is merged with three tasks open. What is partial or deferred is in the
 > roadmap's "Delivery Status" section. The first pilot market is Egypt, which added the requirements in §3.9.
+> The mobile requirements in §3.8 shipped in the Flutter app, except barcode scanning and a request photo
+> (F29) and push delivery, which is built but not yet connected to an FCM/APNs provider.
 
 ---
 

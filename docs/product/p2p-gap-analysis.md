@@ -6,6 +6,7 @@
 | Baseline | `main` @ `45e3778`, 2026-09-29 |
 | Layers compared | **Vision:** roadmap, PRD, user stories, constitution, ADRs · **Specs:** `specs/001`–`021` · **Implementation:** `apps/api`, `apps/web`, `apps/mobile`, `supabase/migrations` |
 | Status | **Final.** Draft v1 was critiqued independently by Codex (GPT) and Agy (Gemini). Their objections were re-checked against the code, and each was accepted, partly accepted or rejected. The debate record is in §10. |
+| Note (2026-11-19) | A snapshot at the baseline above, not re-run since. Some findings have moved on `main`: the web app has a **Create Order** screen (`/orders/new`), blank or pre-filled from an approved request, plus **Edit Draft** and **Cancel Order** (step 7, §5.1); specs `022`–`025` were merged after this baseline. Re-check a finding against the code before acting on it. |
 
 **Method.** Four independent evidence passes, one per area: vision/scope, steps 1–10, steps 11–18,
 and steps 19–25 plus controls. Every load-bearing claim was then re-verified directly against the
