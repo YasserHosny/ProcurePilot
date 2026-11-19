@@ -9,6 +9,7 @@ An approval is valid for the item, version and action named in its row only.
 | 2026-10-28 | G-claims | C-16 (one RFQ to every supplier) for A-04 | approved | Yasser | chat | MD-12 |
 | 2026-10-29 | G-asset | A-01 to A-06 v1.1 text (bilingual blocks) + v2 images | approved | Yasser | chat ("ok i approved") | Arabic approved as written by the owner; v2 images (real material only) |
 | 2026-11-19 | G-asset | A-07 to A-09 text (English only, MD-23; general, not restaurants, MD-22) | approved | Yasser | chat ("موافق على النصوص") | `assets/approved/A-07-to-A-09-2026-11-19.md`. Images wait for the general demo workspace screens; scheduling needs its own go |
+| 2026-11-19 | G-asset | A-10 text ("What happens to your data", C-01, C-17) | approved | Yasser | chat ("موافق على A-10 وCP-08") | Image to make. If the Nuvara Group screens are late, A-07 and the posts after it move later rather than use graphics (Yasser: "لو اتأخرت اختار أ") |
 | | G-publish | each post, when posted by Yasser | pending | | | Claude never posts |
 
 ## Review results (campaign-review)
