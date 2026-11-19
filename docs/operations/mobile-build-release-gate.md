@@ -28,7 +28,9 @@ here today:
 `39075120933` and `39075595173`). It builds the release APK and its size check fails as designed:
 the APK was 54,438,989 bytes against the 31,457,280-byte (30 MB) budget. So the failure path is
 proven, the pass path is not, and the app is over budget. No run since. The app itself has shipped
-(auth, home, requests, approvals, low-stock, delivery, push); this gate is about store submission.
+(auth, home, requests, approvals, low-stock, delivery); this gate is about store submission. Push
+notifications are not delivered yet: the server-side sender is a stub with no FCM/APNs
+credentials (runbook §3.5), so a store release would ship without working pushes.
 
 Until both of those are true, this checklist is the actual gate. Run it before any store
 submission — not on every PR, not on a schedule, but as a deliberate release-readiness step.

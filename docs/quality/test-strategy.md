@@ -21,6 +21,8 @@
 ## 2. Test Environments
 
 - **Local:** `docker compose up` services against the hosted Supabase (`docs/operations/local-dev.md`).
+  `docker-compose.yml` has no Supabase or Postgres service; a local Supabase stack, when a test
+  needs one (as the E2E suite does), comes from `supabase start`.
 - **CI:** ephemeral containers spun up by GitHub Actions, each E2E shard with its own Supabase CLI
   stack, Redis, API, extraction worker and web app.
 - **Staging/demo:** Bunny Magic Containers at `https://procurepilot.iron-sys.com` (API under
@@ -76,6 +78,8 @@
 
 ### Mobile
 1. Branch manager creates request → approver receives push → approves → buyer records order → branch confirms delivery.
+   *(2026-11-19: the "receives push" step cannot pass yet; server-side push delivery is a stub
+   with no FCM/APNs credentials, so every send is recorded as not delivered. Runbook §3.5.)*
 2. Offline draft → sync on reconnect → no duplicate request.
 
 ## 6. Performance Targets

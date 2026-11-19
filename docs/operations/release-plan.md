@@ -246,8 +246,9 @@ worker since 2026-11-19).
 
 ### 2.6 Mobile Builds
 
-The Flutter app (`apps/mobile`) has shipped: auth, home, purchase requests, approvals, low-stock,
-delivery confirmation and push. There is no `build-mobile.yml` and no automated store-release
+The Flutter app (`apps/mobile`) has shipped: auth, home, purchase requests, approvals, low-stock
+and delivery confirmation. Device registration and the push outbox exist, but pushes do not reach
+phones: the server-side sender is a stub with no FCM/APNs credentials (runbook §3.5). There is no `build-mobile.yml` and no automated store-release
 workflow. The only mobile workflow is `.github/workflows/mobile-build-size-check.yml`, a
 manually triggered APK size check that is not a required check; the store-submission gate is
 `docs/operations/mobile-build-release-gate.md`.
