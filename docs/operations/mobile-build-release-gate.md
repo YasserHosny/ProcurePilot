@@ -24,6 +24,14 @@ here today:
    and confirm it both builds and correctly fails on an oversized APK before ever promoting it
    into `ci.yml`'s required set.
 
+**Status (checked 2026-11-19):** the workflow has been run twice, both on 2026-10-17 (runs
+`39075120933` and `39075595173`). It builds the release APK and its size check fails as designed:
+the APK was 54,438,989 bytes against the 31,457,280-byte (30 MB) budget. So the failure path is
+proven, the pass path is not, and the app is over budget. No run since. The app itself has shipped
+(auth, home, requests, approvals, low-stock, delivery); this gate is about store submission. Push
+notifications are not delivered yet: the server-side sender is a stub with no FCM/APNs
+credentials (runbook §3.5), so a store release would ship without working pushes.
+
 Until both of those are true, this checklist is the actual gate. Run it before any store
 submission — not on every PR, not on a schedule, but as a deliberate release-readiness step.
 
