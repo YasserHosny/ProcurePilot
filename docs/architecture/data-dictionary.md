@@ -1793,6 +1793,10 @@ because `quotation` does not yet possess a `(tenant_id, id)` composite unique co
 schema; introducing one piecemeal here would create inconsistency with existing quotation foreign keys across
 the codebase.
 
+Superseded 2026-11-19: `quotation` gained `unique (tenant_id, id)` in `20260924203650_rfq_sourcing.sql`, and
+`20260927000001_composite_tenant_foreign_keys.sql` converted `ingestion_email_log.quotation_id` (and 44 other
+single-column foreign keys) to composite `(tenant_id, …)` foreign keys.
+
 ### `TenantEmailConfig`
 
 Per-tenant email ingestion configuration and rate limit counters (table `tenant_email_config`). Stores the

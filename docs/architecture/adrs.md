@@ -53,6 +53,8 @@
   - Strict JSON schema with field-level confidence.
   - Structured inputs (Excel/CSV) bypass LLM calls.
   - Cost per document tracked; caching by document hash.
+- **Note 2026-11-19:** the decision stands; the default Bedrock model is now Claude Haiku 4.5
+  (`BEDROCK_MODEL_ID` in `services/extraction-worker`), not Claude 3 Haiku.
 
 ## ADR-005 — Container Hosting: bunny.net Magic Containers
 
@@ -64,6 +66,10 @@
   - Containers share a network namespace; frontend uses `BACKEND_HOST=localhost`.
   - CI deploys via `BunnyWay/actions/container-update-image` with GHCR images.
   - Three path-filtered workflows: backend, frontend, mobile build.
+- **Note 2026-11-19:** the workflows are now `ci`, `deploy-backend`, `deploy-frontend`,
+  `deploy-extraction-worker`, `deploy-email-ingestion-worker`, `deploy-optimiser-worker`,
+  `deploy-feedback-worker`, `docs-screenshots` and `mobile-build-size-check`. There is no mobile
+  deploy workflow; `mobile-build-size-check` gates build size only.
 
 ## ADR-006 — Reverse Proxy: Nginx
 
@@ -85,6 +91,10 @@
 - **Consequences:**
   - Explicit, reviewable migrations.
   - No runtime ORM dependency; backend uses `supabase-py` and Pydantic schemas.
+- **Note 2026-11-19:** migrations live in `supabase/migrations/` (197 files), applied with
+  `pnpm db:migrate` (Supabase CLI, then `pnpm db:check-privileges`); `apps/api/migrations/` is a
+  pointer. The backend also talks to Postgres directly through psycopg 3
+  (`procurepilot_api.db.connect`).
 
 ## ADR-008 — Monorepo Layout: Apps + Packages + Services
 
@@ -96,6 +106,10 @@
   - Shared types and validation generated from OpenAPI.
   - Turborepo + pnpm for JS; uv for Python.
   - CI path-filtered workflows keep builds fast.
+- **Note 2026-11-19:** `packages/` holds `domain-types`, `ui`, `i18n` and `py-logging`; there is no
+  `packages/validation`, and types are hand-written rather than generated from OpenAPI.
+  `services/matching-worker` is a README placeholder (matching runs inside `apps/api`); the
+  extraction worker and optimiser are real, separately deployed workers.
 
 ## ADR-009 — AI Evaluation Harness in CI
 
@@ -148,6 +162,10 @@
   - A fourth GitHub secret (`BUNNY_WORKERS_APP_ID`) is required.
   - The `REDIS_URL` on the backend container differs from the worker's `REDIS_URL`
     (`<anycast-ip>:6379` vs `localhost:6379`).
+- **Note 2026-11-19:** the workers app now also runs the email-ingestion, optimiser and feedback
+  workers alongside shared Redis and the extraction worker, and is pinned to a single instance. The
+  other API workers (export, webhook, offer-refresh, catalogue-refresh, digest, report, accounting
+  and POS sync) are not deployed to bunny.net.
 
 ## ADR-012 — Responsive-First Web Design with Shared Breakpoints
 
@@ -195,6 +213,9 @@
     ran. Monitoring should alert when `method != bedrock` despite the mode being `bedrock`.
   - The stub provider (`FakeExtractionProvider`) misleadingly sets `method: "bedrock"` in
     provenance — always verify `model_version` is not `stub-provider-v1`.
+- **Note 2026-11-19:** the fallback is no longer silent: the worker logs
+  `bedrock failed, falling back to azure_di` at `warning` with the traceback. The stub provider is
+  selected only by `EXTRACTION_PROVIDER_MODE=stub` (CI e2e) and is never a fallback.
 
 ## ADR-015 — Structured JSON Logging with Trace IDs and Secret Redaction
 
