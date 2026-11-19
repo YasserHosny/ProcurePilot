@@ -107,7 +107,7 @@ apps/api/
 │   ├── db.py              `connect()` — every psycopg connection (prepare_threshold=None for the pooler)
 │   ├── deps.py            FastAPI dependencies (bearer_token, CurrentMember, require_role, …)
 │   ├── errors.py          error envelope + typed exceptions (NotFoundError, ConflictError, …)
-│   ├── modules/           30 domains — each owns router.py, schemas.py, service.py
+│   ├── modules/           31 domains — each owns router.py, schemas.py, service.py
 │   │   ├── auth  tenants  members  organisation  devices  requests  orders       (identity, org, approvals, P2P)
 │   │   ├── catalogue  documents  quotations  extraction  ingestion               (catalogue + quotation intake)
 │   │   ├── matching  landed_cost  offers  rfq                                    (matching, pricing, Smart Compare, sourcing)
@@ -161,7 +161,7 @@ pnpm workspace package `web`.
 | **UI library** | Angular Material + Angular CDK | 22.2 |
 | **Styling** | Component-scoped SCSS + CSS logical properties (RTL-safe) | — |
 | **i18n** | @ngx-translate/core + @ngx-translate/http-loader (runtime JSON loading) | ^18 |
-| **Schema validation** | Zod | ^4.6 |
+| **Schema validation** | Zod (declared in `package.json`; no source imports it today — forms use Reactive Forms validators) | ^4.6 |
 | **Supabase client** | @supabase/supabase-js | ^2.105 |
 | **Error tracking** | @sentry/angular | ^11 |
 | **Build** | `@angular/build` (application builder) | 22.2 |
@@ -182,8 +182,8 @@ apps/web/
 └── package.json · pnpm-lock.yaml (own lockfile: CI installs with --ignore-workspace --frozen-lockfile)
 ```
 
-- **Strict TypeScript**, no `any`. Shared domain types from `packages/domain-types`; Zod schemas
-  live with the features that use them (there is no shared validation package).
+- **Strict TypeScript**, no `any`. Shared domain types from `packages/domain-types`. Form validation uses Angular Reactive
+  Forms validators; there is no shared validation package.
 - **Every user-facing string** comes from `packages/i18n` (`en.json` + `ar.json`).
   `scripts/check-i18n-keys.mjs` (run by `pnpm lint`) fails when a literal key is missing from either
   language — it never reaches a user as a raw key.
@@ -198,8 +198,10 @@ Flutter (Dart SDK `^3.13`). Shipped, not a placeholder. Features under `lib/feat
 (sign-in, biometric unlock, device registration), home, purchase requests, approvals, low-stock
 reporting, delivery confirmation and quality-issue photos, notifications. Key packages:
 `flutter_secure_storage`, `local_auth`, `hive`/`hive_flutter` (offline cache), `http`,
-`connectivity_plus`, `image_picker`, `intl`. Talks to the same `/api/v1`; push notifications are
-sent by the API through the `push-notifications` RQ queue. CI: `mobile-build-size-check.yml`.
+`connectivity_plus`, `image_picker`, `intl`. State is an `InheritedWidget` plus a Hive offline
+queue. Talks to the same `/api/v1`. Push: devices register with the API and sends go through the
+`push-notifications` RQ queue, but the provider is still a **stub** — no FCM/APNs credentials exist
+yet, so every send is recorded as not delivered. CI: `mobile-build-size-check.yml`.
 
 ---
 
@@ -463,7 +465,7 @@ The distinctive choices, in the order they matter:
    streams, strict TS, no `any`. `@ngx-translate` loads JSON at runtime; a missing key in either
    language fails CI. CSS logical properties for RTL.
 6. **Flutter mobile on the same API.** No separate mobile backend; device registration and push go
-   through the API and an RQ queue.
+   through the API and an RQ queue (push provider not yet wired).
 7. **RQ over Redis plus interval loops for background work.** Redis is the broker only. Heavy,
    separately-scaled work is its own package under `services/`; API-owned jobs reuse the API package
    with a different entrypoint. Loops that must run once at a time get a single-instance host.

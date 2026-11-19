@@ -45,13 +45,14 @@ Redis + RQ (job queues: extraction, basket-split, exports, report scheduling, pu
 
 **Mobile** — Flutter. Shipped, not a placeholder: auth (sign-in, biometric, device registration),
 home, purchase requests, approvals, low-stock reporting, delivery confirmation and quality-issue
-photos, push notifications (`apps/mobile/lib/features/`).
+photos, push notifications (`apps/mobile/lib/features/`). The push provider is still a stub: no
+FCM/APNs credentials yet, so sends are recorded as not delivered (`modules/devices/push_job.py`).
 
 ## Project structure
 
 ```text
 apps/api/          FastAPI modular monolith — the only backend deployable
-  src/procurepilot_api/modules/   30 modules (auth, tenants, catalogue, quotations, matching,
+  src/procurepilot_api/modules/   31 modules (auth, tenants, catalogue, quotations, matching,
                    offers, requests, orders, rfq, analyst, ...) — `ls` for the current list
   src/procurepilot_api/workers/   background workers run from the API image (email ingestion, exports,
                    digests, report scheduling, accounting/POS sync, webhooks, catalogue and offer
@@ -75,7 +76,7 @@ docs/              product, architecture, roadmap, quality, operations
 ## Commands
 
 ```bash
-docker compose up --build   # whole stack: api + web + local Supabase
+docker compose up --build   # api + workers + redis + web (Supabase runs via `supabase start`)
 pnpm db:migrate             # apply versioned SQL migrations
 pnpm db:check-privileges    # read-only: migrations applied, client-role grants as intended
 pnpm db:seed                # reference data + a platform invitation token
