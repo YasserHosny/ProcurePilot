@@ -200,8 +200,8 @@ reporting, delivery confirmation and quality-issue photos, notifications. Key pa
 `flutter_secure_storage`, `local_auth`, `hive`/`hive_flutter` (offline cache), `http`,
 `connectivity_plus`, `image_picker`, `intl`. State is an `InheritedWidget` plus a Hive offline
 queue. Talks to the same `/api/v1`. Push: devices register with the API and sends go through the
-`push-notifications` RQ queue, but the provider is still a **stub** — no FCM/APNs credentials exist
-yet, so every send is recorded as not delivered. CI: `mobile-build-size-check.yml`.
+`push-notifications` RQ queue, but no worker consumes that queue and the sender is still a **stub**
+— no FCM/APNs credentials exist yet — so every send is recorded as not delivered (runbook §3.5). CI: `mobile-build-size-check.yml`.
 
 ---
 
