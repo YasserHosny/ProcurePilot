@@ -34,6 +34,11 @@ http://127.0.0.1:4200/
 
 The Angular dev server proxies `/api` to the local FastAPI container at `http://127.0.0.1:8000`.
 
+`docker-compose.yml` also defines `optimiser` (basket splits), `export-worker`, `webhook-worker`,
+`feedback-worker`, `offer-refresh-scheduler`, `catalogue-refresh-worker` and a containerised `web`
+(nginx on port 4200, so don't run it alongside `ng serve`). Start the ones the flow you are working
+on needs. The email-ingestion worker has no compose service.
+
 ## Verify
 
 ```bash
@@ -44,8 +49,11 @@ docker-compose ps
 Expected API health response:
 
 ```json
-{"status":"ok"}
+{"status":"ok","app_version":"dev"}
 ```
+
+`app_version` comes from `APP_VERSION` (default `dev`). The endpoint answers 503 if it cannot reach
+the database.
 
 ## Migrations And Seed
 
@@ -54,6 +62,12 @@ Run migrations against the hosted database only:
 ```bash
 pnpm db:migrate
 ```
+
+`db:migrate` runs `supabase migration up --db-url "$DATABASE_URL"`. Point `DATABASE_URL` at the
+direct connection or the session pooler (port 5432), never the transaction pooler on port 6543.
+Agents running the Supabase CLI against hosted must add `--yes`, since there is no one to answer
+its prompt. Deploys never run migrations, so apply new ones before deploying code that needs them;
+`supabase migration list` shows what hosted has (197 files, all applied, as of 2026-11-19).
 
 `db:migrate` then runs `pnpm db:check-privileges`, a read-only check that every migration file is
 recorded as applied and that `anon`/`authenticated` hold no table rights the migrations do not

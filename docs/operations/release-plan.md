@@ -3,7 +3,11 @@
 > Authoritative release plan for the ProcurePilot web application (Angular SPA + FastAPI
 > backend) on bunny.net Magic Containers backed by hosted Supabase.
 
-Last updated: 2026-09-02
+Last updated: 2026-09-02 · Facts checked against the repo on 2026-11-19 (migration command and
+count, buckets, workers, CI jobs, CSP, mobile). Today's hosted app is
+`https://procurepilot.iron-sys.com` with the API on the same host under `/api/v1`;
+`pilot.iron-sys.com` is the planned production pilot domain (`pilot-environment-plan.md`, E1-a),
+not live. The `procurepilot.com` hostnames below are examples.
 
 This document consolidates the previous deployment and release plans. Where older guidance
 conflicted with the current infrastructure reference, the newer seven-phase release flow and
@@ -81,15 +85,20 @@ permission issues.
 
 ### 1.3 Apply Migrations
 
-Link the local project to the hosted Supabase instance and push migrations:
+Apply the migrations with the repo script, which runs
+`supabase migration up --db-url "$DATABASE_URL"` and then the read-only `pnpm db:check-privileges`:
 
 ```bash
-supabase link --project-ref <your-project-ref>
-supabase db push
+DATABASE_URL=<session-pooler URL, port 5432> pnpm db:migrate
+supabase migration list --db-url "$DATABASE_URL"
 ```
 
-This applies all 46 migrations in `supabase/migrations/` in order. Migrations are
-forward-only; never edit or delete a merged migration file.
+Use the session pooler (port 5432) or direct connection, not the 6543 transaction pooler. Agents
+running the Supabase CLI against hosted must pass `--yes`. Deploys never run migrations, so this is
+an explicit step before any deploy that needs a new one.
+
+This applies every migration in `supabase/migrations/` in order (197 on 2026-11-19, all applied
+on hosted). Migrations are forward-only; never edit or delete a merged migration file.
 
 **Verify:** Run a spot check in the Supabase SQL Editor:
 
@@ -116,14 +125,12 @@ should include `tenant_id` and `member_role` claims.
 
 ### 1.5 Configure Storage Buckets
 
-Create the required storage buckets via the dashboard or SQL:
+The migrations create every bucket, all private: `quotation-documents`, `quality-issue-photos`,
+`exports`, `ingestion-raw` and `feedback-attachments`. Confirm they exist after 1.3; create them by
+hand only if a migration could not:
 
 ```sql
-INSERT INTO storage.buckets (id, name, public, file_size_limit)
-VALUES
-  ('quotation-documents', 'quotation-documents', false, 52428800),
-  ('exports', 'exports', false, 52428800)
-ON CONFLICT (id) DO NOTHING;
+SELECT id, public, file_size_limit FROM storage.buckets ORDER BY id;
 ```
 
 ### 1.6 Seed Reference Data
@@ -192,13 +199,16 @@ docker pull ghcr.io/<org>/procurepilot-web:latest
 
 ```bash
 docker compose up --build
-# Frontend: http://localhost
-# API proxied through Nginx: http://localhost/api/
+# Frontend: http://localhost:4200
+# API proxied through Nginx: http://localhost:4200/api/v1/
 ```
 
 | Setting | Bunny Magic Containers | Docker Compose |
 |---|---|---|
-| `BACKEND_HOST` | `localhost`, because frontend and backend containers share a Bunny network namespace | `backend`, because nginx reaches the API by Compose service name |
+| `BACKEND_HOST` | `localhost`, because frontend and backend containers share a Bunny network namespace | `api` (the `web.Dockerfile` default), because nginx reaches the API by Compose service name |
+
+Day-to-day development uses `ng serve` against the hosted Supabase instead; see
+`docs/operations/local-dev.md`.
 
 ### 2.5 Build and Push the Extraction Worker Image
 
@@ -229,14 +239,18 @@ More worker images are built the same way and deployed to the same workers app *
   (`docs/operations/runbook.md` §7.9) *(added 2026-11-18)*.
 
 Like the extraction worker's, these workflows only **update** an existing container; each container
-is created once by hand in the workers app. Until the optimiser container exists, its deploy fails
-on purpose and basket splits fail with `optimiser_unavailable`.
+is created once by hand in the workers app. In a new environment, until a worker's container exists
+its deploy fails on purpose (for the optimiser, basket splits then fail with
+`optimiser_unavailable`). On today's hosted workers app all four containers exist (the feedback
+worker since 2026-11-19).
 
-### 2.6 Mobile Build Workflow Placeholder
+### 2.6 Mobile Builds
 
-`build-mobile.yml` is a Phase 2 placeholder for `apps/mobile/**`. When Phase 2 opens, the
-workflow should build Flutter iOS and Android bundles, upload artifacts, and tag releases for
-store submission. Do not implement mobile release automation before the Phase 2 gate.
+The Flutter app (`apps/mobile`) has shipped: auth, home, purchase requests, approvals, low-stock,
+delivery confirmation and push. There is no `build-mobile.yml` and no automated store-release
+workflow. The only mobile workflow is `.github/workflows/mobile-build-size-check.yml`, a
+manually triggered APK size check that is not a required check; the store-submission gate is
+`docs/operations/mobile-build-release-gate.md`.
 
 ---
 
@@ -335,7 +349,7 @@ The extraction worker and Redis run in a **separate** bunny.net Magic Containers
 (`procurepilot-workers`), not in the production app. This provides independent scaling and
 resource isolation.
 
-Create the workers app in bunny.net and add two containers:
+Create the workers app in bunny.net and add these five containers:
 
 | Container | Image | Port | Purpose |
 |---|---|---|---|
@@ -345,8 +359,12 @@ Create the workers app in bunny.net and add two containers:
 | `procurepilot-feedback-worker` | `ghcr.io/<org>/procurepilot-feedback-worker:latest` | — | Feedback digest, retention and orphan sweep; one instance (runbook §7.9) *(added 2026-11-18)* |
 | `shared-redis` | `redis:7.4-alpine` | 6379 | Job queue for RQ |
 
-Because these two containers are in the same app, the worker reaches Redis at
+Because these containers are in the same app, the workers reach Redis at
 `redis://localhost:6379/0`.
+
+Pin the workers app to a single instance in a single region (min 1 / max 1). The feedback digest
+has no cross-process lock, and bunny.net applies the instance cap to the whole app, not one
+container. Hosted has been pinned this way (Paris) since 2026-11-19 (runbook §7.1, §7.9).
 
 The **backend API** (in the production app) connects to this Redis via the workers app's
 **Anycast IP**. Find the Anycast IP in the bunny.net dashboard under the workers app's
@@ -384,7 +402,7 @@ provided automatically by GitHub Actions and is used for GHCR pushes.
 
 Push to `main` (or run `workflow_dispatch`) and confirm:
 
-1. **`ci.yml`** — all jobs pass: secret scan, lint, backend tests, tenant isolation, web unit tests, e2e
+1. **`ci.yml`** — all jobs pass: changes, API image includes i18n catalogues, secret scan (gitleaks), lint, backend tests, dependency audit, tenant isolation, web unit tests, and End-to-end (five shards plus the aggregate `End-to-end` check). `main` also requires «Regenerate and diff» from `docs-screenshots.yml` (`docs/operations/ci-pipeline.md`)
 2. **`deploy-backend.yml`** — builds, pushes to GHCR, updates the Bunny backend container
 3. **`deploy-frontend.yml`** — builds, pushes to GHCR, updates the Bunny frontend container
 4. **`deploy-extraction-worker.yml`** — builds, pushes to GHCR, updates the worker container on the workers Bunny app
@@ -392,22 +410,25 @@ Push to `main` (or run `workflow_dispatch`) and confirm:
 
 ### 4.3 Deployment Workflow Expectations
 
-`deploy-backend.yml` triggers on changes to `apps/api/**` or
-`.github/workflows/deploy-backend.yml` and should:
+`deploy-backend.yml` triggers on pushes to `main` that change `apps/api/**`, `packages/i18n/**`,
+`infra/docker/api.Dockerfile` or the workflow itself (or on `workflow_dispatch`) and:
 
-1. Check out the repository.
-2. Log in to GHCR with `GITHUB_TOKEN`.
-3. Build and push the backend image with `latest` and commit-SHA tags.
-4. Run unit and integration tests in the container.
-5. Update Bunny Magic Container `<project>-backend` with the selected image tag.
+1. Checks out the repository.
+2. Logs in to GHCR with `GITHUB_TOKEN`.
+3. Builds and pushes `procurepilot-api` with `latest` and commit-SHA tags.
+4. Updates Bunny Magic Container `procurepilot-backend` with the new image tag.
 
-`deploy-frontend.yml` triggers on changes to `apps/web/**` or
-`.github/workflows/deploy-frontend.yml` and should:
+The deploy workflows run no tests; the tests run in `ci.yml` on the PR and on `main`.
+
+`deploy-frontend.yml` triggers on changes to `apps/web/**`, `packages/**`,
+`infra/docker/web.Dockerfile`, `infra/nginx/**` or the workflow itself and should:
 
 1. Check out the repository.
 2. Build the Angular production bundle.
 3. Build and push the nginx image with `latest` and commit-SHA tags.
-4. Update Bunny Magic Container `<project>-frontend` with the selected image tag.
+4. Update Bunny Magic Container `procurepilot-frontend` with the selected image tag.
+5. Poll `/version.txt` until the new SHA is served, then purge the bunny CDN cache
+   (`docs/operations/ci-pipeline.md`, "Frontend deployment and CDN purge").
 
 ### 4.4 Production Promotion Flow
 
@@ -445,17 +466,16 @@ staging gate once the first production deployment is stable.
 
 ## Phase 5: Nginx Production Hardening
 
-The current `infra/nginx/nginx.conf` has `connect-src` allowing `http://localhost:*`, which is
-fine for development but should be tightened for production.
-
-Update the CSP `connect-src` directive for the production image:
+*(checked 2026-11-19)* `infra/nginx/nginx.conf` no longer allows `http://localhost:*`. Its CSP
+`connect-src` is now:
 
 ```
-connect-src 'self' https://procurepilot-api.procurepilot.com https://<ref>.supabase.co wss://<ref>.supabase.co;
+connect-src 'self' https://*.supabase.co;
 ```
 
-If the frontend and backend share a Bunny network namespace in the same app, `connect-src 'self'`
-is sufficient since the SPA uses relative `/api/v1` paths.
+`'self'` covers the API, because the frontend and backend share a Bunny network namespace and the
+SPA uses relative `/api/v1` paths. Pinning `https://*.supabase.co` to the project's own host is
+tracked as PPS-225 (P-199).
 
 Nginx injects the upstream host at startup through `envsubst`, so verify the production image
 resolves the backend through the expected Bunny runtime topology and the local image resolves
@@ -630,6 +650,9 @@ the documented targets.
                    └──────────────────┘
 ```
 
+The diagram shows only the extraction worker. The workers app also runs the email-ingestion,
+optimiser and feedback workers beside `shared-redis` (Phase 3.5, runbook §7.1).
+
 ---
 
 ## Rollback Procedures
@@ -653,7 +676,7 @@ Or use the bunny.net dashboard -> Magic Containers -> select container -> change
 Migrations are forward-only. If a migration must be reverted:
 
 1. Write a new migration that undoes the changes.
-2. Apply it via `supabase db push`.
+2. Apply it with `pnpm db:migrate` (see 1.3).
 3. Never edit or delete a merged migration file.
 
 For catastrophic failures, use Supabase's point-in-time recovery (PITR) from the dashboard.

@@ -13,11 +13,11 @@ Phase 3 (local AI) is the only part that needs new code.
 
 | Area | Today |
 |---|---|
-| Containers | `infra/docker/`: `api`, `web` (Nginx), `extraction-worker`, `email-ingestion-worker`; compose also runs `redis`, `optimiser`, `export-worker`, `webhook-worker`, `offer-refresh-scheduler`, `catalogue-refresh-worker` |
+| Containers | `infra/docker/`: `api`, `web` (Nginx), `extraction-worker`, `email-ingestion-worker`, `optimiser`, `feedback-worker` (refreshed 2026-11-19); compose also runs `redis`, `optimiser`, `export-worker`, `webhook-worker`, `feedback-worker`, `offer-refresh-scheduler`, `catalogue-refresh-worker`. `digest_worker`, `report_scheduler`, `accounting_sync_worker` and `pos_sync_worker` have no container anywhere yet |
 | Data | Hosted Supabase: Postgres 17 (`pgvector`, `pg_trgm`), Auth, Storage · Redis + RQ queues |
 | Hosting | bunny.net Magic Containers + bunny DNS, managed by Terraform (`infra/terraform/`, `BunnyWay/bunnynet`) |
-| Registry / CI | GHCR · GitHub Actions (`ci`, `deploy-backend`, `deploy-frontend`, `deploy-extraction-worker`, `deploy-email-ingestion-worker`, `docs-screenshots`, `mobile-build-size-check`) |
-| External services | AWS Bedrock (Claude), Azure Document Intelligence, Mailgun, QuickBooks, Xero, Square, Sentry, PostHog, FCM/APNs |
+| Registry / CI | GHCR · GitHub Actions (`ci`, `deploy-backend`, `deploy-frontend`, `deploy-extraction-worker`, `deploy-email-ingestion-worker`, `deploy-optimiser-worker`, `deploy-feedback-worker`, `docs-screenshots`, `mobile-build-size-check`) |
+| External services | AWS Bedrock (Claude), Azure Document Intelligence, Mailgun, QuickBooks, Xero, Square, Sentry, PostHog, FCM/APNs (planned: push delivery is still a stub, runbook §3.5) |
 
 ## Phase 1 — Run the stack on the box (no code changes)
 
@@ -75,8 +75,10 @@ Caveats:
 
 - **Running all three at once is tight.** You'll probably need one main model loaded at a time plus
   the small embedding model. Queue extraction jobs so they don't compete with analyst requests.
-- **Extraction quality will drop compared to Claude.** There is no extraction eval harness today (only
-  `ml/evals/product_matching/`). Build one first, and switch only when the eval passes.
+- **Extraction quality will drop compared to Claude.** `ml/evals/quotation_extraction/run_eval.py`
+  computes the metrics, but there is no real held-out extraction benchmark yet
+  (`ml/benchmarks/quotation_extraction/` holds only a README), so it cannot validate a model.
+  Build the benchmark first, and switch only when the eval passes.
 - **Embedding size**: the pgvector column's dimension must match the new model's output. A change
   needs a forward-only migration plus a re-embed.
 - Under the delegation rules, implementation goes to Codex/Agy as a normal spec

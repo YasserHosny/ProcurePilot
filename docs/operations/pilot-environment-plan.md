@@ -18,7 +18,7 @@ checks, docs), **Lane** (workflow code, through a PR).
 | Piece | Staging/demo today | Production |
 |---|---|---|
 | Supabase | project `vamrz…` | none |
-| bunny.net | app with `procurepilot-backend` + `procurepilot-frontend`; workers app with extraction, email-ingestion, optimiser and `shared-redis` | none |
+| bunny.net | app with `procurepilot-backend` + `procurepilot-frontend`; workers app with extraction, email-ingestion, optimiser and `shared-redis` (feedback worker added 2026-11-19, and the workers app pinned to one instance in Paris; runbook §7.1) | none |
 | Deploys | push to `main` → staging, via repository secrets `BUNNY_*_APP_ID` | no workflow, no GitHub Environment |
 | Mail | Mailgun sending `mail.procurepilot.iron-sys.com`; Supabase Auth SMTP via Mailgun (PPS-25) | none |
 | Backups | whatever the staging project's plan gives; never restore-tested | — |
@@ -53,12 +53,16 @@ confirmed before anything billable is created).
    the DB password in your password manager. Orch never needs it in chat; `DATABASE_URL` goes
    straight into GitHub/bunny secrets.
 2. **Orch:** apply all migrations with `DATABASE_URL=<prod, port 5432> pnpm db:migrate`. That
-   ends with `pnpm db:check-privileges`. Check with `supabase migration list` that every file in
-   `supabase/migrations/` (165 today) is applied.
+   ends with `pnpm db:check-privileges`. Port 5432 means the session pooler (or direct
+   connection), not the 6543 transaction pooler; an agent running the Supabase CLI must add
+   `--yes`. Check with `supabase migration list` that every file in `supabase/migrations/` (165 when
+   this was drafted, 197 on 2026-11-19) is applied.
 3. **Orch:** Auth settings: Site URL = E1-a; redirect allow list = `/auth/update-password`;
    sign-up behaviour the same as staging; custom SMTP through a **separate** Mailgun SMTP
    credential (User creates it, as for PPS-25).
-4. **Orch:** confirm the four storage buckets exist (the migrations create them) and are private.
+4. **Orch:** confirm the storage buckets exist (the migrations create them) and are private:
+   `quotation-documents`, `quality-issue-photos`, `exports`, `ingestion-raw` and, since spec 025,
+   `feedback-attachments`.
 5. **Orch:** seed reference data only (`pnpm db:seed`). No demo tenant and no test data.
 
 **Done when:** migrations and the privilege check pass; the Auth reset email reaches a test inbox.
@@ -68,6 +72,8 @@ confirmed before anything billable is created).
 1. **User:** create two bunny.net apps mirroring staging: `procurepilot-prod` (backend +
    frontend) and `procurepilot-prod-workers` (extraction, email-ingestion, optimiser, feedback
    (runbook §7.9, added 2026-11-18), Redis with a password). This is a one-time manual step, the same as staging (runbook §7.7).
+   Pin the workers app to one instance in one region, as staging's was on 2026-11-19, so the
+   feedback digest cannot double-send (the cap is app-wide).
 2. **User:** create a GitHub Environment `production`, with **required reviewer = you** and
    environment-scoped secrets `BUNNY_BACKEND_APP_ID`, `BUNNY_FRONTEND_APP_ID`,
    `BUNNY_WORKERS_APP_ID`.
@@ -82,7 +88,7 @@ confirmed before anything billable is created).
    list as the checklist; copy no secret values from staging.
 5. **User:** DNS for E1-a pointed at the production app. Check HTTPS.
 
-**Done when:** `/api/health` is 200 on the production hostname; the web app loads and signs in;
+**Done when:** `/api/v1/health` is 200 on the production hostname; the web app loads and signs in;
 a production deploy needed your approval in GitHub.
 
 ### Phase C — Email in and out (User DNS + Orch config) · ~½ day
