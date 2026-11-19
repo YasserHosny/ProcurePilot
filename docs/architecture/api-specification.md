@@ -1,6 +1,6 @@
 # ProcurePilot — API Specification
 
-> OpenAPI 3.1-style contract for the Phase 1–2 API surface.
+> OpenAPI 3.1-style contract for the API surface, Phase 1 (spec `001`) through in-app feedback (spec `025`).
 
 ---
 
