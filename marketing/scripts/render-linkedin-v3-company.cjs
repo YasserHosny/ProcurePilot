@@ -75,13 +75,37 @@ const co = {
       <div class="disp" style="font-size:40px;width:330px">${a}</div><div style="font-size:32px;color:${I.steel}">${b}</div></div>`).join('')}
     <div style="margin-top:40px;font-size:24px;color:${I.light}">Problem first <span style="color:${I.orange}">·</span> AI where it helps <span style="color:${I.orange}">·</span> Built to last</div>
   </div>${foot}</body>`,
+  'CP-08': `<body>
+  <div class="dots" style="top:0;right:0;width:380px;height:380px"></div>
+  <div class="lbl" style="position:absolute;top:80px;left:80px">AI solutions</div>
+  <div style="position:absolute;left:80px;right:80px;top:150px">
+    <div class="disp" style="font-size:70px;line-height:1.05">AI that reads<br>the documents<br>your team<br><span style="color:${I.orange}">re-types.</span></div>
+  </div>
+  <div style="position:absolute;left:80px;right:80px;top:640px;display:flex;align-items:center;gap:30px">
+    <div style="flex:1;display:flex;flex-direction:column;gap:14px">
+      ${['Quote', 'Invoice', 'Delivery note'].map((d, i) => `<div style="background:${I.iron2};border:1px solid ${I.line};padding:22px 26px;transform:translateX(${i * 18}px)">
+        <div style="font-size:26px;font-weight:600">${d}</div>
+        ${[78, 62, 70].map((w) => `<div style="height:8px;width:${w}%;background:${I.iron3};border-radius:4px;margin-top:12px"></div>`).join('')}
+      </div>`).join('')}
+    </div>
+    <div style="width:70px;height:4px;background:${I.orange}"></div>
+    <div style="flex:1;background:${I.iron2};border:1px solid ${I.line};padding:26px">
+      <div class="lbl" style="font-size:16px">Read and linked</div>
+      ${['Item', 'Quantity', 'Unit price', 'Total'].map((f) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid ${I.line};font-size:22px"><span>${f}</span><span style="width:90px;height:8px;background:${I.steel};border-radius:4px;opacity:.5"></span></div>`).join('')}
+      <div style="margin-top:16px;font-size:18px;color:${I.steel}">Each value linked to its place in the source</div>
+    </div>
+  </div>
+  <div style="position:absolute;left:80px;top:1130px;font-size:24px;color:${I.steel}">The same engine reads supplier quotes in ProcurePilot.</div>
+  ${foot}</body>`,
 };
 
 async function main() {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1080, height: 1350 } });
   fs.mkdirSync(OUT, { recursive: true });
+  const only = process.argv.slice(2);
   for (const [n, h] of Object.entries(co)) {
+    if (only.length && !only.includes(n)) continue;
     await page.setContent(`<!doctype html><html><head><meta charset="utf-8">${FONTS}<style>${css}</style></head>${h}</html>`, { waitUntil: 'networkidle' });
     await page.evaluate(() => document.fonts.ready);
     const file = path.join(OUT, `${n}-1080x1350.png`);
