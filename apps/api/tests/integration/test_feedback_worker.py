@@ -21,7 +21,7 @@ from integration.feedback_operator_helpers import (
 )
 from procurepilot_api.config import get_settings
 from procurepilot_api.shared.mailer import FakeMailer, FakeMessage
-from procurepilot_api.workers.feedback_worker import run_digest
+from procurepilot_api.workers.feedback_worker import DIGEST_SETTLE, run_digest
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
@@ -98,7 +98,26 @@ def test_opted_in_operator_gets_one_digest_with_the_expected_fields(env: _Env) -
         assert "the compare page hangs" in body
         assert "/platform/feedback" in body
     assert "Bug" in message.body
-    assert env.watermark() == NOW
+    assert env.watermark() == NOW - DIGEST_SETTLE
+
+
+def test_a_submission_inside_the_settle_window_waits_for_the_next_digest(env: _Env) -> None:
+    """Debate-review F4 (2026-11-20): created_at is when the submit transaction began, and that
+    transaction stays open while files upload. A digest that took 'everything up to now' could
+    move its watermark past a row that commits a moment later, and that row would never be sent.
+    So the digest takes rows older than DIGEST_SETTLE and moves the watermark only that far."""
+    env.submit("settled report", at=NOW - timedelta(hours=1))
+    env.submit("still uploading", at=NOW - DIGEST_SETTLE / 2)
+
+    env.run()
+    (first,) = env.sent_to_operator()
+    assert "settled report" in first.body
+    assert "still uploading" not in first.body
+
+    env.run(NOW + timedelta(days=1))
+    second = env.sent_to_operator()[-1]
+    assert "still uploading" in second.body
+    assert "settled report" not in second.body
 
 
 def test_the_digest_never_contains_an_email_address_or_attachment_reference(env: _Env) -> None:

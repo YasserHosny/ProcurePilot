@@ -26,6 +26,7 @@
           [attr.aria-invalid]="textError() ? 'true' : null"
           [attr.aria-describedby]="textError() ? 'fb-text-error fb-counter' : 'fb-counter'"
           [attr.aria-required]="true"
+          [readOnly]="submitting()"
           (input)="onText($event)"
         ></textarea>
       </mat-form-field>

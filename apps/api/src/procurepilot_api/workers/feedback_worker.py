@@ -50,6 +50,11 @@ DEFAULT_RETENTION_MONTHS = 12
 DEFAULT_DIGEST_HOUR_UTC = 7  # same as config.feedback_digest_hour_utc
 DEFAULT_WEB_URL = "http://localhost:4200"
 ORPHAN_GRACE = timedelta(hours=1)
+# A submission's created_at is when its transaction began, and that transaction stays open while
+# files upload. The digest only takes rows older than this, and moves each operator's watermark
+# only this far, so a row still committing is picked up next time rather than skipped forever
+# (debate-review F4, 2026-11-20). Requests time out after 120 s (nginx), so 10 minutes is ample.
+DIGEST_SETTLE = timedelta(minutes=10)
 BATCH_LIMIT = 500
 REMOVE_CHUNK = 100
 
@@ -112,6 +117,7 @@ def run_digest(settings: Settings, mailer: Mailer, now: datetime) -> dict[str, i
                 stats["skipped_not_due"] += 1
                 continue
             since = last_sent or (now - timedelta(days=1))
+            settled = now - DIGEST_SETTLE
 
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
@@ -120,7 +126,7 @@ def run_digest(settings: Settings, mailer: Mailer, now: datetime) -> dict[str, i
                     "from feedback_submission s join tenant t on t.id = s.tenant_id "
                     "where s.created_at > %s and s.created_at <= %s "
                     "order by s.created_at, s.id",
-                    (since, now),
+                    (since, settled),
                 )
                 rows = cur.fetchall()
             if not rows:
@@ -149,7 +155,7 @@ def run_digest(settings: Settings, mailer: Mailer, now: datetime) -> dict[str, i
             conn.execute(
                 "update platform_operator set digest_last_sent_at = %s "
                 "where user_id = %s and revoked_at is null",
-                (now, operator["user_id"]),
+                (settled, operator["user_id"]),
             )
             conn.commit()
             stats["sent"] += 1

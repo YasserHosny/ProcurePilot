@@ -203,7 +203,7 @@
 - [x] T081 [P] Docs: `docs/architecture/data-dictionary.md` (three tables), finalise ADR-027, `docs/quality/test-strategy.md`, `docs/architecture/api-specification.md`, `docs/user/user-documentation.md`, `docs/gtm/demo-tenant/README.md` (flag the two demo workspaces with `tenant.is_demo`), `GLOSSARY.md` ("platform operator"), `CLAUDE.md` current-phase paragraph
 - [x] T082 Run `pnpm test`, `pnpm test:isolation`, `pnpm test:a11y`, `pnpm lint` and gitleaks; all green
 - [x] T083 Walk through `specs/025-user-feedback/quickstart.md` end to end and fix any drift
-- [ ] T084 Run `debate-review --local` and fix real findings; write the PR body with `mattpocock-skills:pr`; move PPS-223 to In Review with a Progress comment; after merge apply migrations to hosted with `pnpm db:migrate`, flag the demo workspaces, and grant the first operators
+- [x] T084 Run `debate-review --local` and fix real findings (run 2026-11-20 over `e3ad3f7b..3407f151`: 7 findings, all fixed in migration `20261120000100` and the follow-up PR); write the PR body with `mattpocock-skills:pr`; move PPS-223 to In Review with a Progress comment; after merge apply migrations to hosted with `pnpm db:migrate`, flag the demo workspaces, and grant the first operators
 
 ---
 
