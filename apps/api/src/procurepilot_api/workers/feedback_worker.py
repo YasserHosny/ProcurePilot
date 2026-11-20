@@ -96,6 +96,11 @@ def run_digest(settings: Settings, mailer: Mailer, now: datetime) -> dict[str, i
     hour = int(feedback_setting(settings, "feedback_digest_hour_utc", DEFAULT_DIGEST_HOUR_UTC))
     if now.hour < hour:
         return stats
+    # The once-a-day guard below reads the date of the settled watermark. Until the settle window
+    # stops crossing midnight (00:00-00:10 UTC with a digest hour of 0) that date would still be
+    # yesterday and a second send could follow the same day, so wait until it does.
+    if (now - DIGEST_SETTLE).astimezone(UTC).date() != now.astimezone(UTC).date():
+        return stats
     web_url = settings.web_public_url or settings.web_origin or DEFAULT_WEB_URL
 
     with db.connect(settings.database_url.get_secret_value()) as conn:

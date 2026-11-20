@@ -147,6 +147,23 @@ def test_no_email_on_a_day_with_nothing_new(env: _Env) -> None:
     assert env.watermark() == NOW - timedelta(days=1), "an empty day must not move the watermark"
 
 
+def test_a_midnight_digest_hour_still_sends_at_most_one_email_that_day(env: _Env) -> None:
+    """Codex on #602: with FEEDBACK_DIGEST_HOUR_UTC=0, a send at 00:05 would store a settled
+    watermark dated yesterday, and the once-a-day guard (which reads that date) would let a second
+    send through. The digest waits until the settle window no longer crosses midnight."""
+    settings = get_settings().model_copy(update={"feedback_digest_hour_utc": 0})
+    midnight = NOW.replace(hour=0, minute=0)
+    env.submit("late last night", at=midnight - timedelta(minutes=20))
+
+    assert run_digest(settings, env.mailer, midnight + timedelta(minutes=5))["sent"] == 0
+    run_digest(settings, env.mailer, midnight + timedelta(minutes=15))
+    env.submit("just after midnight", at=midnight + timedelta(minutes=2))
+    run_digest(settings, env.mailer, midnight + timedelta(minutes=30))
+
+    (only,) = env.sent_to_operator()
+    assert "late last night" in only.body
+
+
 def test_at_most_one_digest_per_day(env: _Env) -> None:
     env.submit("first", at=NOW - timedelta(hours=4))
     env.run()
