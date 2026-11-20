@@ -21,7 +21,7 @@ from integration.feedback_operator_helpers import (
 )
 from procurepilot_api.config import get_settings
 from procurepilot_api.shared.mailer import FakeMailer, FakeMessage
-from procurepilot_api.workers.feedback_worker import run_digest
+from procurepilot_api.workers.feedback_worker import DIGEST_SETTLE, run_digest
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
@@ -98,7 +98,26 @@ def test_opted_in_operator_gets_one_digest_with_the_expected_fields(env: _Env) -
         assert "the compare page hangs" in body
         assert "/platform/feedback" in body
     assert "Bug" in message.body
-    assert env.watermark() == NOW
+    assert env.watermark() == NOW - DIGEST_SETTLE
+
+
+def test_a_submission_inside_the_settle_window_waits_for_the_next_digest(env: _Env) -> None:
+    """Debate-review F4 (2026-11-20): created_at is when the submit transaction began, and that
+    transaction stays open while files upload. A digest that took 'everything up to now' could
+    move its watermark past a row that commits a moment later, and that row would never be sent.
+    So the digest takes rows older than DIGEST_SETTLE and moves the watermark only that far."""
+    env.submit("settled report", at=NOW - timedelta(hours=1))
+    env.submit("still uploading", at=NOW - DIGEST_SETTLE / 2)
+
+    env.run()
+    (first,) = env.sent_to_operator()
+    assert "settled report" in first.body
+    assert "still uploading" not in first.body
+
+    env.run(NOW + timedelta(days=1))
+    second = env.sent_to_operator()[-1]
+    assert "still uploading" in second.body
+    assert "settled report" not in second.body
 
 
 def test_the_digest_never_contains_an_email_address_or_attachment_reference(env: _Env) -> None:
@@ -126,6 +145,23 @@ def test_no_email_on_a_day_with_nothing_new(env: _Env) -> None:
     env.run()
     assert env.sent_to_operator() == []
     assert env.watermark() == NOW - timedelta(days=1), "an empty day must not move the watermark"
+
+
+def test_a_midnight_digest_hour_still_sends_at_most_one_email_that_day(env: _Env) -> None:
+    """Codex on #602: with FEEDBACK_DIGEST_HOUR_UTC=0, a send at 00:05 would store a settled
+    watermark dated yesterday, and the once-a-day guard (which reads that date) would let a second
+    send through. The digest waits until the settle window no longer crosses midnight."""
+    settings = get_settings().model_copy(update={"feedback_digest_hour_utc": 0})
+    midnight = NOW.replace(hour=0, minute=0)
+    env.submit("late last night", at=midnight - timedelta(minutes=20))
+
+    assert run_digest(settings, env.mailer, midnight + timedelta(minutes=5))["sent"] == 0
+    run_digest(settings, env.mailer, midnight + timedelta(minutes=15))
+    env.submit("just after midnight", at=midnight + timedelta(minutes=2))
+    run_digest(settings, env.mailer, midnight + timedelta(minutes=30))
+
+    (only,) = env.sent_to_operator()
+    assert "late last night" in only.body
 
 
 def test_at_most_one_digest_per_day(env: _Env) -> None:

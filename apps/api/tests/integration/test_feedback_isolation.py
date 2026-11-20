@@ -60,8 +60,9 @@ def _claims(tenant_id: UUID, member: Member) -> str:
 
 
 def _act_as(cur: psycopg.Cursor, tenant: Tenant, member: Member) -> None:
+    """Act as `member` the way the API does: role `feedback_app` (migration 20261120000100)."""
     cur.execute("reset role")
-    cur.execute("set local role authenticated")
+    cur.execute("set local role feedback_app")
     cur.execute(
         "select set_config('request.jwt.claims', %s, true)", (_claims(tenant.tenant_id, member),)
     )
@@ -269,10 +270,96 @@ def test_no_tenant_claim_sees_nothing(
     conn, _a, _b = world
     with conn.cursor() as cur:
         cur.execute("reset role")
-        cur.execute("set local role authenticated")
+        cur.execute("set local role feedback_app")
         cur.execute("select set_config('request.jwt.claims', '{}', true)")
         cur.execute("select count(*) from feedback_submission")
         assert cur.fetchone() == (0,)
+
+
+# --- debate-review hardening (2026-11-20, migration 20261120000100) ----------------------
+
+
+def test_postgrest_role_has_no_access_to_feedback_tables(
+    world: tuple[psycopg.Connection, Tenant, Tenant],
+) -> None:
+    """D1/F3: a token used directly against PostgREST arrives as `authenticated`, which has no
+    feedback grants, so the API's cooldown, timestamps and audit cannot be skipped."""
+    conn, alpha, _b = world
+    for table in ("feedback_submission", "feedback_attachment"):
+        with conn.cursor() as cur:
+            cur.execute("savepoint direct")
+            cur.execute("reset role")
+            cur.execute("set local role authenticated")
+            cur.execute(
+                "select set_config('request.jwt.claims', %s, true)",
+                (_claims(alpha.tenant_id, alpha.owner),),
+            )
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                cur.execute(f"select id from {table}")  # noqa: S608
+            cur.execute("rollback to savepoint direct")
+
+
+def test_an_attachment_cannot_point_at_another_submissions_file(
+    world: tuple[psycopg.Connection, Tenant, Tenant],
+) -> None:
+    """F1: the stored file must sit under the attachment's own submission folder."""
+    conn, alpha, _b = world
+    with conn.cursor() as cur:
+        _act_as(cur, alpha, alpha.owner)
+        with pytest.raises(psycopg.errors.CheckViolation):
+            cur.execute(
+                "insert into feedback_attachment "
+                "(tenant_id,submission_id,kind,storage_path,content_type,size_bytes,display_order) "
+                "values (%s,%s,'image',%s,'image/png',10,1)",
+                (
+                    alpha.tenant_id,
+                    alpha.owner_submission_id,
+                    f"tenants/{alpha.tenant_id}/feedback/{alpha.buyer_submission_id}/buyer.png",
+                ),
+            )
+
+
+def test_a_removed_member_loses_their_own_feedback_with_a_still_valid_token(
+    world: tuple[psycopg.Connection, Tenant, Tenant],
+) -> None:
+    """F2: own-feedback access needs live membership, not just a matching tenant and user."""
+    conn, alpha, _b = world
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute("delete from membership where id = %s", (alpha.buyer.membership_id,))
+        _act_as(cur, alpha, alpha.buyer)
+        cur.execute(
+            "select id from feedback_submission where id = %s", (alpha.buyer_submission_id,)
+        )
+        assert cur.fetchall() == []
+        cur.execute(
+            "select id from feedback_attachment where id = %s", (alpha.buyer_attachment_id,)
+        )
+        assert cur.fetchall() == []
+        cur.execute(
+            "delete from feedback_submission where id = %s returning id",
+            (alpha.buyer_submission_id,),
+        )
+        assert cur.fetchall() == []
+
+
+def test_created_at_is_always_the_databases_own_time(
+    world: tuple[psycopg.Connection, Tenant, Tenant],
+) -> None:
+    """F3: a far-future created_at would postpone the 12-month retention purge."""
+    conn, alpha, _b = world
+    with conn.cursor() as cur:
+        _act_as(cur, alpha, alpha.buyer)
+        cur.execute(
+            "insert into feedback_submission "
+            "(tenant_id,submitter_user_id,submitter_membership_id,submitter_name,submitter_email,"
+            "member_role,text_content,page_path,app_version,locale,is_demo,idempotency_key,"
+            "created_at) "
+            "values (%s,%s,%s,'b','b@example.test','buyer','later','/','t','en',false,%s,"
+            "now() + interval '5 years') returning created_at <= now()",
+            (alpha.tenant_id, alpha.buyer.user_id, alpha.buyer.membership_id, uuid4()),
+        )
+        assert cur.fetchone() == (True,)
 
 
 # --- within a workspace -------------------------------------------------------------------

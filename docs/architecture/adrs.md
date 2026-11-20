@@ -635,3 +635,13 @@
   workspaces, forward-only status, no other column, no access once revoked, no reach into other tables.
   Any later table an operator should see needs its own policy and a new ADR, not a wider function.
   Flutter mobile is out of scope for v1.
+- **Amended 2026-11-20 (migration `20261120000100`, debate-review of the merged feature):** the
+  feedback tables were reachable as `authenticated`, which is also the role PostgREST uses, so an
+  operator's or member's own token could read, triage or insert directly and skip the API's audit
+  events, cooldown and server timestamps. The feedback grants, policies and operator read helpers
+  (`feedback_operator_labels`, `operator_tenant_names`) now belong to `feedback_app`, a member of
+  `authenticated` that only the API's `DATABASE_URL` connection can become (`set local role
+  feedback_app`; never granted to `authenticator`). "Every operator read and change is audited" now
+  holds for every path, not just the API's. The same migration binds attachment paths to their own
+  submission, requires live membership for own-feedback access, and forces `created_at` to the
+  database's time; the member service writes its audit events on the submission's own transaction.
