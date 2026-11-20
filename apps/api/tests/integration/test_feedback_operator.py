@@ -26,7 +26,7 @@ from psycopg.types.json import Jsonb
 
 from integration.feedback_operator_helpers import (
     Workspace,
-    act_as,
+    act_as_feedback_app,
     committed_workspace,
     grant_operator,
     insert_attachment,
@@ -77,7 +77,7 @@ def test_operator_reads_feedback_from_every_workspace(conn: psycopg.Connection) 
         own = insert_submission(cur, home)
         foreign = insert_submission(cur, other)
         also_foreign = insert_submission(cur, bystander)
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         cur.execute("select id from feedback_submission")
         seen = {row[0] for row in cur.fetchall()}
     assert {own, foreign, also_foreign} <= seen
@@ -88,7 +88,7 @@ def test_operator_sees_attachments_of_other_workspaces(conn: psycopg.Connection)
         home, other, _ = _three_workspaces(cur)
         submission = insert_submission(cur, other)
         attachment_id, _ = insert_attachment(cur, other, submission)
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         cur.execute("select id from feedback_attachment where submission_id = %s", (submission,))
         assert cur.fetchall() == [(attachment_id,)]
 
@@ -98,7 +98,7 @@ def test_a_plain_member_still_sees_only_their_own_workspace(conn: psycopg.Connec
         home, other, bystander = _three_workspaces(cur)
         insert_submission(cur, home)
         theirs = insert_submission(cur, bystander)
-        act_as(cur, other)
+        act_as_feedback_app(cur, other)
         cur.execute("select id from feedback_submission where id = %s", (theirs,))
         assert cur.fetchall() == []
 
@@ -113,7 +113,7 @@ def test_operator_cannot_read_any_other_tenant_table(conn: psycopg.Connection) -
             "insert into supplier (id, tenant_id, name) values (%s, %s, 'Other Co')",
             (supplier_id, other.tenant_id),
         )
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         for query, params in (
             ("select id from supplier where id = %s", (supplier_id,)),
             ("select id from membership where tenant_id = %s", (other.tenant_id,)),
@@ -127,7 +127,7 @@ def test_operator_cannot_read_any_other_tenant_table(conn: psycopg.Connection) -
 def test_platform_operator_table_is_unreachable_by_clients(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
         home, _, _ = _three_workspaces(cur)
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cur.execute("select * from platform_operator")
 
@@ -136,7 +136,7 @@ def test_operator_updates_status_and_labels_only(conn: psycopg.Connection) -> No
     with conn.cursor() as cur:
         home, other, _ = _three_workspaces(cur)
         submission = insert_submission(cur, other)
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         cur.execute(
             "update feedback_submission set status = 'reviewed', labels = %s where id = %s",
             (["billing", "ui"], submission),
@@ -156,7 +156,7 @@ def test_operator_cannot_edit_the_content_or_context_columns(conn: psycopg.Conne
     with conn.cursor() as cur:
         home, other, _ = _three_workspaces(cur)
         submission = insert_submission(cur, other)
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         for column, value in (
             ("text_content", "rewritten"),
             ("submitter_email", "someone@else.test"),
@@ -175,7 +175,7 @@ def test_a_backward_status_move_is_refused_by_the_trigger(conn: psycopg.Connecti
     with conn.cursor() as cur:
         home, other, _ = _three_workspaces(cur)
         submission = insert_submission(cur, other, status="resolved")
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         with pytest.raises((psycopg.errors.RaiseException, psycopg.errors.CheckViolation)):
             cur.execute(
                 "update feedback_submission set status = 'new' where id = %s", (submission,)
@@ -188,7 +188,7 @@ def test_operator_cannot_insert_into_another_workspace_or_delete_anything(
     with conn.cursor() as cur:
         home, other, _ = _three_workspaces(cur)
         submission = insert_submission(cur, other)
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         # Delete: the only delete policy is own-and-new, so another workspace's row is untouched.
         cur.execute("delete from feedback_submission where id = %s", (submission,))
         assert cur.rowcount == 0
@@ -196,7 +196,7 @@ def test_operator_cannot_insert_into_another_workspace_or_delete_anything(
         cur.execute("select count(*) from feedback_submission where id = %s", (submission,))
         assert cur.fetchone() == (1,)
         # Insert: member policy requires the caller's own tenant and identity.
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cur.execute(
                 """
@@ -215,14 +215,14 @@ def test_revoking_takes_effect_immediately_at_the_database(conn: psycopg.Connect
     with conn.cursor() as cur:
         home, other, _ = _three_workspaces(cur)
         foreign = insert_submission(cur, other)
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         cur.execute("select is_platform_operator()")
         assert cur.fetchone() == (True,)
         cur.execute("reset role")
         cur.execute(
             "update platform_operator set revoked_at = now() where user_id = %s", (home.user_id,)
         )
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         cur.execute("select is_platform_operator()")
         assert cur.fetchone() == (False,)
         cur.execute("select id from feedback_submission where id = %s", (foreign,))
@@ -240,7 +240,7 @@ def test_digest_preference_functions_touch_only_the_callers_own_row(
     with conn.cursor() as cur:
         home, other, bystander = _three_workspaces(cur)
         grant_operator(cur, other)
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         cur.execute(
             "select digest_opt_in, digest_locale from set_operator_digest_preference(true, 'ar')"
         )
@@ -251,10 +251,10 @@ def test_digest_preference_functions_touch_only_the_callers_own_row(
         )
         assert cur.fetchone() == (False,)
         # A member who is not an operator gets nothing and changes nothing.
-        act_as(cur, bystander)
+        act_as_feedback_app(cur, bystander)
         cur.execute("select * from set_operator_digest_preference(true, 'en')")
         assert cur.fetchall() == []
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         with pytest.raises(psycopg.errors.InvalidParameterValue):
             with conn.transaction():
                 cur.execute("select * from set_operator_digest_preference(true, 'fr')")
@@ -263,7 +263,7 @@ def test_digest_preference_functions_touch_only_the_callers_own_row(
 def test_enabling_the_digest_starts_the_watermark_at_now(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
         home, _, _ = _three_workspaces(cur)
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         cur.execute("select * from set_operator_digest_preference(true, null)")
         cur.execute("reset role")
         cur.execute(
@@ -276,12 +276,12 @@ def test_enabling_the_digest_starts_the_watermark_at_now(conn: psycopg.Connectio
 def test_workspace_names_are_visible_to_operators_only(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
         home, other, bystander = _three_workspaces(cur)
-        act_as(cur, home)
+        act_as_feedback_app(cur, home)
         cur.execute(
             "select tenant_name from operator_tenant_names(%s::uuid[])", ([other.tenant_id],)
         )
         assert cur.fetchall() == [(f"{other.label} Ltd",)]
-        act_as(cur, bystander)
+        act_as_feedback_app(cur, bystander)
         cur.execute(
             "select tenant_name from operator_tenant_names(%s::uuid[])", ([other.tenant_id],)
         )

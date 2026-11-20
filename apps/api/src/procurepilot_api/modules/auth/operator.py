@@ -9,7 +9,7 @@ module holds the two things that make that safe:
   A `platform_operator` claim on the token, if the auth hook stamped one, is a UI hint only and is
   never read here.
 * `operator_connection` opens the operator's database access: the direct-psycopg-with-claims path
-  (``set local role authenticated`` plus synthesised claims), never `service_role`. What an
+  (``set local role feedback_app`` plus synthesised claims), never `service_role`. What an
   operator can reach is whatever the operator RLS policies on the feedback tables grant, so a bug
   in an operator route cannot read quotations or orders.
 
@@ -75,7 +75,7 @@ def operator_connection(
     settings: Settings,
     member: CurrentMember | CurrentOperator,
 ) -> Iterator[psycopg.Connection[Any]]:
-    """One transaction as the `authenticated` role carrying the operator's claims.
+    """One transaction as `feedback_app` (migration 20261120000100) with the operator's claims.
 
     Commits on a clean exit and rolls back on an exception, so a caller can write an audit event
     before leaving the block and have a failed audit undo the change.
@@ -83,7 +83,7 @@ def operator_connection(
     try:
         with db.connect(settings.database_url.get_secret_value()) as conn:
             with conn.cursor() as cur:
-                cur.execute("set local role authenticated")
+                cur.execute("set local role feedback_app")
                 cur.execute(
                     "select set_config('request.jwt.claims', %s, true)",
                     (json.dumps(operator_claims(member)),),

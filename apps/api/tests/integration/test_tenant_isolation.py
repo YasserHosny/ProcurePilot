@@ -783,6 +783,16 @@ def act_as(cur: psycopg.Cursor, workspace: Workspace) -> None:
     cur.execute("select set_config('request.jwt.claims', %s, true)", (workspace.claims(),))
 
 
+def act_as_feedback_app(cur: psycopg.Cursor, workspace: Workspace) -> None:
+    """Become a member of `workspace` as the API does for the feedback tables (`feedback_app`).
+
+    PostgREST requests arrive as `authenticated` (`act_as`), which has no feedback-table access
+    (migration 20261120000100); only the API's own connection can become `feedback_app`.
+    """
+    cur.execute("set local role feedback_app")
+    cur.execute("select set_config('request.jwt.claims', %s, true)", (workspace.claims(),))
+
+
 def _act_as_tenant_sync(
     conn_or_cur: psycopg.Connection | psycopg.Cursor,
     tenant_id: UUID,
@@ -2440,7 +2450,7 @@ def test_another_workspaces_feedback_submissions_are_invisible(
 ) -> None:
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
-        act_as(cur, alpha)
+        act_as_feedback_app(cur, alpha)
         cur.execute(
             "select id from feedback_submission where id = %s", (beta.feedback_submission_id,)
         )
@@ -2454,7 +2464,7 @@ def test_another_workspaces_feedback_attachments_are_invisible(
 ) -> None:
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
-        act_as(cur, alpha)
+        act_as_feedback_app(cur, alpha)
         cur.execute(
             "select id from feedback_attachment where id = %s", (beta.feedback_attachment_id,)
         )
@@ -2468,7 +2478,7 @@ def test_a_member_cannot_write_a_feedback_submission_into_another_workspace(
 ) -> None:
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
-        act_as(cur, alpha)
+        act_as_feedback_app(cur, alpha)
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cur.execute(
                 "insert into feedback_submission "
@@ -2477,6 +2487,35 @@ def test_a_member_cannot_write_a_feedback_submission_into_another_workspace(
                 "values (%s,%s,'x','x@example.test','owner','hello','/','t','en',false,%s)",
                 (beta.tenant_id, alpha.user_id, uuid4()),
             )
+
+
+def test_a_token_used_directly_against_postgrest_cannot_touch_the_feedback_tables(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """Debate-review D1/F3 (2026-11-20): `authenticated` (PostgREST) has no feedback grants, so a
+    member's own token cannot read, insert, change or delete feedback outside the API."""
+    conn, alpha, _beta = workspaces
+    statements = [
+        ("select id from feedback_submission", ()),
+        ("select id from feedback_attachment", ()),
+        (
+            "insert into feedback_submission "
+            "(tenant_id,submitter_user_id,submitter_name,submitter_email,member_role,"
+            "text_content,page_path,app_version,locale,is_demo,idempotency_key) "
+            "values (%s,%s,'x','x@example.test','owner','hello','/','t','en',false,%s)",
+            (alpha.tenant_id, alpha.user_id, uuid4()),
+        ),
+        ("update feedback_submission set status = 'reviewed'", ()),
+        ("delete from feedback_submission", ()),
+        ("select feedback_operator_labels(%s)", (alpha.feedback_submission_id,)),
+    ]
+    for sql, params in statements:
+        with conn.cursor() as cur:
+            cur.execute("savepoint direct_access")
+            act_as(cur, alpha)
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                cur.execute(sql, params)  # type: ignore[arg-type]
+            cur.execute("rollback to savepoint direct_access")
 
 
 def test_feedback_storage_object_from_another_workspace_is_invisible(
