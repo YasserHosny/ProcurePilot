@@ -165,17 +165,17 @@ class QuotedPrice(NamedTuple):
 
 
 QUOTED_PRICES_SQL = """
-select md.matched_workspace_product_id, ql.unit_price_amount, ql.unit_price_currency,
-       q.prices_include_vat, ql.vat_rate
+select resp.id as rfq_response_id, md.matched_workspace_product_id,
+       ql.unit_price_amount, ql.unit_price_currency, q.prices_include_vat, ql.vat_rate
 from rfq_response resp
 join quotation q on q.id = resp.quotation_id
 join quotation_line ql on ql.quotation_id = resp.quotation_id
 join current_match_decision md on md.quotation_line_id = ql.id
-where resp.id = %(rfq_response_id)s
+where resp.id = any(%(rfq_response_ids)s)
   and md.matched_workspace_product_id = any(%(product_ids)s)
   and ql.unit_price_amount is not null
   and ql.unit_price_currency is not null
-order by ql.line_number
+order by resp.id, ql.line_number
 """
 
 
@@ -187,14 +187,34 @@ def quoted_prices_from_source_response(
 ) -> dict[UUID, QuotedPrice]:
     """The supplier's own quoted per-pack price per product on an RFQ response (no landed
     charges): the only figure that may pre-fill a purchase order's unit price."""
+    return quoted_prices_from_source_responses(conn, sources={rfq_response_id: product_ids})[
+        rfq_response_id
+    ]
+
+
+def quoted_prices_from_source_responses(
+    conn: psycopg.Connection,
+    *,
+    sources: dict[UUID, list[UUID]],
+) -> dict[UUID, dict[UUID, QuotedPrice]]:
+    """Quoted prices for several RFQ responses in one round trip, keyed by response, each
+    narrowed to the products asked of that response."""
+    result: dict[UUID, dict[UUID, QuotedPrice]] = {response_id: {} for response_id in sources}
+    if not sources:
+        return result
+    product_ids = list({product_id for ids in sources.values() for product_id in ids})
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             QUOTED_PRICES_SQL,
-            {"rfq_response_id": rfq_response_id, "product_ids": product_ids},
+            {"rfq_response_ids": list(sources), "product_ids": product_ids},
         )
         rows = cur.fetchall()
-    return {
-        row["matched_workspace_product_id"]: QuotedPrice(
+    wanted = {response_id: set(ids) for response_id, ids in sources.items()}
+    for row in rows:
+        response_id, product_id = row["rfq_response_id"], row["matched_workspace_product_id"]
+        if product_id not in wanted[response_id]:
+            continue
+        result[response_id][product_id] = QuotedPrice(
             Decimal(str(row["unit_price_amount"])),
             str(row["unit_price_currency"]),
             bool(row["prices_include_vat"]),
@@ -202,5 +222,4 @@ def quoted_prices_from_source_response(
             if row["vat_rate"] is not None and row["prices_include_vat"]
             else None,
         )
-        for row in rows
-    }
+    return result
