@@ -32,6 +32,13 @@
       "skipToContent": "الانتقال إلى المحتوى الرئيسي",
       "mainNavigation": "التنقل الرئيسي",
       "homeLink": "بروكيور بايلوت"
+    },
+    "pager": {
+      "pageSize": "عدد الصفوف في الصفحة",
+      "previous": "السابق",
+      "next": "التالي",
+      "range": "{{from}}–{{to}} من {{total}}",
+      "rangeOpen": "{{from}}–{{to}}"
     }
   },
   "auth": {
@@ -2535,8 +2542,6 @@
     },
     "list": {
       "newRequestButton": "طلب جديد",
-      "loadMore": "تحميل المزيد",
-      "loadedCount": "تم تحميل {{count}} من طلبات الشراء",
       "searchLabel": "البحث في الطلبات",
       "searchPlaceholder": "المورد أو المنتج أو الملاحظة",
       "clearSearch": "مسح البحث",
@@ -2549,7 +2554,9 @@
         "total_desc": "الإجمالي (الأعلى)",
         "total_asc": "الإجمالي (الأدنى)"
       },
-      "mineToggle": "طلباتي"
+      "mineToggle": "طلباتي",
+      "pagerLabel": "صفحات طلبات الشراء",
+      "loadedCount": "تم تحميل {{count}} من طلبات الشراء"
     },
     "table": {
       "caption": "طلبات الشراء"

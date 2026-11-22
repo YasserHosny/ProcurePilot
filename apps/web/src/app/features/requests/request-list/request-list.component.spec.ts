@@ -58,6 +58,7 @@ describe('RequestListComponent (T017)', () => {
   let routerSpy: jasmine.SpyObj<Router>;
 
   beforeEach(async () => {
+    localStorage.removeItem('pp.pageSize.requests');
     currentMember.set({ id: 'user-1', membership_id: 'm1' });
     role.set('buyer');
     requestsApi = jasmine.createSpyObj('RequestsApiService', [
@@ -139,7 +140,7 @@ describe('RequestListComponent (T017)', () => {
   });
 
   it('should load requests on init', () => {
-    expect(requestsApi.listRequests).toHaveBeenCalledWith({ status: undefined });
+    expect(requestsApi.listRequests).toHaveBeenCalledWith({ status: undefined, limit: 25 });
     expect(organisationApi.listBranches).toHaveBeenCalledWith({ limit: 100 });
     expect(component.requests().length).toBe(2);
     expect(component.isLoading()).toBeFalse();
@@ -507,7 +508,7 @@ describe('RequestListComponent (T017)', () => {
 
   it('should filter by status', () => {
     component.onStatusFilterChange('submitted');
-    expect(requestsApi.listRequests).toHaveBeenCalledWith({ status: 'submitted' });
+    expect(requestsApi.listRequests).toHaveBeenCalledWith({ status: 'submitted', limit: 25 });
   });
 
   it('should format money from estimated_total', () => {
@@ -667,40 +668,65 @@ describe('RequestListComponent (T017)', () => {
   });
 
   describe('PPS-187', () => {
-    it('(1) Load more appends page 2 and de-duplicates a repeated id, hides when next_cursor is null', () => {
-      requestsApi.listRequests.and.returnValue(
-        of({ items: [mockRequests[0]], next_cursor: 'cursor-page-2' }),
-      );
+    it('(1) Next shows page 2 in place of page 1, Previous returns, and the range shows the total', () => {
+      const page1 = Array.from({ length: 25 }, (_, i) => ({ ...mockRequests[0], id: `p1-${i}` }));
+      requestsApi.listRequests.and.returnValue(of({ items: page1, next_cursor: 'cursor-page-2', total: 26 }));
       component.loadRequests();
       fixture.detectChanges();
 
-      expect(component.requests().length).toBe(1);
-      const loadMoreBtn = fixture.nativeElement.querySelector('.load-more-btn') as HTMLButtonElement;
-      expect(loadMoreBtn).toBeTruthy();
+      const range = () =>
+        (fixture.nativeElement.querySelector('.list-pager__range') as HTMLElement).textContent?.trim();
+      const button = (name: string) =>
+        fixture.nativeElement.querySelector(`.list-pager__${name}`) as HTMLButtonElement;
+      expect(fixture.nativeElement.querySelector('.load-more-btn')).toBeNull();
+      expect(range()).toBe('1–25 of 26');
+      expect(button('previous').disabled).toBeTrue();
+      expect(button('next').disabled).toBeFalse();
 
-      const liveRegion = fixture.nativeElement.querySelector('[role="status"][aria-live="polite"]');
-      expect(liveRegion).toBeTruthy();
-      expect(liveRegion?.textContent).toContain('1 requests loaded');
-
-      // Page 2 returns mockRequests[0] again (duplicate) plus mockRequests[1], next_cursor: null
-      requestsApi.listRequests.and.returnValue(
-        of({ items: [mockRequests[0], mockRequests[1]], next_cursor: null }),
-      );
-
-      loadMoreBtn.click();
+      requestsApi.listRequests.and.returnValue(of({ items: [mockRequests[1]], next_cursor: null, total: 26 }));
+      button('next').click();
       fixture.detectChanges();
 
       expect(requestsApi.listRequests).toHaveBeenCalledWith({
         status: undefined,
         cursor: 'cursor-page-2',
+        limit: 25,
       });
-      expect(component.requests().length).toBe(2);
-      expect(component.requests().map((r) => r.id)).toEqual(['r1', 'r2']);
-      expect(component.nextCursor()).toBeNull();
+      expect(component.requests().map((r) => r.id)).toEqual(['r2']);
+      expect(range()).toBe('26–26 of 26');
+      expect(button('next').disabled).toBeTrue();
 
-      const loadMoreBtnAfter = fixture.nativeElement.querySelector('.load-more-btn');
-      expect(loadMoreBtnAfter).toBeNull();
-      expect(liveRegion?.textContent).toContain('2 requests loaded');
+      requestsApi.listRequests.and.returnValue(of({ items: page1, next_cursor: 'cursor-page-2', total: 26 }));
+      button('previous').click();
+      fixture.detectChanges();
+
+      expect(requestsApi.listRequests.calls.mostRecent().args[0]).toEqual({ status: undefined, limit: 25 });
+      expect(component.requests().length).toBe(25);
+      expect(range()).toBe('1–25 of 26');
+    });
+
+    it('(1b) a page-size change reloads the first page at that size and is remembered', () => {
+      requestsApi.listRequests.and.returnValue(of({ items: [mockRequests[0]], next_cursor: 'c2', total: 60 }));
+      component.loadRequests();
+      fixture.detectChanges();
+      requestsApi.listRequests.calls.reset();
+
+      component.pager.goNext();
+      component.pager.setPageSize(50);
+      component.loadRequests();
+
+      expect(requestsApi.listRequests).toHaveBeenCalledOnceWith({ status: undefined, limit: 50 });
+      expect(localStorage.getItem('pp.pageSize.requests')).toBe('50');
+    });
+
+    it('(1c) a single short page shows no pager and announces the count', () => {
+      requestsApi.listRequests.and.returnValue(of({ items: [mockRequests[0]], next_cursor: null, total: 1 }));
+      component.loadRequests();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('app-list-pager')).toBeNull();
+      const liveRegion = fixture.nativeElement.querySelector('.visually-hidden[role="status"]');
+      expect(liveRegion?.textContent).toContain('1 requests loaded');
     });
 
     it('(2) with two overlapping filter requests (first slower) only the latest filter\'s rows are shown', () => {
@@ -715,11 +741,11 @@ describe('RequestListComponent (T017)', () => {
 
       component.onStatusFilterChange('draft');
       expect(component.requests()).toEqual([]);
-      expect(component.nextCursor()).toBeNull();
+      expect(component.pager.nextCursor()).toBeNull();
 
       component.onStatusFilterChange('approved');
       expect(component.requests()).toEqual([]);
-      expect(component.nextCursor()).toBeNull();
+      expect(component.pager.nextCursor()).toBeNull();
 
       fastApproved$.next({
         items: [{ ...mockRequests[0], id: 'appr-1', status: 'approved' }],
@@ -750,10 +776,10 @@ describe('RequestListComponent (T017)', () => {
       expect(optionValues).withContext('Delivered option in filter dropdown').toContain('delivered');
 
       component.onStatusFilterChange('ordered');
-      expect(requestsApi.listRequests).toHaveBeenCalledWith({ status: 'ordered' });
+      expect(requestsApi.listRequests).toHaveBeenCalledWith({ status: 'ordered', limit: 25 });
 
       component.onStatusFilterChange('delivered');
-      expect(requestsApi.listRequests).toHaveBeenCalledWith({ status: 'delivered' });
+      expect(requestsApi.listRequests).toHaveBeenCalledWith({ status: 'delivered', limit: 25 });
     });
 
     it('(4) filtered-empty vs unfiltered-empty messages, and Clear filter resets', () => {
@@ -783,46 +809,40 @@ describe('RequestListComponent (T017)', () => {
       fixture.detectChanges();
 
       expect(component.statusFilter()).toBe('');
-      expect(requestsApi.listRequests).toHaveBeenCalledWith({ status: undefined });
+      expect(requestsApi.listRequests).toHaveBeenCalledWith({ status: undefined, limit: 25 });
       expect(emptyEl.textContent).toContain('No purchase requests yet. Create your first request to get started.');
       expect(emptyEl.querySelector('.clear-filter-btn')).toBeNull();
     });
 
-    it('(5) failed first load clears rows, failed load-more keeps them', () => {
-      // Setup initial rows on screen with a next_cursor
-      requestsApi.listRequests.and.returnValue(
-        of({ items: [mockRequests[0]], next_cursor: 'cursor-2' }),
-      );
+    it('(5) failed first load clears rows, failed Next keeps the page and the pager', () => {
+      const page1 = Array.from({ length: 25 }, (_, i) => ({ ...mockRequests[0], id: `p1-${i}` }));
+      requestsApi.listRequests.and.returnValue(of({ items: page1, next_cursor: 'cursor-2', total: 26 }));
       component.loadRequests();
       fixture.detectChanges();
-      expect(component.requests().length).toBe(1);
+      const next = () => fixture.nativeElement.querySelector('.list-pager__next') as HTMLButtonElement;
 
-      // Part A: failed load-more keeps existing rows on screen
-      const errLoadMore = new HttpErrorResponse({
+      // Part A: a failed Next keeps page 1 on screen and the pager on page 1
+      const errNext = new HttpErrorResponse({
         status: 500,
         error: { code: 'server_error', message: 'Failed to load page 2' },
       });
-      requestsApi.listRequests.and.returnValue(throwError(() => errLoadMore));
-
-      component.loadMore();
+      requestsApi.listRequests.and.returnValue(throwError(() => errNext));
+      next().click();
       fixture.detectChanges();
 
-      expect(component.requests().length).toBe(1);
-      expect(component.nextCursor()).toBe('cursor-2');
+      expect(component.requests().length).toBe(25);
+      expect(component.pager.pageIndex()).toBe(0);
+      expect(component.pager.nextCursor()).toBe('cursor-2');
       expect(component.errorMessage()).toBe('Failed to load page 2');
-      const retryBtn = fixture.nativeElement.querySelector('.load-more-btn') as HTMLButtonElement;
-      expect(retryBtn).toBeTruthy();
 
-      // Retry via the same Load more button succeeds
-      requestsApi.listRequests.and.returnValue(
-        of({ items: [mockRequests[1]], next_cursor: null }),
-      );
-      retryBtn.click();
+      // Retrying Next succeeds
+      requestsApi.listRequests.and.returnValue(of({ items: [mockRequests[1]], next_cursor: null, total: 26 }));
+      next().click();
       fixture.detectChanges();
-      expect(component.requests().length).toBe(2);
-      expect(component.nextCursor()).toBeNull();
+      expect(component.requests().map((r) => r.id)).toEqual(['r2']);
+      expect(component.pager.pageIndex()).toBe(1);
 
-      // Part B: failed first load clears rows
+      // Part B: a failed reload clears rows
       const errFirstLoad = new HttpErrorResponse({
         status: 500,
         error: { code: 'server_error', message: 'Failed to refresh list' },
@@ -833,7 +853,6 @@ describe('RequestListComponent (T017)', () => {
       fixture.detectChanges();
 
       expect(component.requests()).toEqual([]);
-      expect(component.nextCursor()).toBeNull();
       expect(component.errorMessage()).toBe('Failed to refresh list');
       expect(fixture.nativeElement.querySelector('.error-banner')).toBeTruthy();
     });
@@ -1055,16 +1074,20 @@ describe('RequestListComponent (T017)', () => {
 
       it('sort and mine reset rows and cursor and reload with matching params', () => {
         requestsApi.listRequests.and.returnValue(new Subject());
-        comp.nextCursor.set('old');
+        comp.pager.loaded({ items: [], next_cursor: 'old' });
+        comp.pager.goNext();
         comp.onSortChange('required_by_asc');
         expect(comp.requests()).toEqual([]);
-        expect(comp.nextCursor()).toBeNull();
+        expect(comp.pager.cursor()).toBeNull();
+        expect(comp.pager.nextCursor()).toBeNull();
+        expect(requestsApi.listRequests.calls.mostRecent().args[0]?.cursor).toBeUndefined();
         expect(requestsApi.listRequests.calls.mostRecent().args[0]?.sort).toBe('required_by_asc');
         comp.requests.set(mockRequests);
-        comp.nextCursor.set('old');
+        comp.pager.loaded({ items: [], next_cursor: 'old' });
+        comp.pager.goNext();
         comp.onMineToggleChange(false);
         expect(comp.requests()).toEqual([]);
-        expect(comp.nextCursor()).toBeNull();
+        expect(comp.pager.cursor()).toBeNull();
         expect(requestsApi.listRequests.calls.mostRecent().args[0]?.mine).toBeUndefined();
       });
 
@@ -1119,6 +1142,7 @@ describe('RequestListComponent (T017)', () => {
           q: 'coffee beans',
           sort: 'total_asc',
           mine: true,
+          limit: 25,
         });
       });
     });

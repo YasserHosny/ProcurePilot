@@ -625,6 +625,13 @@ components:
           type: array
           items: { $ref: '#/components/schemas/PurchaseRequest' }
         next_cursor: { type: string, nullable: true }
+        total:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: >-
+            Requests matching the filters across all pages, counted in the page query. Null
+            where the list cannot count them (a cursor past the end, eligible_for_order).
 
     PendingApprovalList:
       type: object

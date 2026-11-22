@@ -1,0 +1,42 @@
+<nav class="list-pager" [attr.aria-label]="label()">
+  <mat-form-field class="list-pager__size" appearance="outline" subscriptSizing="dynamic">
+    <mat-label>{{ 'common.pager.pageSize' | translate }}</mat-label>
+    <mat-select
+      [value]="pager().pageSize()"
+      [disabled]="busy()"
+      (selectionChange)="onPageSize($event.value)"
+    >
+      @for (size of sizes; track size) {
+        <mat-option [value]="size">{{ size }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  @let r = range();
+  <span class="list-pager__range" role="status" aria-live="polite" aria-atomic="true">
+    {{ r.key | translate: r.params }}
+  </span>
+
+  <div class="list-pager__steps">
+    <button
+      mat-stroked-button
+      type="button"
+      class="list-pager__previous"
+      [disabled]="busy() || !pager().hasPrevious()"
+      (click)="onPrevious()"
+    >
+      <mat-icon class="rtl-flip" aria-hidden="true">chevron_left</mat-icon>
+      {{ 'common.pager.previous' | translate }}
+    </button>
+    <button
+      mat-stroked-button
+      type="button"
+      class="list-pager__next"
+      [disabled]="busy() || !pager().hasNext()"
+      (click)="onNext()"
+    >
+      {{ 'common.pager.next' | translate }}
+      <mat-icon class="rtl-flip" iconPositionEnd aria-hidden="true">chevron_right</mat-icon>
+    </button>
+  </div>
+</nav>

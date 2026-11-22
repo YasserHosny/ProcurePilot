@@ -177,7 +177,7 @@
   /* tooltip */
   --pp-tooltip-bg:var(--pp-inverse-surface); --pp-tooltip-fg:var(--pp-on-inverse-surface); --pp-tooltip-radius:var(--pp-radius-control);
   --pp-tooltip-max-width:200px; --pp-tooltip-offset:8px;
-  /* pagination: cursor-based, so Previous/Next and Load more only */
+  /* pagination: cursor-based, so Previous/Next (no page numbers), rows per page and a total */
   --pp-pager-fg:var(--pp-text-muted); --pp-pager-gap:var(--pp-space-3); --pp-pager-page-size:25;
   /* checkbox and radio */
   --pp-check-size:18px; --pp-check-border:var(--pp-field-border); --pp-check-border-hover:var(--pp-primary);
@@ -1469,16 +1469,19 @@ dialog.real::backdrop{background:var(--pp-dialog-scrim)}
       <details class="ctok" data-prefix="tabs"><summary></summary><div class="tablewrap"><div class="scroll"></div></div></details>
 
       <h3 class="sub" data-ar="التنقّل بين الصفحات">Pagination</h3>
-      <p class="note" data-ar="الواجهة البرمجية تقسّم النتائج بمؤشر، لا بأرقام صفحات، فلا نعرض أرقامًا يمكن القفز إليها. القوائم الطويلة تستخدم «عرض المزيد»، والجداول الكثيفة تستخدم السابق والتالي.">The API pages by cursor, not by page number, so there are no numbers to jump to. Long lists use Load more; dense tables use Previous and Next.</p>
+      <p class="note" data-ar="الواجهة البرمجية تقسّم النتائج بمؤشر، لا بأرقام صفحات، فلا نعرض أرقامًا يمكن القفز إليها. جداول القوائم تستخدم شريط التنقّل: عدد الصفوف في الصفحة (١٠ أو ٢٥ أو ٥٠، والافتراضي ٢٥ ويُحفظ لكل قائمة)، والنطاق مع الإجمالي، والسابق والتالي. يختفي الشريط حين تتسع صفحة واحدة لكل النتائج. «عرض المزيد» للخلاصات القصيرة داخل البطاقات فقط.">The API pages by cursor, not by page number, so there are no numbers to jump to. List tables use the pager bar: rows per page (10, 25 or 50; 25 by default, remembered per list), the range with the total, and Previous and Next. The bar hides when one page holds every result. Load more is only for short feeds inside cards.</p>
       <div class="pager-grid">
         <div class="pager">
           <span class="muted" id="lm-count" data-ar="عرض ٢٥ طلبًا">Showing 25 requests</span>
           <button class="btn btn-outline btn-sm" type="button" id="load-more"><span data-ar="عرض ٢٥ أخرى">Load 25 more</span></button>
         </div>
-        <nav class="pager" aria-label="Purchase requests pages" data-ar-label="صفحات طلبات الشراء">
-          <button class="btn btn-outline btn-sm" type="button" disabled><span class="ms s16 mirror" aria-hidden="true">chevron_left</span><span data-ar="السابق">Previous</span></button>
-          <span class="muted" data-ar="الطلبات ١ إلى ٢٥، الأحدث أولًا">Requests 1 to 25, newest first</span>
-          <button class="btn btn-outline btn-sm" type="button"><span data-ar="التالي">Next</span><span class="ms s16 mirror" aria-hidden="true">chevron_right</span></button>
+        <nav class="pager" aria-label="Purchase request pages" data-ar-label="صفحات طلبات الشراء">
+          <label class="muted"><span data-ar="عدد الصفوف في الصفحة">Rows per page</span> <select><option>10</option><option selected>25</option><option>50</option></select></label>
+          <span class="muted" role="status" aria-live="polite" data-ar="١–٢٥ من ٣٤">1–25 of 34</span>
+          <span>
+            <button class="btn btn-outline btn-sm" type="button" disabled><span class="ms s16 mirror" aria-hidden="true">chevron_left</span><span data-ar="السابق">Previous</span></button>
+            <button class="btn btn-outline btn-sm" type="button"><span data-ar="التالي">Next</span><span class="ms s16 mirror" aria-hidden="true">chevron_right</span></button>
+          </span>
         </nav>
       </div>
       <details class="ctok" data-prefix="pager"><summary></summary><div class="tablewrap"><div class="scroll"></div></div></details>

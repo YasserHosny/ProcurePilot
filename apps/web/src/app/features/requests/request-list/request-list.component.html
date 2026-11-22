@@ -70,8 +70,9 @@
     </div>
   }
 
+  <!-- The pager announces its own range; this covers a single short page with no pager. -->
   <div class="visually-hidden" aria-live="polite" role="status" aria-atomic="true">
-    @if (!isLoading() && !errorMessage()) {
+    @if (!isLoading() && !errorMessage() && !pager.needed()) {
       {{ 'requests.list.loadedCount' | translate: { count: requests().length } }}
     }
   </div>
@@ -229,23 +230,15 @@
           ></tr>
         </table>
       </div>
+    }
 
-      @if (nextCursor()) {
-        <div class="pagination">
-          <button
-            mat-stroked-button
-            type="button"
-            class="load-more-btn"
-            [disabled]="isLoadingMore()"
-            (click)="loadMore()"
-          >
-            @if (isLoadingMore()) {
-              <mat-spinner diameter="18" [attr.aria-label]="'common.loading' | translate"></mat-spinner>
-            }
-            <span>{{ 'requests.list.loadMore' | translate }}</span>
-          </button>
-        </div>
-      }
+    @if (pager.needed()) {
+      <app-list-pager
+        [pager]="pager"
+        [label]="'requests.list.pagerLabel' | translate"
+        [busy]="isLoading()"
+        (pageChange)="loadRequests()"
+      />
     }
   </mat-card>
 </div>

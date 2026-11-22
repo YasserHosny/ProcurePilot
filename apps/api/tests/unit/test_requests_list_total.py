@@ -1,0 +1,74 @@
+"""The request list reports the filtered total for the web pager (PPS-228).
+
+The count rides on the page query itself (PostgREST ``count=exact``), never as a second
+round trip.
+"""
+
+from types import SimpleNamespace
+from unittest.mock import Mock
+from uuid import uuid4
+
+import pytest
+
+from procurepilot_api.modules.requests import service as service_module
+from procurepilot_api.modules.requests.service import RequestsService
+
+
+def _service(monkeypatch: pytest.MonkeyPatch, *, rows: int, count: int | None) -> Mock:
+    branch, member = str(uuid4()), str(uuid4())
+    data = [
+        {
+            "id": str(uuid4()),
+            "branch_id": branch,
+            "requested_by_membership_id": member,
+            "required_by_date": "2026-11-30",
+            "status": "draft",
+            "estimated_total_amount": "10",
+            "estimated_total_currency": "SAR",
+            "created_at": "2026-11-01T00:00:00Z",
+        }
+        for _ in range(rows)
+    ]
+    client = Mock()
+    query = client.table.return_value
+    query.select.return_value = query
+    query.eq.return_value = query
+    query.order.return_value = query
+    query.range.return_value = query
+    query.execute.side_effect = lambda: SimpleNamespace(data=data, count=count)
+    monkeypatch.setattr(service_module, "authenticated_client", lambda *_: client)
+    return client
+
+
+@pytest.fixture
+def service(monkeypatch: pytest.MonkeyPatch) -> RequestsService:
+    svc = RequestsService()
+    for name in (
+        "_fetch_lines_batch",
+        "_fetch_steps_batch",
+        "_fetch_member_contacts_batch",
+        "_fetch_auto_prepared_batch",
+        "_fetch_sources_batch",
+        "_fetch_request_groups_batch",
+    ):
+        monkeypatch.setattr(svc, name, Mock(return_value={}))
+    monkeypatch.setattr(svc, "_fetch_budget_rows", Mock(return_value=[]))
+    return svc
+
+
+def test_list_reports_total_from_the_page_query(
+    monkeypatch: pytest.MonkeyPatch, service: RequestsService
+) -> None:
+    client = _service(monkeypatch, rows=3, count=34)
+    result = service.list_requests(bearer_token="test", limit=25)
+    assert result.total == 34
+    query = client.table.return_value
+    assert query.select.call_args.kwargs.get("count") == "exact"
+    assert query.execute.call_count == 1
+
+
+def test_empty_first_page_reports_zero(
+    monkeypatch: pytest.MonkeyPatch, service: RequestsService
+) -> None:
+    _service(monkeypatch, rows=0, count=0)
+    assert service.list_requests(bearer_token="test").total == 0

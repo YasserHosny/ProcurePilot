@@ -12,6 +12,7 @@ from uuid import UUID, uuid4, uuid5
 
 import psycopg
 from postgrest.exceptions import APIError
+from postgrest.types import CountMethod
 from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
@@ -697,6 +698,7 @@ class RequestsService:
         client = authenticated_client(self._settings, bearer_token)
         capped = _cap_limit(limit)
         offset = _decode_cursor(cursor)
+        total: int | None = None
 
         if filtered_sql or eligible_for_order:
             if member is None:
@@ -712,9 +714,15 @@ class RequestsService:
                 limit=capped + 1,
                 eligible_for_order=eligible_for_order,
             )
+            counts = {row.pop("total_count", None) for row in rows}
+            if not eligible_for_order:
+                total = next(iter(counts), None) if rows else (0 if offset == 0 else None)
         else:
             try:
-                query = client.table("purchase_request").select(REQUEST_COLUMNS)
+                # count=exact rides on this same request: no second round trip for the total.
+                query = client.table("purchase_request").select(
+                    REQUEST_COLUMNS, count=CountMethod.exact
+                )
                 if status is not None:
                     query = query.eq("status", status)
                 if branch_id is not None:
@@ -729,12 +737,14 @@ class RequestsService:
                 raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
             rows = _rows(response.data)
+            count = getattr(response, "count", None)
+            total = int(count) if isinstance(count, int) else None
 
         visible = rows[:capped]
         next_cursor = _encode_cursor(offset + capped) if len(rows) > capped else None
 
         if not visible:
-            return PurchaseRequestList(items=[], next_cursor=next_cursor)
+            return PurchaseRequestList(items=[], next_cursor=next_cursor, total=total)
 
         if eligible_for_order:
             assert member is not None
@@ -814,7 +824,7 @@ class RequestsService:
             )
             for item in orderable:
                 item.has_quantity_to_order = item.id in remaining
-        return PurchaseRequestList(items=items, next_cursor=next_cursor)
+        return PurchaseRequestList(items=items, next_cursor=next_cursor, total=total)
 
     def _list_request_rows_sql(
         self,
@@ -880,7 +890,8 @@ class RequestsService:
         # The id tie-break makes a quiet table's offset pages stable. Concurrent inserts
         # can still shift offsets; the web de-duplicates. Retain the existing cursor.
         query = sql.SQL(
-            "select pr.* from purchase_request pr where {} order by {} limit %s offset %s"
+            "select pr.*, count(*) over () as total_count from purchase_request pr "
+            "where {} order by {} limit %s offset %s"
         ).format(sql.SQL(" and ").join(predicates), sql.SQL(orders[sort]))
         params.extend([limit, offset])
         claims = json.dumps(

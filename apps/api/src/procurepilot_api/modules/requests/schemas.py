@@ -170,6 +170,9 @@ class PurchaseRequestUpdate(StrictApiModel):
 class PurchaseRequestList(BaseModel):
     items: list[PurchaseRequest]
     next_cursor: str | None = None
+    # Requests matching the filters across all pages, when the list path can count them in
+    # the page query itself; None where it cannot (an offset past the end, order eligibility).
+    total: int | None = Field(default=None, ge=0)
 
 
 PendingApprovalSort = Literal[
