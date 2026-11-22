@@ -21,15 +21,17 @@ type Quotes = dict[tuple[str, str], QuotedPrice]
 
 
 def _listing(
-    monkeypatch: pytest.MonkeyPatch, *, sourced: int, manual: int
+    monkeypatch: pytest.MonkeyPatch, *, sourced: int, manual: int, shared_product: bool = False
 ) -> tuple[RequestsService, Mock, Quotes]:
     service = RequestsService()
     branch, member = uuid4(), uuid4()
     rows: list[dict[str, object]] = []
     lines_by_request: dict[str, list[dict[str, object]]] = {}
     quotes: Quotes = {}
+    shared = str(uuid4())
     for i in range(sourced + manual):
-        request_id, product_id = str(uuid4()), str(uuid4())
+        request_id = str(uuid4())
+        product_id = shared if shared_product else str(uuid4())
         response_id = str(uuid4()) if i < sourced else None
         rows.append(
             {
@@ -116,14 +118,27 @@ def test_list_with_no_sourced_rows_opens_no_connection(monkeypatch: pytest.Monke
     assert connects.call_count == 0
 
 
-def test_list_keeps_each_rows_own_quoted_prices(monkeypatch: pytest.MonkeyPatch) -> None:
-    service, _, quotes = _listing(monkeypatch, sourced=4, manual=2)
+@pytest.mark.parametrize("shared_product", [False, True])
+def test_list_keeps_each_rows_own_quoted_prices(
+    monkeypatch: pytest.MonkeyPatch, shared_product: bool
+) -> None:
+    # With a shared product, every supplier quotes the same product at its own price, so a
+    # price attached to the wrong request shows up under the wrong source response.
+    service, _, quotes = _listing(monkeypatch, sourced=4, manual=2, shared_product=shared_product)
     result = service.list_requests(bearer_token="test", limit=50)
-    expected = {str(product_id): price.amount for (_, product_id), price in quotes.items()}
+    expected = {key: price.amount for key, price in quotes.items()}
     seen = {
-        str(line.workspace_product_id): Decimal(line.quoted_unit_price.amount)
+        (str(item.source_rfq_response_id), str(line.workspace_product_id)): Decimal(
+            line.quoted_unit_price.amount
+        )
         for item in result.items
         for line in item.lines
         if line.quoted_unit_price is not None
     }
     assert seen == expected
+    assert all(
+        line.quoted_unit_price is None
+        for item in result.items
+        if item.source_rfq_response_id is None
+        for line in item.lines
+    )

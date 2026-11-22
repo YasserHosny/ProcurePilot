@@ -165,15 +165,19 @@ class QuotedPrice(NamedTuple):
 
 
 QUOTED_PRICES_SQL = """
+with wanted as (
+  select * from unnest(%(rfq_response_ids)s::uuid[], %(product_ids)s::uuid[])
+    as w(rfq_response_id, product_id)
+)
 select resp.id as rfq_response_id, md.matched_workspace_product_id,
        ql.unit_price_amount, ql.unit_price_currency, q.prices_include_vat, ql.vat_rate
-from rfq_response resp
+from wanted w
+join rfq_response resp on resp.id = w.rfq_response_id
 join quotation q on q.id = resp.quotation_id
 join quotation_line ql on ql.quotation_id = resp.quotation_id
-join current_match_decision md on md.quotation_line_id = ql.id
-where resp.id = any(%(rfq_response_ids)s)
-  and md.matched_workspace_product_id = any(%(product_ids)s)
-  and ql.unit_price_amount is not null
+join current_match_decision md
+  on md.quotation_line_id = ql.id and md.matched_workspace_product_id = w.product_id
+where ql.unit_price_amount is not null
   and ql.unit_price_currency is not null
 order by resp.id, ql.line_number
 """
@@ -202,18 +206,21 @@ def quoted_prices_from_source_responses(
     result: dict[UUID, dict[UUID, QuotedPrice]] = {response_id: {} for response_id in sources}
     if not sources:
         return result
-    product_ids = list({product_id for ids in sources.values() for product_id in ids})
+    # One row per wanted (response, product) pair, so the join fetches only what was asked.
+    pairs = sorted(
+        {(response_id, product_id) for response_id, ids in sources.items() for product_id in ids}
+    )
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             QUOTED_PRICES_SQL,
-            {"rfq_response_ids": list(sources), "product_ids": product_ids},
+            {
+                "rfq_response_ids": [response_id for response_id, _ in pairs],
+                "product_ids": [product_id for _, product_id in pairs],
+            },
         )
         rows = cur.fetchall()
-    wanted = {response_id: set(ids) for response_id, ids in sources.items()}
     for row in rows:
         response_id, product_id = row["rfq_response_id"], row["matched_workspace_product_id"]
-        if product_id not in wanted[response_id]:
-            continue
         result[response_id][product_id] = QuotedPrice(
             Decimal(str(row["unit_price_amount"])),
             str(row["unit_price_currency"]),
