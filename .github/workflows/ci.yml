@@ -165,6 +165,13 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/ci -p 'test_e2e_shard.py' -v
           python3 scripts/ci/e2e_shard.py check --total 5
+      - name: No piggy-bank icon
+        # Material's `savings` glyph is a piggy bank, which the owner ruled out (PPS-61).
+        run: |
+          if git grep -nP '>\s*savings\s*<|^\s*savings\s*$|icon:\s*.savings.|\?\s*.savings.\s*:|Icons\.savings' -- apps/web/src apps/mobile/lib; then
+            echo "::error::Use the payments icon for money saved, not savings (a piggy bank). PPS-61."
+            exit 1
+          fi
       - name: Lint backend
         run: uv run --project apps/api ruff check apps/api
       - name: Lint web
