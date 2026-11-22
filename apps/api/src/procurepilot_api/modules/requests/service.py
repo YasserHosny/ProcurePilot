@@ -89,6 +89,7 @@ from procurepilot_api.modules.requests.valuation import (
     estimate_from_source_response,
     estimate_line_value,
     quoted_prices_from_source_response,
+    quoted_prices_from_source_responses,
 )
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
@@ -756,6 +757,7 @@ class RequestsService:
         auto_prepared = self._fetch_auto_prepared_batch(client, visible)
         sources = self._fetch_sources_batch(client, visible)
         request_groups = self._fetch_request_groups_batch(client, visible)
+        quoted_prices = self._quoted_prices_batch(visible, lines_by_request)
 
         budgets = self._fetch_budget_rows(client)
         spend_cache: dict[UUID, list[SpendRow]] = {}
@@ -793,6 +795,7 @@ class RequestsService:
                     source_lookup=False,
                     request_group=request_groups.get(str(row["id"])),
                     request_group_lookup=False,
+                    quoted_prices=quoted_prices.get(str(row["id"]), {}),
                     budget_status_for=budget_status_for,
                 )
             )
@@ -3673,6 +3676,7 @@ class RequestsService:
         source_lookup: bool = True,
         request_group: RequestGroupSummary | None = None,
         request_group_lookup: bool = True,
+        quoted_prices: dict[UUID, QuotedPrice] | None = None,
         budget_status_for: Callable[[dict[str, object]], BudgetStatus | None] | None = None,
     ) -> PurchaseRequest:
         if requester_lookup:
@@ -3707,7 +3711,11 @@ class RequestsService:
                 if budget_status_for is not None
                 else self._budget_status_for(client, request_row)
             ),
-            quoted_prices=self._quoted_prices_for(request_row, line_rows),
+            quoted_prices=(
+                quoted_prices
+                if quoted_prices is not None
+                else self._quoted_prices_for(request_row, line_rows)
+            ),
             requester=requester,
             assignee=assignee,
             decider=decider,
@@ -3915,6 +3923,45 @@ class RequestsService:
                 )
         except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+    def _quoted_prices_batch(
+        self,
+        request_rows: list[dict[str, object]],
+        lines_by_request: dict[str, list[dict[str, object]]],
+    ) -> dict[str, dict[UUID, QuotedPrice]]:
+        """``_quoted_prices_for`` for a page of requests over one connection and one query:
+        a connect per row to the hosted pooler cost seconds on a list."""
+        sourced = [
+            (str(row["id"]), UUID(str(row["source_rfq_response_id"])))
+            for row in request_rows
+            if row.get("source_rfq_response_id") and lines_by_request.get(str(row["id"]))
+        ]
+        if not sourced:
+            return {}
+        sources: dict[UUID, list[UUID]] = {}
+        for request_id, response_id in sourced:
+            sources.setdefault(response_id, []).extend(
+                UUID(str(lr["workspace_product_id"])) for lr in lines_by_request[request_id]
+            )
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                by_response = quoted_prices_from_source_responses(conn, sources=sources)
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        products = {
+            request_id: {
+                UUID(str(lr["workspace_product_id"])) for lr in lines_by_request[request_id]
+            }
+            for request_id, _ in sourced
+        }
+        return {
+            request_id: {
+                product_id: price
+                for product_id, price in by_response[response_id].items()
+                if product_id in products[request_id]
+            }
+            for request_id, response_id in sourced
+        }
 
     def _budget_status_for(
         self,
