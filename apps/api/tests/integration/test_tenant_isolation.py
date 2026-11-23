@@ -3063,6 +3063,21 @@ def test_a_member_cannot_link_purchase_order_to_cross_tenant_request_or_line(
                 beta.purchase_request_id,
             ),
         )
+        # A purchase order is only valid with a line, so the listing can read it back.
+        cur.execute(
+            "insert into purchase_order_line (tenant_id,purchase_order_id,line_number,"
+            "workspace_product_id,description,ordered_quantity,base_unit,unit_price_amount,"
+            "unit_price_currency,tax_amount,tax_currency,line_total_amount,"
+            "line_total_currency,source_request_id,source_request_line_id) "
+            "values (%s,%s,1,%s,'own line',1,'each',10,'GBP',0,'GBP',10,'GBP',%s,%s)",
+            (
+                beta.tenant_id,
+                beta_order_id,
+                beta.workspace_product_id,
+                beta.purchase_request_id,
+                beta.purchase_request_line_id,
+            ),
+        )
 
     service = OrdersService()
     monkeypatch.setattr(service, "_transaction", lambda _: conn.cursor(row_factory=dict_row))
