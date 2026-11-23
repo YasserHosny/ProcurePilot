@@ -218,17 +218,3 @@ mat-chip.status-badge {
 .scorecard-link {
   white-space: nowrap;
 }
-
-.pagination-row {
-  display: flex;
-  justify-content: center;
-  border-block-start: 1px solid var(--pp-border);
-  padding: 0.75rem;
-
-  button,
-  button span {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-}

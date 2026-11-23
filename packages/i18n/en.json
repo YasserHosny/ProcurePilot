@@ -954,7 +954,7 @@
       "selectTaskLabel": "Select quotation {{id}}",
       "readOnlyBadge": "Read-Only Access",
       "readOnlyNotice": "Your role has read-only access. Only Owners and Buyers can correct and confirm quotations.",
-      "loadMore": "Load More",
+      "pagerLabel": "Quotation review pages",
       "emptyTitle": "No Review Tasks Found",
       "emptyMessage": "There are no quotation review tasks matching your current filters.",
       "noFilterResults": "No results match your filters",
@@ -1417,7 +1417,7 @@
       "noFilterResults": "No match tasks match the active filters",
       "clearFilters": "Clear Filters",
       "retry": "Retry",
-      "loadMore": "Load More",
+      "pagerLabel": "Match resolution pages",
       "emptyTitle": "No match tasks found",
       "emptyMessage": "There are no quotation lines currently awaiting match resolution.",
       "allLinesMatchedTitle": "All lines of this quote are matched",
@@ -3368,10 +3368,7 @@
       "running": "Recomputing",
       "success": "Recomputed {{count}} supplier snapshot(s)."
     },
-    "pagination": {
-      "more": "Load more",
-      "loading": "Loading more"
-    },
+    "pagerLabel": "Supplier risk pages",
     "empty": {
       "title": "No supplier risk snapshots yet",
       "message": "An owner or buyer can compute the first evidence-based snapshots."

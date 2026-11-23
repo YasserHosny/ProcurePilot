@@ -28,6 +28,8 @@ import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 type ReviewTaskSortBy = 'created_at' | 'stated_total' | 'priority' | 'status';
@@ -56,6 +58,7 @@ type ReviewTaskSortOrder = 'asc' | 'desc';
     MatProgressSpinnerModule,
     MatTooltipModule,
     TranslatePipe,
+    ListPagerComponent,
     RoleDirective,
     FormatDatePipe,
     FormatMoneyPipe,
@@ -74,10 +77,9 @@ export class ReviewQueueComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly isLoading = signal<boolean>(true);
-  readonly isLoadingMore = signal<boolean>(false);
   readonly tasks = signal<ReviewTask[]>([]);
   readonly selectedTaskIds = signal<Set<string>>(new Set());
-  readonly nextCursor = signal<string | null>(null);
+  readonly pager = new CursorPager('review-tasks');
   readonly statusFilter = signal<ReviewTaskStatus | 'all'>('open');
   readonly priorityFilter = signal<ReviewTaskPriority | 'all'>('all');
   readonly supplierFilter = signal<string | null>(null);
@@ -116,7 +118,6 @@ export class ReviewQueueComponent implements OnInit {
   readonly bulkPriorityTarget = signal<ReviewTaskPriority | null>(null);
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
   private loadTasksSub: Subscription | null = null;
-  private loadMoreSub: Subscription | null = null;
   private isInitialLoad = true;
   private queryParamSub: Subscription | null = null;
 
@@ -193,22 +194,16 @@ export class ReviewQueueComponent implements OnInit {
       });
   }
 
-  loadTasks(preserveFailedTasks?: readonly ReviewTask[]): void {
+  loadTasks(retainSelection?: ReadonlySet<string>): void {
     this.loadTasksSub?.unsubscribe();
     this.loadTasksSub = null;
-    if (this.loadMoreSub) {
-      this.loadMoreSub.unsubscribe();
-      this.loadMoreSub = null;
-    }
-    this.isLoadingMore.set(false);
-
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
-    this.nextCursor.set(null);
 
     if (this.dateRangeInvalid()) {
       // From after To can never match: show the error instead of asking the API.
       this.tasks.set([]);
+      this.selectedTaskIds.set(new Set());
       this.isLoading.set(false);
       return;
     }
@@ -220,8 +215,10 @@ export class ReviewQueueComponent implements OnInit {
     const search = this.sanitizedSearch();
     const { date_from, date_to } = this.formatFilterDates();
 
-    this.loadTasksSub = this.api
-      .getReviewTasks({
+    const subscription = new Subscription();
+    this.loadTasksSub = subscription;
+    subscription.add(
+      this.api.getReviewTasks({
         status,
         priority: priority === 'all' ? undefined : priority,
         ...this.additionalRequestFilters(),
@@ -230,71 +227,36 @@ export class ReviewQueueComponent implements OnInit {
         date_to,
         sort_by: this.sortBy(),
         sort_order: this.sortOrder(),
+        ...this.pager.params(),
       })
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (res) => {
-          if (preserveFailedTasks && preserveFailedTasks.length > 0) {
-            const refreshedIds = new Set(res.items.map((item) => item.id));
-            const missingFailedRows = preserveFailedTasks.filter(
-              (task) => !refreshedIds.has(task.id),
-            );
-            this.tasks.set([...missingFailedRows, ...res.items]);
-            this.selectedTaskIds.set(new Set(preserveFailedTasks.map((t) => t.id)));
-          } else {
-            this.tasks.set(res.items);
+          if (!this.pager.loaded(res)) {
+            this.loadTasks(retainSelection);
+            return;
+          }
+          this.tasks.set(res.items);
+          this.selectedTaskIds.set(new Set(
+            res.items.filter((item) => retainSelection?.has(item.id)).map((item) => item.id),
+          ));
+          this.isLoading.set(false);
+        },
+        error: (err: unknown) => {
+          if (!this.pager.failed()) {
+            this.tasks.set([]);
             this.selectedTaskIds.set(new Set());
           }
-          this.nextCursor.set(res.next_cursor);
           this.isLoading.set(false);
-          this.loadTasksSub = null;
-        },
-        error: (err: unknown) => {
-          this.isLoading.set(false);
-          this.loadTasksSub = null;
           this.handleError(err);
         },
-      });
+      }),
+    );
   }
 
-  loadMore(): void {
-    if (this.isLoading()) return;
-    const cursor = this.nextCursor();
-    if (!cursor) return;
-
-    this.isLoadingMore.set(true);
-
-    const status = this.statusFilter();
-    const priority = this.priorityFilter();
-    const search = this.sanitizedSearch();
-    const { date_from, date_to } = this.formatFilterDates();
-
-    this.loadMoreSub = this.api
-      .getReviewTasks({
-        cursor,
-        status,
-        priority: priority === 'all' ? undefined : priority,
-        ...this.additionalRequestFilters(),
-        search,
-        date_from,
-        date_to,
-        sort_by: this.sortBy(),
-        sort_order: this.sortOrder(),
-      })
-      .subscribe({
-        next: (res) => {
-          const currentIds = new Set(this.tasks().map((task) => task.id));
-          const newItems = res.items.filter((item) => !currentIds.has(item.id));
-          this.tasks.set([...this.tasks(), ...newItems]);
-          this.nextCursor.set(res.next_cursor);
-          this.isLoadingMore.set(false);
-          this.loadMoreSub = null;
-        },
-        error: (err: unknown) => {
-          this.isLoadingMore.set(false);
-          this.loadMoreSub = null;
-          this.handleError(err);
-        },
-      });
+  private reloadFromFirstPage(): void {
+    this.pager.reset();
+    this.loadTasks();
   }
 
   truncateId(id: string): string {
@@ -318,31 +280,31 @@ export class ReviewQueueComponent implements OnInit {
   onStatusChange(status: ReviewTaskStatus | 'all'): void {
     this.statusFilter.set(status);
     this.updateQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   onPriorityChange(priority: ReviewTaskPriority | 'all'): void {
     this.priorityFilter.set(priority);
     this.updateQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   onSupplierChange(value: string | null): void {
     this.supplierFilter.set(value);
     this.updateQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   onReasonChange(value: ReviewTaskReason | 'all'): void {
     this.reasonFilter.set(value);
     this.updateQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   onLifecycleChange(value: QuotationStatus | 'all'): void {
     this.lifecycleFilter.set(value);
     this.updateQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   private additionalRequestFilters(): {
@@ -365,7 +327,7 @@ export class ReviewQueueComponent implements OnInit {
       clearTimeout(this.searchDebounce);
     }
     this.searchDebounce = setTimeout(() => {
-      this.loadTasks();
+      this.reloadFromFirstPage();
     }, 300);
   }
 
@@ -374,7 +336,7 @@ export class ReviewQueueComponent implements OnInit {
     if (this.dateFrom() !== next) {
       this.dateFrom.set(next);
       this.updateQueryParams();
-      this.loadTasks();
+      this.reloadFromFirstPage();
     }
   }
 
@@ -383,7 +345,7 @@ export class ReviewQueueComponent implements OnInit {
     if (this.dateTo() !== next) {
       this.dateTo.set(next);
       this.updateQueryParams();
-      this.loadTasks();
+      this.reloadFromFirstPage();
     }
   }
 
@@ -393,7 +355,7 @@ export class ReviewQueueComponent implements OnInit {
     }
     this.sortOrder.set(sort.direction === 'asc' ? 'asc' : 'desc');
     this.updateQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   clearFilters(): void {
@@ -410,19 +372,19 @@ export class ReviewQueueComponent implements OnInit {
     this.dateFrom.set(null);
     this.dateTo.set(null);
     this.updateQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   removeStatusFilter(): void {
     this.statusFilter.set('open');
     this.updateQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   removePriorityFilter(): void {
     this.priorityFilter.set('all');
     this.updateQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   removeSearchFilter(): void {
@@ -432,14 +394,14 @@ export class ReviewQueueComponent implements OnInit {
     }
     this.searchQuery.set('');
     this.updateQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   removeDateRangeFilter(): void {
     this.dateFrom.set(null);
     this.dateTo.set(null);
     this.updateQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   removeFilter(filter: 'status' | 'priority' | 'search' | 'date_range' | 'date'): void {
@@ -462,9 +424,6 @@ export class ReviewQueueComponent implements OnInit {
 
   resultCountText(): string {
     const count = this.tasks().length;
-    if (this.nextCursor()) {
-      return this.translate.instant('quotations.queue.resultsCount.more', { count });
-    }
     if (count === 1) {
       return this.translate.instant('quotations.queue.resultsCount.one', { count });
     }
@@ -482,12 +441,12 @@ export class ReviewQueueComponent implements OnInit {
     this.archivingTaskId.set(task.id);
     this.api.archiveQuotation(task.quotation_id).subscribe({
       next: () => {
-        this.tasks.set(this.tasks().filter((item) => item.id !== task.id));
         const selected = new Set(this.selectedTaskIds());
         if (selected.delete(task.id)) {
           this.selectedTaskIds.set(selected);
         }
         this.archivingTaskId.set(null);
+        this.loadTasks(selected);
       },
       error: (err: unknown) => {
         this.archivingTaskId.set(null);
@@ -803,7 +762,7 @@ export class ReviewQueueComponent implements OnInit {
         this.searchDebounce = null;
       }
       this.applyFilterState(target);
-      this.loadTasks();
+      this.reloadFromFirstPage();
     }
   }
 
@@ -907,7 +866,7 @@ export class ReviewQueueComponent implements OnInit {
 
     const failedIds = new Set(failedTasks.map((t) => t.id));
     this.selectedTaskIds.set(failedIds);
-    this.loadTasks(failedTasks);
+    this.loadTasks(failedIds);
   }
 
   private handleError(err: unknown): void {

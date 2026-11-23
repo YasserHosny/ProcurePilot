@@ -163,6 +163,7 @@ describe('ReviewQueueComponent (T052)', () => {
       date_to: undefined,
       sort_by: 'created_at',
       sort_order: 'desc',
+      limit: 25,
     });
     expect(component.tasks().length).toBe(2);
     expect(component.isLoading()).toBeFalse();
@@ -178,6 +179,7 @@ describe('ReviewQueueComponent (T052)', () => {
       date_to: undefined,
       sort_by: 'created_at',
       sort_order: 'desc',
+      limit: 25,
     });
 
     component.onPriorityChange('high');
@@ -189,27 +191,78 @@ describe('ReviewQueueComponent (T052)', () => {
       date_to: undefined,
       sort_by: 'created_at',
       sort_order: 'desc',
+      limit: 25,
     });
   });
 
-  it('should load more tasks with status all and cursor', () => {
-    apiService.getReviewTasks.and.returnValue(
-      of({ items: mockTasks, next_cursor: 'cursor-123' }),
+  it('pages forward and back with the shared pager, carries limit, and reports total', () => {
+    const page1 = createMockTasks(25, 1);
+    const page2 = [createMockTasks(1, 26)[0]];
+    apiService.getReviewTasks.and.returnValues(
+      of({ items: page1, next_cursor: 'cursor-123', total: 26 }),
+      of({ items: page2, next_cursor: null, total: 26 }),
+      of({ items: page1, next_cursor: 'cursor-123', total: 26 }),
     );
     component.onStatusChange('all');
+    fixture.detectChanges();
 
-    component.loadMore();
+    const range = () =>
+      (fixture.nativeElement.querySelector('.list-pager__range') as HTMLElement)?.textContent?.trim();
+    const button = (name: string) =>
+      fixture.nativeElement.querySelector(`.list-pager__${name}`) as HTMLButtonElement;
 
-    expect(apiService.getReviewTasks).toHaveBeenCalledWith({
-      cursor: 'cursor-123',
-      status: 'all',
-      priority: undefined,
-      search: undefined,
-      date_from: undefined,
-      date_to: undefined,
-      sort_by: 'created_at',
-      sort_order: 'desc',
-    });
+    expect(range()).toBe('1–25 of 26');
+    expect(button('previous').disabled).toBeTrue();
+    expect(button('next').disabled).toBeFalse();
+
+    button('next').click();
+    fixture.detectChanges();
+
+    expect(apiService.getReviewTasks).toHaveBeenCalledWith(
+      jasmine.objectContaining({
+        cursor: 'cursor-123',
+        limit: 25,
+        status: 'all',
+      }),
+    );
+    expect(component.tasks().map((t) => t.id)).toEqual(['task-26']);
+    expect(range()).toBe('26–26 of 26');
+    expect(button('next').disabled).toBeTrue();
+
+    button('previous').click();
+    fixture.detectChanges();
+
+    expect(apiService.getReviewTasks.calls.mostRecent().args[0]).toEqual(
+      jasmine.objectContaining({ limit: 25, status: 'all' }),
+    );
+    expect(apiService.getReviewTasks.calls.mostRecent().args[0]?.cursor).toBeUndefined();
+    expect(component.tasks().length).toBe(25);
+    expect(range()).toBe('1–25 of 26');
+  });
+
+  it('keeps the current page on failed Next and clears rows on failed first load', () => {
+    const page1 = createMockTasks(25, 1);
+    apiService.getReviewTasks.and.returnValue(
+      of({ items: page1, next_cursor: 'cursor-2', total: 26 }),
+    );
+    component.loadTasks();
+    fixture.detectChanges();
+
+    apiService.getReviewTasks.and.returnValue(throwError(() => new Error('network error')));
+    (fixture.nativeElement.querySelector('.list-pager__next') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(component.tasks().length).toBe(25);
+    expect(component.pager.pageIndex()).toBe(0);
+    expect(component.pager.nextCursor()).toBe('cursor-2');
+    expect(component.errorMessage()).toBeTruthy();
+
+    component.pager.reset();
+    component.loadTasks();
+    fixture.detectChanges();
+
+    expect(component.tasks()).toEqual([]);
+    expect(fixture.nativeElement.querySelector('app-list-pager')).toBeNull();
   });
 
   it('should treat resolved tasks as view-only queue history', () => {
@@ -312,30 +365,27 @@ describe('ReviewQueueComponent (T052)', () => {
     expect(component.isLoading()).toBeFalse();
   });
 
-  it('cancels pending loadMore on status change so late loadMore response does not append (b)', () => {
+  it('cancels pending page-2 load on status change so late response does not overwrite (b)', () => {
     apiService.getReviewTasks.and.returnValue(
       of({ items: mockTasks, next_cursor: 'cursor-1' }),
     );
     component.loadTasks();
 
-    const loadMoreSubject = new Subject<{ items: ReviewTask[]; next_cursor: string | null }>();
-    apiService.getReviewTasks.and.returnValue(loadMoreSubject);
-    component.loadMore();
-    expect(component.isLoadingMore()).toBeTrue();
+    const nextSubject = new Subject<{ items: ReviewTask[]; next_cursor: string | null }>();
+    apiService.getReviewTasks.and.returnValue(nextSubject);
+    component.pager.goNext();
+    component.loadTasks();
 
     const statusChangeSubject = new Subject<{ items: ReviewTask[]; next_cursor: string | null }>();
     apiService.getReviewTasks.and.returnValue(statusChangeSubject);
     component.onStatusChange('all');
 
-    expect(component.isLoadingMore()).toBeFalse();
-
-    // Late loadMore response arrives
+    // Late page-2 response arrives
     const lateTasks: ReviewTask[] = [{ ...mockTasks[0], id: 'task-late-loadmore' }];
-    loadMoreSubject.next({ items: lateTasks, next_cursor: 'cursor-late' });
-    loadMoreSubject.complete();
+    nextSubject.next({ items: lateTasks, next_cursor: 'cursor-late' });
+    nextSubject.complete();
 
     expect(component.tasks().some((t) => t.id === 'task-late-loadmore')).toBeFalse();
-    expect(component.isLoadingMore()).toBeFalse();
 
     // Winning status change response completes
     const statusTasks: ReviewTask[] = [{ ...mockTasks[1], id: 'task-status-b' }];
@@ -344,30 +394,9 @@ describe('ReviewQueueComponent (T052)', () => {
 
     expect(component.tasks()).toEqual(statusTasks);
     expect(component.isLoading()).toBeFalse();
-    expect(component.isLoadingMore()).toBeFalse();
   });
 
-  it('ignores loadMore while loadTasks is still pending (c)', () => {
-    apiService.getReviewTasks.and.returnValue(
-      of({ items: mockTasks, next_cursor: 'cursor-1' }),
-    );
-    component.loadTasks();
-    expect(component.nextCursor()).toBe('cursor-1');
-
-    const pendingSubject = new Subject<{ items: ReviewTask[]; next_cursor: string | null }>();
-    apiService.getReviewTasks.and.returnValue(pendingSubject);
-    component.onStatusChange('all');
-    expect(component.isLoading()).toBeTrue();
-
-    apiService.getReviewTasks.calls.reset();
-
-    component.loadMore();
-
-    expect(apiService.getReviewTasks).not.toHaveBeenCalled();
-    expect(component.isLoadingMore()).toBeFalse();
-  });
-
-  it('carries the same date range conversion in loadMore request (d)', () => {
+  it('carries the same date range conversion in Next page request (d)', () => {
     apiService.getReviewTasks.and.returnValue(
       of({ items: mockTasks, next_cursor: 'cursor-123' }),
     );
@@ -376,7 +405,8 @@ describe('ReviewQueueComponent (T052)', () => {
 
     apiService.getReviewTasks.calls.reset();
 
-    component.loadMore();
+    component.pager.goNext();
+    component.loadTasks();
 
     const expectedDateFrom = new Date(2026, 9, 22, 0, 0, 0, 0).toISOString();
     const expectedDateTo = new Date(2026, 9, 25, 23, 59, 59, 999).toISOString();
@@ -664,6 +694,7 @@ describe('ReviewQueueComponent (T052)', () => {
       spyOn(window, 'confirm').and.returnValue(true);
       component.selectedTaskIds.set(new Set(['task-1', 'task-2']));
       apiService.archiveQuotation.and.returnValue(of(mockQuotation));
+      apiService.getReviewTasks.and.returnValue(of({ items: [mockTasks[1]], next_cursor: null }));
 
       component.archiveTask(mockTasks[0], new MouseEvent('click'));
 
@@ -673,20 +704,19 @@ describe('ReviewQueueComponent (T052)', () => {
       expect(component.tasks().some((t) => t.id === 'task-1')).toBeFalse();
     });
 
-    it('prepends failed rows not in first refreshed page, keeps failed ids selected, and prevents loadMore duplicates', () => {
-      const tasks1To50 = createMockTasks(50, 1);
-      const tasks51To100 = createMockTasks(50, 51);
-      const all100Tasks = [...tasks1To50, ...tasks51To100];
+    it('keeps failed ids selected on the refreshed page and replaces rows on Next', () => {
+      const tasks1To25 = createMockTasks(25, 1);
+      const tasks26To50 = createMockTasks(25, 26);
 
-      component.tasks.set(all100Tasks);
-      component.selectedTaskIds.set(new Set(all100Tasks.map((t) => t.id)));
+      component.tasks.set(tasks1To25);
+      component.selectedTaskIds.set(new Set(tasks1To25.map((t) => t.id)));
 
       apiService.updateReviewTaskPriority.and.callFake((taskId: string, priority: ReviewTaskPriority) => {
         const match = taskId.match(/task-(\d+)/);
         const index = match ? parseInt(match[1], 10) : 0;
-        if (index <= 50) {
+        if (index <= 10) {
           return of({
-            ...tasks1To50[index - 1],
+            ...tasks1To25[index - 1],
             priority,
           });
         }
@@ -695,30 +725,28 @@ describe('ReviewQueueComponent (T052)', () => {
 
       apiService.getReviewTasks.calls.reset();
       apiService.getReviewTasks.and.returnValue(
-        of({ items: tasks1To50, next_cursor: 'cursor-page-2' }),
+        of({ items: tasks1To25, next_cursor: 'cursor-page-2', total: 50 }),
       );
 
       component.bulkReprioritise('high');
 
-      expect(component.selectedTaskIds().size).toBe(50);
-      for (const failedTask of tasks51To100) {
+      expect(component.selectedTaskIds().size).toBe(15);
+      for (const failedTask of tasks1To25.slice(10)) {
         expect(component.selectedTaskIds().has(failedTask.id)).toBeTrue();
       }
-
-      expect(component.tasks().length).toBe(100);
-      for (const failedTask of tasks51To100) {
-        expect(component.tasks().some((t) => t.id === failedTask.id)).toBeTrue();
-      }
+      expect(component.tasks().length).toBe(25);
 
       apiService.getReviewTasks.calls.reset();
       apiService.getReviewTasks.and.returnValue(
-        of({ items: tasks51To100, next_cursor: null }),
+        of({ items: tasks26To50, next_cursor: null, total: 50 }),
       );
 
-      component.loadMore();
+      component.pager.goNext();
+      component.loadTasks();
 
-      expect(component.tasks().length).toBe(100);
-      expect(component.nextCursor()).toBeNull();
+      expect(component.tasks().length).toBe(25);
+      expect(component.tasks()[0].id).toBe('task-26');
+      expect(component.pager.nextCursor()).toBeNull();
     });
 
     it('normal bulk success path leaves the refreshed list exactly as returned with empty selection', () => {
@@ -767,9 +795,10 @@ describe('ReviewQueueComponent (T052)', () => {
         expect(apiService.getReviewTasks).toHaveBeenCalledWith(jasmine.objectContaining({
           supplier_id: supplierId, reason: 'read_failure', quotation_status: 'in_review',
         }));
-        nextFixture.componentInstance.loadMore();
+        nextFixture.componentInstance.pager.goNext();
+        nextFixture.componentInstance.loadTasks();
         expect(apiService.getReviewTasks).toHaveBeenCalledWith(jasmine.objectContaining({
-          cursor: 'page-2', supplier_id: supplierId, reason: 'read_failure', quotation_status: 'in_review',
+          cursor: 'page-2', limit: 25, supplier_id: supplierId, reason: 'read_failure', quotation_status: 'in_review',
         }));
       });
 
@@ -925,6 +954,7 @@ describe('ReviewQueueComponent (T052)', () => {
           date_to: expectedDateTo,
           sort_by: 'stated_total',
           sort_order: 'asc',
+          limit: 25,
         });
       });
 
@@ -968,6 +998,7 @@ describe('ReviewQueueComponent (T052)', () => {
           date_to: undefined,
           sort_by: 'created_at',
           sort_order: 'desc',
+          limit: 25,
         });
       });
     });
@@ -1379,7 +1410,6 @@ describe('ReviewQueueComponent (T052)', () => {
     describe('Result count text', () => {
       it('displays correct pluralized count when list is loaded', () => {
         component.tasks.set(mockTasks); // 2 tasks
-        component.nextCursor.set(null);
         fixture.detectChanges();
 
         const el = fixture.nativeElement as HTMLElement;
@@ -1390,7 +1420,6 @@ describe('ReviewQueueComponent (T052)', () => {
 
       it('displays "1 result" for a single loaded item', () => {
         component.tasks.set([mockTasks[0]]);
-        component.nextCursor.set(null);
         fixture.detectChanges();
 
         const el = fixture.nativeElement as HTMLElement;
@@ -1399,20 +1428,8 @@ describe('ReviewQueueComponent (T052)', () => {
         expect(component.resultCountText()).toBe('1 result');
       });
 
-      it('displays "N+" when more pages exist', () => {
-        component.tasks.set(mockTasks); // 2 tasks
-        component.nextCursor.set('next-cursor-xyz');
-        fixture.detectChanges();
-
-        const el = fixture.nativeElement as HTMLElement;
-        const countEl = el.querySelector('[data-testid="result-count"], .result-count');
-        expect(countEl?.textContent?.trim()).toBe('2+ results');
-        expect(component.resultCountText()).toBe('2+ results');
-      });
-
-      it('displays "0 results" when empty list is loaded without more pages', () => {
+      it('displays "0 results" when empty list is loaded', () => {
         component.tasks.set([]);
-        component.nextCursor.set(null);
         fixture.detectChanges();
 
         expect(component.resultCountText()).toBe('0 results');

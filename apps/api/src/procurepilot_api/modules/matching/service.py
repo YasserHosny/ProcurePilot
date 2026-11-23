@@ -477,6 +477,7 @@ class MatchingService:
                   )
             )
             select *,
+                   count(*) over () as total_count,
                    case priority
                      when 'high' then 3 when 'normal' then 2 else 1
                    end as priority_rank,
@@ -516,10 +517,12 @@ class MatchingService:
 
         has_more = len(rows) > fetch_limit - 1
         page_rows = rows[: fetch_limit - 1]
+        total = rows[0]["total_count"] if rows else (0 if offset == 0 else None)
         return MatchQueueList(
             items=[_queue_item(row) for row in page_rows],
             next_cursor=_encode_cursor(offset + fetch_limit - 1) if has_more else None,
             rfq_id=rfq_id,
+            total=total if isinstance(total, int) else None,
         )
 
     def match_task_for_line(self, *, bearer_token: str, line_id: UUID) -> MatchTask:

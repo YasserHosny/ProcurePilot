@@ -167,19 +167,15 @@
           <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
         </table>
       </div>
+    }
 
-      @if (nextCursor()) {
-        <div class="pagination-row">
-          <button mat-stroked-button type="button" [disabled]="isLoadingMore()" (click)="loadMore()">
-            @if (isLoadingMore()) {
-              <mat-spinner diameter="18" [attr.aria-label]="'supplierRisk.pagination.loading' | translate" />
-            } @else {
-              <mat-icon aria-hidden="true">expand_more</mat-icon>
-            }
-            <span>{{ (isLoadingMore() ? 'supplierRisk.pagination.loading' : 'supplierRisk.pagination.more') | translate }}</span>
-          </button>
-        </div>
-      }
+    @if (pager.needed()) {
+      <app-list-pager
+        [pager]="pager"
+        [label]="'supplierRisk.pagerLabel' | translate"
+        [busy]="isLoading()"
+        (pageChange)="loadRisks()"
+      />
     }
   </section>
 </div>

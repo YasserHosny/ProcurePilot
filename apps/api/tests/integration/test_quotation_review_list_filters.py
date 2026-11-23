@@ -63,6 +63,7 @@ def test_archived_quotation_does_not_consume_page_space(
     result = QuotationService().list_review_tasks(bearer_token="test-token", limit=2)
     assert {task.id for task in result.items} == set(visible)
     assert result.next_cursor is None
+    assert result.total == 2
 
 
 @pytest.mark.parametrize("name", ["Later Supplier", "Acme (UK), Ltd"])
@@ -84,6 +85,7 @@ def test_supplier_search_filters_before_pagination(
     result = service.list_review_tasks(bearer_token="test-token", search=name, limit=2)
     assert [task.quotation_id for task in result.items] == [quotation_id]
     assert result.next_cursor is None
+    assert result.total == 1
 
 
 def test_eight_hex_id_prefix_matches_only_its_quotation(

@@ -49,6 +49,7 @@ export interface SupplierRiskSnapshot {
 export interface SupplierRiskList {
   items: SupplierRiskSnapshot[];
   next_cursor: string | null;
+  readonly total?: number | null;
 }
 
 export interface SupplierRiskRecomputeResponse {

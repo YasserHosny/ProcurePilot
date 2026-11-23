@@ -271,6 +271,7 @@ class MatchQueueList(BaseModel):
     items: list[MatchQueueItem]
     next_cursor: str | None = None
     rfq_id: UUID | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class QuotationLineMatchState(BaseModel):

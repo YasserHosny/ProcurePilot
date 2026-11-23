@@ -22,8 +22,9 @@ class FakeQuery:
         self.data: list[dict[str, object]] = []
         self.executed = False
 
-    def select(self, columns: str) -> FakeQuery:
+    def select(self, columns: str, count: object | None = None) -> FakeQuery:
         self.columns = columns
+        self.count_method = count
         return self
 
     def filter(self, column: str, operator: str, value: object) -> FakeQuery:

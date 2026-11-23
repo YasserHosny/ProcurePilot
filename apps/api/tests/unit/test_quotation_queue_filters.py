@@ -114,7 +114,7 @@ def test_route_forwards_new_filters_and_preserves_response_shape() -> None:
             },
         )
     assert response.status_code == 200
-    assert response.json() == {"items": [], "next_cursor": None}
+    assert response.json() == {"items": [], "next_cursor": None, "total": None}
     assert captured["supplier_id"] == UUID(SUPPLIER_IDS[0])
     assert captured["reason"] == "total_unverified"
     assert captured["quotation_status"] == "refused"
