@@ -381,34 +381,10 @@
   }
 }
 
-.pagination-footer {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding-block: 1rem;
-}
-
-.load-more-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-
-  .btn-content {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-}
-
-.no-more-text {
-  font-size: 0.85rem;
-  color: var(--pp-text-muted);
-}
-
 @media print {
   .back-link,
   .filter-toolbar,
-  .pagination-footer {
+  app-list-pager {
     display: none !important;
   }
 

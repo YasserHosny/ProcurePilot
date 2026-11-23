@@ -96,6 +96,7 @@ def test_list_email_logs_empty(monkeypatch: pytest.MonkeyPatch) -> None:
         data = res.json()
         assert data["items"] == []
         assert data["next_cursor"] is None
+        assert data["total"] == 0
 
 
 def test_list_email_logs_pagination_across_pages(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -125,6 +126,7 @@ def test_list_email_logs_pagination_across_pages(monkeypatch: pytest.MonkeyPatch
         assert page1_res.status_code == 200, page1_res.text
         page1 = page1_res.json()
         assert len(page1["items"]) == 2
+        assert page1["total"] == 5
         assert page1["items"][0]["id"] == expected_order[0]
         assert page1["items"][1]["id"] == expected_order[1]
         assert page1["next_cursor"] is not None
@@ -137,6 +139,7 @@ def test_list_email_logs_pagination_across_pages(monkeypatch: pytest.MonkeyPatch
         assert page2_res.status_code == 200, page2_res.text
         page2 = page2_res.json()
         assert len(page2["items"]) == 2
+        assert page2["total"] == 5
         assert page2["items"][0]["id"] == expected_order[2]
         assert page2["items"][1]["id"] == expected_order[3]
         assert page2["next_cursor"] is not None
@@ -185,6 +188,7 @@ def test_list_email_logs_filter_status(monkeypatch: pytest.MonkeyPatch) -> None:
         # Test filtering by status="completed"
         res_completed = client.get("/api/v1/ingestion/emails", params={"status": "completed"})
         assert res_completed.status_code == 200
+        assert res_completed.json()["total"] == 1
         items = res_completed.json()["items"]
         assert len(items) == 1
         assert items[0]["id"] == str(id_completed)
@@ -354,6 +358,7 @@ def test_list_email_logs_cross_tenant_isolation(monkeypatch: pytest.MonkeyPatch)
         # Tenant A sees only Tenant A rows
         res_a = client_a.get("/api/v1/ingestion/emails")
         assert res_a.status_code == 200
+        assert res_a.json()["total"] == 2
         items_a = res_a.json()["items"]
         ids_seen_a = {item["id"] for item in items_a}
         assert ids_seen_a == {str(id_a1), str(id_a2)}
@@ -363,6 +368,7 @@ def test_list_email_logs_cross_tenant_isolation(monkeypatch: pytest.MonkeyPatch)
         # Tenant B sees only Tenant B rows
         res_b = client_b.get("/api/v1/ingestion/emails")
         assert res_b.status_code == 200
+        assert res_b.json()["total"] == 2
         items_b = res_b.json()["items"]
         ids_seen_b = {item["id"] for item in items_b}
         assert ids_seen_b == {str(id_b1), str(id_b2)}

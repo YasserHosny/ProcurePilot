@@ -1,5 +1,6 @@
 import { NgClass } from '@angular/common';
 import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -16,6 +17,10 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { EMPTY, Subject } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
@@ -47,6 +52,7 @@ import {
     MatTableModule,
     MatTooltipModule,
     TranslatePipe,
+    ListPagerComponent,
     FormatDatePipe,
   ],
   templateUrl: './email-log.component.html',
@@ -59,9 +65,8 @@ export class EmailLogComponent implements OnInit {
   private readonly translate = inject(TranslateService);
 
   readonly isLoading = signal<boolean>(true);
-  readonly isLoadingMore = signal<boolean>(false);
   readonly logs = signal<IngestionEmailLog[]>([]);
-  readonly nextCursor = signal<string | null>(null);
+  readonly pager = new CursorPager('ingestion-email-log');
   readonly errorMessage = signal<string | null>(null);
 
   readonly statusFilter = signal<IngestionEmailStatus | 'all'>('all');
@@ -115,15 +120,47 @@ export class EmailLogComponent implements OnInit {
     );
   });
 
+  private readonly reloadSubject = new Subject<ListEmailLogsParams>();
+
+  constructor() {
+    this.reloadSubject
+      .pipe(
+        switchMap((params) => {
+          this.isLoading.set(true);
+          this.errorMessage.set(null);
+
+          return this.ingestionApi.listEmailLogs(params).pipe(
+            catchError(() => {
+              this.isLoading.set(false);
+              if (!this.pager.failed()) this.logs.set([]);
+              this.errorMessage.set(this.translate.instant('ingestion.emailLog.error.generic'));
+              this.snackBar.open(
+                this.translate.instant('ingestion.emailLog.loadError'),
+                undefined,
+                { duration: 4000 },
+              );
+              return EMPTY;
+            }),
+          );
+        }),
+        takeUntilDestroyed(),
+      )
+      .subscribe((res) => {
+        if (!this.pager.loaded(res)) {
+          this.loadLogs();
+          return;
+        }
+        this.logs.set([...res.items]);
+        this.isLoading.set(false);
+      });
+  }
+
   ngOnInit(): void {
     this.loadLogs();
   }
 
   loadLogs(): void {
-    this.isLoading.set(true);
-    this.errorMessage.set(null);
-
-    const params: ListEmailLogsParams = { limit: 50 };
+    const params: ListEmailLogsParams = { ...this.pager.params() };
     if (this.statusFilter() !== 'all') {
       params.status = this.statusFilter() as IngestionEmailStatus;
     }
@@ -137,70 +174,12 @@ export class EmailLogComponent implements OnInit {
     if (this.dateTo()) {
       params.date_to = this.dateTo();
     }
-
-    this.ingestionApi.listEmailLogs(params).subscribe({
-      next: (res) => {
-        this.logs.set([...res.items]);
-        this.nextCursor.set(res.next_cursor);
-        this.isLoading.set(false);
-      },
-      error: () => {
-        this.isLoading.set(false);
-        this.errorMessage.set(
-          this.translate.instant('ingestion.emailLog.error.generic')
-        );
-        this.snackBar.open(
-          this.translate.instant('ingestion.emailLog.loadError'),
-          undefined,
-          { duration: 4000 }
-        );
-      },
-    });
-  }
-
-  loadMore(): void {
-    const cursor = this.nextCursor();
-    if (!cursor || this.isLoadingMore()) {
-      return;
-    }
-
-    this.isLoadingMore.set(true);
-    const params: ListEmailLogsParams = {
-      cursor,
-      limit: 50,
-    };
-    if (this.statusFilter() !== 'all') {
-      params.status = this.statusFilter() as IngestionEmailStatus;
-    }
-    const domain = this.fromDomain().trim();
-    if (domain) {
-      params.from_domain = domain;
-    }
-    if (this.dateFrom()) {
-      params.date_from = this.dateFrom();
-    }
-    if (this.dateTo()) {
-      params.date_to = this.dateTo();
-    }
-
-    this.ingestionApi.listEmailLogs(params).subscribe({
-      next: (res) => {
-        this.logs.set([...this.logs(), ...res.items]);
-        this.nextCursor.set(res.next_cursor);
-        this.isLoadingMore.set(false);
-      },
-      error: () => {
-        this.isLoadingMore.set(false);
-        this.snackBar.open(
-          this.translate.instant('ingestion.emailLog.loadError'),
-          undefined,
-          { duration: 4000 }
-        );
-      },
-    });
+    this.reloadSubject.next(params);
   }
 
   onFilterChange(): void {
+    this.logs.set([]);
+    this.pager.reset();
     this.loadLogs();
   }
 
@@ -209,7 +188,7 @@ export class EmailLogComponent implements OnInit {
     this.fromDomain.set('');
     this.dateFrom.set('');
     this.dateTo.set('');
-    this.loadLogs();
+    this.onFilterChange();
   }
 
   getStatusClass(status: IngestionEmailStatus): string {

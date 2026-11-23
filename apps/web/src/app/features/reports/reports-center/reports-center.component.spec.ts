@@ -1,6 +1,9 @@
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MatTabGroupHarness } from '@angular/material/tabs/testing';
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { provideTranslateService } from '@ngx-translate/core';
@@ -121,7 +124,14 @@ describe('ReportsCenterComponent', () => {
     },
   ];
 
+  function clickPager(direction: 'next' | 'previous'): void {
+    const button = fixture.debugElement.query(By.css(`.mat-mdc-tab-body-active .list-pager__${direction}`));
+    (button.nativeElement as HTMLButtonElement).click();
+  }
+
   beforeEach(async () => {
+    localStorage.removeItem('pp.pageSize.report-artifacts');
+    localStorage.removeItem('pp.pageSize.report-schedules');
     await TestBed.configureTestingModule({
       imports: [ReportsCenterComponent],
       providers: [
@@ -149,91 +159,101 @@ describe('ReportsCenterComponent', () => {
   it('should load artifacts and schedules on init', () => {
     fixture.detectChanges();
 
-    const artifactsReq = httpTestingController.expectOne('/api/v1/reports/artifacts?limit=50');
+    const artifactsReq = httpTestingController.expectOne('/api/v1/reports/artifacts?limit=25');
     expect(artifactsReq.request.method).toBe('GET');
     artifactsReq.flush({ items: mockArtifacts, next_cursor: 'art-cursor-1' });
 
-    const schedulesReq = httpTestingController.expectOne('/api/v1/reports/schedules?limit=50');
+    const schedulesReq = httpTestingController.expectOne('/api/v1/reports/schedules?limit=25');
     expect(schedulesReq.request.method).toBe('GET');
     schedulesReq.flush({ items: mockSchedules, next_cursor: 'sch-cursor-1' });
 
     expect(component.isLoadingArtifacts()).toBeFalse();
     expect(component.artifacts().length).toBe(3);
-    expect(component.artifactsNextCursor()).toBe('art-cursor-1');
+    expect(component.artifactsPager.nextCursor()).toBe('art-cursor-1');
 
     expect(component.isLoadingSchedules()).toBeFalse();
     expect(component.schedules().length).toBe(2);
-    expect(component.schedulesNextCursor()).toBe('sch-cursor-1');
+    expect(component.schedulesPager.nextCursor()).toBe('sch-cursor-1');
   });
 
-  it('should handle cursor pagination for artifacts', () => {
-    fixture.detectChanges();
+  describe('pagination', () => {
+    beforeEach(() => {
+      fixture.detectChanges();
+      httpTestingController.expectOne('/api/v1/reports/artifacts?limit=25')
+        .flush({ items: mockArtifacts, next_cursor: 'art-cursor-1' });
+      httpTestingController.expectOne('/api/v1/reports/schedules?limit=25')
+        .flush({ items: mockSchedules, next_cursor: 'sch-cursor-1' });
+      fixture.detectChanges();
+    });
 
-    httpTestingController
-      .expectOne('/api/v1/reports/artifacts?limit=50')
-      .flush({ items: mockArtifacts, next_cursor: 'art-cursor-1' });
-    httpTestingController
-      .expectOne('/api/v1/reports/schedules?limit=50')
-      .flush({ items: mockSchedules, next_cursor: null });
+    it('replaces artifact rows and goes back without changing schedules', () => {
+      const nextArtifact = { ...mockArtifacts[0], id: 'art-004' };
+      clickPager('next');
+      httpTestingController.expectOne('/api/v1/reports/artifacts?cursor=art-cursor-1&limit=25')
+        .flush({ items: [nextArtifact], next_cursor: null, total: 26 });
+      fixture.detectChanges();
 
-    const nextArtifact: ReportArtifact = {
-      ...mockArtifacts[0],
-      id: 'art-004',
-      created_at: '2026-08-25T00:00:00Z',
-    };
+      expect(component.artifacts()).toEqual([nextArtifact]);
+      expect(component.artifactsPager.total()).toBe(26);
+      expect(component.schedules()).toEqual(mockSchedules);
+      expect(component.schedulesPager.pageIndex()).toBe(0);
 
-    component.loadMoreArtifacts();
-    expect(component.isLoadingMoreArtifacts()).toBeTrue();
+      clickPager('previous');
+      httpTestingController.expectOne('/api/v1/reports/artifacts?limit=25')
+        .flush({ items: mockArtifacts, next_cursor: 'art-cursor-1' });
+      expect(component.artifacts()).toEqual(mockArtifacts);
+    });
 
-    const loadMoreReq = httpTestingController.expectOne(
-      '/api/v1/reports/artifacts?cursor=art-cursor-1&limit=50',
-    );
-    expect(loadMoreReq.request.method).toBe('GET');
-    loadMoreReq.flush({ items: [nextArtifact], next_cursor: null });
+    it('replaces schedule rows and goes back without changing artifacts', async () => {
+      await selectSchedulesTab();
+      const nextSchedule = { ...mockSchedules[0], id: 'sch-003' };
+      clickPager('next');
+      httpTestingController.expectOne('/api/v1/reports/schedules?cursor=sch-cursor-1&limit=25')
+        .flush({ items: [nextSchedule], next_cursor: null, total: 26 });
+      fixture.detectChanges();
 
-    expect(component.isLoadingMoreArtifacts()).toBeFalse();
-    expect(component.artifacts().length).toBe(4);
-    expect(component.artifactsNextCursor()).toBeNull();
+      expect(component.schedules()).toEqual([nextSchedule]);
+      expect(component.schedulesPager.total()).toBe(26);
+      expect(component.artifacts()).toEqual(mockArtifacts);
+      expect(component.artifactsPager.pageIndex()).toBe(0);
+
+      clickPager('previous');
+      httpTestingController.expectOne('/api/v1/reports/schedules?limit=25')
+        .flush({ items: mockSchedules, next_cursor: 'sch-cursor-1' });
+      expect(component.schedules()).toEqual(mockSchedules);
+    });
+
+    it('keeps each list on its current rows when Next fails', async () => {
+      clickPager('next');
+      httpTestingController.expectOne('/api/v1/reports/artifacts?cursor=art-cursor-1&limit=25')
+        .flush(null, { status: 500, statusText: 'Server Error' });
+      expect(component.artifacts()).toEqual(mockArtifacts);
+      expect(component.artifactsPager.pageIndex()).toBe(0);
+
+      await selectSchedulesTab();
+      clickPager('next');
+      httpTestingController.expectOne('/api/v1/reports/schedules?cursor=sch-cursor-1&limit=25')
+        .flush(null, { status: 500, statusText: 'Server Error' });
+      expect(component.schedules()).toEqual(mockSchedules);
+      expect(component.schedulesPager.pageIndex()).toBe(0);
+    });
   });
 
-  it('should handle cursor pagination for schedules', () => {
-    fixture.detectChanges();
-
-    httpTestingController
-      .expectOne('/api/v1/reports/artifacts?limit=50')
-      .flush({ items: mockArtifacts, next_cursor: null });
-    httpTestingController
-      .expectOne('/api/v1/reports/schedules?limit=50')
-      .flush({ items: mockSchedules, next_cursor: 'sch-cursor-1' });
-
-    const nextSchedule: ReportSchedule = {
-      ...mockSchedules[0],
-      id: 'sch-003',
-      created_at: '2026-08-20T00:00:00Z',
-    };
-
-    component.loadMoreSchedules();
-    expect(component.isLoadingMoreSchedules()).toBeTrue();
-
-    const loadMoreReq = httpTestingController.expectOne(
-      '/api/v1/reports/schedules?cursor=sch-cursor-1&limit=50',
-    );
-    expect(loadMoreReq.request.method).toBe('GET');
-    loadMoreReq.flush({ items: [nextSchedule], next_cursor: null });
-
-    expect(component.isLoadingMoreSchedules()).toBeFalse();
-    expect(component.schedules().length).toBe(3);
-    expect(component.schedulesNextCursor()).toBeNull();
-  });
+  async function selectSchedulesTab(): Promise<void> {
+    const loader = TestbedHarnessEnvironment.loader(fixture);
+    const tabs = await loader.getHarness(MatTabGroupHarness);
+    const [, schedulesTab] = await tabs.getTabs();
+    await schedulesTab.select();
+  }
 
   it('should apply filters and reload artifacts', () => {
     fixture.detectChanges();
 
     httpTestingController
-      .expectOne('/api/v1/reports/artifacts?limit=50')
+      .expectOne('/api/v1/reports/artifacts?limit=25')
       .flush({ items: mockArtifacts, next_cursor: null });
     httpTestingController
-      .expectOne('/api/v1/reports/schedules?limit=50')
+      .expectOne('/api/v1/reports/schedules?limit=25')
       .flush({ items: mockSchedules, next_cursor: null });
 
     component.selectedKind.set('savings_ledger');
@@ -241,7 +261,7 @@ describe('ReportsCenterComponent', () => {
     component.onFilterChange();
 
     const filteredReq = httpTestingController.expectOne(
-      '/api/v1/reports/artifacts?limit=50&kind=savings_ledger&status=completed',
+      '/api/v1/reports/artifacts?limit=25&kind=savings_ledger&status=completed',
     );
     filteredReq.flush({ items: [mockArtifacts[0]], next_cursor: null });
 
@@ -252,7 +272,7 @@ describe('ReportsCenterComponent', () => {
     expect(component.selectedKind()).toBe('all');
     expect(component.selectedStatus()).toBe('all');
 
-    const resetReq = httpTestingController.expectOne('/api/v1/reports/artifacts?limit=50');
+    const resetReq = httpTestingController.expectOne('/api/v1/reports/artifacts?limit=25');
     resetReq.flush({ items: mockArtifacts, next_cursor: null });
     expect(component.artifacts().length).toBe(3);
   });
@@ -261,13 +281,13 @@ describe('ReportsCenterComponent', () => {
     fixture.detectChanges();
 
     httpTestingController
-      .expectOne('/api/v1/reports/artifacts?limit=50')
+      .expectOne('/api/v1/reports/artifacts?limit=25')
       .flush(
         { message: 'Tenant storage unavailable', trace_id: 'trace-xyz-123' },
         { status: 500, statusText: 'Internal Server Error' },
       );
     httpTestingController
-      .expectOne('/api/v1/reports/schedules?limit=50')
+      .expectOne('/api/v1/reports/schedules?limit=25')
       .flush({ items: mockSchedules, next_cursor: null });
 
     expect(component.isLoadingArtifacts()).toBeFalse();
@@ -279,10 +299,10 @@ describe('ReportsCenterComponent', () => {
     fixture.detectChanges();
 
     httpTestingController
-      .expectOne('/api/v1/reports/artifacts?limit=50')
+      .expectOne('/api/v1/reports/artifacts?limit=25')
       .flush({ items: mockArtifacts, next_cursor: null });
     httpTestingController
-      .expectOne('/api/v1/reports/schedules?limit=50')
+      .expectOne('/api/v1/reports/schedules?limit=25')
       .flush(
         { message: 'Database query timeout', trace_id: 'trace-sch-999' },
         { status: 504, statusText: 'Gateway Timeout' },

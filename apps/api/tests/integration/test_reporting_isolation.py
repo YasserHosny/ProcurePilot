@@ -836,6 +836,12 @@ def test_cross_tenant_schedule_read_returns_not_found(
     assert cross.status_code == 404
     assert cross.json()["code"]
 
+    for client, tenant in ((owner_client, alpha), (intruder_client, beta)):
+        response = client.get("/api/v1/reports/schedules")
+        assert response.status_code == 200, response.text
+        assert response.json()["total"] == 1
+        assert {item["id"] for item in response.json()["items"]} == {str(tenant.schedule_id)}
+
 
 def test_branch_scoped_member_sees_only_own_branch_artifacts(
     monkeypatch: pytest.MonkeyPatch,
@@ -856,12 +862,21 @@ def test_branch_scoped_member_sees_only_own_branch_artifacts(
         f"positive control failed: the artifacts listing must answer (got "
         f"{response.status_code}; body={response.text})"
     )
+    assert response.json()["total"] == 2
     ids = {item["id"] for item in response.json()["items"]}
 
     assert str(alpha.branch_a_job_id) in ids
     assert str(alpha.branch_b_job_id) not in ids
     # No branch filter on the artifact means no branch restriction on the listing.
     assert str(alpha.scheduled_job_id) in ids
+
+    filtered = branch_client.get(
+        "/api/v1/reports/artifacts",
+        params={"kind": "spend_by_supplier", "status": "completed"},
+    )
+    assert filtered.status_code == 200, filtered.text
+    assert filtered.json()["total"] == 1
+    assert {item["id"] for item in filtered.json()["items"]} == {str(alpha.branch_a_job_id)}
 
 
 # --- layer 3: scheduler claim hardening (Wave 17) ----------------------------

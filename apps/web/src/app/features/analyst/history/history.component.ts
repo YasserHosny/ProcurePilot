@@ -1,10 +1,15 @@
 import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink, Router } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
+import { EMPTY, Subject } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { AnalystApiService, type AnalystConversation } from '../analyst-api';
 
@@ -18,6 +23,7 @@ import { AnalystApiService, type AnalystConversation } from '../analyst-api';
     MatIconModule,
     MatProgressSpinnerModule,
     TranslatePipe,
+    ListPagerComponent,
     FormatDatePipe,
   ],
   templateUrl: './history.component.html',
@@ -29,39 +35,43 @@ export class AnalystHistoryComponent implements OnInit {
   private readonly router = inject(Router);
 
   readonly isLoading = signal(false);
-  readonly isLoadingMore = signal(false);
   readonly conversations = signal<AnalystConversation[]>([]);
-  readonly nextCursor = signal<string | null>(null);
+  readonly pager = new CursorPager('analyst-history');
+
+  private readonly reloadSubject = new Subject<{ limit: number; cursor?: string }>();
+
+  constructor() {
+    this.reloadSubject
+      .pipe(
+        switchMap(({ limit, cursor }) => {
+          this.isLoading.set(true);
+
+          return this.api.listConversations(limit, cursor).pipe(
+            catchError(() => {
+              this.isLoading.set(false);
+              if (!this.pager.failed()) this.conversations.set([]);
+              return EMPTY;
+            }),
+          );
+        }),
+        takeUntilDestroyed(),
+      )
+      .subscribe((res) => {
+        if (!this.pager.loaded(res)) {
+          this.loadHistory();
+          return;
+        }
+        this.conversations.set([...res.items]);
+        this.isLoading.set(false);
+      });
+  }
 
   ngOnInit(): void {
     this.loadHistory();
   }
 
-  private loadHistory(): void {
-    this.isLoading.set(true);
-    this.api.listConversations(50).subscribe({
-      next: (res) => {
-        this.conversations.set(res.items);
-        this.nextCursor.set(res.next_cursor);
-        this.isLoading.set(false);
-      },
-      error: () => this.isLoading.set(false),
-    });
-  }
-
-  loadMore(): void {
-    const cursor = this.nextCursor();
-    if (!cursor || this.isLoadingMore()) return;
-
-    this.isLoadingMore.set(true);
-    this.api.listConversations(50, cursor).subscribe({
-      next: (res) => {
-        this.conversations.update((curr) => [...curr, ...res.items]);
-        this.nextCursor.set(res.next_cursor);
-        this.isLoadingMore.set(false);
-      },
-      error: () => this.isLoadingMore.set(false),
-    });
+  loadHistory(): void {
+    this.reloadSubject.next(this.pager.params());
   }
 
   openConversation(id: string): void {

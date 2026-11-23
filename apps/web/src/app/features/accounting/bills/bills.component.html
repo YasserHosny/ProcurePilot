@@ -183,32 +183,15 @@
             <tr mat-row *matRowDef="let row; columns: displayedColumns" data-testid="bill-row"></tr>
           </table>
         </div>
+      }
 
-        <!-- Pagination Footer -->
-        <div class="pagination-footer">
-          @if (nextCursor()) {
-            <button
-              mat-stroked-button
-              type="button"
-              class="load-more-btn"
-              [disabled]="isLoadingMore()"
-              (click)="loadMore()"
-              data-testid="load-more-btn"
-            >
-              @if (isLoadingMore()) {
-                <mat-spinner diameter="18" [attr.aria-label]="'accounting.bills.pagination.loadingMore' | translate" />
-                <span>{{ 'accounting.bills.pagination.loadingMore' | translate }}</span>
-              } @else {
-                <mat-icon aria-hidden="true">expand_more</mat-icon>
-                <span>{{ 'accounting.bills.pagination.loadMore' | translate }}</span>
-              }
-            </button>
-          } @else {
-            <span class="no-more-text" data-testid="no-more-bills">
-              {{ 'accounting.bills.pagination.noMore' | translate }}
-            </span>
-          }
-        </div>
+      @if (pager.needed()) {
+        <app-list-pager
+          [pager]="pager"
+          [label]="'accounting.bills.pagerLabel' | translate"
+          [busy]="isLoading()"
+          (pageChange)="loadBills()"
+        />
       }
     </div>
   </mat-card>
