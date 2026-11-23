@@ -144,10 +144,13 @@
         <mat-spinner diameter="28" [attr.aria-label]="'platform.feedback.loading' | translate"></mat-spinner>
       }
 
-      @if (nextCursor() && !loading()) {
-        <button mat-stroked-button type="button" (click)="loadMore()" data-testid="load-more">
-          {{ 'platform.feedback.loadMore' | translate }}
-        </button>
+      @if (pager.needed()) {
+        <app-list-pager
+          [pager]="pager"
+          [label]="'platform.feedback.pagerLabel' | translate"
+          [busy]="loading()"
+          (pageChange)="reload()"
+        />
       }
     </section>
 

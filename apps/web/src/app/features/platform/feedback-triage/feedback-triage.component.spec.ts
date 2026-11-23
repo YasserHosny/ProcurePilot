@@ -73,7 +73,10 @@ describe('FeedbackTriageComponent', () => {
     fixture.detectChanges();
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    localStorage.removeItem('pp.pageSize.feedback-triage');
+  });
 
   it('loads and lists feedback across workspaces', () => {
     flushList([item('a'), item('b', { tenant_name: 'Rawaq', is_demo: true })]);
@@ -144,15 +147,46 @@ describe('FeedbackTriageComponent', () => {
     req.flush({ items: [] });
   });
 
-  it('pages with the cursor and appends', () => {
-    flushList([item('a')], 'c1');
-    (el.querySelector('[data-testid="load-more"]') as HTMLButtonElement).click();
+  it('pages with Next and Previous, passes limit, and keeps rows when Next fails', () => {
+    const page1 = Array.from({ length: 25 }, (_, i) => item(`a-${i}`));
+    const initial = http.expectOne((r) => r.url === base && r.method === 'GET');
+    expect(initial.request.params.get('limit')).toBe('25');
+    initial.flush({ items: page1, next_cursor: 'c1', total: 26 });
+    fixture.detectChanges();
+
+    const range = (): string | undefined =>
+      el.querySelector('.list-pager__range')?.textContent?.trim();
+    const nextBtn = (): HTMLButtonElement =>
+      el.querySelector('.list-pager__next') as HTMLButtonElement;
+    const prevBtn = (): HTMLButtonElement =>
+      el.querySelector('.list-pager__previous') as HTMLButtonElement;
+
+    expect(range()).toBe('1–25 of 26');
+
+    nextBtn().click();
+    const failNext = http.expectOne((r) => r.url === base);
+    expect(failNext.request.params.get('cursor')).toBe('c1');
+    failNext.flush({}, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(component.items().length).toBe(25);
+    expect(component.pager.pageIndex()).toBe(0);
+
+    nextBtn().click();
     const req = http.expectOne((r) => r.url === base);
     expect(req.request.params.get('cursor')).toBe('c1');
-    req.flush({ items: [item('b')], next_cursor: null });
+    expect(req.request.params.get('limit')).toBe('25');
+    req.flush({ items: [item('b')], next_cursor: null, total: 26 });
     fixture.detectChanges();
-    expect(component.items().map((i) => i.id)).toEqual(['a', 'b']);
-    expect(el.querySelector('[data-testid="load-more"]')).toBeNull();
+    expect(component.items().map((i) => i.id)).toEqual(['b']);
+    expect(range()).toBe('26–26 of 26');
+
+    prevBtn().click();
+    const prev = http.expectOne((r) => r.url === base);
+    expect(prev.request.params.has('cursor')).toBeFalse();
+    prev.flush({ items: page1, next_cursor: 'c1', total: 26 });
+    fixture.detectChanges();
+    expect(component.items().length).toBe(25);
+    expect(range()).toBe('1–25 of 26');
   });
 
   it('opens the detail pane for the picked row and reflects status changes in the list', () => {

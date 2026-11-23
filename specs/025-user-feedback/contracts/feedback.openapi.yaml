@@ -365,6 +365,7 @@ components:
           type: array
           items: { $ref: '#/components/schemas/Submission' }
         next_cursor: { type: [string, 'null'] }
+        total: { type: [integer, 'null'], minimum: 0 }
     OperatorSubmission:
       allOf:
         - $ref: '#/components/schemas/Submission'
@@ -388,6 +389,7 @@ components:
           type: array
           items: { $ref: '#/components/schemas/OperatorSubmission' }
         next_cursor: { type: [string, 'null'] }
+        total: { type: [integer, 'null'], minimum: 0 }
     OperatorMe:
       type: object
       required: [digest_enabled, digest_locale]

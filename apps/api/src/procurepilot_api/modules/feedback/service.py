@@ -432,17 +432,21 @@ class FeedbackService:
         if category is not None:
             clauses.append("category = %s::feedback_category")
             params.append(category.value)
+        # Count the same RLS-visible, filtered rows on every page, before the cursor.
+        filters = " and ".join(clauses)
+        page_params = params.copy()
         decoded = decode_cursor(cursor)
         if decoded is not None:
             clauses.append("(created_at, id) < (%s, %s)")
-            params.extend(decoded)
-        params.append(limit + 1)
+            page_params.extend(decoded)
         with _feedback_db(self._settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
-                    f"select {_SUBMISSION_COLUMNS} from feedback_submission "
+                    f"select {_SUBMISSION_COLUMNS}, "
+                    f"(select count(*) from feedback_submission where {filters}) as total_count "
+                    "from feedback_submission "
                     f"where {' and '.join(clauses)} order by created_at desc, id desc limit %s",
-                    params,
+                    (*params, *page_params, limit + 1),
                 )
                 rows = cur.fetchall()
             visible = rows[:limit]
@@ -461,7 +465,8 @@ class FeedbackService:
             if len(rows) > limit
             else None
         )
-        return SubmissionPage(items=items, next_cursor=next_cursor)
+        total = rows[0]["total_count"] if rows else (0 if cursor is None else None)
+        return SubmissionPage(items=items, next_cursor=next_cursor, total=total)
 
     def get(self, *, member: CurrentMember, submission_id: UUID) -> Submission:
         with _feedback_db(self._settings, member) as conn:

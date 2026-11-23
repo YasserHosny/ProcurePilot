@@ -18,9 +18,10 @@ import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { SessionService } from '../../../core/auth/session.service';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { FeedbackCardComponent } from '../feedback-card/feedback-card.component';
 import { FeedbackApiService, type Submission } from '../feedback-api';
-import { FEEDBACK_PAGE_SIZE, PagedSubmissions } from '../paged-submissions';
+import { PagedSubmissions } from '../paged-submissions';
 import { WithdrawDialogComponent } from './withdraw-dialog.component';
 
 /** The member's own feedback with its current status, and withdrawal while it is still new (FR-012, FR-014). */
@@ -34,6 +35,7 @@ import { WithdrawDialogComponent } from './withdraw-dialog.component';
     RouterLink,
     TranslatePipe,
     FeedbackCardComponent,
+    ListPagerComponent,
   ],
   templateUrl: './my-feedback.component.html',
   styleUrl: './my-feedback.component.scss',
@@ -48,9 +50,7 @@ export class MyFeedbackComponent implements OnInit {
 
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
 
-  readonly list = new PagedSubmissions((cursor) =>
-    this.api.listMine({ cursor, limit: FEEDBACK_PAGE_SIZE }),
-  );
+  readonly list = new PagedSubmissions('my-feedback', (params) => this.api.listMine(params));
   /** A withdrawal that did not go through, in words (refused, or failed). */
   readonly withdrawMessage = signal<string | null>(null);
   readonly isOwner = computed(() => this.session.hasRole('owner'));
