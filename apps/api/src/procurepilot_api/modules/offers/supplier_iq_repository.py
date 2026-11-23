@@ -54,6 +54,7 @@ class SnapshotWrite:
 class SnapshotPage:
     items: tuple[SnapshotRow, ...]
     next_cursor: str | None
+    total: int | None
 
 
 @dataclass(frozen=True)
@@ -445,7 +446,8 @@ def list_latest(
                      when (risk_score->>'total')::numeric < 0.65 then 'medium'
                      else 'high'
                    end as risk_level,
-                   computed_at
+                   computed_at,
+                   (select count(*) from ranked where row_number = 1) as total_count
             from ranked
             where row_number = 1
               {after_clause}
@@ -455,10 +457,15 @@ def list_latest(
             (*query_params, fetch_limit + 1),
         )
         rows = tuple(dict(row) for row in cur.fetchall())
+    total = rows[0]["total_count"] if rows else (0 if page_after is None else None)
     has_more = len(rows) > fetch_limit
+    items = rows[:fetch_limit]
+    for item in items:
+        item.pop("total_count")
     return SnapshotPage(
-        items=rows[:fetch_limit],
+        items=items,
         next_cursor=_encode_cursor(rows[fetch_limit - 1]) if has_more else None,
+        total=total if isinstance(total, int) else None,
     )
 
 

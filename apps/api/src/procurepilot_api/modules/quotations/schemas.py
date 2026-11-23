@@ -145,6 +145,7 @@ class ReviewTask(BaseModel):
 class ReviewTaskList(BaseModel):
     items: list[ReviewTask]
     next_cursor: str | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class AuditTrailEntry(BaseModel):
