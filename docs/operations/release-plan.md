@@ -403,7 +403,7 @@ provided automatically by GitHub Actions and is used for GHCR pushes.
 
 Push to `main` (or run `workflow_dispatch`) and confirm:
 
-1. **`ci.yml`** — all jobs pass: changes, API image includes i18n catalogues, secret scan (gitleaks), lint, backend tests, dependency audit, tenant isolation, web unit tests, and End-to-end (five shards plus the aggregate `End-to-end` check). `main` also requires «Regenerate and diff» from `docs-screenshots.yml` (`docs/operations/ci-pipeline.md`)
+1. **`ci.yml`** — all jobs pass: changes, API image includes i18n catalogues, secret scan (gitleaks), lint, backend tests, dependency audit, tenant isolation, web unit tests, and End-to-end (six shards plus the aggregate `End-to-end` check). `main` also requires «Regenerate and diff» from `docs-screenshots.yml` (`docs/operations/ci-pipeline.md`)
 2. **`deploy-backend.yml`** — builds, pushes to GHCR, updates the Bunny backend container
 3. **`deploy-frontend.yml`** — builds, pushes to GHCR, updates the Bunny frontend container
 4. **`deploy-extraction-worker.yml`** — builds, pushes to GHCR, updates the worker container on the workers Bunny app

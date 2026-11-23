@@ -11,7 +11,7 @@
 | Unit | pytest 8.3 + pytest-asyncio (backend, Python 3.12), Karma 6.4 / Jasmine 5.6 (frontend) | Functions, services, components, validators | Every PR |
 | Integration | pytest + httpx TestClient | API endpoints, DB queries, auth middleware | Every PR |
 | Tenant isolation | pytest (`pnpm test:isolation` = `apps/api/tests/integration/test_tenant_isolation.py`) | Forced RLS, cross-tenant 404 | Every PR (`Tenant isolation` job) |
-| E2E | Playwright ^1.60 | Critical user journeys on web | Every PR, five shards (`docs/operations/ci-pipeline.md`) |
+| E2E | Playwright ^1.60 | Critical user journeys on web | Every PR, six shards (`docs/operations/ci-pipeline.md`) |
 | Mobile E2E | `flutter test` (`apps/mobile/test/`, including `integration/`) | Request, approval, delivery flows | Before store release (not in CI) |
 | AI eval | Custom harness + benchmark datasets | Extraction and matching accuracy | Every model/prompt change |
 | Performance | Locust / k6 | Latency, throughput, concurrent extraction | Before G1 and G2 |
@@ -199,7 +199,7 @@ Release R3.0 (`013-automated-ingestion`) introduces multi-channel ingestion (inb
 ## 12. End-to-End Conventions (added 2026-10-18)
 
 These come from flaky or misleading E2E runs fixed in October 2026 (PRs #77, #78, #85, #93). CI's shape —
-docs-only skip, five shards, accessibility split — is in `docs/operations/ci-pipeline.md`.
+docs-only skip, six shards, accessibility split — is in `docs/operations/ci-pipeline.md`.
 
 - **Run one spec** with `pnpm --filter web exec playwright test <spec>`. `pnpm --filter web test:e2e -- <spec>`
   silently runs the whole suite.

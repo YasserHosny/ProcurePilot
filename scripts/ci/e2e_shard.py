@@ -40,6 +40,14 @@ def load_weights(specs_dir: Path, manifest: Path) -> Dict[str, float]:
     return {name: known.get(name, fallback) for name in names}
 
 
+def unmeasured(specs_dir: Path, manifest: Path) -> List[str]:
+    measured = json.loads(manifest.read_text(encoding="utf-8"))
+    return sorted(
+        path.name for path in specs_dir.glob("*.spec.ts")
+        if path.is_file() and path.name not in measured
+    )
+
+
 def make_plan(weights: Dict[str, float], total: int) -> List[List[str]]:
     if total < 1:
         raise ValueError("--total must be positive")
@@ -79,6 +87,17 @@ def check_plan(weights: Dict[str, float], shards: List[List[str]]) -> bool:
     return valid
 
 
+def plan_gain(current: Dict[str, float], refit: Dict[str, float], total: int) -> float:
+    """Seconds the refitted plan takes off the slowest shard, both scored on refit weights."""
+    def slowest(shards: List[List[str]]) -> float:
+        return max(sum(refit[name] for name in shard) for shard in shards)
+    before = slowest(make_plan(current, total))
+    after = slowest(make_plan(refit, total))
+    print("Current plan slowest shard: {:.1f}s".format(before))
+    print("Refitted plan slowest shard: {:.1f}s".format(after))
+    return round(before - after, 1)
+
+
 def from_logs(logs: Sequence[Path]) -> Dict[str, float]:
     samples: Dict[str, List[float]] = defaultdict(list)
     for log in logs:
@@ -104,7 +123,12 @@ def main() -> int:
     plan.add_argument("--kind", choices=("all", "a11y", "functional"), default="all")
     check = commands.add_parser("check", help="Verify coverage and print predicted balance")
     check.add_argument("--total", type=int, default=3)
-    for command in (plan, check):
+    gain = commands.add_parser(
+        "gain", help="Print seconds a refitted manifest takes off the slowest shard"
+    )
+    gain.add_argument("--total", type=int, required=True)
+    gain.add_argument("--new", type=Path, required=True, help="Refitted manifest")
+    for command in (plan, check, gain):
         command.add_argument("--specs-dir", type=Path, default=DEFAULT_SPECS)
         command.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     logs = commands.add_parser("from-logs", help="Regenerate duration JSON from CI logs")
@@ -115,9 +139,20 @@ def main() -> int:
             print(json.dumps(from_logs(args.logs), sort_keys=True, indent=2))
             return 0
         weights = load_weights(args.specs_dir, args.manifest)
+        if args.command == "gain":
+            refit = load_weights(args.specs_dir, args.new)
+            print("{:.1f}".format(plan_gain(weights, refit, args.total)))
+            return 0
         shards = make_plan(weights, args.total)
         if args.command == "check":
-            return 0 if check_plan(weights, shards) else 1
+            valid = check_plan(weights, shards)
+            missing = unmeasured(args.specs_dir, args.manifest)
+            # Drift shows up here before it shows up as a slow shard (PPS-229).
+            if len(missing) > 0.10 * len(weights):
+                print("WARNING: {} of {} spec files have no measured duration "
+                      "(scheduled at the median): {}".format(
+                          len(missing), len(weights), ", ".join(missing)))
+            return 0 if valid else 1
         if not 1 <= args.shard <= args.total:
             raise ValueError("--shard must be between 1 and --total")
         for name in select_kind(shards[args.shard - 1], args.kind):

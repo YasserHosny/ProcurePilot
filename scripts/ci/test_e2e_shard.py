@@ -82,6 +82,43 @@ class E2EShardTests(unittest.TestCase):
         with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
             self.assertFalse(shard.check_plan({"a": 2, "b": 1}, [["a"], ["a"]]))
 
+    def test_check_warns_when_manifest_misses_over_ten_percent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / "durations.json"
+            names = ["s{:02}.spec.ts".format(index) for index in range(10)]
+            for name in names:
+                (root / name).touch()
+            args = ("check", "--total", "2", "--specs-dir", str(root), "--manifest", str(manifest))
+            manifest.write_text(json.dumps({name: 5 for name in names[1:]}), encoding="utf-8")
+            self.assertNotIn("WARNING: 1 of 10", self.cli(*args))
+            manifest.write_text(json.dumps({name: 5 for name in names[2:]}), encoding="utf-8")
+            output = self.cli(*args)
+            self.assertIn("WARNING: 2 of 10 spec files have no measured duration", output)
+            self.assertIn("s00.spec.ts", output)
+
+    def test_gain_scores_both_plans_against_the_new_durations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("a.spec.ts", "b.spec.ts", "c.spec.ts", "d.spec.ts"):
+                (root / name).touch()
+            old = root / "old.json"
+            new = root / "new.json"
+            # Old plan pairs a+d / b+c; measured, d is slow, so a+d is the bottleneck.
+            old.write_text(json.dumps({
+                "a.spec.ts": 40, "b.spec.ts": 30, "c.spec.ts": 20, "d.spec.ts": 10,
+            }), encoding="utf-8")
+            new.write_text(json.dumps({
+                "a.spec.ts": 40, "b.spec.ts": 30, "c.spec.ts": 20, "d.spec.ts": 35,
+            }), encoding="utf-8")
+            args = ("gain", "--total", "2", "--specs-dir", str(root))
+            output = self.cli(*args, "--manifest", str(old), "--new", str(new))
+            self.assertEqual(output.strip().splitlines()[-1], "10.0")
+            self.assertIn("Current plan slowest shard: 75.0s", output)
+            self.assertIn("Refitted plan slowest shard: 65.0s", output)
+            same = self.cli(*args, "--manifest", str(new), "--new", str(new))
+            self.assertEqual(same.strip().splitlines()[-1], "0.0")
+
     def test_from_logs_sums_units_then_takes_median(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             first = Path(directory) / "first.log"

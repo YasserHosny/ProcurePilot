@@ -21,10 +21,10 @@ outside `docs/`, `specs/`, `.specify/` and `*.md`. If not, every job except the 
   path is under both `apps/web/**` and `packages/**`, so a positive-only `web` filter would match nothing; the
   second step uses the default `any` quantifier.
 
-## End-to-end is sharded five ways
+## End-to-end is sharded six ways
 
 Playwright runs with `workers: 1`, so the suite is serial inside a shard. The `e2e-shard` matrix splits the spec
-*files* across five runners with the duration-balanced planner `scripts/ci/e2e_shard.py` (each shard runs explicit
+*files* across six runners with the duration-balanced planner `scripts/ci/e2e_shard.py` (each shard runs explicit
 file lists, not Playwright's `--shard`), each with its own isolated Supabase, Redis, API, extraction worker and web
 app. The aggregate job `e2e`, named exactly `End-to-end`, passes when the matrix succeeded, or was skipped because
 `changes` found no code change, so the check name other tooling may rely on is unchanged.
@@ -47,9 +47,24 @@ app. The aggregate job `e2e`, named exactly `End-to-end`, passes when the matrix
 - **Duration-balanced shards.** `scripts/ci/e2e_shard.py plan` does a deterministic longest-processing-time split
   over `scripts/ci/e2e-durations.json`: a11y and functional files are balanced together, so a shard's two steps sum
   to a balanced total. Specs missing from the manifest get the median of the measured weights (1 s if none are
-  measured) and are never dropped. The matrix size and the planner's `--total 5` must change together. The `lint`
-  job runs the planner's unit tests plus `check`, so a new spec cannot be silently left out. Regenerate the manifest
-  from downloaded CI list-reporter logs with `e2e_shard.py from-logs`.
+  measured) and are never dropped. The matrix size and the planner's `--total 6` must change together (the matrix,
+  both Playwright steps and the `lint` job's `check`). The `lint` job runs the planner's unit tests plus `check`, so
+  a new spec cannot be silently left out; `check` also prints a WARNING when more than 10% of spec files have no
+  measured duration, so manifest drift shows in the lint log before it shows as a slow shard.
+- **Weekly manifest refresh.** `.github/workflows/e2e-durations-refresh.yml` runs on Sundays (and on demand from
+  the Actions tab). It downloads the E2E shard logs of the last 5 green push-to-main `CI` runs, refits the manifest
+  with `e2e_shard.py from-logs` (median per file), and scores it with `e2e_shard.py gain`: both the current and the
+  refitted plan are scored on the refitted durations, and a PR (`ci/e2e-durations-refresh`) is opened or updated
+  only when the refit takes at least 5 s off the slowest shard. Smaller weekly changes accumulate against the
+  committed manifest until they cross that bar. It reads the shard count from `ci.yml`, so it needs no edit when
+  the count changes. Re-partitioning changes which specs share a stack: merge its PR only on a green run.
+- **The refresh token.** The PR is pushed and opened with the `E2E_MANIFEST_TOKEN` secret, a fine-grained personal
+  access token scoped to this repository with Contents and Pull requests read/write. A PR opened with the default
+  `GITHUB_TOKEN` triggers no `pull_request` workflows, so the required checks would never run on it. Without the
+  secret the workflow fails on its first step. The token expires; renew it before then.
+- To refit by hand: download the shard job logs (`gh api repos/<owner>/<repo>/actions/jobs/<id>/logs`), then
+  `python3 scripts/ci/e2e_shard.py from-logs <logs...> > scripts/ci/e2e-durations.json`. The parser strips the ANSI
+  codes and timestamps itself. The two screenshot specs report no `✓` lines and keep the median weight.
 
 ## Docs screenshots drift always reports
 
@@ -124,7 +139,7 @@ Runner speed varies about ±30% run to run, so single runs are indicative only.
 
 Sharding costs roughly five times the ~150 s stack start-up in runner minutes, in exchange for a shorter wait. Runner
 minutes are free on this public repository; the limit that matters is the Free plan's ~20 concurrent jobs, which one
-run (five shards plus about eight other jobs) stays under.
+run (six shards plus about eight other jobs) stays under.
 
 **2026-10-24: three shards → five.** With three shards the slowest shard ran 7–8.5 min, of which ~5.3 min was specs
 and ~2 min fixed stack start-up. The planner predicts ~330 s of specs per shard at `--total 3` and ~199 s at
@@ -143,6 +158,25 @@ manifest, so per-shard predictions understate wall time by that much.
 After the cache fix the Actions cache went from 10.78 GB (955 shared-scope BuildKit entries) to 1.54 GB once
 each deploy had rebuilt its own scope, so the pnpm and uv caches are no longer evicted.
 
+**2026-11-23: manifest refit, five shards → six (PPS-229).** Push-to-main runs crept back above 7 minutes. The
+manifest had been written once, on 2026-10-18 (60 entries), and never refreshed. By 2026-11-22 the suite had 75
+spec files and ~1,085 s of measured test time (was 950 s). The 15 newer specs were scheduled at the median guess
+of 13.2 s, but `rfq-a11y` takes 47 s and `feedback-a11y` 33 s, and `requests-a11y` grew from 29 s to 75 s (8 → 20
+tests; each still ~4 s). Supabase start (~75 s) and other setup (~60 s) stayed flat: all the growth was test time
+and imbalance.
+
+| Period | Shards | Slowest shard | Spread | a11y step | Functional step |
+|---|---|---|---|---|---|
+| 2026-10-24, just after #248 | 5 | 348–354 s | 57–74 s | 69–81 s | 91–101 s |
+| 2026-11-13 to 11-22 | 5 | 413–466 s | 82–152 s | 99–127 s | 103–130 s |
+
+Refitted on the shard logs of the last five green push-to-main runs (25 logs) and scored on those durations, the
+old manifest's 5-shard plan has a slowest shard of 277 s of tests; the refit alone brings that to 223 s, and six
+shards to 187 s (imbalance 1.015). An out-of-sample check (refit on three November runs, scored on a held-out
+run) gave slowest shards of 294 s → 249 s (refit, five shards) → 206 s (six shards). With the ~2.4 min fixed
+start-up, the slowest six-shard job should land at about 340–380 s, under the 420 s (7 min) bar. The manifest
+now refreshes weekly (above).
+
 ## Verified after merge
 
 - The main-run queueing fix is confirmed: two `main` runs started within 3 s of creation ran in parallel.
@@ -151,9 +185,9 @@ each deploy had rebuilt its own scope, so the pnpm and uv caches are no longer e
 
 ## Not done / ideas
 
-- Refitting `e2e-durations.json` was evaluated and deliberately not done: it would move 37 of 61 files to a
-  different shard, re-opening state-sharing risk between specs, for a balance gain smaller than runner noise.
-  Revisit if shard times drift.
+- Refitting `e2e-durations.json` was first evaluated and deliberately not done (2026-10): it would have moved 37
+  of 61 files for a gain smaller than runner noise. Shard times then drifted (2026-11), so it was refitted and is
+  now refreshed weekly, gated on a 5 s gain so the plan does not reshuffle for noise.
 - Impact-based E2E spec selection is the biggest remaining lever and the riskiest; keep the full suite on `main`.
 - Serve a prebuilt web app instead of `ng serve` (still `ng serve` in ci.yml).
 - Use `pytest-xdist` for backend tests (Backend tests are ~150–210 s, the next floor once E2E shrinks).
