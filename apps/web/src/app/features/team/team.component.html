@@ -46,12 +46,12 @@
           <mat-icon class="tab-icon" aria-hidden="true">group</mat-icon>
           <span>{{ 'team.membersTab' | translate }}</span>
           @if (!isLoadingMembers()) {
-            <span class="count-badge">{{ members().length }}</span>
+            <span class="count-badge">{{ pager.total() ?? members().length }}</span>
           }
         </ng-template>
 
         <div class="tab-body">
-          @if (isLoadingMembers()) {
+          @if (isLoadingMembers() && members().length === 0) {
             <div class="loading-state">
               <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="36"></mat-spinner>
               <span>{{ 'common.loading' | translate }}</span>
@@ -173,6 +173,14 @@
                 <tr mat-row *matRowDef="let row; columns: memberColumns"></tr>
               </table>
             </div>
+          }
+          @if (pager.needed()) {
+            <app-list-pager
+              [pager]="pager"
+              [label]="'team.pagerLabel' | translate"
+              [busy]="isLoadingMembers()"
+              (pageChange)="loadMembers()"
+            />
           }
         </div>
       </mat-tab>

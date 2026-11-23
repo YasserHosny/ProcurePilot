@@ -209,6 +209,7 @@ def test_the_workspace_inbox_filters_and_paginates(monkeypatch: pytest.MonkeyPat
         while True:
             page = harness.service.list_workspace(member=owner, cursor=cursor, limit=2)
             assert len(page.items) <= 2
+            assert page.total == len(created)
             seen.extend(i.id for i in page.items)
             cursor = page.next_cursor
             if cursor is None:

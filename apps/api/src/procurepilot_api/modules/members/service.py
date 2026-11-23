@@ -6,6 +6,7 @@ import logging
 from uuid import UUID
 
 from postgrest.exceptions import APIError
+from postgrest.types import CountMethod
 from supabase import Client, create_client
 
 from procurepilot_api.config import Settings, get_settings
@@ -162,13 +163,19 @@ class MemberService:
         try:
             response = (
                 client.table("membership")
-                .select("id,email,display_name,role,status,mfa_enabled,created_at")
+                .select(
+                    "id,email,display_name,role,status,mfa_enabled,created_at",
+                    count=CountMethod.exact,
+                )
                 .order("created_at")
                 .order("id")
                 .range(offset, offset + capped_limit)
                 .execute()
             )
         except APIError as exc:
+            # PostgREST rejects an offset past the current total when requesting an exact count.
+            if exc.code == "PGRST103" and offset > 0:
+                return MemberList(items=[])
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         rows = _rows(response.data)
         visible_rows = rows[:capped_limit]
@@ -176,6 +183,7 @@ class MemberService:
         return MemberList(
             items=[Member.model_validate(row) for row in visible_rows],
             next_cursor=next_cursor,
+            total=response.count if rows else (0 if offset == 0 else None),
         )
 
     def update_member(

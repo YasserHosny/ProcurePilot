@@ -40,6 +40,7 @@ export interface Submission {
 export interface SubmissionPage {
   readonly items: readonly Submission[];
   readonly next_cursor?: string | null;
+  readonly total?: number | null;
 }
 
 export interface SignedUrl {

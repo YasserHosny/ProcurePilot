@@ -58,6 +58,7 @@ class OperatorSubmission(BaseModel):
 class OperatorSubmissionPage(BaseModel):
     items: list[OperatorSubmission]
     next_cursor: str | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class OperatorMe(BaseModel):

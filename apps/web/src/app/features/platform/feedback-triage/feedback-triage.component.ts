@@ -18,6 +18,8 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { OperatorService } from '../../../core/auth/operator.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { FeedbackDetailComponent } from './feedback-detail/feedback-detail.component';
 import { CATEGORY_LABEL_KEYS, ROLE_LABEL_KEYS, STATUS_LABEL_KEYS } from './feedback-labels';
 import {
@@ -47,6 +49,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     TranslatePipe,
     FormatDatePipe,
     FeedbackDetailComponent,
+    ListPagerComponent,
   ],
   templateUrl: './feedback-triage.component.html',
   styleUrl: './feedback-triage.component.scss',
@@ -71,7 +74,7 @@ export class FeedbackTriageComponent implements OnInit {
   private readonly workspace = signal<string | null>(null);
 
   readonly items = signal<readonly OperatorSubmission[]>([]);
-  readonly nextCursor = signal<string | null>(null);
+  readonly pager = new CursorPager('feedback-triage');
   readonly loading = signal(false);
   readonly loadFailed = signal(false);
   readonly selectedId = signal<string | null>(null);
@@ -88,17 +91,17 @@ export class FeedbackTriageComponent implements OnInit {
 
   setStatus(value: FeedbackStatus | null): void {
     this.status.set(value);
-    this.reload();
+    this.resetAndReload();
   }
 
   setCategory(value: FeedbackCategory | null): void {
     this.category.set(value);
-    this.reload();
+    this.resetAndReload();
   }
 
   setDemo(value: DemoFilter): void {
     this.demo.set(value);
-    this.reload();
+    this.resetAndReload();
   }
 
   applyWorkspace(): void {
@@ -109,7 +112,7 @@ export class FeedbackTriageComponent implements OnInit {
     }
     this.workspaceInvalid.set(false);
     this.workspace.set(value || null);
-    this.reload();
+    this.resetAndReload();
   }
 
   /** Narrows the list to one workspace, from the detail pane. */
@@ -117,7 +120,7 @@ export class FeedbackTriageComponent implements OnInit {
     this.workspaceDraft.set(tenantId);
     this.workspaceInvalid.set(false);
     this.workspace.set(tenantId);
-    this.reload();
+    this.resetAndReload();
   }
 
   clearFilters(): void {
@@ -127,7 +130,7 @@ export class FeedbackTriageComponent implements OnInit {
     this.workspaceDraft.set('');
     this.workspaceInvalid.set(false);
     this.workspace.set(null);
-    this.reload();
+    this.resetAndReload();
   }
 
   select(item: OperatorSubmission): void {
@@ -138,15 +141,10 @@ export class FeedbackTriageComponent implements OnInit {
     this.items.update((list) => list.map((i) => (i.id === saved.id ? saved : i)));
   }
 
-  reload(): void {
+  private resetAndReload(): void {
     this.items.set([]);
-    this.nextCursor.set(null);
-    this.fetch(null);
-  }
-
-  loadMore(): void {
-    const cursor = this.nextCursor();
-    if (cursor && !this.loading()) this.fetch(cursor);
+    this.pager.reset();
+    this.reload();
   }
 
   setDigest(enabled: boolean): void {
@@ -164,27 +162,32 @@ export class FeedbackTriageComponent implements OnInit {
     });
   }
 
-  private fetch(cursor: string | null): void {
+  reload(): void {
     const seq = ++this.requestSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
     const demo = this.demo();
+    const { cursor, limit } = this.pager.params();
     this.api
       .list({
         status: this.status(),
         category: this.category(),
         tenantId: this.workspace(),
         isDemo: demo === 'all' ? null : demo === 'demo',
-      }, cursor)
+      }, cursor, limit)
       .subscribe({
         next: (page) => {
           if (seq !== this.requestSeq) return;
-          this.items.update((list) => [...list, ...page.items]);
-          this.nextCursor.set(page.next_cursor ?? null);
+          if (!this.pager.loaded({ ...page, next_cursor: page.next_cursor ?? null })) {
+            this.reload();
+            return;
+          }
+          this.items.set(page.items);
           this.loading.set(false);
         },
         error: () => {
           if (seq !== this.requestSeq) return;
+          if (!this.pager.failed()) this.items.set([]);
           this.loading.set(false);
           this.loadFailed.set(true);
         },

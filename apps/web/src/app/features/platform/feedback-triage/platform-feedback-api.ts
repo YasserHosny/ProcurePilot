@@ -44,6 +44,7 @@ export interface OperatorSubmission {
 export interface OperatorSubmissionPage {
   readonly items: readonly OperatorSubmission[];
   readonly next_cursor?: string | null;
+  readonly total?: number | null;
 }
 
 export interface OperatorMe {

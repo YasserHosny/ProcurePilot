@@ -407,7 +407,9 @@ def test_operator_lists_filters_and_is_audited_once(client: TestClient) -> None:
             headers=headers,
         )
         assert response.status_code == 200, response.text
-        items = response.json()["items"]
+        body = response.json()
+        assert body["total"] == 1
+        items = body["items"]
         assert [item["id"] for item in items] == [str(submission)]
         assert items[0]["tenant_name"] == f"{other.label} Ltd"
         assert items[0]["submitter_email"].endswith("@example.test")
@@ -434,12 +436,14 @@ def test_list_paginates_with_a_cursor(client: TestClient) -> None:
             headers=headers,
         ).json()
         assert len(first["items"]) == 2 and first["next_cursor"]
+        assert first["total"] == 3
         second = client.get(
             "/api/v1/platform/feedback",
             params={"limit": 2, "cursor": first["next_cursor"], "tenant_id": str(other.tenant_id)},
             headers=headers,
         ).json()
         assert len(second["items"]) == 1 and second["next_cursor"] is None
+        assert second["total"] == 3
         seen = [item["id"] for item in first["items"] + second["items"]]
         assert sorted(seen) == sorted(str(i) for i in created)
         bad = client.get(

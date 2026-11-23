@@ -42,6 +42,7 @@ class Member(BaseModel):
 class MemberList(BaseModel):
     items: list[Member]
     next_cursor: str | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class MemberUpdate(BaseModel):

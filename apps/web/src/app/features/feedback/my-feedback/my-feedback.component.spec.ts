@@ -69,7 +69,10 @@ describe('MyFeedbackComponent (US4, FR-012, FR-014)', () => {
     fixture.detectChanges();
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    localStorage.removeItem('pp.pageSize.my-feedback');
+  });
 
   it('lists the member\'s own submissions with text, category, status and page', () => {
     mineReq().flush({
@@ -110,17 +113,56 @@ describe('MyFeedbackComponent (US4, FR-012, FR-014)', () => {
     expect(root().querySelectorAll('[data-test="card"]').length).toBe(1);
   });
 
-  it('loads the next page with the cursor and appends it', () => {
-    mineReq().flush({ items: [submission()], next_cursor: 'cur-1' });
+  it('pages with Next and Previous, passes limit, and keeps rows when Next fails', () => {
+    const page1 = Array.from({ length: 25 }, (_, i) => submission({ id: `sub-${i}`, text: `Item ${i}` }));
+    const initial = mineReq();
+    expect(initial.request.params.get('limit')).toBe('25');
+    initial.flush({ items: page1, next_cursor: 'cur-1', total: 26 });
     fixture.detectChanges();
-    root().querySelector<HTMLButtonElement>('[data-test="load-more"]')!.click();
+
+    const range = (): string | undefined =>
+      root().querySelector('.list-pager__range')?.textContent?.trim();
+    const nextBtn = (): HTMLButtonElement =>
+      root().querySelector('.list-pager__next') as HTMLButtonElement;
+    const prevBtn = (): HTMLButtonElement =>
+      root().querySelector('.list-pager__previous') as HTMLButtonElement;
+
+    expect(range()).toBe('1–25 of 26');
+
+    nextBtn().click();
+    const failNext = mineReq();
+    expect(failNext.request.params.get('cursor')).toBe('cur-1');
+    expect(failNext.request.params.get('limit')).toBe('25');
+    failNext.flush({ code: 'x', message: 'x', trace_id: 't' }, { status: 500, statusText: 'Err' });
+    fixture.detectChanges();
+    expect(root().querySelectorAll('[data-test="card"]').length).toBe(25);
+    expect(componentPageIndex(fixture)).toBe(0);
+
+    nextBtn().click();
     const next = mineReq();
     expect(next.request.params.get('cursor')).toBe('cur-1');
-    next.flush({ items: [submission({ id: 'sub-9', text: 'Second page' })], next_cursor: null });
+    next.flush({
+      items: [submission({ id: 'sub-99', text: 'Second page' })],
+      next_cursor: null,
+      total: 26,
+    });
     fixture.detectChanges();
-    expect(root().querySelectorAll('[data-test="card"]').length).toBe(2);
-    expect(root().querySelector('[data-test="load-more"]')).toBeNull();
+    expect(root().querySelectorAll('[data-test="card"]').length).toBe(1);
+    expect(text()).toContain('Second page');
+    expect(range()).toBe('26–26 of 26');
+
+    prevBtn().click();
+    const prev = mineReq();
+    expect(prev.request.params.has('cursor')).toBeFalse();
+    prev.flush({ items: page1, next_cursor: 'cur-1', total: 26 });
+    fixture.detectChanges();
+    expect(root().querySelectorAll('[data-test="card"]').length).toBe(25);
+    expect(range()).toBe('1–25 of 26');
   });
+
+  function componentPageIndex(f: ComponentFixture<MyFeedbackComponent>): number {
+    return f.componentInstance.list.pager.pageIndex();
+  }
 
   it('offers withdraw only while the submission can still be withdrawn', () => {
     mineReq().flush({
@@ -142,6 +184,7 @@ describe('MyFeedbackComponent (US4, FR-012, FR-014)', () => {
     const del = http.expectOne('/api/v1/feedback/a');
     expect(del.request.method).toBe('DELETE');
     del.flush(null, { status: 204, statusText: 'No Content' });
+    mineReq().flush({ items: [submission({ id: 'b', text: 'Keep me' })], next_cursor: null, total: 1 });
     fixture.detectChanges();
     expect(root().querySelectorAll('[data-test="card"]').length).toBe(1);
     expect(text()).toContain('Keep me');

@@ -7,6 +7,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { FeedbackCardComponent } from '../feedback-card/feedback-card.component';
 import {
   FEEDBACK_CATEGORIES,
@@ -15,7 +16,7 @@ import {
   type FeedbackCategory,
   type FeedbackStatus,
 } from '../feedback-api';
-import { FEEDBACK_PAGE_SIZE, PagedSubmissions } from '../paged-submissions';
+import { PagedSubmissions } from '../paged-submissions';
 
 /**
  * The owner's read-only inbox of the workspace's feedback (FR-013). It is a support surface:
@@ -34,6 +35,7 @@ import { FEEDBACK_PAGE_SIZE, PagedSubmissions } from '../paged-submissions';
     RouterLink,
     TranslatePipe,
     FeedbackCardComponent,
+    ListPagerComponent,
   ],
   templateUrl: './workspace-feedback.component.html',
   styleUrl: '../my-feedback/my-feedback.component.scss',
@@ -47,10 +49,9 @@ export class WorkspaceFeedbackComponent implements OnInit {
   readonly status = signal<FeedbackStatus | null>(null);
   readonly category = signal<FeedbackCategory | null>(null);
 
-  readonly list = new PagedSubmissions((cursor) =>
+  readonly list = new PagedSubmissions('workspace-feedback', (params) =>
     this.api.listWorkspace({
-      cursor,
-      limit: FEEDBACK_PAGE_SIZE,
+      ...params,
       status: this.status(),
       category: this.category(),
     }),
@@ -62,11 +63,11 @@ export class WorkspaceFeedbackComponent implements OnInit {
 
   onStatusFilter(value: FeedbackStatus | null): void {
     this.status.set(value);
-    this.list.reload();
+    this.list.resetAndReload();
   }
 
   onCategoryFilter(value: FeedbackCategory | null): void {
     this.category.set(value);
-    this.list.reload();
+    this.list.resetAndReload();
   }
 }
