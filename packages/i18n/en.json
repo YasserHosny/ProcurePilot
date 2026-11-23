@@ -32,6 +32,13 @@
       "skipToContent": "Skip to main content",
       "mainNavigation": "Main navigation",
       "homeLink": "ProcurePilot"
+    },
+    "pager": {
+      "pageSize": "Rows per page",
+      "previous": "Previous",
+      "next": "Next",
+      "range": "{{from}}–{{to}} of {{total}}",
+      "rangeOpen": "{{from}}–{{to}}"
     }
   },
   "auth": {
@@ -2535,8 +2542,6 @@
     },
     "list": {
       "newRequestButton": "New request",
-      "loadMore": "Load more",
-      "loadedCount": "{{count}} requests loaded",
       "searchLabel": "Search requests",
       "searchPlaceholder": "Supplier, product or note",
       "clearSearch": "Clear search",
@@ -2549,7 +2554,9 @@
         "total_desc": "Total (highest)",
         "total_asc": "Total (lowest)"
       },
-      "mineToggle": "My requests"
+      "mineToggle": "My requests",
+      "pagerLabel": "Purchase request pages",
+      "loadedCount": "{{count}} requests loaded"
     },
     "table": {
       "caption": "Purchase requests"

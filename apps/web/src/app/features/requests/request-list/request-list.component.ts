@@ -18,12 +18,14 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe,
 TranslateService } from '@ngx-translate/core';
 import { RoleDirective } from '../../../core/auth/role.directive';
-import { EMPTY, Subject, defer, forkJoin, of, type Observable, type Subscription } from 'rxjs';
+import { EMPTY, Subject, defer, forkJoin, of, type Observable } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, expand, map, reduce, switchMap } from 'rxjs/operators';
 
 import type { ApiError, Branch, BranchList, PurchaseRequest } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { parseIsoDateLocal } from '../../../core/format/iso-date';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { RequestsApiService, type PurchaseRequestSort, type PurchaseRequestStatus } from '../requests-api';
@@ -49,6 +51,7 @@ const I18N = 'requests';
     MatTooltipModule,
     TranslatePipe,
     RoleDirective,
+    ListPagerComponent,
   ],
   templateUrl: './request-list.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -68,9 +71,8 @@ export class RequestListComponent implements OnInit {
   @ViewChild('searchInput', { read: ElementRef }) searchInput?: ElementRef<HTMLInputElement>;
 
   readonly isLoading = signal<boolean>(true);
-  readonly isLoadingMore = signal<boolean>(false);
   readonly requests = signal<PurchaseRequest[]>([]);
-  readonly nextCursor = signal<string | null>(null);
+  readonly pager = new CursorPager('requests');
   readonly branches = signal<Branch[]>([]);
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
@@ -89,7 +91,6 @@ export class RequestListComponent implements OnInit {
   ];
   private readonly searchSubject = new Subject<string>();
   private readonly reloadSubject = new Subject<Parameters<RequestsApiService['listRequests']>[0]>();
-  private loadMoreSub?: Subscription;
 
   constructor() {
     this.searchSubject.pipe(
@@ -115,8 +116,9 @@ export class RequestListComponent implements OnInit {
           }).pipe(
             catchError((err: unknown) => {
               this.isLoading.set(false);
-              this.requests.set([]);
-              this.nextCursor.set(null);
+              // A failed Previous / Next keeps the page on screen and the pager where it was;
+              // any other failed load (first load, filters, refresh) clears rows and pager.
+              if (!this.pager.failed()) this.requests.set([]);
               this.handleError(err);
               return EMPTY;
             }),
@@ -125,9 +127,13 @@ export class RequestListComponent implements OnInit {
         takeUntilDestroyed(),
       )
       .subscribe(({ requests, branches }) => {
-        this.requests.set([...requests.items]);
         this.branches.set([...branches.items]);
-        this.nextCursor.set(requests.next_cursor);
+        // An empty page past the first (its last row withdrawn): step back and load again.
+        if (!this.pager.loaded(requests)) {
+          this.loadRequests();
+          return;
+        }
+        this.requests.set([...requests.items]);
         this.isLoading.set(false);
       });
   }
@@ -182,49 +188,18 @@ export class RequestListComponent implements OnInit {
       ...(this.searchQuery() ? { q: this.searchQuery() } : {}),
       ...(this.sortOption() !== 'created_desc' ? { sort: this.sortOption() } : {}),
       ...(this.mineFilter() ? { mine: true } : {}),
+      ...this.pager.params(),
     };
   }
 
+  /** Loads the pager's current page; also the reload after a withdrawal. */
   loadRequests(): void {
-    this.loadMoreSub?.unsubscribe();
-    this.isLoadingMore.set(false);
     this.reloadSubject.next(this.listParams());
-  }
-
-  loadMore(): void {
-    const cursor = this.nextCursor();
-    if (!cursor || this.isLoadingMore()) {
-      return;
-    }
-
-    this.isLoadingMore.set(true);
-    this.errorMessage.set(null);
-    this.errorTraceId.set(null);
-
-    this.loadMoreSub?.unsubscribe();
-    this.loadMoreSub = this.requestsApi
-      .listRequests({
-        ...this.listParams(),
-        cursor,
-      })
-      .subscribe({
-        next: (res) => {
-          const existingIds = new Set(this.requests().map((r) => r.id));
-          const newItems = res.items.filter((r) => !existingIds.has(r.id));
-          this.requests.set([...this.requests(), ...newItems]);
-          this.nextCursor.set(res.next_cursor);
-          this.isLoadingMore.set(false);
-        },
-        error: (err: unknown) => {
-          this.isLoadingMore.set(false);
-          this.handleError(err);
-        },
-      });
   }
 
   private resetAndReload(): void {
     this.requests.set([]);
-    this.nextCursor.set(null);
+    this.pager.reset();
     this.loadRequests();
   }
 

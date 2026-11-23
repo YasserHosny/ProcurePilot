@@ -113,4 +113,10 @@ def test_pending_sort_filter_and_count_contract() -> None:
         model = schema["components"]["schemas"]["PendingApprovalList"]
         assert "total" in model["required"]
         assert model["properties"]["total"]["type"] == "integer"
-        assert "total" not in schema["components"]["schemas"]["PurchaseRequestList"]["properties"]
+        # The request list's total (PPS-228) is optional: some list paths cannot count.
+        request_list = schema["components"]["schemas"]["PurchaseRequestList"]
+        assert "total" not in request_list.get("required", [])
+        total = request_list["properties"]["total"]
+        assert total.get("type") == "integer" or {"type": "integer", "minimum": 0} in total.get(
+            "anyOf", []
+        )

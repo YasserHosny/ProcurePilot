@@ -338,10 +338,14 @@ class PsycopgTableQuery:
         self._offset: int | None = None
         self._order: list[tuple[str, bool]] = []
         self._columns = "*"
+        self._count: str | None = None
 
-    def select(self, columns: str = "*") -> PsycopgTableQuery:
+    def select(self, columns: str = "*", *, count: str | None = None) -> PsycopgTableQuery:
         self._operation = "select"
         self._columns = columns
+        if count not in (None, "exact"):
+            raise NotImplementedError(f"test adapter only supports count='exact', not {count!r}")
+        self._count = count
         return self
 
     def insert(self, payload: dict[str, object] | list[dict[str, object]]) -> PsycopgTableQuery:
@@ -478,7 +482,16 @@ class PsycopgTableQuery:
         if self._offset is not None:
             query += sql.SQL(" offset %s")
             params.append(self._offset)
-        return _Response(self._fetch(query, params))
+        rows = self._fetch(query, params)
+        if self._count is None:
+            return _Response(rows)
+        # PostgREST's count=exact: every row matching the filters, ignoring range/limit.
+        count_query = sql.SQL("select count(*) as count from {}").format(
+            sql.Identifier(self._table)
+        )
+        if where_sql is not None:
+            count_query += sql.SQL(" where ") + where_sql
+        return _Response(rows, int(self._fetch(count_query, where_params)[0]["count"]))
 
     def _relation_sql(self, embed: str) -> tuple[sql.Identifier, sql.SQL]:
         relation = _EMBED_RELATIONS.get((self._table, embed))
@@ -610,6 +623,7 @@ class PsycopgTableQuery:
 @dataclass(frozen=True)
 class _Response:
     data: list[dict[str, object]]
+    count: int | None = None
 
 
 # Columns typed jsonb that this fake client's callers write scalar (not just dict/list) Python

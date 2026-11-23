@@ -1625,6 +1625,8 @@ export interface PurchaseRequestUpdate {
 export interface PurchaseRequestList {
   readonly items: readonly PurchaseRequest[];
   readonly next_cursor: string | null;
+  /** Matches across all pages, when the API could count them (PPS-228). */
+  readonly total?: number | null;
 }
 
 export type PendingApprovalSort =
