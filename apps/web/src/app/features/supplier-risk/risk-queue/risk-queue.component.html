@@ -43,7 +43,7 @@
       <mat-icon aria-hidden="true">error_outline</mat-icon>
       <span>{{ 'supplierRisk.error.' + errorKind | translate }}</span>
       @if (errorKind === 'load') {
-        <button mat-button type="button" (click)="loadRisks(true)">
+        <button mat-button type="button" (click)="loadRisks()">
           <mat-icon aria-hidden="true">refresh</mat-icon>
           <span>{{ 'supplierRisk.error.retry' | translate }}</span>
         </button>
