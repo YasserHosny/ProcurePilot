@@ -445,6 +445,7 @@
     "subtitle": "Manage workspace members, invite colleagues, and configure role-based access.",
     "inviteButton": "Invite Member",
     "membersTab": "Members",
+    "pagerLabel": "Team member pages",
     "invitationsTab": "Pending Invitations",
     "membersSectionTitle": "Workspace Members",
     "invitationsSectionTitle": "Pending Invitations",
@@ -2097,8 +2098,14 @@
     "list": {
       "myTitle": "My feedback",
       "myIntro": "Feedback you sent, with its current status.",
+      "mine": {
+        "pagerLabel": "My feedback pages"
+      },
       "workspaceTitle": "Workspace feedback",
       "workspaceIntro": "Feedback sent by members of this workspace. This list is read-only; the ProcurePilot team reviews every item.",
+      "workspace": {
+        "pagerLabel": "Workspace feedback pages"
+      },
       "viewWorkspace": "Workspace feedback",
       "viewMine": "My feedback",
       "empty": "You have not sent any feedback yet. Use the Send feedback button at any time.",
@@ -2106,7 +2113,6 @@
       "loading": "Loading feedback…",
       "loadError": "Feedback could not be loaded.",
       "retry": "Try again",
-      "loadMore": "Load more",
       "filterStatus": "Status",
       "filterCategory": "Category",
       "all": "All",
@@ -5369,7 +5375,7 @@
       "empty": "No feedback matches these filters.",
       "loadError": "Feedback could not be loaded.",
       "retry": "Try again",
-      "loadMore": "Load more",
+      "pagerLabel": "Platform feedback pages",
       "filters": {
         "title": "Filters",
         "status": "Status",

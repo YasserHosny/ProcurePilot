@@ -63,6 +63,12 @@ export interface Member {
   readonly display_name?: string | null;
 }
 
+export interface MemberList {
+  readonly items: Member[];
+  readonly next_cursor: string | null;
+  readonly total?: number | null;
+}
+
 export interface Invitation {
   readonly token?: string;
   readonly email_delivery?: 'sent' | 'not_configured' | 'failed';

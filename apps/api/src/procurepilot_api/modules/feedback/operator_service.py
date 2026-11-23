@@ -198,18 +198,22 @@ class OperatorFeedbackService:
         if is_demo is not None:
             clauses.append("s.is_demo = %s")
             params.append(is_demo)
+        # Use the same operator connection and filters for the count, before applying the cursor.
+        count_where = f"where {' and '.join(clauses)}" if clauses else ""
+        page_params = params.copy()
         if cursor is not None:
             created_at, row_id = decode_cursor(cursor)
             clauses.append("(s.created_at, s.id) < (%s, %s)")
-            params.extend([created_at, row_id])
+            page_params.extend([created_at, row_id])
         where = f"where {' and '.join(clauses)}" if clauses else ""
 
         with operator_connection(self._settings, operator) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
-                    f"select {_SUBMISSION_COLUMNS} from feedback_submission s {where} "  # noqa: S608
-                    "order by s.created_at desc, s.id desc limit %s",
-                    (*params, limit + 1),
+                    f"select {_SUBMISSION_COLUMNS}, "  # noqa: S608
+                    f"(select count(*) from feedback_submission s {count_where}) as total_count "
+                    f"from feedback_submission s {where} order by s.created_at desc, s.id desc limit %s",
+                    (*params, *page_params, limit + 1),
                 )
                 rows = cur.fetchall()
             page_rows = rows[:limit]
@@ -238,7 +242,8 @@ class OperatorFeedbackService:
         if len(rows) > limit and page_rows:
             last = page_rows[-1]
             next_cursor = encode_cursor(last["created_at"], last["id"])
-        return OperatorSubmissionPage(items=items, next_cursor=next_cursor)
+        total = rows[0]["total_count"] if rows else (0 if cursor is None else None)
+        return OperatorSubmissionPage(items=items, next_cursor=next_cursor, total=total)
 
     # -- detail -----------------------------------------------------------------------------
 

@@ -63,6 +63,7 @@ class Submission(BaseModel):
 class SubmissionPage(BaseModel):
     items: list[Submission]
     next_cursor: str | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class SignedUrl(BaseModel):

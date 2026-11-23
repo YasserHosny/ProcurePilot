@@ -1,4 +1,4 @@
-import { HttpClient, HttpContext } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
@@ -62,6 +62,7 @@ import type {
   MatchTaskStatus,
   Me,
   Member,
+  MemberList,
   Offer,
   OfferComparison,
   PendingApprovalList,
@@ -211,11 +212,11 @@ export class ApiService {
 
   // --- members and invitations --------------------------------------------
 
-  members(cursor?: string): Observable<{ items: Member[]; next_cursor: string | null }> {
-    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
-    return this.http.get<{ items: Member[]; next_cursor: string | null }>(
-      `${this.base}/members${query}`,
-    );
+  members(cursor?: string, limit?: number): Observable<MemberList> {
+    let params = new HttpParams();
+    if (cursor) params = params.set('cursor', cursor);
+    if (limit !== undefined) params = params.set('limit', limit);
+    return this.http.get<MemberList>(`${this.base}/members`, { params });
   }
 
   changeMemberRole(memberId: string, role: Role): Observable<Member> {
