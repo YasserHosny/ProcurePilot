@@ -2832,7 +2832,16 @@
       },
       "loadError": "Unable to load more requests. Please try again.",
       "pageLoadError": "Unable to load pending requests. Please try again.",
-      "pagerLabel": "Approval queue pages"
+      "pagerLabel": "Approval queue pages",
+      "showingMore": {
+        "zero": "Showing 0 requests, more available",
+        "one": "Showing 1 request, more available",
+        "two": "Showing 2 requests, more available",
+        "few": "Showing {{count}} requests, more available",
+        "many": "Showing {{count}} requests, more available",
+        "other": "Showing {{count}} requests, more available"
+      },
+      "showingOf": "Showing {{loaded}} of {{total}}"
     },
     "requestCount": {
       "zero": "{{count}} requests",
