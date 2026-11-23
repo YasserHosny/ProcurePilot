@@ -1485,6 +1485,7 @@ class RfqService:
                 r.created_at,
                 r.cancelled_at,
                 r.created_by_membership_id,
+                count(*) over () as total,
                 (SELECT max(rr_sent.sent_at) FROM rfq_recipient rr_sent
                  WHERE rr_sent.rfq_id = r.id) as sent_at,
                 (SELECT count(*) FROM rfq_recipient rr WHERE rr.rfq_id = r.id) as recipient_count,
@@ -1524,7 +1525,8 @@ class RfqService:
             next_cursor = None
 
         items = [RfqSummary.model_validate(row) for row in rows]
-        return RfqList(items=items, next_cursor=next_cursor)
+        total = rows[0]["total"] if rows else (0 if offset == 0 else None)
+        return RfqList(items=items, next_cursor=next_cursor, total=total)
 
 
 # Prices each reply the way the RFQ split does (services/optimiser repository.py

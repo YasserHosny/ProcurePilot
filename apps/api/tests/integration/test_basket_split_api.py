@@ -244,6 +244,7 @@ def test_recent_splits_list_pages_newest_first_with_a_summary_of_each(
         first = service.list_jobs(member=context.member, limit=2)
         assert [item.id for item in first.items] == [created[2], created[1]]
         assert first.next_cursor is not None
+        assert first.total == 3
         assert first.items[0].status == "queued"
         assert first.items[0].item_count == 1
         assert len(first.items[0].supplier_ids) == 2
@@ -261,6 +262,7 @@ def test_recent_splits_list_pages_newest_first_with_a_summary_of_each(
         second = service.list_jobs(member=context.member, limit=2, cursor=first.next_cursor)
         assert [item.id for item in second.items] == [created[0]]
         assert second.next_cursor is None
+        assert second.total == 4
 
         with pytest.raises(UnprocessableEntityError):
             service.list_jobs(member=context.member, cursor="not-a-cursor")

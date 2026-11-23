@@ -255,6 +255,7 @@ class RfqSummary(BaseModel):
 class RfqList(BaseModel):
     items: list[RfqSummary]
     next_cursor: str | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class RfqDetail(BaseModel):

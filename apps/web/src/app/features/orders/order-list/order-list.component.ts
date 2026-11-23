@@ -14,6 +14,8 @@ import { parseIsoDateLocal } from '../../../core/format/iso-date';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { ApiService } from '../../../core/api/api.service';
 import type { Supplier } from '../../../core/api/models';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { RequestsApiService, type PurchaseRequest } from '../../requests/requests-api';
 import { isOrderOverdue } from '../order-helpers';
 import { OrdersApiService, type OrderListQuery, type OrderStatus, type PurchaseOrder } from '../orders-api';
@@ -32,6 +34,7 @@ import { OrdersApiService, type OrderListQuery, type OrderStatus, type PurchaseO
     FormatDatePipe,
     FormatMoneyPipe,
     RoleDirective,
+    ListPagerComponent,
   ],
   templateUrl: './order-list.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -46,14 +49,11 @@ export class OrderListComponent implements OnInit {
   private readonly translate = inject(TranslateService);
 
   readonly orders = signal<PurchaseOrder[]>([]);
-  readonly nextCursor = signal<string | null>(null);
+  readonly pager = new CursorPager('orders');
   readonly isLoading = signal(true);
-  readonly isLoadingMore = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly approvedRequests = signal<PurchaseRequest[]>([]);
   readonly isLoadingApprovedRequests = signal(false);
-  readonly totalCount = signal<number | null>(null);
-  readonly loadMoreError = signal(false);
   // Bumped on every fresh query so a slow answer to an earlier one is dropped.
   private generation = 0;
   // The filters the loaded rows were fetched with; paging must reuse them, not the live inputs.
@@ -101,28 +101,28 @@ export class OrderListComponent implements OnInit {
 
   onSearchSubmit(event: Event): void {
     event.preventDefault();
-    this.loadOrders();
+    this.resetAndReload();
   }
 
   onStatusChange(event: Event): void {
     this.statusFilter.set((event.target as HTMLSelectElement).value);
-    this.loadOrders();
+    this.resetAndReload();
   }
 
   onSupplierChange(event: Event): void {
     this.supplierFilter.set((event.target as HTMLSelectElement).value);
-    this.loadOrders();
+    this.resetAndReload();
   }
 
   onDateChange(which: 'from' | 'to', event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     (which === 'from' ? this.dateFrom : this.dateTo).set(value);
-    this.loadOrders();
+    this.resetAndReload();
   }
 
   onSortChange(event: Event): void {
     this.sortKey.set((event.target as HTMLSelectElement).value);
-    this.loadOrders();
+    this.resetAndReload();
   }
 
   getSortLabel(key: string): string {
@@ -132,7 +132,7 @@ export class OrderListComponent implements OnInit {
   readonly isOverdue = isOrderOverdue;
 
   ngOnInit(): void {
-    this.loadOrders();
+    this.resetAndReload();
     this.loadSuppliers();
   }
 
@@ -148,50 +148,32 @@ export class OrderListComponent implements OnInit {
     });
   }
 
+  private resetAndReload(): void {
+    this.appliedQuery = this.query();
+    this.orders.set([]);
+    this.pager.reset();
+    this.loadOrders();
+  }
+
   loadOrders(): void {
     this.isLoading.set(true);
     this.errorMessage.set(null);
-    this.loadMoreError.set(false);
-    this.isLoadingMore.set(false);
     const generation = ++this.generation;
-    const applied = this.query();
-    this.ordersApi.listOrders(undefined, applied).subscribe({
+    this.ordersApi.listOrders({ ...this.appliedQuery, ...this.pager.params() }).subscribe({
       next: (response) => {
         if (generation !== this.generation) return;
-        this.appliedQuery = applied;
+        if (!this.pager.loaded({ ...response, total: response.total ?? response.total_count })) {
+          this.loadOrders();
+          return;
+        }
         this.orders.set(response.items);
-        this.nextCursor.set(response.next_cursor);
-        this.totalCount.set(response.total_count ?? null);
         this.isLoading.set(false);
       },
       error: () => {
         if (generation !== this.generation) return;
+        if (!this.pager.failed()) this.orders.set([]);
         this.errorMessage.set(this.translate.instant('orders.loadError'));
         this.isLoading.set(false);
-      },
-    });
-  }
-
-  loadMore(): void {
-    const cursor = this.nextCursor();
-    if (!cursor || this.isLoadingMore()) return;
-    this.isLoadingMore.set(true);
-    this.loadMoreError.set(false);
-    const generation = this.generation;
-    this.ordersApi.listOrders(cursor, this.appliedQuery).subscribe({
-      next: (response) => {
-        if (generation !== this.generation) return;
-        // An order created between two page loads shifts the offset and repeats a row.
-        const known = new Set(this.orders().map((order) => order.id));
-        this.orders.set([...this.orders(), ...response.items.filter((order) => !known.has(order.id))]);
-        this.nextCursor.set(response.next_cursor);
-        this.totalCount.set(response.total_count ?? this.totalCount());
-        this.isLoadingMore.set(false);
-      },
-      error: () => {
-        if (generation !== this.generation) return;
-        this.isLoadingMore.set(false);
-        this.loadMoreError.set(true);
       },
     });
   }

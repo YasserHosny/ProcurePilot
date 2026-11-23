@@ -1059,7 +1059,7 @@ class RequestsService:
         try:
             with db.connect(self._settings.database_url.get_secret_value()) as conn:
                 with conn.cursor(row_factory=dict_row) as cur:
-                    # Both reads use the verified member's RLS context.
+                    # The page and its count use the verified member's RLS context.
                     cur.execute("set local role authenticated")
                     cur.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
                     cur.execute(
@@ -1073,14 +1073,22 @@ class RequestsService:
                         is_owner=member.role is MemberRole.owner,
                         is_sole_owner=member.role is MemberRole.owner
                         and owners == {member.membership_id},
-                        limit=limit,
                     )
-                    query, params = _pending_approval_query(**options, boundary=None, count=True)
+                    query, params = _pending_approval_query(
+                        **options, boundary=boundary, limit=limit
+                    )
                     cur.execute(query, params)
-                    total = int(cur.fetchone()["total"])
-                    query, params = _pending_approval_query(**options, boundary=boundary)
+                    rows = cur.fetchall()
+                    if rows:
+                        return rows, int(rows[0]["total"])
+                    if boundary is None:
+                        return rows, 0
+                    # An empty page past a boundary (the queue shrank) has no row to carry
+                    # the count, so read it from the first page: rare, and keeps total required.
+                    query, params = _pending_approval_query(**options, boundary=None, limit=0)
                     cur.execute(query, params)
-                    return cur.fetchall(), total
+                    first = cur.fetchall()
+                    return rows, int(first[0]["total"]) if first else 0
         except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -4529,7 +4537,6 @@ def _pending_approval_query(
     is_sole_owner: bool,
     boundary: tuple[str | None, UUID] | None,
     limit: int,
-    count: bool = False,
 ) -> tuple[str, list[object]]:
     column, direction = _APPROVAL_SORT_COLUMNS[sort]
     predicates = ["ast.status = 'pending'"]
@@ -4546,29 +4553,32 @@ def _pending_approval_query(
     if branch_id is not None:
         predicates.append("pr.branch_id = %s")
         params.append(branch_id)
-    if boundary is not None and not count:
-        value, step_id = boundary
-        if value is None:
-            predicates.append(f"({column} is null and ast.id > %s)")
-            params.append(step_id)
-        else:
-            operator = "<" if direction == "desc" else ">"
-            predicates.append(
-                f"({column} {operator} %s or ({column} = %s and ast.id > %s) or {column} is null)"
-            )
-            params.extend([value, value, step_id])
-    projection = "count(*) as total" if count else f"ast.*, {column} as sort_value"
-    query = (
-        f"select {projection} from approval_step ast "
+    filtered = (
+        "from approval_step ast "
         "join purchase_request pr on pr.id = ast.purchase_request_id "
         "left join purchase_request_group prg "
         "on prg.tenant_id = pr.tenant_id and prg.id = pr.request_group_id "
         "where " + " and ".join(predicates)
     )
-    if not count:
-        query += f" order by {column} {direction} nulls last, ast.id asc limit %s"
-        params.append(limit + 1)
-    return query, params
+    condition = filtered
+    page_params = list(params)
+    if boundary is not None:
+        value, step_id = boundary
+        if value is None:
+            condition += f" and ({column} is null and ast.id > %s)"
+            page_params.append(step_id)
+        else:
+            operator = "<" if direction == "desc" else ">"
+            condition += (
+                f" and ({column} {operator} %s or ({column} = %s and ast.id > %s)"
+                f" or {column} is null)"
+            )
+            page_params.extend([value, value, step_id])
+    query = (
+        f"select ast.*, {column} as sort_value, (select count(*) {filtered}) as total "
+        f"{condition} order by {column} {direction} nulls last, ast.id asc limit %s"
+    )
+    return query, [*params, *page_params, limit + 1]
 
 
 def _encode_approval_cursor(

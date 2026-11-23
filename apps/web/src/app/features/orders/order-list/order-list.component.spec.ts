@@ -18,6 +18,7 @@ describe('OrderListComponent', () => {
   let mockSession: Partial<SessionService>;
 
   beforeEach(async () => {
+    localStorage.removeItem('pp.pageSize.orders');
     mockRole = signal<Role | null>('owner');
     mockSession = {
       role: mockRole as unknown as Signal<Role | null>,
@@ -38,7 +39,7 @@ describe('OrderListComponent', () => {
     }).compileComponents();
     TestBed.inject(TranslateService).setTranslation('en', {
       orders: {
-        title: 'Order Tracking', subtitle: 'Orders', refresh: 'Refresh', retry: 'Retry', loadMore: 'Load more',
+        title: 'Order Tracking', subtitle: 'Orders', refresh: 'Refresh', retry: 'Retry',
         loadError: 'Load failed', open: 'Open', orderDate: 'Ordered {{date}}', createdDate: 'Created {{date}}', lineCount: '{{count}} line(s)',
         createButton: 'Create Order', fromApprovedRequest: 'From approved request', resultCount: '{{count}} orders', expectedDate: 'Expected {{date}}',
         fromApprovedRequestEmpty: 'No approved requests available.',
@@ -59,7 +60,7 @@ describe('OrderListComponent', () => {
 
   it('loads and renders purchase orders with status and total', () => {
     fixture.detectChanges();
-    const request = http.expectOne('/api/v1/orders?limit=50');
+    const request = http.expectOne('/api/v1/orders?limit=25');
     request.flush({
       next_cursor: null,
       items: [{
@@ -79,7 +80,7 @@ describe('OrderListComponent', () => {
   it('shows create button for owner and hides for viewer', () => {
     mockRole.set('owner');
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({ items: [], next_cursor: null });
+    http.expectOne('/api/v1/orders?limit=25').flush({ items: [], next_cursor: null });
     let btn = fixture.nativeElement.querySelector('[data-testid="order-create-btn"]');
     expect(btn).toBeTruthy();
 
@@ -94,7 +95,7 @@ describe('OrderListComponent', () => {
     spyOn(router, 'navigate');
 
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({ items: [], next_cursor: null });
+    http.expectOne('/api/v1/orders?limit=25').flush({ items: [], next_cursor: null });
 
     const fromApprovedBtn = fixture.nativeElement.querySelector(
       '[data-testid="order-from-approved-request-btn"]',
@@ -154,7 +155,7 @@ describe('OrderListComponent', () => {
 
   it('shows empty state in From approved request picker when no approved requests exist', () => {
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({ items: [], next_cursor: null });
+    http.expectOne('/api/v1/orders?limit=25').flush({ items: [], next_cursor: null });
 
     const fromApprovedBtn = fixture.nativeElement.querySelector(
       '[data-testid="order-from-approved-request-btn"]',
@@ -172,7 +173,7 @@ describe('OrderListComponent', () => {
 
   it('formats required-by dates in approved request picker in en and ar', () => {
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({ items: [], next_cursor: null });
+    http.expectOne('/api/v1/orders?limit=25').flush({ items: [], next_cursor: null });
 
     const fromApprovedBtn = fixture.nativeElement.querySelector(
       '[data-testid="order-from-approved-request-btn"]',
@@ -219,7 +220,7 @@ describe('OrderListComponent', () => {
 
   it('renders supplier name and displays Created date for draft and Ordered date for submitted', () => {
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({
+    http.expectOne('/api/v1/orders?limit=25').flush({
       next_cursor: null,
       items: [
         {
@@ -289,7 +290,7 @@ describe('OrderListComponent', () => {
   // P-182: search, status, sort and a result count; the server does the work.
   it('searches, filters and sorts through the API and shows the result count', () => {
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: null, total_count: 14 });
+    http.expectOne('/api/v1/orders?limit=25').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: null, total_count: 14 });
     fixture.detectChanges();
     expect(el().querySelector('[data-testid="orders-result-count"]')?.textContent).toContain('14');
 
@@ -298,63 +299,80 @@ describe('OrderListComponent', () => {
     search.dispatchEvent(new Event('input'));
     (el().querySelector('[data-testid="orders-search-form"]') as HTMLFormElement)
       .dispatchEvent(new Event('submit'));
-    http.expectOne('/api/v1/orders?limit=50&q=alpha').flush({ items: [], next_cursor: null, total_count: 0 });
+    http.expectOne('/api/v1/orders?limit=25&q=alpha').flush({ items: [], next_cursor: null, total_count: 0 });
     fixture.detectChanges();
 
     const status = el().querySelector('[data-testid="orders-status-filter"]') as HTMLSelectElement;
     status.value = 'submitted';
     status.dispatchEvent(new Event('change'));
-    http.expectOne('/api/v1/orders?limit=50&q=alpha&status=submitted')
+    http.expectOne('/api/v1/orders?limit=25&q=alpha&status=submitted')
       .flush({ items: [], next_cursor: null, total_count: 0 });
     fixture.detectChanges();
 
     const sort = el().querySelector('[data-testid="orders-sort"]') as HTMLSelectElement;
     sort.value = 'total:asc';
     sort.dispatchEvent(new Event('change'));
-    http.expectOne('/api/v1/orders?limit=50&q=alpha&status=submitted&sort=total&dir=asc')
+    http.expectOne('/api/v1/orders?limit=25&q=alpha&status=submitted&sort=total&dir=asc')
       .flush({ items: [], next_cursor: null, total_count: 0 });
   });
 
   it('says when filters match nothing instead of showing the empty-workspace message', () => {
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: null, total_count: 1 });
+    http.expectOne('/api/v1/orders?limit=25').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: null, total_count: 1 });
     fixture.detectChanges();
     const status = el().querySelector('[data-testid="orders-status-filter"]') as HTMLSelectElement;
     status.value = 'cancelled';
     status.dispatchEvent(new Event('change'));
-    http.expectOne('/api/v1/orders?limit=50&status=cancelled').flush({ items: [], next_cursor: null, total_count: 0 });
+    http.expectOne('/api/v1/orders?limit=25&status=cancelled').flush({ items: [], next_cursor: null, total_count: 0 });
     fixture.detectChanges();
     expect(el().querySelector('[data-testid="orders-no-match"]')).toBeTruthy();
   });
 
-  // P-182: a failed «Load more» used to replace the rows already loaded with an error card.
-  it('keeps the loaded orders and offers a retry when Load more fails', () => {
+  it('keeps the loaded orders and lets the user retry a failed Next (PPS-206)', () => {
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: '50', total_count: 80 });
+    http.expectOne('/api/v1/orders?limit=25').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: '50', total_count: 80 });
     fixture.detectChanges();
 
-    component.loadMore();
-    http.expectOne('/api/v1/orders?limit=50&cursor=50').flush({}, { status: 503, statusText: 'Unavailable' });
+    (el().querySelector('.list-pager__next') as HTMLButtonElement).click();
+    http.expectOne('/api/v1/orders?limit=25&cursor=50').flush({}, { status: 503, statusText: 'Unavailable' });
     fixture.detectChanges();
 
     expect(el().querySelector('[data-testid="orders-list"]')?.textContent).toContain('PO-1');
-    expect(el().querySelector('[data-testid="load-more-error"]')).toBeTruthy();
+    expect(el().querySelector('[role="alert"]')?.textContent).toContain('Load failed');
+    expect(component.pager.pageIndex()).toBe(0);
+    expect((el().querySelector('.list-pager__next') as HTMLButtonElement).disabled).toBeFalse();
   });
 
-  // P-182: an order created between two page loads shifts the offset and repeats a row.
-  it('does not list an order twice when the next page repeats it', () => {
+  it('replaces rows on Next and restores the first page on Previous (PPS-206)', () => {
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1'), orderRow('o2', 'PO-2')], next_cursor: '2', total_count: 3 });
-    component.loadMore();
-    http.expectOne('/api/v1/orders?limit=50&cursor=2').flush({ items: [orderRow('o2', 'PO-2'), orderRow('o3', 'PO-3')], next_cursor: null, total_count: 3 });
+    const first = { items: [orderRow('o1', 'PO-1'), orderRow('o2', 'PO-2')], next_cursor: '2', total_count: 3 };
+    http.expectOne('/api/v1/orders?limit=25').flush(first);
     fixture.detectChanges();
-    expect(component.orders().map((o) => o.id)).toEqual(['o1', 'o2', 'o3']);
+    (el().querySelector('.list-pager__next') as HTMLButtonElement).click();
+    http.expectOne('/api/v1/orders?limit=25&cursor=2').flush({ items: [orderRow('o2', 'PO-2'), orderRow('o3', 'PO-3')], next_cursor: null, total_count: 3 });
+    fixture.detectChanges();
+    expect(component.orders().map((o) => o.id)).toEqual(['o2', 'o3']);
+    (el().querySelector('.list-pager__previous') as HTMLButtonElement).click();
+    http.expectOne('/api/v1/orders?limit=25').flush(first);
+    expect(component.orders().map((o) => o.id)).toEqual(['o1', 'o2']);
+  });
+
+  it('uses the selected limit and returns to page one', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=25').flush({
+      items: [orderRow('o1', 'PO-1')], next_cursor: 'next', total: 34,
+    });
+    component.pager.goNext();
+    component.pager.setPageSize(10);
+    component.loadOrders();
+    http.expectOne('/api/v1/orders?limit=10').flush({ items: [], next_cursor: null, total: 0 });
+    expect(component.pager.params()).toEqual({ limit: 10 });
   });
 
   // P-182: the approved-request menu named requests only by date and total.
   it('names the supplier and line count of each approved request in the picker', () => {
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({ items: [], next_cursor: null, total_count: 0 });
+    http.expectOne('/api/v1/orders?limit=25').flush({ items: [], next_cursor: null, total_count: 0 });
     (el().querySelector('[data-testid="order-from-approved-request-btn"]') as HTMLButtonElement).click();
     fixture.detectChanges();
     http.expectOne('/api/v1/requests?limit=100&eligible_for_order=true').flush({
@@ -372,42 +390,43 @@ describe('OrderListComponent', () => {
     expect(option?.textContent).toContain('Al Dhahabi');
     expect(option?.textContent).toContain('2');
   });
-  // P-182 review: a late «Load more» answer must not land in a newer filter's result set.
-  it('ignores a Load more response that arrives after the filter changed', () => {
+  // P-182 review: a late page response must not land in a newer filter's result set.
+  it('ignores a Next response that arrives after the filter changed', () => {
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: '50', total_count: 80 });
-    component.loadMore();
-    const late = http.expectOne('/api/v1/orders?limit=50&cursor=50');
+    http.expectOne('/api/v1/orders?limit=25').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: '50', total_count: 80 });
+    fixture.detectChanges();
+    (el().querySelector('.list-pager__next') as HTMLButtonElement).click();
+    const late = http.expectOne('/api/v1/orders?limit=25&cursor=50');
 
     const status = el().querySelector('[data-testid="orders-status-filter"]') as HTMLSelectElement;
     status.value = 'draft';
     status.dispatchEvent(new Event('change'));
-    http.expectOne('/api/v1/orders?limit=50&status=draft').flush({ items: [orderRow('d1', 'PO-D1')], next_cursor: null, total_count: 1 });
+    http.expectOne('/api/v1/orders?limit=25&status=draft').flush({ items: [orderRow('d1', 'PO-D1')], next_cursor: null, total_count: 1 });
     late.flush({ items: [orderRow('o2', 'PO-2')], next_cursor: '100', total_count: 80 });
 
     expect(component.orders().map((o) => o.id)).toEqual(['d1']);
-    expect(component.nextCursor()).toBeNull();
-    expect(component.totalCount()).toBe(1);
+    expect(component.pager.nextCursor()).toBeNull();
+    expect(component.pager.total()).toBe(1);
   });
-  // Review (Codex, #419): Load more used the text typed after the page was loaded.
+  // Review (Codex, #419): Paging used the text typed after the page was loaded.
   it('pages with the search that was applied, not with text typed but not submitted', () => {
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: '50', total_count: 80 });
+    http.expectOne('/api/v1/orders?limit=25').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: '50', total_count: 80 });
     fixture.detectChanges();
 
     const search = el().querySelector('[data-testid="orders-search"]') as HTMLInputElement;
     search.value = 'ALPHA';
     search.dispatchEvent(new Event('input')); // typed, never submitted
-    component.loadMore();
+    (el().querySelector('.list-pager__next') as HTMLButtonElement).click();
 
-    http.expectOne('/api/v1/orders?limit=50&cursor=50').flush({ items: [orderRow('o2', 'PO-2')], next_cursor: null, total_count: 80 });
-    expect(component.orders().map((o) => o.id)).toEqual(['o1', 'o2']);
-    expect(component.totalCount()).toBe(80);
+    http.expectOne('/api/v1/orders?limit=25&cursor=50').flush({ items: [orderRow('o2', 'PO-2')], next_cursor: null, total_count: 80 });
+    expect(component.orders().map((o) => o.id)).toEqual(['o2']);
+    expect(component.pager.total()).toBe(80);
   });
   // P-188: the list showed neither the expected delivery date nor which orders are late.
   it('shows the expected delivery date and flags only late open orders', () => {
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({
+    http.expectOne('/api/v1/orders?limit=25').flush({
       next_cursor: null, total_count: 3,
       items: [
         { ...orderRow('late', 'PO-LATE'), expected_delivery_date: '2020-01-01' },
@@ -427,7 +446,7 @@ describe('OrderListComponent', () => {
   // PPS-206: the API filters by supplier and order date; the page now offers both.
   it('filters by supplier and by order date range through the API', () => {
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: null, total_count: 1 });
+    http.expectOne('/api/v1/orders?limit=25').flush({ items: [orderRow('o1', 'PO-1')], next_cursor: null, total_count: 1 });
     http.expectOne((r) => r.url.includes('/suppliers')).flush({
       items: [{ id: 'sup-1', name: 'Al Dhahabi', status: 'active', created_at: '' }, { id: 'sup-2', name: 'Al Wafra', status: 'active', created_at: '' }],
       next_cursor: null,
@@ -438,19 +457,19 @@ describe('OrderListComponent', () => {
     expect(Array.from(supplier.options).map((o) => o.textContent?.trim())).toContain('Al Wafra');
     supplier.value = 'sup-2';
     supplier.dispatchEvent(new Event('change'));
-    http.expectOne('/api/v1/orders?limit=50&supplier_id=sup-2').flush({ items: [], next_cursor: null, total_count: 0 });
+    http.expectOne('/api/v1/orders?limit=25&supplier_id=sup-2').flush({ items: [], next_cursor: null, total_count: 0 });
     fixture.detectChanges();
 
     const from = el().querySelector('[data-testid="orders-date-from"]') as HTMLInputElement;
     from.value = '2026-10-01';
     from.dispatchEvent(new Event('change'));
-    http.expectOne('/api/v1/orders?limit=50&supplier_id=sup-2&date_from=2026-10-01').flush({ items: [], next_cursor: null, total_count: 0 });
+    http.expectOne('/api/v1/orders?limit=25&supplier_id=sup-2&date_from=2026-10-01').flush({ items: [], next_cursor: null, total_count: 0 });
     fixture.detectChanges();
 
     const to = el().querySelector('[data-testid="orders-date-to"]') as HTMLInputElement;
     to.value = '2026-10-31';
     to.dispatchEvent(new Event('change'));
-    http.expectOne('/api/v1/orders?limit=50&supplier_id=sup-2&date_from=2026-10-01&date_to=2026-10-31')
+    http.expectOne('/api/v1/orders?limit=25&supplier_id=sup-2&date_from=2026-10-01&date_to=2026-10-31')
       .flush({ items: [], next_cursor: null, total_count: 0 });
     fixture.detectChanges();
     expect(el().querySelector('[data-testid="orders-no-match"]')).toBeTruthy(); // a filter is active
@@ -458,7 +477,7 @@ describe('OrderListComponent', () => {
   // Review (Codex, #460): suppliers beyond the first page could never be chosen in the filter.
   it('follows the supplier cursors so every supplier can be filtered on', () => {
     fixture.detectChanges();
-    http.expectOne('/api/v1/orders?limit=50').flush({ items: [], next_cursor: null, total_count: 0 });
+    http.expectOne('/api/v1/orders?limit=25').flush({ items: [], next_cursor: null, total_count: 0 });
     http.expectOne((r) => r.url.includes('/suppliers') && !r.url.includes('cursor')).flush({
       items: [{ id: 'sup-1', name: 'Al Dhahabi', status: 'active', created_at: '' }],
       next_cursor: 'page-2',

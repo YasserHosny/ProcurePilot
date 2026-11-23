@@ -1958,13 +1958,13 @@
     "history": {
       "title": "Recent splits",
       "items": "{{count}} items",
-      "loadMore": "Show older splits",
       "status": {
         "queued": "Queued",
         "running": "Running",
         "completed": "Completed",
         "failed": "Failed"
-      }
+      },
+      "pagerLabel": "Basket split history pages"
     }
   },
   "alerts": {
@@ -2822,7 +2822,6 @@
     "pagination": {
       "loadMore": "Load more",
       "loading": "Loading...",
-      "showingOf": "Showing {{loaded}} of {{total}}",
       "showing": {
         "zero": "Showing 0 requests",
         "one": "Showing 1 request",
@@ -2831,16 +2830,9 @@
         "many": "Showing {{count}} requests",
         "other": "Showing {{count}} requests"
       },
-      "showingMore": {
-        "zero": "Showing 0 requests, more available",
-        "one": "Showing 1 request, more available",
-        "two": "Showing 2 requests, more available",
-        "few": "Showing {{count}} requests, more available",
-        "many": "Showing {{count}} requests, more available",
-        "other": "Showing {{count}} requests, more available"
-      },
       "loadError": "Unable to load more requests. Please try again.",
-      "pageLoadError": "Unable to load pending requests. Please try again."
+      "pageLoadError": "Unable to load pending requests. Please try again.",
+      "pagerLabel": "Approval queue pages"
     },
     "requestCount": {
       "zero": "{{count}} requests",
@@ -4116,7 +4108,6 @@
     "subtitle": "Follow purchase orders from submission through confirmation, delivery, and invoice evidence.",
     "refresh": "Refresh",
     "retry": "Retry",
-    "loadMore": "Load more",
     "loadError": "Unable to load purchase orders. Please try again.",
     "saveError": "Unable to save order evidence. Please try again.",
     "backToOrders": "Back to orders",
@@ -4284,7 +4275,6 @@
       "withdrawn": "Order is a draft again."
     },
     "resultCount": "{{count}} orders",
-    "loadMoreError": "More orders could not be loaded. The orders above are still shown.",
     "filters": {
       "search": "Search",
       "searchPlaceholder": "Order number or supplier",
@@ -4310,7 +4300,8 @@
       "order_number_desc": "Order number, Z to A"
     },
     "expectedDate": "Expected {{date}}",
-    "overdue": "Overdue"
+    "overdue": "Overdue",
+    "pagerLabel": "Purchase order pages"
   },
   "accounting": {
     "nav": "Accounting",
@@ -4820,9 +4811,6 @@
       "recipientStatus_draft": "Not sent",
       "unknownSupplier": "Unknown supplier",
       "retry": "Retry",
-      "loadMore": "Load more",
-      "loadingMore": "Loading more RFQs...",
-      "loadMoreError": "Failed to load more RFQs.",
       "showingRfqs": "Showing {{count}} RFQs",
       "showingCount": {
         "zero": "Showing 0 RFQs",
@@ -4866,7 +4854,8 @@
         "needed_desc": "Needed by: latest",
         "reference_desc": "Reference: high to low",
         "reference_asc": "Reference: low to high"
-      }
+      },
+      "pagerLabel": "RFQ history pages"
     },
     "detail": {
       "cancelledAtLabel": "Cancelled",

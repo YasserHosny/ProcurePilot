@@ -22,8 +22,6 @@
 .state h2 { color: var(--pp-text-strong); font-size: 1.15rem; }
 .error { flex-direction: row; justify-content: flex-start; color: var(--pp-error); }
 .error mat-icon { color: var(--pp-error); font-size: 24px; width: 24px; height: 24px; }
-.pagination { display: flex; justify-content: center; }
-.pagination button { display: inline-flex; align-items: center; gap: 0.35rem; }
 @media (max-width: 720px) { .orders-container { padding: 0.75rem; } .order-row { grid-template-columns: 1fr; } .order-summary { align-items: flex-start; } .order-row > a { justify-content: center; } }
 .header-actions { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
 .approved-requests-state, .approved-requests-empty { display: flex; align-items: center; gap: 0.5rem; padding-block: 0.75rem; padding-inline: 1rem; color: var(--pp-text-muted); font-size: 0.875rem; }

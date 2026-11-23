@@ -379,6 +379,7 @@ class PurchaseOrderList(StrictModel):
     items: tuple[PurchaseOrder, ...]
     next_cursor: str | None = None
     total_count: int | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class RequestLineAllocation(StrictModel):

@@ -157,6 +157,7 @@ describe('ApprovalQueueComponent', () => {
   });
 
   beforeEach(async () => {
+    localStorage.removeItem('pp.pageSize.approvals');
     role.set('buyer');
     sessionSpy = {
       currentMember: jasmine.createSpy('currentMember').and.returnValue({ membership_id: 'mem-requester-1' }),
@@ -493,7 +494,7 @@ describe('ApprovalQueueComponent', () => {
       const nextPageRow: PurchaseRequest = {...mockPendingRequests[0], id: 'req-051'};
 
       it('reloads page 1, keeps the results panel and never renders the empty state', () => {
-        component.nextCursor.set('cursor-2');
+        component.pager.nextCursor.set('cursor-2');
         selectBoth();
         const reloaded = new Subject<PendingApprovalList>();
         approvalsApi.listPendingApprovals.calls.reset();
@@ -502,7 +503,7 @@ describe('ApprovalQueueComponent', () => {
 
         component.submitBulk('approved', null); fixture.detectChanges();
 
-        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledOnceWith({limit: 50});
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledOnceWith({limit: 25});
         expect(query('.loading-state')).not.toBeNull();
         expect(query('[data-testid="empty-default"]')).toBeNull();
         expect(query('[data-testid="bulk-results"]')).not.toBeNull();
@@ -512,7 +513,7 @@ describe('ApprovalQueueComponent', () => {
 
         expect(loadedIds()).toEqual(['req-051']);
         expect(component.totalCount()).toBe(50);
-        expect(query('[data-testid="load-more-btn"]')).not.toBeNull();
+        expect(query('.list-pager__next')).not.toBeNull();
         expect(query('[data-testid="empty-default"]')).toBeNull();
         expect(query('[data-testid="bulk-results"]')?.textContent).toContain('2 decided');
       });
@@ -529,16 +530,21 @@ describe('ApprovalQueueComponent', () => {
         expect(query('[data-testid="bulk-results"]')).not.toBeNull();
       });
 
-      it('does not reload when rows remain loaded', () => {
-        component.nextCursor.set('cursor-2');
+      it('refills the page and keeps failed selections available for retry', () => {
+        component.pager.nextCursor.set('cursor-2');
         selectBoth();
         approvalsApi.listPendingApprovals.calls.reset();
+        approvalsApi.listPendingApprovals.and.returnValue(of({
+          items: [mockPendingRequests[1], nextPageRow], next_cursor: 'cursor-3', total: 34,
+        }));
         approvalsApi.bulkDecide.and.returnValue(of(bulkResponse()));
 
         component.submitBulk('approved', null); fixture.detectChanges();
 
-        expect(approvalsApi.listPendingApprovals).not.toHaveBeenCalled();
-        expect(query('[data-testid="load-more-btn"]')).not.toBeNull();
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledOnceWith({ limit: 25 });
+        expect(loadedIds()).toEqual(['req-002', 'req-051']);
+        expect([...component.selectedIds()]).toEqual(['req-002']);
+        expect(query('.list-pager__next')).not.toBeNull();
       });
 
       it('leaves an ordinary reload clearing the results panel', () => {
@@ -628,7 +634,7 @@ describe('ApprovalQueueComponent', () => {
         approvalsApi.listPendingApprovals.and.returnValues(urlList, reloaded);
 
         queryParamMapSubject.next(convertToParamMap({sort: 'total_desc'}));
-        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledOnceWith({sort: 'total_desc', limit: 50});
+        expect(approvalsApi.listPendingApprovals).toHaveBeenCalledOnceWith({sort: 'total_desc', limit: 25});
         // This list GET ran before the items committed, so req-001 still reads as pending.
         urlList.next({items: mockPendingRequests, next_cursor: null, total: 2}); urlList.complete();
         expect(loadedIds()).toEqual(['req-001', 'req-002']);
@@ -637,7 +643,7 @@ describe('ApprovalQueueComponent', () => {
 
         expect(component.bulkBusy()).toBeFalse();
         expect(approvalsApi.listPendingApprovals).toHaveBeenCalledTimes(2);
-        expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({sort: 'total_desc', limit: 50});
+        expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({sort: 'total_desc', limit: 25});
         // The stale response's local removals stay off the new list; only the reload changes it.
         expect(loadedIds()).toEqual(['req-001', 'req-002']);
         const panel = query('[data-testid="bulk-results"]');
@@ -775,8 +781,8 @@ describe('ApprovalQueueComponent', () => {
     }
   });
 
-  it('should load pending approvals with limit 50 on init', () => {
-    expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({ limit: 50 });
+  it('loads pending approvals with the default page size on init', () => {
+    expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({ limit: 25 });
     expect(organisationApi.listBranches).toHaveBeenCalledWith({ limit: 100 });
     expect(organisationApi.listCostCentres).toHaveBeenCalledWith({ limit: 100 });
     expect(api.products).toHaveBeenCalledWith({ status: 'all', limit: 100 });
@@ -1692,103 +1698,62 @@ describe('ApprovalQueueComponent', () => {
   });
 
   describe('P-170 (PPS-164) — Pagination and Group Completeness Gate', () => {
-    it('pagination: appends next page and de-duplicates by request id', () => {
-      const page1Item1 = { ...mockPendingRequests[0], id: 'req-p1-1' };
-      const page1Item2 = { ...mockPendingRequests[1], id: 'req-p1-2' };
-      const page2Item1 = { ...mockPendingRequests[0], id: 'req-p1-2' }; // duplicate
-      const page2Item2 = { ...mockPendingRequests[0], id: 'req-p2-1' }; // new
+    const pageButton = (step: string) =>
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(`.list-pager__${step}`)!;
+
+    it('replaces the page on Next and reloads the first page on Previous', () => {
+      const first = { items: [mockPendingRequests[0]], next_cursor: 'cursor-2', total: 26 };
+      approvalsApi.listPendingApprovals.and.returnValue(of(first));
+      component.loadPendingApprovals();
+      fixture.detectChanges();
+      expect(pageButton('previous').disabled).toBeTrue();
 
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [page1Item1, page1Item2], next_cursor: 'cursor-page-2' , total: 0}),
+        of({ items: [mockPendingRequests[1]], next_cursor: null, total: 26 }),
+      );
+      pageButton('next').click();
+      fixture.detectChanges();
+
+      expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0])
+        .toEqual({ cursor: 'cursor-2', limit: 25 });
+      expect(component.pendingRequests()).toEqual([mockPendingRequests[1]]);
+      expect(pageButton('next').disabled).toBeTrue();
+
+      approvalsApi.listPendingApprovals.and.returnValue(of(first));
+      pageButton('previous').click();
+      expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({ limit: 25 });
+      expect(component.pendingRequests()).toEqual(first.items);
+    });
+
+    it('uses the new limit from the first page', () => {
+      component.pager.nextCursor.set('cursor-2');
+      component.pager.goNext();
+      component.pager.setPageSize(10);
+      component.loadPendingApprovals();
+      expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({ limit: 10 });
+      expect(component.pager.pageIndex()).toBe(0);
+    });
+
+    it('keeps the current rows and can retry Next after a failed page request', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(
+        of({ items: mockPendingRequests, next_cursor: 'cursor-retry', total: 34 }),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
 
-      expect(component.pendingRequests().length).toBe(2);
-      expect(component.nextCursor()).toBe('cursor-page-2');
-
-      const loadMoreBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
-      expect(loadMoreBtn).toBeTruthy();
-
-      const statusEl = fixture.nativeElement.querySelector('[data-testid="pagination-status"]');
-      expect(statusEl?.textContent).toContain('Showing 2 requests, more available');
-
-      // Next page returns page2Item1 (duplicate) and page2Item2 (new), with next_cursor: null
-      approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [page2Item1, page2Item2], next_cursor: null , total: 0}),
-      );
-
-      loadMoreBtn.click();
+      approvalsApi.listPendingApprovals.and.returnValue(throwError(() => new Error('Unavailable')));
+      pageButton('next').click();
       fixture.detectChanges();
 
-      expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
-        cursor: 'cursor-page-2',
-        limit: 50,
-      });
-      // Deduplicated: 2 original + 1 new = 3
-      expect(component.pendingRequests().length).toBe(3);
-      expect(component.pendingRequests().map((r) => r.id)).toEqual(['req-p1-1', 'req-p1-2', 'req-p2-1']);
-      expect(component.nextCursor()).toBeNull();
-
-      // Button hidden when no cursor
-      const loadMoreBtnAfter = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
-      expect(loadMoreBtnAfter).toBeNull();
-
-      // Status updated
-      expect(statusEl?.textContent).toContain('Showing 3 requests');
-      expect(statusEl?.textContent).not.toContain('more available');
+      expect(component.pendingRequests()).toEqual([...mockPendingRequests]);
+      expect(component.pager.params()).toEqual({ limit: 25 });
+      expect(component.totalCount()).toBe(34);
+      expect(fixture.nativeElement.querySelectorAll('tr.request-row').length).toBe(2);
+      expect(fixture.nativeElement.querySelector('.error-banner')).not.toBeNull();
+      expect(pageButton('next').disabled).toBeFalse();
     });
 
-    it('pagination: button hidden when no cursor on initial load', () => {
-      approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: null , total: 0}),
-      );
-      component.loadPendingApprovals();
-      fixture.detectChanges();
-
-      expect(component.nextCursor()).toBeNull();
-      const loadMoreBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
-      expect(loadMoreBtn).toBeNull();
-
-      const statusEl = fixture.nativeElement.querySelector('[data-testid="pagination-status"]');
-      expect(statusEl?.textContent).toContain('Showing 2 requests');
-      expect(statusEl?.textContent).not.toContain('more available');
-    });
-
-    it('pagination: failure keeps loaded rows, shows error banner and keeps load more available to retry', () => {
-      approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: 'cursor-retry' , total: 0}),
-      );
-      component.loadPendingApprovals();
-      fixture.detectChanges();
-
-      expect(component.pendingRequests().length).toBe(2);
-
-      // Trigger error on load more
-      approvalsApi.listPendingApprovals.and.returnValue(
-        throwError(() => new Error('Server unavailable')),
-      );
-
-      const loadMoreBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
-      loadMoreBtn.click();
-      fixture.detectChanges();
-
-      // Rows kept
-      expect(component.pendingRequests().length).toBe(2);
-      // Next cursor preserved
-      expect(component.nextCursor()).toBe('cursor-retry');
-      // Error banner visible
-      expect(component.errorMessage()).toBeTruthy();
-      const errorBanner = fixture.nativeElement.querySelector('.error-banner');
-      expect(errorBanner).toBeTruthy();
-
-      // Load more button remains available to retry
-      const retryBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
-      expect(retryBtn).toBeTruthy();
-      expect(retryBtn.disabled).toBeFalse();
-    });
-
-    it('pagination: plain new Error from listPendingApprovals during loadMore shows localized loadError text, not raw message', () => {
+    it('pagination: plain new Error from listPendingApprovals during Next shows localized loadError text, not raw message', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
         of({ items: mockPendingRequests, next_cursor: 'cursor-retry' , total: 0}),
       );
@@ -1799,21 +1764,22 @@ describe('ApprovalQueueComponent', () => {
         throwError(() => new Error('boom')),
       );
 
-      component.loadMore();
+      component.pager.goNext();
+      component.loadPendingApprovals();
       fixture.detectChanges();
 
-      expect(component.errorMessage()).toBe('Unable to load more requests. Please try again.');
+      expect(component.errorMessage()).toBe('Unable to load pending requests. Please try again.');
       expect(component.errorMessage()).not.toContain('boom');
     });
 
-    it('pagination: loadMore failure shows translated loadError for non-envelope HttpErrorResponse and envelope message for real API errors', () => {
+    it('pagination: Next failure shows translated loadError for non-envelope HttpErrorResponse and envelope message for real API errors', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
         of({ items: mockPendingRequests, next_cursor: 'cursor-retry' , total: 0}),
       );
       component.loadPendingApprovals();
       fixture.detectChanges();
 
-      const expectedLoadError = 'Unable to load more requests. Please try again.';
+      const expectedLoadError = 'Unable to load pending requests. Please try again.';
 
       // Case 1: status 0 with ProgressEvent (network drop / aborted)
       approvalsApi.listPendingApprovals.and.returnValue(
@@ -1826,7 +1792,8 @@ describe('ApprovalQueueComponent', () => {
             }),
         ),
       );
-      component.loadMore();
+      component.pager.goNext();
+      component.loadPendingApprovals();
       fixture.detectChanges();
 
       expect(component.errorMessage()).toBe(expectedLoadError);
@@ -1843,7 +1810,8 @@ describe('ApprovalQueueComponent', () => {
             }),
         ),
       );
-      component.loadMore();
+      component.pager.goNext();
+      component.loadPendingApprovals();
       fixture.detectChanges();
 
       expect(component.errorMessage()).toBe(expectedLoadError);
@@ -1864,7 +1832,8 @@ describe('ApprovalQueueComponent', () => {
             }),
         ),
       );
-      component.loadMore();
+      component.pager.goNext();
+      component.loadPendingApprovals();
       fixture.detectChanges();
 
       expect(component.errorMessage()).toBe('Approval cursor expired. Please refresh the queue.');
@@ -1884,130 +1853,38 @@ describe('ApprovalQueueComponent', () => {
             }),
         ),
       );
-      component.loadMore();
+      component.pager.goNext();
+      component.loadPendingApprovals();
       fixture.detectChanges();
 
       expect(component.errorMessage()).toBe('Database query timed out.');
       expect(component.errorTraceId()).toBe('trace-500');
     });
 
-    it('pagination: double click does not fire two requests and shows loading spinner', () => {
-      approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: 'cursor-slow' , total: 0}),
-      );
+    it('disables Next during a request and steps back when the last page becomes empty', () => {
+      const first = { items: [mockPendingRequests[0]], next_cursor: 'next', total: 26 };
+      approvalsApi.listPendingApprovals.and.returnValue(of(first));
       component.loadPendingApprovals();
       fixture.detectChanges();
 
-      const pendingSubject = new Subject<PendingApprovalList>();
+      const pending = new Subject<PendingApprovalList>();
       approvalsApi.listPendingApprovals.calls.reset();
-      approvalsApi.listPendingApprovals.and.returnValue(pendingSubject);
-
-      const loadMoreBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
-      loadMoreBtn.click();
-      fixture.detectChanges();
-
-      // Button is disabled and loading
-      expect(component.isLoadingMore()).toBeTrue();
-      expect(loadMoreBtn.disabled).toBeTrue();
-
-      // Second click while in-flight
-      loadMoreBtn.click();
-      fixture.detectChanges();
-
-      // Still only called once with cursor
-      expect(approvalsApi.listPendingApprovals).toHaveBeenCalledTimes(1);
-      expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
-        cursor: 'cursor-slow',
-        limit: 50,
-      });
-
-      // Complete in-flight
-      pendingSubject.next({ items: [], next_cursor: null, total: 0 });
-      pendingSubject.complete();
-      fixture.detectChanges();
-
-      expect(component.isLoadingMore()).toBeFalse();
-    });
-
-    it('stale loadMore in flight during loadPendingApprovals does not leave isLoadingMore stuck true', () => {
-      approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: 'cursor-1' , total: 0}),
+      approvalsApi.listPendingApprovals.and.returnValues(
+        pending,
+        of({ items: [mockPendingRequests[0]], next_cursor: null, total: 1 }),
       );
-      component.loadPendingApprovals();
+      pageButton('next').click();
       fixture.detectChanges();
+      expect(pageButton('next').disabled).toBeTrue();
+      pageButton('next').click();
+      expect(approvalsApi.listPendingApprovals).toHaveBeenCalledOnceWith({ cursor: 'next', limit: 25 });
 
-      expect(component.nextCursor()).toBe('cursor-1');
-      expect(component.isLoadingMore()).toBeFalse();
-
-      // Start loadMore with pending observable
-      const pendingLoadMore$ = new Subject<PendingApprovalList>();
-      approvalsApi.listPendingApprovals.calls.reset();
-      approvalsApi.listPendingApprovals.and.returnValue(pendingLoadMore$);
-
-      component.loadMore();
+      pending.next({ items: [], next_cursor: null, total: null });
+      pending.complete();
       fixture.detectChanges();
-
-      expect(component.isLoadingMore()).toBeTrue();
-
-      // While loadMore is in flight, a decision or reload triggers loadPendingApprovals()
-      approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: 'cursor-2' , total: 0}),
-      );
-      component.loadPendingApprovals();
-      fixture.detectChanges();
-
-      // Old loadMore resolves now (stale response)
-      pendingLoadMore$.next({ items: [], next_cursor: null, total: 0 });
-      pendingLoadMore$.complete();
-      fixture.detectChanges();
-
-      // Assert isLoadingMore is false
-      expect(component.isLoadingMore()).toBeFalse();
-
-      // Assert a new loadMore works once reload returned cursor-2
-      approvalsApi.listPendingApprovals.calls.reset();
-      approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [], next_cursor: null , total: 0}),
-      );
-      component.loadMore();
-      fixture.detectChanges();
-
-      expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
-        cursor: 'cursor-2',
-        limit: 50,
-      });
-      expect(component.isLoadingMore()).toBeFalse();
-    });
-
-    it('decisions reload first page and reset cursor clearing accumulated rows', () => {
-      const page1Item = { ...mockPendingRequests[0], id: 'req-single' };
-      approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [page1Item], next_cursor: 'cur-page-2' , total: 0}),
-      );
-      component.loadPendingApprovals();
-      fixture.detectChanges();
-
-      // Load page 2
-      const page2Item = { ...mockPendingRequests[1], id: 'req-page-2' };
-      approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [page2Item], next_cursor: 'cur-page-3' , total: 0}),
-      );
-      component.loadMore();
-      fixture.detectChanges();
-      expect(component.pendingRequests().length).toBe(2);
-
-      // Now approve req-single
-      requestsApi.approveRequest.and.returnValue(of(page1Item));
-      approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [page2Item], next_cursor: null , total: 0}),
-      );
-
-      component.submitDecision('req-single', 'approve');
-      fixture.detectChanges();
-
-      // Reloaded page 1: extra pages and old cursor are cleared
-      expect(component.pendingRequests().length).toBe(1);
-      expect(component.nextCursor()).toBeNull();
+      expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({ limit: 25 });
+      expect(component.pendingRequests()).toEqual([mockPendingRequests[0]]);
+      expect(fixture.nativeElement.querySelector('app-list-pager')).toBeNull();
     });
 
     it('group with size 2 but only one request in page: disabled, fetches missing sibling, enables when resolved, includes sibling in detail and totals', () => {
@@ -2192,7 +2069,7 @@ describe('ApprovalQueueComponent', () => {
       expect(rejectBtnAfter.disabled).toBeFalse();
     });
 
-    it('failed sibling fetch: then loadMore returns the sibling: banner and Retry gone, buttons enabled; and Retry with everything known clears the failure', () => {
+    it('fetches the previous page’s sibling on Next and clears the group failure', () => {
       const splitReq1: PurchaseRequest = {
         ...mockPendingRequests[0],
         id: 'req-split-f1',
@@ -2239,12 +2116,12 @@ describe('ApprovalQueueComponent', () => {
       expect(errorHint).toBeTruthy();
       expect(retryBtn).toBeTruthy();
 
-      // User clicks Load more: next page brings in splitReq2!
+      // The next page contains the other half; fetch the first half to complete the group.
+      requestsApi.getRequest.and.returnValue(of(splitReq1));
       approvalsApi.listPendingApprovals.and.returnValue(
         of({ items: [splitReq2], next_cursor: null , total: 0}),
       );
-      const loadMoreBtn = fixture.nativeElement.querySelector('[data-testid="load-more-btn"]');
-      loadMoreBtn.click();
+      pageButton('next').click();
       fixture.detectChanges();
 
       // Banner and Retry gone, buttons enabled, status marked complete
@@ -2505,14 +2382,6 @@ describe('ApprovalQueueComponent', () => {
       expect(requestsApi.getRequest).toHaveBeenCalledTimes(1);
       expect(requestsApi.getRequest).toHaveBeenCalledWith('req-inc-2');
 
-      approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [], next_cursor: null , total: 0}),
-      );
-      component.loadMore();
-      fixture.detectChanges();
-
-      expect(requestsApi.getRequest).toHaveBeenCalledTimes(1);
-
       siblingSubject.next(siblingReq2);
       siblingSubject.complete();
       fixture.detectChanges();
@@ -2611,14 +2480,6 @@ describe('ApprovalQueueComponent', () => {
       expect(requestsApi.getRequest).toHaveBeenCalledTimes(1);
       expect(requestsApi.getRequest).toHaveBeenCalledWith('req-inc-2');
 
-      approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: [], next_cursor: null , total: 0}),
-      );
-      component.loadMore();
-      fixture.detectChanges();
-
-      expect(requestsApi.getRequest).toHaveBeenCalledTimes(1);
-
       siblingSubject.next(siblingReq2);
       siblingSubject.complete();
       fixture.detectChanges();
@@ -2635,7 +2496,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('renders cleanly in RTL direction', () => {
       approvalsApi.listPendingApprovals.and.returnValue(
-        of({ items: mockPendingRequests, next_cursor: 'cur-ar' , total: 0}),
+        of({ items: mockPendingRequests, next_cursor: 'cur-ar', total: 34}),
       );
       component.loadPendingApprovals();
 
@@ -2646,8 +2507,8 @@ describe('ApprovalQueueComponent', () => {
 
       const container = fixture.nativeElement.querySelector('.approval-queue-container');
       expect(container).not.toBeNull();
-      const statusEl = fixture.nativeElement.querySelector('[data-testid="pagination-status"]');
-      expect(statusEl?.textContent).toContain('عرض طلبين، ويتوفر المزيد');
+      const statusEl = fixture.nativeElement.querySelector('.list-pager__range');
+      expect(statusEl?.textContent).toContain('١–٢ من ٣٤');
 
       document.documentElement.setAttribute('dir', 'ltr');
       translate.use('en');
@@ -2677,7 +2538,7 @@ describe('ApprovalQueueComponent', () => {
         expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
           sort: 'required_by_asc',
           branch_id: VALID_BRANCH_ID,
-          limit: 50,
+          limit: 25,
         });
       });
     });
@@ -2707,7 +2568,7 @@ describe('ApprovalQueueComponent', () => {
 
     it('changing sort resets rows, cursor and groups, writes the URL and reloads without a cursor', () => {
       component.pendingRequests.set([...mockPendingRequests]);
-      component.nextCursor.set('old-cursor');
+      component.pager.nextCursor.set('old-cursor');
       component.groupSiblings.set(new Map([['grp', [...mockPendingRequests]]]));
       component.groupStatus.set(new Map([['grp', 'complete']]));
       approvalsApi.listPendingApprovals.calls.reset();
@@ -2716,7 +2577,7 @@ describe('ApprovalQueueComponent', () => {
       component.onSortChange('submitted_asc');
 
       expect(component.pendingRequests()).toEqual([]);
-      expect(component.nextCursor()).toBeNull();
+      expect(component.pager.nextCursor()).toBeNull();
       expect(component.groupSiblings().size).toBe(0);
       expect(component.groupStatus().size).toBe(0);
       const params = approvalsApi.listPendingApprovals.calls.mostRecent().args[0];
@@ -2740,7 +2601,7 @@ describe('ApprovalQueueComponent', () => {
       expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({
         sort: 'total_desc',
         branch_id: 'branch-south',
-        limit: 50,
+        limit: 25,
       });
       expect(routerSpy.navigate).toHaveBeenCalledWith([], {
         queryParams: { sort: 'total_desc', branch: 'branch-south' },
@@ -2749,20 +2610,21 @@ describe('ApprovalQueueComponent', () => {
       });
     });
 
-    it('Load more sends the same sort and branch with the cursor', () => {
+    it('Next sends the same sort and branch with the cursor', () => {
       component.sortOption.set('required_by_asc');
       component.branchFilter.set('branch-north');
-      component.nextCursor.set('cursor-2');
+      component.pager.nextCursor.set('cursor-2');
       approvalsApi.listPendingApprovals.calls.reset();
-      approvalsApi.listPendingApprovals.and.returnValue(of(list([], null, 120)));
+      approvalsApi.listPendingApprovals.and.returnValue(of(list([mockPendingRequests[1]], null, 120)));
 
-      component.loadMore();
+      component.pager.goNext();
+      component.loadPendingApprovals();
 
       expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
         sort: 'required_by_asc',
         branch_id: 'branch-north',
         cursor: 'cursor-2',
-        limit: 50,
+        limit: 25,
       });
     });
 
@@ -2872,11 +2734,11 @@ describe('ApprovalQueueComponent', () => {
     });
 
     it('formats the pending request count for singular, plural and zero in English', () => {
-      component.totalCount.set(1);
+      component.pager.total.set(1);
       expect(component.totalCountLabel()).toBe('1 pending request');
-      component.totalCount.set(12);
+      component.pager.total.set(12);
       expect(component.totalCountLabel()).toBe('12 pending requests');
-      component.totalCount.set(0);
+      component.pager.total.set(0);
       expect(component.totalCountLabel()).toBe('0 pending requests');
     });
 
@@ -2884,31 +2746,31 @@ describe('ApprovalQueueComponent', () => {
       const translate = TestBed.inject(TranslateService);
       translate.use('ar');
 
-      component.totalCount.set(1);
+      component.pager.total.set(1);
       expect(component.totalCountLabel()).toBe('طلب معلق واحد');
-      component.totalCount.set(2);
+      component.pager.total.set(2);
       expect(component.totalCountLabel()).toBe('طلبان معلقان');
-      component.totalCount.set(3);
+      component.pager.total.set(3);
       expect(component.totalCountLabel()).toBe('3 طلبات معلقة');
-      component.totalCount.set(12);
+      component.pager.total.set(12);
       expect(component.totalCountLabel()).toBe('12 طلبًا معلقًا');
-      component.totalCount.set(0);
+      component.pager.total.set(0);
       expect(component.totalCountLabel()).toBe('لا توجد طلبات معلقة');
       expect(component.sortOptionLabel('submitted_asc')).toBe('الأقدم أولاً');
     });
 
-    it('shows the total under the title and loaded-vs-total in the pagination status', () => {
-      approvalsApi.listPendingApprovals.and.returnValue(of(list(mockPendingRequests, null, 120)));
+    it('shows the total under the title and the range in the pager', () => {
+      approvalsApi.listPendingApprovals.and.returnValue(of(list(mockPendingRequests, 'next', 120)));
       component.loadPendingApprovals();
       fixture.detectChanges();
 
       const count = fixture.nativeElement.querySelector('[data-testid="approval-total-count"]');
       expect(count?.textContent?.trim()).toBe('120 pending requests');
-      const status = fixture.nativeElement.querySelector('[data-testid="pagination-status"]');
-      expect(status?.textContent).toContain('Showing 2 of 120');
+      const status = fixture.nativeElement.querySelector('.list-pager__range');
+      expect(status?.textContent).toContain('1–2 of 120');
     });
 
-    it('uses Latin digits in the Arabic header and fully loaded pagination status', () => {
+    it('uses Latin digits in the Arabic header and localized digits in the pager', () => {
       const translate = TestBed.inject(TranslateService);
       translate.use('ar');
       const many = Array.from({ length: 12 }, (_, index) => ({
@@ -2922,9 +2784,8 @@ describe('ApprovalQueueComponent', () => {
       const count = fixture.nativeElement.querySelector('[data-testid="approval-total-count"]');
       expect(count?.textContent).toContain('12');
       expect(count?.textContent).not.toContain('١٢');
-      const status = fixture.nativeElement.querySelector('[data-testid="pagination-status"]');
-      expect(status?.textContent).toContain('12');
-      expect(status?.textContent).not.toContain('١٢');
+      const status = fixture.nativeElement.querySelector('.list-pager__range');
+      expect(status?.textContent).toContain('١–١٢ من ١٢');
 
       translate.use('en');
       fixture.detectChanges();
@@ -3007,7 +2868,7 @@ describe('ApprovalQueueComponent', () => {
       expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
         sort: 'total_asc',
         branch_id: 'branch-south',
-        limit: 50,
+        limit: 25,
       });
     });
 
@@ -3023,7 +2884,7 @@ describe('ApprovalQueueComponent', () => {
       expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({
         sort: 'total_asc',
         branch_id: VALID_BRANCH_ID,
-        limit: 50,
+        limit: 25,
       });
     });
 
@@ -3048,7 +2909,7 @@ describe('ApprovalQueueComponent', () => {
       await configureQueue({ branch: 'abc' });
 
       expect(component.branchFilter()).toBe('');
-      expect(approvalsApi.listPendingApprovals.calls.first().args[0]).toEqual({ limit: 50 });
+      expect(approvalsApi.listPendingApprovals.calls.first().args[0]).toEqual({ limit: 25 });
       expect(routerSpy.navigate).toHaveBeenCalledWith([], {
         queryParams: { sort: null, branch: null },
         queryParamsHandling: 'merge',
@@ -3067,7 +2928,7 @@ describe('ApprovalQueueComponent', () => {
         fixture.nativeElement.querySelector('[data-testid="approval-total-count"]'),
       ).toBeNull();
 
-      pending.next(list([], null, 5));
+      pending.next(list([mockPendingRequests[0]], 'next', 5));
       pending.complete();
       fixture.detectChanges();
       expect(
@@ -3075,6 +2936,7 @@ describe('ApprovalQueueComponent', () => {
           .querySelector('[data-testid="approval-total-count"]')
           ?.textContent?.trim(),
       ).toBe('5 pending requests');
+      expect(fixture.nativeElement.querySelector('app-list-pager')).not.toBeNull();
 
       approvalsApi.listPendingApprovals.and.returnValue(
         throwError(() => new HttpErrorResponse({ status: 500 })),
@@ -3086,6 +2948,7 @@ describe('ApprovalQueueComponent', () => {
       expect(
         fixture.nativeElement.querySelector('[data-testid="approval-total-count"]'),
       ).toBeNull();
+      expect(fixture.nativeElement.querySelector('app-list-pager')).toBeNull();
     });
 
     it('keeps the live region empty until a successful load supplies the count', () => {
@@ -3139,7 +3002,7 @@ describe('ApprovalQueueComponent', () => {
       expect(component.pageLoadFailed()).toBeFalse();
       expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
         sort: 'submitted_asc',
-        limit: 50,
+        limit: 25,
       });
       expect(fixture.nativeElement.querySelector('[data-testid="empty-default"]')).not.toBeNull();
       expect(fixture.nativeElement.querySelector('[data-testid="empty-filtered"]')).toBeNull();
@@ -3172,7 +3035,7 @@ describe('ApprovalQueueComponent', () => {
       expect(component.pageLoadFailed()).toBeFalse();
       expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({
         branch_id: VALID_BRANCH_ID,
-        limit: 50,
+        limit: 25,
       });
       expect(fixture.nativeElement.querySelector('[data-testid="empty-default"]')).toBeNull();
       expect(fixture.nativeElement.querySelector('[data-testid="empty-filtered"]')).not.toBeNull();
@@ -3221,7 +3084,7 @@ describe('ApprovalQueueComponent', () => {
       expect(component.branchFilter()).toBe(VALID_BRANCH_ID);
       expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({
         branch_id: VALID_BRANCH_ID,
-        limit: 50,
+        limit: 25,
       });
       expect(routerSpy.navigate).not.toHaveBeenCalled();
     });
@@ -3267,7 +3130,7 @@ describe('ApprovalQueueComponent', () => {
       expect(component.branchFilter()).toBe(VALID_BRANCH_ID);
       expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({
         branch_id: VALID_BRANCH_ID,
-        limit: 50,
+        limit: 25,
       });
       expect(routerSpy.navigate).not.toHaveBeenCalled();
     });
@@ -3299,7 +3162,7 @@ describe('ApprovalQueueComponent', () => {
       expect(component.branchFilter()).toBe(VALID_BRANCH_ID);
       expect(approvalsApi.listPendingApprovals.calls.mostRecent().args[0]).toEqual({
         branch_id: VALID_BRANCH_ID,
-        limit: 50,
+        limit: 25,
       });
       expect(routerSpy.navigate).not.toHaveBeenCalled();
     });
