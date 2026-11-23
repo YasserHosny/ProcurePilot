@@ -992,6 +992,7 @@ export interface BasketSplitJobSummary {
 export interface BasketSplitJobList {
   readonly items: readonly BasketSplitJobSummary[];
   readonly next_cursor: string | null;
+  readonly total?: number | null;
 }
 
 export interface BasketPackSnapshot {
@@ -1639,7 +1640,7 @@ export type PendingApprovalSort =
 export interface PendingApprovalList {
   readonly items: readonly PurchaseRequest[];
   readonly next_cursor: string | null;
-  readonly total: number;
+  readonly total?: number | null;
 }
 
 export interface BulkApprovalDecisionInput {

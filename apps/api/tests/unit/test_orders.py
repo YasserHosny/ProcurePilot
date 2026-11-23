@@ -3,6 +3,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 from uuid import UUID
 
 import pytest
@@ -89,6 +90,50 @@ def _order() -> PurchaseOrder:
             ),
         ),
     )
+
+
+@pytest.mark.parametrize(
+    ("has_cursor", "has_rows", "expected"),
+    [(True, True, 34), (False, False, 0), (True, False, None)],
+)
+def test_order_total_is_in_the_page_query_and_ignores_the_cursor(
+    monkeypatch: pytest.MonkeyPatch, has_cursor: bool, has_rows: bool, expected: int | None
+) -> None:
+    order = _order()
+    boundary = {"created_at": order.created_at, "id": order.id}
+    cursor = (
+        orders_service._encode_keyset(
+            boundary, sort="created_at", sort_column="created_at", direction="desc"
+        )
+        if has_cursor
+        else None
+    )
+    cur = Mock()
+    if has_rows:
+        cur.fetchall.side_effect = [
+            [{**boundary, "total": 34, "supplier_id": order.supplier_id}],
+            [],  # Lines.
+            [],  # Supplier names.
+        ]
+    else:
+        cur.fetchall.return_value = []
+    service = OrdersService()
+    monkeypatch.setattr(service, "_transaction", lambda _: nullcontext(cur))
+    monkeypatch.setattr(orders_service, "_order_model", lambda *_: order)
+
+    page = service.search_orders(member=_member(), cursor=cursor, q="Alpha", limit=25)
+
+    assert page.total == page.total_count == expected
+    assert cur.execute.call_count == (3 if has_rows else 1)
+    query, params = cur.execute.call_args_list[0].args
+    count_sql, page_sql = query.split(") as total ", 1)
+    assert "(select count(*) from purchase_order where tenant_id = %s" in count_sql
+    assert "order_number ilike %s" in count_sql and "order_number ilike %s" in page_sql
+    assert "(created_at, id)" not in count_sql
+    assert ("(created_at, id) <" in page_sql) == has_cursor
+    filters = [TENANT, "%Alpha%", "%Alpha%"]
+    position = [order.created_at.isoformat(), str(order.id)] if has_cursor else []
+    assert params == [*filters, *filters, *position, 26]
 
 
 def test_lifecycle_accumulates_partial_multiple_receipts_without_zero_for_missing_evidence() -> (

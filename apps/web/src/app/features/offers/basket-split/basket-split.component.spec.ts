@@ -120,6 +120,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
   };
 
   beforeEach(async () => {
+    localStorage.removeItem('pp.pageSize.basket-history');
     apiService = jasmine.createSpyObj<ApiService>('ApiService', [
       'suppliers',
       'products',
@@ -1308,16 +1309,15 @@ describe('BasketSplitComponent (US3, T045)', () => {
     }));
 
     // PPS-209: earlier splits could only be found through their URL.
-    it('lists recent splits with a link to each and loads further pages', () => {
+    it('links to each recent split and replaces rows on Next and Previous', () => {
       const summary = (id: string) => ({
         id, status: 'completed' as const, created_at: '2026-11-03T10:00:00Z',
         supplier_ids: ['supp-1', 'supp-2'], supplier_names: ['Al Dhahabi', 'Al Wafra'], item_count: 3,
         total_landed_cost: { amount: '255.0000', currency: 'SAR' },
       });
-      apiService.listBasketSplitJobs.and.returnValues(
-        of({ items: [summary('job-a')], next_cursor: 'c2' }),
-        of({ items: [summary('job-b')], next_cursor: null }),
-      );
+      const firstPage = { items: [summary('job-a')], next_cursor: 'c2', total: 11 };
+      apiService.listBasketSplitJobs.and.returnValue(of(firstPage));
+      component.pager.setPageSize(10);
       component.loadHistory();
       fixture.detectChanges();
 
@@ -1328,14 +1328,32 @@ describe('BasketSplitComponent (US3, T045)', () => {
       // The stored amount is shown like every other amount, not as «255.0000».
       expect(rows()[0].textContent).not.toContain('255.0000');
       expect(rows()[0].textContent).toContain('255');
-      expect(component.hasMoreHistory()).toBeTrue();
+      const pageButton = (step: string) =>
+        (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(`.list-pager__${step}`)!;
+      expect(apiService.listBasketSplitJobs.calls.mostRecent().args[0]).toEqual({ limit: 10 });
 
-      component.loadMoreHistory();
+      apiService.listBasketSplitJobs.and.returnValue(throwError(() => new Error('down')));
+      pageButton('next').click();
+      fixture.detectChanges();
+      expect(rows()[0].getAttribute('href')).toBe('/offers/basket-split/job-a');
+      expect(component.pager.pageIndex()).toBe(0);
+      expect(pageButton('next').disabled).toBeFalse();
+
+      apiService.listBasketSplitJobs.and.returnValue(of({
+        items: [summary('job-b')], next_cursor: null, total: 11,
+      }));
+      pageButton('next').click();
       fixture.detectChanges();
 
-      expect(apiService.listBasketSplitJobs).toHaveBeenCalledWith(jasmine.objectContaining({ cursor: 'c2' }));
-      expect(rows().map((r) => r.getAttribute('href'))).toEqual(['/offers/basket-split/job-a', '/offers/basket-split/job-b']);
-      expect(component.hasMoreHistory()).toBeFalse();
+      expect(apiService.listBasketSplitJobs.calls.mostRecent().args[0]).toEqual({ cursor: 'c2', limit: 10 });
+      expect(rows().map((r) => r.getAttribute('href'))).toEqual(['/offers/basket-split/job-b']);
+      expect(pageButton('next').disabled).toBeTrue();
+
+      apiService.listBasketSplitJobs.and.returnValue(of(firstPage));
+      pageButton('previous').click();
+      fixture.detectChanges();
+      expect(rows().map((r) => r.getAttribute('href'))).toEqual(['/offers/basket-split/job-a']);
+      expect(apiService.listBasketSplitJobs.calls.mostRecent().args[0]).toEqual({ limit: 10 });
     });
 
     it('says nothing when there is no history, and keeps the form usable when it cannot be loaded', () => {

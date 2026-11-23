@@ -444,29 +444,14 @@
         </table>
       </div>
 
-      <div class="pagination-footer">
-        <div class="pagination-status" aria-live="polite" aria-atomic="true" data-testid="pagination-status">
-          {{ paginationStatusText() }}
-        </div>
-        @if (nextCursor()) {
-          <button
-            mat-stroked-button
-            type="button"
-            class="load-more-btn"
-            data-testid="load-more-btn"
-            [disabled]="isLoadingMore()"
-            (click)="loadMore()"
-          >
-            @if (isLoadingMore()) {
-              <mat-spinner diameter="18" [attr.aria-label]="'approvals.pagination.loading' | translate"></mat-spinner>
-              <span>{{ 'approvals.pagination.loading' | translate }}</span>
-            } @else {
-              <mat-icon aria-hidden="true">expand_more</mat-icon>
-              <span>{{ 'approvals.pagination.loadMore' | translate }}</span>
-            }
-          </button>
-        }
-      </div>
+    }
+    @if (pager.needed()) {
+      <app-list-pager
+        [pager]="pager"
+        [label]="'approvals.pagination.pagerLabel' | translate"
+        [busy]="bulkDisabled()"
+        (pageChange)="loadPendingApprovals()"
+      />
     }
     <app-approval-bulk-panel [count]="selectedIds().size" [totals]="selectionTotals()"
       [incomplete]="selectionIncomplete()" [busy]="bulkBusy()" [disabled]="bulkDisabled()"

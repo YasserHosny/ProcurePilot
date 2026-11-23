@@ -94,6 +94,7 @@ describe('HistoryComponent', () => {
     });
   }
   beforeEach(async () => {
+    localStorage.removeItem('pp.pageSize.rfq-history');
     jasmine.clock().install();
     jasmine.clock().mockDate(new Date(2026, 9, 28));
     rfqApiSpy = jasmine.createSpyObj('RfqApi', ['listRfqs', 'sendRfq', 'cancelRfq', 'getRfq']);
@@ -257,7 +258,7 @@ describe('HistoryComponent', () => {
       type('new'); enter();
       stale.next(mockRfqList);
       expect(component.rfqs()).toEqual([]);
-      expect(component.nextCursor()).toBeNull();
+      expect(component.pager.nextCursor()).toBeNull();
       jasmine.clock().tick(300);
     });
     it('debounces two edits into one final request', () => {
@@ -268,7 +269,7 @@ describe('HistoryComponent', () => {
       jasmine.clock().tick(299);
       expect(rfqApiSpy.listRfqs).not.toHaveBeenCalled();
       jasmine.clock().tick(1);
-      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([[undefined, undefined, undefined, 'supplier', 'created_desc']]);
+      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([[undefined, undefined, 25, 'supplier', 'created_desc']]);
     });
     it('Enter reloads immediately and cancels the pending debounce', () => {
       rfqApiSpy.listRfqs.calls.reset();
@@ -285,7 +286,7 @@ describe('HistoryComponent', () => {
       fixture.detectChanges();
       jasmine.clock().tick(300);
       expect(input().value).toBe('');
-      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([[undefined, undefined, undefined, undefined, 'created_desc']]);
+      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([[undefined, undefined, 25, undefined, 'created_desc']]);
     });
     it('sort reloads, persists all address parameters and keeps them for pagination', () => {
       type(' bolt ');
@@ -293,21 +294,25 @@ describe('HistoryComponent', () => {
       component.setStatusFilter('sent');
       rfqApiSpy.listRfqs.calls.reset();
       chooseSort();
-      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([['sent', undefined, undefined, 'bolt', 'needed_asc']]);
+      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([['sent', undefined, 25, 'bolt', 'needed_asc']]);
       expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({
         queryParams: { status: 'sent', q: 'bolt', sort: 'needed_asc' },
         queryParamsHandling: 'merge', replaceUrl: true,
       }));
-      component.nextCursor.set('next');
-      component.loadMore();
-      expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual(['sent', 'next', undefined, 'bolt', 'needed_asc']);
+      rfqApiSpy.listRfqs.and.returnValue(of(mockRfqList));
+      component.pager.nextCursor.set('next');
+      component.pager.goNext();
+      component.loadRfqs();
+      expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual(['sent', 'next', 25, 'bolt', 'needed_asc']);
     });
     it('keeps the applied query while an edit is waiting to debounce', () => {
       type('old'); enter();
       type('new');
-      component.nextCursor.set('next');
-      component.loadMore();
-      expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual([undefined, 'next', undefined, 'old', 'created_desc']);
+      rfqApiSpy.listRfqs.and.returnValue(of(mockRfqList));
+      component.pager.nextCursor.set('next');
+      component.pager.goNext();
+      component.loadRfqs();
+      expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual([undefined, 'next', 25, 'old', 'created_desc']);
       jasmine.clock().tick(300);
     });
     it('initializes valid address values, trims and caps search and defaults invalid sort', () => {
@@ -316,7 +321,7 @@ describe('HistoryComponent', () => {
         Object.defineProperty(route.snapshot, 'queryParamMap', { configurable: true, value: convertToParamMap({ status: 'sent', q: '  ' + 'x'.repeat(110) + '  ', sort }) });
         const other = TestBed.createComponent(HistoryComponent);
         other.detectChanges();
-        expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual(['sent', undefined, undefined, 'x'.repeat(100), sort === 'invalid' ? 'created_desc' : sort]);
+        expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual(['sent', undefined, 25, 'x'.repeat(100), sort === 'invalid' ? 'created_desc' : sort]);
         other.destroy();
       }
     });
@@ -332,7 +337,7 @@ describe('HistoryComponent', () => {
       clear.click();
       fixture.detectChanges();
       jasmine.clock().tick(300);
-      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([[undefined, undefined, undefined, undefined, 'created_desc']]);
+      expect(rfqApiSpy.listRfqs.calls.allArgs()).toEqual([[undefined, undefined, 25, undefined, 'created_desc']]);
       expect(fixture.nativeElement.textContent).toContain('No RFQs found.');
       expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({ queryParams: { q: null, sort: null, status: null } }));
     });
@@ -387,7 +392,7 @@ describe('HistoryComponent', () => {
       rfqApiSpy.listRfqs.calls.reset();
       filterButtons().find((b) => b.textContent?.trim() === 'Sent')?.click();
       fixture.detectChanges();
-      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith('sent', undefined, undefined, undefined, 'created_desc');
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith('sent', undefined, 25, undefined, 'created_desc');
       expect(filterButtons().find((b) => b.textContent?.trim() === 'Sent')?.getAttribute('aria-pressed')).toBe('true');
       expect(filterButtons()[0].getAttribute('aria-pressed')).toBe('false');
       expect(router.navigate).toHaveBeenCalledWith(
@@ -396,15 +401,16 @@ describe('HistoryComponent', () => {
       );
     });
 
-    it('keeps the filter when loading more and clears it with All', () => {
+    it('keeps the filter when paging and clears it with All', () => {
       component.setStatusFilter('expired');
       rfqApiSpy.listRfqs.calls.reset();
-      component.nextCursor.set('cursor-2');
-      component.loadMore();
-      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith('expired', 'cursor-2', undefined, undefined, 'created_desc');
+      component.pager.nextCursor.set('cursor-2');
+      component.pager.goNext();
+      component.loadRfqs();
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith('expired', 'cursor-2', 25, undefined, 'created_desc');
       rfqApiSpy.listRfqs.calls.reset();
       component.setStatusFilter(null);
-      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith(undefined, undefined, undefined, undefined, 'created_desc');
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith(undefined, undefined, 25, undefined, 'created_desc');
       expect(router.navigate).toHaveBeenCalledWith(
         [],
         jasmine.objectContaining({ queryParams: { status: null, q: null, sort: null } }),
@@ -429,7 +435,7 @@ describe('HistoryComponent', () => {
       rfqApiSpy.listRfqs.and.returnValue(of(mockRfqList));
       rfqApiSpy.listRfqs.calls.reset();
       clear?.click();
-      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith(undefined, undefined, undefined, undefined, 'created_desc');
+      expect(rfqApiSpy.listRfqs).toHaveBeenCalledOnceWith(undefined, undefined, 25, undefined, 'created_desc');
     });
   });
 
@@ -593,112 +599,68 @@ describe('HistoryComponent', () => {
     expect(compiled.querySelector('.error-state')).toBeNull();
   });
 
-  it('load more appends and de-duplicates and hides the button on the last page', async () => {
-    const initialList: RfqList = {
-      items: [mockRfqs[0], mockRfqs[1]],
-      next_cursor: 'cursor-page-2',
-    };
-    rfqApiSpy.listRfqs.and.returnValue(of(initialList));
+  it('replaces the page on Next and Previous with the selected limit', () => {
+    fixture.detectChanges();
+    const firstPage = { items: mockRfqs.slice(0, 2), next_cursor: 'cursor-page-2', total: 34 };
+    rfqApiSpy.listRfqs.and.returnValue(of(firstPage));
+    component.pager.setPageSize(10);
     component.loadRfqs();
     fixture.detectChanges();
-    await fixture.whenStable();
+    const pageButton = (step: string) =>
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(`.list-pager__${step}`)!;
+    expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual([undefined, undefined, 10, undefined, 'created_desc']);
+
+    rfqApiSpy.listRfqs.and.returnValue(of({ items: [mockRfqs[2]], next_cursor: null, total: 34 }));
+    pageButton('next').click();
     fixture.detectChanges();
+    expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual([undefined, 'cursor-page-2', 10, undefined, 'created_desc']);
+    expect(component.rfqs()).toEqual([mockRfqs[2]]);
+    expect(component.pager.total()).toBe(34);
 
-    const compiled = fixture.nativeElement as HTMLElement;
-    let loadMoreBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-load-more-button"]');
-    expect(loadMoreBtn).not.toBeNull();
-
-    const secondPage: RfqList = {
-      items: [mockRfqs[1], mockRfqs[2]],
-      next_cursor: null,
-    };
-    rfqApiSpy.listRfqs.and.returnValue(of(secondPage));
-
-    loadMoreBtn?.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect(rfqApiSpy.listRfqs).toHaveBeenCalledWith(undefined, 'cursor-page-2', undefined, undefined, 'created_desc');
-    expect(component.rfqs().length).toBe(3);
-    expect(component.rfqs().map((r) => r.id)).toEqual(['rfq-draft-1', 'rfq-1', 'rfq-2']);
-    expect(component.nextCursor()).toBeNull();
-
-    loadMoreBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-load-more-button"]');
-    expect(loadMoreBtn).toBeNull();
+    rfqApiSpy.listRfqs.and.returnValue(of(firstPage));
+    pageButton('previous').click();
+    expect(component.rfqs()).toEqual(firstPage.items);
+    expect(rfqApiSpy.listRfqs.calls.mostRecent().args).toEqual([undefined, undefined, 10, undefined, 'created_desc']);
   });
 
-  it('double click on Load more sends one request', () => {
-    component.nextCursor.set('cursor-1');
-    const subject = new Subject<RfqList>();
-    rfqApiSpy.listRfqs.and.returnValue(subject);
+  it('keeps Next disabled while a page is pending and ignores its result after a filter change', () => {
+    fixture.detectChanges();
+    rfqApiSpy.listRfqs.and.returnValue(of({ ...mockRfqList, next_cursor: 'next', total: 34 }));
+    component.loadRfqs();
+    fixture.detectChanges();
+    const next = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.list-pager__next')!;
+    const late = new Subject<RfqList>();
     rfqApiSpy.listRfqs.calls.reset();
-
-    component.loadMore();
-    component.loadMore();
-
+    rfqApiSpy.listRfqs.and.returnValue(late);
+    next.click();
+    fixture.detectChanges();
+    expect(next.disabled).toBeTrue();
+    next.click();
     expect(rfqApiSpy.listRfqs).toHaveBeenCalledTimes(1);
-    subject.next({ items: [], next_cursor: null });
-    subject.complete();
+
+    rfqApiSpy.listRfqs.and.returnValue(of({ items: [mockRfqs[1]], next_cursor: null, total: 1 }));
+    component.setStatusFilter('sent');
+    late.next({ items: [mockRfqs[2]], next_cursor: null, total: 34 });
+    expect(component.rfqs()).toEqual([mockRfqs[1]]);
+    expect(component.pager.pageIndex()).toBe(0);
   });
 
-  it('Load more pending, then loadRfqs() refresh, then old page resolves -> rows are exactly refreshed first page and cursor is refreshed cursor', () => {
-    component.rfqs.set([mockRfqs[0]]);
-    component.nextCursor.set('cursor-page-2');
-
-    const loadMoreSubject = new Subject<RfqList>();
-    const refreshedFirstPage: RfqList = {
-      items: [
-        {
-          ...mockRfqs[0],
-          id: 'rfq-fresh-1',
-          created_at: '2026-10-01T00:00:00Z',
-        },
-      ],
-      next_cursor: 'cursor-fresh-2',
-    };
-
-    rfqApiSpy.listRfqs.and.returnValue(loadMoreSubject);
-    component.loadMore();
-    expect(component.loadingMore()).toBeTrue();
-
-    const refreshSubject = new Subject<RfqList>();
-    rfqApiSpy.listRfqs.and.returnValue(refreshSubject);
+  it('keeps rows visible and allows another Next after a failed page load', () => {
+    fixture.detectChanges();
+    rfqApiSpy.listRfqs.and.returnValue(of({ ...mockRfqList, next_cursor: 'next', total: 34 }));
     component.loadRfqs();
-    refreshSubject.next(refreshedFirstPage);
-    refreshSubject.complete();
-
-    expect(component.rfqs()).toEqual(refreshedFirstPage.items);
-    expect(component.nextCursor()).toBe('cursor-fresh-2');
-
-    const oldPage: RfqList = {
-      items: [mockRfqs[1]],
-      next_cursor: 'cursor-old-page-3',
-    };
-    loadMoreSubject.next(oldPage);
-    loadMoreSubject.complete();
-
-    expect(component.rfqs()).toEqual(refreshedFirstPage.items);
-    expect(component.nextCursor()).toBe('cursor-fresh-2');
-  });
-
-  it('load-more failure keeps rows and shows retry', async () => {
-    component.nextCursor.set('cursor-1');
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+    const next = host.querySelector<HTMLButtonElement>('.list-pager__next')!;
     rfqApiSpy.listRfqs.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
 
-    component.loadMore();
+    next.click();
     fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect(component.rfqs().length).toBe(3);
-    const compiled = fixture.nativeElement as HTMLElement;
-    const retryBtn = compiled.querySelector<HTMLButtonElement>('[data-testid="rfq-load-more-retry"]');
-    expect(retryBtn).not.toBeNull();
-
-    rfqApiSpy.listRfqs.and.returnValue(of({ items: [], next_cursor: null }));
-    retryBtn?.click();
-    expect(rfqApiSpy.listRfqs).toHaveBeenCalledWith(undefined, 'cursor-1', undefined, undefined, 'created_desc');
+    expect(component.rfqs()).toEqual(mockRfqs);
+    expect(host.querySelectorAll('tr.clickable-row').length).toBe(mockRfqs.length);
+    expect(host.querySelector('[data-testid="rfq-error-state"]')).not.toBeNull();
+    expect(component.pager.pageIndex()).toBe(0);
+    expect(next.disabled).toBeFalse();
   });
 
   it('the row link has the expected accessible name and navigates', async () => {

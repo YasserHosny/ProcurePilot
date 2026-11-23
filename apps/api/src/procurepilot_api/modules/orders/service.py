@@ -927,8 +927,6 @@ class OrdersService:
         condition = " and ".join(where)
 
         with self._transaction(member) as cur:
-            cur.execute(f"select count(*) as n from purchase_order where {condition}", params)
-            total_count = int(cur.fetchone()["n"])
             # Keyset paging: the page starts after the last row shown, so an order created or
             # changed meanwhile can neither repeat a row nor hide one. The id tie-break makes the
             # position unique when several orders share a sort value.
@@ -939,11 +937,14 @@ class OrdersService:
                 page_condition += f" and ({sort_column}, id) {comparison} (%s::{cast}, %s::uuid)"
                 page_params += [after[0], after[1]]
             cur.execute(
-                f"select {ORDER_HEADER_COLUMNS} from purchase_order where {page_condition} "
+                f"select {ORDER_HEADER_COLUMNS}, "
+                f"(select count(*) from purchase_order where {condition}) as total "
+                f"from purchase_order where {page_condition} "
                 f"order by {sort_column} {direction}, id {direction} limit %s",
-                [*page_params, capped + 1],
+                [*params, *page_params, capped + 1],
             )
             rows = cur.fetchall()
+            total = rows[0]["total"] if rows else (0 if after is None else None)
             visible = rows[:capped]
             order_ids = [row["id"] for row in visible]
             lines_by_order: dict[object, list[dict[str, object]]] = {}
@@ -972,7 +973,8 @@ class OrdersService:
                 if len(rows) > capped
                 else None
             ),
-            total_count=total_count,
+            total_count=total,
+            total=total,
         )
 
     def get_order(self, *, bearer_token: str, order_id: UUID) -> OrderEvidenceProjection:

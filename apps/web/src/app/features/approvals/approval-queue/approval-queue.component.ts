@@ -79,6 +79,8 @@ export type QueueItem = SingleQueueItem | GroupQueueItem;
 import { FormatService } from '../../../core/format/format.service';
 import { parseIsoDateLocal } from '../../../core/format/iso-date';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { RequestsApiService } from '../../requests/requests-api';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { ApprovalsApiService } from '../approvals-api';
@@ -239,6 +241,7 @@ export class ApprovalDecisionDialogComponent {
     MatSelectModule,
     TranslatePipe,
     FormatQuantityPipe,
+    ListPagerComponent,
   ],
   templateUrl: './approval-queue.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -263,8 +266,7 @@ export class ApprovalQueueComponent implements OnInit {
 
   readonly isLoading = signal<boolean>(true);
   readonly pendingRequests = signal<PurchaseRequest[]>([]);
-  readonly nextCursor = signal<string | null>(null);
-  readonly isLoadingMore = signal<boolean>(false);
+  readonly pager = new CursorPager('approvals');
   readonly groupSiblings = signal<Map<string, PurchaseRequest[]>>(new Map());
   readonly groupStatus = signal<Map<string, 'loading' | 'complete' | 'failed'>>(new Map());
   readonly branches = signal<Branch[]>([]);
@@ -277,7 +279,7 @@ export class ApprovalQueueComponent implements OnInit {
   readonly processingRequestId = signal<string | null>(null);
   readonly sortOption = signal<PendingApprovalSort>(DEFAULT_SORT);
   readonly branchFilter = signal<string>('');
-  readonly totalCount = signal<number | null>(null);
+  readonly totalCount = computed(() => this.isLoading() ? null : this.pager.total());
   readonly sortOptions = PENDING_APPROVAL_SORTS;
   readonly hasActiveBranchFilter = computed(() => this.branchFilter() !== '');
   readonly hasActiveFilters = computed(
@@ -527,14 +529,15 @@ export class ApprovalQueueComponent implements OnInit {
         }
         const decided = new Set(response.results.filter(result => result.outcome === 'decided' && submitted.has(result.request_id)).map(result => result.request_id));
         this.pendingRequests.update(requests => requests.filter(request => !decided.has(request.id)));
+        this.pager.count.set(this.pendingRequests().length);
         this.selection.set(new Set([...this.selection()].filter(id => !decided.has(id))));
-        this.totalCount.update(total => total === null ? null : Math.max(0, total - decided.size));
+        this.pager.total.update(total => total === null ? null : Math.max(0, total - decided.size));
         // Keep the namespace for failed subsets: unavailable may mean the write committed
         // but its response failed, so their UUIDv5 item keys must replay the original audit.
         this.bulkAttempt = this.selectedIds().size > 0
           ? {key, signature: bulkAttemptSignature({...body, request_ids: [...this.selectedIds()]})} : null;
-        // No rows means no pagination footer, so a remaining page would be unreachable.
-        if (this.pendingRequests().length === 0 && this.nextCursor() !== null) {
+        // Refill the page so its rows and the next cursor reflect the removals.
+        if (decided.size && (this.pager.hasNext() || this.pager.hasPrevious())) {
           this.loadPendingApprovals({keepBulkResults: true});
         }
       },
@@ -620,12 +623,16 @@ export class ApprovalQueueComponent implements OnInit {
 
   private resetAndReload(): void {
     this.pendingRequests.set([]);
-    this.totalCount.set(null);
+    this.pager.reset();
+    this.selection.set(new Set());
+    this.bulkAttempt = null;
     this.expandedRequestIds.set(new Set());
+    this.groupSiblings.set(new Map());
+    this.groupStatus.set(new Map());
     this.loadPendingApprovals();
   }
 
-  private listParams(cursor?: string): {
+  private listParams(): {
     sort?: PendingApprovalSort;
     branch_id?: string;
     cursor?: string;
@@ -634,8 +641,7 @@ export class ApprovalQueueComponent implements OnInit {
     return {
       ...(this.sortOption() !== DEFAULT_SORT ? { sort: this.sortOption() } : {}),
       ...(this.branchFilter() ? { branch_id: this.branchFilter() } : {}),
-      ...(cursor ? { cursor } : {}),
-      limit: 50,
+      ...this.pager.params(),
     };
   }
 
@@ -728,7 +734,7 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   announcementText(): string {
-    if (this.isLoading() || this.totalCount() === null) {
+    if (this.totalCount() === null) {
       return '';
     }
     return this.translate.instant(`${I18N}.announce.sorted`, {
@@ -738,25 +744,16 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   loadPendingApprovals({keepBulkResults = false}: {readonly keepBulkResults?: boolean} = {}): void {
-    // When reloading (e.g. after a decision), reload from the first page and reset cursor.
-    // Why: Reloading from cursor=null fetches fresh page 1 from the server. If accumulated
-    // extra pages were kept, items could be duplicated or stale across pages, and the server
-    // cursor would be out-of-sync with the spliced client list.
     const generation = ++this.loadGeneration;
-    this.selection.set(new Set()); this.bulkAttempt = null; this.bulkError.set(false);
+    this.bulkError.set(false);
     if (!keepBulkResults) {
       this.bulkResult.set(null); this.bulkFailures.set([]);
     }
     this.loadOwnerEligibility(generation);
     this.isLoading.set(true);
-    this.isLoadingMore.set(false);
     this.errorMessage.set(null);
     this.pageLoadFailed.set(false);
     this.errorTraceId.set(null);
-    this.totalCount.set(null);
-    this.nextCursor.set(null);
-    this.groupSiblings.set(new Map());
-    this.groupStatus.set(new Map());
 
     forkJoin({
       approvals: this.approvalsApi.listPendingApprovals(this.listParams()),
@@ -768,9 +765,14 @@ export class ApprovalQueueComponent implements OnInit {
         if (generation !== this.loadGeneration) {
           return;
         }
+        if (!this.pager.loaded(approvals)) {
+          this.loadPendingApprovals({keepBulkResults});
+          return;
+        }
         this.pendingRequests.set([...approvals.items]);
-        this.nextCursor.set(approvals.next_cursor ?? null);
-        this.totalCount.set(approvals.total ?? null);
+        this.groupSiblings.set(new Map());
+        this.groupStatus.set(new Map());
+        if (!keepBulkResults) this.clearSelection();
         if (branches.succeeded) {
           this.branches.set([...branches.list.items]);
           this.branchesLoaded = true;
@@ -789,8 +791,18 @@ export class ApprovalQueueComponent implements OnInit {
           return;
         }
         this.isLoading.set(false);
-        this.totalCount.set(null);
-        this.pageLoadFailed.set(true);
+        const keptPage = this.pager.failed();
+        if (keptPage) {
+          // Sibling requests from the previous generation can no longer update the page.
+          this.groupStatus.update(statuses => new Map(
+            [...statuses].filter(([, status]) => status !== 'loading'),
+          ));
+          this.checkAndFetchMissingGroupSiblings(generation);
+        } else {
+          this.pendingRequests.set([]);
+          this.clearSelection();
+        }
+        this.pageLoadFailed.set(!keptPage);
         this.handleError(err, 'approvals.pagination.pageLoadError');
       },
     });
@@ -820,41 +832,6 @@ export class ApprovalQueueComponent implements OnInit {
     }
     this.urlNeedsCleanup = false;
     this.writeUrl();
-  }
-
-  loadMore(): void {
-    const cursor = this.nextCursor();
-    if (!cursor || this.isLoadingMore()) {
-      return;
-    }
-    const generation = this.loadGeneration;
-    this.isLoadingMore.set(true);
-    this.errorMessage.set(null);
-    this.errorTraceId.set(null);
-
-    this.approvalsApi.listPendingApprovals(this.listParams(cursor)).subscribe({
-      next: (res) => {
-        if (generation !== this.loadGeneration) {
-          return;
-        }
-        const current = this.pendingRequests();
-        const seenIds = new Set(current.map((r) => r.id));
-        const additions = res.items.filter((r) => !seenIds.has(r.id));
-        this.pendingRequests.set([...current, ...additions]);
-        this.nextCursor.set(res.next_cursor ?? null);
-        this.totalCount.set(res.total ?? this.totalCount());
-        this.isLoadingMore.set(false);
-        this.checkAndFetchMissingGroupSiblings(generation);
-      },
-      error: (err: unknown) => {
-        if (generation !== this.loadGeneration) {
-          return;
-        }
-        this.isLoadingMore.set(false);
-        // Keep rows already loaded, show error banner and keep nextCursor so Load more can retry.
-        this.handleError(err, 'approvals.pagination.loadError');
-      },
-    });
   }
 
   toggleExpand(requestId: string): void {
@@ -1411,25 +1388,6 @@ export class ApprovalQueueComponent implements OnInit {
     });
   }
 
-  paginationStatusText(): string {
-    const count = this.pendingRequests().length;
-    const total = this.totalCount();
-    if (total !== null && total > count) {
-      return this.translate.instant('approvals.pagination.showingOf', {
-        loaded: this.formatService.formatNumber(count, { numberingSystem: 'latn' }),
-        total: this.formatService.formatNumber(total, { numberingSystem: 'latn' }),
-      });
-    }
-    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
-    const category = new Intl.PluralRules(locale).select(count);
-    const key = this.nextCursor()
-      ? `approvals.pagination.showingMore.${category}`
-      : `approvals.pagination.showing.${category}`;
-    return this.translate.instant(key, {
-      count: this.formatService.formatNumber(count, { numberingSystem: 'latn' }),
-    });
-  }
-
   private handleError(err: unknown, defaultMessageKey = `${I18N}.genericError`): void {
     if (err instanceof HttpErrorResponse) {
       const apiError = err.error as ApiError | undefined;
@@ -1445,10 +1403,7 @@ export class ApprovalQueueComponent implements OnInit {
       }
       this.errorTraceId.set(apiError?.trace_id ?? null);
 
-      const isListError =
-        defaultMessageKey === 'approvals.pagination.loadError' ||
-        defaultMessageKey === 'approvals.pagination.pageLoadError';
-      if (isListError) {
+      if (defaultMessageKey === 'approvals.pagination.pageLoadError') {
         const raw = err.error as unknown;
         const isEnvelope =
           typeof raw === 'object' &&

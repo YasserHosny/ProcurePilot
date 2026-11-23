@@ -236,12 +236,14 @@ class BasketService:
                 cur.execute(
                     "select id, status, created_at, started_at, supplier_ids, rfq_id, "
                     "jsonb_array_length(items) as item_count, "
-                    "result -> 'total_landed_cost' as total_landed_cost "
+                    "result -> 'total_landed_cost' as total_landed_cost, "
+                    "(select count(*) from basket_split_job) as total "
                     f"from basket_split_job where {condition} "
                     "order by created_at desc, id desc limit %s",
                     [*params, capped + 1],
                 )
                 rows = [dict(row) for row in cur.fetchall()]
+                total = rows[0]["total"] if rows else (0 if after is None else None)
                 supplier_ids = {sid for row in rows[:capped] for sid in row["supplier_ids"]}
                 cur.execute(
                     "select id, name from supplier where id = any(%s)", (list(supplier_ids),)
@@ -270,6 +272,7 @@ class BasketService:
                 for row in visible
             ],
             next_cursor=(_encode_history_cursor(visible[-1]) if len(rows) > capped else None),
+            total=total,
         )
 
     def _stale_code(self, row: dict[str, object], *, worker_alive: bool | None) -> str | None:

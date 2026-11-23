@@ -13,6 +13,7 @@ from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember, current_member
 from procurepilot_api.main import app
 from procurepilot_api.modules.auth.jwt import MemberRole
+from procurepilot_api.modules.rfq.service import _encode_cursor
 
 SORTS = {
     "created_desc": [1, 20, 12, 2],
@@ -126,6 +127,7 @@ def test_search(history: TestClient, q: str, expected: list[int]) -> None:
     body = response.json()
     assert [row["reference_number"] for row in body["items"]] == expected
     assert body["next_cursor"] is None
+    assert body["total"] == len(expected)  # The fixture also has four RFQs in a second tenant.
 
 
 @pytest.mark.parametrize("sort", SORTS)
@@ -141,6 +143,7 @@ def test_sort_and_paging(history: TestClient, sort: str) -> None:
         assert response.status_code == 200, response.text
         body = response.json()
         assert len(body["items"]) == 1
+        assert body["total"] == len(SORTS[sort])
         seen.append(body["items"][0]["id"])
         references.append(body["items"][0]["reference_number"])
         if body["next_cursor"] is None:
@@ -168,7 +171,7 @@ def test_invalid_query(
 def test_trim_before_length_validation(history: TestClient) -> None:
     response = history.get("/api/v1/rfq", params={"q": " " + "x" * 100 + " "})
     assert response.status_code == 200
-    assert response.json() == {"items": [], "next_cursor": None}
+    assert response.json() == {"items": [], "next_cursor": None, "total": 0}
 
 
 def test_combined_filters(history: TestClient) -> None:
@@ -178,6 +181,11 @@ def test_combined_filters(history: TestClient) -> None:
     )
     assert response.status_code == 200, response.text
     assert [row["reference_number"] for row in response.json()["items"]] == [1, 20]
+    assert response.json()["total"] == 2
+
+    past_end = history.get("/api/v1/rfq", params={"cursor": _encode_cursor(25)})
+    assert past_end.status_code == 200, past_end.text
+    assert past_end.json() == {"items": [], "next_cursor": None, "total": None}
 
 
 def test_search_keeps_statement_count_flat(
