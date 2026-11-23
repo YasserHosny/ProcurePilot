@@ -64,17 +64,23 @@ jobs:
           mkdir -p "$RUNNER_TEMP/logs"
           runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main \
             --event push --status success --limit "$RUNS" --json databaseId --jq '.[].databaseId')
+          sampled=0
           for run in $runs; do
-            jobs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/jobs?per_page=100" \
-              --jq '.jobs[] | select((.name | startswith("End-to-end shard")) and .conclusion == "success") | .id')
+            # filter=all: a green run whose lint job was re-run keeps its shard jobs on an earlier
+            # attempt. Take the latest successful attempt of each shard.
+            jobs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run/jobs?filter=all&per_page=100" \
+              --jq '.jobs[] | select((.name | startswith("End-to-end shard")) and .conclusion == "success") | "\(.name)\t\(.run_attempt)\t\(.id)"' \
+              | sort -t$'\t' -k1,1 -k2,2nr | awk -F'\t' '!seen[$1]++ { print $3 }')
+            if [ -n "$jobs" ]; then sampled=$((sampled + 1)); fi
             for job in $jobs; do
               gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$job/logs" > "$RUNNER_TEMP/logs/$run-$job.log"
             done
           done
           count=$(find "$RUNNER_TEMP/logs" -name '*.log' | wc -l)
-          echo "Downloaded $count shard logs from runs: $(echo $runs)"
-          if [ "$count" -eq 0 ]; then
-            echo "::error::No green E2E shard logs found"
+          echo "Downloaded $count shard logs from $sampled runs: $(echo $runs)"
+          # One run's timings are runner noise (±30% run to run), not a trend.
+          if [ "$sampled" -lt 3 ]; then
+            echo "::error::Shard logs from only $sampled green runs; need at least 3"
             exit 1
           fi
 
@@ -84,7 +90,10 @@ jobs:
           # The shard count lives in ci.yml (lint job's planner check); read it, don't repeat it.
           total=$(sed -nE 's/.*e2e_shard\.py check --total ([0-9]+).*/\1/p' .github/workflows/ci.yml)
           [ -n "$total" ] || { echo "::error::Cannot read --total from ci.yml"; exit 1; }
-          python3 scripts/ci/e2e_shard.py from-logs "$RUNNER_TEMP"/logs/*.log > "$RUNNER_TEMP/refit.json"
+          # --carry keeps the committed timing of any live spec the sample did not measure, so a
+          # partial sample cannot drop a slow spec to the median and fake a gain.
+          python3 scripts/ci/e2e_shard.py from-logs --carry scripts/ci/e2e-durations.json \
+            "$RUNNER_TEMP"/logs/*.log > "$RUNNER_TEMP/refit.json"
           python3 scripts/ci/e2e_shard.py gain --total "$total" --new "$RUNNER_TEMP/refit.json" \
             | tee "$RUNNER_TEMP/gain.txt"
           gain=$(tail -n 1 "$RUNNER_TEMP/gain.txt")
@@ -111,10 +120,21 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Replace the branch only if every commit on it is this workflow's own: a maintainer's
+          # commit on the open PR is left alone, and the lease fails the push if it moves meanwhile.
+          tip=$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)
+          if [ -n "$tip" ]; then
+            foreign=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$tip" \
+              --jq '[.commits[] | select(.commit.author.email != "41898282+github-actions[bot]@users.noreply.github.com")] | length')
+            if [ "$foreign" != 0 ]; then
+              echo "::warning::$BRANCH has $foreign commit(s) not made by this workflow; leaving it alone"
+              exit 0
+            fi
+          fi
           git switch -C "$BRANCH"
           git add scripts/ci/e2e-durations.json
           git commit -m "ci: refit E2E shard durations (${GAIN}s off the slowest shard)"
-          git push --force origin "$BRANCH"
+          git push --force-with-lease="$BRANCH:$tip" origin "$BRANCH"
           {
             echo "Weekly refit of \`scripts/ci/e2e-durations.json\` from the shard logs of the last $RUNS green push-to-main CI runs (PPS-229)."
             echo

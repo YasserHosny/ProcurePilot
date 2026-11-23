@@ -42,8 +42,9 @@ app. The aggregate job `e2e`, named exactly `End-to-end`, passes when the matrix
   compiles while the ~100 s Supabase pull/start runs; the dev server only needs the API at request time. The "Wait for
   the web app" step verifies readiness right before the first test (measured 0–1 s).
 - **a11y step gating.** The accessibility step runs only when the `changes` job's `web` output is true (a PR
-  touching `apps/web/**`, `packages/**`, `.github/workflows/**` or `supabase/config.toml`) and always on pushes to
-  `main`; the functional step runs either way.
+  touching `apps/web/**`, `packages/**`, `.github/workflows/**`, `supabase/config.toml`, or the shard planner
+  `scripts/ci/e2e_shard.py` and its manifest, since those decide which a11y specs share a stack) and always on
+  pushes to `main`; the functional step runs either way.
 - **Duration-balanced shards.** `scripts/ci/e2e_shard.py plan` does a deterministic longest-processing-time split
   over `scripts/ci/e2e-durations.json`: a11y and functional files are balanced together, so a shard's two steps sum
   to a balanced total. Specs missing from the manifest get the median of the measured weights (1 s if none are
@@ -52,12 +53,16 @@ app. The aggregate job `e2e`, named exactly `End-to-end`, passes when the matrix
   a new spec cannot be silently left out; `check` also prints a WARNING when more than 10% of spec files have no
   measured duration, so manifest drift shows in the lint log before it shows as a slow shard.
 - **Weekly manifest refresh.** `.github/workflows/e2e-durations-refresh.yml` runs on Sundays (and on demand from
-  the Actions tab). It downloads the E2E shard logs of the last 5 green push-to-main `CI` runs, refits the manifest
-  with `e2e_shard.py from-logs` (median per file), and scores it with `e2e_shard.py gain`: both the current and the
+  the Actions tab). It downloads the E2E shard logs of the last 5 green push-to-main `CI` runs (the latest successful
+  attempt of each shard, so a re-run lint job does not hide them; at least 3 runs must contribute), refits the
+  manifest with `e2e_shard.py from-logs --carry` (median per file; a live spec the sample did not measure keeps its
+  committed timing, so a partial sample cannot fake a gain), and scores it with `e2e_shard.py gain`: both the current and the
   refitted plan are scored on the refitted durations, and a PR (`ci/e2e-durations-refresh`) is opened or updated
   only when the refit takes at least 5 s off the slowest shard. Smaller weekly changes accumulate against the
   committed manifest until they cross that bar. It reads the shard count from `ci.yml`, so it needs no edit when
-  the count changes. Re-partitioning changes which specs share a stack: merge its PR only on a green run.
+  the count changes. It replaces the PR branch only when every commit on it is its own (with a lease on the tip it
+  checked); a maintainer's commit there makes it skip the update with a warning. Re-partitioning changes which specs
+  share a stack: merge its PR only on a green run.
 - **The refresh token.** The PR is pushed and opened with the `E2E_MANIFEST_TOKEN` secret, a fine-grained personal
   access token scoped to this repository with Contents and Pull requests read/write. A PR opened with the default
   `GITHUB_TOKEN` triggers no `pull_request` workflows, so the required checks would never run on it. Without the

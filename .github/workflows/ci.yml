@@ -61,6 +61,9 @@ jobs:
               - 'packages/**'
               - '.github/workflows/**'
               - 'supabase/config.toml'
+              # The planner and its manifest decide which a11y specs share a stack.
+              - 'scripts/ci/e2e_shard.py'
+              - 'scripts/ci/e2e-durations.json'
       - name: Set code-change output
         id: code
         env:

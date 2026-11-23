@@ -114,6 +114,17 @@ def from_logs(logs: Sequence[Path]) -> Dict[str, float]:
     return {name: round(statistics.median(values), 1) for name, values in samples.items()}
 
 
+def carry_forward(measured: Dict[str, float], committed: Path, specs_dir: Path) -> Dict[str, float]:
+    """Live specs only: sampled timings win, unsampled ones keep their committed timing."""
+    live = {path.name for path in specs_dir.glob("*.spec.ts") if path.is_file()}
+    if not live.intersection(measured):
+        raise ValueError("The logs measured no live spec file")
+    previous = json.loads(committed.read_text(encoding="utf-8"))
+    merged = {name: previous[name] for name in live if name in previous}
+    merged.update({name: seconds for name, seconds in measured.items() if name in live})
+    return merged
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -133,10 +144,18 @@ def main() -> int:
         command.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     logs = commands.add_parser("from-logs", help="Regenerate duration JSON from CI logs")
     logs.add_argument("logs", type=Path, nargs="+")
+    logs.add_argument(
+        "--carry", type=Path,
+        help="Committed manifest: keep its timings for live specs the logs did not measure",
+    )
+    logs.add_argument("--specs-dir", type=Path, default=DEFAULT_SPECS)
     args = parser.parse_args()
     try:
         if args.command == "from-logs":
-            print(json.dumps(from_logs(args.logs), sort_keys=True, indent=2))
+            durations = from_logs(args.logs)
+            if args.carry:
+                durations = carry_forward(durations, args.carry, args.specs_dir)
+            print(json.dumps(durations, sort_keys=True, indent=2))
             return 0
         weights = load_weights(args.specs_dir, args.manifest)
         if args.command == "gain":

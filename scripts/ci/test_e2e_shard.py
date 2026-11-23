@@ -119,6 +119,36 @@ class E2EShardTests(unittest.TestCase):
             same = self.cli(*args, "--manifest", str(new), "--new", str(new))
             self.assertEqual(same.strip().splitlines()[-1], "0.0")
 
+    def test_from_logs_carry_keeps_committed_timings_for_unsampled_specs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("a.spec.ts", "b.spec.ts", "c.spec.ts"):
+                (root / name).touch()
+            committed = root / "committed.json"
+            committed.write_text(json.dumps({
+                "a.spec.ts": 10, "b.spec.ts": 80, "gone.spec.ts": 5,
+            }), encoding="utf-8")
+            log = root / "shard.log"
+            log.write_text(
+                "✓ 1 [chrome] › tests/e2e/a.spec.ts:1:2 › one (12s)\n"
+                "✓ 2 [chrome] › tests/e2e/gone.spec.ts:1:2 › old (3s)\n",
+                encoding="utf-8",
+            )
+            args = ("from-logs", "--carry", str(committed), "--specs-dir", str(root))
+            # b keeps its committed 80 s; c has no timing anywhere; gone is not a live spec.
+            self.assertEqual(json.loads(self.cli(*args, str(log))), {
+                "a.spec.ts": 12.0, "b.spec.ts": 80,
+            })
+            empty = root / "empty.log"
+            empty.write_text("✓ 1 [chrome] › tests/e2e/gone.spec.ts:1:2 › old (3s)\n",
+                             encoding="utf-8")
+            failed = subprocess.run(
+                [sys.executable, str(Path(shard.__file__).resolve()), *args, str(empty)],
+                capture_output=True, text=True,
+            )
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("no live spec", failed.stderr)
+
     def test_from_logs_sums_units_then_takes_median(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             first = Path(directory) / "first.log"
