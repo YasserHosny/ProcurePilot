@@ -256,6 +256,7 @@ def list_supplier_risks(
     return SupplierRiskList(
         items=tuple(SupplierRiskSnapshot.model_validate(item) for item in page.items),
         next_cursor=page.next_cursor,
+        total=page.total,
     )
 
 

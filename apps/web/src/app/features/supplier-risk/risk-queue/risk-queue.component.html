@@ -43,7 +43,7 @@
       <mat-icon aria-hidden="true">error_outline</mat-icon>
       <span>{{ 'supplierRisk.error.' + errorKind | translate }}</span>
       @if (errorKind === 'load') {
-        <button mat-button type="button" (click)="loadRisks(true)">
+        <button mat-button type="button" (click)="loadRisks()">
           <mat-icon aria-hidden="true">refresh</mat-icon>
           <span>{{ 'supplierRisk.error.retry' | translate }}</span>
         </button>
@@ -167,19 +167,15 @@
           <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
         </table>
       </div>
+    }
 
-      @if (nextCursor()) {
-        <div class="pagination-row">
-          <button mat-stroked-button type="button" [disabled]="isLoadingMore()" (click)="loadMore()">
-            @if (isLoadingMore()) {
-              <mat-spinner diameter="18" [attr.aria-label]="'supplierRisk.pagination.loading' | translate" />
-            } @else {
-              <mat-icon aria-hidden="true">expand_more</mat-icon>
-            }
-            <span>{{ (isLoadingMore() ? 'supplierRisk.pagination.loading' : 'supplierRisk.pagination.more') | translate }}</span>
-          </button>
-        </div>
-      }
+    @if (pager.needed()) {
+      <app-list-pager
+        [pager]="pager"
+        [label]="'supplierRisk.pagerLabel' | translate"
+        [busy]="isLoading()"
+        (pageChange)="loadRisks()"
+      />
     }
   </section>
 </div>

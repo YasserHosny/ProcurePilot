@@ -587,7 +587,7 @@ export class ApiService {
 
   getReviewTasks(
     params?: ReviewTaskFilters,
-  ): Observable<{ items: ReviewTask[]; next_cursor: string | null }> {
+  ): Observable<{ items: ReviewTask[]; next_cursor: string | null; total?: number | null }> {
     const query = new URLSearchParams();
     if (params?.cursor) query.set('cursor', params.cursor);
     if (params?.limit) query.set('limit', String(params.limit));
@@ -602,7 +602,7 @@ export class ApiService {
     if (params?.sort_by) query.set('sort_by', params.sort_by);
     if (params?.sort_order) query.set('sort_order', params.sort_order);
     const qs = query.toString() ? `?${query.toString()}` : '';
-    return this.http.get<{ items: ReviewTask[]; next_cursor: string | null }>(
+    return this.http.get<{ items: ReviewTask[]; next_cursor: string | null; total?: number | null }>(
       `${this.base}/review-tasks${qs}`,
     );
   }
@@ -629,7 +629,7 @@ export class ApiService {
     date_to?: string;
     sort_by?: 'created_at' | 'priority' | 'status';
     sort_order?: 'asc' | 'desc';
-  }): Observable<{ items: MatchQueueItem[]; next_cursor: string | null; rfq_id?: string | null }> {
+  }): Observable<{ items: MatchQueueItem[]; next_cursor: string | null; rfq_id?: string | null; total?: number | null }> {
     const query = new URLSearchParams();
     if (params?.cursor) query.set('cursor', params.cursor);
     if (params?.limit) query.set('limit', String(params.limit));
@@ -643,7 +643,7 @@ export class ApiService {
     if (params?.sort_by) query.set('sort_by', params.sort_by);
     if (params?.sort_order) query.set('sort_order', params.sort_order);
     const qs = query.toString() ? `?${query.toString()}` : '';
-    return this.http.get<{ items: MatchQueueItem[]; next_cursor: string | null; rfq_id?: string | null }>(
+    return this.http.get<{ items: MatchQueueItem[]; next_cursor: string | null; rfq_id?: string | null; total?: number | null }>(
       `${this.base}/match-tasks${qs}`,
     );
   }

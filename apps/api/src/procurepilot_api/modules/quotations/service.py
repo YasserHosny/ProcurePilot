@@ -8,6 +8,7 @@ from typing import Literal
 from uuid import UUID
 
 from postgrest.exceptions import APIError
+from postgrest.types import CountMethod
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
@@ -222,11 +223,11 @@ class QuotationService:
                             str(UUID(hex=prefix.ljust(32, "f"))),
                         )
                     else:
-                        return ReviewTaskList(items=[], next_cursor=None)
+                        return ReviewTaskList(items=[], total=0 if offset == 0 else None)
             _sync_open_review_tasks(client, self._settings.extraction_confidence_threshold)
             query = (
                 client.table("review_task")
-                .select(TASK_LIST_COLUMNS)
+                .select(TASK_LIST_COLUMNS, count=CountMethod.exact)
                 .filter("quotation.deleted_at", "is", "null")
             )
             if supplier_ids:
@@ -270,14 +271,20 @@ class QuotationService:
                 .execute()
             )
         except APIError as exc:
+            if exc.code == "PGRST103" and offset > 0:
+                return ReviewTaskList(items=[])
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         rows = _rows(response.data)
+        if not rows:
+            return ReviewTaskList(items=[], total=0 if offset == 0 else None)
         visible = rows[:capped_limit]
+        count = getattr(response, "count", None)
         return ReviewTaskList(
             items=[_task(row) for row in visible],
             next_cursor=(
                 _encode_cursor(offset + capped_limit) if len(rows) > capped_limit else None
             ),
+            total=int(count) if isinstance(count, int) else None,
         )
 
     def get_audit_trail(

@@ -10,9 +10,10 @@ import { TranslatePipe } from '@ngx-translate/core';
 
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { SupplierRiskApiService, SupplierRiskSnapshot } from '../supplier-risk-api';
 
-const PAGE_SIZE = 50;
 const DRIVER_ORDER = [
   'concentration',
   'price_drift',
@@ -34,6 +35,7 @@ type QueueError = 'load' | 'recompute';
     MatTooltipModule,
     RouterLink,
     TranslatePipe,
+    ListPagerComponent,
     FormatDatePipe,
   ],
   templateUrl: './risk-queue.component.html',
@@ -44,10 +46,11 @@ export class RiskQueueComponent implements OnInit {
   private readonly api = inject(SupplierRiskApiService);
   private readonly session = inject(SessionService);
 
+  private latestLoadRequestId = 0;
+
   readonly risks = signal<SupplierRiskSnapshot[]>([]);
-  readonly nextCursor = signal<string | null>(null);
+  readonly pager = new CursorPager('supplier-risks');
   readonly isLoading = signal(true);
-  readonly isLoadingMore = signal(false);
   readonly isRecomputing = signal(false);
   readonly error = signal<QueueError | null>(null);
   readonly recomputedCount = signal<number | null>(null);
@@ -65,36 +68,32 @@ export class RiskQueueComponent implements OnInit {
   ];
 
   ngOnInit(): void {
-    this.loadRisks(true);
+    this.loadRisks();
   }
 
-  loadRisks(reset: boolean): void {
-    if (reset) {
-      this.isLoading.set(true);
-      this.error.set(null);
-    } else {
-      if (this.isLoadingMore() || !this.nextCursor()) return;
-      this.isLoadingMore.set(true);
-    }
+  loadRisks(): void {
+    const requestId = ++this.latestLoadRequestId;
+    this.isLoading.set(true);
+    this.error.set(null);
 
-    const cursor = reset ? undefined : (this.nextCursor() ?? undefined);
-    this.api.listRisks(cursor, PAGE_SIZE).subscribe({
+    const { cursor, limit } = this.pager.params();
+    this.api.listRisks(cursor, limit).subscribe({
       next: (page) => {
-        this.risks.update((current) => (reset ? [...page.items] : [...current, ...page.items]));
-        this.nextCursor.set(page.next_cursor);
+        if (requestId !== this.latestLoadRequestId) return;
+        if (!this.pager.loaded(page)) {
+          this.loadRisks();
+          return;
+        }
+        this.risks.set(page.items);
         this.isLoading.set(false);
-        this.isLoadingMore.set(false);
       },
       error: () => {
+        if (requestId !== this.latestLoadRequestId) return;
+        if (!this.pager.failed()) this.risks.set([]);
         this.error.set('load');
         this.isLoading.set(false);
-        this.isLoadingMore.set(false);
       },
     });
-  }
-
-  loadMore(): void {
-    this.loadRisks(false);
   }
 
   recompute(): void {
@@ -107,7 +106,8 @@ export class RiskQueueComponent implements OnInit {
       next: (result) => {
         this.recomputedCount.set(result.generated_snapshots);
         this.isRecomputing.set(false);
-        this.loadRisks(true);
+        this.pager.reset();
+        this.loadRisks();
       },
       error: () => {
         this.error.set('recompute');

@@ -59,7 +59,8 @@ describe('RiskQueueComponent', () => {
   const page = (
     items: SupplierRiskSnapshot[],
     nextCursor: string | null = null,
-  ): SupplierRiskList => ({ items, next_cursor: nextCursor });
+    total: number | null = null,
+  ): SupplierRiskList => ({ items, next_cursor: nextCursor, total });
 
   beforeEach(async () => {
     api = jasmine.createSpyObj<SupplierRiskApiService>('SupplierRiskApiService', [
@@ -109,7 +110,7 @@ describe('RiskQueueComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="risk-empty"]')).toBeNull();
 
     api.listRisks.and.returnValue(of(page([])));
-    component.loadRisks(true);
+    component.loadRisks();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[data-testid="risk-empty"]')).not.toBeNull();
   });
@@ -178,31 +179,83 @@ describe('RiskQueueComponent', () => {
     expect(text).toContain('supplierRisk.level.high');
   });
 
-  it('appends the next cursor page without replacing current suppliers', () => {
+  it('pages forward and back with the shared pager and reports the total', () => {
+    const page1 = Array.from({ length: 25 }, (_, i) =>
+      snapshot({ id: `snapshot-${i}`, supplier_id: `supplier-${i}`, supplier_name: `Supplier ${i}` }),
+    );
+    const page2 = [
+      snapshot({
+        id: 'snapshot-026',
+        supplier_id: 'supplier-026',
+        supplier_name: 'Nile Supplies',
+        risk_level: 'low',
+      }),
+    ];
     api.listRisks.and.returnValues(
-      of(page([snapshot()], 'cursor-2')),
-      of(
-        page([
-          snapshot({
-            id: 'snapshot-002',
-            supplier_id: 'supplier-002',
-            supplier_name: 'Nile Supplies',
-            risk_level: 'low',
-          }),
-        ]),
-      ),
+      of(page(page1, 'cursor-2', 26)),
+      of(page(page2, null, 26)),
+      of(page(page1, 'cursor-2', 26)),
     );
     fixture.detectChanges();
 
-    component.loadMore();
+    const range = () =>
+      (fixture.nativeElement.querySelector('.list-pager__range') as HTMLElement)?.textContent?.trim();
+    const button = (name: string) =>
+      fixture.nativeElement.querySelector(`.list-pager__${name}`) as HTMLButtonElement;
+
+    expect(range()).toBeTruthy();
+    expect(component.pager.from()).toBe(1);
+    expect(component.pager.to()).toBe(25);
+    expect(component.pager.total()).toBe(26);
+    expect(button('previous').disabled).toBeTrue();
+    expect(button('next').disabled).toBeFalse();
+
+    button('next').click();
     fixture.detectChanges();
 
     expect(api.listRisks.calls.allArgs()).toEqual([
-      [undefined, 50],
-      ['cursor-2', 50],
+      [undefined, 25],
+      ['cursor-2', 25],
     ]);
-    expect(fixture.nativeElement.textContent).toContain('Alfaisal Trade');
     expect(fixture.nativeElement.textContent).toContain('Nile Supplies');
+    expect(fixture.nativeElement.textContent).not.toContain('Supplier 0');
+    expect(component.pager.from()).toBe(26);
+    expect(component.pager.to()).toBe(26);
+    expect(component.pager.total()).toBe(26);
+    expect(button('next').disabled).toBeTrue();
+
+    button('previous').click();
+    fixture.detectChanges();
+
+    expect(api.listRisks.calls.mostRecent().args).toEqual([undefined, 25]);
+    expect(fixture.nativeElement.textContent).toContain('Supplier 0');
+    expect(component.pager.from()).toBe(1);
+    expect(component.pager.to()).toBe(25);
+    expect(component.pager.total()).toBe(26);
+  });
+
+  it('keeps the current page on failed Next and clears rows on failed first load', () => {
+    const page1 = Array.from({ length: 25 }, (_, i) =>
+      snapshot({ id: `snapshot-${i}`, supplier_id: `supplier-${i}`, supplier_name: `Supplier ${i}` }),
+    );
+    api.listRisks.and.returnValue(of(page(page1, 'cursor-2', 26)));
+    fixture.detectChanges();
+
+    api.listRisks.and.returnValue(throwError(() => new Error('network error')));
+    (fixture.nativeElement.querySelector('.list-pager__next') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(component.risks().length).toBe(25);
+    expect(component.pager.pageIndex()).toBe(0);
+    expect(component.pager.nextCursor()).toBe('cursor-2');
+    expect(fixture.nativeElement.querySelector('[role="alert"]')).not.toBeNull();
+
+    component.pager.reset();
+    component.loadRisks();
+    fixture.detectChanges();
+
+    expect(component.risks()).toEqual([]);
+    expect(fixture.nativeElement.querySelector('app-list-pager')).toBeNull();
   });
 
   it('allows owners and buyers to recompute and then refreshes the queue', () => {

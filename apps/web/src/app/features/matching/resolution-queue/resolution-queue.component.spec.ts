@@ -193,9 +193,10 @@ describe('ResolutionQueueComponent', () => {
       date_to: undefined,
       sort_by: 'created_at',
       sort_order: 'desc',
+      limit: 25,
     });
     expect(component.tasks().length).toBe(2);
-    expect(component.nextCursor()).toBe('cursor-123');
+    expect(component.pager.nextCursor()).toBe('cursor-123');
     expect(component.isLoading()).toBeFalse();
     expect(component.groups().length).toBe(2);
   });
@@ -303,7 +304,7 @@ describe('ResolutionQueueComponent', () => {
 
     expect(component.statusFilter()).toBe('resolved');
     expect(component.tasks()).toEqual([resolvedTask]);
-    expect(component.nextCursor()).toBeNull();
+    expect(component.pager.nextCursor()).toBeNull();
     expect(component.isLoading()).toBeFalse();
   });
 
@@ -317,30 +318,86 @@ describe('ResolutionQueueComponent', () => {
     );
   });
 
-  it('should load more tasks when loadMore is called', () => {
-    const extraTask: MatchTask = {
+  it('pages forward and back with the shared pager, carries limit, and reports total', () => {
+    const page1 = Array.from({ length: 25 }, (_, i) => ({
       ...mockTasks[0],
-      id: 'task-3',
-      quotation_id: 'q-103',
-      quotation_line: {
-        ...mockTasks[0].quotation_line,
-        id: 'line-103',
-      },
+      id: `task-p1-${i}`,
+      quotation_id: `q-p1-${i}`,
+      quotation_line: { ...mockTasks[0].quotation_line, id: `line-p1-${i}` },
+    }));
+    const page2: MatchTask = {
+      ...mockTasks[0],
+      id: 'task-26',
+      quotation_id: 'q-126',
+      quotation_line: { ...mockTasks[0].quotation_line, id: 'line-126' },
     };
-    apiService.getMatchTasks.and.returnValue(of({ items: [extraTask], next_cursor: null }));
+    apiService.getMatchTasks.and.returnValues(
+      of({ items: page1, next_cursor: 'cursor-123', total: 26 }),
+      of({ items: [page2], next_cursor: null, total: 26 }),
+      of({ items: page1, next_cursor: 'cursor-123', total: 26 }),
+    );
+    component.loadTasks();
+    fixture.detectChanges();
 
-    component.loadMore();
+    const range = () =>
+      (fixture.nativeElement.querySelector('.list-pager__range') as HTMLElement)?.textContent?.trim();
+    const button = (name: string) =>
+      fixture.nativeElement.querySelector(`.list-pager__${name}`) as HTMLButtonElement;
+
+    expect(range()).toBe('1–25 of 26');
+    expect(button('previous').disabled).toBeTrue();
+    expect(button('next').disabled).toBeFalse();
+
+    button('next').click();
+    fixture.detectChanges();
 
     expect(apiService.getMatchTasks).toHaveBeenCalledWith(
-      jasmine.objectContaining({
-        cursor: 'cursor-123',
-      }),
+      jasmine.objectContaining({ cursor: 'cursor-123', limit: 25 }),
     );
-    expect(component.tasks().length).toBe(3);
-    expect(component.nextCursor()).toBeNull();
+    expect(component.tasks().map((t) => t.id)).toEqual(['task-26']);
+    expect(range()).toBe('26–26 of 26');
+    expect(button('next').disabled).toBeTrue();
+
+    button('previous').click();
+    fixture.detectChanges();
+
+    expect(apiService.getMatchTasks.calls.mostRecent().args[0]).toEqual(
+      jasmine.objectContaining({ limit: 25 }),
+    );
+    expect(apiService.getMatchTasks.calls.mostRecent().args[0]?.cursor).toBeUndefined();
+    expect(component.tasks().length).toBe(25);
+    expect(range()).toBe('1–25 of 26');
   });
 
-  it('should ignore stale loadMore responses after filters change', () => {
+  it('keeps the current page on failed Next and clears rows on failed first load', () => {
+    const page1 = Array.from({ length: 25 }, (_, i) => ({
+      ...mockTasks[0],
+      id: `task-p1-${i}`,
+    }));
+    apiService.getMatchTasks.and.returnValue(
+      of({ items: page1, next_cursor: 'cursor-2', total: 26 }),
+    );
+    component.loadTasks();
+    fixture.detectChanges();
+
+    apiService.getMatchTasks.and.returnValue(throwError(() => new Error('network error')));
+    (fixture.nativeElement.querySelector('.list-pager__next') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(component.tasks().length).toBe(25);
+    expect(component.pager.pageIndex()).toBe(0);
+    expect(component.pager.nextCursor()).toBe('cursor-2');
+    expect(component.errorMessage()).toBeTruthy();
+
+    component.pager.reset();
+    component.loadTasks();
+    fixture.detectChanges();
+
+    expect(component.tasks()).toEqual([]);
+    expect(fixture.nativeElement.querySelector('app-list-pager')).toBeNull();
+  });
+
+  it('should ignore stale page-2 responses after filters change', () => {
     const extraTask: MatchTask = {
       ...mockTasks[0],
       id: 'task-extra-open',
@@ -355,25 +412,26 @@ describe('ResolutionQueueComponent', () => {
       id: 'task-resolved',
       status: 'resolved',
     };
-    const loadMoreResponse = new Subject<{ items: MatchTask[]; next_cursor: string | null }>();
+    const page2Response = new Subject<{ items: MatchTask[]; next_cursor: string | null }>();
     const resolvedResponse = new Subject<{ items: MatchTask[]; next_cursor: string | null }>();
     apiService.getMatchTasks.and.returnValues(
-      loadMoreResponse.asObservable(),
+      page2Response.asObservable(),
       resolvedResponse.asObservable(),
     );
 
-    component.loadMore();
+    component.pager.goNext();
+    component.loadTasks();
     component.onStatusChange('resolved');
 
     resolvedResponse.next({ items: [resolvedTask], next_cursor: null });
     resolvedResponse.complete();
-    loadMoreResponse.next({ items: [extraTask], next_cursor: 'stale-cursor' });
-    loadMoreResponse.complete();
+    page2Response.next({ items: [extraTask], next_cursor: 'stale-cursor' });
+    page2Response.complete();
 
     expect(component.statusFilter()).toBe('resolved');
     expect(component.tasks()).toEqual([resolvedTask]);
-    expect(component.nextCursor()).toBeNull();
-    expect(component.isLoadingMore()).toBeFalse();
+    expect(component.pager.nextCursor()).toBeNull();
+    expect(component.isLoading()).toBeFalse();
   });
 
   it('should detect active filters and clear them', () => {
@@ -691,7 +749,7 @@ describe('ResolutionQueueComponent', () => {
       expect(count.textContent).toContain('Lines shown: 2');
       expect(count.textContent).toContain(enCatalog.matching.queue.moreAvailable);
 
-      component.nextCursor.set(null);
+      component.pager.nextCursor.set(null);
       fixture.detectChanges();
       expect(count.textContent).not.toContain(enCatalog.matching.queue.moreAvailable);
     });
@@ -745,18 +803,17 @@ describe('ResolutionQueueComponent', () => {
   });
 
   describe('paging and refresh (P-153, PPS-197)', () => {
-    it('does not list a task twice when Load more brings back one that moved between pages', () => {
-      const dup = mockTasks[0] as unknown as MatchQueueItem;
+    it('replaces the current page when paging to the next page', () => {
+      const nextTask: MatchTask = { ...(mockTasks[1] as unknown as MatchTask), id: 'task-new' };
       expect(component.tasks().length).toBe(2);
       apiService.getMatchTasks.and.returnValue(
-        of({ items: [dup, { ...(mockTasks[1] as unknown as MatchQueueItem), id: 'task-new' }], next_cursor: null }),
+        of({ items: [nextTask], next_cursor: null, total: 3 }),
       );
 
-      component.loadMore();
+      component.pager.goNext();
+      component.loadTasks();
 
-      const ids = component.tasks().map((t) => t.id);
-      expect(new Set(ids).size).withContext(ids.join(',')).toBe(ids.length);
-      expect(ids).toContain('task-new');
+      expect(component.tasks().map((t) => t.id)).toEqual(['task-new']);
     });
 
     it('lets the buyer refresh the list in place', () => {

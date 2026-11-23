@@ -486,6 +486,7 @@ class SupplierRiskSnapshot(StrictApiModel):
 class SupplierRiskList(StrictApiModel):
     items: tuple[SupplierRiskSnapshot, ...]
     next_cursor: str | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class SupplierRiskRecomputeResponse(StrictApiModel):
