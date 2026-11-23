@@ -855,6 +855,34 @@ describe('RequestListComponent (T017)', () => {
       expect(component.requests()).toEqual([]);
       expect(component.errorMessage()).toBe('Failed to refresh list');
       expect(fixture.nativeElement.querySelector('.error-banner')).toBeTruthy();
+      // No stale «26–26 of 26» or live Previous next to the cleared table.
+      expect(fixture.nativeElement.querySelector('app-list-pager')).toBeNull();
+      expect(component.pager.pageIndex()).toBe(0);
+    });
+
+    it('(6) withdrawing the only row on the last page steps back to the previous page', () => {
+      const page1 = Array.from({ length: 25 }, (_, i) => ({ ...mockRequests[0], id: `p1-${i}` }));
+      requestsApi.listRequests.and.returnValue(of({ items: page1, next_cursor: 'cursor-2', total: 26 }));
+      component.loadRequests();
+      fixture.detectChanges();
+      requestsApi.listRequests.and.returnValue(of({ items: [mockRequests[1]], next_cursor: null, total: 26 }));
+      component.pager.goNext();
+      component.loadRequests();
+      fixture.detectChanges();
+      expect(component.pager.pageIndex()).toBe(1);
+
+      // After the withdrawal page 2 is empty; the list steps back to page 1 instead of «no matches».
+      requestsApi.listRequests.and.returnValues(
+        of({ items: [], next_cursor: null, total: null }),
+        of({ items: page1, next_cursor: null, total: 25 }),
+      );
+      component.loadRequests();
+      fixture.detectChanges();
+
+      expect(requestsApi.listRequests.calls.mostRecent().args[0]).toEqual({ status: undefined, limit: 25 });
+      expect(component.pager.pageIndex()).toBe(0);
+      expect(component.requests().length).toBe(25);
+      expect(fixture.nativeElement.querySelector('.empty-state')).toBeNull();
     });
 
     it('(6) branch names from page 2 resolve', () => {

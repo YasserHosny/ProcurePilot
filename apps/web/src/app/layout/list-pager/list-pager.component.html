@@ -14,7 +14,12 @@
 
   @let r = range();
   <span class="list-pager__range" role="status" aria-live="polite" aria-atomic="true">
-    {{ r.key | translate: r.params }}
+    <!-- While a page loads the pager has moved but the counts still describe the old page. -->
+    @if (busy()) {
+      {{ 'common.loading' | translate }}
+    } @else {
+      {{ r.key | translate: r.params }}
+    }
   </span>
 
   <div class="list-pager__steps">

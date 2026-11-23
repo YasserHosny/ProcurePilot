@@ -117,8 +117,8 @@ export class RequestListComponent implements OnInit {
             catchError((err: unknown) => {
               this.isLoading.set(false);
               // A failed Previous / Next keeps the page on screen and the pager where it was;
-              // any other failed load (first load, filters, retry) clears the rows.
-              if (!this.pager.revert()) this.requests.set([]);
+              // any other failed load (first load, filters, refresh) clears rows and pager.
+              if (!this.pager.failed()) this.requests.set([]);
               this.handleError(err);
               return EMPTY;
             }),
@@ -127,9 +127,13 @@ export class RequestListComponent implements OnInit {
         takeUntilDestroyed(),
       )
       .subscribe(({ requests, branches }) => {
-        this.requests.set([...requests.items]);
         this.branches.set([...branches.items]);
-        this.pager.loaded(requests);
+        // An empty page past the first (its last row withdrawn): step back and load again.
+        if (!this.pager.loaded(requests)) {
+          this.loadRequests();
+          return;
+        }
+        this.requests.set([...requests.items]);
         this.isLoading.set(false);
       });
   }

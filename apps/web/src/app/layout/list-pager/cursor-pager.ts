@@ -46,12 +46,32 @@ export class CursorPager {
     return cursor ? { cursor, limit: this.pageSize() } : { limit: this.pageSize() };
   }
 
-  /** Records the page the API returned for the current cursor. */
-  loaded(page: CursorPage): void {
+  /**
+   * Records the page the API returned for the current cursor. Returns false when a page past
+   * the first came back empty (the list shrank, e.g. its last row was withdrawn): the pager
+   * has stepped back one page and the host should load again instead of showing «no results».
+   */
+  loaded(page: CursorPage): boolean {
     this.undo = null;
+    if (page.items.length === 0 && this.hasPrevious()) {
+      this.cursors.update((stack) => stack.slice(0, -1));
+      return false;
+    }
     this.count.set(page.items.length);
     this.nextCursor.set(page.next_cursor);
     this.total.set(page.total ?? null);
+    return true;
+  }
+
+  /**
+   * After a failed load. Returns true when it undid a Previous / Next / size move, so the host
+   * keeps the rows on screen; otherwise it resets the pager (no stale range or controls) and
+   * returns false, so the host clears the rows.
+   */
+  failed(): boolean {
+    if (this.revert()) return true;
+    this.reset();
+    return false;
   }
 
   /** Back to the first page, as after a filter or sort change. */

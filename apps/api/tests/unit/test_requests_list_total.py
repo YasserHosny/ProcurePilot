@@ -9,9 +9,11 @@ from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
+from postgrest.exceptions import APIError
 
+from procurepilot_api.errors import ServiceUnavailableError
 from procurepilot_api.modules.requests import service as service_module
-from procurepilot_api.modules.requests.service import RequestsService
+from procurepilot_api.modules.requests.service import RequestsService, _encode_cursor
 
 
 def _service(monkeypatch: pytest.MonkeyPatch, *, rows: int, count: int | None) -> Mock:
@@ -72,3 +74,27 @@ def test_empty_first_page_reports_zero(
 ) -> None:
     _service(monkeypatch, rows=0, count=0)
     assert service.list_requests(bearer_token="test").total == 0
+
+
+def test_stale_offset_past_the_count_is_an_empty_page_not_an_outage(
+    monkeypatch: pytest.MonkeyPatch, service: RequestsService
+) -> None:
+    # With count=exact, PostgREST answers an offset past the current total with 416/PGRST103,
+    # e.g. a list that shrank between pages. That is an empty page, not a database outage.
+    client = _service(monkeypatch, rows=0, count=None)
+    client.table.return_value.execute.side_effect = APIError(
+        {"code": "PGRST103", "message": "Requested range not satisfiable", "details": None}
+    )
+    result = service.list_requests(bearer_token="test", cursor=_encode_cursor(25), limit=25)
+    assert (result.items, result.next_cursor, result.total) == ([], None, None)
+
+
+def test_other_database_errors_still_report_the_outage(
+    monkeypatch: pytest.MonkeyPatch, service: RequestsService
+) -> None:
+    client = _service(monkeypatch, rows=0, count=None)
+    client.table.return_value.execute.side_effect = APIError(
+        {"code": "57014", "message": "canceling statement due to statement timeout"}
+    )
+    with pytest.raises(ServiceUnavailableError):
+        service.list_requests(bearer_token="test", limit=25)

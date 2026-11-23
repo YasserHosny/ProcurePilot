@@ -90,4 +90,36 @@ describe('CursorPager', () => {
     pager.loaded(page(3, 'c2'));
     expect(pager.needed()).toBeTrue();
   });
+
+  it('an empty page past the first steps back and asks the host to load again', () => {
+    const pager = new CursorPager('spec-list');
+    pager.loaded(page(25, 'c2', 26));
+    pager.goNext();
+    expect(pager.loaded(page(1, null, 26))).toBeTrue();
+
+    // The last row was withdrawn: page 2 is now empty.
+    expect(pager.loaded(page(0, null, null))).toBeFalse();
+    expect(pager.params()).toEqual({ limit: 25 });
+    expect(pager.loaded(page(25, null, 25))).toBeTrue();
+    expect([pager.from(), pager.to(), pager.total()]).toEqual([1, 25, 25]);
+  });
+
+  it('an empty first page is simply empty', () => {
+    const pager = new CursorPager('spec-list');
+    expect(pager.loaded(page(0, null, 0))).toBeTrue();
+    expect(pager.needed()).toBeFalse();
+  });
+
+  it('failed() keeps the rows after a failed move, and resets the pager otherwise', () => {
+    const pager = new CursorPager('spec-list');
+    pager.loaded(page(25, 'c2', 26));
+    pager.goNext();
+    expect(pager.failed()).toBeTrue();
+    expect(pager.params()).toEqual({ limit: 25 });
+
+    pager.goNext();
+    pager.loaded(page(1, null, 26));
+    expect(pager.failed()).toBeFalse();
+    expect([pager.pageIndex(), pager.count(), pager.total(), pager.needed()]).toEqual([0, 0, null, false]);
+  });
 });

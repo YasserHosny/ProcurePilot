@@ -75,9 +75,10 @@ describe('ListPagerComponent', () => {
     expect(range()).toBe('1–25');
   });
 
-  it('disables every control while a page loads', () => {
+  it('disables every control and shows Loading in place of the range while a page loads', () => {
     host.busy = true;
     fixture.detectChanges();
+    expect(range()).toBe('Loading...');
     expect((el('.list-pager__next') as HTMLButtonElement).disabled).toBeTrue();
     expect(el('mat-select').getAttribute('aria-disabled')).toBe('true');
   });

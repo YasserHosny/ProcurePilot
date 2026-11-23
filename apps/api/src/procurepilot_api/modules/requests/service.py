@@ -734,6 +734,11 @@ class RequestsService:
                     .execute()
                 )
             except APIError as exc:
+                # With count=exact, PostgREST rejects an offset past the current total
+                # (416, PGRST103): the list shrank since the cursor was issued. That is an
+                # empty page, and the web pager steps back from it.
+                if exc.code == "PGRST103" and offset > 0:
+                    return PurchaseRequestList(items=[], next_cursor=None, total=None)
                 raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
             rows = _rows(response.data)
