@@ -154,7 +154,7 @@ class ReportsService:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
                     """
-                    select * from report_schedule
+                    select *, count(*) over () as total_count from report_schedule
                     order by created_at desc, id desc
                     limit %(limit)s offset %(offset)s
                     """,
@@ -163,7 +163,9 @@ class ReportsService:
                 rows = [dict(row) for row in cur.fetchall()]
         next_cursor = _encode_cursor(offset + capped) if len(rows) > capped else None
         return ReportScheduleList(
-            items=[_schedule(row) for row in rows[:capped]], next_cursor=next_cursor
+            items=[_schedule(row) for row in rows[:capped]],
+            next_cursor=next_cursor,
+            total=rows[0]["total_count"] if rows else (0 if offset == 0 else None),
         )
 
     def get_schedule(self, *, member: CurrentMember, schedule_id: UUID) -> ReportSchedule:
@@ -305,7 +307,7 @@ class ReportsService:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
                     f"""
-                    select * from export_job {where}
+                    select *, count(*) over () as total_count from export_job {where}
                     order by created_at desc, id desc
                     limit %(limit)s offset %(offset)s
                     """,
@@ -314,7 +316,9 @@ class ReportsService:
                 rows = [dict(row) for row in cur.fetchall()]
         next_cursor = _encode_cursor(offset + capped) if len(rows) > capped else None
         return ReportArtifactList(
-            items=[_artifact(row) for row in rows[:capped]], next_cursor=next_cursor
+            items=[_artifact(row) for row in rows[:capped]],
+            next_cursor=next_cursor,
+            total=rows[0]["total_count"] if rows else (0 if offset == 0 else None),
         )
 
 

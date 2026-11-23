@@ -48,6 +48,7 @@ export interface SyncedBill {
 export interface SyncedBillList {
   items: SyncedBill[];
   next_cursor: string | null;
+  readonly total?: number | null;
 }
 
 export interface ListBillsParams {
@@ -147,6 +148,7 @@ export interface ReconciliationDiscrepancy {
 export interface ReconciliationDiscrepancyList {
   items: ReconciliationDiscrepancy[];
   next_cursor: string | null;
+  readonly total?: number | null;
 }
 
 export interface ListDiscrepanciesParams {

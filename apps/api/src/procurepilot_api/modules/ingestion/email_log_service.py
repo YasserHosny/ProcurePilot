@@ -79,7 +79,8 @@ class IngestionEmailLogService:
                 l.supplier_id,
                 s.name as supplier_name,
                 l.match_method,
-                l.created_at
+                l.created_at,
+                count(*) over () as total_count
             from ingestion_email_log l
             left join supplier s on s.id = l.supplier_id and s.tenant_id = l.tenant_id
             {where_sql}
@@ -99,6 +100,7 @@ class IngestionEmailLogService:
         return IngestionEmailLogList(
             items=[_map_log_entry(r) for r in page_rows],
             next_cursor=next_cursor,
+            total=rows[0]["total_count"] if rows else (0 if offset == 0 else None),
         )
 
 

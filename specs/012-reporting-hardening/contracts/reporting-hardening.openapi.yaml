@@ -48,6 +48,7 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/ReportSchedule' }
                   next_cursor: { type: string, nullable: true }
+                  total: { type: [integer, "null"], minimum: 0 }
         '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       summary: Create a report schedule
@@ -148,6 +149,7 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/ReportArtifact' }
                   next_cursor: { type: string, nullable: true }
+                  total: { type: [integer, "null"], minimum: 0 }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /exports:

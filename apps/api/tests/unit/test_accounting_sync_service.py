@@ -206,6 +206,7 @@ def test_synced_bill_projection(monkeypatch: pytest.MonkeyPatch, balance: Decima
         "matched": False, "due_date": date(2026, 7, 31),
         "remaining_balance_amount": balance,
         "remaining_balance_currency": "EUR" if balance is not None else None,
+        "total_count": 1,
     }
     cursor = _Cursor(row)
     monkeypatch.setattr(cursor, "fetchall", lambda: [row], raising=False)
@@ -221,6 +222,7 @@ def test_synced_bill_projection(monkeypatch: pytest.MonkeyPatch, balance: Decima
     result = ConnectionService(settings=SimpleNamespace()).list_bills(
         SimpleNamespace(tenant_id=TENANT_ID)
     ).model_dump(mode="json")
+    assert result["total"] == 1
     bill = result["items"][0]
     assert bill["amount"] == "20.00"
     assert bill["currency"] == "EUR"

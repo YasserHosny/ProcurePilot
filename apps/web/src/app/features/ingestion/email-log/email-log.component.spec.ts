@@ -1,6 +1,7 @@
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { provideTranslateService } from '@ngx-translate/core';
@@ -140,7 +141,13 @@ describe('EmailLogComponent', () => {
     next_cursor: null,
   };
 
+  function clickPager(direction: 'next' | 'previous'): void {
+    const button = fixture.debugElement.query(By.css(`.list-pager__${direction}`));
+    (button.nativeElement as HTMLButtonElement).click();
+  }
+
   beforeEach(async () => {
+    localStorage.removeItem('pp.pageSize.ingestion-email-log');
     await TestBed.configureTestingModule({
       imports: [EmailLogComponent],
       providers: [
@@ -166,16 +173,16 @@ describe('EmailLogComponent', () => {
   });
 
   describe('initial load', () => {
-    it('should request email logs with limit=50 and render rows on success', () => {
+    it('should request email logs with limit=25 and render rows on success', () => {
       fixture.detectChanges();
 
-      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50');
+      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=25');
       expect(req.request.method).toBe('GET');
       req.flush(mockInitialResponse);
 
       expect(component.isLoading()).toBeFalse();
       expect(component.logs().length).toBe(6);
-      expect(component.nextCursor()).toBe('cursor-page-2');
+      expect(component.pager.nextCursor()).toBe('cursor-page-2');
 
       fixture.detectChanges();
       const compiled = fixture.nativeElement as HTMLElement;
@@ -186,7 +193,7 @@ describe('EmailLogComponent', () => {
     it('should show error banner when initial load fails', () => {
       fixture.detectChanges();
 
-      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50');
+      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=25');
       req.flush({ message: 'Internal server error' }, { status: 500, statusText: 'Server Error' });
 
       expect(component.isLoading()).toBeFalse();
@@ -201,7 +208,7 @@ describe('EmailLogComponent', () => {
     it('should retry loading when retry button is clicked', () => {
       fixture.detectChanges();
 
-      const req1 = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50');
+      const req1 = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=25');
       req1.flush({}, { status: 500, statusText: 'Server Error' });
 
       fixture.detectChanges();
@@ -211,7 +218,7 @@ describe('EmailLogComponent', () => {
 
       retryBtn.click();
 
-      const req2 = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50');
+      const req2 = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=25');
       req2.flush(mockInitialResponse);
 
       expect(component.errorMessage()).toBeNull();
@@ -219,70 +226,46 @@ describe('EmailLogComponent', () => {
     });
   });
 
-  describe('pagination (load more)', () => {
-    it('should append new items to the existing list rather than replacing them', () => {
+  describe('pagination', () => {
+    beforeEach(() => {
       fixture.detectChanges();
-
-      const req1 = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50');
-      req1.flush(mockInitialResponse);
-
-      expect(component.logs().length).toBe(6);
-      expect(component.nextCursor()).toBe('cursor-page-2');
-
-      component.loadMore();
-      expect(component.isLoadingMore()).toBeTrue();
-
-      const req2 = httpTestingController.expectOne(
-        '/api/v1/ingestion/emails?cursor=cursor-page-2&limit=50'
-      );
-      expect(req2.request.method).toBe('GET');
-      req2.flush(mockSecondPage);
-
-      expect(component.isLoadingMore()).toBeFalse();
-      expect(component.logs().length).toBe(7);
-      expect(component.nextCursor()).toBeNull();
-      expect(component.logs()[6].id).toBe('log-007');
+      httpTestingController.expectOne('/api/v1/ingestion/emails?limit=25').flush(mockInitialResponse);
+      fixture.detectChanges();
     });
 
-    it('should not call API if nextCursor is null', () => {
+    it('shows the next page and returns to the first with Previous', () => {
+      clickPager('next');
+      httpTestingController.expectOne('/api/v1/ingestion/emails?cursor=cursor-page-2&limit=25')
+        .flush(mockSecondPage);
       fixture.detectChanges();
 
-      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50');
-      req.flush({ items: mockLogs, next_cursor: null });
+      expect(component.logs()).toEqual(mockSecondPage.items);
+      expect(component.pager.nextCursor()).toBeNull();
 
-      expect(component.nextCursor()).toBeNull();
-
-      component.loadMore();
-      httpTestingController.expectNone(
-        (request) => request.url.includes('/api/v1/ingestion/emails') && request.params.has('cursor')
-      );
-      expect(component.logs().length).toBe(mockLogs.length);
+      clickPager('previous');
+      httpTestingController.expectOne('/api/v1/ingestion/emails?limit=25').flush(mockInitialResponse);
+      expect(component.logs()).toEqual(mockInitialResponse.items);
     });
 
-    it('should not call API if already loading more', () => {
+    it('keeps rows and restores Next when its request fails', () => {
+      clickPager('next');
+      const request = httpTestingController.expectOne('/api/v1/ingestion/emails?cursor=cursor-page-2&limit=25');
       fixture.detectChanges();
+      const next = fixture.debugElement.query(By.css('.list-pager__next')).nativeElement as HTMLButtonElement;
+      expect(next.disabled).toBeTrue();
 
-      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50');
-      req.flush(mockInitialResponse);
-
-      component.loadMore();
-      const moreReq = httpTestingController.expectOne(
-        '/api/v1/ingestion/emails?cursor=cursor-page-2&limit=50'
-      );
-
-      // Attempt second loadMore while first is still pending
-      component.loadMore();
-      httpTestingController.verify();
-
-      moreReq.flush(mockSecondPage);
-      expect(component.logs().length).toBe(7);
+      request.flush(null, { status: 500, statusText: 'Server Error' });
+      fixture.detectChanges();
+      expect(next.disabled).toBeFalse();
+      expect(component.logs()).toEqual(mockInitialResponse.items);
+      expect(component.pager.pageIndex()).toBe(0);
     });
   });
 
   describe('filtering', () => {
     beforeEach(() => {
       fixture.detectChanges();
-      const initReq = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50');
+      const initReq = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=25');
       initReq.flush(mockInitialResponse);
     });
 
@@ -290,7 +273,7 @@ describe('EmailLogComponent', () => {
       component.statusFilter.set('completed');
       component.onFilterChange();
 
-      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50&status=completed');
+      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=25&status=completed');
       expect(req.request.method).toBe('GET');
       req.flush({ items: [mockLogs[0]], next_cursor: null });
 
@@ -303,7 +286,7 @@ describe('EmailLogComponent', () => {
       component.onFilterChange();
 
       const req = httpTestingController.expectOne(
-        '/api/v1/ingestion/emails?limit=50&from_domain=acme.com'
+        '/api/v1/ingestion/emails?limit=25&from_domain=acme.com'
       );
       expect(req.request.method).toBe('GET');
       req.flush({ items: [mockLogs[0]], next_cursor: null });
@@ -317,7 +300,7 @@ describe('EmailLogComponent', () => {
       component.onFilterChange();
 
       const req = httpTestingController.expectOne(
-        '/api/v1/ingestion/emails?limit=50&date_from=2026-09-17'
+        '/api/v1/ingestion/emails?limit=25&date_from=2026-09-17'
       );
       expect(req.request.method).toBe('GET');
       req.flush({ items: mockLogs.slice(0, 3), next_cursor: null });
@@ -330,7 +313,7 @@ describe('EmailLogComponent', () => {
       component.onFilterChange();
 
       const req = httpTestingController.expectOne(
-        '/api/v1/ingestion/emails?limit=50&date_to=2026-09-16'
+        '/api/v1/ingestion/emails?limit=25&date_to=2026-09-16'
       );
       expect(req.request.method).toBe('GET');
       req.flush({ items: mockLogs.slice(3), next_cursor: null });
@@ -346,7 +329,7 @@ describe('EmailLogComponent', () => {
       component.onFilterChange();
 
       const req = httpTestingController.expectOne(
-        '/api/v1/ingestion/emails?limit=50&status=failed&from_domain=unknown-vendor.net&date_from=2026-09-01&date_to=2026-09-17'
+        '/api/v1/ingestion/emails?limit=25&status=failed&from_domain=unknown-vendor.net&date_from=2026-09-01&date_to=2026-09-17'
       );
       expect(req.request.method).toBe('GET');
       req.flush({ items: [mockLogs[1]], next_cursor: null });
@@ -373,7 +356,7 @@ describe('EmailLogComponent', () => {
       expect(dateFromInput.value).toBe('22/10/2026');
 
       const req = httpTestingController.expectOne(
-        '/api/v1/ingestion/emails?limit=50&date_from=2026-10-22'
+        '/api/v1/ingestion/emails?limit=25&date_from=2026-10-22'
       );
       expect(req.request.method).toBe('GET');
       req.flush({ items: [], next_cursor: null });
@@ -389,7 +372,7 @@ describe('EmailLogComponent', () => {
 
       component.resetFilters();
 
-      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50');
+      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=25');
       expect(req.request.method).toBe('GET');
       req.flush(mockInitialResponse);
 
@@ -405,7 +388,7 @@ describe('EmailLogComponent', () => {
     it('should render distinct status badges for all six statuses', () => {
       fixture.detectChanges();
 
-      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50');
+      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=25');
       req.flush(mockInitialResponse);
 
       fixture.detectChanges();
@@ -439,7 +422,7 @@ describe('EmailLogComponent', () => {
     it('should render quotation link when quotation_id is present and fallback when absent', () => {
       fixture.detectChanges();
 
-      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50');
+      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=25');
       req.flush(mockInitialResponse);
 
       fixture.detectChanges();
@@ -461,7 +444,7 @@ describe('EmailLogComponent', () => {
     it('should render supplier info when supplier_id is present and unmatched when absent', () => {
       fixture.detectChanges();
 
-      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50');
+      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=25');
       req.flush(mockInitialResponse);
 
       fixture.detectChanges();
@@ -484,7 +467,7 @@ describe('EmailLogComponent', () => {
     it('should render empty state when no email logs are returned', () => {
       fixture.detectChanges();
 
-      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=50');
+      const req = httpTestingController.expectOne('/api/v1/ingestion/emails?limit=25');
       req.flush({ items: [], next_cursor: null });
 
       fixture.detectChanges();

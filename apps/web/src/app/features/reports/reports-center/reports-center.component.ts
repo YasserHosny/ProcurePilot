@@ -1,6 +1,7 @@
 import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -13,6 +14,10 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { EMPTY, Subject } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import {
   type ReportArtifact,
@@ -44,6 +49,7 @@ interface ApiErrorShape {
     MatTabsModule,
     RouterLink,
     TranslatePipe,
+    ListPagerComponent,
     FormatDatePipe,
   ],
   templateUrl: './reports-center.component.html',
@@ -55,9 +61,8 @@ export class ReportsCenterComponent implements OnInit {
   private readonly translate = inject(TranslateService);
 
   readonly isLoadingArtifacts = signal<boolean>(true);
-  readonly isLoadingMoreArtifacts = signal<boolean>(false);
   readonly artifacts = signal<ReportArtifact[]>([]);
-  readonly artifactsNextCursor = signal<string | null>(null);
+  readonly artifactsPager = new CursorPager('report-artifacts');
   readonly artifactsErrorMessage = signal<string | null>(null);
   readonly artifactsErrorTraceId = signal<string | null>(null);
 
@@ -65,9 +70,8 @@ export class ReportsCenterComponent implements OnInit {
   readonly selectedStatus = signal<ReportArtifactStatus | 'all'>('all');
 
   readonly isLoadingSchedules = signal<boolean>(true);
-  readonly isLoadingMoreSchedules = signal<boolean>(false);
   readonly schedules = signal<ReportSchedule[]>([]);
-  readonly schedulesNextCursor = signal<string | null>(null);
+  readonly schedulesPager = new CursorPager('report-schedules');
   readonly schedulesErrorMessage = signal<string | null>(null);
   readonly schedulesErrorTraceId = signal<string | null>(null);
 
@@ -92,120 +96,94 @@ export class ReportsCenterComponent implements OnInit {
     'lastRunAt',
   ];
 
+  private readonly reloadArtifacts = new Subject<Parameters<ReportsApiService['getArtifacts']>[0]>();
+  private readonly reloadSchedules = new Subject<Parameters<ReportsApiService['getSchedules']>[0]>();
+
+  constructor() {
+    this.reloadArtifacts
+      .pipe(
+        switchMap((params) => {
+          this.isLoadingArtifacts.set(true);
+          this.artifactsErrorMessage.set(null);
+          this.artifactsErrorTraceId.set(null);
+
+          return this.reportsApi.getArtifacts(params).pipe(
+            catchError((err: unknown) => {
+              this.isLoadingArtifacts.set(false);
+              if (!this.artifactsPager.failed()) this.artifacts.set([]);
+              this.handleArtifactError(err);
+              return EMPTY;
+            }),
+          );
+        }),
+        takeUntilDestroyed(),
+      )
+      .subscribe((res) => {
+        if (!this.artifactsPager.loaded(res)) {
+          this.loadArtifacts();
+          return;
+        }
+        this.artifacts.set([...res.items]);
+        this.isLoadingArtifacts.set(false);
+      });
+
+    this.reloadSchedules
+      .pipe(
+        switchMap((params) => {
+          this.isLoadingSchedules.set(true);
+          this.schedulesErrorMessage.set(null);
+          this.schedulesErrorTraceId.set(null);
+
+          return this.reportsApi.getSchedules(params).pipe(
+            catchError((err: unknown) => {
+              this.isLoadingSchedules.set(false);
+              if (!this.schedulesPager.failed()) this.schedules.set([]);
+              this.handleScheduleError(err);
+              return EMPTY;
+            }),
+          );
+        }),
+        takeUntilDestroyed(),
+      )
+      .subscribe((res) => {
+        if (!this.schedulesPager.loaded(res)) {
+          this.loadSchedules();
+          return;
+        }
+        this.schedules.set([...res.items]);
+        this.isLoadingSchedules.set(false);
+      });
+  }
+
   ngOnInit(): void {
     this.loadArtifacts();
     this.loadSchedules();
   }
 
   loadArtifacts(): void {
-    this.isLoadingArtifacts.set(true);
-    this.artifactsErrorMessage.set(null);
-    this.artifactsErrorTraceId.set(null);
-
-    const kindParam = this.selectedKind() === 'all' ? undefined : this.selectedKind() as ReportKind;
-    const statusParam = this.selectedStatus() === 'all' ? undefined : this.selectedStatus() as ReportArtifactStatus;
-
-    this.reportsApi
-      .getArtifacts({
-        limit: 50,
-        kind: kindParam,
-        status: statusParam,
-      })
-      .subscribe({
-        next: (res) => {
-          this.artifacts.set([...res.items]);
-          this.artifactsNextCursor.set(res.next_cursor);
-          this.isLoadingArtifacts.set(false);
-        },
-        error: (err: unknown) => {
-          this.isLoadingArtifacts.set(false);
-          this.handleArtifactError(err);
-        },
-      });
-  }
-
-  loadMoreArtifacts(): void {
-    const cursor = this.artifactsNextCursor();
-    if (!cursor || this.isLoadingMoreArtifacts()) return;
-
-    this.isLoadingMoreArtifacts.set(true);
-    const kindParam = this.selectedKind() === 'all' ? undefined : this.selectedKind() as ReportKind;
-    const statusParam = this.selectedStatus() === 'all' ? undefined : this.selectedStatus() as ReportArtifactStatus;
-
-    this.reportsApi
-      .getArtifacts({
-        cursor,
-        limit: 50,
-        kind: kindParam,
-        status: statusParam,
-      })
-      .subscribe({
-        next: (res) => {
-          this.artifacts.set([...this.artifacts(), ...res.items]);
-          this.artifactsNextCursor.set(res.next_cursor);
-          this.isLoadingMoreArtifacts.set(false);
-        },
-        error: (err: unknown) => {
-          this.isLoadingMoreArtifacts.set(false);
-          this.handleArtifactError(err);
-        },
-      });
+    const kind = this.selectedKind();
+    const status = this.selectedStatus();
+    this.reloadArtifacts.next({
+      ...this.artifactsPager.params(),
+      kind: kind === 'all' ? undefined : kind,
+      status: status === 'all' ? undefined : status,
+    });
   }
 
   onFilterChange(): void {
+    this.artifacts.set([]);
+    this.artifactsPager.reset();
     this.loadArtifacts();
   }
 
   clearFilters(): void {
     this.selectedKind.set('all');
     this.selectedStatus.set('all');
-    this.loadArtifacts();
+    this.onFilterChange();
   }
 
   loadSchedules(): void {
-    this.isLoadingSchedules.set(true);
-    this.schedulesErrorMessage.set(null);
-    this.schedulesErrorTraceId.set(null);
-
-    this.reportsApi
-      .getSchedules({
-        limit: 50,
-      })
-      .subscribe({
-        next: (res) => {
-          this.schedules.set([...res.items]);
-          this.schedulesNextCursor.set(res.next_cursor);
-          this.isLoadingSchedules.set(false);
-        },
-        error: (err: unknown) => {
-          this.isLoadingSchedules.set(false);
-          this.handleScheduleError(err);
-        },
-      });
-  }
-
-  loadMoreSchedules(): void {
-    const cursor = this.schedulesNextCursor();
-    if (!cursor || this.isLoadingMoreSchedules()) return;
-
-    this.isLoadingMoreSchedules.set(true);
-
-    this.reportsApi
-      .getSchedules({
-        cursor,
-        limit: 50,
-      })
-      .subscribe({
-        next: (res) => {
-          this.schedules.set([...this.schedules(), ...res.items]);
-          this.schedulesNextCursor.set(res.next_cursor);
-          this.isLoadingMoreSchedules.set(false);
-        },
-        error: (err: unknown) => {
-          this.isLoadingMoreSchedules.set(false);
-          this.handleScheduleError(err);
-        },
-      });
+    this.reloadSchedules.next(this.schedulesPager.params());
   }
 
   getArtifactStatusClass(status: ReportArtifactStatus): string {

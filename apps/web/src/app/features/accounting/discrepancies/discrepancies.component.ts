@@ -1,6 +1,7 @@
 import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -14,7 +15,11 @@ import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { EMPTY, Subject } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 import { RoleDirective } from '../../../core/auth/role.directive';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
@@ -43,6 +48,7 @@ import {
     MatSnackBarModule,
     MatTableModule,
     TranslatePipe,
+    ListPagerComponent,
     FormatDatePipe,
     FormatMoneyPipe,
     RoleDirective,
@@ -58,9 +64,8 @@ export class DiscrepanciesComponent implements OnInit {
   private readonly translate = inject(TranslateService);
 
   readonly isLoading = signal<boolean>(true);
-  readonly isLoadingMore = signal<boolean>(false);
   readonly discrepancies = signal<ReconciliationDiscrepancy[]>([]);
-  readonly nextCursor = signal<string | null>(null);
+  readonly pager = new CursorPager('accounting-discrepancies');
   readonly errorMessage = signal<string | null>(null);
   readonly statusFilter = signal<DiscrepancyStatus>('open');
 
@@ -76,61 +81,47 @@ export class DiscrepanciesComponent implements OnInit {
     'actions',
   ];
 
+  private readonly reloadSubject = new Subject<ListDiscrepanciesParams>();
+
+  constructor() {
+    this.reloadSubject
+      .pipe(
+        switchMap((params) => {
+          this.isLoading.set(true);
+          this.errorMessage.set(null);
+
+          return this.accountingApi.listDiscrepancies(params).pipe(
+            catchError(() => {
+              this.isLoading.set(false);
+              if (!this.pager.failed()) this.discrepancies.set([]);
+              const message = this.translate.instant('accounting.discrepancies.loadError');
+              this.errorMessage.set(message);
+              this.snackBar.open(message, undefined, { duration: 4000 });
+              return EMPTY;
+            }),
+          );
+        }),
+        takeUntilDestroyed(),
+      )
+      .subscribe((res) => {
+        if (!this.pager.loaded(res)) {
+          this.loadDiscrepancies();
+          return;
+        }
+        this.discrepancies.set([...res.items]);
+        this.isLoading.set(false);
+      });
+  }
+
   ngOnInit(): void {
     this.loadDiscrepancies();
   }
 
   loadDiscrepancies(): void {
-    this.isLoading.set(true);
-    this.errorMessage.set(null);
 
-    const params: ListDiscrepanciesParams = {
-      limit: 50,
+    this.reloadSubject.next({
+      ...this.pager.params(),
       status: this.statusFilter(),
-    };
-
-    this.accountingApi.listDiscrepancies(params).subscribe({
-      next: (res) => {
-        this.discrepancies.set([...res.items]);
-        this.nextCursor.set(res.next_cursor);
-        this.isLoading.set(false);
-      },
-      error: () => {
-        this.isLoading.set(false);
-        const msg = this.translate.instant('accounting.discrepancies.loadError');
-        this.errorMessage.set(msg);
-        this.snackBar.open(msg, undefined, { duration: 4000 });
-      },
-    });
-  }
-
-  loadMore(): void {
-    const cursor = this.nextCursor();
-    if (!cursor || this.isLoadingMore()) {
-      return;
-    }
-
-    this.isLoadingMore.set(true);
-    const params: ListDiscrepanciesParams = {
-      cursor,
-      limit: 50,
-      status: this.statusFilter(),
-    };
-
-    this.accountingApi.listDiscrepancies(params).subscribe({
-      next: (res) => {
-        this.discrepancies.set([...this.discrepancies(), ...res.items]);
-        this.nextCursor.set(res.next_cursor);
-        this.isLoadingMore.set(false);
-      },
-      error: () => {
-        this.isLoadingMore.set(false);
-        this.snackBar.open(
-          this.translate.instant('accounting.discrepancies.loadError'),
-          undefined,
-          { duration: 4000 },
-        );
-      },
     });
   }
 
@@ -138,6 +129,8 @@ export class DiscrepanciesComponent implements OnInit {
     this.statusFilter.set(status);
     this.activeResolvingId.set(null);
     this.resolutionNote.set('');
+    this.discrepancies.set([]);
+    this.pager.reset();
     this.loadDiscrepancies();
   }
 
@@ -173,13 +166,7 @@ export class DiscrepanciesComponent implements OnInit {
         this.activeResolvingId.set(null);
         this.resolutionNote.set('');
 
-        if (this.statusFilter() === 'open') {
-          this.discrepancies.set(
-            this.discrepancies().filter((d) => d.id !== discrepancy.id),
-          );
-        } else {
-          this.loadDiscrepancies();
-        }
+        this.loadDiscrepancies();
 
         this.snackBar.open(
           this.translate.instant('accounting.discrepancies.resolveSuccess'),

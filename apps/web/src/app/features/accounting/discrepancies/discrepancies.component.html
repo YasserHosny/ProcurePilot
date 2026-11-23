@@ -369,36 +369,15 @@
             <tr mat-row *matRowDef="let row; columns: displayedColumns" class="discrepancy-row" data-testid="discrepancy-row"></tr>
           </table>
         </div>
+      }
 
-        <!-- Pagination Footer -->
-        <div class="pagination-footer">
-          @if (nextCursor()) {
-            <button
-              mat-stroked-button
-              type="button"
-              class="load-more-btn"
-              [disabled]="isLoadingMore()"
-              (click)="loadMore()"
-              data-testid="load-more-btn"
-            >
-              @if (isLoadingMore()) {
-                <ng-container>
-                  <mat-spinner diameter="18" [attr.aria-label]="'accounting.discrepancies.pagination.loadingMore' | translate" />
-                  <span>{{ 'accounting.discrepancies.pagination.loadingMore' | translate }}</span>
-                </ng-container>
-              } @else {
-                <ng-container>
-                  <mat-icon aria-hidden="true">expand_more</mat-icon>
-                  <span>{{ 'accounting.discrepancies.pagination.loadMore' | translate }}</span>
-                </ng-container>
-              }
-            </button>
-          } @else {
-            <span class="no-more-text" data-testid="no-more-discrepancies">
-              {{ 'accounting.discrepancies.pagination.noMore' | translate }}
-            </span>
-          }
-        </div>
+      @if (pager.needed()) {
+        <app-list-pager
+          [pager]="pager"
+          [label]="'accounting.discrepancies.pagerLabel' | translate"
+          [busy]="isLoading() || isResolving()"
+          (pageChange)="loadDiscrepancies()"
+        />
       }
     </div>
   </mat-card>
