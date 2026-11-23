@@ -56,6 +56,7 @@ class IngestionEmailLog(BaseModel):
 class IngestionEmailLogList(BaseModel):
     items: list[IngestionEmailLog]
     next_cursor: str | None
+    total: int | None = Field(default=None, ge=0)
 
 
 CatalogueImportStatus = Literal["pending", "processing", "completed", "failed"]

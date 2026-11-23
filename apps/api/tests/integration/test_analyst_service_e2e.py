@@ -579,6 +579,10 @@ def test_continuation_of_another_tenants_conversation_raises_not_found() -> None
         idempotency_key=uuid4(),
         bearer_token="unused-in-this-path",
     )
+    assert service.list_conversations(member=member_a).total == 1
+    tenant_b_history = service.list_conversations(member=member_b)
+    assert tenant_b_history.items == []
+    assert tenant_b_history.total == 0
 
     with pytest.raises(NotFoundError):
         service.ask(
@@ -687,15 +691,25 @@ def test_conversation_list_scoping_by_member_and_role() -> None:
     # list for member 1
     l1 = service.list_conversations(member=mem_1)
     assert len(l1.items) == 2
+    assert l1.total == 2
     assert {c.id for c in l1.items} == {c1.id, c2.id}
+
+    first = service.list_conversations(member=mem_1, limit=1)
+    assert first.next_cursor is not None
+    second = service.list_conversations(member=mem_1, limit=1, cursor=first.next_cursor)
+    assert len(second.items) == 1
+    assert second.items[0].id != first.items[0].id
+    assert first.total == second.total == 2
 
     # list for member 2 (viewer)
     l2 = service.list_conversations(member=mem_2)
     assert len(l2.items) == 0
+    assert l2.total == 0
 
     # list for member 3 (owner)
     l3 = service.list_conversations(member=mem_3)
     assert len(l3.items) == 2
+    assert l3.total == 2
     assert {c.id for c in l3.items} == {c1.id, c2.id}
 
 

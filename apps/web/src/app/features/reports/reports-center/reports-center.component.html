@@ -211,31 +211,15 @@
                 <tr mat-row *matRowDef="let row; columns: artifactDisplayedColumns"></tr>
               </table>
             </div>
+          }
 
-            <!-- Cursor Pagination -->
-            <div class="pagination-footer">
-              @if (artifactsNextCursor()) {
-                <button
-                  mat-stroked-button
-                  type="button"
-                  class="load-more-btn"
-                  [disabled]="isLoadingMoreArtifacts()"
-                  (click)="loadMoreArtifacts()"
-                >
-                  @if (isLoadingMoreArtifacts()) {
-                    <mat-spinner diameter="18" [attr.aria-label]="'reports.pagination.loadingMore' | translate"></mat-spinner>
-                    <span>{{ 'reports.pagination.loadingMore' | translate }}</span>
-                  } @else {
-                    <span class="btn-content">
-                      <mat-icon aria-hidden="true">expand_more</mat-icon>
-                      <span>{{ 'reports.pagination.loadMore' | translate }}</span>
-                    </span>
-                  }
-                </button>
-              } @else {
-                <span class="no-more-text">{{ 'reports.pagination.noMore' | translate }}</span>
-              }
-            </div>
+          @if (artifactsPager.needed()) {
+            <app-list-pager
+              [pager]="artifactsPager"
+              [label]="'reports.artifacts.pagerLabel' | translate"
+              [busy]="isLoadingArtifacts()"
+              (pageChange)="loadArtifacts()"
+            />
           }
         </div>
       </mat-tab>
@@ -373,31 +357,15 @@
                 <tr mat-row *matRowDef="let row; columns: scheduleDisplayedColumns"></tr>
               </table>
             </div>
+          }
 
-            <!-- Cursor Pagination -->
-            <div class="pagination-footer">
-              @if (schedulesNextCursor()) {
-                <button
-                  mat-stroked-button
-                  type="button"
-                  class="load-more-btn"
-                  [disabled]="isLoadingMoreSchedules()"
-                  (click)="loadMoreSchedules()"
-                >
-                  @if (isLoadingMoreSchedules()) {
-                    <mat-spinner diameter="18" [attr.aria-label]="'reports.pagination.loadingMore' | translate"></mat-spinner>
-                    <span>{{ 'reports.pagination.loadingMore' | translate }}</span>
-                  } @else {
-                    <span class="btn-content">
-                      <mat-icon aria-hidden="true">expand_more</mat-icon>
-                      <span>{{ 'reports.pagination.loadMore' | translate }}</span>
-                    </span>
-                  }
-                </button>
-              } @else {
-                <span class="no-more-text">{{ 'reports.pagination.noMore' | translate }}</span>
-              }
-            </div>
+          @if (schedulesPager.needed()) {
+            <app-list-pager
+              [pager]="schedulesPager"
+              [label]="'reports.schedules.pagerLabel' | translate"
+              [busy]="isLoadingSchedules()"
+              (pageChange)="loadSchedules()"
+            />
           }
         </div>
       </mat-tab>

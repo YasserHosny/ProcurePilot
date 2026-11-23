@@ -234,6 +234,7 @@ def test_exact_match_creates_purchase_bill_match(
         client = TestClient(app, raise_server_exceptions=False)
         bills_res = client.get("/api/v1/accounting/bills?match_status=matched")
         assert bills_res.status_code == 200, bills_res.text
+        assert bills_res.json()["total"] == 1
         matched_items = bills_res.json()["items"]
         assert len(matched_items) == 1
         assert matched_items[0]["matched"] is True
@@ -267,6 +268,7 @@ def test_unmatched_bill_stays_unmatched_and_visible(
         # GET /accounting/bills?match_status=unmatched returns all 3 bills
         unmatched_res = client.get("/api/v1/accounting/bills?match_status=unmatched")
         assert unmatched_res.status_code == 200, unmatched_res.text
+        assert unmatched_res.json()["total"] == 3
         unmatched_items = unmatched_res.json()["items"]
         assert len(unmatched_items) == 3
         for item in unmatched_items:
@@ -277,6 +279,7 @@ def test_unmatched_bill_stays_unmatched_and_visible(
         matched_res = client.get("/api/v1/accounting/bills?match_status=matched")
         assert matched_res.status_code == 200, matched_res.text
         assert len(matched_res.json()["items"]) == 0
+        assert matched_res.json()["total"] == 0
 
 
 def test_cross_tenant_purchase_records_are_never_matched(
@@ -339,6 +342,20 @@ def test_cross_tenant_purchase_records_are_never_matched(
                         (ctx_a.workspace.tenant_id,),
                     )
                     assert cur.fetchone()[0] == 0
+
+            app_a, _ = _app(monkeypatch, ctx_a.member)
+            client_a = TestClient(app_a, raise_server_exceptions=False)
+            bills_a = client_a.get("/api/v1/accounting/bills", params={"limit": 1})
+            assert bills_a.status_code == 200, bills_a.text
+            assert len(bills_a.json()["items"]) == 1
+            assert bills_a.json()["total"] == 3
+
+            app_b, _ = _app(monkeypatch, ctx_b.member)
+            client_b = TestClient(app_b, raise_server_exceptions=False)
+            bills_b = client_b.get("/api/v1/accounting/bills")
+            assert bills_b.status_code == 200, bills_b.text
+            assert bills_b.json()["items"] == []
+            assert bills_b.json()["total"] == 0
 
 
 def test_sc_002_batch_auto_match_rate_at_least_90_percent(

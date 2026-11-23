@@ -61,6 +61,7 @@ def test_schedule_lifecycle_and_rbac(monkeypatch: pytest.MonkeyPatch) -> None:
         # 4. List schedules
         list_res = owner_client.get("/api/v1/reports/schedules")
         assert list_res.status_code == 200
+        assert list_res.json()["total"] == 1
         items = list_res.json()["items"]
         assert any(item["id"] == schedule_id for item in items)
 

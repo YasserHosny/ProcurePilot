@@ -78,7 +78,13 @@ describe('BillsComponent (T026)', () => {
     next_cursor: null,
   };
 
+  function clickPager(direction: 'next' | 'previous'): void {
+    const button = fixture.debugElement.query(By.css(`.list-pager__${direction}`));
+    (button.nativeElement as HTMLButtonElement).click();
+  }
+
   beforeEach(async () => {
+    localStorage.removeItem('pp.pageSize.accounting-bills');
     mockRoleSignal = signal<Role | null>('owner');
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
@@ -114,7 +120,10 @@ describe('BillsComponent (T026)', () => {
 
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', {
-      common: { loading: 'Loading...' },
+      common: {
+        loading: 'Loading...',
+        pager: { range: '{{from}}–{{to}} of {{total}}' },
+      },
       accounting: {
         bills: {
           title: 'Synced Bills & Invoices',
@@ -157,11 +166,7 @@ describe('BillsComponent (T026)', () => {
           syncAlreadyRunning: 'A sync is already running. Please wait for it to complete.',
           syncNoConnection: 'Connect an accounting system first before syncing bills.',
           syncFailed: 'Failed to trigger sync. Please try again.',
-          pagination: {
-            loadMore: 'Load more',
-            loadingMore: 'Loading more...',
-            noMore: 'All bills loaded',
-          },
+          pagerLabel: 'Bill pages',
         },
       },
     });
@@ -173,6 +178,7 @@ describe('BillsComponent (T026)', () => {
   });
 
   afterEach(() => {
+    localStorage.removeItem('pp.pageSize.accounting-bills');
     httpTestingController.verify();
   });
 
@@ -181,10 +187,10 @@ describe('BillsComponent (T026)', () => {
   });
 
   describe('Initial load and render', () => {
-    it('should call listBills() with limit=50 on init and render table with bills', () => {
+    it('should call listBills() with limit=25 on init and render table with bills', () => {
       fixture.detectChanges();
 
-      const req = httpTestingController.expectOne('/api/v1/accounting/bills?limit=50');
+      const req = httpTestingController.expectOne('/api/v1/accounting/bills?limit=25');
       expect(req.request.method).toBe('GET');
       req.flush(mockInitialResponse);
 
@@ -192,7 +198,7 @@ describe('BillsComponent (T026)', () => {
 
       expect(component.isLoading()).toBeFalse();
       expect(component.bills().length).toBe(3);
-      expect(component.nextCursor()).toBe('cursor-page-2');
+      expect(component.pager.nextCursor()).toBe('cursor-page-2');
 
       const rows = fixture.debugElement.queryAll(By.css('[data-testid="bill-row"]'));
       expect(rows.length).toBe(3);
@@ -230,7 +236,7 @@ describe('BillsComponent (T026)', () => {
     it('should display empty state when no bills are returned', () => {
       fixture.detectChanges();
 
-      const req = httpTestingController.expectOne('/api/v1/accounting/bills?limit=50');
+      const req = httpTestingController.expectOne('/api/v1/accounting/bills?limit=25');
       req.flush({ items: [], next_cursor: null });
 
       fixture.detectChanges();
@@ -244,7 +250,7 @@ describe('BillsComponent (T026)', () => {
     it('should show error banner when initial load fails and allow retry', () => {
       fixture.detectChanges();
 
-      const req = httpTestingController.expectOne('/api/v1/accounting/bills?limit=50');
+      const req = httpTestingController.expectOne('/api/v1/accounting/bills?limit=25');
       req.flush({ message: 'Internal Server Error' }, { status: 500, statusText: 'Server Error' });
 
       fixture.detectChanges();
@@ -260,7 +266,7 @@ describe('BillsComponent (T026)', () => {
       const retryBtn = fixture.debugElement.query(By.css('[data-testid="retry-btn"]'));
       retryBtn.nativeElement.click();
 
-      const retryReq = httpTestingController.expectOne('/api/v1/accounting/bills?limit=50');
+      const retryReq = httpTestingController.expectOne('/api/v1/accounting/bills?limit=25');
       retryReq.flush(mockInitialResponse);
 
       fixture.detectChanges();
@@ -272,7 +278,7 @@ describe('BillsComponent (T026)', () => {
   describe('Filter changes', () => {
     beforeEach(() => {
       fixture.detectChanges();
-      const req = httpTestingController.expectOne('/api/v1/accounting/bills?limit=50');
+      const req = httpTestingController.expectOne('/api/v1/accounting/bills?limit=25');
       req.flush(mockInitialResponse);
       fixture.detectChanges();
     });
@@ -281,7 +287,7 @@ describe('BillsComponent (T026)', () => {
       component.onFilterChange('matched');
 
       const req = httpTestingController.expectOne(
-        '/api/v1/accounting/bills?limit=50&match_status=matched',
+        '/api/v1/accounting/bills?limit=25&match_status=matched',
       );
       expect(req.request.method).toBe('GET');
       req.flush({
@@ -299,7 +305,7 @@ describe('BillsComponent (T026)', () => {
       component.onFilterChange('unmatched');
 
       const req = httpTestingController.expectOne(
-        '/api/v1/accounting/bills?limit=50&match_status=unmatched',
+        '/api/v1/accounting/bills?limit=25&match_status=unmatched',
       );
       expect(req.request.method).toBe('GET');
       req.flush({
@@ -316,12 +322,12 @@ describe('BillsComponent (T026)', () => {
     it('should request all bills without match_status when filter resets to "all"', () => {
       component.onFilterChange('matched');
       const req1 = httpTestingController.expectOne(
-        '/api/v1/accounting/bills?limit=50&match_status=matched',
+        '/api/v1/accounting/bills?limit=25&match_status=matched',
       );
       req1.flush({ items: [], next_cursor: null });
 
       component.onFilterChange('all');
-      const req2 = httpTestingController.expectOne('/api/v1/accounting/bills?limit=50');
+      const req2 = httpTestingController.expectOne('/api/v1/accounting/bills?limit=25');
       expect(req2.request.urlWithParams).not.toContain('match_status');
       req2.flush(mockInitialResponse);
 
@@ -329,57 +335,97 @@ describe('BillsComponent (T026)', () => {
     });
   });
 
-  describe('Load more pagination', () => {
+  describe('pagination', () => {
+    const firstPage = {
+      items: Array.from({ length: 25 }, (_, i) => ({ ...mockInitialResponse.items[0], id: `first-${i}` })),
+      next_cursor: 'cursor-page-2',
+      total: 26,
+    };
+
     beforeEach(() => {
       fixture.detectChanges();
-      const req = httpTestingController.expectOne('/api/v1/accounting/bills?limit=50');
-      req.flush(mockInitialResponse);
+      httpTestingController.expectOne('/api/v1/accounting/bills?limit=25').flush(firstPage);
       fixture.detectChanges();
     });
 
-    it('should show "Load more" button when next_cursor is present and append items on click', () => {
-      const loadMoreBtn = fixture.debugElement.query(By.css('[data-testid="load-more-btn"]'));
-      expect(loadMoreBtn).not.toBeNull();
-
-      loadMoreBtn.nativeElement.click();
-
-      const req = httpTestingController.expectOne(
-        '/api/v1/accounting/bills?cursor=cursor-page-2&limit=50',
-      );
-      expect(req.request.method).toBe('GET');
-      req.flush(mockSecondPageResponse);
-
+    it('replaces rows on Next and restores the first page on Previous', () => {
+      const range = () => (fixture.nativeElement as HTMLElement)
+        .querySelector('.list-pager__range')?.textContent?.trim();
+      expect(range()).toBe('1–25 of 26');
+      clickPager('next');
+      httpTestingController.expectOne('/api/v1/accounting/bills?cursor=cursor-page-2&limit=25')
+        .flush({ ...mockSecondPageResponse, total: 26 });
       fixture.detectChanges();
 
-      expect(component.bills().length).toBe(4);
-      expect(component.nextCursor()).toBeNull();
+      expect(component.bills()).toEqual(mockSecondPageResponse.items);
+      expect(component.pager.total()).toBe(26);
+      expect(component.pager.nextCursor()).toBeNull();
+      expect(range()).toBe('26–26 of 26');
 
-      // "All bills loaded" text replaces load more button
-      const loadMoreBtnAfter = fixture.debugElement.query(By.css('[data-testid="load-more-btn"]'));
-      expect(loadMoreBtnAfter).toBeNull();
-      const noMoreEl = fixture.debugElement.query(By.css('[data-testid="no-more-bills"]'));
-      expect(noMoreEl).not.toBeNull();
-      expect(noMoreEl.nativeElement.textContent).toContain('All bills loaded');
+      clickPager('previous');
+      httpTestingController.expectOne('/api/v1/accounting/bills?limit=25').flush(firstPage);
+      fixture.detectChanges();
+
+      expect(component.bills()).toEqual(firstPage.items);
+      expect(component.pager.pageIndex()).toBe(0);
+      expect(range()).toBe('1–25 of 26');
     });
 
-    it('should preserve active match_status filter when loading more', () => {
-      component.matchStatusFilter.set('matched');
-      component.nextCursor.set('cur-matched-2');
+    it('keeps rows when Next fails and clears the pager when a refresh fails', () => {
+      clickPager('next');
+      httpTestingController.expectOne('/api/v1/accounting/bills?cursor=cursor-page-2&limit=25')
+        .flush(null, { status: 500, statusText: 'Server Error' });
+      fixture.detectChanges();
 
-      component.loadMore();
+      expect(component.bills()).toEqual(firstPage.items);
+      expect(component.pager.pageIndex()).toBe(0);
+      expect(fixture.debugElement.query(By.css('app-list-pager'))).not.toBeNull();
 
-      const req = httpTestingController.expectOne(
-        '/api/v1/accounting/bills?cursor=cur-matched-2&limit=50&match_status=matched',
+      component.loadBills();
+      httpTestingController.expectOne('/api/v1/accounting/bills?limit=25')
+        .flush(null, { status: 500, statusText: 'Server Error' });
+      fixture.detectChanges();
+
+      expect(component.bills()).toEqual([]);
+      expect(fixture.debugElement.query(By.css('app-list-pager'))).toBeNull();
+    });
+
+    it('changes the limit and goes back to the first page', () => {
+      clickPager('next');
+      httpTestingController.expectOne('/api/v1/accounting/bills?cursor=cursor-page-2&limit=25')
+        .flush(mockSecondPageResponse);
+      fixture.detectChanges();
+
+      const select = fixture.debugElement.query(By.css('app-list-pager mat-select'));
+      select.triggerEventHandler('selectionChange', { value: 10 });
+      httpTestingController.expectOne('/api/v1/accounting/bills?limit=10').flush(mockInitialResponse);
+      expect(component.pager.pageIndex()).toBe(0);
+      expect(localStorage.getItem('pp.pageSize.accounting-bills')).toBe('10');
+    });
+
+    it('cancels a pending page and starts at the first page when the filter changes', () => {
+      clickPager('next');
+      const pending = httpTestingController.expectOne(
+        '/api/v1/accounting/bills?cursor=cursor-page-2&limit=25',
       );
-      expect(req.request.method).toBe('GET');
-      req.flush(mockSecondPageResponse);
+
+      component.onFilterChange('matched');
+      expect(pending.cancelled).toBeTrue();
+      httpTestingController.expectOne('/api/v1/accounting/bills?limit=25&match_status=matched')
+        .flush(mockInitialResponse);
+      expect(component.pager.pageIndex()).toBe(0);
+
+      fixture.detectChanges();
+      clickPager('next');
+      httpTestingController.expectOne('/api/v1/accounting/bills?cursor=cursor-page-2&limit=25&match_status=matched')
+        .flush(mockSecondPageResponse);
     });
   });
 
   describe('Sync now button', () => {
     beforeEach(() => {
       fixture.detectChanges();
-      const req = httpTestingController.expectOne('/api/v1/accounting/bills?limit=50');
+      const req = httpTestingController.expectOne('/api/v1/accounting/bills?limit=25');
       req.flush(mockInitialResponse);
       fixture.detectChanges();
     });

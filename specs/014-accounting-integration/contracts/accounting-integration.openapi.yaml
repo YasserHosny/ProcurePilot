@@ -407,6 +407,7 @@ components:
           type: array
           items: { $ref: '#/components/schemas/SyncedBill' }
         next_cursor: { type: string, nullable: true }
+        total: { type: integer, nullable: true, minimum: 0 }
 
     ReconciliationDiscrepancy:
       type: object
@@ -503,3 +504,4 @@ components:
           type: array
           items: { $ref: '#/components/schemas/ReconciliationDiscrepancy' }
         next_cursor: { type: string, nullable: true }
+        total: { type: integer, nullable: true, minimum: 0 }

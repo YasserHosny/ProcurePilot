@@ -60,11 +60,13 @@ export interface ReportArtifact {
 export interface ReportScheduleList {
   items: ReportSchedule[];
   next_cursor: string | null;
+  readonly total?: number | null;
 }
 
 export interface ReportArtifactList {
   items: ReportArtifact[];
   next_cursor: string | null;
+  readonly total?: number | null;
 }
 
 @Injectable({ providedIn: 'root' })

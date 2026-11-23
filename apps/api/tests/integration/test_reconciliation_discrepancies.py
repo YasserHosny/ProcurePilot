@@ -688,7 +688,9 @@ def test_cross_tenant_discrepancy_lookup_returns_404(
         owner_a = member_from_workspace(ctx_a.workspace, role=MemberRole.owner)
         app_a, _ = _app(monkeypatch, owner_a)
         client_a = TestClient(app_a, raise_server_exceptions=False)
-        disc_id_a = client_a.get("/api/v1/accounting/discrepancies").json()["items"][0]["id"]
+        list_a = client_a.get("/api/v1/accounting/discrepancies").json()
+        assert list_a["total"] == 1
+        disc_id_a = list_a["items"][0]["id"]
 
         with committed_smart_context("disc-tenant-b", supplier_count=1) as ctx_b:
             owner_b = member_from_workspace(ctx_b.workspace, role=MemberRole.owner)
@@ -696,8 +698,9 @@ def test_cross_tenant_discrepancy_lookup_returns_404(
             client_b = TestClient(app_b, raise_server_exceptions=False)
 
             # Tenant B list does not contain Tenant A's discrepancy
-            list_b = client_b.get("/api/v1/accounting/discrepancies").json()["items"]
-            assert not any(item["id"] == disc_id_a for item in list_b)
+            list_b = client_b.get("/api/v1/accounting/discrepancies").json()
+            assert list_b["items"] == []
+            assert list_b["total"] == 0
 
             # Tenant B trying to resolve Tenant A's discrepancy returns 404 (not 403)
             resolve_b = client_b.post(
@@ -789,9 +792,11 @@ def test_open_discrepancy_auto_resolves_when_condition_clears(
 
         open_res = client.get("/api/v1/accounting/discrepancies?status=open").json()
         assert len(open_res["items"]) == 0
+        assert open_res["total"] == 0
 
         resolved_res = client.get("/api/v1/accounting/discrepancies?status=resolved").json()
         assert len(resolved_res["items"]) == 1
+        assert resolved_res["total"] == 1
         assert resolved_res["items"][0]["id"] == str(disc_id)
         assert resolved_res["items"][0]["resolved_by"] is None
 
@@ -922,6 +927,7 @@ def test_list_discrepancies_cursor_pagination(
         # Page 1: limit 2
         page1 = client.get("/api/v1/accounting/discrepancies?limit=2").json()
         assert len(page1["items"]) == 2
+        assert page1["total"] == 5
         assert page1["next_cursor"] is not None
 
         # Page 2: limit 2 using cursor
@@ -929,6 +935,7 @@ def test_list_discrepancies_cursor_pagination(
             f"/api/v1/accounting/discrepancies?limit=2&cursor={page1['next_cursor']}"
         ).json()
         assert len(page2["items"]) == 2
+        assert page2["total"] == 5
         assert page2["next_cursor"] is not None
 
         # Items across pages should not overlap

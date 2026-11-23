@@ -439,7 +439,8 @@ class ConnectionService:
                 b.remaining_balance_currency,
                 b.provider_status,
                 (m.id is not null) as matched,
-                m.purchase_record_id
+                m.purchase_record_id,
+                count(*) over () as total_count
             from synced_bill b
             join synced_vendor v on v.tenant_id = b.tenant_id and v.id = b.vendor_id
             left join purchase_bill_match m on m.tenant_id = b.tenant_id and m.synced_bill_id = b.id
@@ -467,6 +468,7 @@ class ConnectionService:
         return SyncedBillList(
             items=[SyncedBill.model_validate(r) for r in page_rows],
             next_cursor=next_cursor,
+            total=rows[0]["total_count"] if rows else (0 if offset == 0 else None),
         )
 
 

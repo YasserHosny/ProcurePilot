@@ -199,7 +199,13 @@ describe('DiscrepanciesComponent (T031)', () => {
     next_cursor: null,
   };
 
+  function clickPager(direction: 'next' | 'previous'): void {
+    const button = fixture.debugElement.query(By.css(`.list-pager__${direction}`));
+    (button.nativeElement as HTMLButtonElement).click();
+  }
+
   beforeEach(async () => {
+    localStorage.removeItem('pp.pageSize.accounting-discrepancies');
     mockRoleSignal = signal<Role | null>('owner');
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
@@ -316,11 +322,7 @@ describe('DiscrepanciesComponent (T031)', () => {
           resolveSuccess: 'Discrepancy resolved successfully.',
           resolveAlreadyResolved: 'This discrepancy was already resolved by someone else. Please refresh.',
           resolveFailed: 'Failed to resolve discrepancy. Please try again.',
-          pagination: {
-            loadMore: 'Load more',
-            loadingMore: 'Loading more...',
-            noMore: 'All discrepancies loaded',
-          },
+          pagerLabel: 'Discrepancy pages',
         },
       },
     });
@@ -339,7 +341,7 @@ describe('DiscrepanciesComponent (T031)', () => {
     fixture.detectChanges();
 
     const req = httpTestingController.expectOne(
-      '/api/v1/accounting/discrepancies?limit=50&status=open',
+      '/api/v1/accounting/discrepancies?limit=25&status=open',
     );
     expect(req.request.method).toBe('GET');
     req.flush(mockInitialOpenResponse);
@@ -355,7 +357,7 @@ describe('DiscrepanciesComponent (T031)', () => {
   it('should switch status filter and load resolved discrepancies', () => {
     fixture.detectChanges();
     const req1 = httpTestingController.expectOne(
-      '/api/v1/accounting/discrepancies?limit=50&status=open',
+      '/api/v1/accounting/discrepancies?limit=25&status=open',
     );
     req1.flush(mockInitialOpenResponse);
     fixture.detectChanges();
@@ -364,7 +366,7 @@ describe('DiscrepanciesComponent (T031)', () => {
     fixture.detectChanges();
 
     const req2 = httpTestingController.expectOne(
-      '/api/v1/accounting/discrepancies?limit=50&status=resolved',
+      '/api/v1/accounting/discrepancies?limit=25&status=resolved',
     );
     expect(req2.request.method).toBe('GET');
     req2.flush({
@@ -380,7 +382,7 @@ describe('DiscrepanciesComponent (T031)', () => {
   it('should render amount_mismatch detail with side-by-side comparison and explicit currencies', () => {
     fixture.detectChanges();
     const req = httpTestingController.expectOne(
-      '/api/v1/accounting/discrepancies?limit=50&status=open',
+      '/api/v1/accounting/discrepancies?limit=25&status=open',
     );
     req.flush(mockInitialOpenResponse);
     fixture.detectChanges();
@@ -404,7 +406,7 @@ describe('DiscrepanciesComponent (T031)', () => {
   it('should render unmatched_bill detail with vendor, amount, and date', () => {
     fixture.detectChanges();
     const req = httpTestingController.expectOne(
-      '/api/v1/accounting/discrepancies?limit=50&status=open',
+      '/api/v1/accounting/discrepancies?limit=25&status=open',
     );
     req.flush(mockInitialOpenResponse);
     fixture.detectChanges();
@@ -426,7 +428,7 @@ describe('DiscrepanciesComponent (T031)', () => {
   it('should render unmatched_purchase detail with supplier, amount, and date', () => {
     fixture.detectChanges();
     const req = httpTestingController.expectOne(
-      '/api/v1/accounting/discrepancies?limit=50&status=open',
+      '/api/v1/accounting/discrepancies?limit=25&status=open',
     );
     req.flush(mockInitialOpenResponse);
     fixture.detectChanges();
@@ -448,7 +450,7 @@ describe('DiscrepanciesComponent (T031)', () => {
   it('should render three-way evidence and missing evidence states', () => {
     fixture.detectChanges();
     const req = httpTestingController.expectOne(
-      '/api/v1/accounting/discrepancies?limit=50&status=open',
+      '/api/v1/accounting/discrepancies?limit=25&status=open',
     );
     req.flush({ items: [mockThreeWayDiscrepancy], next_cursor: null });
     fixture.detectChanges();
@@ -466,7 +468,7 @@ describe('DiscrepanciesComponent (T031)', () => {
   it('should remove row and show success snackbar on successful resolve', () => {
     fixture.detectChanges();
     const req = httpTestingController.expectOne(
-      '/api/v1/accounting/discrepancies?limit=50&status=open',
+      '/api/v1/accounting/discrepancies?limit=25&status=open',
     );
     req.flush(mockInitialOpenResponse);
     fixture.detectChanges();
@@ -497,6 +499,8 @@ describe('DiscrepanciesComponent (T031)', () => {
       resolved_at: '2026-09-18T12:30:00Z',
       resolution_note: 'Approved exception',
     });
+    httpTestingController.expectOne('/api/v1/accounting/discrepancies?limit=25&status=open')
+      .flush({ items: mockOpenDiscrepancies.slice(1), next_cursor: null, total: 2 });
     fixture.detectChanges();
 
     expect(snackBarSpy.open).toHaveBeenCalledWith(
@@ -511,7 +515,7 @@ describe('DiscrepanciesComponent (T031)', () => {
   it('should show already resolved message on 409 error during resolve', () => {
     fixture.detectChanges();
     const req = httpTestingController.expectOne(
-      '/api/v1/accounting/discrepancies?limit=50&status=open',
+      '/api/v1/accounting/discrepancies?limit=25&status=open',
     );
     req.flush(mockInitialOpenResponse);
     fixture.detectChanges();
@@ -539,7 +543,7 @@ describe('DiscrepanciesComponent (T031)', () => {
   it('should show generic error message on unexpected error during resolve', () => {
     fixture.detectChanges();
     const req = httpTestingController.expectOne(
-      '/api/v1/accounting/discrepancies?limit=50&status=open',
+      '/api/v1/accounting/discrepancies?limit=25&status=open',
     );
     req.flush(mockInitialOpenResponse);
     fixture.detectChanges();
@@ -564,29 +568,48 @@ describe('DiscrepanciesComponent (T031)', () => {
     );
   });
 
-  it('should append items when clicking load more button', () => {
-    fixture.detectChanges();
-    const req = httpTestingController.expectOne(
-      '/api/v1/accounting/discrepancies?limit=50&status=open',
-    );
-    req.flush(mockInitialOpenResponse);
-    fixture.detectChanges();
+  describe('pagination', () => {
+    beforeEach(() => {
+      fixture.detectChanges();
+      httpTestingController.expectOne('/api/v1/accounting/discrepancies?limit=25&status=open')
+        .flush(mockInitialOpenResponse);
+      fixture.detectChanges();
+    });
 
-    expect(component.discrepancies().length).toBe(3);
-    const loadMoreBtn = fixture.debugElement.query(By.css('[data-testid="load-more-btn"]'));
-    expect(loadMoreBtn).toBeTruthy();
+    it('replaces rows on Next and reloads the first page on Previous', () => {
+      clickPager('next');
+      httpTestingController.expectOne('/api/v1/accounting/discrepancies?cursor=cur-page-2&limit=25&status=open')
+        .flush(mockMoreOpenResponse);
+      fixture.detectChanges();
 
-    loadMoreBtn.nativeElement.click();
-    fixture.detectChanges();
+      expect(component.discrepancies()).toEqual(mockMoreOpenResponse.items);
+      expect(component.pager.nextCursor()).toBeNull();
 
-    const moreReq = httpTestingController.expectOne(
-      '/api/v1/accounting/discrepancies?cursor=cur-page-2&limit=50&status=open',
-    );
-    moreReq.flush(mockMoreOpenResponse);
-    fixture.detectChanges();
+      clickPager('previous');
+      httpTestingController.expectOne('/api/v1/accounting/discrepancies?limit=25&status=open')
+        .flush(mockInitialOpenResponse);
+      expect(component.discrepancies()).toEqual(mockInitialOpenResponse.items);
+    });
 
-    expect(component.discrepancies().length).toBe(4);
-    expect(component.nextCursor()).toBeNull();
+    it('keeps the previous rows after a failed Next', () => {
+      clickPager('next');
+      httpTestingController.expectOne('/api/v1/accounting/discrepancies?cursor=cur-page-2&limit=25&status=open')
+        .flush(null, { status: 500, statusText: 'Server Error' });
+
+      expect(component.discrepancies()).toEqual(mockInitialOpenResponse.items);
+      expect(component.pager.pageIndex()).toBe(0);
+    });
+
+    it('reloads the previous page when the last page becomes empty', () => {
+      clickPager('next');
+      httpTestingController.expectOne('/api/v1/accounting/discrepancies?cursor=cur-page-2&limit=25&status=open')
+        .flush({ items: [], next_cursor: null, total: null });
+
+      httpTestingController.expectOne('/api/v1/accounting/discrepancies?limit=25&status=open')
+        .flush({ items: mockOpenDiscrepancies, next_cursor: null, total: 3 });
+      expect(component.discrepancies()).toEqual(mockOpenDiscrepancies);
+      expect(component.pager.pageIndex()).toBe(0);
+    });
   });
 
   it('should render system-resolved indicator instead of a blank when resolved_by is null', () => {
@@ -594,7 +617,7 @@ describe('DiscrepanciesComponent (T031)', () => {
     fixture.detectChanges();
 
     const req = httpTestingController.expectOne(
-      '/api/v1/accounting/discrepancies?limit=50&status=resolved',
+      '/api/v1/accounting/discrepancies?limit=25&status=resolved',
     );
     req.flush({
       items: [mockResolvedDiscrepancies[1]], // resolved_by: null

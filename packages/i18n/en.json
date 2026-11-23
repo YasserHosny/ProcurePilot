@@ -296,7 +296,7 @@
       "empty": "No past conversations found.",
       "turns": "{{count}} turn(s)",
       "noTurns": "Empty conversation",
-      "loadMore": "Load More"
+      "pagerLabel": "Conversation history pages"
     }
   },
   "forecasting": {
@@ -3588,7 +3588,8 @@
       },
       "scopeAll": "All branches & suppliers",
       "notApplicable": "—",
-      "rows": "{{count}} rows"
+      "rows": "{{count}} rows",
+      "pagerLabel": "Report artifact pages"
     },
     "schedules": {
       "table": {
@@ -3608,7 +3609,8 @@
       "scopeAll": "All branches & suppliers",
       "notApplicable": "—",
       "never": "Never",
-      "newSchedule": "New Schedule"
+      "newSchedule": "New Schedule",
+      "pagerLabel": "Report schedule pages"
     },
     "scheduleForm": {
       "title": "New Scheduled Report",
@@ -3624,11 +3626,6 @@
       "errors": {
         "conflict": "A schedule with these exact parameters already exists."
       }
-    },
-    "pagination": {
-      "loadMore": "Load More",
-      "loadingMore": "Loading more...",
-      "noMore": "All records loaded"
     },
     "error": {
       "title": "Unable to load reports",
@@ -3980,14 +3977,6 @@
       "unmatchedSupplier": "Unmatched",
       "supplierId": "Supplier #{{id}}",
       "noSubject": "(No subject)",
-      "pagination": {
-        "loadMore": "Load More",
-        "loadingMore": "Loading more emails...",
-        "noMore": "All emails loaded"
-      },
-      "loadMore": "Load More",
-      "loadingMore": "Loading more emails...",
-      "noMore": "All emails loaded",
       "empty": {
         "title": "No emails found",
         "message": "No inbound emails match the specified filters."
@@ -4001,7 +3990,8 @@
         "generic": "An unexpected error occurred while loading email logs.",
         "retry": "Retry"
       },
-      "matchedSupplier": "Matched supplier"
+      "matchedSupplier": "Matched supplier",
+      "pagerLabel": "Inbound email pages"
     },
     "capture": {
       "title": "Quotation Capture",
@@ -4398,11 +4388,7 @@
       "syncAlreadyRunning": "A sync is already running. Please wait for it to complete.",
       "syncNoConnection": "Connect an accounting system first before syncing bills.",
       "syncFailed": "Failed to trigger sync. Please try again.",
-      "pagination": {
-        "loadMore": "Load more",
-        "loadingMore": "Loading more...",
-        "noMore": "All bills loaded"
-      }
+      "pagerLabel": "Bill pages"
     },
     "discrepancies": {
       "title": "Reconciliation Discrepancies",
@@ -4491,11 +4477,7 @@
       "resolveSuccess": "Discrepancy resolved successfully.",
       "resolveAlreadyResolved": "This discrepancy was already resolved by someone else. Please refresh.",
       "resolveFailed": "Failed to resolve discrepancy. Please try again.",
-      "pagination": {
-        "loadMore": "Load more",
-        "loadingMore": "Loading more...",
-        "noMore": "All discrepancies loaded"
-      }
+      "pagerLabel": "Discrepancy pages"
     }
   },
   "pos": {

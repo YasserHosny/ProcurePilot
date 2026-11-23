@@ -68,6 +68,7 @@ class ReportSchedule(BaseModel):
 class ReportScheduleList(BaseModel):
     items: list[ReportSchedule]
     next_cursor: str | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class ReportArtifactFilters(BaseModel):
@@ -100,3 +101,4 @@ class ReportArtifact(BaseModel):
 class ReportArtifactList(BaseModel):
     items: list[ReportArtifact]
     next_cursor: str | None = None
+    total: int | None = Field(default=None, ge=0)
