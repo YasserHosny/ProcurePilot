@@ -126,6 +126,9 @@ otherwise). Add anything else per job with `--relay-arg`.
 
 ## After a job
 
+`gate <job>` on a clone identical to its checkpoint ends `no_changes` with exit 1, even when
+every gate passes: gates run against the checkpoint prove nothing the implementer did.
+
 The runner never commits or pushes. Read `summary.md`, read the patch, run the gates yourself if
 anything looks off, then commit from the clone or apply `changes.patch` onto a branch in the main
 checkout. `clean --done` removes finished clones; the patch stays in the job directory.
