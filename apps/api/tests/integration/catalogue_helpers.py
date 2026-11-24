@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
@@ -140,6 +140,48 @@ def delete_tenant_scoped_rows(cur: psycopg.Cursor, tenant_id: UUID) -> None:
                 )
     finally:
         cur.execute("set session_replication_role = default")
+
+
+def delete_committed_workspaces(tenant_ids: Sequence[UUID]) -> None:
+    """Delete workspaces a test committed, with their members, invitations and products.
+
+    The owner-guard trigger refuses to delete a workspace's last owner, even by cascade, so
+    memberships go first with triggers off. The tenant delete then runs with triggers back on:
+    replica mode would also skip its FK cascades and orphan the child rows.
+    """
+    if not tenant_ids:
+        return
+    ids = list(tenant_ids)
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            cur.execute("reset role")
+            cur.execute("select user_id from membership where tenant_id = any(%s)", (ids,))
+            user_ids = [user_id for (user_id,) in cur.fetchall()]
+            cur.execute("select platform_invitation_id from tenant where id = any(%s)", (ids,))
+            invitation_ids = [invitation_id for (invitation_id,) in cur.fetchall()]
+            cur.execute(
+                "select canonical_product_id from workspace_product where tenant_id = any(%s)",
+                (ids,),
+            )
+            canonical_ids = [canonical_id for (canonical_id,) in cur.fetchall()]
+
+            cur.execute("set local session_replication_role = replica")
+            cur.execute("delete from membership where tenant_id = any(%s)", (ids,))
+            cur.execute("set local session_replication_role = default")
+            cur.execute("delete from tenant where id = any(%s)", (ids,))
+            cur.execute("delete from platform_invitation where id = any(%s)", (invitation_ids,))
+            cur.execute(
+                "delete from auth.users u where u.id = any(%s) "
+                "and not exists (select 1 from membership m where m.user_id = u.id)",
+                (user_ids,),
+            )
+            cur.execute(
+                "delete from canonical_product c where c.id = any(%s) "
+                "and not exists (select 1 from workspace_product p "
+                "where p.canonical_product_id = c.id)",
+                (canonical_ids,),
+            )
+        conn.commit()
 
 
 def make_canonical_product(cur: psycopg.Cursor, name: str, *, gtin: str | None = None) -> UUID:

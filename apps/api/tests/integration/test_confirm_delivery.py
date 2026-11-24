@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from uuid import UUID, uuid4
 
 import psycopg
@@ -10,6 +11,7 @@ from integration.catalogue_helpers import (
     Workspace,
     act_as,
     connection,
+    delete_committed_workspaces,
     make_workspace,
     make_workspace_product,
     reset_role,
@@ -33,9 +35,28 @@ def conn() -> psycopg.Connection:
     yield from connection()
 
 
+# Workspaces each test seeds; the autouse fixture deletes the ones it committed afterwards so
+# the file can run twice against a shared database.
+_seeded_tenant_ids: list[UUID] = []
+
+
+@pytest.fixture(autouse=True)
+def _delete_seeded_workspaces() -> Iterator[None]:
+    _seeded_tenant_ids.clear()
+    yield
+    delete_committed_workspaces(_seeded_tenant_ids)
+
+
+def _make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
+    workspace = make_workspace(cur, label)
+    _seeded_tenant_ids.append(workspace.tenant_id)
+    return workspace
+
+
 def _make_member(
     cur: psycopg.Cursor, tenant_id: UUID, label: str, role: str
 ) -> Workspace:
+    label = f"{label}-{uuid4().hex[:12]}"
     user_id, membership_id = uuid4(), uuid4()
     cur.execute(
         "insert into auth.users (id,email) values (%s,%s)",
@@ -162,7 +183,7 @@ def test_full_quantity_delivery_marks_delivered_without_discrepancy(
     conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with conn.cursor() as cur:
-        owner = make_workspace(cur, "delivery-full")
+        owner = _make_workspace(cur, "delivery-full")
         requester = _make_member(
             cur, owner.tenant_id, "delivery-full-requester", "branch_manager"
         )
@@ -214,7 +235,7 @@ def test_short_quantity_records_exact_line_quantities_and_discrepancy(
     conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with conn.cursor() as cur:
-        owner = make_workspace(cur, "delivery-short")
+        owner = _make_workspace(cur, "delivery-short")
         requester = _make_member(
             cur, owner.tenant_id, "delivery-short-requester", "branch_manager"
         )
@@ -268,7 +289,7 @@ def test_not_ordered_request_refuses_with_not_ordered_conflict(
     conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with conn.cursor() as cur:
-        owner = make_workspace(cur, "delivery-not-ordered")
+        owner = _make_workspace(cur, "delivery-not-ordered")
         branch_id = _make_branch(cur, owner, "Delivery Submitted")
         request_id = _make_request(cur, owner, branch_id, owner, status="submitted")
         line_id = _add_line(cur, owner, request_id, quantity="3.000000", name="Tea")
@@ -309,7 +330,7 @@ def test_branch_scoped_member_assigned_elsewhere_resolves_404_not_403(
     was unreachable dead code when reused for `confirm_delivery`, since RLS always wins first.
     """
     with conn.cursor() as cur:
-        owner = make_workspace(cur, "delivery-forbidden")
+        owner = _make_workspace(cur, "delivery-forbidden")
         requester = _make_member(
             cur,
             owner.tenant_id,
@@ -347,7 +368,7 @@ def test_requester_without_branch_assignment_can_confirm_own_order(
     conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with conn.cursor() as cur:
-        owner = make_workspace(cur, "delivery-requester")
+        owner = _make_workspace(cur, "delivery-requester")
         requester = _make_member(
             cur, owner.tenant_id, "delivery-requester-own", "branch_manager"
         )

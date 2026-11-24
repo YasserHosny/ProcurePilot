@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from uuid import UUID, uuid4
 
 import psycopg
@@ -10,6 +11,7 @@ from integration.catalogue_helpers import (
     Workspace,
     act_as,
     connection,
+    delete_committed_workspaces,
     make_workspace,
     reset_role,
 )
@@ -32,7 +34,26 @@ def conn() -> psycopg.Connection:
     yield from connection()
 
 
+# Workspaces each test seeds; the autouse fixture deletes the ones it committed afterwards so
+# the file can run twice against a shared database.
+_seeded_tenant_ids: list[UUID] = []
+
+
+@pytest.fixture(autouse=True)
+def _delete_seeded_workspaces() -> Iterator[None]:
+    _seeded_tenant_ids.clear()
+    yield
+    delete_committed_workspaces(_seeded_tenant_ids)
+
+
+def _make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
+    workspace = make_workspace(cur, label)
+    _seeded_tenant_ids.append(workspace.tenant_id)
+    return workspace
+
+
 def _make_member(cur: psycopg.Cursor, tenant_id: UUID, label: str, role: str) -> Workspace:
+    label = f"{label}-{uuid4().hex[:12]}"
     user_id, membership_id = uuid4(), uuid4()
     cur.execute(
         "insert into auth.users (id,email) values (%s,%s)",
@@ -113,7 +134,7 @@ def test_quality_issue_with_zero_photos_persists_and_lists_with_empty_photos(
     conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with conn.cursor() as cur:
-        owner = make_workspace(cur, "quality-zero-photo")
+        owner = _make_workspace(cur, "quality-zero-photo")
         reporter = _make_member(
             cur, owner.tenant_id, "quality-zero-photo-reporter", "branch_manager"
         )
@@ -159,7 +180,7 @@ def test_quality_issue_against_not_delivered_request_refuses_with_conflict(
     conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with conn.cursor() as cur:
-        owner = make_workspace(cur, "quality-not-delivered")
+        owner = _make_workspace(cur, "quality-not-delivered")
         branch_id = _make_branch(cur, owner, "Quality Not Delivered")
         request_id = _make_request(cur, owner, branch_id, owner, status="ordered")
     conn.commit()
@@ -212,7 +233,7 @@ def test_quality_issue_photo_uploads_with_colliding_names_get_distinct_paths(
             return self.delegate.table(name)
 
     with conn.cursor() as cur:
-        owner = make_workspace(cur, "quality-photo-collisions")
+        owner = _make_workspace(cur, "quality-photo-collisions")
         reporter = _make_member(cur, owner.tenant_id, "quality-photo-reporter", "branch_manager")
         branch_id = _make_branch(cur, owner, "Quality Photo Collision")
         request_id = _make_request(cur, owner, branch_id, reporter, status="delivered")
@@ -257,8 +278,8 @@ def test_quality_issue_photo_storage_object_from_another_workspace_is_invisible(
     conn: psycopg.Connection,
 ) -> None:
     with conn.cursor() as cur:
-        alpha = make_workspace(cur, "quality-storage-alpha")
-        beta = make_workspace(cur, "quality-storage-beta")
+        alpha = _make_workspace(cur, "quality-storage-alpha")
+        beta = _make_workspace(cur, "quality-storage-beta")
         alpha_path = f"tenants/{alpha.tenant_id}/quality-issues/{uuid4()}/alpha.jpg"
         beta_path = f"tenants/{beta.tenant_id}/quality-issues/{uuid4()}/beta.jpg"
         reset_role(cur)
