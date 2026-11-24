@@ -16,6 +16,7 @@ queue, and a spend/savings answer links to the reports center.
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from datetime import date
 from uuid import UUID, uuid4
 
@@ -36,11 +37,49 @@ pytestmark = pytest.mark.skipif(
     reason="TEST_DATABASE_URL is not set; needs a Postgres with the migrations applied",
 )
 
+# What the seed helpers below committed during the current test; the autouse fixture
+# deletes it afterwards so the file can run twice against a shared database.
+_seeded_tenant_ids: list[UUID] = []
+_seeded_emails: list[str] = []
+_seeded_canonical_product_ids: list[UUID] = []
+
+
+@pytest.fixture(autouse=True)
+def _delete_seeded_rows() -> Iterator[None]:
+    _seeded_tenant_ids.clear()
+    _seeded_emails.clear()
+    _seeded_canonical_product_ids.clear()
+    yield
+    if not _seeded_tenant_ids and not _seeded_emails and not _seeded_canonical_product_ids:
+        return
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            # The owner-guard trigger refuses to delete a workspace's last owner, even by
+            # cascade, so memberships go first with triggers off. The tenant delete then runs
+            # with triggers back on: replica mode would also skip its FK cascades.
+            cur.execute("set local session_replication_role = replica")
+            cur.execute("delete from membership where tenant_id = any(%s)", (_seeded_tenant_ids,))
+            cur.execute("set local session_replication_role = default")
+            cur.execute("delete from tenant where id = any(%s)", (_seeded_tenant_ids,))
+            cur.execute("delete from platform_invitation where email = any(%s)", (_seeded_emails,))
+            cur.execute("delete from auth.users where email = any(%s)", (_seeded_emails,))
+            cur.execute(
+                "delete from canonical_product where id = any(%s)",
+                (_seeded_canonical_product_ids,),
+            )
+        conn.commit()
+
+
+def _unique_email(suffix: str) -> str:
+    return f"analyst-e2e-{suffix}-{uuid4().hex[:12]}@example.test"
+
 
 def _seed_tenant(cur: psycopg.Cursor, *, email_suffix: str) -> tuple[UUID, UUID, UUID]:
     """One tenant and one owner member — the common base every scenario below extends."""
     tenant_id, user_id, membership_id, invitation_id = uuid4(), uuid4(), uuid4(), uuid4()
-    email = f"analyst-e2e-{email_suffix}@example.test"
+    email = _unique_email(email_suffix)
+    _seeded_tenant_ids.append(tenant_id)
+    _seeded_emails.append(email)
 
     cur.execute(
         "insert into supported_region (code,label_en,label_ar) values ('GB','UK','ب') "
@@ -159,6 +198,7 @@ def _seed_reorder_proposal(cur: psycopg.Cursor, tenant_id: UUID) -> UUID:
         uuid4(),
         uuid4(),
     )
+    _seeded_canonical_product_ids.append(canonical_id)
     cur.execute(
         "insert into canonical_product (id,name,gtin,base_unit) values (%s,%s,null,'litre')",
         (canonical_id, "Analyst E2E Canonical Product"),
@@ -215,11 +255,13 @@ def _member(
 
 
 def _seed_additional_member(
-    cur: psycopg.Cursor, tenant_id: UUID, *, role: str, email: str
+    cur: psycopg.Cursor, tenant_id: UUID, *, role: str, email_suffix: str
 ) -> tuple[UUID, UUID]:
     """Add a second (or third) member to an already-seeded tenant — for scoping tests
     that need more than one member in the same workspace."""
     user_id, membership_id = uuid4(), uuid4()
+    email = _unique_email(email_suffix)
+    _seeded_emails.append(email)
     cur.execute("insert into auth.users (id,email) values (%s,%s)", (user_id, email))
     cur.execute(
         "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
@@ -601,16 +643,8 @@ def test_continuation_by_a_non_creator_member_raises_not_found() -> None:
     with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, creator_user, creator_membership = _seed_workspace_with_spend(cur)
-            other_user_id, other_membership_id = uuid4(), uuid4()
-            other_email = "analyst-e2e-other-member@example.test"
-            cur.execute(
-                "insert into auth.users (id,email) values (%s,%s)",
-                (other_user_id, other_email),
-            )
-            cur.execute(
-                "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
-                "values (%s,%s,%s,%s,'owner',true)",
-                (other_membership_id, tenant_id, other_user_id, other_email),
+            other_user_id, other_membership_id = _seed_additional_member(
+                cur, tenant_id, role="owner", email_suffix="other-member"
             )
         conn.commit()
 
@@ -658,10 +692,10 @@ def test_conversation_list_scoping_by_member_and_role() -> None:
         with conn.cursor() as cur:
             tenant_id, user_1_id, member_1_id = _seed_workspace_with_spend(cur)
             user_2_id, member_2_id = _seed_additional_member(
-                cur, tenant_id, role="viewer", email="analyst-e2e-viewer2@example.test"
+                cur, tenant_id, role="viewer", email_suffix="viewer2"
             )
             user_3_id, member_3_id = _seed_additional_member(
-                cur, tenant_id, role="owner", email="analyst-e2e-owner3@example.test"
+                cur, tenant_id, role="owner", email_suffix="owner3"
             )
         conn.commit()
 
@@ -749,7 +783,7 @@ def test_get_conversation_access_control() -> None:
             t1_id, u1_id, m1_id = _seed_workspace_with_spend(cur)
             t2_id, u2_id, m2_id = _seed_tenant(cur, email_suffix="t2")
             u3_id, m3_id = _seed_additional_member(
-                cur, t1_id, role="viewer", email="analyst-e2e-viewer3@example.test"
+                cur, t1_id, role="viewer", email_suffix="viewer3"
             )
         conn.commit()
 
