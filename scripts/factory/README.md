@@ -84,8 +84,8 @@ the job when any of these holds:
 A Codex job counts against the cap from the moment `new` admits it: while it clones, while it is
 staged with `--no-start` (for up to 30 minutes), and while its supervisor or its relay is alive.
 Admission takes a lock (`$FACTORY_HOME/codex-admission.lock`) from the check until `job.json` is
-written, so concurrent submissions see each other. `start` re-checks a Codex job before launching
-it. The readings come from the `CODEX_HOME` the relay will get (the env file's, else the caller's,
+written, so concurrent submissions see each other. `start` re-checks a Codex job and reserves its
+slot under the same lock before launching it. The readings come from the `CODEX_HOME` the relay will get (the env file's, else the caller's,
 else `~/.codex`), looking back 8 days so an unexpired weekly reading still counts.
 
 A refused job goes to `FACTORY_CODEX_FALLBACK_LANE` (default `ui`, Agy, whose relay always runs

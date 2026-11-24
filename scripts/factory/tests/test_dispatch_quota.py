@@ -289,3 +289,34 @@ def test_choose_lane_refuses_to_carry_relay_args_onto_the_fallback(dispatch) -> 
             "ui",
             relay_args=["--ignore-user-config"],
         )
+
+
+@pytest.mark.parametrize("status", ["cloned", "implementer_failed"])
+def test_start_holds_the_slot_before_the_lock_is_released(
+    dispatch,  # noqa: ANN001
+    monkeypatch: pytest.MonkeyPatch,
+    status: str,
+) -> None:
+    import argparse
+
+    # Created long ago: a staged job past its reservation, or a failed job being restarted.
+    _job(
+        dispatch,
+        "old",
+        "/b/o.md",
+        status,
+        "complex",
+        "codex",
+        created_at="2026-01-01T00:00:00+00:00",
+    )
+    monkeypatch.setattr(
+        dispatch, "check_codex_quota", lambda brief, exclude=None: (None, {})
+    )
+    counted: list[int] = []
+    monkeypatch.setattr(
+        dispatch,
+        "start_supervisor",
+        lambda job: counted.append(dispatch.running_codex_jobs()),
+    )
+    dispatch.cmd_start(argparse.Namespace(job="old", ignore_quota=False))
+    assert counted == [1]

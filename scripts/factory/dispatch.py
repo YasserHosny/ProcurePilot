@@ -97,8 +97,8 @@ CODEX_FALLBACK_LANE = os.environ.get("FACTORY_CODEX_FALLBACK_LANE", "ui") or Non
 # A brief whose earlier job reached an implementer and did not pass. preflight_failed and
 # stopped are left out: no implementer spent quota failing on the brief.
 RETRYABLE = {"implementer_failed", "timeout", "gate_failed", "no_changes"}
-# A Codex job holds a slot from admission: while it clones (created, or cloned and staged with
-# --no-start) for up to this long, then while its supervisor or its relay is alive.
+# A Codex job holds a slot from admission (or from `start`): while it clones, or sits cloned and
+# staged with --no-start, for up to this long; then while its supervisor or its relay is alive.
 CODEX_RESERVATION_MINUTES = 30
 ADMISSION_LOCK = FACTORY_HOME / "codex-admission.lock"
 
@@ -307,7 +307,8 @@ def _holds_codex_slot(data: dict) -> bool:
         return pid_alive(data.get("supervisor_pid")) or pid_alive(data.get("relay_pid"))
     if status in {"created", "cloned"}:
         try:
-            created = datetime.fromisoformat(data.get("created_at", "")).timestamp()
+            since = data.get("reserved_at") or data.get("created_at", "")
+            created = datetime.fromisoformat(since).timestamp()
         except (TypeError, ValueError):
             return False
         return time.time() - created < CODEX_RESERVATION_MINUTES * 60
@@ -758,7 +759,10 @@ def cmd_start(args: argparse.Namespace) -> None:
                     1,
                 )
             job.data["codex_quota"] = quota
-            job.event(None, "quota re-checked at start")
+            # Hold the slot before the lock goes: the supervisor writes `running` only after
+            # start_supervisor has returned, and a stale or terminal status holds none.
+            job.data["reserved_at"] = now()
+            job.event("cloned", "quota re-checked at start; slot reserved")
             start_supervisor(job)
         return
     start_supervisor(job)

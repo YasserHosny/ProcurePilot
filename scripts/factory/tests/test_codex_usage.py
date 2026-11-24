@@ -251,8 +251,12 @@ def test_latest_reading_keeps_looking_when_the_newest_file_holds_an_older_readin
 ) -> None:
     # A: last reading 08:30, but tool output kept it written until 09:01.
     # B: a reading at 08:55, last written 08:56. B's reading is the latest.
-    a = write_rollout(tmp_path, "a", [meta("/x/a", "a"), tc(ts("08:30", 21), 3.0, 50.0)])
-    b = write_rollout(tmp_path, "b", [meta("/x/b", "b"), tc(ts("08:55", 21), 9.0, 51.0)])
+    a = write_rollout(
+        tmp_path, "a", [meta("/x/a", "a"), tc(ts("08:30", 21), 3.0, 50.0)]
+    )
+    b = write_rollout(
+        tmp_path, "b", [meta("/x/b", "b"), tc(ts("08:55", 21), 9.0, 51.0)]
+    )
     os.utime(a, (datetime(2026, 11, 21, 9, 1, tzinfo=UTC).timestamp(),) * 2)
     os.utime(b, (datetime(2026, 11, 21, 8, 56, tzinfo=UTC).timestamp(),) * 2)
     r = cu.latest_reading(tmp_path, datetime(2026, 11, 16, tzinfo=UTC))
