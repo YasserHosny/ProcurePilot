@@ -1129,7 +1129,7 @@ def cmd_gate(args: argparse.Namespace) -> None:
     ):
         die("job is still running; stop it first or wait")
     try:
-        record_changes(job)
+        changed = record_changes(job)
     except RuntimeError as exc:
         die(str(exc), 1)
     if args.gate:
@@ -1141,6 +1141,14 @@ def cmd_gate(args: argparse.Namespace) -> None:
     else:
         job.event("gating", "manual gate run")
     ok = run_gates(job, job_env(job)) == "passed"
+    if ok and not changed:
+        # Gates passing on the checkpoint prove nothing the implementer did; a 2026-11-23 Agy job
+        # that changed nothing read `passed` after a manual run with replacement gates.
+        job.event(
+            "no_changes",
+            "gates passed, but the clone is identical to the checkpoint: nothing to land",
+        )
+        ok = False
     write_summary(job)
     print((job.dir / "summary.md").read_text())
     sys.exit(0 if ok else 1)
