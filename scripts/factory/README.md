@@ -67,6 +67,40 @@ Each of these came from a real failure in this project's delegation history.
 | Relay launched with stdin closed, in its own session | Codex hangs forever reading stdin when backgrounded |
 | Brief footer: do the work yourself, no destructive commands, the gates are listed | repo `AGENTS.md` makes Codex hand frontend work to Agy and stop |
 
+## Codex quota gate
+
+The account is on ChatGPT Plus. On 2026-11-23 four parallel Codex jobs used up the 5-hour window
+in 25 minutes: three were cut off mid-run, and Agy then finished all three. Before a job on a
+Codex lane starts, `new` reads the latest quota reading from `$CODEX_HOME/sessions` and refuses
+the job when any of these holds:
+
+| Rule | Default | Env |
+|---|---|---|
+| Codex jobs already running | 2 | `FACTORY_CODEX_MAX_PARALLEL` |
+| 5-hour used + job cost x (running + 1) | over 85% | `FACTORY_CODEX_CEILING`, `FACTORY_CODEX_JOB_COST` (25) |
+| The brief already failed on an earlier job (same brief file, the implementer ran) | 5-hour at 60% or more | `FACTORY_CODEX_RETRY_CEILING` |
+| Weekly used | 90% or more | `FACTORY_CODEX_WEEKLY_CEILING` |
+
+A Codex job counts against the cap from the moment `new` admits it: while it clones, while it is
+staged with `--no-start` (for up to 30 minutes), and while its supervisor or its relay is alive.
+Admission takes a lock (`$FACTORY_HOME/codex-admission.lock`) from the check until `job.json` is
+written, so concurrent submissions see each other. `start` re-checks a Codex job and reserves its
+slot under the same lock before launching it. The readings come from the `CODEX_HOME` the relay will get (the env file's, else the caller's,
+else `~/.codex`), looking back 8 days so an unexpired weekly reading still counts.
+
+A refused job goes to `FACTORY_CODEX_FALLBACK_LANE` (default `ui`, Agy, whose relay always runs
+with `--dangerously-skip-permissions` under the standing approval; the reroute message says so).
+The reason is printed, and `job.json` records it as `requested_lane` and `codex_quota`. A job
+with `--relay-arg` is refused rather than rerouted, since those arguments were written for the
+Codex relay. `--no-reroute` fails instead; `--ignore-quota` (on `new` or `start`) skips the check.
+An empty `FACTORY_CODEX_FALLBACK_LANE` turns rerouting off.
+
+`dispatch.py usage` (or `scripts/factory/codex_usage.py`) prints both windows, when each resets, and each
+session's share of every 5-hour window. The percentages are account-wide: usage from another
+device appears as `(not seen locally)` once a local reading follows it, and is invisible until
+then. A job's cost is assumed, not measured: about 20-25 points for an implementation job, 8 for a
+`debate-review` run.
+
 ## Lanes and relays
 
 Lanes come from `~/.config/delegate-skills/config.json` (the same file `delegate-setup`
@@ -101,4 +135,8 @@ checkout. `clean --done` removes finished clones; the patch stays in the job dir
 Point `FACTORY_HOME`, `FACTORY_SKILLS_DIR` and `FACTORY_LANES` at scratch locations with a fake
 `<implementer>-delegate/scripts/relay.mjs` that writes `result.json` and a file in `--cd`. That
 exercises clone, checkpoint, gate pass and fail, `no_changes`, `stop` and `clean` without
-spending quota.
+spending quota. Add `CODEX_HOME` pointing at a scratch `sessions/` with one hand-written
+`token_count` line to drive the quota gate.
+
+`apps/api/.venv/bin/pytest scripts/factory/tests -q` covers the quota gate and `codex_usage`,
+replayed against the 2026-11-23 numbers.

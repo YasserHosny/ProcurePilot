@@ -14,6 +14,7 @@ memory between commands.
     dispatch.py diff <job>             # changes against the checkpoint
     dispatch.py stop <job>
     dispatch.py clean <job>            # remove the clone, keep the job record
+    dispatch.py usage                  # Codex quota windows and each session's share
 
 Job status values (job.json "status"):
     created, preflight_failed, cloned, running, gating,
@@ -29,11 +30,20 @@ Environment (all optional):
     FACTORY_MIN_MEM_GB       default 3
     FACTORY_LANES            default ~/.config/delegate-skills/config.json
     FACTORY_SKILLS_DIR       default ~/.claude/skills   (where <implementer>-delegate/scripts/relay.mjs lives)
+    FACTORY_CODEX_CEILING        default 85   refuse a Codex job if 5-hour used + cost x (running + 1) exceeds it
+    FACTORY_CODEX_JOB_COST       default 25   5-hour points one Codex implementation job is assumed to use
+    FACTORY_CODEX_MAX_PARALLEL   default 2    Codex jobs running at once
+    FACTORY_CODEX_RETRY_CEILING  default 60   a brief that already failed goes to Codex only below this
+    FACTORY_CODEX_WEEKLY_CEILING default 90
+    FACTORY_CODEX_FALLBACK_LANE  default ui   where a refused Codex job goes; empty = fail instead
+    CODEX_HOME                   default ~/.codex   where the quota readings are read from
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import json
 import os
 import re
@@ -43,6 +53,7 @@ import signal
 import subprocess
 import sys
 import time
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -74,6 +85,22 @@ SKILLS_DIR = Path(
 ).expanduser()
 MIN_DISK_GB = float(os.environ.get("FACTORY_MIN_DISK_GB", "8"))
 MIN_MEM_GB = float(os.environ.get("FACTORY_MIN_MEM_GB", "3"))
+
+# Codex quota gate. The account is on ChatGPT Plus: one Codex implementation job costs about
+# 20-25% of the 5-hour window, and four parallel jobs ran it out on 2026-11-23.
+CODEX_CEILING = float(os.environ.get("FACTORY_CODEX_CEILING", "85"))
+CODEX_RETRY_CEILING = float(os.environ.get("FACTORY_CODEX_RETRY_CEILING", "60"))
+CODEX_WEEKLY_CEILING = float(os.environ.get("FACTORY_CODEX_WEEKLY_CEILING", "90"))
+CODEX_JOB_COST = float(os.environ.get("FACTORY_CODEX_JOB_COST", "25"))
+CODEX_MAX_PARALLEL = int(os.environ.get("FACTORY_CODEX_MAX_PARALLEL", "2"))
+CODEX_FALLBACK_LANE = os.environ.get("FACTORY_CODEX_FALLBACK_LANE", "ui") or None
+# A brief whose earlier job reached an implementer and did not pass. preflight_failed and
+# stopped are left out: no implementer spent quota failing on the brief.
+RETRYABLE = {"implementer_failed", "timeout", "gate_failed", "no_changes"}
+# A Codex job holds a slot from admission (or from `start`): while it clones, or sits cloned and
+# staged with --no-start, for up to this long; then while its supervisor or its relay is alive.
+CODEX_RESERVATION_MINUTES = 30
+ADMISSION_LOCK = FACTORY_HOME / "codex-admission.lock"
 
 LFS_EXCLUDE = "docs/gtm/video"  # demo-video media: pointers are enough in a clone
 HEARTBEAT_SECONDS = 15
@@ -236,6 +263,135 @@ def check_resources() -> list[str]:
     except (OSError, AttributeError):
         pass
     return problems
+
+
+def codex_quota_problem(
+    five_hour: float, weekly: float, running: int, retry: bool
+) -> str | None:
+    """Why a new Codex job should not start now, or None. Pure, so the thresholds are testable."""
+    if running >= CODEX_MAX_PARALLEL:
+        return (
+            f"{running} Codex jobs already running (parallel cap {CODEX_MAX_PARALLEL})"
+        )
+    if weekly >= CODEX_WEEKLY_CEILING:
+        return f"weekly window at {weekly:g}% (ceiling {CODEX_WEEKLY_CEILING:g}%)"
+    if retry and five_hour >= CODEX_RETRY_CEILING:
+        return (
+            f"this brief already failed on another job, and a retry needs the 5-hour window "
+            f"under {CODEX_RETRY_CEILING:g}% (it is at {five_hour:g}%)"
+        )
+    projected = five_hour + CODEX_JOB_COST * (running + 1)
+    if projected > CODEX_CEILING:
+        return (
+            f"5-hour window would reach {projected:g}% ({five_hour:g}% used + {running + 1} "
+            f"Codex job(s) x {CODEX_JOB_COST:g}%; ceiling {CODEX_CEILING:g}%)"
+        )
+    return None
+
+
+def previous_failure(brief_source: str) -> Job | None:
+    """The newest earlier job on the same brief file that reached an implementer and failed."""
+    for job in list_jobs():
+        if (
+            job.data.get("brief_source") == brief_source
+            and job.data.get("status") in RETRYABLE
+        ):
+            return job
+    return None
+
+
+def _holds_codex_slot(data: dict) -> bool:
+    status = data.get("status")
+    if status in {"running", "gating"}:
+        # The relay runs in its own session and outlives a dead supervisor.
+        return pid_alive(data.get("supervisor_pid")) or pid_alive(data.get("relay_pid"))
+    if status in {"created", "cloned"}:
+        try:
+            since = data.get("reserved_at") or data.get("created_at", "")
+            created = datetime.fromisoformat(since).timestamp()
+        except (TypeError, ValueError):
+            return False
+        return time.time() - created < CODEX_RESERVATION_MINUTES * 60
+    return False
+
+
+def running_codex_jobs(exclude: str | None = None) -> int:
+    """Codex jobs holding a slot: running, or admitted and not started yet."""
+    return sum(
+        1
+        for job in list_jobs()
+        if job.id != exclude
+        and job.data.get("implementer") == "codex"
+        and _holds_codex_slot(job.data)
+    )
+
+
+@contextlib.contextmanager
+def admission_lock() -> Iterator[None]:
+    """Serialise Codex admission across dispatch processes: check, then record the job."""
+    FACTORY_HOME.mkdir(parents=True, exist_ok=True)
+    with open(ADMISSION_LOCK, "a") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)
+
+
+def codex_home() -> Path:
+    """The Codex home the relay will use: job_env lays the env file over the caller's env."""
+    value = load_env_file(ENV_FILE).get("CODEX_HOME") or os.environ.get("CODEX_HOME")
+    return Path(value).expanduser() if value else HOME / ".codex"
+
+
+def check_codex_quota(
+    brief_source: str, exclude: str | None = None
+) -> tuple[str | None, dict]:
+    """Read the latest local quota reading and decide. Returns (problem, snapshot for job.json)."""
+    sys.path.insert(0, str(HERE))
+    import codex_usage
+
+    at = datetime.now(timezone.utc)
+    home = codex_home()
+    last = codex_usage.latest_reading(home, at - codex_usage.WINDOW_LOOKBACK)
+    five_hour = codex_usage.current_five_hour(last, at)
+    weekly = codex_usage.current_weekly(last, at)
+    running = running_codex_jobs(exclude=exclude)
+    failed = previous_failure(brief_source)
+    snapshot = {
+        "codex_home": str(home),
+        "five_hour": five_hour,
+        "weekly": weekly,
+        "reading_at": last.at.isoformat() if last else None,
+        "running_codex_jobs": running,
+        "retry_of": failed.id if failed else None,
+    }
+    return codex_quota_problem(five_hour, weekly, running, failed is not None), snapshot
+
+
+def choose_lane(
+    lane: str,
+    implementer: str,
+    problem: str | None,
+    fallback: str | None,
+    relay_args: list[str] | None = None,
+) -> tuple[str, str | None]:
+    """Keep the lane, reroute a refused Codex job to `fallback`, or stop when there is none."""
+    if implementer != "codex" or problem is None:
+        return lane, None
+    hint = (
+        "Wait for the window to reset (`dispatch.py usage`), pick another lane, "
+        "or pass --ignore-quota"
+    )
+    if not fallback:
+        die(f"Codex quota: {problem}. {hint}", 1)
+    if relay_args:
+        die(
+            f"Codex quota: {problem}. Not rerouting to {fallback}: --relay-arg "
+            f"{' '.join(relay_args)} was written for the Codex relay. {hint}",
+            1,
+        )
+    return fallback, f"Codex quota: {problem}; lane {lane} rerouted to {fallback}"
 
 
 def load_env_file(path: Path) -> dict[str, str]:
@@ -413,6 +569,39 @@ def job_env(job: Job) -> dict[str, str]:
 # ---------------------------------------------------------------- commands
 
 
+def record_new_job(
+    job: Job,
+    args: argparse.Namespace,
+    brief_path: Path,
+    lane_name: str,
+    lane: dict,
+    quota: dict | None,
+    quota_note: str | None,
+) -> None:
+    job.data = {
+        "id": job.id,
+        "created_at": now(),
+        "lane": lane_name,
+        "requested_lane": args.lane,
+        "codex_quota": quota,
+        "implementer": lane["implementer"],
+        "relay": lane["relay"],
+        "clone": str(CLONES_DIR / job.id),
+        "brief_source": str(brief_path),
+        "gates": args.gate,
+        "gate_timeout_seconds": args.gate_timeout * 60,
+        "relay_timeout": args.timeout,
+        "web": bool(args.web),
+        "relay_extra_args": RELAY_EXTRA_ARGS[lane["implementer"]]
+        + (args.relay_arg or []),
+        "status": "created",
+        "events": [],
+    }
+    job.event("created", f"lane {lane_name} -> {lane['implementer']}")
+    if quota_note:
+        job.event(None, quota_note)
+
+
 def cmd_new(args: argparse.Namespace) -> None:
     brief_path = Path(args.brief).expanduser().resolve()
     if not brief_path.exists():
@@ -435,24 +624,30 @@ def cmd_new(args: argparse.Namespace) -> None:
         die(f"job already exists: {job_id}")
 
     lane = resolve_lane(args.lane)
-    job.data = {
-        "id": job_id,
-        "created_at": now(),
-        "lane": args.lane,
-        "implementer": lane["implementer"],
-        "relay": lane["relay"],
-        "clone": str(CLONES_DIR / job_id),
-        "brief_source": str(brief_path),
-        "gates": args.gate,
-        "gate_timeout_seconds": args.gate_timeout * 60,
-        "relay_timeout": args.timeout,
-        "web": bool(args.web),
-        "relay_extra_args": RELAY_EXTRA_ARGS[lane["implementer"]]
-        + (args.relay_arg or []),
-        "status": "created",
-        "events": [],
-    }
-    job.event("created", f"lane {args.lane} -> {lane['implementer']}")
+    gated = lane["implementer"] == "codex" and not args.ignore_quota
+    # Held from the quota check until job.json exists, so a concurrent submission counts this
+    # job's reservation. Released before the clone, which is the slow part.
+    with admission_lock() if gated else contextlib.nullcontext():
+        lane_name, quota_note, quota = args.lane, None, None
+        if gated:
+            problem, quota = check_codex_quota(str(brief_path))
+            fallback = None if args.no_reroute else CODEX_FALLBACK_LANE
+            lane_name, quota_note = choose_lane(
+                args.lane, "codex", problem, fallback, args.relay_arg
+            )
+            if lane_name != args.lane:
+                lane = resolve_lane(lane_name)
+                if lane["implementer"] == "codex":
+                    die(
+                        f"fallback lane '{lane_name}' is also Codex; "
+                        f"set FACTORY_CODEX_FALLBACK_LANE",
+                        1,
+                    )
+                extra = RELAY_EXTRA_ARGS[lane["implementer"]]
+                if extra:
+                    quota_note += f" (its relay runs with {' '.join(extra)})"
+                print(f"dispatch: {quota_note}", file=sys.stderr)
+        record_new_job(job, args, brief_path, lane_name, lane, quota, quota_note)
 
     log: list[str] = []
     try:
@@ -551,6 +746,25 @@ def cmd_start(args: argparse.Namespace) -> None:
     job = Job.load(args.job)
     if not job.clone.exists():
         die(f"clone is gone: {job.clone}; create a new job")
+    if job.data.get("implementer") == "codex" and not args.ignore_quota:
+        # A staged job was admitted when it was created; a restart was not admitted at all.
+        with admission_lock():
+            problem, quota = check_codex_quota(
+                job.data.get("brief_source", ""), exclude=job.id
+            )
+            if problem:
+                die(
+                    f"Codex quota: {problem}. Start it once the window allows "
+                    f"(`dispatch.py usage`), or pass --ignore-quota",
+                    1,
+                )
+            job.data["codex_quota"] = quota
+            # Hold the slot before the lock goes: the supervisor writes `running` only after
+            # start_supervisor has returned, and a stale or terminal status holds none.
+            job.data["reserved_at"] = now()
+            job.event("cloned", "quota re-checked at start; slot reserved")
+            start_supervisor(job)
+        return
     start_supervisor(job)
 
 
@@ -1010,6 +1224,26 @@ def cmd_clean(args: argparse.Namespace) -> None:
             print(f"{job.id}: clone already gone")
 
 
+def cmd_usage(args: argparse.Namespace) -> None:
+    sys.path.insert(0, str(HERE))
+    import codex_usage
+
+    codex_usage.main(
+        ["--hours", str(args.hours), "--codex-home", str(codex_home())]
+        + (["--json"] if args.json else [])
+    )
+    if args.json:
+        return
+    problem, quota = check_codex_quota("")
+    verdict = f"refused: {problem}" if problem else "allowed"
+    print(
+        f"\nNext Codex job: {verdict}\n"
+        f"  running {quota['running_codex_jobs']}/{CODEX_MAX_PARALLEL}; refused when 5-hour used + "
+        f"{CODEX_JOB_COST:g}% per job passes {CODEX_CEILING:g}% (retries {CODEX_RETRY_CEILING:g}%); "
+        f"fallback lane {CODEX_FALLBACK_LANE or 'none'}"
+    )
+
+
 def main() -> None:
     p = argparse.ArgumentParser(
         prog="dispatch.py",
@@ -1054,12 +1288,27 @@ def main() -> None:
         help="extra argument passed to the relay; repeatable",
     )
     n.add_argument("--no-start", action="store_true")
+    n.add_argument(
+        "--ignore-quota",
+        action="store_true",
+        help="start a Codex job even when the quota check would refuse it",
+    )
+    n.add_argument(
+        "--no-reroute",
+        action="store_true",
+        help="fail instead of moving a refused Codex job to FACTORY_CODEX_FALLBACK_LANE",
+    )
     n.set_defaults(fn=cmd_new)
 
     s = sub.add_parser(
         "start", help="start (or restart) the supervisor for an existing job"
     )
     s.add_argument("job")
+    s.add_argument(
+        "--ignore-quota",
+        action="store_true",
+        help="start a Codex job even when the quota check would refuse it",
+    )
     s.set_defaults(fn=cmd_start)
 
     st = sub.add_parser("status", help="list jobs, or show one")
@@ -1101,6 +1350,13 @@ def main() -> None:
     c.add_argument("job", nargs="?")
     c.add_argument("--done", action="store_true", help="every finished job's clone")
     c.set_defaults(fn=cmd_clean)
+
+    u = sub.add_parser(
+        "usage", help="Codex 5-hour and weekly quota, and each session's share"
+    )
+    u.add_argument("--hours", type=float, default=24)
+    u.add_argument("--json", action="store_true")
+    u.set_defaults(fn=cmd_usage)
 
     sv = sub.add_parser("_supervise")
     sv.add_argument("job")
