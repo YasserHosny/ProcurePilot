@@ -40,17 +40,23 @@ pytestmark = pytest.mark.skipif(
 # What the seed helpers below committed during the current test; the autouse fixture
 # deletes it afterwards so the file can run twice against a shared database.
 _seeded_tenant_ids: list[UUID] = []
-_seeded_emails: list[str] = []
+_seeded_invitation_ids: list[UUID] = []
+_seeded_user_ids: list[UUID] = []
 _seeded_canonical_product_ids: list[UUID] = []
 
 
 @pytest.fixture(autouse=True)
 def _delete_seeded_rows() -> Iterator[None]:
-    _seeded_tenant_ids.clear()
-    _seeded_emails.clear()
-    _seeded_canonical_product_ids.clear()
+    seeded = (
+        _seeded_tenant_ids,
+        _seeded_invitation_ids,
+        _seeded_user_ids,
+        _seeded_canonical_product_ids,
+    )
+    for ids in seeded:
+        ids.clear()
     yield
-    if not _seeded_tenant_ids and not _seeded_emails and not _seeded_canonical_product_ids:
+    if not any(seeded):
         return
     with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
@@ -61,8 +67,10 @@ def _delete_seeded_rows() -> Iterator[None]:
             cur.execute("delete from membership where tenant_id = any(%s)", (_seeded_tenant_ids,))
             cur.execute("set local session_replication_role = default")
             cur.execute("delete from tenant where id = any(%s)", (_seeded_tenant_ids,))
-            cur.execute("delete from platform_invitation where email = any(%s)", (_seeded_emails,))
-            cur.execute("delete from auth.users where email = any(%s)", (_seeded_emails,))
+            cur.execute(
+                "delete from platform_invitation where id = any(%s)", (_seeded_invitation_ids,)
+            )
+            cur.execute("delete from auth.users where id = any(%s)", (_seeded_user_ids,))
             cur.execute(
                 "delete from canonical_product where id = any(%s)",
                 (_seeded_canonical_product_ids,),
@@ -79,7 +87,8 @@ def _seed_tenant(cur: psycopg.Cursor, *, email_suffix: str) -> tuple[UUID, UUID,
     tenant_id, user_id, membership_id, invitation_id = uuid4(), uuid4(), uuid4(), uuid4()
     email = _unique_email(email_suffix)
     _seeded_tenant_ids.append(tenant_id)
-    _seeded_emails.append(email)
+    _seeded_invitation_ids.append(invitation_id)
+    _seeded_user_ids.append(user_id)
 
     cur.execute(
         "insert into supported_region (code,label_en,label_ar) values ('GB','UK','ب') "
@@ -261,7 +270,7 @@ def _seed_additional_member(
     that need more than one member in the same workspace."""
     user_id, membership_id = uuid4(), uuid4()
     email = _unique_email(email_suffix)
-    _seeded_emails.append(email)
+    _seeded_user_ids.append(user_id)
     cur.execute("insert into auth.users (id,email) values (%s,%s)", (user_id, email))
     cur.execute(
         "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
