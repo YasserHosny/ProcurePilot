@@ -30,7 +30,9 @@ supervisor is detached, so the job outlives this turn. Reference: `scripts/facto
    scripts/factory/dispatch.py new --lane <lane> --brief ~/factory/briefs/<name>.md --name <name> [--web] --gate '<cmd>'
    ```
    Relay the job id and clone path. Preflight failure (disk, memory, stale node_modules) is the
-   whole answer; fix the cause, then re-run.
+   whole answer; fix the cause, then re-run. Before a batch of Codex jobs, read the headroom with
+   `dispatch.py usage`. A Codex job the quota gate refuses lands on the fallback lane with the
+   reason printed; report the reroute alongside the job id.
 5. **Wait** with a scheduled wakeup or a background `status` watch, never a sleep loop. A job
    marked `(stale)` or `(supervisor dead)` needs a look at `logs <job>`, not a restart.
 6. **Read the result** from `status <job>` (summary.md). The verdict is the gate table. The
