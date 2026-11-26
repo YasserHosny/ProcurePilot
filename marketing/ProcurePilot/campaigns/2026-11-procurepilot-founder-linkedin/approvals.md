@@ -18,3 +18,4 @@ An approval is valid for the item, version and action named in its row only.
 |---|---|---|---|
 | 2026-10-28 | A-01 to A-06 | Claude self-check: claims traced to C-01 to C-16, synthetic data labelled, one CTA each, no competitor names, no price, no results. Open: images, Arabic native check, C-16 | not a substitute for the campaign-review gate |
 | 2026-10-29 | all posts v1.1 | pass with changes (senior review): language rule per channel to decide, images to produce, Egypt screens to capture; text fixes applied | `review-A-01-to-A-06-2026-10-29.md` |
+| 2026-11-26 | G-asset + G-publish (schedule) | A-07 to A-09 v3 images (Nuvara Group screens, "Real screen · demo data") and new dates 29 Nov, 3 Dec, 10 Dec | approved | Yasser | chat ("موافق، جدول") | Scheduled on the Iron Systems page 2026-11-26 with alt text |
