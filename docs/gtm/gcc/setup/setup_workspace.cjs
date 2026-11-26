@@ -1,6 +1,6 @@
 // Populate a demo workspace (profiles.cjs) through the API, as the signed-in owner in the kiosk Chrome
 // (CDP :9333). Idempotency keys are fixed, so a re-run returns the same rows instead of duplicating them.
-// usage: PP_PROFILE=sa|sa-en|ie PP_OWNER_GMAIL=<gmail username> NODE_PATH=<web node_modules> node setup_workspace.cjs [--guardrail-only]
+// usage: PP_PROFILE=sa|sa-en|ie|gen PP_OWNER_GMAIL=<gmail username> NODE_PATH=<web node_modules> node setup_workspace.cjs [--guardrail-only]
 // The owner signs in first; this script never touches credentials and refuses to run against any other workspace.
 const { chromium } = require('@playwright/test');
 const BASE = 'https://procurepilot.iron-sys.com/api/v1';
@@ -35,15 +35,16 @@ const { tenant: TENANT, branches: BRANCHES, costCentres: COST_CENTRES, suppliers
   const ids = { branch: {}, cc: {}, supplier: {} };
   for (const x of BRANCHES) ids.branch[x.key] = ok(await call('POST', '/organisation/branches', { name: x.name, address: x.address, region: x.region }, `sa-branch-${x.key}`), x.name).id;
   console.log('branches', Object.keys(ids.branch).length);
-  for (const x of COST_CENTRES) ids.cc[x.key] = ok(await call('POST', '/organisation/cost-centres', { name: x.name, code: x.code, branch_id: ids.branch[x.key], budget_owner_membership_id: me.membership_id }, `sa-cc-${x.key}`), x.name).id;
+  for (const x of COST_CENTRES) ids.cc[x.key] = ok(await call('POST', '/organisation/cost-centres', { name: x.name, code: x.code, branch_id: ids.branch[x.branch || x.key], budget_owner_membership_id: me.membership_id }, `sa-cc-${x.key}`), x.name).id;
   console.log('cost centres', Object.keys(ids.cc).length);
-  for (const x of COST_CENTRES) ok(await call('POST', '/organisation/budgets', { amount: P.budget, currency: P.currency, period: 'monthly', period_start: '2026-10-01', scope: 'cost_centre', cost_centre_id: ids.cc[x.key] }, `sa-budget-${x.key}`), 'budget ' + x.name);
-  console.log(`budgets 3 × ${P.currency} ${P.budget} monthly`);
+  for (const x of COST_CENTRES) ok(await call('POST', '/organisation/budgets', { amount: x.budget || P.budget, currency: P.currency, period: 'monthly', period_start: P.budgetPeriodStart || '2026-10-01', scope: 'cost_centre', cost_centre_id: ids.cc[x.key] }, `sa-budget-${x.key}`), 'budget ' + x.name);
+  console.log(`budgets ${COST_CENTRES.length} monthly, ${P.currency}`);
   for (const x of SUPPLIERS) ids.supplier[x.key] = ok(await call('POST', '/suppliers', { name: x.name, payment_terms: x.payment_terms, lead_time_days: x.lead_time_days, contact_email: `${OWNER_GMAIL}+${P.aliasPrefix}${x.key}@gmail.com` }, `sa-supplier-${x.key}`), x.name).id;
   console.log('suppliers', Object.keys(ids.supplier).length);
   let n = 0;
   for (const [name, unit, count, size] of PRODUCTS) { ok(await call('POST', '/products', { tenant_name: name, base_unit: unit, pack: { pack_count: count, unit_size: size } }, `sa-product-${n}`), name); n++; }
   console.log('products', n);
+  if (P.guardrail === false) { console.log('no guardrail for this profile (W2: a guardrail blocks the RFQ split)'); process.exit(0); }
   // /rfq/guardrails ignores Idempotency-Key, and two enabled guardrails stop auto-preparation (the orchestrator needs
   // exactly one to fire): update the existing demo guardrail instead of adding another on a re-run.
   const rule = { max_order_value_amount: P.guardrailLimit, max_order_value_currency: P.currency, supplier_allowlist: Object.values(ids.supplier), min_response_count: 1, max_price_variance_pct: '0.20', default_branch_id: ids.branch[BRANCHES[0].key], default_cost_centre_id: ids.cc[COST_CENTRES[0].key], enabled: true };

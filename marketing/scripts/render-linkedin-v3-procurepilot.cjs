@@ -26,7 +26,54 @@ body:after{content:"";position:absolute;inset:0;background:${GRAIN};opacity:.07;
 const bars = `<div class="bars"><i style="width:64px;background:${P.navy}"></i><i style="width:46px;background:${P.mist}"></i><i style="width:92px;background:${P.teal}"></i></div>`;
 const foot = `<div class="foot"><img src="${LOGO}" style="height:44px"><span style="font-size:22px;color:${P.ink2}">procurepilot.iron-sys.com</span></div>`;
 
+const SRC = (f) => `data:image/png;base64,${fs.readFileSync(path.join(OUT, '..', 'source-general', f)).toString('base64')}`;
+/** A crop (x, y, cw, ch) of a 1920x1080 screen, shown at width w. */
+const crop = (src, x, y, cw, ch, w) => {
+  const s = w / cw;
+  return `<div style="width:${w}px;height:${Math.round(ch * s)}px;background:url(${src}) ${-x * s}px ${-y * s}px / ${1920 * s}px ${1080 * s}px no-repeat"></div>`;
+};
+/** Crop of any image of size (iw, ih). */
+const cropOf = (src, iw, ih, x, y, cw, ch, w) => {
+  const s = w / cw;
+  return `<div style="width:${w}px;height:${Math.round(ch * s)}px;background:url(${src}) ${-x * s}px ${-y * s}px / ${iw * s}px ${ih * s}px no-repeat"></div>`;
+};
+const chip = `<span style="display:inline-block;border:1.5px solid ${P.tealText};color:${P.tealText};border-radius:999px;padding:6px 16px;font-size:19px">Real screen · demo data</span>`;
+const footDemo = `<div class="foot"><img src="${LOGO}" style="height:44px">${chip}</div>`;
+
 const pp = {
+  'A-07': `<body>
+  <div style="position:absolute;top:72px;right:72px">${bars}</div>
+  <div class="kick" style="position:absolute;top:80px;left:72px">Basket split</div>
+  <div style="position:absolute;left:72px;right:72px;top:150px">
+    <div style="font-size:80px;font-weight:700;line-height:1.1;letter-spacing:-.02em">Split the order.<br><span style="color:${P.tealText}">Lower the total.</span></div>
+    <div style="font-size:30px;color:${P.ink2};margin-top:26px;line-height:1.45">When splitting the order across suppliers<br>lowers the total, you see exactly how.</div>
+  </div>
+  <div class="card" style="position:absolute;left:60px;top:560px;width:960px;padding:12px">${crop(SRC('A-07-basket-split-1920x1080.png'), 480, 415, 1200, 330, 936)}</div>
+  <div class="card" style="position:absolute;left:60px;top:860px;width:960px;padding:12px">${crop(SRC('A-07-basket-split-1920x1080.png'), 480, 770, 1200, 280, 936)}</div>
+  ${footDemo}</body>`,
+
+  'A-08': `<body>
+  <div style="position:absolute;top:72px;right:72px">${bars}</div>
+  <div class="kick" style="position:absolute;top:80px;left:72px">Request for quotation</div>
+  <div style="position:absolute;left:72px;right:72px;top:150px">
+    <div style="font-size:80px;font-weight:700;line-height:1.1;letter-spacing:-.02em">One request.<br><span style="color:${P.tealText}">Every supplier.</span></div>
+    <div style="font-size:30px;color:${P.ink2};margin-top:26px;line-height:1.45">Sent in Arabic or English.<br>Sending is always your action.</div>
+  </div>
+  <div class="card" style="position:absolute;left:150px;top:540px;width:780px;padding:12px">${crop(SRC('A-08a-rfq-create-4-suppliers-1920x1080.png'), 690, 195, 775, 465, 756)}</div>
+  <div class="card" style="position:absolute;right:60px;top:1035px;padding:8px">${crop(SRC('A-08b-rfq-sent-1920x1080.png'), 788, 1024, 344, 48, 430)}</div>
+  ${footDemo}</body>`,
+
+  'A-09': `<body>
+  <div style="position:absolute;top:72px;right:72px">${bars}</div>
+  <div class="kick" style="position:absolute;top:80px;left:72px">The whole purchasing cycle</div>
+  <div style="position:absolute;left:72px;right:72px;top:150px">
+    <div style="font-size:72px;font-weight:700;line-height:1.12;letter-spacing:-.02em">Request. Quote.<br>Compare. <span style="color:${P.tealText}">Approve.</span></div>
+    <div style="font-size:30px;color:${P.ink2};margin-top:26px;line-height:1.45">Nothing is ordered until someone<br>on your team approves.</div>
+  </div>
+  <div class="card" style="position:absolute;left:60px;top:500px;width:840px;padding:12px">${crop(SRC('A-09a-smart-compare-1920x1080.png'), 477, 245, 1200, 650, 816)}</div>
+  <div class="card" style="position:absolute;right:60px;top:830px;width:480px;padding:10px;border-radius:24px">${cropOf(SRC('extra-phone-approve-dialog-1170x2532.png'), 1170, 2532, 48, 850, 1076, 840, 460)}</div>
+  ${footDemo}</body>`,
+
   'A-10': `<body>
   <div style="position:absolute;top:72px;right:72px">${bars}</div>
   <div class="kick" style="position:absolute;top:80px;left:72px">Your data</div>
