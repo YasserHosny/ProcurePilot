@@ -30,6 +30,8 @@ import { RoleDirective } from '../../../core/auth/role.directive';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { ApiService } from '../../../core/api/api.service';
 import { SessionService } from '../../../core/auth/session.service';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 
 export function isDateInPast(date: Date | string | null | undefined): boolean {
   if (!date) return false;
@@ -93,6 +95,7 @@ export function parseSearch(value: string | null | undefined): string {
     TranslatePipe,
     FormatDatePipe,
     RoleDirective,
+    ListPagerComponent,
   ],
   templateUrl: './history.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -133,13 +136,11 @@ export class HistoryComponent implements OnInit {
 
   readonly loading = signal<boolean>(true);
   readonly loadError = signal<boolean>(false);
-  readonly loadingMore = signal<boolean>(false);
-  readonly loadMoreError = signal<boolean>(false);
   readonly statusFilters = RFQ_STATUS_FILTERS;
   readonly statusFilter = signal<string | null>(null);
   readonly draftActionsUnavailable = signal<boolean>(false);
   readonly rfqs = signal<RfqSummary[]>([]);
-  readonly nextCursor = signal<string | null>(null);
+  readonly pager = new CursorPager('rfq-history');
   readonly searchText = signal('');
   readonly sort = signal<RfqSort>('created_desc');
   readonly sorts = RFQ_SORTS;
@@ -285,6 +286,8 @@ export class HistoryComponent implements OnInit {
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
+    this.rfqs.set([]);
+    this.pager.reset();
     this.loadRfqs();
   }
 
@@ -293,54 +296,26 @@ export class HistoryComponent implements OnInit {
     this.recipientsCache.set({});
     this.loading.set(true);
     this.loadError.set(false);
-    this.loadMoreError.set(false);
-    this.loadingMore.set(false);
-    this.rfqApi.listRfqs(this.statusFilter() ?? undefined, undefined, undefined, this.appliedQuery || undefined, this.sort()).subscribe({
+    const { cursor, limit } = this.pager.params();
+    this.rfqApi.listRfqs(this.statusFilter() ?? undefined, cursor, limit, this.appliedQuery || undefined, this.sort()).subscribe({
       next: (response) => {
         if (generation !== this.listGeneration) {
+          return;
+        }
+        if (!this.pager.loaded(response)) {
+          this.loadRfqs();
           return;
         }
         this.rfqs.set(response.items);
-        this.nextCursor.set(response.next_cursor);
         this.loading.set(false);
       },
       error: () => {
         if (generation !== this.listGeneration) {
           return;
         }
+        if (!this.pager.failed()) this.rfqs.set([]);
         this.loading.set(false);
         this.loadError.set(true);
-      },
-    });
-  }
-
-  loadMore(): void {
-    const cursor = this.nextCursor();
-    if (this.loading() || this.loadingMore() || !cursor) {
-      return;
-    }
-
-    const generation = this.listGeneration;
-    this.loadingMore.set(true);
-    this.loadMoreError.set(false);
-    this.rfqApi.listRfqs(this.statusFilter() ?? undefined, cursor, undefined, this.appliedQuery || undefined, this.sort()).subscribe({
-      next: (response) => {
-        if (generation !== this.listGeneration) {
-          return;
-        }
-        const current = this.rfqs();
-        const existingIds = new Set(current.map((item) => item.id));
-        const uniqueItems = response.items.filter((item) => !existingIds.has(item.id));
-        this.rfqs.set([...current, ...uniqueItems]);
-        this.nextCursor.set(response.next_cursor);
-        this.loadingMore.set(false);
-      },
-      error: () => {
-        if (generation !== this.listGeneration) {
-          return;
-        }
-        this.loadingMore.set(false);
-        this.loadMoreError.set(true);
       },
     });
   }

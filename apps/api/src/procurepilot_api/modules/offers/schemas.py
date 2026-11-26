@@ -347,6 +347,7 @@ class BasketSplitJobSummary(BaseModel):
 class BasketSplitJobList(BaseModel):
     items: list[BasketSplitJobSummary]
     next_cursor: str | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class BasketRequestSettings(BaseModel):
@@ -486,6 +487,7 @@ class SupplierRiskSnapshot(StrictApiModel):
 class SupplierRiskList(StrictApiModel):
     items: tuple[SupplierRiskSnapshot, ...]
     next_cursor: str | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class SupplierRiskRecomputeResponse(StrictApiModel):

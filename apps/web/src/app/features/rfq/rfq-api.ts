@@ -179,6 +179,7 @@ export interface RfqSummary {
 export interface RfqList {
   items: RfqSummary[];
   next_cursor: string | null;
+  readonly total?: number | null;
 }
 
 export interface PrepareRequestPayload {

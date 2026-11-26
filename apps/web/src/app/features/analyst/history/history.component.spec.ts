@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter, Router } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import {
@@ -55,7 +55,13 @@ describe('AnalystHistoryComponent (R4.2)', () => {
     return { items, next_cursor };
   }
 
+  function clickPager(direction: 'next' | 'previous'): void {
+    const element = fixture.nativeElement as HTMLElement;
+    element.querySelector<HTMLButtonElement>(`.list-pager__${direction}`)!.click();
+  }
+
   beforeEach(async () => {
+    localStorage.removeItem('pp.pageSize.analyst-history');
     analystApi = jasmine.createSpyObj<AnalystApiService>('AnalystApiService', [
       'listConversations',
     ]);
@@ -85,7 +91,7 @@ describe('AnalystHistoryComponent (R4.2)', () => {
           empty: 'No past conversations found.',
           turns: '{{count}} turn(s)',
           noTurns: 'Empty conversation',
-          loadMore: 'Load More',
+          pagerLabel: 'Conversation history pages',
         },
       },
     });
@@ -98,7 +104,7 @@ describe('AnalystHistoryComponent (R4.2)', () => {
   it('creates and loads history on init', () => {
     fixture.detectChanges();
     expect(component).toBeTruthy();
-    expect(analystApi.listConversations).toHaveBeenCalledWith(50);
+    expect(analystApi.listConversations).toHaveBeenCalledWith(25, undefined);
   });
 
   it('shows the empty state when there are no past conversations', () => {
@@ -142,13 +148,36 @@ describe('AnalystHistoryComponent (R4.2)', () => {
     expect(navigateSpy).toHaveBeenCalledWith(['/analyst', conversation.id]);
   });
 
-  it('requests the next page with the returned cursor on load more', () => {
-    analystApi.listConversations.and.returnValue(of(pageOf([conversation], 'cursor-abc')));
+  it('replaces rather than appends the next page and can go back', () => {
+    const firstPage = pageOf([conversation], 'cursor-abc');
+    const nextConversation = { ...conversation, id: 'conversation-2' };
+    analystApi.listConversations.and.returnValues(
+      of(firstPage),
+      of(pageOf([nextConversation])),
+      of(firstPage),
+    );
     fixture.detectChanges();
 
-    analystApi.listConversations.and.returnValue(of(pageOf([])));
-    component.loadMore();
+    clickPager('next');
+    fixture.detectChanges();
+    expect(analystApi.listConversations).toHaveBeenCalledWith(25, 'cursor-abc');
+    expect(component.conversations()).toEqual([nextConversation]);
 
-    expect(analystApi.listConversations).toHaveBeenCalledWith(50, 'cursor-abc');
+    clickPager('previous');
+    expect(analystApi.listConversations.calls.mostRecent().args).toEqual([25, undefined]);
+    expect(component.conversations()).toEqual([conversation]);
+  });
+
+  it('keeps the visible conversations on a failed Next', () => {
+    analystApi.listConversations.and.returnValues(
+      of(pageOf([conversation], 'cursor-abc')),
+      throwError(() => new Error('Request failed')),
+    );
+    fixture.detectChanges();
+
+    clickPager('next');
+    expect(component.conversations()).toEqual([conversation]);
+    expect(component.pager.pageIndex()).toBe(0);
+    expect(component.pager.nextCursor()).toBe('cursor-abc');
   });
 });

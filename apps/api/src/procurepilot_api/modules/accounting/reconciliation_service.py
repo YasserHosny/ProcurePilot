@@ -545,7 +545,8 @@ class ReconciliationService:
                 po.id as po_id,
                 po.order_number as po_order_number,
                 po.status as po_status,
-                po.order_date as po_order_date
+                po.order_date as po_order_date,
+                count(*) over () as total_count
             from reconciliation_discrepancy d
             left join synced_bill b
                 on b.tenant_id = d.tenant_id and b.id = d.synced_bill_id
@@ -586,7 +587,11 @@ class ReconciliationService:
             ReconciliationDiscrepancy.model_validate(_format_discrepancy_row(r))
             for r in page_rows
         ]
-        return ReconciliationDiscrepancyList(items=items, next_cursor=next_cursor)
+        return ReconciliationDiscrepancyList(
+            items=items,
+            next_cursor=next_cursor,
+            total=rows[0]["total_count"] if rows else (0 if offset == 0 else None),
+        )
 
 
 def get_reconciliation_service(

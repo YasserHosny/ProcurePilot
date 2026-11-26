@@ -67,20 +67,24 @@
   </div>
 
   <mat-card class="content-card">
+    @if (loadError()) {
+      <div class="error-state" role="alert" data-testid="rfq-error-state">
+        <mat-icon aria-hidden="true">error_outline</mat-icon>
+        <p>{{ 'rfq.history.loadError' | translate }}</p>
+        @if (rfqs().length === 0) {
+          <button mat-stroked-button color="primary" type="button" (click)="loadRfqs()" data-testid="rfq-retry-button">
+            {{ 'rfq.history.retry' | translate }}
+          </button>
+        }
+      </div>
+    }
+
     @if (loading()) {
       <div class="loading-state">
         <mat-spinner diameter="40"></mat-spinner>
         <p>{{ 'rfq.history.loading' | translate }}</p>
       </div>
-    } @else if (loadError()) {
-      <div class="error-state" role="alert" data-testid="rfq-error-state">
-        <mat-icon aria-hidden="true">error_outline</mat-icon>
-        <p>{{ 'rfq.history.loadError' | translate }}</p>
-        <button mat-stroked-button color="primary" type="button" (click)="loadRfqs()" data-testid="rfq-retry-button">
-          {{ 'rfq.history.retry' | translate }}
-        </button>
-      </div>
-    } @else if (rfqs().length === 0) {
+    } @else if (!loadError() && rfqs().length === 0) {
       <div class="empty-state">
         <mat-icon aria-hidden="true">history</mat-icon>
         @if (hasActiveFilters()) {
@@ -92,10 +96,12 @@
           <p>{{ 'rfq.history.noRfqs' | translate }}</p>
         }
       </div>
-    } @else {
-      <div class="results-info" role="status" aria-live="polite" data-testid="rfq-count-status">
-        {{ showingRfqsText() }}
-      </div>
+    } @else if (rfqs().length > 0) {
+      @if (!pager.needed()) {
+        <div class="results-info" role="status" aria-live="polite" data-testid="rfq-count-status">
+          {{ showingRfqsText() }}
+        </div>
+      }
       <div class="table-container">
         <table mat-table [dataSource]="rfqs()">
 
@@ -295,30 +301,15 @@
         </table>
       </div>
 
-      @if (loadMoreError()) {
-        <div class="load-more-error" role="alert" data-testid="rfq-load-more-error">
-          <span>{{ 'rfq.history.loadMoreError' | translate }}</span>
-          <button mat-button color="primary" type="button" (click)="loadMore()" data-testid="rfq-load-more-retry">
-            {{ 'rfq.history.retry' | translate }}
-          </button>
-        </div>
-      } @else if (nextCursor()) {
-        <div class="load-more-container">
-          <button
-            mat-stroked-button
-            type="button"
-            class="load-more-btn"
-            [disabled]="loadingMore()"
-            (click)="loadMore()"
-            data-testid="rfq-load-more-button"
-          >
-            @if (loadingMore()) {
-              <mat-spinner diameter="16" class="btn-spinner" [attr.aria-label]="'rfq.history.loadingMore' | translate"></mat-spinner>
-            }
-            <span>{{ 'rfq.history.loadMore' | translate }}</span>
-          </button>
-        </div>
-      }
+    }
+
+    @if (pager.needed()) {
+      <app-list-pager
+        [pager]="pager"
+        [label]="'rfq.history.pagerLabel' | translate"
+        [busy]="loading()"
+        (pageChange)="loadRfqs()"
+      />
     }
   </mat-card>
 

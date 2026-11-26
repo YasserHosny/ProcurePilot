@@ -64,6 +64,7 @@ export interface AnalystConversation {
 export interface AnalystConversationList {
   items: AnalystConversation[];
   next_cursor: string | null;
+  readonly total?: number | null;
 }
 
 @Injectable({ providedIn: 'root' })

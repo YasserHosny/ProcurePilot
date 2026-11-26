@@ -326,6 +326,7 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/Member' }
                   next_cursor: { type: string, nullable: true }
+                  total: { type: [integer, 'null'], minimum: 0 }
 
   /members/{member_id}:
     parameters:

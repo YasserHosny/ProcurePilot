@@ -345,15 +345,16 @@ def test_get_mine_matches_the_contract_and_never_carries_labels(
         display_order=0,
     )
     service.list_mine.return_value = SubmissionPage(
-        items=[_submission(attachments=[attachment])], next_cursor="abc"
+        items=[_submission(attachments=[attachment])], next_cursor="abc", total=7
     )
 
     response = client.get("/api/v1/feedback/mine", params={"limit": 10, "cursor": "zzz"})
 
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"items", "next_cursor"}
+    assert set(body) == {"items", "next_cursor", "total"}
     assert body["next_cursor"] == "abc"
+    assert body["total"] == 7
     assert "labels" not in response.text
     assert set(body["items"][0]["attachments"][0]) == {
         "id",

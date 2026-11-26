@@ -59,7 +59,10 @@ describe('WorkspaceFeedbackComponent (owner inbox, read-only, FR-013)', () => {
     fixture.detectChanges();
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    localStorage.removeItem('pp.pageSize.workspace-feedback');
+  });
 
   it('lists every member\'s feedback with who sent it and their role', () => {
     listReq().flush({ items: [submission(), submission({ id: 'sub-2', submitter_name: 'Omar', member_role: 'viewer' })], next_cursor: null });
@@ -100,15 +103,45 @@ describe('WorkspaceFeedbackComponent (owner inbox, read-only, FR-013)', () => {
     expect(text()).toContain(en.list.emptyWorkspace);
   });
 
-  it('loads more with the cursor', () => {
-    listReq().flush({ items: [submission()], next_cursor: 'cur-2' });
+  it('pages with Next and Previous, passes limit, and keeps rows when Next fails', () => {
+    const page1 = Array.from({ length: 25 }, (_, i) => submission({ id: `sub-${i}` }));
+    const initial = listReq();
+    expect(initial.request.params.get('limit')).toBe('25');
+    initial.flush({ items: page1, next_cursor: 'cur-2', total: 26 });
     fixture.detectChanges();
-    root().querySelector<HTMLButtonElement>('[data-test="load-more"]')!.click();
+
+    const range = (): string | undefined =>
+      root().querySelector('.list-pager__range')?.textContent?.trim();
+    const nextBtn = (): HTMLButtonElement =>
+      root().querySelector('.list-pager__next') as HTMLButtonElement;
+    const prevBtn = (): HTMLButtonElement =>
+      root().querySelector('.list-pager__previous') as HTMLButtonElement;
+
+    expect(range()).toBe('1–25 of 26');
+
+    nextBtn().click();
+    const failNext = listReq();
+    expect(failNext.request.params.get('cursor')).toBe('cur-2');
+    failNext.flush({ code: 'x', message: 'x', trace_id: 't' }, { status: 500, statusText: 'Err' });
+    fixture.detectChanges();
+    expect(root().querySelectorAll('[data-test="card"]').length).toBe(25);
+    expect(fixture.componentInstance.list.pager.pageIndex()).toBe(0);
+
+    nextBtn().click();
     const next = listReq();
     expect(next.request.params.get('cursor')).toBe('cur-2');
-    next.flush({ items: [submission({ id: 'sub-3' })], next_cursor: null });
+    next.flush({ items: [submission({ id: 'sub-99' })], next_cursor: null, total: 26 });
     fixture.detectChanges();
-    expect(root().querySelectorAll('[data-test="card"]').length).toBe(2);
+    expect(root().querySelectorAll('[data-test="card"]').length).toBe(1);
+    expect(range()).toBe('26–26 of 26');
+
+    prevBtn().click();
+    const prev = listReq();
+    expect(prev.request.params.has('cursor')).toBeFalse();
+    prev.flush({ items: page1, next_cursor: 'cur-2', total: 26 });
+    fixture.detectChanges();
+    expect(root().querySelectorAll('[data-test="card"]').length).toBe(25);
+    expect(range()).toBe('1–25 of 26');
   });
 
   it('shows an error with retry when the inbox cannot be loaded', () => {

@@ -31,9 +31,7 @@
 .resolve-buttons,
 .resolve-action-btn,
 .resolver-wrap,
-.system-resolved-badge,
-.pagination-footer,
-.load-more-btn {
+.system-resolved-badge {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -60,7 +58,6 @@
 
 .page-subtitle,
 .back-link a,
-.no-more-text,
 .three-way-label,
 .mismatch-tag,
 .detected-date,
@@ -188,7 +185,7 @@
 .bill-amount { color: var(--pp-warning); }
 .purchase-amount { color: var(--pp-info); }
 .resolve-input-field { width: 100%; margin-bottom: -1.25rem; }
-.resolve-buttons, .pagination-footer { justify-content: center; }
+.resolve-buttons { justify-content: center; }
 .system-resolved-badge { width: fit-content; padding: 0.2rem 0.5rem; background: var(--pp-surface-sunken); border-radius: 4px; }
 .resolution-note { padding: 0.25rem 0.5rem; background: var(--pp-surface-page); border-radius: 4px; font-style: italic; }
 

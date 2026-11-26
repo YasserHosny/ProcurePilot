@@ -31,10 +31,22 @@ from integration.catalogue_helpers import (
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
+
+def act_as_feedback_app(cur: psycopg.Cursor, workspace: Workspace) -> None:
+    """Act as `workspace`'s member the way the API does for feedback: role `feedback_app`.
+
+    `act_as` (role `authenticated`) is the PostgREST path, which has no feedback-table access
+    since migration 20261120000100.
+    """
+    cur.execute("set local role feedback_app")
+    cur.execute("select set_config('request.jwt.claims', %s, true)", (workspace.claims(),))
+
+
 __all__ = [
     "TEST_DATABASE_URL",
     "Workspace",
     "act_as",
+    "act_as_feedback_app",
     "committed_workspace",
     "grant_operator",
     "insert_attachment",

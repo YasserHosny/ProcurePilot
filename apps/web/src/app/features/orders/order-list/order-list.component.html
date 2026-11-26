@@ -99,31 +99,35 @@
     </label>
     <button mat-stroked-button type="submit">{{ 'orders.filters.apply' | translate }}</button>
   </form>
-  @if (totalCount() !== null && !isLoading() && !errorMessage()) {
-    <p class="result-count" role="status" data-testid="orders-result-count">{{ 'orders.resultCount' | translate: { count: totalCount() } }}</p>
+  @if (pager.total() !== null && !pager.needed() && !isLoading() && !errorMessage()) {
+    <p class="result-count" role="status" data-testid="orders-result-count">{{ 'orders.resultCount' | translate: { count: pager.total() } }}</p>
   }
 
   @if (errorMessage(); as error) {
     <mat-card class="state error" role="alert">
       <mat-icon aria-hidden="true">error_outline</mat-icon>
       <span>{{ error }}</span>
-      <button mat-button type="button" (click)="loadOrders()">{{ 'orders.retry' | translate }}</button>
+      @if (orders().length === 0) {
+        <button mat-button type="button" (click)="loadOrders()">{{ 'orders.retry' | translate }}</button>
+      }
     </mat-card>
-  } @else if (isLoading()) {
+  }
+
+  @if (isLoading()) {
     <div class="state" role="status"><mat-spinner diameter="36" /></div>
-  } @else if (orders().length === 0 && filtersActive()) {
+  } @else if (!errorMessage() && orders().length === 0 && filtersActive()) {
     <mat-card class="state" data-testid="orders-no-match">
       <mat-icon aria-hidden="true">search_off</mat-icon>
       <h2>{{ 'orders.filters.noMatchTitle' | translate }}</h2>
       <p>{{ 'orders.filters.noMatchDescription' | translate }}</p>
     </mat-card>
-  } @else if (orders().length === 0) {
+  } @else if (!errorMessage() && orders().length === 0) {
     <mat-card class="state">
       <mat-icon aria-hidden="true">assignment</mat-icon>
       <h2>{{ 'orders.empty.title' | translate }}</h2>
       <p>{{ 'orders.empty.description' | translate }}</p>
     </mat-card>
-  } @else {
+  } @else if (orders().length > 0) {
     <div class="order-list" data-testid="orders-list">
       @for (order of orders(); track order.id) {
         <mat-card class="order-row">
@@ -158,20 +162,13 @@
         </mat-card>
       }
     </div>
-    @if (loadMoreError()) {
-      <mat-card class="state error" role="alert" data-testid="load-more-error">
-        <mat-icon aria-hidden="true">error_outline</mat-icon>
-        <span>{{ 'orders.loadMoreError' | translate }}</span>
-        <button mat-button type="button" (click)="loadMore()">{{ 'orders.retry' | translate }}</button>
-      </mat-card>
-    }
-    @if (nextCursor()) {
-      <div class="pagination">
-        <button mat-stroked-button type="button" (click)="loadMore()" [disabled]="isLoadingMore()">
-          @if (isLoadingMore()) { <mat-spinner diameter="18" /> } @else { <mat-icon aria-hidden="true">expand_more</mat-icon> }
-          {{ 'orders.loadMore' | translate }}
-        </button>
-      </div>
-    }
+  }
+  @if (pager.needed()) {
+    <app-list-pager
+      [pager]="pager"
+      [label]="'orders.pagerLabel' | translate"
+      [busy]="isLoading()"
+      (pageChange)="loadOrders()"
+    />
   }
 </div>

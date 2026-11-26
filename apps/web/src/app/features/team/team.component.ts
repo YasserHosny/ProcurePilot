@@ -19,6 +19,8 @@ import type { ApiError, Invitation, Member, Role } from '../../core/api/models';
 import { RoleDirective } from '../../core/auth/role.directive';
 import { SessionService } from '../../core/auth/session.service';
 import { FormatDatePipe } from '../../core/format';
+import { CursorPager } from '../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../layout/list-pager/list-pager.component';
 import {
   ChangeRoleDialogComponent,
   type ChangeRoleDialogResult,
@@ -49,6 +51,7 @@ import { InviteDialogComponent } from './invite-dialog/invite-dialog.component';
     TranslatePipe,
     FormatDatePipe,
     RoleDirective,
+    ListPagerComponent,
   ],
   templateUrl: './team.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -68,7 +71,9 @@ export class TeamComponent implements OnInit {
   readonly members = signal<Member[]>([]);
   readonly invitations = signal<Invitation[]>([]);
   readonly resendingIds = signal<ReadonlySet<string>>(new Set());
-  readonly nextCursor = signal<string | null>(null);
+  readonly pager = new CursorPager('team');
+
+  private memberRequestSeq = 0;
 
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
@@ -97,17 +102,25 @@ export class TeamComponent implements OnInit {
   }
 
   loadMembers(): void {
+    const seq = ++this.memberRequestSeq;
     this.isLoadingMembers.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
 
-    this.api.members().subscribe({
+    const { cursor, limit } = this.pager.params();
+    this.api.members(cursor, limit).subscribe({
       next: (res) => {
+        if (seq !== this.memberRequestSeq) return;
+        if (!this.pager.loaded(res)) {
+          this.loadMembers();
+          return;
+        }
         this.members.set(res.items);
-        this.nextCursor.set(res.next_cursor);
         this.isLoadingMembers.set(false);
       },
       error: (err: unknown) => {
+        if (seq !== this.memberRequestSeq) return;
+        if (!this.pager.failed()) this.members.set([]);
         this.isLoadingMembers.set(false);
         this.handleError(err);
       },

@@ -49,11 +49,18 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Iterator
+from contextlib import nullcontext
 from uuid import UUID, uuid4
 
 import psycopg
 import pytest
+from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
+
+from procurepilot_api.deps import CurrentMember
+from procurepilot_api.modules.auth.jwt import MemberRole
+from procurepilot_api.modules.offers import basket_service
+from procurepilot_api.modules.orders.service import OrdersService
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
@@ -166,6 +173,15 @@ class Workspace:
         return (
             f'{{"sub":"{self.user_id}","tenant_id":"{self.tenant_id}",'
             f'"role":"authenticated","member_role":"owner"}}'
+        )
+
+    def owner(self) -> CurrentMember:
+        return CurrentMember(
+            tenant_id=self.tenant_id,
+            membership_id=self.membership_id,
+            user_id=self.user_id,
+            email=f"{self.user_id}@example.test",
+            role=MemberRole.owner,
         )
 
 
@@ -780,6 +796,16 @@ def workspaces() -> Iterator[tuple[psycopg.Connection, Workspace, Workspace]]:
 def act_as(cur: psycopg.Cursor, workspace: Workspace) -> None:
     """Become a member of `workspace`, exactly as a real request arrives."""
     cur.execute("set local role authenticated")
+    cur.execute("select set_config('request.jwt.claims', %s, true)", (workspace.claims(),))
+
+
+def act_as_feedback_app(cur: psycopg.Cursor, workspace: Workspace) -> None:
+    """Become a member of `workspace` as the API does for the feedback tables (`feedback_app`).
+
+    PostgREST requests arrive as `authenticated` (`act_as`), which has no feedback-table access
+    (migration 20261120000100); only the API's own connection can become `feedback_app`.
+    """
+    cur.execute("set local role feedback_app")
     cur.execute("select set_config('request.jwt.claims', %s, true)", (workspace.claims(),))
 
 
@@ -1484,6 +1510,7 @@ def test_canonical_products_embedding_is_shared_by_design_not_a_leak(
 
 def test_another_workspaces_basket_split_jobs_are_invisible(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
@@ -1493,6 +1520,11 @@ def test_another_workspaces_basket_split_jobs_are_invisible(
         )
         row = cur.fetchone()
     assert row is not None and row[0] == 0
+    monkeypatch.setattr(basket_service, "_authenticated_db", lambda *_: nullcontext(conn))
+    monkeypatch.setattr(basket_service, "optimiser_worker_alive", lambda _: True)
+    page = basket_service.BasketService().list_jobs(member=alpha.owner())
+    assert [job.id for job in page.items] == [alpha.basket_split_job_id]
+    assert page.total == 1  # Beta's job was also seeded by the fixture.
 
 
 def test_another_workspaces_alert_dismissals_are_invisible(
@@ -2440,7 +2472,7 @@ def test_another_workspaces_feedback_submissions_are_invisible(
 ) -> None:
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
-        act_as(cur, alpha)
+        act_as_feedback_app(cur, alpha)
         cur.execute(
             "select id from feedback_submission where id = %s", (beta.feedback_submission_id,)
         )
@@ -2454,7 +2486,7 @@ def test_another_workspaces_feedback_attachments_are_invisible(
 ) -> None:
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
-        act_as(cur, alpha)
+        act_as_feedback_app(cur, alpha)
         cur.execute(
             "select id from feedback_attachment where id = %s", (beta.feedback_attachment_id,)
         )
@@ -2468,7 +2500,7 @@ def test_a_member_cannot_write_a_feedback_submission_into_another_workspace(
 ) -> None:
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
-        act_as(cur, alpha)
+        act_as_feedback_app(cur, alpha)
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cur.execute(
                 "insert into feedback_submission "
@@ -2477,6 +2509,35 @@ def test_a_member_cannot_write_a_feedback_submission_into_another_workspace(
                 "values (%s,%s,'x','x@example.test','owner','hello','/','t','en',false,%s)",
                 (beta.tenant_id, alpha.user_id, uuid4()),
             )
+
+
+def test_a_token_used_directly_against_postgrest_cannot_touch_the_feedback_tables(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """Debate-review D1/F3 (2026-11-20): `authenticated` (PostgREST) has no feedback grants, so a
+    member's own token cannot read, insert, change or delete feedback outside the API."""
+    conn, alpha, _beta = workspaces
+    statements = [
+        ("select id from feedback_submission", ()),
+        ("select id from feedback_attachment", ()),
+        (
+            "insert into feedback_submission "
+            "(tenant_id,submitter_user_id,submitter_name,submitter_email,member_role,"
+            "text_content,page_path,app_version,locale,is_demo,idempotency_key) "
+            "values (%s,%s,'x','x@example.test','owner','hello','/','t','en',false,%s)",
+            (alpha.tenant_id, alpha.user_id, uuid4()),
+        ),
+        ("update feedback_submission set status = 'reviewed'", ()),
+        ("delete from feedback_submission", ()),
+        ("select feedback_operator_labels(%s)", (alpha.feedback_submission_id,)),
+    ]
+    for sql, params in statements:
+        with conn.cursor() as cur:
+            cur.execute("savepoint direct_access")
+            act_as(cur, alpha)
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                cur.execute(sql, params)  # type: ignore[arg-type]
+            cur.execute("rollback to savepoint direct_access")
 
 
 def test_feedback_storage_object_from_another_workspace_is_invisible(
@@ -2924,6 +2985,7 @@ def test_a_member_cannot_write_a_cross_tenant_document_reference(
 
 def test_a_member_cannot_link_purchase_order_to_cross_tenant_request_or_line(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """US4 draft-order links are tenant-pinned at both header and line level.
 
@@ -2933,6 +2995,7 @@ def test_a_member_cannot_link_purchase_order_to_cross_tenant_request_or_line(
     """
     conn, alpha, beta = workspaces
     order_id = uuid4()
+    beta_order_id = uuid4()
     with conn.cursor() as cur:
         act_as(cur, alpha)
         cur.execute("savepoint cross_tenant_order_header")
@@ -2985,6 +3048,42 @@ def test_a_member_cannot_link_purchase_order_to_cross_tenant_request_or_line(
                 ),
             )
         cur.execute("rollback to savepoint cross_tenant_order_line")
+        act_as(cur, beta)
+        cur.execute(
+            "insert into purchase_order (id,tenant_id,order_number,supplier_id,order_date,"
+            "total_amount,total_currency,tax_amount,tax_currency,source_reference,"
+            "created_by,source_request_id) "
+            "values (%s,%s,%s,%s,current_date,10,'GBP',0,'GBP','test',%s,%s)",
+            (
+                beta_order_id,
+                beta.tenant_id,
+                f"PO-OWN-{uuid4().hex[:8]}",
+                beta.supplier_id,
+                beta.membership_id,
+                beta.purchase_request_id,
+            ),
+        )
+        # A purchase order is only valid with a line, so the listing can read it back.
+        cur.execute(
+            "insert into purchase_order_line (tenant_id,purchase_order_id,line_number,"
+            "workspace_product_id,description,ordered_quantity,base_unit,unit_price_amount,"
+            "unit_price_currency,tax_amount,tax_currency,line_total_amount,"
+            "line_total_currency,source_request_id,source_request_line_id) "
+            "values (%s,%s,1,%s,'own line',1,'each',10,'GBP',0,'GBP',10,'GBP',%s,%s)",
+            (
+                beta.tenant_id,
+                beta_order_id,
+                beta.workspace_product_id,
+                beta.purchase_request_id,
+                beta.purchase_request_line_id,
+            ),
+        )
+
+    service = OrdersService()
+    monkeypatch.setattr(service, "_transaction", lambda _: conn.cursor(row_factory=dict_row))
+    page = service.search_orders(member=beta.owner())
+    assert [order.id for order in page.items] == [beta_order_id]
+    assert page.total == page.total_count == 1  # Alpha's order is outside Beta's scope.
 
 
 def test_purchase_order_line_direct_delete_requires_draft_parent(

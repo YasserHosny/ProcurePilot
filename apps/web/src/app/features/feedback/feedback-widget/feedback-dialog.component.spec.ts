@@ -234,6 +234,20 @@ describe('FeedbackDialogComponent (widget form, US1 to US3)', () => {
       http.expectOne('/api/v1/feedback');
     });
 
+    it('locks the message while a send is in flight, so a success cannot wipe later typing', () => {
+      typeText('Sent text');
+      click('[data-test="send"]');
+      const area = q<HTMLTextAreaElement>('textarea')!;
+      expect(area.readOnly).toBeTrue();
+
+      http
+        .expectOne('/api/v1/feedback')
+        .flush({ code: 'x', message: 'x', trace_id: 't' }, { status: 500, statusText: 'Err' });
+      fixture.detectChanges();
+      expect(area.readOnly).toBeFalse();
+      expect(draft.text()).toBe('Sent text');
+    });
+
     it('closes the dialog from the Close button', () => {
       click('[data-test="close"]');
       expect(dialogRef.close).toHaveBeenCalled();

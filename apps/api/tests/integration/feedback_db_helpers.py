@@ -21,7 +21,6 @@ from procurepilot_api.config import Settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ServiceUnavailableError
 from procurepilot_api.modules.auth.jwt import MemberRole
-from procurepilot_api.modules.feedback import service as feedback_service_module
 from procurepilot_api.modules.feedback.service import FeedbackService, SubmitResult
 from procurepilot_api.modules.feedback.storage import FeedbackStorage
 from procurepilot_api.shared.audit import AuditEventCreate
@@ -71,11 +70,31 @@ class FakeStorage(FeedbackStorage):
 
 
 class RecordingAudit:
-    def __init__(self) -> None:
-        self.events: list[tuple[AuditEventCreate, str | None]] = []
+    """The member-path feedback audit events written since this harness was made.
 
-    def record(self, event: AuditEventCreate, bearer_token: str | None = None) -> None:
-        self.events.append((event, bearer_token))
+    The member service appends `feedback.*` events on its own transaction (debate-review F5,
+    2026-11-20), so they are read back from `audit_event` rather than captured in memory. Each
+    entry is `(event, None)`: there is no bearer token on an in-transaction write.
+    """
+
+    def __init__(self) -> None:
+        assert TEST_DATABASE_URL
+        with psycopg.connect(TEST_DATABASE_URL, prepare_threshold=None) as conn:
+            row = conn.execute("select coalesce(max(id), 0) from audit_event").fetchone()
+        self._after_id = row[0] if row else 0
+
+    @property
+    def events(self) -> list[tuple[AuditEventCreate, str | None]]:
+        assert TEST_DATABASE_URL
+        with psycopg.connect(TEST_DATABASE_URL, prepare_threshold=None, row_factory=dict_row) as c:
+            rows = c.execute(
+                "select tenant_id, actor_membership_id, actor_email, action, target, "
+                "outcome::text as outcome from audit_event "
+                "where id > %s and action in ('feedback.submitted', 'feedback.withdrawn') "
+                "order by id",
+                (self._after_id,),
+            ).fetchall()
+        return [(AuditEventCreate.model_validate(row), None) for row in rows]
 
     def actions(self) -> list[str]:
         return [event.action for event, _ in self.events]
@@ -186,7 +205,6 @@ def make_harness(
     settings = settings_for_test_db(monkeypatch)
     storage = FakeStorage()
     audit = RecordingAudit()
-    monkeypatch.setattr(feedback_service_module, "get_audit_writer", lambda: audit)
     return Harness(settings, storage, audit, FeedbackService(settings, storage))
 
 

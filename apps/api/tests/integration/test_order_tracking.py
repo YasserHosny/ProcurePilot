@@ -1022,7 +1022,9 @@ def test_order_list_filters_searches_sorts_and_counts(monkeypatch: pytest.Monkey
         def numbers(**params: object) -> list[str]:
             res = client.get("/api/v1/orders", params=params)
             assert res.status_code == 200, res.text
-            return [item["order_number"] for item in res.json()["items"]]
+            page = res.json()
+            assert page["total"] == page["total_count"] == len(page["items"])
+            return [item["order_number"] for item in page["items"]]
 
         assert sorted(numbers()) == ["PO-ALPHA-1", "PO-BRAVO-2", "PO-CHARLIE-3"]
         assert numbers(q="alpha") == ["PO-ALPHA-1"]
@@ -1044,7 +1046,7 @@ def test_order_list_filters_searches_sorts_and_counts(monkeypatch: pytest.Monkey
         first = client.get(
             "/api/v1/orders", params={"limit": 2, "sort": "order_number", "dir": "asc"}
         )
-        assert first.json()["total_count"] == 3
+        assert first.json()["total"] == first.json()["total_count"] == 3
         second = client.get(
             "/api/v1/orders",
             params={
@@ -1057,6 +1059,7 @@ def test_order_list_filters_searches_sorts_and_counts(monkeypatch: pytest.Monkey
         listed = [i["order_number"] for i in first.json()["items"] + second.json()["items"]]
         assert listed == ["PO-ALPHA-1", "PO-BRAVO-2", "PO-CHARLIE-3"]
         assert second.json()["next_cursor"] is None
+        assert second.json()["total"] == second.json()["total_count"] == 3
         assert first.json()["items"][0]["supplier_name"]
         assert len(first.json()["items"][0]["lines"]) == 1
 
@@ -1263,6 +1266,8 @@ def test_order_list_paging_is_stable_when_an_order_is_created_between_pages(
         )
         assert [i["order_number"] for i in second.json()["items"]] == ["PO-K1"]
         assert second.json()["next_cursor"] is None
+        assert first.json()["total"] == 3
+        assert second.json()["total"] == 4
 
 
 @pytest.mark.parametrize(

@@ -99,11 +99,93 @@ describe('TeamComponent (T057)', () => {
     fixture.detectChanges();
   });
 
+  afterEach(() => {
+    localStorage.removeItem('pp.pageSize.team');
+  });
+
   it('should load members and invitations on init', () => {
-    expect(apiService.members).toHaveBeenCalled();
+    expect(apiService.members).toHaveBeenCalledWith(undefined, 25);
     expect(apiService.invitations).toHaveBeenCalled();
     expect(component.members().length).toBe(2);
     expect(component.invitations().length).toBe(1);
+  });
+
+  it('pages to a second page with Next, returns with Previous, and changes page size', () => {
+    const page1 = Array.from({ length: 25 }, (_, i) => ({ ...mockMembers[0], id: `p1-${i}` }));
+    const page2: Member[] = [{ ...mockMembers[1], id: 'p2-1', email: 'page2@example.com' }];
+    apiService.members.and.returnValue(of({ items: page1, next_cursor: 'cursor-2', total: 26 }));
+    component.loadMembers();
+    fixture.detectChanges();
+
+    const range = () =>
+      (fixture.nativeElement.querySelector('.list-pager__range') as HTMLElement)?.textContent?.trim();
+    const button = (name: string) =>
+      fixture.nativeElement.querySelector(`.list-pager__${name}`) as HTMLButtonElement;
+
+    expect(range()).toBe('1–25 of 26');
+    expect(button('previous').disabled).toBeTrue();
+    expect(button('next').disabled).toBeFalse();
+
+    apiService.members.and.returnValue(of({ items: page2, next_cursor: null, total: 26 }));
+    button('next').click();
+    fixture.detectChanges();
+
+    expect(apiService.members).toHaveBeenCalledWith('cursor-2', 25);
+    expect(component.members().map((m) => m.id)).toEqual(['p2-1']);
+    expect(range()).toBe('26–26 of 26');
+    expect(button('next').disabled).toBeTrue();
+
+    apiService.members.and.returnValue(of({ items: page1, next_cursor: 'cursor-2', total: 26 }));
+    button('previous').click();
+    fixture.detectChanges();
+
+    expect(apiService.members.calls.mostRecent().args).toEqual([undefined, 25]);
+    expect(component.members().length).toBe(25);
+    expect(range()).toBe('1–25 of 26');
+
+    component.pager.setPageSize(50);
+    component.loadMembers();
+    expect(apiService.members.calls.mostRecent().args).toEqual([undefined, 50]);
+  });
+
+  it('keeps current rows when Next fails and clears rows when initial load fails', () => {
+    const page1 = Array.from({ length: 25 }, (_, i) => ({ ...mockMembers[0], id: `p1-${i}` }));
+    apiService.members.and.returnValue(of({ items: page1, next_cursor: 'cursor-2', total: 26 }));
+    component.loadMembers();
+    fixture.detectChanges();
+
+    const next = fixture.nativeElement.querySelector('.list-pager__next') as HTMLButtonElement;
+    apiService.members.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 500,
+            error: { code: 'server_error', message: 'Page 2 failed' },
+          }),
+      ),
+    );
+    next.click();
+    fixture.detectChanges();
+
+    expect(component.members().length).toBe(25);
+    expect(component.pager.pageIndex()).toBe(0);
+    expect(component.pager.nextCursor()).toBe('cursor-2');
+    expect(component.errorMessage()).toBe('Page 2 failed');
+
+    apiService.members.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 500,
+            error: { code: 'server_error', message: 'Refresh failed' },
+          }),
+      ),
+    );
+    component.loadMembers();
+    fixture.detectChanges();
+
+    expect(component.members()).toEqual([]);
+    expect(fixture.nativeElement.querySelector('app-list-pager')).toBeNull();
   });
 
   it('should render display_name or No name placeholder in the Name column', () => {

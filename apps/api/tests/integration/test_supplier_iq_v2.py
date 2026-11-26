@@ -51,6 +51,7 @@ def test_recompute_persists_four_metrics_and_replays_by_fingerprint(
         assert second.generated_snapshots == 0
         risks = service.list_risks(member=context.member)
         assert len(risks.items) == 2
+        assert risks.total == 2
         with pytest.raises(UnprocessableEntityError):
             service.list_risks(member=context.member, cursor="invalid")
 
@@ -166,6 +167,8 @@ def test_recompute_and_evidence_are_tenant_scoped(monkeypatch: pytest.MonkeyPatc
                 ).generated_snapshots
                 == 1
             )
+            assert service.list_risks(member=tenant_a.member).total == 1
+            assert service.list_risks(member=tenant_b.member).total == 0
 
             with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
                 with conn.cursor() as cur:

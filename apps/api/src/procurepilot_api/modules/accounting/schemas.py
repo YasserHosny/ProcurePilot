@@ -104,6 +104,7 @@ class SyncedBillList(BaseModel):
 
     items: list[SyncedBill]
     next_cursor: str | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class SyncedBillDetail(BaseModel):
@@ -242,6 +243,7 @@ class ReconciliationDiscrepancyList(BaseModel):
 
     items: list[ReconciliationDiscrepancy]
     next_cursor: str | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class ResolveDiscrepancyRequest(BaseModel):

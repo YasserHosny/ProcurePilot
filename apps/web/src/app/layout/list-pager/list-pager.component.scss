@@ -1,0 +1,36 @@
+// Design system «Pagination» (docs/design/design-system.html): a card-surface bar under the
+// table, muted range text, outlined Previous / Next. Logical properties only, for RTL.
+.list-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-pager-gap);
+  padding: var(--pp-space-3);
+  border-block-start: 1px solid var(--pp-border);
+  font-size: var(--pp-text-14);
+}
+
+.list-pager__size {
+  inline-size: 9.5rem;
+}
+
+.list-pager__range {
+  flex: 1 1 auto;
+  text-align: center;
+  font-size: var(--pp-text-12);
+  color: var(--pp-pager-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.list-pager__steps {
+  display: flex;
+  gap: var(--pp-space-2);
+}
+
+@media (max-width: 599px) {
+  .list-pager__range {
+    order: -1;
+    flex-basis: 100%;
+  }
+}

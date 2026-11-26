@@ -155,3 +155,4 @@ class AnalystConversationCreate(StrictApiModel):
 class AnalystConversationList(StrictApiModel):
     items: list[AnalystConversationResponse]
     next_cursor: str | None = None
+    total: int | None = Field(default=None, ge=0)

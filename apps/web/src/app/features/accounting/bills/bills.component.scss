@@ -280,21 +280,3 @@
   font-size: 0.75rem;
   color: var(--pp-text-muted);
 }
-
-.pagination-footer {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding-block: 1rem 0.5rem;
-
-  .load-more-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .no-more-text {
-    font-size: 0.875rem;
-    color: var(--pp-text-muted);
-  }
-}

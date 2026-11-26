@@ -1,9 +1,8 @@
 import { signal } from '@angular/core';
-import type { Observable, Subscription } from 'rxjs';
+import { type Observable, Subscription } from 'rxjs';
 
+import { CursorPager } from '../../layout/list-pager/cursor-pager';
 import type { Submission, SubmissionPage } from './feedback-api';
-
-export const FEEDBACK_PAGE_SIZE = 10;
 
 /**
  * Cursor-paged list state shared by the member list and the owner inbox. A newer request
@@ -13,40 +12,50 @@ export class PagedSubmissions {
   readonly items = signal<readonly Submission[]>([]);
   readonly loading = signal(false);
   readonly failed = signal(false);
-  readonly nextCursor = signal<string | null>(null);
+  readonly pager: CursorPager;
 
   private inFlight: Subscription | null = null;
 
-  constructor(private readonly fetch: (cursor: string | null) => Observable<SubmissionPage>) {}
-
-  /** Starts again from the first page. */
-  reload(): void {
-    this.run(null, true);
+  constructor(
+    key: string,
+    private readonly fetch: (params: ReturnType<CursorPager['params']>) => Observable<SubmissionPage>,
+  ) {
+    this.pager = new CursorPager(key);
   }
 
-  loadMore(): void {
-    const cursor = this.nextCursor();
-    if (cursor && !this.loading()) this.run(cursor, false);
+  resetAndReload(): void {
+    this.items.set([]);
+    this.pager.reset();
+    this.reload();
   }
 
   remove(id: string): void {
     this.items.update((list) => list.filter((item) => item.id !== id));
+    this.reload();
   }
 
-  private run(cursor: string | null, replace: boolean): void {
+  reload(): void {
     this.inFlight?.unsubscribe();
+    const request = new Subscription();
+    this.inFlight = request;
     this.loading.set(true);
     this.failed.set(false);
-    this.inFlight = this.fetch(cursor).subscribe({
-      next: (page) => {
-        this.items.update((list) => (replace ? [...page.items] : [...list, ...page.items]));
-        this.nextCursor.set(page.next_cursor ?? null);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.failed.set(true);
-        this.loading.set(false);
-      },
-    });
+    request.add(
+      this.fetch(this.pager.params()).subscribe({
+        next: (page) => {
+          if (!this.pager.loaded({ ...page, next_cursor: page.next_cursor ?? null })) {
+            this.reload();
+            return;
+          }
+          this.items.set(page.items);
+          this.loading.set(false);
+        },
+        error: () => {
+          if (!this.pager.failed()) this.items.set([]);
+          this.failed.set(true);
+          this.loading.set(false);
+        },
+      }),
+    );
   }
 }

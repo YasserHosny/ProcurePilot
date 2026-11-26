@@ -209,6 +209,7 @@ def test_the_workspace_inbox_filters_and_paginates(monkeypatch: pytest.MonkeyPat
         while True:
             page = harness.service.list_workspace(member=owner, cursor=cursor, limit=2)
             assert len(page.items) <= 2
+            assert page.total == len(created)
             seen.extend(i.id for i in page.items)
             cursor = page.next_cursor
             if cursor is None:
@@ -244,7 +245,7 @@ def test_no_role_can_change_status_or_labels_through_row_level_security(
             member = world.member(role)
             with psycopg.connect(TEST_DATABASE_URL, prepare_threshold=None) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("set local role authenticated")
+                    cur.execute("set local role feedback_app")
                     cur.execute(
                         "select set_config('request.jwt.claims', %s, true)",
                         (

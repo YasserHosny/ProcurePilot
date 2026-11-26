@@ -42,16 +42,13 @@
       </mat-card>
     }
   </div>
+}
 
-  @if (nextCursor()) {
-    <div class="load-more-container">
-      <button mat-stroked-button (click)="loadMore()" [disabled]="isLoadingMore()">
-        @if (isLoadingMore()) {
-          <mat-spinner diameter="20"></mat-spinner>
-        } @else {
-          {{ 'analyst.history.loadMore' | translate }}
-        }
-      </button>
-    </div>
-  }
+@if (pager.needed()) {
+  <app-list-pager
+    [pager]="pager"
+    [label]="'analyst.history.pagerLabel' | translate"
+    [busy]="isLoading()"
+    (pageChange)="loadHistory()"
+  />
 }

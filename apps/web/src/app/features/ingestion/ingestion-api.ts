@@ -62,6 +62,7 @@ export interface IngestionEmailLog {
 export interface IngestionEmailLogList {
   items: IngestionEmailLog[];
   next_cursor: string | null;
+  readonly total?: number | null;
 }
 
 export interface ListEmailLogsParams {

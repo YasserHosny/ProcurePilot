@@ -241,11 +241,16 @@ def test_combined_paging(client: TestClient, data: Seed) -> None:
     second = listing(client, **params, cursor=first["next_cursor"])
     assert ids(first) + ids(second) == sorted(data.ids[2:4]) + sorted(data.ids[:2])
     assert second["next_cursor"] is None
+    # The total counts every match across pages, on each page (PPS-228).
+    assert first["total"] == second["total"] == 4
     assert ids(listing(client, **{**params, "mine": "true"})) == [data.ids[2], data.ids[0]]
 
 
 def test_search_tenant_isolation(client: TestClient, data: Seed) -> None:
-    assert data.foreign not in ids(listing(client, q="Needle"))
+    body = listing(client, q="Needle")
+    assert data.foreign not in ids(body)
+    # The count runs under the same RLS: another tenant's match is not counted.
+    assert body["total"] == len(body["items"])
     assert ids(listing(client, q="Needle Fresh الوفرة")) == []
 
 
@@ -259,6 +264,7 @@ def test_default_unchanged(client: TestClient, data: Seed, monkeypatch: pytest.M
     body = listing(client)
     assert ids(body) == expected
     assert body["next_cursor"] is None
+    assert body["total"] == len(expected)
 
 
 @dataclass
@@ -418,6 +424,7 @@ def test_search_pages_beyond_2000_matches(client: TestClient, data: Seed) -> Non
         first = listing(client, q="bulk-only-needle", sort="created_asc", limit=1)
         assert ids(first) == bulk_ids[:1]
         assert first["next_cursor"] == _encode_cursor(1)
+        assert first["total"] == 2001
         last = listing(
             client,
             q="bulk-only-needle",
@@ -427,6 +434,7 @@ def test_search_pages_beyond_2000_matches(client: TestClient, data: Seed) -> Non
         )
         assert ids(last) == bulk_ids[-1:]
         assert last["next_cursor"] is None
+        assert last["total"] == 2001
     finally:
         data.conn.rollback()
         with data.conn.cursor() as cur:

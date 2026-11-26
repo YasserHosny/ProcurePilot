@@ -154,8 +154,15 @@ def test_keyset_dataset(sort: str, mutation: str) -> None:
     assert seen == expected_indices
 
 
-def test_sql_reads_use_authenticated_claims_and_identical_filters(
+@pytest.mark.parametrize(
+    ("has_cursor", "rows", "expected"),
+    [(True, [{"total": 7}], 7), (False, [], 0)],
+)
+def test_page_and_total_use_one_statement_with_authenticated_claims(
     monkeypatch: pytest.MonkeyPatch,
+    has_cursor: bool,
+    rows: list[dict[str, int]],
+    expected: int | None,
 ) -> None:
     import json
     from contextlib import nullcontext
@@ -166,17 +173,19 @@ def test_sql_reads_use_authenticated_claims_and_identical_filters(
     actor = member()
     branch = uuid4()
     cur = Mock()
-    cur.fetchall.side_effect = [[], []]
-    cur.fetchone.return_value = {"total": 7}
+    cur.fetchall.side_effect = [[], rows]
     connection = Mock()
     connection.cursor.return_value = nullcontext(cur)
     connect = Mock(return_value=nullcontext(connection))
     monkeypatch.setattr(service.db, "connect", connect)
+    step_id = uuid4()
+    boundary = ("20", step_id) if has_cursor else None
     result = service.RequestsService()._pending_approval_page(
-        member=actor, sort="total_desc", branch_id=branch, boundary=("20", uuid4()), limit=2
+        member=actor, sort="total_desc", branch_id=branch, boundary=boundary, limit=2
     )
-    assert result == ([], 7)
+    assert result == (rows, expected)
     calls = cur.execute.call_args_list
+    assert len(calls) == 4  # Role, claims, owner eligibility, then the counted page.
     assert calls[0].args == ("set local role authenticated",)
     claims = json.loads(calls[1].args[1][0])
     assert claims == {
@@ -185,17 +194,22 @@ def test_sql_reads_use_authenticated_claims_and_identical_filters(
         "role": "authenticated",
         "member_role": actor.role.value,
     }
-    count_query, count_params = calls[3].args
-    page_query, page_params = calls[4].args
-    assert "count(*) as total" in count_query
-    assert "ast.*" in page_query  # Includes created_at for default cursor generation.
+    query, params = calls[3].args
+    count_query, page_query = query.split(") as total ", 1)
+    assert "(select count(*) from approval_step" in count_query
+    assert query.startswith("select ast.*,")  # Includes created_at for default cursor generation.
     for predicate in (
         "ast.assigned_membership_id = %s",
         "pr.requested_by_membership_id <> %s",
         "pr.branch_id = %s",
     ):
         assert predicate in count_query and predicate in page_query
+    count_params = params[: count_query.count("%s")]
+    page_params = params[len(count_params) :]
     assert page_params[: len(count_params)] == count_params
+    assert page_params[len(count_params) :] == (["20", "20", step_id, 3] if has_cursor else [3])
+    assert "ast.id > %s" not in count_query
+    assert ("ast.id > %s" in page_query) == has_cursor
     assert "limit" not in count_query
     assert "prg.tenant_id = pr.tenant_id" in count_query
     assert "prg.id = pr.request_group_id" in count_query
@@ -287,8 +301,6 @@ def test_group_total_keyset(sort: str, limit: int) -> None:
     boundary = None
     seen = []
     while True:
-        query, params = service._pending_approval_query(**options, boundary=boundary, count=True)
-        assert conn.execute(query.replace("%s", "?"), params).fetchone()["total"] == 3
         query, params = service._pending_approval_query(**options, boundary=boundary)
         # SQLite expressions lack column affinity; emulate Postgres numeric parameter typing.
         if boundary is not None and sort.startswith("total") and boundary[0] is not None:
@@ -296,6 +308,7 @@ def test_group_total_keyset(sort: str, limit: int) -> None:
         rows = conn.execute(
             query.replace("%s", "?"), [str(p) if isinstance(p, UUID) else p for p in params]
         ).fetchall()
+        assert all(row["total"] == 3 for row in rows)
         page = rows[:limit]
         assert len(seen) < 3
         seen.extend(row["purchase_request_id"] for row in page)
@@ -307,3 +320,27 @@ def test_group_total_keyset(sort: str, limit: int) -> None:
         )
         boundary = service._decode_approval_cursor(cursor, sort=sort)
     assert seen == (["1", "2", "3"] if sort == "total_desc" else ["3", "1", "2"])
+
+
+def test_empty_page_past_a_boundary_reads_the_total_from_the_first_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from contextlib import nullcontext
+    from unittest.mock import Mock
+
+    from unit.test_approval_decisions import member
+
+    from procurepilot_api.modules.requests import service
+
+    cur = Mock()
+    # Owners, then the empty page past the boundary, then the first-page count.
+    cur.fetchall.side_effect = [[], [], [{"total": 4}]]
+    connection = Mock()
+    connection.cursor.return_value = nullcontext(cur)
+    monkeypatch.setattr(service.db, "connect", Mock(return_value=nullcontext(connection)))
+    result = service.RequestsService()._pending_approval_page(
+        member=member(), sort="total_desc", branch_id=None, boundary=("20", uuid4()), limit=2
+    )
+    assert result == ([], 4)
+    fallback, _ = cur.execute.call_args_list[-1].args
+    assert "ast.id > %s" not in fallback

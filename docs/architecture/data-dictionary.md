@@ -2538,26 +2538,36 @@ to any column except `status`, `labels`, the two `status_changed_*` columns (whi
 `submitter_membership_id` going to null (the FK's delete action). It raises `check_violation` and
 applies to every role, `service_role` included.
 
-**RLS** (enabled + forced):
+**Who can reach it:** only the API. Since `20261120000100` the table's grants and policies belong to
+the role `feedback_app`, a member of `authenticated` that only the API's own `DATABASE_URL`
+connection can become; PostgREST's `authenticator` is never granted it. A member's or operator's
+token used directly against PostgREST arrives as `authenticated` and is refused, so the API's
+cooldown, server timestamps, upload flow and audit events cannot be bypassed.
+
+**RLS** (enabled + forced), all `to feedback_app`:
 
 | Policy | Command | Rule |
 |---|---|---|
-| `feedback_select_own_or_owner` | select | `tenant_id = current_tenant_id()` and (`submitter_user_id = current_user_id()` or `current_membership_role() = 'owner'`) |
+| `feedback_select_own_or_owner` | select | `tenant_id = current_tenant_id()`, a live membership, and (`submitter_user_id = current_user_id()` or `current_membership_role() = 'owner'`) |
 | `feedback_select_operator` | select | `is_platform_operator()` |
 | `feedback_insert_member` | insert | Own workspace, own user id, a live membership, `member_role` equal to the live role, `is_demo` equal to the workspace's flag, `status = 'new'`, `labels = '{}'`, no status history |
 | `feedback_update_operator` | update | `USING` and `WITH CHECK` `is_platform_operator()` |
-| `feedback_delete_own_new` | delete | Own workspace, own submission, `status = 'new'` (withdrawal) |
+| `feedback_delete_own_new` | delete | Own workspace, a live membership, own submission, `status = 'new'` (withdrawal) |
 
 Role checks use the live `current_membership_role()`, not the JWT's `member_role`, so a removed or
 demoted member loses access on their next statement.
 
-Grants to `authenticated`: column-level `SELECT` on every column **except `labels`**; `INSERT`;
+The trigger `feedback_submission_server_created_at` sets `created_at := now()` on every insert made
+as `feedback_app`, so a submission's age (and its 12-month purge) cannot be chosen by the caller.
+
+Grants to `feedback_app` (none to `authenticated` since `20261120000100`): column-level `SELECT` on
+every column **except `labels`**; `INSERT`;
 `DELETE`; column-level `UPDATE (status, labels, status_changed_at, status_changed_by)`. Members hold
 the update grant but no update policy applies to them, so their updates change nothing. Because RLS
-hides rows, not columns, the column grant is what keeps labels from a tenant JWT, PostgREST included.
-Operators read labels only through `feedback_operator_labels(p_submission_id uuid) returns text[]`
-(SECURITY DEFINER, pinned `search_path`), which returns null to anyone who is not a live operator and
-for an unknown id. `service_role` has full table privileges (workers).
+hides rows, not columns, the column grant is what keeps labels out of tenant reads. Operators read
+labels only through `feedback_operator_labels(p_submission_id uuid) returns text[]` (SECURITY
+DEFINER, pinned `search_path`, execute `feedback_app` only), which returns null to anyone who is not a
+live operator and for an unknown id. `service_role` has full table privileges (workers).
 
 `operator_tenant_names(p_tenant_ids uuid[])` (SECURITY DEFINER, `…000600`) returns `(tenant_id,
 tenant_name)` for the requested ids, and only to a live operator: the one tenant column the triage view
@@ -2585,7 +2595,10 @@ index `(submission_id) where kind = 'audio'`, so at most one audio.
 RLS (enabled + forced): `feedback_attachment_select` shows a row when its submission is visible to the
 caller in their own workspace (the sub-select runs under the submission's RLS: own, or owner) or the
 caller is a platform operator; `feedback_attachment_insert` admits only the submission's own submitter
-in the same workspace. No update or delete policy; `authenticated` holds `SELECT` and `INSERT` only.
+in the same workspace with a live membership. Both policies are `to feedback_app`. No update or
+delete policy; `feedback_app` holds `SELECT` and `INSERT` only. The `feedback_attachment_path` check
+requires `storage_path` to start with `tenants/<tenant_id>/feedback/<submission_id>/`, so a row can
+only point at a file in its own submission's folder.
 Rows go by cascade when the submission is withdrawn or purged.
 
 ### Storage: `feedback-attachments` bucket

@@ -384,11 +384,13 @@ def test_pending_queue_paginates_only_visible_requests_and_preserves_tenant_scop
     first = service.list_pending_approvals(bearer_token="test", member=member, limit=1)
     assert [item.id for item in first.items] == live[:1]
     assert first.next_cursor is not None
+    assert first.total == len(live)
     second = service.list_pending_approvals(
         bearer_token="test", member=member, limit=1, cursor=first.next_cursor
     )
     assert [item.id for item in second.items] == live[1:]
     assert second.next_cursor is None
+    assert second.total == len(live)
     all_visible = service.list_pending_approvals(bearer_token="test", member=member)
     assert len(all_visible.items) == 2
     assert {item.id for item in all_visible.items} == set(live)

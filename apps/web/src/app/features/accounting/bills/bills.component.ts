@@ -1,6 +1,7 @@
 import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -14,7 +15,11 @@ import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { EMPTY, Subject } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 import { RoleDirective } from '../../../core/auth/role.directive';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import {
@@ -42,6 +47,7 @@ import {
     MatSnackBarModule,
     MatTableModule,
     TranslatePipe,
+    ListPagerComponent,
     FormatDatePipe,
     FormatMoneyPipe,
     RoleDirective,
@@ -56,10 +62,9 @@ export class BillsComponent implements OnInit {
   private readonly translate = inject(TranslateService);
 
   readonly isLoading = signal<boolean>(true);
-  readonly isLoadingMore = signal<boolean>(false);
   readonly isSyncing = signal<boolean>(false);
   readonly bills = signal<SyncedBill[]>([]);
-  readonly nextCursor = signal<string | null>(null);
+  readonly pager = new CursorPager('accounting-bills');
   readonly errorMessage = signal<string | null>(null);
   readonly matchStatusFilter = signal<BillMatchStatus | 'all'>('all');
 
@@ -71,73 +76,56 @@ export class BillsComponent implements OnInit {
     'matchedStatus',
   ];
 
+  private readonly reloadSubject = new Subject<ListBillsParams>();
+
+  constructor() {
+    this.reloadSubject
+      .pipe(
+        switchMap((params) => {
+          this.isLoading.set(true);
+          this.errorMessage.set(null);
+
+          return this.accountingApi.listBills(params).pipe(
+            catchError(() => {
+              this.isLoading.set(false);
+              if (!this.pager.failed()) this.bills.set([]);
+              const message = this.translate.instant('accounting.bills.loadError');
+              this.errorMessage.set(message);
+              this.snackBar.open(message, undefined, { duration: 4000 });
+              return EMPTY;
+            }),
+          );
+        }),
+        takeUntilDestroyed(),
+      )
+      .subscribe((res) => {
+        if (!this.pager.loaded(res)) {
+          this.loadBills();
+          return;
+        }
+        this.bills.set([...res.items]);
+        this.isLoading.set(false);
+      });
+  }
+
   ngOnInit(): void {
     this.loadBills();
   }
 
   loadBills(): void {
-    this.isLoading.set(true);
-    this.errorMessage.set(null);
 
-    const params: ListBillsParams = { limit: 50 };
+    const params: ListBillsParams = { ...this.pager.params() };
     const filter = this.matchStatusFilter();
     if (filter !== 'all') {
       params.match_status = filter;
     }
-
-    this.accountingApi.listBills(params).subscribe({
-      next: (res) => {
-        this.bills.set([...res.items]);
-        this.nextCursor.set(res.next_cursor);
-        this.isLoading.set(false);
-      },
-      error: () => {
-        this.isLoading.set(false);
-        this.errorMessage.set(this.translate.instant('accounting.bills.loadError'));
-        this.snackBar.open(
-          this.translate.instant('accounting.bills.loadError'),
-          undefined,
-          { duration: 4000 },
-        );
-      },
-    });
-  }
-
-  loadMore(): void {
-    const cursor = this.nextCursor();
-    if (!cursor || this.isLoadingMore()) {
-      return;
-    }
-
-    this.isLoadingMore.set(true);
-    const params: ListBillsParams = {
-      cursor,
-      limit: 50,
-    };
-    const filter = this.matchStatusFilter();
-    if (filter !== 'all') {
-      params.match_status = filter;
-    }
-
-    this.accountingApi.listBills(params).subscribe({
-      next: (res) => {
-        this.bills.set([...this.bills(), ...res.items]);
-        this.nextCursor.set(res.next_cursor);
-        this.isLoadingMore.set(false);
-      },
-      error: () => {
-        this.isLoadingMore.set(false);
-        this.snackBar.open(
-          this.translate.instant('accounting.bills.loadError'),
-          undefined,
-          { duration: 4000 },
-        );
-      },
-    });
+    this.reloadSubject.next(params);
   }
 
   onFilterChange(status: BillMatchStatus | 'all'): void {
     this.matchStatusFilter.set(status);
+    this.bills.set([]);
+    this.pager.reset();
     this.loadBills();
   }
 

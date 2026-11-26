@@ -12,6 +12,7 @@ from uuid import UUID, uuid4, uuid5
 
 import psycopg
 from postgrest.exceptions import APIError
+from postgrest.types import CountMethod
 from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
@@ -89,6 +90,7 @@ from procurepilot_api.modules.requests.valuation import (
     estimate_from_source_response,
     estimate_line_value,
     quoted_prices_from_source_response,
+    quoted_prices_from_source_responses,
 )
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
@@ -696,6 +698,7 @@ class RequestsService:
         client = authenticated_client(self._settings, bearer_token)
         capped = _cap_limit(limit)
         offset = _decode_cursor(cursor)
+        total: int | None = None
 
         if filtered_sql or eligible_for_order:
             if member is None:
@@ -711,9 +714,15 @@ class RequestsService:
                 limit=capped + 1,
                 eligible_for_order=eligible_for_order,
             )
+            counts = {row.pop("total_count", None) for row in rows}
+            if not eligible_for_order:
+                total = next(iter(counts), None) if rows else (0 if offset == 0 else None)
         else:
             try:
-                query = client.table("purchase_request").select(REQUEST_COLUMNS)
+                # count=exact rides on this same request: no second round trip for the total.
+                query = client.table("purchase_request").select(
+                    REQUEST_COLUMNS, count=CountMethod.exact
+                )
                 if status is not None:
                     query = query.eq("status", status)
                 if branch_id is not None:
@@ -725,15 +734,22 @@ class RequestsService:
                     .execute()
                 )
             except APIError as exc:
+                # With count=exact, PostgREST rejects an offset past the current total
+                # (416, PGRST103): the list shrank since the cursor was issued. That is an
+                # empty page, and the web pager steps back from it.
+                if exc.code == "PGRST103" and offset > 0:
+                    return PurchaseRequestList(items=[], next_cursor=None, total=None)
                 raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
             rows = _rows(response.data)
+            count = getattr(response, "count", None)
+            total = int(count) if isinstance(count, int) else None
 
         visible = rows[:capped]
         next_cursor = _encode_cursor(offset + capped) if len(rows) > capped else None
 
         if not visible:
-            return PurchaseRequestList(items=[], next_cursor=next_cursor)
+            return PurchaseRequestList(items=[], next_cursor=next_cursor, total=total)
 
         if eligible_for_order:
             assert member is not None
@@ -756,6 +772,7 @@ class RequestsService:
         auto_prepared = self._fetch_auto_prepared_batch(client, visible)
         sources = self._fetch_sources_batch(client, visible)
         request_groups = self._fetch_request_groups_batch(client, visible)
+        quoted_prices = self._quoted_prices_batch(visible, lines_by_request)
 
         budgets = self._fetch_budget_rows(client)
         spend_cache: dict[UUID, list[SpendRow]] = {}
@@ -793,6 +810,7 @@ class RequestsService:
                     source_lookup=False,
                     request_group=request_groups.get(str(row["id"])),
                     request_group_lookup=False,
+                    quoted_prices=quoted_prices.get(str(row["id"]), {}),
                     budget_status_for=budget_status_for,
                 )
             )
@@ -811,7 +829,7 @@ class RequestsService:
             )
             for item in orderable:
                 item.has_quantity_to_order = item.id in remaining
-        return PurchaseRequestList(items=items, next_cursor=next_cursor)
+        return PurchaseRequestList(items=items, next_cursor=next_cursor, total=total)
 
     def _list_request_rows_sql(
         self,
@@ -877,7 +895,8 @@ class RequestsService:
         # The id tie-break makes a quiet table's offset pages stable. Concurrent inserts
         # can still shift offsets; the web de-duplicates. Retain the existing cursor.
         query = sql.SQL(
-            "select pr.* from purchase_request pr where {} order by {} limit %s offset %s"
+            "select pr.*, count(*) over () as total_count from purchase_request pr "
+            "where {} order by {} limit %s offset %s"
         ).format(sql.SQL(" and ").join(predicates), sql.SQL(orders[sort]))
         params.extend([limit, offset])
         claims = json.dumps(
@@ -1040,7 +1059,7 @@ class RequestsService:
         try:
             with db.connect(self._settings.database_url.get_secret_value()) as conn:
                 with conn.cursor(row_factory=dict_row) as cur:
-                    # Both reads use the verified member's RLS context.
+                    # The page and its count use the verified member's RLS context.
                     cur.execute("set local role authenticated")
                     cur.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
                     cur.execute(
@@ -1054,14 +1073,22 @@ class RequestsService:
                         is_owner=member.role is MemberRole.owner,
                         is_sole_owner=member.role is MemberRole.owner
                         and owners == {member.membership_id},
-                        limit=limit,
                     )
-                    query, params = _pending_approval_query(**options, boundary=None, count=True)
+                    query, params = _pending_approval_query(
+                        **options, boundary=boundary, limit=limit
+                    )
                     cur.execute(query, params)
-                    total = int(cur.fetchone()["total"])
-                    query, params = _pending_approval_query(**options, boundary=boundary)
+                    rows = cur.fetchall()
+                    if rows:
+                        return rows, int(rows[0]["total"])
+                    if boundary is None:
+                        return rows, 0
+                    # An empty page past a boundary (the queue shrank) has no row to carry
+                    # the count, so read it from the first page: rare, and keeps total required.
+                    query, params = _pending_approval_query(**options, boundary=None, limit=0)
                     cur.execute(query, params)
-                    return cur.fetchall(), total
+                    first = cur.fetchall()
+                    return rows, int(first[0]["total"]) if first else 0
         except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -3673,6 +3700,7 @@ class RequestsService:
         source_lookup: bool = True,
         request_group: RequestGroupSummary | None = None,
         request_group_lookup: bool = True,
+        quoted_prices: dict[UUID, QuotedPrice] | None = None,
         budget_status_for: Callable[[dict[str, object]], BudgetStatus | None] | None = None,
     ) -> PurchaseRequest:
         if requester_lookup:
@@ -3707,7 +3735,11 @@ class RequestsService:
                 if budget_status_for is not None
                 else self._budget_status_for(client, request_row)
             ),
-            quoted_prices=self._quoted_prices_for(request_row, line_rows),
+            quoted_prices=(
+                quoted_prices
+                if quoted_prices is not None
+                else self._quoted_prices_for(request_row, line_rows)
+            ),
             requester=requester,
             assignee=assignee,
             decider=decider,
@@ -3915,6 +3947,45 @@ class RequestsService:
                 )
         except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+    def _quoted_prices_batch(
+        self,
+        request_rows: list[dict[str, object]],
+        lines_by_request: dict[str, list[dict[str, object]]],
+    ) -> dict[str, dict[UUID, QuotedPrice]]:
+        """``_quoted_prices_for`` for a page of requests over one connection and one query:
+        a connect per row to the hosted pooler cost seconds on a list."""
+        sourced = [
+            (str(row["id"]), UUID(str(row["source_rfq_response_id"])))
+            for row in request_rows
+            if row.get("source_rfq_response_id") and lines_by_request.get(str(row["id"]))
+        ]
+        if not sourced:
+            return {}
+        sources: dict[UUID, list[UUID]] = {}
+        for request_id, response_id in sourced:
+            sources.setdefault(response_id, []).extend(
+                UUID(str(lr["workspace_product_id"])) for lr in lines_by_request[request_id]
+            )
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                by_response = quoted_prices_from_source_responses(conn, sources=sources)
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        products = {
+            request_id: {
+                UUID(str(lr["workspace_product_id"])) for lr in lines_by_request[request_id]
+            }
+            for request_id, _ in sourced
+        }
+        return {
+            request_id: {
+                product_id: price
+                for product_id, price in by_response[response_id].items()
+                if product_id in products[request_id]
+            }
+            for request_id, response_id in sourced
+        }
 
     def _budget_status_for(
         self,
@@ -4466,7 +4537,6 @@ def _pending_approval_query(
     is_sole_owner: bool,
     boundary: tuple[str | None, UUID] | None,
     limit: int,
-    count: bool = False,
 ) -> tuple[str, list[object]]:
     column, direction = _APPROVAL_SORT_COLUMNS[sort]
     predicates = ["ast.status = 'pending'"]
@@ -4483,29 +4553,32 @@ def _pending_approval_query(
     if branch_id is not None:
         predicates.append("pr.branch_id = %s")
         params.append(branch_id)
-    if boundary is not None and not count:
-        value, step_id = boundary
-        if value is None:
-            predicates.append(f"({column} is null and ast.id > %s)")
-            params.append(step_id)
-        else:
-            operator = "<" if direction == "desc" else ">"
-            predicates.append(
-                f"({column} {operator} %s or ({column} = %s and ast.id > %s) or {column} is null)"
-            )
-            params.extend([value, value, step_id])
-    projection = "count(*) as total" if count else f"ast.*, {column} as sort_value"
-    query = (
-        f"select {projection} from approval_step ast "
+    filtered = (
+        "from approval_step ast "
         "join purchase_request pr on pr.id = ast.purchase_request_id "
         "left join purchase_request_group prg "
         "on prg.tenant_id = pr.tenant_id and prg.id = pr.request_group_id "
         "where " + " and ".join(predicates)
     )
-    if not count:
-        query += f" order by {column} {direction} nulls last, ast.id asc limit %s"
-        params.append(limit + 1)
-    return query, params
+    condition = filtered
+    page_params = list(params)
+    if boundary is not None:
+        value, step_id = boundary
+        if value is None:
+            condition += f" and ({column} is null and ast.id > %s)"
+            page_params.append(step_id)
+        else:
+            operator = "<" if direction == "desc" else ">"
+            condition += (
+                f" and ({column} {operator} %s or ({column} = %s and ast.id > %s)"
+                f" or {column} is null)"
+            )
+            page_params.extend([value, value, step_id])
+    query = (
+        f"select ast.*, {column} as sort_value, (select count(*) {filtered}) as total "
+        f"{condition} order by {column} {direction} nulls last, ast.id asc limit %s"
+    )
+    return query, [*params, *page_params, limit + 1]
 
 
 def _encode_approval_cursor(

@@ -561,25 +561,16 @@
             ></tr>
           </table>
         </div>
-
-        <!-- Pagination: Load More (Q1) -->
-        @if (nextCursor()) {
-          <div class="load-more-bar">
-            <button
-              mat-stroked-button
-              type="button"
-              (click)="loadMore()"
-              [disabled]="isLoadingMore()"
-              class="load-more-btn"
-            >
-              @if (isLoadingMore()) {
-                <mat-spinner diameter="18"></mat-spinner>
-              }
-              <span>{{ 'quotations.queue.loadMore' | translate }}</span>
-            </button>
-          </div>
-        }
       }
+    }
+
+    @if (pager.needed()) {
+      <app-list-pager
+        [pager]="pager"
+        [label]="'quotations.queue.pagerLabel' | translate"
+        [busy]="isLoading()"
+        (pageChange)="loadTasks()"
+      />
     }
     </mat-card-content>
   </mat-card>

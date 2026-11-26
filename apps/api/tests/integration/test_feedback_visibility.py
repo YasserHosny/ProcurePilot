@@ -49,12 +49,14 @@ def test_another_workspaces_items_are_invisible_to_list_get_withdraw_and_url(
         # The other workspace's owner reads their whole inbox: only their own item.
         inbox = harness.service.list_workspace(member=world.other_owner)
         assert [i.id for i in inbox.items] == [theirs.submission.id]
-        assert harness.service.list_mine(member=world.other_owner).items[0].id == (
-            theirs.submission.id
-        )
-        # And ours never sees theirs.
+        assert inbox.total == 1
+        other_mine = harness.service.list_mine(member=world.other_owner)
+        assert other_mine.items[0].id == theirs.submission.id
+        assert other_mine.total == 1
+        # And ours never sees theirs (nor counts it).
         ours = harness.service.list_workspace(member=world.member(MemberRole.owner))
         assert [i.id for i in ours.items] == [sid]
+        assert ours.total == 1
 
         # Cross-tenant ids are "not found", never "forbidden".
         with pytest.raises(NotFoundError):
@@ -80,7 +82,9 @@ def test_a_claim_naming_another_workspace_still_reads_only_its_own_rows(
     with committed_feedback_world("fb-iso-claim") as world:
         theirs = submit(harness, world.other_owner, text="secret of the other workspace")
         spoof = world.member(MemberRole.owner).model_copy(update={"user_id": uuid4()})
-        assert harness.service.list_workspace(member=spoof).items == []
+        empty_inbox = harness.service.list_workspace(member=spoof)
+        assert empty_inbox.items == []
+        assert empty_inbox.total == 0
         with pytest.raises(NotFoundError):
             harness.service.get(member=spoof, submission_id=theirs.submission.id)
 

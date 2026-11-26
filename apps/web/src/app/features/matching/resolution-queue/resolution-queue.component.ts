@@ -37,6 +37,8 @@ import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-dat
 import { UnitLabelPipe } from '../../../core/format/unit-label';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 import { CorrectMatchDialogComponent, FALLBACK_BASE_UNITS, type SelectableUnit } from '../match-resolution/correct-match-dialog.component';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { formatSweptLinesMessage, appendSweptMessage, CorrectionKeyManager } from '../matching-api';
 
 type MatchTaskSortBy = 'created_at' | 'priority' | 'status';
@@ -68,6 +70,7 @@ export interface QuotationTaskGroup {
     MatDialogModule,
     MatSnackBarModule,
     TranslatePipe,
+    ListPagerComponent,
     UnitLabelPipe,
     FormatDatePipe,
     FormatMoneyPipe,
@@ -88,9 +91,8 @@ export class ResolutionQueueComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
 
   readonly isLoading = signal<boolean>(true);
-  readonly isLoadingMore = signal<boolean>(false);
   readonly tasks = signal<MatchQueueItem[]>([]);
-  readonly nextCursor = signal<string | null>(null);
+  readonly pager = new CursorPager('match-tasks');
   readonly statusFilter = signal<MatchTaskStatus | 'all'>('open');
   readonly priorityFilter = signal<MatchTaskPriority | 'all'>('all');
   readonly reasonFilter = signal<MatchTaskReason | 'all'>('all');
@@ -297,11 +299,9 @@ export class ResolutionQueueComponent implements OnInit {
   loadTasks(): void {
     const requestId = ++this.latestLoadRequestId;
     this.isLoading.set(true);
-    this.isLoadingMore.set(false);
     this.tasksLoadFailed.set(false);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
-    this.nextCursor.set(null);
     if (this.quotationId() === null) {
       this.quotationRfqId.set(null);
     }
@@ -322,75 +322,36 @@ export class ResolutionQueueComponent implements OnInit {
         date_to: this.dateTo() ?? undefined,
         sort_by: this.sortBy(),
         sort_order: this.sortOrder(),
+        ...this.pager.params(),
       })
       .subscribe({
         next: (res) => {
           if (requestId !== this.latestLoadRequestId) return;
+          if (!this.pager.loaded(res)) {
+            this.loadTasks();
+            return;
+          }
           this.tasks.set(res.items);
-          this.nextCursor.set(res.next_cursor);
           this.quotationRfqId.set(this.quotationId() !== null ? (res.rfq_id ?? null) : null);
           this.tasksLoadFailed.set(false);
           this.isLoading.set(false);
         },
         error: (err: unknown) => {
           if (requestId !== this.latestLoadRequestId) return;
-          this.tasks.set([]);
-          this.nextCursor.set(null);
-          this.quotationRfqId.set(null);
-          this.tasksLoadFailed.set(true);
+          if (!this.pager.failed()) {
+            this.tasks.set([]);
+            this.quotationRfqId.set(null);
+            this.tasksLoadFailed.set(true);
+          }
           this.isLoading.set(false);
           this.handleError(err);
         },
       });
   }
 
-  loadMore(): void {
-    const cursor = this.nextCursor();
-    if (!cursor) return;
-
-    const requestId = this.latestLoadRequestId;
-    this.isLoadingMore.set(true);
-
-    const status = this.statusFilter();
-    const priority = this.priorityFilter();
-    const reason = this.reasonFilter();
-    const search = this.sanitizedSearch();
-
-    this.api
-      .getMatchTasks({
-        cursor,
-        status,
-        priority: priority === 'all' ? undefined : priority,
-        reason: reason === 'all' ? undefined : reason,
-        quotation_id: this.quotationId() ?? undefined,
-        search,
-        date_from: this.dateFrom() ?? undefined,
-        date_to: this.dateTo() ?? undefined,
-        sort_by: this.sortBy(),
-        sort_order: this.sortOrder(),
-      })
-      .subscribe({
-        next: (res) => {
-          if (requestId !== this.latestLoadRequestId) return;
-          const current = this.tasks();
-          const seen = new Set(current.map((t) => t.id));
-          const toAdd: MatchQueueItem[] = [];
-          for (const item of res.items) {
-            if (!seen.has(item.id)) {
-              seen.add(item.id);
-              toAdd.push(item);
-            }
-          }
-          this.tasks.set([...current, ...toAdd]);
-          this.nextCursor.set(res.next_cursor);
-          this.isLoadingMore.set(false);
-        },
-        error: (err: unknown) => {
-          if (requestId !== this.latestLoadRequestId) return;
-          this.isLoadingMore.set(false);
-          this.handleError(err);
-        },
-      });
+  private reloadFromFirstPage(): void {
+    this.pager.reset();
+    this.loadTasks();
   }
 
   clearCorrectionNotices(): void {
@@ -407,21 +368,21 @@ export class ResolutionQueueComponent implements OnInit {
     this.statusFilter.set('all');
     this.dependentLinesQuotationId.set(null);
     this.syncQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   onStatusChange(status: MatchTaskStatus | 'all'): void {
     this.clearCorrectionNotices();
     this.statusFilter.set(status);
     this.syncQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   onPriorityChange(priority: MatchTaskPriority | 'all'): void {
     this.clearCorrectionNotices();
     this.priorityFilter.set(priority);
     this.syncQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   onReasonChange(reason: MatchTaskReason | 'all'): void {
@@ -434,7 +395,7 @@ export class ResolutionQueueComponent implements OnInit {
       this.statusFilter.set('all');
     }
     this.syncQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   onSearchChange(value: string): void {
@@ -445,7 +406,7 @@ export class ResolutionQueueComponent implements OnInit {
     }
     this.searchDebounce = setTimeout(() => {
       this.syncQueryParams();
-      this.loadTasks();
+      this.reloadFromFirstPage();
     }, 300);
   }
 
@@ -455,7 +416,7 @@ export class ResolutionQueueComponent implements OnInit {
       this.clearCorrectionNotices();
       this.dateFrom.set(next);
       this.syncQueryParams();
-      this.loadTasks();
+      this.reloadFromFirstPage();
     }
   }
 
@@ -465,7 +426,7 @@ export class ResolutionQueueComponent implements OnInit {
       this.clearCorrectionNotices();
       this.dateTo.set(next);
       this.syncQueryParams();
-      this.loadTasks();
+      this.reloadFromFirstPage();
     }
   }
 
@@ -476,7 +437,7 @@ export class ResolutionQueueComponent implements OnInit {
     this.sortBy.set(by);
     this.sortOrder.set(order);
     this.syncQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   onSortChange(sort: Sort): void {
@@ -485,7 +446,7 @@ export class ResolutionQueueComponent implements OnInit {
     }
     this.sortOrder.set(sort.direction === 'asc' ? 'asc' : 'desc');
     this.syncQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   clearFilters(): void {
@@ -501,7 +462,7 @@ export class ResolutionQueueComponent implements OnInit {
     this.sortBy.set('created_at');
     this.sortOrder.set('desc');
     this.syncQueryParams();
-    this.loadTasks();
+    this.reloadFromFirstPage();
   }
 
   formatScore(score: string | number | undefined | null): number {

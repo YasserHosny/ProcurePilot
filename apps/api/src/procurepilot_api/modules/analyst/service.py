@@ -238,9 +238,11 @@ class AnalystService:
                 if after is not None:
                     after_clause = "where (created_at, id) < (%s, %s)"
                     query_params.extend(after)
+                # RLS scopes both reads. The keyset predicate applies to the outer query.
                 cur.execute(
                     f"""
-                    select id, created_at
+                    select id, created_at,
+                           (select count(*) from analyst_conversation) as total_count
                     from analyst_conversation
                     {after_clause}
                     order by created_at desc, id desc
@@ -251,20 +253,24 @@ class AnalystService:
                 rows = cur.fetchall()
             has_more = len(rows) > fetch_limit
             visible_rows = rows[:fetch_limit]
-            
+
             # Use _build_conversation_response for each row
             items = []
             for row in visible_rows:
                 resp = _build_conversation_response(conn, UUID(str(row["id"])))
                 if resp is not None:
                     items.append(resp)
-                    
+
             next_cursor = (
                 _encode_conversation_cursor(visible_rows[-1]["created_at"], visible_rows[-1]["id"])
                 if has_more
                 else None
             )
-            return AnalystConversationList(items=items, next_cursor=next_cursor)
+            return AnalystConversationList(
+                items=items,
+                next_cursor=next_cursor,
+                total=rows[0]["total_count"] if rows else (0 if after is None else None),
+            )
 
 
 def get_analyst_service() -> AnalystService:

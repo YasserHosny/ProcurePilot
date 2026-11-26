@@ -27,6 +27,8 @@ import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { unitLabel } from '../../../core/format/unit-label';
+import { CursorPager } from '../../../layout/list-pager/cursor-pager';
+import { ListPagerComponent } from '../../../layout/list-pager/list-pager.component';
 import { RfqApi, type RfqDetail } from '../../rfq/rfq-api';
 import type {
   BasketItemRequest,
@@ -84,6 +86,7 @@ export class BasketSubmitErrorStateMatcher implements ErrorStateMatcher {
     FormatMoneyPipe,
     BasketSplitResultsComponent,
     BasketSplitInfeasibleComponent,
+    ListPagerComponent,
   ],
   templateUrl: './basket-split.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -238,8 +241,8 @@ export class BasketSplitComponent implements OnInit {
 
   /** Earlier splits of this workspace, newest first. */
   readonly history = signal<BasketSplitJobSummary[]>([]);
-  private readonly historyCursor = signal<string | null>(null);
-  readonly hasMoreHistory = computed(() => this.historyCursor() !== null);
+  readonly pager = new CursorPager('basket-history');
+  readonly historyLoading = signal(false);
 
   /** What a screen reader hears as the job moves from queued to running to finished. */
   readonly liveStatus = computed(() => {
@@ -367,35 +370,24 @@ export class BasketSplitComponent implements OnInit {
   }
 
   loadHistory(): void {
+    this.historyLoading.set(true);
     this.api
-      .listBasketSplitJobs({ limit: 10 })
+      .listBasketSplitJobs(this.pager.params())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (res) => {
+          if (!this.pager.loaded(res)) {
+            this.loadHistory();
+            return;
+          }
           this.history.set([...res.items]);
-          this.historyCursor.set(res.next_cursor);
+          this.historyLoading.set(false);
         },
         error: () => {
           // History is a convenience: without it the form works as before.
-          this.history.set([]);
-          this.historyCursor.set(null);
+          if (!this.pager.failed()) this.history.set([]);
+          this.historyLoading.set(false);
         },
-      });
-  }
-
-  loadMoreHistory(): void {
-    const cursor = this.historyCursor();
-    if (!cursor) return;
-    this.api
-      .listBasketSplitJobs({ limit: 10, cursor })
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (res) => {
-          const known = new Set(this.history().map((job) => job.id));
-          this.history.set([...this.history(), ...res.items.filter((job) => !known.has(job.id))]);
-          this.historyCursor.set(res.next_cursor);
-        },
-        error: () => undefined,
       });
   }
 

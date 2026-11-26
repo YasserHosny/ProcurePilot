@@ -568,6 +568,7 @@ components:
         next_cursor:
           type: string
           nullable: true
+        total: { type: [integer, "null"], minimum: 0 }
 
     CatalogueImportSummary:
       type: object

@@ -13,7 +13,8 @@ from __future__ import annotations
 import base64
 import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
@@ -21,7 +22,9 @@ from uuid import UUID, uuid4
 import psycopg
 from psycopg import errors as pg_errors
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (
@@ -29,6 +32,7 @@ from procurepilot_api.errors import (
     FeedbackCooldownError,
     FeedbackWithdrawRefusedError,
     NotFoundError,
+    ServiceUnavailableError,
     UnprocessableEntityError,
 )
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -51,8 +55,7 @@ from procurepilot_api.modules.feedback.validation import (
     ValidatedAttachment,
     validate_attachments,
 )
-from procurepilot_api.modules.offers.service import _authenticated_db
-from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.logging import get_trace_id, redact
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +70,59 @@ _SUBMISSION_COLUMNS = (
     "status, page_path, locale, created_at"
 )
 _ATTACHMENT_COLUMNS = "id, submission_id, kind, content_type, size_bytes, display_order"
+
+
+@contextmanager
+def _feedback_db(settings: Settings, member: CurrentMember) -> Iterator[psycopg.Connection]:
+    """One transaction as `feedback_app` carrying the member's claims.
+
+    `feedback_app` (migration 20261120000100) is the only role with access to the feedback tables,
+    and only this API's own DATABASE_URL connection can become it: a token used directly against
+    PostgREST arrives as `authenticated` and is refused. Commits on a clean exit.
+    """
+    try:
+        with db.connect(settings.database_url.get_secret_value()) as conn:
+            with conn.cursor() as cur:
+                claims = {
+                    "sub": str(member.user_id),
+                    "tenant_id": str(member.tenant_id),
+                    "role": "authenticated",
+                    "member_role": member.role.value,
+                }
+                cur.execute("set local role feedback_app")
+                cur.execute(
+                    "select set_config('request.jwt.claims', %s, true)",
+                    (json.dumps(claims),),
+                )
+            yield conn
+    except psycopg.Error as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+
+def _audit_in_transaction(
+    conn: psycopg.Connection,
+    member: CurrentMember,
+    action: str,
+    target: dict[str, object],
+) -> None:
+    """Append an audit event on the caller's own transaction.
+
+    It commits or rolls back with the change it describes, so a change is never left without its
+    event and a replay never needs to repair one (debate-review F5, 2026-11-20). Goes through the
+    same append-only `record_audit_event` function as every other audit write.
+    """
+    conn.execute(
+        "select record_audit_event(%s, 'success'::audit_outcome, %s::uuid, %s::uuid, %s, "
+        "%s::jsonb, %s)",
+        (
+            action,
+            str(member.tenant_id),
+            str(member.membership_id),
+            member.email,
+            Jsonb(redact(target)),
+            get_trace_id(),
+        ),
+    )
 
 
 class _DuplicateIdempotencyKey(Exception):
@@ -120,7 +176,7 @@ class FeedbackService:
         submission_id = uuid4()
         uploaded: list[str] = []
         try:
-            with _authenticated_db(self._settings, member) as conn:
+            with _feedback_db(self._settings, member) as conn:
                 # One submission at a time per member: the replay and cooldown checks below read
                 # state that a parallel request would change.
                 self._lock_member(conn, member)
@@ -160,6 +216,17 @@ class FeedbackService:
                     locale=locale,
                 )
                 attachment_rows = self._insert_attachments(conn, member, submission_id, stored)
+                _audit_in_transaction(
+                    conn,
+                    member,
+                    "feedback.submitted",
+                    {
+                        "submission_id": str(submission_id),
+                        "category": category.value if category else None,
+                        "image_count": sum(1 for a in attachments if a.kind == "image"),
+                        "has_audio": any(a.kind == "audio" for a in attachments),
+                    },
+                )
         except _DuplicateIdempotencyKey:
             # The key is already used by someone else in this workspace; the member's own earlier
             # use is a replay, handled above under the lock.
@@ -170,17 +237,6 @@ class FeedbackService:
             raise
 
         submission = _to_submission(row, attachment_rows, viewer_user_id=member.user_id)
-        self._record_audit(
-            member,
-            bearer_token,
-            "feedback.submitted",
-            {
-                "submission_id": str(submission.id),
-                "category": category.value if category else None,
-                "image_count": sum(1 for a in attachments if a.kind == "image"),
-                "has_audio": any(a.kind == "audio" for a in attachments),
-            },
-        )
         return SubmitResult(submission, created=True)
 
     @staticmethod
@@ -376,17 +432,21 @@ class FeedbackService:
         if category is not None:
             clauses.append("category = %s::feedback_category")
             params.append(category.value)
+        # Count the same RLS-visible, filtered rows on every page, before the cursor.
+        filters = " and ".join(clauses)
+        page_params = params.copy()
         decoded = decode_cursor(cursor)
         if decoded is not None:
             clauses.append("(created_at, id) < (%s, %s)")
-            params.extend(decoded)
-        params.append(limit + 1)
-        with _authenticated_db(self._settings, member) as conn:
+            page_params.extend(decoded)
+        with _feedback_db(self._settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
-                    f"select {_SUBMISSION_COLUMNS} from feedback_submission "
+                    f"select {_SUBMISSION_COLUMNS}, "
+                    f"(select count(*) from feedback_submission where {filters}) as total_count "
+                    "from feedback_submission "
                     f"where {' and '.join(clauses)} order by created_at desc, id desc limit %s",
-                    params,
+                    (*params, *page_params, limit + 1),
                 )
                 rows = cur.fetchall()
             visible = rows[:limit]
@@ -405,10 +465,11 @@ class FeedbackService:
             if len(rows) > limit
             else None
         )
-        return SubmissionPage(items=items, next_cursor=next_cursor)
+        total = rows[0]["total_count"] if rows else (0 if cursor is None else None)
+        return SubmissionPage(items=items, next_cursor=next_cursor, total=total)
 
     def get(self, *, member: CurrentMember, submission_id: UUID) -> Submission:
-        with _authenticated_db(self._settings, member) as conn:
+        with _feedback_db(self._settings, member) as conn:
             row = _fetch_visible_row(conn, member, submission_id)
             if row is None:
                 raise NotFoundError(details={"resource": "feedback"})
@@ -424,7 +485,7 @@ class FeedbackService:
 
     def withdraw(self, *, member: CurrentMember, bearer_token: str, submission_id: UUID) -> None:
         paths: list[str] = []
-        with _authenticated_db(self._settings, member) as conn:
+        with _feedback_db(self._settings, member) as conn:
             with conn.cursor() as cur:
                 # Read the object paths first: the delete cascades the attachment rows away. A
                 # row that is not the caller's own is invisible or undeletable, handled below.
@@ -452,20 +513,17 @@ class FeedbackService:
                     # Missing, another workspace, or someone else's (even for the owner): 404.
                     raise NotFoundError(details={"resource": "feedback"})
                 raise FeedbackWithdrawRefusedError(details={"status": str(row["status"])})
+            _audit_in_transaction(
+                conn, member, "feedback.withdrawn", {"submission_id": str(submission_id)}
+            )
         self._storage.delete(paths)
-        self._record_audit(
-            member,
-            bearer_token,
-            "feedback.withdrawn",
-            {"submission_id": str(submission_id)},
-        )
 
     # ------------------------------------------------------------- attachments
 
     def attachment_url(
         self, *, member: CurrentMember, submission_id: UUID, attachment_id: UUID
     ) -> SignedUrl:
-        with _authenticated_db(self._settings, member) as conn:
+        with _feedback_db(self._settings, member) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select storage_path from feedback_attachment "
@@ -481,25 +539,6 @@ class FeedbackService:
         )
 
     # ------------------------------------------------------------------- audit
-
-    def _record_audit(
-        self,
-        member: CurrentMember,
-        bearer_token: str,
-        action: str,
-        target: dict[str, object],
-    ) -> None:
-        get_audit_writer().record(
-            AuditEventCreate(
-                tenant_id=member.tenant_id,
-                actor_membership_id=member.membership_id,
-                actor_email=member.email,
-                action=action,
-                target=target,
-                outcome="success",
-            ),
-            bearer_token=bearer_token,
-        )
 
 
 def get_feedback_service() -> FeedbackService:

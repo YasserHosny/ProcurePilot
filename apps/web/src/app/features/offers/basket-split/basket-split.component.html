@@ -67,7 +67,7 @@
     </div>
   }
 
-  @if (!currentJob() && !jobNotFound() && history().length > 0) {
+  @if (!currentJob() && !jobNotFound() && (history().length > 0 || pager.needed())) {
     <mat-card class="history-card" data-testid="split-history">
       <h2 class="section-title">{{ 'basketSplit.history.title' | translate }}</h2>
       <ul class="history-list">
@@ -85,10 +85,13 @@
           </li>
         }
       </ul>
-      @if (hasMoreHistory()) {
-        <button mat-stroked-button type="button" (click)="loadMoreHistory()" data-testid="load-more-history">
-          {{ 'basketSplit.history.loadMore' | translate }}
-        </button>
+      @if (pager.needed()) {
+        <app-list-pager
+          [pager]="pager"
+          [label]="'basketSplit.history.pagerLabel' | translate"
+          [busy]="historyLoading()"
+          (pageChange)="loadHistory()"
+        />
       }
     </mat-card>
   }
@@ -338,7 +341,7 @@
               <input matInput type="search" (input)="onProductSearch($any($event.target).value)" (keydown.enter)="$event.preventDefault()" data-testid="product-search" />
             </mat-form-field>
             @if (hasMoreProducts()) {
-              <button mat-stroked-button type="button" (click)="loadMoreProducts()" data-testid="load-more-products">
+              <button mat-stroked-button type="button" (click)="loadMoreProducts()" data-testid="product-picker-more">
                 {{ 'basketSplit.form.loadMoreProducts' | translate }}
               </button>
             }

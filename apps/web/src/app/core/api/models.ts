@@ -63,6 +63,12 @@ export interface Member {
   readonly display_name?: string | null;
 }
 
+export interface MemberList {
+  readonly items: Member[];
+  readonly next_cursor: string | null;
+  readonly total?: number | null;
+}
+
 export interface Invitation {
   readonly token?: string;
   readonly email_delivery?: 'sent' | 'not_configured' | 'failed';
@@ -992,6 +998,7 @@ export interface BasketSplitJobSummary {
 export interface BasketSplitJobList {
   readonly items: readonly BasketSplitJobSummary[];
   readonly next_cursor: string | null;
+  readonly total?: number | null;
 }
 
 export interface BasketPackSnapshot {
@@ -1625,6 +1632,8 @@ export interface PurchaseRequestUpdate {
 export interface PurchaseRequestList {
   readonly items: readonly PurchaseRequest[];
   readonly next_cursor: string | null;
+  /** Matches across all pages, when the API could count them (PPS-228). */
+  readonly total?: number | null;
 }
 
 export type PendingApprovalSort =
@@ -1637,7 +1646,7 @@ export type PendingApprovalSort =
 export interface PendingApprovalList {
   readonly items: readonly PurchaseRequest[];
   readonly next_cursor: string | null;
-  readonly total: number;
+  readonly total?: number | null;
 }
 
 export interface BulkApprovalDecisionInput {

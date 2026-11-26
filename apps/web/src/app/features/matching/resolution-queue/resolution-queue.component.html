@@ -224,7 +224,7 @@
   <div class="queue-summary-row">
     <div class="queue-result-summary" data-testid="queue-result-summary" role="status" aria-live="polite">
       @if (isLoading() === false && tasksLoadFailed() === false) {
-        {{ 'matching.queue.resultSummary' | translate: { lines: tasks().length, quotations: groups().length } }}@if (nextCursor() !== null) { · {{ 'matching.queue.moreAvailable' | translate }}}
+        {{ 'matching.queue.resultSummary' | translate: { lines: tasks().length, quotations: groups().length } }}@if (pager.hasNext()) { · {{ 'matching.queue.moreAvailable' | translate }}}
       }
     </div>
     <button
@@ -405,14 +405,14 @@
         </mat-card>
       }
     </section>
+  }
 
-    @if (nextCursor()) {
-      <div class="load-more-bar">
-        <button mat-stroked-button type="button" (click)="loadMore()" [disabled]="isLoadingMore()" class="load-more-btn">
-          @if (isLoadingMore()) { <mat-spinner diameter="18"></mat-spinner> }
-          <span>{{ 'matching.queue.loadMore' | translate }}</span>
-        </button>
-      </div>
-    }
+  @if (pager.needed()) {
+    <app-list-pager
+      [pager]="pager"
+      [label]="'matching.queue.pagerLabel' | translate"
+      [busy]="isLoading()"
+      (pageChange)="loadTasks()"
+    />
   }
 </div>

@@ -32,6 +32,13 @@
       "skipToContent": "Skip to main content",
       "mainNavigation": "Main navigation",
       "homeLink": "ProcurePilot"
+    },
+    "pager": {
+      "pageSize": "Rows per page",
+      "previous": "Previous",
+      "next": "Next",
+      "range": "{{from}}–{{to}} of {{total}}",
+      "rangeOpen": "{{from}}–{{to}}"
     }
   },
   "auth": {
@@ -289,7 +296,7 @@
       "empty": "No past conversations found.",
       "turns": "{{count}} turn(s)",
       "noTurns": "Empty conversation",
-      "loadMore": "Load More"
+      "pagerLabel": "Conversation history pages"
     }
   },
   "forecasting": {
@@ -438,6 +445,7 @@
     "subtitle": "Manage workspace members, invite colleagues, and configure role-based access.",
     "inviteButton": "Invite Member",
     "membersTab": "Members",
+    "pagerLabel": "Team member pages",
     "invitationsTab": "Pending Invitations",
     "membersSectionTitle": "Workspace Members",
     "invitationsSectionTitle": "Pending Invitations",
@@ -947,7 +955,7 @@
       "selectTaskLabel": "Select quotation {{id}}",
       "readOnlyBadge": "Read-Only Access",
       "readOnlyNotice": "Your role has read-only access. Only Owners and Buyers can correct and confirm quotations.",
-      "loadMore": "Load More",
+      "pagerLabel": "Quotation review pages",
       "emptyTitle": "No Review Tasks Found",
       "emptyMessage": "There are no quotation review tasks matching your current filters.",
       "noFilterResults": "No results match your filters",
@@ -1410,7 +1418,7 @@
       "noFilterResults": "No match tasks match the active filters",
       "clearFilters": "Clear Filters",
       "retry": "Retry",
-      "loadMore": "Load More",
+      "pagerLabel": "Match resolution pages",
       "emptyTitle": "No match tasks found",
       "emptyMessage": "There are no quotation lines currently awaiting match resolution.",
       "allLinesMatchedTitle": "All lines of this quote are matched",
@@ -1951,13 +1959,13 @@
     "history": {
       "title": "Recent splits",
       "items": "{{count}} items",
-      "loadMore": "Show older splits",
       "status": {
         "queued": "Queued",
         "running": "Running",
         "completed": "Completed",
         "failed": "Failed"
-      }
+      },
+      "pagerLabel": "Basket split history pages"
     }
   },
   "alerts": {
@@ -2090,8 +2098,14 @@
     "list": {
       "myTitle": "My feedback",
       "myIntro": "Feedback you sent, with its current status.",
+      "mine": {
+        "pagerLabel": "My feedback pages"
+      },
       "workspaceTitle": "Workspace feedback",
       "workspaceIntro": "Feedback sent by members of this workspace. This list is read-only; the ProcurePilot team reviews every item.",
+      "workspace": {
+        "pagerLabel": "Workspace feedback pages"
+      },
       "viewWorkspace": "Workspace feedback",
       "viewMine": "My feedback",
       "empty": "You have not sent any feedback yet. Use the Send feedback button at any time.",
@@ -2099,7 +2113,6 @@
       "loading": "Loading feedback…",
       "loadError": "Feedback could not be loaded.",
       "retry": "Try again",
-      "loadMore": "Load more",
       "filterStatus": "Status",
       "filterCategory": "Category",
       "all": "All",
@@ -2535,8 +2548,6 @@
     },
     "list": {
       "newRequestButton": "New request",
-      "loadMore": "Load more",
-      "loadedCount": "{{count}} requests loaded",
       "searchLabel": "Search requests",
       "searchPlaceholder": "Supplier, product or note",
       "clearSearch": "Clear search",
@@ -2549,7 +2560,9 @@
         "total_desc": "Total (highest)",
         "total_asc": "Total (lowest)"
       },
-      "mineToggle": "My requests"
+      "mineToggle": "My requests",
+      "pagerLabel": "Purchase request pages",
+      "loadedCount": "{{count}} requests loaded"
     },
     "table": {
       "caption": "Purchase requests"
@@ -2815,7 +2828,6 @@
     "pagination": {
       "loadMore": "Load more",
       "loading": "Loading...",
-      "showingOf": "Showing {{loaded}} of {{total}}",
       "showing": {
         "zero": "Showing 0 requests",
         "one": "Showing 1 request",
@@ -2824,6 +2836,9 @@
         "many": "Showing {{count}} requests",
         "other": "Showing {{count}} requests"
       },
+      "loadError": "Unable to load more requests. Please try again.",
+      "pageLoadError": "Unable to load pending requests. Please try again.",
+      "pagerLabel": "Approval queue pages",
       "showingMore": {
         "zero": "Showing 0 requests, more available",
         "one": "Showing 1 request, more available",
@@ -2832,8 +2847,7 @@
         "many": "Showing {{count}} requests, more available",
         "other": "Showing {{count}} requests, more available"
       },
-      "loadError": "Unable to load more requests. Please try again.",
-      "pageLoadError": "Unable to load pending requests. Please try again."
+      "showingOf": "Showing {{loaded}} of {{total}}"
     },
     "requestCount": {
       "zero": "{{count}} requests",
@@ -3361,10 +3375,7 @@
       "running": "Recomputing",
       "success": "Recomputed {{count}} supplier snapshot(s)."
     },
-    "pagination": {
-      "more": "Load more",
-      "loading": "Loading more"
-    },
+    "pagerLabel": "Supplier risk pages",
     "empty": {
       "title": "No supplier risk snapshots yet",
       "message": "An owner or buyer can compute the first evidence-based snapshots."
@@ -3581,7 +3592,8 @@
       },
       "scopeAll": "All branches & suppliers",
       "notApplicable": "—",
-      "rows": "{{count}} rows"
+      "rows": "{{count}} rows",
+      "pagerLabel": "Report artifact pages"
     },
     "schedules": {
       "table": {
@@ -3601,7 +3613,8 @@
       "scopeAll": "All branches & suppliers",
       "notApplicable": "—",
       "never": "Never",
-      "newSchedule": "New Schedule"
+      "newSchedule": "New Schedule",
+      "pagerLabel": "Report schedule pages"
     },
     "scheduleForm": {
       "title": "New Scheduled Report",
@@ -3617,11 +3630,6 @@
       "errors": {
         "conflict": "A schedule with these exact parameters already exists."
       }
-    },
-    "pagination": {
-      "loadMore": "Load More",
-      "loadingMore": "Loading more...",
-      "noMore": "All records loaded"
     },
     "error": {
       "title": "Unable to load reports",
@@ -3973,14 +3981,6 @@
       "unmatchedSupplier": "Unmatched",
       "supplierId": "Supplier #{{id}}",
       "noSubject": "(No subject)",
-      "pagination": {
-        "loadMore": "Load More",
-        "loadingMore": "Loading more emails...",
-        "noMore": "All emails loaded"
-      },
-      "loadMore": "Load More",
-      "loadingMore": "Loading more emails...",
-      "noMore": "All emails loaded",
       "empty": {
         "title": "No emails found",
         "message": "No inbound emails match the specified filters."
@@ -3994,7 +3994,8 @@
         "generic": "An unexpected error occurred while loading email logs.",
         "retry": "Retry"
       },
-      "matchedSupplier": "Matched supplier"
+      "matchedSupplier": "Matched supplier",
+      "pagerLabel": "Inbound email pages"
     },
     "capture": {
       "title": "Quotation Capture",
@@ -4109,7 +4110,6 @@
     "subtitle": "Follow purchase orders from submission through confirmation, delivery, and invoice evidence.",
     "refresh": "Refresh",
     "retry": "Retry",
-    "loadMore": "Load more",
     "loadError": "Unable to load purchase orders. Please try again.",
     "saveError": "Unable to save order evidence. Please try again.",
     "backToOrders": "Back to orders",
@@ -4277,7 +4277,6 @@
       "withdrawn": "Order is a draft again."
     },
     "resultCount": "{{count}} orders",
-    "loadMoreError": "More orders could not be loaded. The orders above are still shown.",
     "filters": {
       "search": "Search",
       "searchPlaceholder": "Order number or supplier",
@@ -4303,7 +4302,8 @@
       "order_number_desc": "Order number, Z to A"
     },
     "expectedDate": "Expected {{date}}",
-    "overdue": "Overdue"
+    "overdue": "Overdue",
+    "pagerLabel": "Purchase order pages"
   },
   "accounting": {
     "nav": "Accounting",
@@ -4391,11 +4391,7 @@
       "syncAlreadyRunning": "A sync is already running. Please wait for it to complete.",
       "syncNoConnection": "Connect an accounting system first before syncing bills.",
       "syncFailed": "Failed to trigger sync. Please try again.",
-      "pagination": {
-        "loadMore": "Load more",
-        "loadingMore": "Loading more...",
-        "noMore": "All bills loaded"
-      }
+      "pagerLabel": "Bill pages"
     },
     "discrepancies": {
       "title": "Reconciliation Discrepancies",
@@ -4484,11 +4480,7 @@
       "resolveSuccess": "Discrepancy resolved successfully.",
       "resolveAlreadyResolved": "This discrepancy was already resolved by someone else. Please refresh.",
       "resolveFailed": "Failed to resolve discrepancy. Please try again.",
-      "pagination": {
-        "loadMore": "Load more",
-        "loadingMore": "Loading more...",
-        "noMore": "All discrepancies loaded"
-      }
+      "pagerLabel": "Discrepancy pages"
     }
   },
   "pos": {
@@ -4813,9 +4805,6 @@
       "recipientStatus_draft": "Not sent",
       "unknownSupplier": "Unknown supplier",
       "retry": "Retry",
-      "loadMore": "Load more",
-      "loadingMore": "Loading more RFQs...",
-      "loadMoreError": "Failed to load more RFQs.",
       "showingRfqs": "Showing {{count}} RFQs",
       "showingCount": {
         "zero": "Showing 0 RFQs",
@@ -4859,7 +4848,8 @@
         "needed_desc": "Needed by: latest",
         "reference_desc": "Reference: high to low",
         "reference_asc": "Reference: low to high"
-      }
+      },
+      "pagerLabel": "RFQ history pages"
     },
     "detail": {
       "cancelledAtLabel": "Cancelled",
@@ -5362,7 +5352,7 @@
       "empty": "No feedback matches these filters.",
       "loadError": "Feedback could not be loaded.",
       "retry": "Try again",
-      "loadMore": "Load more",
+      "pagerLabel": "Platform feedback pages",
       "filters": {
         "title": "Filters",
         "status": "Status",

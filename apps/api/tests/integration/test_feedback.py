@@ -225,7 +225,8 @@ def test_submitting_writes_a_content_free_audit_event(monkeypatch: pytest.Monkey
             "has_audio": True,
         }
         assert "private words" not in repr(event)
-        assert token == "member-jwt"
+        # Written on the submission's own transaction (debate-review F5), not with a bearer token.
+        assert token is None
 
 
 def test_category_is_optional(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -512,3 +512,4 @@ def test_router_sync_rbac_and_lifecycle(
         data = bills_res.json()
         assert "items" in data
         assert len(data["items"]) == 3
+        assert data["total"] == 3

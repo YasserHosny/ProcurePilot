@@ -56,11 +56,12 @@
     </div>
   }
 
-  @if (list.nextCursor() && !list.loading()) {
-    <div class="fl-more">
-      <button mat-stroked-button type="button" data-test="load-more" (click)="list.loadMore()">
-        {{ 'feedback.list.loadMore' | translate }}
-      </button>
-    </div>
+  @if (list.pager.needed()) {
+    <app-list-pager
+      [pager]="list.pager"
+      [label]="'feedback.list.workspace.pagerLabel' | translate"
+      [busy]="list.loading()"
+      (pageChange)="list.reload()"
+    />
   }
 </section>

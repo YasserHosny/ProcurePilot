@@ -186,11 +186,12 @@ def api_as(
                 # the shared adapter so a missing enrichment still fails on assertions.
                 original_select = query.select
 
-                def select(columns: str = "*") -> PsycopgTableQuery:
+                def select(columns: str = "*", **kwargs: str | None) -> PsycopgTableQuery:
                     if "purchase_request_request_group_fkey" in columns:
                         queries.append("group")
                         return tracked(GroupQuery(conn, name, claims=ws.claims()).select(columns))
-                    return original_select(columns)
+                    # Pass count=exact (the list's total, PPS-228) through to the adapter.
+                    return original_select(columns, **kwargs)
 
                 query.select = select
             return tracked(query)
