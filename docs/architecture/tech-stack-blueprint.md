@@ -321,7 +321,7 @@ In compose, Nginx's `BACKEND_HOST` defaults to `api` (the service name). In prod
 | **dependency-audit** | `pip-audit` over `apps/api` and the worker packages (allowlist: `docs/operations/dependency-audit-allowlist.txt`) and `pnpm audit --prod`. |
 | **tenant-isolation** | Its own job — migrations + `test_tenant_isolation.py` alone, so a cross-tenant leak is unambiguous. |
 | **web-unit-tests** | `pnpm install` (own lockfile) → Karma/Jasmine in ChromeHeadless → production `ng build`. |
-| **e2e** (5 shards + aggregate) | `supabase start` → seed → API + extraction worker + web → Playwright, including the `@a11y` axe-core specs (WCAG 2.1 AA, zero violations). |
+| **e2e** (6 shards + aggregate) | `supabase start` → seed → API + extraction worker + web → Playwright, including the `@a11y` axe-core specs (WCAG 2.1 AA, zero violations). |
 
 `main` also requires **"Regenerate and diff"** from `docs-screenshots.yml`: it recaptures the user-doc
 screenshots and fails if any image drifts past 1 % of pixels (`scripts/docs_screenshots_diff.py`);

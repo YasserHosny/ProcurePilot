@@ -171,6 +171,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-173 | PPS-167 | P-174 | PPS-168 | P-175 | PPS-169 |
 | P-176 | PPS-170 | P-177 | PPS-171 | P-178 | PPS-172 |
 | P-179 | PPS-173 | | | | |
+| P-203 | PPS-229 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.

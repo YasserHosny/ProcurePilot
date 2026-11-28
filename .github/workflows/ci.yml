@@ -61,6 +61,9 @@ jobs:
               - 'packages/**'
               - '.github/workflows/**'
               - 'supabase/config.toml'
+              # The planner and its manifest decide which a11y specs share a stack.
+              - 'scripts/ci/e2e_shard.py'
+              - 'scripts/ci/e2e-durations.json'
       - name: Set code-change output
         id: code
         env:
@@ -164,7 +167,7 @@ jobs:
       - name: E2E shard plan
         run: |
           python3 -m unittest discover -s scripts/ci -p 'test_e2e_shard.py' -v
-          python3 scripts/ci/e2e_shard.py check --total 5
+          python3 scripts/ci/e2e_shard.py check --total 6
       - name: No piggy-bank icon
         # Material's `savings` glyph is a piggy bank, which the owner ruled out (PPS-61).
         run: |
@@ -496,15 +499,15 @@ jobs:
         run: pnpm exec ng build
 
   e2e-shard:
-    name: End-to-end shard ${{ matrix.shard }}/5
+    name: End-to-end shard ${{ matrix.shard }}/6
     needs: changes
     if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
-        # Matrix size and planner --total 5 must change together.
-        # Regenerate e2e-durations.json with e2e_shard.py from-logs.
-        shard: [1, 2, 3, 4, 5]
+        # Matrix size and planner --total 6 must change together (lint job too).
+        # e2e-durations.json is refitted weekly by e2e-durations-refresh.yml.
+        shard: [1, 2, 3, 4, 5, 6]
     runs-on: ubuntu-latest
     services:
       # The quotation extraction pipeline (services/extraction-worker) is an RQ consumer over
@@ -669,7 +672,7 @@ jobs:
             echo "::error::web app did not become ready"; exit 1
           }
 
-      # Specs are sharded by file across five runners. Each shard boots its own isolated stack
+      # Specs are sharded by file across six runners. Each shard boots its own isolated stack
       # (Supabase, Redis, API, worker, web), so no state is shared between shards; within a shard
       # the suite stays serial (workers: 1) exactly as before.
       - name: Accessibility — WCAG 2.1 AA, zero violations
@@ -681,7 +684,7 @@ jobs:
         # the functional specs (FR-022, SC-006).
         working-directory: apps/web
         run: |
-          files=$(python3 ../../scripts/ci/e2e_shard.py plan --shard ${{ matrix.shard }} --total 5 --kind a11y)
+          files=$(python3 ../../scripts/ci/e2e_shard.py plan --shard ${{ matrix.shard }} --total 6 --kind a11y)
           if [ -z "$files" ]; then
             echo "::notice::No a11y end-to-end specs assigned to this shard"
             exit 0
@@ -697,7 +700,7 @@ jobs:
           TZ: Asia/Dubai
         run: |
           google-chrome --version
-          files=$(python3 ../../scripts/ci/e2e_shard.py plan --shard ${{ matrix.shard }} --total 5 --kind functional)
+          files=$(python3 ../../scripts/ci/e2e_shard.py plan --shard ${{ matrix.shard }} --total 6 --kind functional)
           if [ -z "$files" ]; then
             echo "::error::No non-a11y end-to-end specs found"
             exit 1

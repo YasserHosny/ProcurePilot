@@ -99,7 +99,11 @@ test.describe('Phase 1 Complete Canonical Value Path (T075)', () => {
     ).toBe('ui_resolution');
     const matchedProduct = { id: match.productId };
 
-    // 6. Smart Compare for the newly created product: the resolved line is its only offer.
+    // 6. Smart Compare for the newly created product. Our resolved line is one of its offers, but
+    //    not necessarily the only one: resolving teaches the workspace an alias, and the sweep
+    //    (PPS-95) matches every open line with the same wording, such as the tomato lines
+    //    match-resolution.spec.ts leaves open when it shares this stack (PPS-229). Each is £12
+    //    for 10 kg, so the price assertions below hold whichever one is recommended.
     await page.goto(`/offers/compare?product_id=${matchedProduct.id}`);
 
     await expect(page.locator('.page-title')).toContainText('Smart Compare');
@@ -125,7 +129,9 @@ test.describe('Phase 1 Complete Canonical Value Path (T075)', () => {
       0.01,
     );
     expect(recommendedLandedCost).toBeCloseTo(12.0, 2);
-    await expect(page.locator('.offers-table tr.mat-mdc-row')).toHaveCount(1);
+    await expect(
+      page.locator('.offers-table tr.mat-mdc-row', { hasText: supplierName }),
+    ).toHaveCount(1);
 
     // 7. Record the purchase against the recommended offer.
     await page.locator('.record-purchase-btn').click();

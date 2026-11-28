@@ -1,0 +1,154 @@
+name: E2E durations refresh
+
+# Refits scripts/ci/e2e-durations.json from the shard logs of recent green push-to-main CI runs
+# and opens a pull request when the refit would take time off the slowest E2E shard (PPS-229).
+# The manifest went stale once — written 2026-10-18, never refreshed — and by 2026-11-22 15 of
+# 75 specs were scheduled at a median guess, pushing the slowest shard from ~350 s to ~450 s.
+#
+# The PR is pushed and opened with E2E_MANIFEST_TOKEN, a fine-grained PAT (this repo only;
+# Contents and Pull requests read/write). A PR opened with the default GITHUB_TOKEN would not
+# trigger the pull_request workflows, so the required checks would never run on it.
+
+on:
+  schedule:
+    # Sunday 04:23 UTC: after the week's merges, before the working week starts in Cairo.
+    - cron: '23 4 * * 0'
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Green push-to-main CI runs to sample
+        default: '5'
+      min_gain:
+        description: Seconds the refit must take off the slowest shard to open a PR
+        default: '5'
+
+concurrency:
+  group: e2e-durations-refresh
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      BRANCH: ci/e2e-durations-refresh
+      RUNS: ${{ inputs.runs || '5' }}
+      MIN_GAIN: ${{ inputs.min_gain || '5' }}
+    steps:
+      - name: Require the PR token
+        env:
+          TOKEN: ${{ secrets.E2E_MANIFEST_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Secret E2E_MANIFEST_TOKEN is not set (see docs/operations/ci-pipeline.md)"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.E2E_MANIFEST_TOKEN }}
+          # Skip docs/gtm/video (~825 MB of demo cuts no job reads): ~60 s per checkout.
+          sparse-checkout: |
+            /*
+            !/docs/gtm/video/
+          sparse-checkout-cone-mode: false
+
+      - name: Download E2E shard logs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/logs"
+          runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main \
+            --event push --status success --limit "$RUNS" --json databaseId --jq '.[].databaseId')
+          sampled=0
+          for run in $runs; do
+            # filter=all: a green run whose lint job was re-run keeps its shard jobs on an earlier
+            # attempt. Take the latest successful attempt of each shard.
+            jobs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run/jobs?filter=all&per_page=100" \
+              --jq '.jobs[] | select((.name | startswith("End-to-end shard")) and .conclusion == "success") | "\(.name)\t\(.run_attempt)\t\(.id)"' \
+              | sort -t$'\t' -k1,1 -k2,2nr | awk -F'\t' '!seen[$1]++ { print $3 }')
+            if [ -n "$jobs" ]; then sampled=$((sampled + 1)); fi
+            for job in $jobs; do
+              gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$job/logs" > "$RUNNER_TEMP/logs/$run-$job.log"
+            done
+          done
+          count=$(find "$RUNNER_TEMP/logs" -name '*.log' | wc -l)
+          echo "Downloaded $count shard logs from $sampled runs: $(echo $runs)"
+          # One run's timings are runner noise (±30% run to run), not a trend.
+          if [ "$sampled" -lt 3 ]; then
+            echo "::error::Shard logs from only $sampled green runs; need at least 3"
+            exit 1
+          fi
+
+      - name: Refit and score
+        id: refit
+        run: |
+          # The shard count lives in ci.yml (lint job's planner check); read it, don't repeat it.
+          total=$(sed -nE 's/.*e2e_shard\.py check --total ([0-9]+).*/\1/p' .github/workflows/ci.yml)
+          [ -n "$total" ] || { echo "::error::Cannot read --total from ci.yml"; exit 1; }
+          # --carry keeps the committed timing of any live spec the sample did not measure, so a
+          # partial sample cannot drop a slow spec to the median and fake a gain.
+          python3 scripts/ci/e2e_shard.py from-logs --carry scripts/ci/e2e-durations.json \
+            "$RUNNER_TEMP"/logs/*.log > "$RUNNER_TEMP/refit.json"
+          python3 scripts/ci/e2e_shard.py gain --total "$total" --new "$RUNNER_TEMP/refit.json" \
+            | tee "$RUNNER_TEMP/gain.txt"
+          gain=$(tail -n 1 "$RUNNER_TEMP/gain.txt")
+          cp "$RUNNER_TEMP/refit.json" scripts/ci/e2e-durations.json
+          python3 scripts/ci/e2e_shard.py check --total "$total" | tee "$RUNNER_TEMP/check.txt"
+          if git diff --quiet -- scripts/ci/e2e-durations.json; then
+            echo "Manifest unchanged."
+            echo "open=false" >> "$GITHUB_OUTPUT"
+          elif awk -v gain="$gain" -v min="$MIN_GAIN" 'BEGIN { exit !(gain >= min) }'; then
+            echo "open=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Refit takes ${gain}s off the slowest shard, under the ${MIN_GAIN}s bar: no PR."
+            echo "open=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "total=$total" >> "$GITHUB_OUTPUT"
+          echo "gain=$gain" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the pull request
+        if: steps.refit.outputs.open == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.E2E_MANIFEST_TOKEN }}
+          GAIN: ${{ steps.refit.outputs.gain }}
+          TOTAL: ${{ steps.refit.outputs.total }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Replace the branch only if every commit on it is this workflow's own: a maintainer's
+          # commit on the open PR is left alone, and the lease fails the push if it moves meanwhile.
+          tip=$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)
+          if [ -n "$tip" ]; then
+            foreign=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$tip" \
+              --jq '[.commits[] | select(.commit.author.email != "41898282+github-actions[bot]@users.noreply.github.com")] | length')
+            if [ "$foreign" != 0 ]; then
+              echo "::warning::$BRANCH has $foreign commit(s) not made by this workflow; leaving it alone"
+              exit 0
+            fi
+          fi
+          git switch -C "$BRANCH"
+          git add scripts/ci/e2e-durations.json
+          git commit -m "ci: refit E2E shard durations (${GAIN}s off the slowest shard)"
+          git push --force-with-lease="$BRANCH:$tip" origin "$BRANCH"
+          {
+            echo "Weekly refit of \`scripts/ci/e2e-durations.json\` from the shard logs of the last $RUNS green push-to-main CI runs (PPS-229)."
+            echo
+            echo "Scored on the refitted durations, the new $TOTAL-shard plan takes **${GAIN}s** off the slowest shard's predicted test time."
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/gain.txt" "$RUNNER_TEMP/check.txt"
+            echo '```'
+            echo
+            echo "Re-partitioning changes which specs share a stack, so merge only on a green run for this PR's head."
+          } > "$RUNNER_TEMP/body.md"
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            gh pr edit "$BRANCH" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --base main --head "$BRANCH" \
+              --title "ci: refit E2E shard durations" --body-file "$RUNNER_TEMP/body.md"
+          fi
