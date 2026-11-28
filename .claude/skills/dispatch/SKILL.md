@@ -32,18 +32,13 @@ supervisor is detached, so the job outlives this turn. Reference: `scripts/facto
    (tenancy, i18n, money, ADRs by number), what done looks like. The runner appends the gate footer
    and the "do it yourself, nothing destructive" rules, so leave those out. Tenancy work stays in
    house: RLS, tenancy migrations, the JWT path are never dispatched.
-   A Haiku lane brief also states its boundary, which the runner's footer does not carry: the
-   implementer edits code and tests in the clone only, and leaves DB migrations, hosted
-   environments, `.env` and credential files, commits and pushes alone.
+   For Haiku, the runner appends the lane boundary after the gate footer.
 4. **Run**
    ```bash
    scripts/factory/dispatch.py new --lane <lane> --brief ~/factory/briefs/<name>.md --name <name> [--web] --gate '<cmd>'
    ```
-   On a Haiku lane, append the caps (the runner adds none for `claude`; the `=` form lets a
-   value start with `--`):
-   ```bash
-   --relay-arg=--max-turns --relay-arg=40 --relay-arg=--max-budget-usd --relay-arg=3
-   ```
+   The runner adds the turn and budget caps on Haiku lanes. Use `--relay-arg=` for per-job
+   overrides.
    Relay the job id and clone path. Preflight failure (disk, memory, stale node_modules) is the
    whole answer; fix the cause, then re-run. Before a batch of Codex jobs, read the headroom with
    `dispatch.py usage`. A Codex job the quota gate refuses lands on the fallback lane with the
@@ -72,10 +67,9 @@ The runner has no wave command: a wave is one `new` per part, and the jobs run s
 once started. Each part follows steps 1–4 above; these rules cover running them together.
 
 1. **Name** every part `<wave>-<part>` (e.g. `pps228-w2-sourcing`) so `status` groups them.
-2. **Headroom.** Preflight checks disk and memory once per job, against what is free at that
-   moment, and reserves nothing. Before the wave:
-   - `df -h ~` shows at least 8 GB plus about 1.5 GB per part (a clone is about 1.3 GB;
-     `node_modules` is hardlinked).
+2. **Headroom.** Check disk, memory and Codex quota before the wave.
+   - `df -h ~` shows at least 8 GB plus about 1.5 GB per part. The runner reserves
+     `FACTORY_CLONE_GB` (default 1.5 GB) per in-flight clone.
    - `free -g` shows at least 3 GB available plus room for every web gate (Karma + Chrome).
    - `dispatch.py usage` for any Codex part: two Codex jobs run at once, each costs about 25
      points of the 5-hour window, and a third is rerouted to `ui`. Plan Codex parts within that.
