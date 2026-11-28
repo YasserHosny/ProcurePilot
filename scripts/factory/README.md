@@ -58,6 +58,8 @@ Each of these came from a real failure in this project's delegation history.
 | Check | Why |
 |---|---|
 | Free disk and memory floors (`FACTORY_MIN_DISK_GB`, `FACTORY_MIN_MEM_GB`) | the root disk hit 100% mid-dispatch, twice |
+| Reserve `FACTORY_CLONE_GB` (default 1.5 GB) above the disk floor for each other job still `created` and less than 30 minutes old | on 2026-11-23, three W2 parts all read 8.0 GB free and were refused. A shared snapshot could also let concurrent clones overcommit disk. |
+| `FACTORY_MAX_PARALLEL` caps `new` based on the number of in-flight clones and jobs running or gating with a live supervisor (unset or `0` disables it) | the 2026-11-23 W2 refusals exposed how easily a burst of submissions can hit shared limits. |
 | Clone from **origin**, objects shared with the local checkout | clones based on a stale local `main` rebuilt a commit that reverted newer work |
 | `lfs.fetchexclude docs/gtm/video` | demo video stays as pointers; git-lfs is installed, so they are never re-committed as raw files |
 | Git identity copied into the clone | fresh clones had none, and the checkpoint check failed |
@@ -66,6 +68,9 @@ Each of these came from a real failure in this project's delegation history.
 | Env from `FACTORY_ENV_FILE` (default `~/codex-clones/pp-env.sh`), plus `PYTHONPATH=<clone>/apps/api/src`, the main `.venv/bin` on `PATH`, and `CHROME_BIN` | DB tests skip silently without `TEST_DATABASE_URL`; the main venv imports main's `src`; Karma needs the no-sandbox Chrome |
 | Relay launched with stdin closed, in its own session | Codex hangs forever reading stdin when backgrounded |
 | Brief footer: do the work yourself, no destructive commands, the gates are listed | repo `AGENTS.md` makes Codex hand frontend work to Agy and stop |
+
+`new` holds `$FACTORY_HOME/resource-admission.lock` from the resource check through recording the
+reservation in `job.json`, then releases it before cloning.
 
 ## Codex quota gate
 
@@ -108,7 +113,14 @@ writes). The runner maps the lane's implementer to its relay at
 `~/.claude/skills/<implementer>-delegate/scripts/relay.mjs` and passes `--lane`, so model and
 effort dials still apply. Supported implementers: `codex`, `agy`, `opencode`, `claude`. The
 `agy` relay gets `--dangerously-skip-permissions` (standing approval; headless Agy auto-denies
-otherwise). Add anything else per job with `--relay-arg`.
+otherwise). Claude lanes whose model contains `haiku` (case-insensitive) get `--max-turns 40`
+and `--max-budget-usd 3`. Set `FACTORY_HAIKU_MAX_TURNS` and `FACTORY_HAIKU_MAX_BUDGET_USD` to
+change the defaults. Per-job `--relay-arg=` values come last so they can override the caps.
+
+On those lanes the runner also appends a Haiku footer after the gate footer: the implementer
+edits code and tests in the clone only, leaves DB migrations, hosted environments, `.env` and
+credential files, commits and pushes alone, and reports work touching money, currency,
+`audit_event`, RLS or tenancy back unstarted.
 
 ## Writing a gate
 

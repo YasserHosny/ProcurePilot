@@ -28,8 +28,12 @@ Environment (all optional):
     FACTORY_CHROME_BIN       default ~/codex-clones/bin/chrome-nosandbox
     FACTORY_MIN_DISK_GB      default 8
     FACTORY_MIN_MEM_GB       default 3
+    FACTORY_CLONE_GB         default 1.5  disk reserved per other in-flight clone (created <30 minutes ago)
+    FACTORY_MAX_PARALLEL    default 0    cap for new jobs counting in-flight clones and live supervisors; 0 disables
     FACTORY_LANES            default ~/.config/delegate-skills/config.json
     FACTORY_SKILLS_DIR       default ~/.claude/skills   (where <implementer>-delegate/scripts/relay.mjs lives)
+    FACTORY_HAIKU_MAX_TURNS      default 40
+    FACTORY_HAIKU_MAX_BUDGET_USD default 3
     FACTORY_CODEX_CEILING        default 85   refuse a Codex job if 5-hour used + cost x (running + 1) exceeds it
     FACTORY_CODEX_JOB_COST       default 25   5-hour points one Codex implementation job is assumed to use
     FACTORY_CODEX_MAX_PARALLEL   default 2    Codex jobs running at once
@@ -85,6 +89,13 @@ SKILLS_DIR = Path(
 ).expanduser()
 MIN_DISK_GB = float(os.environ.get("FACTORY_MIN_DISK_GB", "8"))
 MIN_MEM_GB = float(os.environ.get("FACTORY_MIN_MEM_GB", "3"))
+CLONE_GB = float(os.environ.get("FACTORY_CLONE_GB", "1.5"))
+MAX_PARALLEL = int(os.environ.get("FACTORY_MAX_PARALLEL") or "0")
+CLONE_RESERVATION_MINUTES = 30
+RESOURCE_ADMISSION_LOCK = FACTORY_HOME / "resource-admission.lock"
+
+HAIKU_MAX_TURNS = os.environ.get("FACTORY_HAIKU_MAX_TURNS", "40")
+HAIKU_MAX_BUDGET_USD = os.environ.get("FACTORY_HAIKU_MAX_BUDGET_USD", "3")
 
 # Codex quota gate. The account is on ChatGPT Plus: one Codex implementation job costs about
 # 20-25% of the 5-hour window, and four parallel jobs ran it out on 2026-11-23.
@@ -139,6 +150,12 @@ outside your sandbox, and record the real output. Your report does not need to c
 they pass; it needs to say what you changed and what you could not run.
 
 {gates}
+"""
+
+HAIKU_FOOTER = """
+Edit code and tests in this clone only. Leave DB migrations, hosted environments, `.env`
+and credential files, commits and pushes alone. If the task touches money, currency,
+`audit_event`, RLS or tenancy, report it back unstarted.
 """
 
 
@@ -243,16 +260,42 @@ def list_jobs() -> list[Job]:
 # ---------------------------------------------------------------- preflight
 
 
-def check_resources() -> list[str]:
+def _clone_in_flight(data: dict, cutoff: float) -> bool:
+    if data.get("status") != "created":
+        return False
+    try:
+        return datetime.fromisoformat(data.get("created_at", "")).timestamp() > cutoff
+    except (TypeError, ValueError):
+        return False
+
+
+def check_resources(exclude: str | None = None) -> list[str]:
     problems = []
     FACTORY_HOME.mkdir(parents=True, exist_ok=True)
+    cutoff = time.time() - CLONE_RESERVATION_MINUTES * 60
+    jobs = [job.data for job in list_jobs() if job.id != exclude]
+    in_flight = sum(_clone_in_flight(data, cutoff) for data in jobs)
+    # Read disk after the reservations so clones finishing during the scan are still accounted for.
     usage = shutil.disk_usage(FACTORY_HOME)
     free_gb = usage.free / 1e9
-    if free_gb < MIN_DISK_GB:
+    required_gb = MIN_DISK_GB + CLONE_GB * in_flight
+    if free_gb < required_gb:
         problems.append(
-            f"only {free_gb:.1f} GB free on {FACTORY_HOME} (floor {MIN_DISK_GB:g} GB): "
-            f"clean old clones first (`dispatch.py clean --done`)"
+            f"only {free_gb:.1f} GB free on {FACTORY_HOME} "
+            f"(need {required_gb:g} GB for the {MIN_DISK_GB:g} GB floor and "
+            f"{in_flight} in-flight clone(s)): wait for clones or clean old ones "
+            f"(`dispatch.py clean --done`)"
         )
+    if MAX_PARALLEL > 0:
+        active = in_flight + sum(
+            data.get("status") in {"running", "gating"}
+            and pid_alive(data.get("supervisor_pid"))
+            for data in jobs
+        )
+        if active >= MAX_PARALLEL:
+            problems.append(
+                f"{active} jobs already active (parallel cap {MAX_PARALLEL})"
+            )
     try:
         meminfo = Path("/proc/meminfo").read_text()
         avail_kb = int(re.search(r"MemAvailable:\s+(\d+)", meminfo).group(1))
@@ -327,15 +370,24 @@ def running_codex_jobs(exclude: str | None = None) -> int:
 
 
 @contextlib.contextmanager
-def admission_lock() -> Iterator[None]:
-    """Serialise Codex admission across dispatch processes: check, then record the job."""
+def _admission_lock(path: Path) -> Iterator[None]:
     FACTORY_HOME.mkdir(parents=True, exist_ok=True)
-    with open(ADMISSION_LOCK, "a") as fh:
+    with open(path, "a") as fh:
         fcntl.flock(fh, fcntl.LOCK_EX)
         try:
             yield
         finally:
             fcntl.flock(fh, fcntl.LOCK_UN)
+
+
+def admission_lock() -> contextlib.AbstractContextManager[None]:
+    """Serialise Codex admission across dispatch processes."""
+    return _admission_lock(ADMISSION_LOCK)
+
+
+def resource_admission_lock() -> contextlib.AbstractContextManager[None]:
+    """Serialise the resource check and its job reservation across dispatch processes."""
+    return _admission_lock(RESOURCE_ADMISSION_LOCK)
 
 
 def codex_home() -> Path:
@@ -436,6 +488,33 @@ def resolve_lane(lane: str) -> dict:
         die(f"relay for '{impl}' not found at {relay}")
     spec["relay"] = str(relay)
     return spec
+
+
+def _is_haiku_lane(lane: dict) -> bool:
+    return (
+        lane["implementer"] == "claude" and "haiku" in (lane.get("model") or "").lower()
+    )
+
+
+def relay_extra_args(lane: dict) -> list[str]:
+    extra = RELAY_EXTRA_ARGS[lane["implementer"]].copy()
+    if _is_haiku_lane(lane):
+        extra.extend(
+            ["--max-turns", HAIKU_MAX_TURNS, "--max-budget-usd", HAIKU_MAX_BUDGET_USD]
+        )
+    return extra
+
+
+def build_brief(
+    brief: str, lane: dict, clone: Path, branch: str, gates: list[str]
+) -> str:
+    gates_md = "\n".join(f"{i + 1}. `{gate}`" for i, gate in enumerate(gates))
+    brief = brief.rstrip("\n") + BRIEF_FOOTER.format(
+        clone=clone, branch=branch, gates=gates_md
+    )
+    if _is_haiku_lane(lane):
+        brief += HAIKU_FOOTER
+    return brief
 
 
 def angular_version(root: Path) -> str | None:
@@ -592,14 +671,20 @@ def record_new_job(
         "gate_timeout_seconds": args.gate_timeout * 60,
         "relay_timeout": args.timeout,
         "web": bool(args.web),
-        "relay_extra_args": RELAY_EXTRA_ARGS[lane["implementer"]]
-        + (args.relay_arg or []),
+        "relay_extra_args": relay_extra_args(lane) + (args.relay_arg or []),
         "status": "created",
         "events": [],
     }
     job.event("created", f"lane {lane_name} -> {lane['implementer']}")
     if quota_note:
         job.event(None, quota_note)
+
+
+def fail_preflight(job: Job, log: list[str], detail: str) -> None:
+    (job.dir / "preflight.log").write_text("\n".join(log) + f"\nFAILED: {detail}\n")
+    job.event("preflight_failed", detail.strip()[:500])
+    print("\n".join(log))
+    die(f"preflight failed for {job.id}: {detail.strip()[:500]}", 1)
 
 
 def cmd_new(args: argparse.Namespace) -> None:
@@ -625,8 +710,8 @@ def cmd_new(args: argparse.Namespace) -> None:
 
     lane = resolve_lane(args.lane)
     gated = lane["implementer"] == "codex" and not args.ignore_quota
-    # Held from the quota check until job.json exists, so a concurrent submission counts this
-    # job's reservation. Released before the clone, which is the slow part.
+    # Always take the Codex lock first and the resource lock second. Each protects its check
+    # until job.json records the reservation. Both release before the clone.
     with admission_lock() if gated else contextlib.nullcontext():
         lane_name, quota_note, quota = args.lane, None, None
         if gated:
@@ -643,17 +728,20 @@ def cmd_new(args: argparse.Namespace) -> None:
                         f"set FACTORY_CODEX_FALLBACK_LANE",
                         1,
                     )
-                extra = RELAY_EXTRA_ARGS[lane["implementer"]]
+                extra = relay_extra_args(lane)
                 if extra:
                     quota_note += f" (its relay runs with {' '.join(extra)})"
                 print(f"dispatch: {quota_note}", file=sys.stderr)
-        record_new_job(job, args, brief_path, lane_name, lane, quota, quota_note)
+        with resource_admission_lock():
+            if job.dir.exists():
+                die(f"job already exists: {job_id}")
+            problems = check_resources(exclude=job.id)
+            record_new_job(job, args, brief_path, lane_name, lane, quota, quota_note)
+            if problems:
+                fail_preflight(job, [], "; ".join(problems))
 
     log: list[str] = []
     try:
-        problems = check_resources()
-        if problems:
-            raise RuntimeError("; ".join(problems))
         make_clone(job, args.base, args.local_base, log)
         if args.web:
             prepare_web(job.clone, log)
@@ -661,9 +749,8 @@ def cmd_new(args: argparse.Namespace) -> None:
             log.append(
                 f"warning: env file {ENV_FILE} not found; gates run with the caller's environment only"
             )
-        gates_md = "\n".join(f"{i + 1}. `{g}`" for i, g in enumerate(args.gate))
-        brief = brief_path.read_text().rstrip("\n") + BRIEF_FOOTER.format(
-            clone=job.clone, branch=job.data["branch"], gates=gates_md
+        brief = build_brief(
+            brief_path.read_text(), lane, job.clone, job.data["branch"], args.gate
         )
         (job.dir / "brief.md").write_text(brief)
         (job.dir / "preflight.log").write_text("\n".join(log) + "\n")
@@ -674,10 +761,7 @@ def cmd_new(args: argparse.Namespace) -> None:
             if isinstance(exc, subprocess.CalledProcessError) and exc.stdout
             else str(exc)
         )
-        (job.dir / "preflight.log").write_text("\n".join(log) + f"\nFAILED: {detail}\n")
-        job.event("preflight_failed", detail.strip()[:500])
-        print("\n".join(log))
-        die(f"preflight failed for {job_id}: {detail.strip()[:500]}", 1)
+        fail_preflight(job, log, detail)
 
     print("\n".join(log))
     print(
